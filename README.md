@@ -19,7 +19,14 @@ One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
 Node.js ≥ 20, on **macOS or Linux**. **Windows is not supported** — the store's atomic writes (write temp file, then `rename`) and its path handling have never been verified there, so the tool is not shipped for it. `package.json` declares this via `os`, which makes `npm install` refuse the platform rather than fail somewhere later.
 
-Nothing to install ahead of time for the daemon itself — `npx artisign` fetches the package on first use (see Quickstart below). For repeated use, `npm install -g artisign` avoids the npx lookup on every invocation.
+**Two ways to run it, and the choice matters.** `npx artisign` fetches the package on first use and needs no setup — the fastest way to try it, and enough for everything except the two screenshot tools. Installing it into a directory of your own is the other path, and the one to pick if you want screenshots:
+
+```bash
+mkdir artisign && cd artisign
+npm install artisign
+```
+
+The commands below are written as `npx artisign`. With a local install, run `./node_modules/.bin/artisign` instead — or `npm install -g artisign` and just `artisign`.
 
 **Optional: screenshots.** `get_screenshot` and `inspect_node` need a real browser, which is intentionally not bundled (`npx artisign` stays light without it). Playwright is an **optional peer dependency** — npm neither installs it nor its ~150 MB of browser binaries unless you ask for them:
 
@@ -27,7 +34,7 @@ Nothing to install ahead of time for the daemon itself — `npx artisign` fetche
 npm install playwright && npx playwright install chromium
 ```
 
-Where you install it matters: `artisign` imports Playwright dynamically, so Node resolves it from the tree `artisign` itself lives in. Installing Playwright into your design project has no effect when `artisign` runs from npx's cache directory — for the screenshot tools, install `artisign` as a local dependency alongside Playwright. If Playwright isn't installed, both tools fail with the install command in the error message rather than crashing the server; every other tool works without it.
+Run that **in the same directory you installed `artisign` into**. `artisign` imports Playwright dynamically, so Node resolves it from the tree `artisign` itself lives in: installing Playwright into your design project has no effect, and no placement works at all while `artisign` runs from npx's cache. The npx path and the screenshot tools are mutually exclusive — that is the one thing the two install options above actually decide. If Playwright isn't installed, both tools fail with the install command in the error message rather than crashing the server; every other tool works without it.
 
 **Register the MCP server.**
 
@@ -62,17 +69,28 @@ The `?project=` parameter scopes every tool call to that project (auto-opening i
 
 ## Quickstart
 
-```bash
-npx artisign start               # start the daemon in the background (no project needed)
-npx artisign status              # pid, port, open projects
-npx artisign stop                # stop the daemon
+First run, in this order:
 
-npx artisign init ./my-project   # scaffold an empty project
-npx artisign serve ./my-project  # foreground daemon (development); opens the project on start
-npx artisign mcp ./my-project    # stdio MCP server for Claude Desktop / Claude Code
+```bash
+npx artisign init ./my-project    # scaffold an empty project
+npx artisign start ./my-project   # start the daemon in the background and open the project
+npx artisign status               # pid, port, open projects
+# then open http://127.0.0.1:4711
 ```
 
+The remaining commands, for reference — this block is a catalogue, not a sequence:
+
+```bash
+npx artisign serve ./my-project   # foreground daemon (development); opens the project on start
+npx artisign mcp ./my-project     # stdio MCP server for Claude Desktop / Claude Code
+npx artisign stop                 # stop the daemon
+```
+
+`artisign --help` lists the flags each command accepts.
+
 The daemon is **multi-project**: it runs permanently on `127.0.0.1:4711` and can hold several projects open at once. Open or create projects from the browser UI (project picker in the topbar), or let agents address any project directly via the MCP URL — no restart when you switch projects. The port comes from `~/.artisign/config.json` or `--port N` on `start` and `serve` (a `settings.port` in a project's `artisign.json` is deprecated and ignored).
+
+Daemon-level state — that config plus the `daemon.lock` holding the running pid and port — lives in `~/.artisign`. Set `ARTISIGN_HOME` to move it somewhere else; that, together with `--port`, is what lets a second daemon run fully isolated from the first, which is worth doing before you try anything destructive against projects you care about.
 
 ## The 23 tools
 

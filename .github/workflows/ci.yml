@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Playwright is an optional peer dependency and is deliberately left
+      # uninstalled: the screenshot tests then skip themselves, which is the
+      # state a fresh user's machine is in.
+      - run: npm ci
+
+      - run: npm run type-check
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

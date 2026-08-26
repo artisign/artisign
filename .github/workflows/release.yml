@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run every step but publish nothing"
+        type: boolean
+        default: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub Release
+      id-token: write # OIDC for npm trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # npm trusted publishing (OIDC, no stored token) needs npm >= 11.5.1;
+      # the npm bundled with Node 22 predates it. No `registry-url` on
+      # setup-node either — its .npmrc expects a NODE_AUTH_TOKEN we do not have.
+      - run: npm install -g npm@latest
+
+      # A manual run publishes nothing: real releases come from a tag, which is
+      # what pins the version and gives `gh release create` something to attach to.
+      - name: Refuse a manual publish
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run == false
+        run: |
+          echo "::error::A real publish runs from a v* tag, not from workflow_dispatch."
+          exit 1
+
+      - name: Resolve the version
+        id: version
+        run: |
+          package_version="$(node -p 'require("./package.json").version')"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            tag_version="${GITHUB_REF_NAME#v}"
+            if [ "$tag_version" != "$package_version" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $package_version."
+              exit 1
+            fi
+          fi
+          echo "version=$package_version" >> "$GITHUB_OUTPUT"
+
+      - run: npm ci
+
+      - run: npm run type-check
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+      # Always runs, tag releases included: its file listing is the pack audit
+      # from CHR-544, re-checked on every release.
+      - run: npm publish --dry-run
+
+      # Written outside the workspace so it cannot slip into the tarball and
+      # make the real publish differ from the dry run above.
+      - name: Extract the release notes
+        run: npx tsx scripts/changelog-section.ts "${{ steps.version.outputs.version }}" > "$RUNNER_TEMP/release-notes.md"
+
+      - name: Publish to npm
+        if: inputs.dry_run != true
+        run: npm publish --provenance
+
+      - name: Create the GitHub Release
+        if: inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Artisign v${{ steps.version.outputs.version }}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"

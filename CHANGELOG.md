@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-26
+
+First public release of Artisign, as a beta. It ships the CLI and the daemon,
+the file store with its watcher, the HTML parser and canonical ref model, the
+23-tool MCP surface (stdio and streamable HTTP), and the browser preview with
+live reload, flow mode, comments and the design-system view.
+
 ### Changed
 
 - Renamed the product from "ux-designer" to **Artisign**. This affects the

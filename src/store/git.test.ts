@@ -27,22 +27,28 @@ describe("autoCommit", () => {
   it("leaves no detached git maintenance process running in the project", async () => {
     // `git commit` spawns `git maintenance run --auto --detach`, which keeps
     // writing into .git/objects/ after autoCommit() has already resolved.
-    // GIT_TRACE names every command git runs, so the absence of that spawn is
-    // observable rather than merely argued.
+    // GIT_TRACE names every command git runs, so whether that child is
+    // detached is observable rather than merely argued.
     await writeFile(join(dir, "screens.html"), "<div id=\"n1\"></div>");
-    // Outside the project: a file inside it would be swept into the commit.
-    const tracePath = join(tmpdir(), `artisign-git-trace-${Date.now()}.log`);
+    // Its own temp dir, outside the project: inside, it would be swept into
+    // the commit; a shared name would collide with a second concurrent run.
+    const traceDir = await mkdtemp(join(tmpdir(), "artisign-git-trace-"));
+    const tracePath = join(traceDir, "trace.log");
+
     process.env.GIT_TRACE = tracePath;
+    let trace: string;
     try {
       expect((await autoCommit(dir, "feat: add screen")).sha).toMatch(/^[0-9a-f]{40}$/);
     } finally {
       delete process.env.GIT_TRACE;
+      trace = await readFile(tracePath, "utf8");
+      await rm(traceDir, { recursive: true, force: true });
     }
 
-    const trace = await readFile(tracePath, "utf8");
-    await rm(tracePath, { force: true });
     expect(trace).toContain("commit");
-    expect(trace).not.toContain("maintenance run");
+    // Maintenance may or may not decide to run; when it does it must not detach.
+    const detached = trace.split("\n").filter((line) => line.includes("maintenance run") && !line.includes("--no-detach"));
+    expect(detached).toEqual([]);
   });
 
   it("commits changes in a standalone project directory", async () => {

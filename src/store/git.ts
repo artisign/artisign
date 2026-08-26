@@ -7,14 +7,20 @@ const execFileAsync = promisify(execFile);
 
 // `git commit` spawns `git maintenance run --auto --detach` — a *detached*
 // child that keeps writing into `.git/objects/` after the command that
-// started it has returned. Artisign commits once per tool write, so it
-// triggers that far more often than ordinary use, and the tool would be
-// answering while git work it started is still running in the user's
-// repository. Whether a repo gets maintained is its owner's call. Passed
-// per invocation, so the user's own config is untouched; git < 2.36 does
-// not know the key and ignores it.
+// started it has returned. Artisign commits once per tool write, so a write
+// would answer while git work it started is still running in the user's
+// repository, and a caller acting on the directory (a cleanup, a move) races
+// it. `--no-detach` keeps the maintenance — an agent-driven repo needs it
+// more than most, not less, since nobody else ever writes to it — and only
+// makes it finish before the commit call does. `gc.autoDetach` is the older
+// spelling that gits without `maintenance.autoDetach` honour; both are set so
+// this holds across versions. Disabling maintenance instead would leave a
+// long-lived project accumulating loose objects nothing ever packs.
+// Passed per invocation, so the user's own config is untouched.
+const NO_DETACHED_MAINTENANCE = ["-c", "gc.autoDetach=false", "-c", "maintenance.autoDetach=false"];
+
 async function git(projectDir: string, args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync("git", ["-c", "maintenance.auto=false", ...args], { cwd: projectDir });
+  const { stdout } = await execFileAsync("git", [...NO_DETACHED_MAINTENANCE, ...args], { cwd: projectDir });
   return stdout.trim();
 }
 

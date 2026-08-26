@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
@@ -22,6 +22,27 @@ describe("autoCommit", () => {
 
   afterEach(async () => {
     await rm(dir, { recursive: true, force: true });
+  });
+
+  it("leaves no detached git maintenance process running in the project", async () => {
+    // `git commit` spawns `git maintenance run --auto --detach`, which keeps
+    // writing into .git/objects/ after autoCommit() has already resolved.
+    // GIT_TRACE names every command git runs, so the absence of that spawn is
+    // observable rather than merely argued.
+    await writeFile(join(dir, "screens.html"), "<div id=\"n1\"></div>");
+    // Outside the project: a file inside it would be swept into the commit.
+    const tracePath = join(tmpdir(), `artisign-git-trace-${Date.now()}.log`);
+    process.env.GIT_TRACE = tracePath;
+    try {
+      expect((await autoCommit(dir, "feat: add screen")).sha).toMatch(/^[0-9a-f]{40}$/);
+    } finally {
+      delete process.env.GIT_TRACE;
+    }
+
+    const trace = await readFile(tracePath, "utf8");
+    await rm(tracePath, { force: true });
+    expect(trace).toContain("commit");
+    expect(trace).not.toContain("maintenance run");
   });
 
   it("commits changes in a standalone project directory", async () => {

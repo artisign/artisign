@@ -5,8 +5,16 @@ import type { CommitResult, HeadCommitResult } from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
+// `git commit` spawns `git maintenance run --auto --detach` — a *detached*
+// child that keeps writing into `.git/objects/` after the command that
+// started it has returned. Artisign commits once per tool write, so it
+// triggers that far more often than ordinary use, and the tool would be
+// answering while git work it started is still running in the user's
+// repository. Whether a repo gets maintained is its owner's call. Passed
+// per invocation, so the user's own config is untouched; git < 2.36 does
+// not know the key and ignores it.
 async function git(projectDir: string, args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync("git", args, { cwd: projectDir });
+  const { stdout } = await execFileAsync("git", ["-c", "maintenance.auto=false", ...args], { cwd: projectDir });
   return stdout.trim();
 }
 

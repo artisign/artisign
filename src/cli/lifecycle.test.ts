@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
-import { execFile } from "node:child_process";
-import type { ExecFileException } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import type { ChildProcess, ExecFileException } from "node:child_process";
+import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
-import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
+import {
+  setupArtisignHome,
+  setupProject,
+  type ArtisignHomeFixture,
+} from "../tools/test-fixtures.js";
 
 // These tests exercise the built CLI binary as a real detached process
 // (start/stop/status only make sense across process boundaries), so they
@@ -21,6 +26,20 @@ function runCli(args: string[]): Promise<CliResult> {
       const code = typeof exception?.code === "number" ? exception.code : 0;
       resolve({ stdout, stderr, code });
     });
+  });
+}
+
+/** Resolves with the child's first line of stdout — `serve` runs in the foreground. */
+function firstStdoutLine(child: ChildProcess): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
+      buffer += chunk.toString();
+      const newline = buffer.indexOf("\n");
+      if (newline !== -1) resolve(buffer.slice(0, newline));
+    });
+    child.on("error", reject);
+    child.on("exit", () => reject(new Error(`serve exited before printing: ${buffer}`)));
   });
 }
 
@@ -71,6 +90,42 @@ describe("CLI lifecycle", () => {
     const afterStop = await runCli(["status"]);
     expect(afterStop.stdout.trim()).toBe("not running");
   }, 20_000);
+
+  it("serve honours --port instead of taking it for a project directory", async () => {
+    const project = await setupProject();
+    const child = spawn(process.execPath, [cliEntry, "serve", "--port", "0", project.dir]);
+
+    try {
+      const line = await firstStdoutLine(child);
+      const port = Number(/http:\/\/127\.0\.0\.1:(\d+)/.exec(line)?.[1]);
+      expect(Number.isInteger(port)).toBe(true);
+      expect(port).not.toBe(4711);
+
+      const health = await fetch(`http://127.0.0.1:${port}/health`);
+      expect(health.ok).toBe(true);
+    } finally {
+      // Wait for the daemon to actually exit before removing the project
+      // directory — it still holds chokidar watchers and the global lock.
+      child.kill("SIGTERM");
+      await once(child, "exit");
+      await project.cleanup();
+    }
+  }, 20_000);
+
+  it("prints usage for --help on a subcommand instead of rejecting it as an option", async () => {
+    const result = await runCli(["serve", "--help"]);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("serve [--port N] [dir...]");
+  });
+
+  it("serve rejects an unknown option without starting a daemon", async () => {
+    const result = await runCli(["serve", "--prot", "4799", "."]);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("Unknown option: --prot");
+
+    const status = await runCli(["status"]);
+    expect(status.stdout.trim()).toBe("not running");
+  });
 
   it("start is idempotent — a second start reports the already-running daemon", async () => {
     const first = await runCli(["start", "--port", "0"]);

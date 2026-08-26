@@ -8,10 +8,29 @@ import { runStop } from "./stop.js";
 import { runStatus } from "./status.js";
 import { parseStartArgs } from "./args.js";
 
-const USAGE = "Usage: artisign <init|start|stop|status|serve|mcp> [dir]";
+const USAGE = [
+  "Usage: artisign <init|start|stop|status|serve|mcp> [options] [dir]",
+  "",
+  "  init [dir]                  scaffold a new project",
+  "  start [--port N] [dir...]   start the daemon in the background",
+  "  status                      pid, port, open projects",
+  "  stop                        stop the daemon",
+  "  serve [--port N] [dir...]   run the daemon in the foreground",
+  "  mcp [dir]                   stdio MCP server for Claude Desktop / Claude Code",
+  "",
+  "Without --port the port comes from the config in ARTISIGN_HOME, else 4711.",
+].join("\n");
 
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
+
+  // Anywhere in the line, not just as the command — `serve --help` is at
+  // least as likely a way to discover the flags as `artisign --help`, and
+  // the option guard in parseStartArgs would otherwise reject it.
+  if (rest.includes("--help") || rest.includes("-h")) {
+    console.log(USAGE);
+    return;
+  }
 
   switch (command) {
     case "--help":
@@ -22,9 +41,11 @@ async function main(): Promise<void> {
       await initProject(rest[0] ?? ".");
       console.log(`Initialized Artisign project in ${rest[0] ?? "."}`);
       break;
-    case "serve":
-      await runServe(rest[0] ?? ".");
+    case "serve": {
+      const { port, projects } = parseStartArgs(rest);
+      await runServe({ port, projects });
       break;
+    }
     case "mcp":
       await runMcp(rest[0] ?? ".");
       break;

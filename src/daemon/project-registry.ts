@@ -245,6 +245,11 @@ export class ProjectRegistry {
     // invisible to it, and its index watcher would outlive this call.
     await this.settled();
     await Promise.all([...this.projects.keys()].map((root) => this.close(root)));
+    // And again after it: the await above yields, so a watcher callback for
+    // some *other* project can land in that window and start an eviction
+    // that removes its entry before the walk reads the keys. By now every
+    // watcher is stopped, so nothing can start a further one.
+    await this.settled();
   }
 
   /**
@@ -260,14 +265,6 @@ export class ProjectRegistry {
     await Promise.all([...this.evictions]);
   }
 
-  /**
-   * Evicts `root` because it disappeared from disk (its config file is gone —
-   * see the `onChange` hook in `openNew()`), rather than because a caller
-   * asked to close it. Broadcasts `project-closed` first, then tears down
-   * via `close()` — `SseHub.close()` ends every attached `/events` response,
-   * so the lifecycle event must go out before that happens, not after. A
-   * no-op if `root` was already closed/evicted (guards double eviction).
-   */
   /**
    * Starts an eviction and keeps hold of it. Callers are watcher callbacks
    * with no request handler above them, so a rejection here would be an
@@ -285,6 +282,14 @@ export class ProjectRegistry {
     this.evictions.add(eviction);
   }
 
+  /**
+   * Evicts `root` because it disappeared from disk (its config file is gone —
+   * see the `onChange` hook in `openNew()`), rather than because a caller
+   * asked to close it. Broadcasts `project-closed` first, then tears down
+   * via `close()` — `SseHub.close()` ends every attached `/events` response,
+   * so the lifecycle event must go out before that happens, not after. A
+   * no-op if `root` was already closed/evicted (guards double eviction).
+   */
   private async evict(root: string): Promise<void> {
     const key = resolve(root);
     if (!this.projects.has(key)) return;

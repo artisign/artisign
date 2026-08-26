@@ -14,11 +14,13 @@ export function parseStartArgs(argv: string[]): ParsedStartArgs {
     if (arg === "--port") {
       i++;
       const value = argv[i];
-      const parsed = value === undefined ? NaN : Number(value);
-      if (!Number.isInteger(parsed) || parsed < 0) {
+      // Digits only: Number("") and Number(" ") are 0, so an unset shell
+      // variable would otherwise pass as "port 0" and silently hand the
+      // daemon an OS-assigned port nobody can guess.
+      if (value === undefined || !/^\d+$/.test(value)) {
         throw new Error("--port requires a non-negative integer value");
       }
-      port = parsed;
+      port = Number(value);
     } else if (arg.startsWith("--")) {
       // Without this an unknown flag would be taken for a project directory,
       // and the daemon binds its port before it ever resolves projects — so

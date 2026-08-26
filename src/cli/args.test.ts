@@ -38,6 +38,18 @@ describe("parseStartArgs", () => {
     );
   });
 
+  it.each([
+    ["an empty value", ""],
+    ["whitespace", " "],
+    ["a hex literal", "0x10"],
+    ["a negative number", "-1"],
+    ["a float", "1.5"],
+  ])("rejects %s rather than coercing it to a port", (_label, value) => {
+    expect(() => parseStartArgs(["--port", value])).toThrow(
+      "--port requires a non-negative integer value",
+    );
+  });
+
   it("rejects an unknown option instead of taking it for a project directory", () => {
     expect(() => parseStartArgs(["--prot", "4799", "./proj"])).toThrow("Unknown option: --prot");
   });

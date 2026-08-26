@@ -24,6 +24,14 @@ const USAGE = [
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
 
+  // Anywhere in the line, not just as the command — `serve --help` is at
+  // least as likely a way to discover the flags as `artisign --help`, and
+  // the option guard in parseStartArgs would otherwise reject it.
+  if (rest.includes("--help") || rest.includes("-h")) {
+    console.log(USAGE);
+    return;
+  }
+
   switch (command) {
     case "--help":
     case "-h":

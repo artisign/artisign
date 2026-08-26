@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { execFile, spawn } from "node:child_process";
 import type { ChildProcess, ExecFileException } from "node:child_process";
+import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import {
@@ -103,10 +104,19 @@ describe("CLI lifecycle", () => {
       const health = await fetch(`http://127.0.0.1:${port}/health`);
       expect(health.ok).toBe(true);
     } finally {
+      // Wait for the daemon to actually exit before removing the project
+      // directory — it still holds chokidar watchers and the global lock.
       child.kill("SIGTERM");
+      await once(child, "exit");
       await project.cleanup();
     }
   }, 20_000);
+
+  it("prints usage for --help on a subcommand instead of rejecting it as an option", async () => {
+    const result = await runCli(["serve", "--help"]);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("serve [--port N] [dir...]");
+  });
 
   it("serve rejects an unknown option without starting a daemon", async () => {
     const result = await runCli(["serve", "--prot", "4799", "."]);

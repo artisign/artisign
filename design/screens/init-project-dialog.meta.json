@@ -1,0 +1,6 @@
+{
+  "notes": "Creating a new project: the same folder browser plus a name field. Confirm stays disabled until both a parent folder and a name are chosen.",
+  "tags": [
+    "dialog"
+  ]
+}

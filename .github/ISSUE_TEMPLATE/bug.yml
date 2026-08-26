@@ -1,0 +1,61 @@
+name: Bug report
+description: Something does not work the way the documentation says it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Security vulnerabilities are **not** bugs for this form — see [SECURITY.md](https://github.com/artisign/artisign/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Artisign version
+      description: "`npm ls -g artisign` (global install) or `npm ls artisign` (project install). For plain `npx artisign` runs: `npm view artisign version` shows what npx fetched today."
+      placeholder: "0.9.0"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 15.5 / Ubuntu 24.04"
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      description: "`node --version`"
+      placeholder: "v22.11.0"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Commands, tool calls, or the HTML you wrote — enough for someone else to hit the same thing.
+      placeholder: |
+        1. `npx artisign init ./demo`
+        2. `write_html` with …
+        3. `get_screenshot` …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: What happened instead — error text, tool response, or a screenshot.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Daemon output (optional)
+      description: Output of `npx artisign serve <project>` in the foreground while reproducing, if relevant.
+      render: shell

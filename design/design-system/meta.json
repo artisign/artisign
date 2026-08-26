@@ -1,0 +1,33 @@
+{
+  "idea": "The design source for Artisign's own preview shell — the tool designing itself. Every token that has a counterpart in src/preview/style.css :root mirrors it by value AND by role name: the 19 colors (accent #2a3edb, canvas #e5e5e5, the grey text scale from text #1a1a1a down to text-faint #999), the six spacing steps xs4/sm6/md8/lg12/xl16/2xl24, radius.pill 999px and shadow.menu. Those can be compared line by line with the implementation, so a drift in either direction is visible rather than a matter of opinion. The typography scale and radius.sm/radius.md have no custom property behind them — they are design decisions, not a mirror, and should be read as such.",
+  "decisions": [
+    {
+      "id": "tokens-mirror-shipped-css",
+      "date": "2026-08-24",
+      "title": "Tokens mirror the shipped stylesheet by value and by role name",
+      "body": "Where a CSS custom property exists in src/preview/style.css, the token takes that property's role name and its exact value — never an appearance-based name, never a 'close enough' value re-derived by eye, and never an existing token whose name is convenient but whose value differs. Values with no custom property behind them (the 0.95rem rail icon, the 17px chip line-height) stay literal rather than inventing a token that implies a binding that does not exist. This is what makes the design checkable against the implementation instead of merely similar to it.",
+      "status": "active"
+    },
+    {
+      "id": "instance-style-is-discarded",
+      "date": "2026-08-24",
+      "title": "A component instance's own style is discarded — vary through variants",
+      "body": "Writing <span class=\"$tag-chip\" style=\"background: $color.accent\"> does NOT tint that instance: the renderer emits the definition's root style and drops the instance's entirely. Confirmed by inspecting the rendered output, where the accent override was absent and only the definition's grey remained. Every visual difference between two instances therefore has to be a named variant. $tag-chip carries default / active / ref / badge for exactly this reason, and $btn carries default / confirm / confirm-disabled. The upside is that ad-hoc per-instance drift is impossible by construction; the cost is that a one-off tint needs a named variant and a reason to exist.",
+      "status": "active"
+    },
+    {
+      "id": "no-component-refs-inside-slots",
+      "date": "2026-08-24",
+      "title": "Component refs inside slot content are not resolved",
+      "body": "A $component ref placed inside an instance's data-slot content survives into the output verbatim as class=\"$view-tab\", unresolved, and the slot content's element ids are stripped as well — so such a node can be neither styled nor addressed by a flow or a comment. This ruled out the natural composition for the topbar (a tabs slot filled with $view-tab instances carrying their own flow targets). The topbar instead carries its tabs in the definition, with one variant per active tab, and the view-switching flows start from the sidebar's screen list, which are real, addressable nodes.",
+      "status": "active"
+    }
+  ],
+  "component_usage": {
+    "topbar": "The 48px application header, on every screen. Variants select which view tab reads as active — default (Screens) / design-system / board — plus empty, which is the pre-project state: title and a dashed project picker only. The canvas controls (zoom group, status-bar toggle) appear only on the default variant, matching the shipped app, where they are hidden outside the Screens view. Flow mode is pushed right with margin-left: auto; the topbar's own gap and padding are $spacing.xl (16px) — binding them to $spacing.md instead is the easy mistake, and it visibly squashes the bar.",
+    "tag-chip": "Neutral pill for a tag on a screen row, a design-system chip, or the 'project' badge in the folder browser — the shipped CSS makes .tag-chip and the badge pixel-identical, so one component covers both and no second badge style should be built. Single slot `label`. Variants: default (grey), active (accent fill, for the selected row's first tag), ref (monospace on surface, for a $token or $component reference), badge (accent-subtle). Wrap several in a flex row with gap $spacing.xs and margin-top $spacing.sm.",
+    "btn": "Dialog and empty-state action. default is the secondary/cancel treatment, confirm is the accent-filled primary, confirm-disabled is the same at 0.4 opacity for a form that is not yet satisfiable. Single slot `label`. Primary sits to the right of secondary in an actions row.",
+    "quick-chip": "Quick-access folder shortcut in the project dialogs (Home / Workspace / Desktop). The current variant marks the chip whose folder is being browsed. Single slot `label`."
+  },
+  "pattern_usage": {}
+}

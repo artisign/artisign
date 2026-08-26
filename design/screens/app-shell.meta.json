@@ -1,0 +1,7 @@
+{
+  "notes": "The frame every view renders into: a 48px topbar, the Screens and Context side panels at 280px each, the canvas, and the Elements panel on the right. Every other screen is this shell with one region in a different state, so changes here propagate by construction.",
+  "tags": [
+    "shell",
+    "screens"
+  ]
+}

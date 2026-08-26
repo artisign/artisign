@@ -1,0 +1,19 @@
+name: Question
+description: Something about using Artisign that the docs did not answer.
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before asking, please check the [README](https://github.com/artisign/artisign/blob/main/README.md), the [agent guide](https://github.com/artisign/artisign/blob/main/docs/agent-guide.md) and the [design workflow tutorial](https://github.com/artisign/artisign/blob/main/docs/design-workflow-tutorial.md) — most workflow questions are answered there.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you already tried (optional)
+      description: Docs you read, commands or tool calls you ran, and what they returned.

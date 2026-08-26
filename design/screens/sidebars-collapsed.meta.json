@@ -1,0 +1,7 @@
+{
+  "notes": "All three side panels in their 36px rail state. The rail keeps the panel's bottom border and shows the panel icon above a flipped chevron; the body is hidden, not unmounted.",
+  "tags": [
+    "shell",
+    "empty-state"
+  ]
+}

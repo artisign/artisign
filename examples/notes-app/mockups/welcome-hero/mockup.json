@@ -1,0 +1,14 @@
+{
+  "variants": [
+    {
+      "id": "bold",
+      "title": "Bold headline",
+      "description": "Large type, high-contrast CTA, minimal copy."
+    },
+    {
+      "id": "friendly",
+      "title": "Friendly and soft",
+      "description": "Rounded shapes, warm background, conversational copy."
+    }
+  ]
+}

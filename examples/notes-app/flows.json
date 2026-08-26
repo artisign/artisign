@@ -1,0 +1,14 @@
+[
+  {
+    "from": "welcome.n4",
+    "event": "tap",
+    "to": "notes",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes.n7",
+    "event": "tap",
+    "to": "new-note",
+    "to_kind": "screen"
+  }
+]

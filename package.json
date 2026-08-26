@@ -1,0 +1,69 @@
+{
+  "name": "artisign",
+  "version": "0.9.0",
+  "description": "Artisign — local-first design system tool for AI agents, keeping screens consistent through shared tokens and components",
+  "keywords": [
+    "mcp",
+    "ai-agents",
+    "design-system",
+    "ui-design",
+    "html"
+  ],
+  "homepage": "https://artisign.dev",
+  "repository": "github:artisign/artisign",
+  "bugs": "https://github.com/artisign/artisign/issues",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "bin": {
+    "artisign": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "src/preview",
+    "!src/preview/*.test.js",
+    "assets",
+    "docs/agent-guide.md",
+    "docs/design-workflow-tutorial.md"
+  ],
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli/index.ts",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.16.0",
+    "@types/node": "^22.10.0",
+    "eslint": "^9.16.0",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "chokidar": "^5.0.0",
+    "parse5": "^8.0.1",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "playwright": ">=1.40 <2"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  }
+}

@@ -1,0 +1,58 @@
+<header id="topbar" style="flex: none; display: flex; align-items: center; gap: $spacing.xl; padding: 0 $spacing.xl; height: 48px; border-bottom: 1px solid $color.border; background: $color.surface">
+  <span id="tb-title" style="font-weight: $typography.weight-semibold; font-size: $typography.size-md">Artisign</span>
+  <span id="tb-picker" style="display: flex; align-items: center; gap: $spacing.md; border: 1px solid $color.border-strong; background: $color.surface; border-radius: $radius.sm; padding: $spacing.sm $spacing.lg; font-size: $typography.size-base; color: $color.text"><span id="tb-picker-name" style="font-weight: $typography.weight-semibold">artisign-ui</span><span id="tb-picker-chevron" style="color: $color.text-faded">&#9662;</span></span>
+  <span id="tb-tabs" style="display: flex; gap: $spacing.xs">
+    <span id="tb-tab-screens" style="background: $color.accent-subtle; padding: $spacing.sm 10px; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.accent; font-weight: $typography.weight-semibold">Screens</span>
+    <span id="tb-tab-ds" style="padding: $spacing.sm 10px; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text-muted">Design System</span>
+    <span id="tb-tab-board" style="padding: $spacing.sm 10px; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text-muted">Board</span>
+  </span>
+  <span id="tb-flow" style="margin-left: auto; border: 1px solid $color.border-strong; background: $color.surface; padding: $spacing.sm $spacing.lg; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text">Flow mode</span>
+  <span id="tb-comment" style="border: 1px solid $color.border-strong; background: $color.surface; padding: $spacing.sm $spacing.lg; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text">Comment mode</span>
+  <span id="tb-inspect" style="border: 1px solid $color.border-strong; background: $color.surface; padding: $spacing.sm $spacing.lg; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text">Inspect mode</span>
+  <span id="tb-controls" style="display: flex; align-items: center; gap: $spacing.lg">
+    <span id="tb-zoom" style="display: flex; gap: 2px; border: 1px solid $color.border-strong; border-radius: $radius.sm; overflow: hidden">
+      <span id="tb-zoom-fit" style="border-right: 1px solid $color.border-strong; background: $color.accent-subtle; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.accent; font-weight: $typography.weight-semibold">Fit</span>
+      <span id="tb-zoom-50" style="border-right: 1px solid $color.border-strong; background: $color.surface; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.text-muted">50%</span>
+      <span id="tb-zoom-100" style="border-right: 1px solid $color.border-strong; background: $color.surface; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.text-muted">100%</span>
+      <span id="tb-zoom-200" style="background: $color.surface; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.text-muted">200%</span>
+    </span>
+    <span id="tb-status" style="border: 1px solid $color.border-strong; background: $color.surface; padding: $spacing.sm $spacing.lg; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text">Status bar</span>
+  </span>
+  <span id="tb-conn" style="font-size: $typography.size-2xs; color: #22a55a">&#9679;</span>
+</header>
+<template data-variant="design-system">
+  <header id="topbar" style="flex: none; display: flex; align-items: center; gap: $spacing.xl; padding: 0 $spacing.xl; height: 48px; border-bottom: 1px solid $color.border; background: $color.surface">
+    <span id="tb-title" style="font-weight: $typography.weight-semibold; font-size: $typography.size-md">Artisign</span>
+    <span id="tb-picker" style="display: flex; align-items: center; gap: $spacing.md; border: 1px solid $color.border-strong; background: $color.surface; border-radius: $radius.sm; padding: $spacing.sm $spacing.lg; font-size: $typography.size-base; color: $color.text"><span id="tb-picker-name" style="font-weight: $typography.weight-semibold">artisign-ui</span><span id="tb-picker-chevron" style="color: $color.text-faded">&#9662;</span></span>
+    <span id="tb-tabs" style="display: flex; gap: $spacing.xs">
+      <span id="tb-tab-screens" style="padding: $spacing.sm 10px; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text-muted">Screens</span>
+      <span id="tb-tab-ds" style="background: $color.accent-subtle; padding: $spacing.sm 10px; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.accent; font-weight: $typography.weight-semibold">Design System</span>
+      <span id="tb-tab-board" style="padding: $spacing.sm 10px; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text-muted">Board</span>
+    </span>
+    <span id="tb-flow" style="margin-left: auto; border: 1px solid $color.border-strong; background: $color.surface; padding: $spacing.sm $spacing.lg; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text">Flow mode</span>
+    <span id="tb-comment" style="border: 1px solid $color.border-strong; background: $color.surface; padding: $spacing.sm $spacing.lg; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text">Comment mode</span>
+    <span id="tb-inspect" style="border: 1px solid $color.border-strong; background: $color.surface; padding: $spacing.sm $spacing.lg; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text">Inspect mode</span>
+    <span id="tb-conn" style="font-size: $typography.size-2xs; color: #22a55a">&#9679;</span>
+  </header>
+</template>
+<template data-variant="board">
+  <header id="topbar" style="flex: none; display: flex; align-items: center; gap: $spacing.xl; padding: 0 $spacing.xl; height: 48px; border-bottom: 1px solid $color.border; background: $color.surface">
+    <span id="tb-title" style="font-weight: $typography.weight-semibold; font-size: $typography.size-md">Artisign</span>
+    <span id="tb-picker" style="display: flex; align-items: center; gap: $spacing.md; border: 1px solid $color.border-strong; background: $color.surface; border-radius: $radius.sm; padding: $spacing.sm $spacing.lg; font-size: $typography.size-base; color: $color.text"><span id="tb-picker-name" style="font-weight: $typography.weight-semibold">artisign-ui</span><span id="tb-picker-chevron" style="color: $color.text-faded">&#9662;</span></span>
+    <span id="tb-tabs" style="display: flex; gap: $spacing.xs">
+      <span id="tb-tab-screens" style="padding: $spacing.sm 10px; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text-muted">Screens</span>
+      <span id="tb-tab-ds" style="padding: $spacing.sm 10px; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text-muted">Design System</span>
+      <span id="tb-tab-board" style="background: $color.accent-subtle; padding: $spacing.sm 10px; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.accent; font-weight: $typography.weight-semibold">Board</span>
+    </span>
+    <span id="tb-flow" style="margin-left: auto; border: 1px solid $color.border-strong; background: $color.surface; padding: $spacing.sm $spacing.lg; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text">Flow mode</span>
+    <span id="tb-comment" style="border: 1px solid $color.border-strong; background: $color.surface; padding: $spacing.sm $spacing.lg; border-radius: $radius.sm; font-size: $typography.size-base; color: $color.text">Comment mode</span>
+    <span id="tb-conn" style="font-size: $typography.size-2xs; color: #22a55a">&#9679;</span>
+  </header>
+</template>
+<template data-variant="empty">
+  <header id="topbar" style="flex: none; display: flex; align-items: center; gap: $spacing.xl; padding: 0 $spacing.xl; height: 48px; border-bottom: 1px solid $color.border; background: $color.surface">
+    <span id="tb-title" style="font-weight: $typography.weight-semibold; font-size: $typography.size-md">Artisign</span>
+    <span id="tb-picker" style="display: flex; align-items: center; gap: $spacing.md; border: 1px dashed $color.border-strong; background: $color.surface; border-radius: $radius.sm; padding: $spacing.sm $spacing.lg; font-size: $typography.size-base; color: $color.text-muted"><span id="tb-picker-name" style="font-weight: $typography.weight-semibold">No project open</span><span id="tb-picker-chevron" style="color: $color.text-faded">&#9662;</span></span>
+    <span id="tb-conn" style="margin-left: auto; font-size: $typography.size-2xs; color: #22a55a">&#9679;</span>
+  </header>
+</template>

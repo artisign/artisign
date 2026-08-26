@@ -1,0 +1,7 @@
+{
+  "notes": "What the daemon shows before any project is open. The topbar collapses to the title and a dashed project picker; both actions lead into the project dialogs.",
+  "tags": [
+    "empty-state",
+    "dialog"
+  ]
+}

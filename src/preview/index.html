@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Artisign</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="topbar">
+        <span id="app-title">Artisign</span>
+        <div id="project-picker">
+          <button type="button" id="project-picker-trigger" aria-haspopup="true" aria-expanded="false">
+            <span id="project-picker-name">No project open</span>
+            <span id="project-picker-chevron" aria-hidden="true">▾</span>
+          </button>
+          <div id="project-menu" hidden>
+            <p id="menu-label-open" class="project-menu-label" hidden>Open projects</p>
+            <div id="menu-open-list"></div>
+            <div id="menu-divider-1" class="project-menu-divider" hidden></div>
+            <p id="menu-label-recent" class="project-menu-label" hidden>Recent</p>
+            <div id="menu-recent-list"></div>
+            <div id="menu-divider-2" class="project-menu-divider"></div>
+            <button type="button" id="menu-action-open" class="project-menu-action">
+              <span class="project-menu-action-icon" aria-hidden="true">📂</span>Open project…
+            </button>
+            <button type="button" id="menu-action-init" class="project-menu-action">
+              <span class="project-menu-action-icon" aria-hidden="true">＋</span>New project…
+            </button>
+          </div>
+        </div>
+        <nav id="view-tabs">
+          <button type="button" class="view-tab" data-view="screens" aria-pressed="true">Screens</button>
+          <button type="button" class="view-tab" data-view="design-system" aria-pressed="false">Design System</button>
+          <button type="button" class="view-tab" data-view="board" aria-pressed="false">Board</button>
+        </nav>
+        <button type="button" id="flow-mode-toggle" class="toggle-button" aria-pressed="false">Flow mode</button>
+        <button type="button" id="comment-mode-toggle" class="toggle-button" aria-pressed="false">Comment mode</button>
+        <button
+          type="button"
+          id="inspect-mode-toggle"
+          class="toggle-button"
+          aria-pressed="false"
+          title="When on, clicking an element in the canvas focuses and expands its entry in the Elements panel"
+        >
+          Inspect mode
+        </button>
+        <div id="canvas-controls">
+          <div id="zoom-controls" role="group" aria-label="Zoom">
+            <button type="button" class="zoom-button" data-zoom="fit" aria-pressed="true">Fit</button>
+            <button type="button" class="zoom-button" data-zoom="0.5" aria-pressed="false">50%</button>
+            <button type="button" class="zoom-button" data-zoom="1" aria-pressed="false">100%</button>
+            <button type="button" class="zoom-button" data-zoom="2" aria-pressed="false">200%</button>
+          </div>
+          <button type="button" id="status-bar-toggle" class="toggle-button" aria-pressed="false">Status bar</button>
+        </div>
+        <button type="button" id="warning-badge" title="Render diagnostics — click to step through" hidden></button>
+        <span id="connection-status" title="Live reload connection">●</span>
+      </header>
+      <div id="body">
+        <aside id="sidebar-screens" class="side-panel" data-collapsed="false">
+          <div class="side-panel-header">
+            <span class="side-panel-title">Screens</span>
+            <span class="side-panel-rail-icon" aria-hidden="true">▤</span>
+            <button type="button" id="sidebar-screens-collapse" class="side-panel-collapse" aria-expanded="true" aria-label="Collapse Screens panel">
+              <span class="side-panel-collapse-chevron" aria-hidden="true">◂</span>
+            </button>
+          </div>
+          <div class="side-panel-body">
+            <div id="screen-filter">
+              <div id="screen-filter-input-wrap">
+                <span id="screen-filter-icon" aria-hidden="true"></span>
+                <input type="text" id="screen-filter-input" placeholder="Search screens, mockups and tags…" autocomplete="off" />
+              </div>
+              <div id="screen-filter-hint"></div>
+            </div>
+            <ul id="screen-list"></ul>
+            <div id="mockup-section" hidden>
+              <div class="sidebar-section-title">Mockups</div>
+              <ul id="mockup-list"></ul>
+            </div>
+          </div>
+        </aside>
+        <aside id="sidebar-context" class="side-panel" data-collapsed="false">
+          <div class="side-panel-header">
+            <span class="side-panel-title">Context</span>
+            <span class="side-panel-rail-icon" aria-hidden="true">💬</span>
+            <button type="button" id="sidebar-context-collapse" class="side-panel-collapse" aria-expanded="true" aria-label="Collapse Context panel">
+              <span class="side-panel-collapse-chevron" aria-hidden="true">◂</span>
+            </button>
+          </div>
+          <div class="side-panel-body">
+            <section id="notes-panel" hidden>
+              <button type="button" id="notes-panel-header" aria-expanded="true">
+                <span id="notes-panel-chevron" aria-hidden="true"></span>
+                <span id="notes-panel-title">Notes</span>
+                <span id="notes-panel-screen"></span>
+              </button>
+              <div id="notes-panel-body">
+                <p id="notes-panel-text"></p>
+              </div>
+            </section>
+            <section id="comments-panel">
+              <h2>Comments</h2>
+              <form id="comment-compose" hidden>
+                <p id="comment-target-label"></p>
+                <textarea id="comment-body-input" placeholder="Write a comment…" required></textarea>
+                <p id="comment-error" hidden></p>
+                <div id="comment-compose-actions">
+                  <button type="submit">Post</button>
+                  <button type="button" id="comment-cancel">Cancel</button>
+                </div>
+              </form>
+              <ul id="comments-list"></ul>
+            </section>
+          </div>
+        </aside>
+        <main id="main">
+          <div id="screens-view" class="main-view">
+            <div id="canvas">
+              <div id="screen-holder">
+                <!--
+                  sandbox="allow-same-origin" only, NEVER "allow-scripts": this
+                  origin also serves /api/tools/* (write_html etc.) with only
+                  Origin-header checks guarding it, so a screen with script
+                  execution could call those same-origin. Screen HTML is
+                  agent-authored and untrusted; the sandbox is the only barrier.
+                -->
+                <iframe id="screen-frame" title="Screen preview" sandbox="allow-same-origin"></iframe>
+                <!--
+                  Device chrome overlay lives in the PARENT document, layered
+                  over the iframe — never inside its srcdoc. It must never
+                  appear in stored screen HTML or a get_screen response.
+                -->
+                <div id="status-bar-overlay" hidden>
+                  <span id="status-bar-time">9:41</span>
+                  <span id="status-bar-glyphs">●●● 🛜 🔋</span>
+                </div>
+                <!--
+                  Inspect mode's selection outline — same layering rationale
+                  as #status-bar-overlay: positioned in the PARENT document,
+                  in the iframe's own (unscaled) coordinate space, since
+                  #screen-holder carries the zoom transform both share.
+                -->
+                <div id="inspect-overlay" hidden></div>
+              </div>
+            </div>
+            <p id="empty-state" hidden>No screens yet.</p>
+          </div>
+          <div id="mockup-view" class="main-view" hidden></div>
+          <div id="design-system-view" class="main-view" hidden></div>
+          <div id="board-view" class="main-view" hidden>
+            <!--
+              One scrollable surface holding every screen as a tile
+              (#board-tiles) plus an SVG overlay drawing flow edges between
+              them (#board-edges), sized in JS to the full tile content so
+              edges stay aligned while scrolling. Comment mode has no effect
+              here — see board-view.js's module comment.
+            -->
+            <div id="board-surface">
+              <div id="board-tiles"></div>
+              <svg id="board-edges"></svg>
+            </div>
+          </div>
+        </main>
+        <aside id="inspector" class="side-panel side-panel-right" data-collapsed="false">
+          <div class="side-panel-header">
+            <span class="side-panel-title">Elements</span>
+            <span class="side-panel-rail-icon" aria-hidden="true">☰</span>
+            <button type="button" id="inspector-collapse" class="side-panel-collapse" aria-expanded="true" aria-label="Collapse Elements panel">
+              <span class="side-panel-collapse-chevron" aria-hidden="true">▸</span>
+            </button>
+          </div>
+          <div class="side-panel-body">
+            <ul id="inspector-list"></ul>
+            <p id="inspector-empty" hidden>No elements.</p>
+            <p id="inspector-error" hidden></p>
+          </div>
+        </aside>
+      </div>
+      <main id="no-project-state" hidden>
+        <section id="empty-card">
+          <span id="empty-icon" aria-hidden="true">🗂️</span>
+          <h1 id="empty-title">No project open</h1>
+          <p id="empty-copy">The daemon is running, but no design project is open yet. Open an existing project folder or initialize a new one.</p>
+          <div id="empty-actions">
+            <button type="button" id="empty-btn-open" class="btn-confirm">Open project…</button>
+            <button type="button" id="empty-btn-init" class="btn-cancel">New project…</button>
+          </div>
+          <div id="empty-recent">
+            <p id="empty-recent-label">Recent</p>
+            <div id="empty-recent-list"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div id="dialog-scrim" hidden>
+      <section id="open-project-dialog" class="project-dialog" hidden>
+        <h1 class="dialog-title">Open project</h1>
+        <div class="quick-access">
+          <button type="button" class="quick-chip" data-quick="home">🏠 Home</button>
+          <button type="button" class="quick-chip" data-quick="workspace">Workspace</button>
+          <button type="button" class="quick-chip" data-quick="desktop">Desktop</button>
+        </div>
+        <nav class="breadcrumbs"></nav>
+        <div class="dir-list"></div>
+        <p class="selection-hint">Selected: <span class="selection-path">—</span> — folders already containing a project are badged.</p>
+        <p class="dialog-error" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn-cancel">Cancel</button>
+          <button type="button" class="btn-confirm" disabled>Open</button>
+        </div>
+      </section>
+      <section id="init-project-dialog" class="project-dialog" hidden>
+        <h1 class="dialog-title">New project</h1>
+        <p class="dialog-sub">Choose where the new project folder is created.</p>
+        <div class="quick-access">
+          <button type="button" class="quick-chip" data-quick="home">🏠 Home</button>
+          <button type="button" class="quick-chip" data-quick="workspace">Workspace</button>
+          <button type="button" class="quick-chip" data-quick="desktop">Desktop</button>
+        </div>
+        <nav class="breadcrumbs"></nav>
+        <div class="dir-list"></div>
+        <div class="field-name">
+          <label for="init-name-input">New folder / project name</label>
+          <input type="text" id="init-name-input" class="field-name-input" placeholder="my-new-project" autocomplete="off" />
+        </div>
+        <p class="selection-hint">Will create: <span class="selection-path">—</span></p>
+        <p class="dialog-error" hidden></p>
+        <div class="dialog-actions">
+          <button type="button" class="btn-cancel">Cancel</button>
+          <button type="button" class="btn-confirm" disabled>Create &amp; open</button>
+        </div>
+      </section>
+    </div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

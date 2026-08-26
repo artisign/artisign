@@ -1,0 +1,6 @@
+{
+  "notes": "Opening an existing project. Browsing happens in-app rather than through the native folder picker, because a browser never reveals an absolute path to the page and the daemon could not act on the selection. Folders that already hold a project are badged.",
+  "tags": [
+    "dialog"
+  ]
+}

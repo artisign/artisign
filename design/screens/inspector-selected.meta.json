@@ -1,0 +1,6 @@
+{
+  "notes": "Inspect mode with one element focused. The focused entry takes an accent left border and loses 3px of left padding so its content still lines up with the unfocused rows, and expands to show the box metrics and the design-system refs the element resolves to.",
+  "tags": [
+    "inspector"
+  ]
+}

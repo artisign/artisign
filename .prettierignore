@@ -1,0 +1,10 @@
+# Artisign projects are written by the tool, not by hand. Screen files carry the
+# canonical serialization `serializeScreen` produces, and definition files are
+# deliberately never canonicalized — `patch-definition.ts` edits them through
+# byte-range splices. Letting Prettier reformat either one detaches the file
+# from what the tool expects to read back.
+design/
+examples/notes-app/
+
+# Build output
+dist/

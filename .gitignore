@@ -1,0 +1,50 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+
+# testing
+coverage/
+
+# typescript
+*.tsbuildinfo
+
+# tool state (derived cache of an Artisign project — rebuildable from source)
+.artisign/
+.uxd/
+
+# env files
+.env
+.env.local
+.env*.local
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# misc
+.DS_Store
+*.pem
+
+# backup files (macOS copy artifacts)
+* 2.*
+* 2/
+
+# editor
+.vscode/
+
+# claude code — the whole agent setup is internal working material and is
+# deliberately not published. Kept on disk, never tracked.
+.claude/
+CLAUDE.md
+
+# internal working notes — ticket postmortems and superseded planning specs
+docs/iterations/
+docs/superpowers/
+
+# agent-guide benchmark harness — maintainer-only: needs a private pre-refactor
+# build and the authenticated claude CLI, so it is not reproducible from a clone
+_eval/

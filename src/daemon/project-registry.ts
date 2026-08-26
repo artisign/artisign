@@ -40,6 +40,11 @@ export class ProjectRegistry {
   // silently drop entries.
   private recentChain: Promise<void> = Promise.resolve();
   private active: string | undefined;
+  // Evictions start from a watcher callback, with nothing above them to
+  // await the teardown. Holding them here makes "this project is gone" and
+  // "this project has finished letting go of its files" two separate,
+  // observable facts — see settled().
+  private readonly evictions = new Set<Promise<void>>();
   /** Daemon-wide project lifecycle broadcaster (project-opened/-switched) — see http/sse.ts. */
   readonly lifecycle: LifecycleHub = createLifecycleHub();
 
@@ -130,9 +135,7 @@ export class ProjectRegistry {
               // otherwise be an unhandled rejection and, on Node >= 15, kill
               // the daemon: exactly the crash class this eviction path
               // exists to prevent.
-              this.evict(root).catch((evictErr) => {
-                console.error(`failed to evict ${root}:`, evictErr instanceof Error ? evictErr.message : evictErr);
-              });
+              this.startEviction(root);
               return;
             }
             console.error(`failed to refresh project name (${root}):`, err instanceof Error ? err.message : err);
@@ -238,7 +241,23 @@ export class ProjectRegistry {
   }
 
   async closeAll(): Promise<void> {
+    // Before the map walk: an eviction already past `projects.delete()` is
+    // invisible to it, and its index watcher would outlive this call.
+    await this.settled();
     await Promise.all([...this.projects.keys()].map((root) => this.close(root)));
+  }
+
+  /**
+   * Resolves once every in-flight eviction has finished tearing down.
+   *
+   * `close()` deletes the map entry before awaiting `index.stop()`, so a
+   * project stops being *listed* well before it stops *writing*: the index
+   * can still be flushing `.artisign/index.json` at that point. Anything
+   * that acts on the project's directory once it disappears from the
+   * registry — a shutdown, a test's cleanup — has to wait on this instead.
+   */
+  async settled(): Promise<void> {
+    await Promise.all([...this.evictions]);
   }
 
   /**
@@ -249,6 +268,23 @@ export class ProjectRegistry {
    * so the lifecycle event must go out before that happens, not after. A
    * no-op if `root` was already closed/evicted (guards double eviction).
    */
+  /**
+   * Starts an eviction and keeps hold of it. Callers are watcher callbacks
+   * with no request handler above them, so a rejection here would be an
+   * unhandled one and, on Node >= 15, kill the daemon — exactly the crash
+   * class this eviction path exists to prevent.
+   */
+  private startEviction(root: string): void {
+    const eviction: Promise<void> = this.evict(root)
+      .catch((err: unknown) => {
+        console.error(`failed to evict ${root}:`, err instanceof Error ? err.message : err);
+      })
+      .finally(() => {
+        this.evictions.delete(eviction);
+      });
+    this.evictions.add(eviction);
+  }
+
   private async evict(root: string): Promise<void> {
     const key = resolve(root);
     if (!this.projects.has(key)) return;

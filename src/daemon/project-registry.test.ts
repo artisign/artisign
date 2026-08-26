@@ -30,6 +30,22 @@ describe("ProjectRegistry", () => {
     await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
   });
 
+  /** Waits until the watcher has dropped `dir` from the registry's listing. */
+  async function waitUntilUnlisted(dir: string): Promise<void> {
+    const start = Date.now();
+    await new Promise<void>((resolveWait, reject) => {
+      const interval = setInterval(() => {
+        if (registry.get(dir) === undefined) {
+          clearInterval(interval);
+          resolveWait();
+        } else if (Date.now() - start > 4000) {
+          clearInterval(interval);
+          reject(new Error("project was not evicted after artisign.json was deleted"));
+        }
+      }, 20);
+    });
+  }
+
   async function makeProject(screenHtml?: string): Promise<string> {
     const dir = await mkdtemp(join(tmpdir(), "artisign-registry-"));
     dirs.push(dir);
@@ -392,19 +408,27 @@ describe("ProjectRegistry", () => {
 
     await rm(join(dir, "artisign.json"));
 
-    const start = Date.now();
-    await new Promise<void>((resolveWait, reject) => {
-      const interval = setInterval(() => {
-        if (registry.get(dir) === undefined) {
-          clearInterval(interval);
-          resolveWait();
-        } else if (Date.now() - start > 4000) {
-          clearInterval(interval);
-          reject(new Error("project was not evicted after artisign.json was deleted"));
-        }
-      }, 20);
-    });
+    await waitUntilUnlisted(dir);
     expect(registry.activeProject).toBeUndefined();
+  }, 10000);
+
+  it("settled() waits until an evicted project has stopped writing its index", async () => {
+    const dir = await makeProject(`<div id="n1"></div>`);
+    await registry.open(dir);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    await rm(join(dir, "artisign.json"));
+    await waitUntilUnlisted(dir);
+    await registry.settled();
+
+    // Dropping out of the registry only means "no longer listed" — the
+    // watcher can still be flushing .artisign/index.json at that point.
+    // After settled() it is gone, so nothing rebuilds the derived index.
+    await rm(join(dir, ".artisign"), { recursive: true, force: true });
+    await writeFile(join(dir, "screens", "home.html"), `<div id="n2"></div>`);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    await expect(stat(join(dir, ".artisign", "index.json"))).rejects.toThrow();
   }, 10000);
 
   it("does not evict when artisign.json is merely broken (hand-edited, not deleted)", async () => {

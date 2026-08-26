@@ -74,17 +74,6 @@ npx artisign mcp ./my-project    # stdio MCP server for Claude Desktop / Claude 
 
 The daemon is **multi-project**: it runs permanently on `127.0.0.1:4711` and can hold several projects open at once. Open or create projects from the browser UI (project picker in the topbar), or let agents address any project directly via the MCP URL — no restart when you switch projects. The port comes from `~/.artisign/config.json` or `start --port N` (a `settings.port` in a project's `artisign.json` is deprecated and ignored).
 
-### Try the bundled example
-
-[`examples/notes-app`](examples/notes-app) is a small real project — 3 screens, a shared `btn-primary` component with `hover` and `disabled` variants, and a welcome → notes → new-note flow — so you can see a populated preview immediately, without designing anything first:
-
-```bash
-npx artisign serve examples/notes-app
-# open http://127.0.0.1:4711
-```
-
-(Regenerated via `npx tsx scripts/gen-example.ts` if the on-disk schema changes — it goes through the real `write_html` tool rather than hand-written HTML, so it can't drift from what the parser actually accepts.)
-
 ## The 23 tools
 
 | Bucket | Tool | Does |
@@ -189,7 +178,6 @@ src/mcp/             MCP server — stdio + streamable HTTP
 src/http/            internal JSON API + SSE, consumed by the preview
 src/preview/         browser preview — plain ES modules, no build step
 design/              the tool's own UI, designed with the tool (see below)
-examples/notes-app/  bundled example project (see Quickstart)
 scripts/             one-off dev tooling, not shipped in the npm package
 ```
 
@@ -234,7 +222,6 @@ Only `dist/`, `src/preview/` (minus its test files), `assets/` and the two guide
 | Design methodology for agents (normative, served by `get_guide`) | [`docs/agent-guide.md`](docs/agent-guide.md) |
 | The same workflow long-form, for humans and skill authors | [`docs/design-workflow-tutorial.md`](docs/design-workflow-tutorial.md) |
 | The tool's own UI, designed with the tool | [`design/`](design/) — see [Designed with itself](#designed-with-itself) |
-| A small worked example project | [`examples/notes-app`](examples/notes-app) |
 
 ## Issues & security
 

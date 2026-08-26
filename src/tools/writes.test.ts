@@ -986,13 +986,13 @@ describe("set_tokens", () => {
   });
 });
 
-describe("set_tokens — examples/notes-app", () => {
+describe("set_tokens — notes-app fixture", () => {
   let dir: string;
   let store: FsStore;
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "artisign-set-tokens-ds-"));
-    await cp(join(process.cwd(), "examples", "notes-app"), dir, { recursive: true });
+    await cp(join(process.cwd(), "src", "tools", "__fixtures__", "notes-app"), dir, { recursive: true });
     store = new FsStore(dir);
   });
   afterEach(() => rm(dir, { recursive: true, force: true }));

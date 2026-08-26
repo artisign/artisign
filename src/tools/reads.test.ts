@@ -628,13 +628,13 @@ describe("find_nodes — design-system sources", () => {
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "artisign-find-nodes-ds-"));
-    await cp(join(process.cwd(), "examples", "notes-app"), dir, { recursive: true });
+    await cp(join(process.cwd(), "src", "tools", "__fixtures__", "notes-app"), dir, { recursive: true });
     store = new FsStore(dir);
   });
   afterEach(() => rm(dir, { recursive: true, force: true }));
 
   it("finds a style_ref that lives only in a component definition, never in any screen", async () => {
-    // examples/notes-app: $color.primary is used exclusively in
+    // src/tools/__fixtures__/notes-app: $color.primary is used exclusively in
     // design-system/components/btn-primary.html — a screens-only scan finds
     // nothing here even though every screen visibly styles buttons with it.
     const res = await findNodes(store, { where: [{ kind: "style_ref", ref_path: "$color.primary" }] });

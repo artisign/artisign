@@ -330,7 +330,7 @@ describe.skipIf(!isPlaywrightAvailable())("getScreenshot — e2e (real Chromium)
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "artisign-screenshot-e2e-"));
-    await cp(join(process.cwd(), "examples", "notes-app"), dir, { recursive: true });
+    await cp(join(process.cwd(), "src", "tools", "__fixtures__", "notes-app"), dir, { recursive: true });
     store = new FsStore(dir);
   });
 
@@ -440,7 +440,7 @@ describe.skipIf(!isPlaywrightAvailable())("getScreenshot — fallback launch (re
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "artisign-screenshot-fallback-e2e-"));
-    await cp(join(process.cwd(), "examples", "notes-app"), dir, { recursive: true });
+    await cp(join(process.cwd(), "src", "tools", "__fixtures__", "notes-app"), dir, { recursive: true });
     store = new FsStore(dir);
     await __resetBrowserForTests();
   });

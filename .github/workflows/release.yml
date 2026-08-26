@@ -32,9 +32,11 @@ jobs:
           git config --global user.email "ci@artisign.dev"
 
       # npm trusted publishing (OIDC, no stored token) needs npm >= 11.5.1;
-      # the npm bundled with Node 22 predates it. No `registry-url` on
-      # setup-node either — its .npmrc expects a NODE_AUTH_TOKEN we do not have.
-      - run: npm install -g npm@latest
+      # the npm bundled with Node 22 predates it. Pinned to that major: a tag
+      # is immutable, so a breaking npm release must not be able to strand one.
+      # No `registry-url` on setup-node either — its .npmrc expects a
+      # NODE_AUTH_TOKEN we do not have.
+      - run: npm install -g npm@^11.5.1
 
       # A manual run publishes nothing: real releases come from a tag, which is
       # what pins the version and gives `gh release create` something to attach to.
@@ -59,13 +61,20 @@ jobs:
 
       - run: npm ci
 
+      # Same reason as in ci.yml: without Playwright the browser-backed suites
+      # skip, and the publish gate would be green without ever launching one.
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
       - run: npm run type-check
       - run: npm run lint
       - run: npm test
       - run: npm run build
 
-      # Always runs, tag releases included: its file listing is the pack audit
-      # from CHR-544, re-checked on every release.
+      # Prints the tarball contents for the release log. It asserts nothing —
+      # read the listing when a release changes what ships.
       - run: npm publish --dry-run
 
       # Written outside the workspace so it cannot slip into the tarball and
@@ -73,15 +82,20 @@ jobs:
       - name: Extract the release notes
         run: npx tsx scripts/changelog-section.ts "${{ steps.version.outputs.version }}" > "$RUNNER_TEMP/release-notes.md"
 
-      - name: Publish to npm
-        if: inputs.dry_run != true
-        run: npm publish --provenance
-
+      # Before the publish, and idempotent: a GitHub Release can be deleted, an
+      # npm version cannot. Doing it the other way round means a failure here
+      # leaves the version live on npm with no release, and the re-run dies on
+      # "cannot publish over previously published version".
       - name: Create the GitHub Release
         if: inputs.dry_run != true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && exit 0
           gh release create "$GITHUB_REF_NAME" \
             --title "Artisign v${{ steps.version.outputs.version }}" \
             --notes-file "$RUNNER_TEMP/release-notes.md"
+
+      - name: Publish to npm
+        if: inputs.dry_run != true
+        run: npm publish --provenance

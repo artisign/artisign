@@ -17,7 +17,7 @@ One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
 ## Install
 
-Node.js ≥ 20, on **macOS or Linux**. **Windows is not supported** — the store's atomic writes (write temp file, then `rename`) and its path handling have never been verified there, so the tool is not shipped for it. `package.json` declares this via `os`, which makes `npm install` refuse the platform rather than fail somewhere later.
+Node.js ≥ 20.19, on **macOS or Linux**. **Windows is not supported** — the store's atomic writes (write temp file, then `rename`) and its path handling have never been verified there, so the tool is not shipped for it. `package.json` declares this via `os`, which makes `npm install` refuse the platform rather than fail somewhere later.
 
 **Two ways to run it, and the choice matters.** `npx artisign` fetches the package on first use and needs no setup — the fastest way to try it, and enough for everything except the two screenshot tools. Installing it into a directory of your own is the other path, and the one to pick if you want screenshots:
 

@@ -86,7 +86,7 @@ describe.skipIf(!isPlaywrightAvailable())("inspectNode — e2e (real Chromium)",
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "artisign-inspect-node-e2e-"));
-    await cp(join(process.cwd(), "examples", "notes-app"), dir, { recursive: true });
+    await cp(join(process.cwd(), "src", "tools", "__fixtures__", "notes-app"), dir, { recursive: true });
     store = new FsStore(dir);
   });
 
@@ -171,7 +171,7 @@ describe.skipIf(!isPlaywrightAvailable())("inspectNode — fallback launch (real
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "artisign-inspect-node-fallback-e2e-"));
-    await cp(join(process.cwd(), "examples", "notes-app"), dir, { recursive: true });
+    await cp(join(process.cwd(), "src", "tools", "__fixtures__", "notes-app"), dir, { recursive: true });
     store = new FsStore(dir);
     await __resetBrowserForTests();
   });

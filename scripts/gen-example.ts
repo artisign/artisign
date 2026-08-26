@@ -4,7 +4,7 @@ import { initProject } from "../src/init/init-project.js";
 import { FsStore } from "../src/store/index.js";
 import { findTool } from "../src/tools/registry.js";
 
-const dir = resolve("examples/notes-app");
+const dir = resolve("src/tools/__fixtures__/notes-app");
 
 async function main(): Promise<void> {
   await rm(dir, { recursive: true, force: true });
@@ -12,7 +12,7 @@ async function main(): Promise<void> {
 
   // Nested inside this repo, so autoCommit stays at its `init` default
   // (true): git.ts's own toplevel guard skips it here (this directory isn't
-  // its own repo root), so nothing gets committed into examples/notes-app/.git.
+  // its own repo root), so nothing gets committed into src/tools/__fixtures__/notes-app/.git.
   const store = new FsStore(dir);
 
   await store.writeTokens({

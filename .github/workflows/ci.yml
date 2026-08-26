@@ -15,6 +15,14 @@ jobs:
           node-version: 22
           cache: npm
 
+      # The auto-commit tests drive real `git commit` against throwaway repos,
+      # and a bare runner has no committer identity — without this they all
+      # fail with `sha: null`.
+      - name: Give git a committer identity
+        run: |
+          git config --global user.name "Artisign CI"
+          git config --global user.email "ci@artisign.dev"
+
       # Playwright is an optional peer dependency and is deliberately left
       # uninstalled: the screenshot tests then skip themselves, which is the
       # state a fresh user's machine is in.

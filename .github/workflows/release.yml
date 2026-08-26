@@ -23,6 +23,14 @@ jobs:
           node-version: 22
           cache: npm
 
+      # The auto-commit tests drive real `git commit` against throwaway repos,
+      # and a bare runner has no committer identity — without this they all
+      # fail with `sha: null`.
+      - name: Give git a committer identity
+        run: |
+          git config --global user.name "Artisign CI"
+          git config --global user.email "ci@artisign.dev"
+
       # npm trusted publishing (OIDC, no stored token) needs npm >= 11.5.1;
       # the npm bundled with Node 22 predates it. No `registry-url` on
       # setup-node either — its .npmrc expects a NODE_AUTH_TOKEN we do not have.

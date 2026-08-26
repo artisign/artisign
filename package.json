@@ -15,7 +15,7 @@
   "type": "module",
   "license": "AGPL-3.0-only",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19.0"
   },
   "os": [
     "darwin",

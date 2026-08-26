@@ -6,36 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Changed
+## [0.9.0] - 2026-08-26
 
-- Renamed the product from "ux-designer" to **Artisign**. This affects the
-  npm package name and the CLI command: `npx ux-designer` → `npx artisign`.
-- Renamed the MCP server from `ux-designer` to `artisign`.
-- Renamed the environment variable `UXD_HOME` to `ARTISIGN_HOME`.
-- Renamed the daemon state directory from `~/.ux-designer/` to
-  `~/.artisign/`.
-- Renamed the project config file `uxd.json` to `artisign.json`.
-- Renamed the derived cache directory `.uxd/` to `.artisign/`.
-- The derived cache is now self-ignoring: `.artisign/` carries its own
-  `.gitignore`, so the index and the font cache stay out of a project's
-  git history even when the project's own `.gitignore` predates the
-  rename.
-- Preview UI browser-storage keys migrate automatically from the `uxd.`
-  prefix — no manual action needed.
+First public release of Artisign, as a beta. Everything below is new because
+nothing was public before; the version says 0.9 because the tool palette is not
+yet under an API-stability promise.
 
-### Upgrading
+### Added
 
-None of the renames above have a compatibility fallback. Before upgrading:
-
-1. **Stop the running daemon.** After the upgrade its lock file is looked
-   up under `~/.artisign/`, so `artisign stop` can no longer find a daemon
-   started by the previous version, and starting a new one fails against
-   the still-occupied port.
-2. **Rename each project's config file** from `uxd.json` to
-   `artisign.json`. A project without `artisign.json` is no longer
-   recognised.
-3. Optionally delete each project's now-unused `.uxd/` directory. It is a
-   derived cache and is rebuilt as `.artisign/` on first use.
-
-The daemon's own state — the recent-projects list and any custom port —
-is not carried over from `~/.ux-designer/` and has to be set up again.
+- The CLI and the daemon on `127.0.0.1`: `init`, `start`, `serve`, `status`,
+  `stop`, and a project registry that serves several projects at once.
+- The MCP server over stdio and streamable HTTP, exposing the 23-tool palette.
+- The file store: augmented HTML per screen, JSON tokens, atomic writes, a
+  filesystem watcher, and optional auto-commit per write.
+- The design system: tokens, components with variants, patterns, ref drift
+  warnings and `promote_to_system`.
+- The browser preview: screen list, sandboxed render, live reload over SSE,
+  flow mode, comment threads and the design-system view.
+- `get_screenshot` and `inspect_node` for the agent's own review loop, backed
+  by Playwright as an optional peer dependency.

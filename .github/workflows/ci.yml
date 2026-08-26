@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor `engines` promises and the version releases are built on.
+        # Without the floor, nothing checks that the package actually runs on
+        # the oldest Node it claims to support.
+        node-version: ["20.19.0", "22"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      # The auto-commit tests drive real `git commit` against throwaway repos,
+      # and a bare runner has no committer identity — without this they all
+      # fail with `sha: null`.
+      - name: Give git a committer identity
+        run: |
+          git config --global user.name "Artisign CI"
+          git config --global user.email "ci@artisign.dev"
+
+      - run: npm ci
+
+      # Playwright is an optional peer dependency, so the screenshot and
+      # inspect-node suites skip themselves when it is absent — a green run
+      # that never touched the browser path. Installing it here is what makes
+      # `npm test` an actual gate for `get_screenshot` and `inspect_node`.
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - run: npm run type-check
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build

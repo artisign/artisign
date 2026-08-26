@@ -72,7 +72,7 @@ npx artisign serve ./my-project  # foreground daemon (development); opens the pr
 npx artisign mcp ./my-project    # stdio MCP server for Claude Desktop / Claude Code
 ```
 
-The daemon is **multi-project**: it runs permanently on `127.0.0.1:4711` and can hold several projects open at once. Open or create projects from the browser UI (project picker in the topbar), or let agents address any project directly via the MCP URL — no restart when you switch projects. The port comes from `~/.artisign/config.json` or `start --port N` (a `settings.port` in a project's `artisign.json` is deprecated and ignored).
+The daemon is **multi-project**: it runs permanently on `127.0.0.1:4711` and can hold several projects open at once. Open or create projects from the browser UI (project picker in the topbar), or let agents address any project directly via the MCP URL — no restart when you switch projects. The port comes from `~/.artisign/config.json` or `--port N` on `start` and `serve` (a `settings.port` in a project's `artisign.json` is deprecated and ignored).
 
 ## The 23 tools
 

@@ -3,7 +3,7 @@ export type ParsedStartArgs = {
   projects: string[];
 };
 
-/** Parses `[--port N] [dir...]` — used by both `start` and the internal `__daemon` command. */
+/** Parses `[--port N] [dir...]` — used by `start`, `serve` and the internal `__daemon` command. */
 export function parseStartArgs(argv: string[]): ParsedStartArgs {
   const projects: string[] = [];
   let port: number | undefined;
@@ -19,6 +19,11 @@ export function parseStartArgs(argv: string[]): ParsedStartArgs {
         throw new Error("--port requires a non-negative integer value");
       }
       port = parsed;
+    } else if (arg.startsWith("--")) {
+      // Without this an unknown flag would be taken for a project directory,
+      // and the daemon binds its port before it ever resolves projects — so
+      // the failure would surface as a confusing path error on the wrong port.
+      throw new Error(`Unknown option: ${arg}`);
     } else {
       projects.push(arg);
     }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, readdir, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FsStore } from "./fs-store.js";
@@ -292,6 +292,23 @@ describe("FsStore", () => {
       await expect(store.deleteMockup("../../pwned")).rejects.toThrow();
 
       await expect(readdir(join(dir, ".."))).resolves.not.toContain("pwned");
+    });
+  });
+
+  describe("readAsset", () => {
+    it("reads a file under assets/", async () => {
+      await mkdir(join(dir, "assets", "icons"), { recursive: true });
+      await writeFile(join(dir, "assets", "icons", "logo.svg"), "<svg></svg>");
+      expect((await store.readAsset("icons/logo.svg")).toString()).toBe("<svg></svg>");
+    });
+
+    it("propagates ENOENT for a missing asset", async () => {
+      await expect(store.readAsset("does-not-exist.png")).rejects.toThrow();
+    });
+
+    it("rejects a path escaping assets/", async () => {
+      await expect(store.readAsset("../artisign.json")).rejects.toThrow();
+      await expect(store.readAsset("../../etc/passwd")).rejects.toThrow();
     });
   });
 

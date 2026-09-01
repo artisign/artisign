@@ -45,6 +45,7 @@ describe("initProject", () => {
     expect((await stat(join(dir, "design-system", "patterns"))).isDirectory()).toBe(true);
     expect((await stat(join(dir, "screens"))).isDirectory()).toBe(true);
     expect((await stat(join(dir, "mockups"))).isDirectory()).toBe(true);
+    expect((await stat(join(dir, "assets"))).isDirectory()).toBe(true);
 
     const flows = JSON.parse(await readFile(join(dir, "flows.json"), "utf-8"));
     expect(flows).toEqual([]);

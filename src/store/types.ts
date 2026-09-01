@@ -134,6 +134,16 @@ export interface Store {
   readComments(): Promise<string[]>;
   appendComment(line: string): Promise<void>;
 
+  /**
+   * Reads a project asset (e.g. an image referenced from a screen or
+   * component as `assets/hero.png`) by its path relative to `assets/`
+   * (i.e. `"hero.png"`, not `"assets/hero.png"`). Rejects a path that
+   * would escape the `assets/` directory. Propagates its `ENOENT` — a
+   * missing asset is the caller's problem to render visibly, not this
+   * method's to paper over.
+   */
+  readAsset(relPath: string): Promise<Buffer>;
+
   /** Derived cache under `.artisign/`. `undefined` when no cache exists yet. */
   readCacheIndex(): Promise<unknown | undefined>;
   writeCacheIndex(index: unknown): Promise<void>;

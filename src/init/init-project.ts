@@ -22,6 +22,7 @@ export async function initProject(dir: string): Promise<void> {
   await mkdir(join(projectDir, "design-system", "patterns"), { recursive: true });
   await mkdir(join(projectDir, "screens"), { recursive: true });
   await mkdir(join(projectDir, "mockups"), { recursive: true });
+  await mkdir(join(projectDir, "assets"), { recursive: true });
   await mkdir(join(projectDir, CACHE_DIR), { recursive: true });
   await ensureCacheGitignore(projectDir);
 

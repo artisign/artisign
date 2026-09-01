@@ -28,13 +28,24 @@ npm install artisign
 
 The commands below are written as `npx artisign`. With a local install, run `./node_modules/.bin/artisign` instead — or `npm install -g artisign` and just `artisign`.
 
-**Optional: screenshots.** `get_screenshot` and `inspect_node` need a real browser, which is intentionally not bundled (`npx artisign` stays light without it). Playwright is an **optional peer dependency** — npm neither installs it nor its ~150 MB of browser binaries unless you ask for them:
+**Canonical quickstart.** The local install, from an empty directory to a connected agent. Start the daemon before registering the MCP server — the HTTP registration below runs against an already-running daemon:
+
+```bash
+mkdir artisign && cd artisign
+npm install artisign
+./node_modules/.bin/artisign start ./my-project
+claude mcp add --transport http artisign "http://127.0.0.1:4711/mcp?project=/absolute/path/to/my-project"
+```
+
+The first two lines repeat the install above on purpose: the point of this block is that nothing has to be assembled from elsewhere. On the npx path, drop them and start with `npx artisign start ./my-project` instead — the screenshot tools are then unavailable, as described below.
+
+**Optional: screenshots.** `get_screenshot` and `inspect_node` need a real browser, which is intentionally not bundled (`npx artisign` stays light without it). Playwright is an **optional peer dependency** — npm neither installs it nor its ~150 MB of browser binaries unless you ask for them. Run this **in the same directory you installed `artisign` into**:
 
 ```bash
 npm install playwright && npx playwright install chromium
 ```
 
-Run that **in the same directory you installed `artisign` into**. `artisign` imports Playwright dynamically, so Node resolves it from the tree `artisign` itself lives in: installing Playwright into your design project has no effect, and no placement works at all while `artisign` runs from npx's cache. The npx path and the screenshot tools are mutually exclusive — that is the one thing the two install options above actually decide. If Playwright isn't installed, both tools fail with the install command in the error message rather than crashing the server; every other tool works without it.
+`artisign` imports Playwright dynamically, so Node resolves it from the tree `artisign` itself lives in: installing Playwright into your design project has no effect, and no placement works at all while `artisign` runs from npx's cache. The npx path and the screenshot tools are mutually exclusive — that is the one thing the two install options above actually decide. If Playwright isn't installed, both tools fail with the install command in the error message rather than crashing the server; every other tool works without it.
 
 **Register the MCP server.**
 

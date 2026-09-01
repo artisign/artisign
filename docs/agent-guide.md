@@ -115,6 +115,21 @@ Everything else in this guide works without it, so treat a
 `Playwright is not installed` error as a setup gap to report, not as a bug in
 your design work.
 
+### Reviewing a component before a screen uses it
+
+`get_screenshot` on a component definition renders it in isolation. That is the
+right view for the definition itself, but it cannot answer whether the component
+behaves once it is filled and placed — an empty slot's layout, a copy affordance
+against a full-length line, a `wide` variant breaking out of its content column.
+
+Do not wait for the first real screen to find out. Write a scratch screen that
+instantiates the component with real slot content under a real width, screenshot
+that, and `delete_entity` it when the question is answered. It costs two calls
+and keeps a class of defect out of the next ticket.
+
+Keep it disposable: a scratch screen that survives the review becomes a screen
+someone has to maintain.
+
 ## Promote discipline
 
 `promote_to_system` is the ratchet that turns exploration into system:

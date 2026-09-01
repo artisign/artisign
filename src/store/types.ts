@@ -41,6 +41,7 @@ export type ChangeCategory =
   | "config"
   | "design_system_meta"
   | "mockup"
+  | "asset"
   | "other";
 
 export type ProjectChangeEvent = {

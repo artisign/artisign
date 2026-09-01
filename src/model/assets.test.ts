@@ -90,4 +90,46 @@ describe("resolveAssetRefs", () => {
     const out = await resolveAssetRefs(html, store, "inline");
     expect(out).toBe(`<img src="data:image/png;base64,${Buffer.from([5, 6, 7, 8]).toString("base64")}">`);
   });
+
+  // A double-quoted url() argument inside a `style="…"` attribute has
+  // already been through `escapeAttr` (html-syntax.ts) by the time it
+  // reaches `resolveAssetRefs` — its literal `"` delimiters arrive as
+  // `&quot;`, not `"`. render-context.test.ts / preview-routes.test.ts cover
+  // this through the real render pipeline; these two exercise the escaped
+  // text directly, the shape `resolveAssetRefs` actually has to parse.
+  it("rewrites a &quot;-delimited url() (a double-quoted CSS url() after HTML attribute escaping)", async () => {
+    const html = `<div style="background-image: url(&quot;assets/icons/logo.svg&quot;)"></div>`;
+    const out = await resolveAssetRefs(html, store, "url");
+    expect(out).toBe(`<div style="background-image: url('/api/assets/icons/logo.svg')"></div>`);
+  });
+
+  it("&quot; rewrite never introduces a literal \" that would close the enclosing style attribute early", async () => {
+    const html = `<div style="background-image: url(&quot;assets/icons/logo.svg&quot;)" id="n1"></div>`;
+    const out = await resolveAssetRefs(html, store, "url");
+    expect(out).not.toContain('url("');
+    // The id attribute must still parse as its own attribute, not as part of style's value.
+    expect(out).toContain('" id="n1">');
+  });
+
+  it("unescapes &amp; in a captured reference before using it as a path or URL segment (a literal & in a filename)", async () => {
+    await writeFile(join(dir, "assets", "a&b.png"), Buffer.from([1, 2, 3, 4]));
+    // What the render pipeline actually produces for `src="assets/a&b.png"`
+    // once escapeAttr has run over it.
+    const html = `<img src="assets/a&amp;b.png">`;
+    const out = await resolveAssetRefs(html, store, "url");
+    expect(out).toBe(`<img src="/api/assets/a%26b.png">`);
+  });
+
+  it("unescapes &amp; in an inline-mode reference too, so the file is actually found", async () => {
+    await writeFile(join(dir, "assets", "a&b.png"), Buffer.from([1, 2, 3, 4]));
+    const html = `<img src="assets/a&amp;b.png">`;
+    const out = await resolveAssetRefs(html, store, "inline");
+    expect(out).toBe(`<img src="data:image/png;base64,${Buffer.from([1, 2, 3, 4]).toString("base64")}">`);
+  });
+
+  it("trims interior whitespace CSS permits around an unquoted url() argument", async () => {
+    const html = `<div style="background-image: url( assets/icons/logo.svg )"></div>`;
+    const out = await resolveAssetRefs(html, store, "url");
+    expect(out).toBe(`<div style="background-image: url('/api/assets/icons/logo.svg')"></div>`);
+  });
 });

@@ -204,7 +204,7 @@ Drop a local image into a project's `assets/` folder (subfolders are fine) and r
 <div style="background-image: url(assets/icons/logo.svg)"></div>
 ```
 
-The reference stays portable in the source file. At render time it resolves two ways, the same split webfonts use: a page loaded over HTTP (the preview iframe, `/api/render/*`) gets it rewritten to `/api/assets/<path>`; a headless render with no HTTP base URL (`get_screenshot`, `inspect_node`) gets it inlined as a `data:` URI instead. A path that doesn't resolve to a file under `assets/` is left as-is, so the browser's own broken-image handling makes the problem visible rather than the image silently vanishing.
+The reference stays portable in the source file. At render time it resolves two ways, the same split webfonts use: a page loaded over HTTP (the preview iframe, `/api/render/*`) gets it rewritten to `/api/assets/<path>` unconditionally — a path that doesn't resolve to a file under `assets/` still gets the URL, and 404s there, rather than being checked against the filesystem twice; a headless render with no HTTP base URL (`get_screenshot`, `inspect_node`) gets it inlined as a `data:` URI instead, and there an unresolvable path is left as-is. Either way, the browser's own broken-image handling makes the problem visible rather than the image silently vanishing.
 
 ## Repo structure
 

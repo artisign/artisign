@@ -189,7 +189,18 @@ export async function handlePreviewRoutes(req: IncomingMessage, res: ServerRespo
     try {
       const body = await store.readAsset(relPath);
       const contentType = assetContentType(relPath) ?? "application/octet-stream";
-      res.writeHead(200, { "content-type": contentType });
+      res.writeHead(200, {
+        "content-type": contentType,
+        // A project asset can be an SVG a user downloaded from the web and
+        // dropped into `assets/` — served bare, it would run as script on
+        // the daemon's own origin (same-origin requests reach the full tool
+        // API, per `isAllowedOrigin`). These two headers close that off:
+        // `sandbox` (no scripts, no same-origin) if it's ever opened as a
+        // top-level navigation, `nosniff` so a non-image extension never
+        // gets sniffed into something executable.
+        "content-security-policy": "default-src 'none'; sandbox",
+        "x-content-type-options": "nosniff",
+      });
       res.end(body);
     } catch {
       // `store.readAsset` throws both for a missing file (ENOENT) and for a

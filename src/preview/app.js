@@ -347,14 +347,17 @@ async function handleChangeEvent(event) {
       if (screenListChanged) await loadBoard();
       else await board.refreshScreen(event.name);
     }
-  } else if (event.kind === "tokens" || event.kind === "component" || event.kind === "pattern") {
+  } else if (event.kind === "tokens" || event.kind === "component" || event.kind === "pattern" || event.kind === "asset") {
     // Tokens/components/patterns can affect any screen's render (refs
-    // resolve through them) and the design-system view itself. The
-    // Elements panel's own refs don't change, but the RESOLVED values it
-    // shows for them do — loadInspectorEntries() rebuilds the list (a
-    // same-screen rebuild, so createInspectorPanel.setEntries carries
-    // expand/focus state over), and the iframe's own `load` handler then
-    // refreshes those rows' bodies once the re-render lands.
+    // resolve through them) and the design-system view itself; an asset
+    // change is the same shape — any screen or component/pattern variant
+    // could reference it — and there's no cheaper way to know which without
+    // re-parsing every document, so a re-render on any `assets/` change is
+    // the whole fix. The Elements panel's own refs don't change, but the
+    // RESOLVED values it shows for them do — loadInspectorEntries() rebuilds
+    // the list (a same-screen rebuild, so createInspectorPanel.setEntries
+    // carries expand/focus state over), and the iframe's own `load` handler
+    // then refreshes those rows' bodies once the re-render lands.
     if (currentScreen) {
       await loadCurrentScreen();
       await loadInspectorEntries();

@@ -365,6 +365,34 @@ describe("asset routes (/api/assets/*, src/url() rewriting)", () => {
     expect(Buffer.from(await res.arrayBuffer())).toEqual(Buffer.from([1, 2, 3, 4]));
   });
 
+  it("GET /api/assets/<path> sends a CSP + nosniff header (an SVG in assets/ must never run as script on this origin)", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/assets/icons/logo.svg`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-security-policy")).toBe("default-src 'none'; sandbox");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
+  it("GET /api/render/<screen> rewrites a double-quoted CSS url() through the real render pipeline (escapeAttr turns its quotes into &quot;)", async () => {
+    // The outer `style` attribute is single-quoted in the *source* so the
+    // CSS url() argument's own double quotes don't need escaping there — the
+    // parser decodes this into a real `url("assets/…")` internally, and
+    // render.ts's escapeAttr then re-encodes those quotes as `&quot;` when
+    // it re-serializes the (always double-quoted) style attribute. This is
+    // the actual escaped shape resolveAssetRefs has to handle, produced by
+    // the real pipeline rather than hand-written.
+    await store.writeScreen("home", `<div id="n1" style='background-image: url("assets/icons/logo.svg")'></div>`);
+
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/home`);
+    const html = await res.text();
+    expect(html).toContain("url('/api/assets/icons/logo.svg')");
+    expect(html).not.toContain("&quot;");
+
+    const assetMatch = /url\('([^']+)'\)/.exec(html);
+    const assetRes = await fetch(`http://127.0.0.1:${daemon.port}${assetMatch![1]}`);
+    expect(assetRes.status).toBe(200);
+    expect(await assetRes.text()).toBe("<svg></svg>");
+  });
+
   it("GET /api/assets/<encoded path> round-trips a filename with a space", async () => {
     await writeFile(join(dir, "assets", "hero copy.png"), Buffer.from([9, 9, 9]));
     const res = await fetch(`http://127.0.0.1:${daemon.port}/api/assets/${encodeURIComponent("hero copy.png")}`);

@@ -328,3 +328,114 @@ describe("webfont routes (/api/fonts/*, @font-face injection)", () => {
     expect(html).toContain("url(/api/fonts/inter-400-normal-0.woff2)");
   });
 });
+
+describe("asset routes (/api/assets/*, src/url() rewriting)", () => {
+  let dir: string;
+  let artisignHome: ArtisignHomeFixture;
+  let daemon: DaemonHandle;
+  let store: FsStore;
+
+  beforeEach(async () => {
+    __resetFontMemoForTests();
+    dir = await mkdtemp(join(tmpdir(), "artisign-preview-assets-"));
+    await initProject(dir);
+    store = new FsStore(dir);
+    await mkdir(join(dir, "assets", "icons"), { recursive: true });
+    await writeFile(join(dir, "assets", "hero.png"), Buffer.from([1, 2, 3, 4]));
+    await writeFile(join(dir, "assets", "icons", "logo.svg"), "<svg></svg>");
+    await store.writeScreen(
+      "home",
+      `<div id="n1"><img id="hero" src="assets/hero.png"><div id="bg" style="background-image: url(assets/icons/logo.svg)"></div></div>`,
+    );
+
+    artisignHome = await setupArtisignHome();
+    daemon = await startDaemon({ port: 0, projects: [dir] });
+  });
+
+  afterEach(async () => {
+    await daemon.stop();
+    await artisignHome.cleanup();
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("GET /api/assets/<path> serves a project asset with the right content-type", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/assets/hero.png`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    expect(Buffer.from(await res.arrayBuffer())).toEqual(Buffer.from([1, 2, 3, 4]));
+  });
+
+  it("GET /api/assets/<path> sends a CSP + nosniff header (an SVG in assets/ must never run as script on this origin)", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/assets/icons/logo.svg`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-security-policy")).toBe("default-src 'none'; sandbox");
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
+  it("GET /api/render/<screen> rewrites a double-quoted CSS url() through the real render pipeline (escapeAttr turns its quotes into &quot;)", async () => {
+    // The outer `style` attribute is single-quoted in the *source* so the
+    // CSS url() argument's own double quotes don't need escaping there — the
+    // parser decodes this into a real `url("assets/…")` internally, and
+    // render.ts's escapeAttr then re-encodes those quotes as `&quot;` when
+    // it re-serializes the (always double-quoted) style attribute. This is
+    // the actual escaped shape resolveAssetRefs has to handle, produced by
+    // the real pipeline rather than hand-written.
+    await store.writeScreen("home", `<div id="n1" style='background-image: url("assets/icons/logo.svg")'></div>`);
+
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/home`);
+    const html = await res.text();
+    expect(html).toContain("url('/api/assets/icons/logo.svg')");
+    expect(html).not.toContain("&quot;");
+
+    const assetMatch = /url\('([^']+)'\)/.exec(html);
+    const assetRes = await fetch(`http://127.0.0.1:${daemon.port}${assetMatch![1]}`);
+    expect(assetRes.status).toBe(200);
+    expect(await assetRes.text()).toBe("<svg></svg>");
+  });
+
+  it("GET /api/assets/<encoded path> round-trips a filename with a space", async () => {
+    await writeFile(join(dir, "assets", "hero copy.png"), Buffer.from([9, 9, 9]));
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/assets/${encodeURIComponent("hero copy.png")}`);
+    expect(res.status).toBe(200);
+    expect(Buffer.from(await res.arrayBuffer())).toEqual(Buffer.from([9, 9, 9]));
+  });
+
+  it("GET /api/render/<screen> rewrites a filename with a space to a route the server can decode", async () => {
+    await writeFile(join(dir, "assets", "hero copy.png"), Buffer.from([9, 9, 9]));
+    await store.writeScreen("home", `<div id="n1"><img id="hero2" src="assets/hero copy.png"></div>`);
+
+    const renderRes = await fetch(`http://127.0.0.1:${daemon.port}/api/render/home`);
+    const html = await renderRes.text();
+    const srcMatch = /id="hero2" src="([^"]+)"/.exec(html);
+    expect(srcMatch?.[1]).toBe("/api/assets/hero%20copy.png");
+
+    const assetRes = await fetch(`http://127.0.0.1:${daemon.port}${srcMatch![1]}`);
+    expect(assetRes.status).toBe(200);
+    expect(Buffer.from(await assetRes.arrayBuffer())).toEqual(Buffer.from([9, 9, 9]));
+  });
+
+  it("GET /api/assets/<nested path> serves a file from a subdirectory", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/assets/icons/logo.svg`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/svg+xml");
+    expect(await res.text()).toBe("<svg></svg>");
+  });
+
+  it("GET /api/assets/<unknown> returns 404", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/assets/does-not-exist.png`);
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects a path-traversal attempt with 404, not a filesystem read outside assets/", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/assets/${encodeURIComponent("../artisign.json")}`);
+    expect(res.status).toBe(404);
+  });
+
+  it("GET /api/render/<screen> rewrites src and url() asset refs to /api/assets/*", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/home`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('src="/api/assets/hero.png"');
+    expect(html).toContain("url('/api/assets/icons/logo.svg')");
+  });
+});

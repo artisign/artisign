@@ -102,6 +102,18 @@ describe("watchProject", () => {
     expect(events.find((e) => e.path.includes("assign-caregiver"))?.category).toBe("mockup");
   });
 
+  it("categorizes assets/<path> as \"asset\"", async () => {
+    await mkdir(join(dir, "assets"), { recursive: true });
+    const events: ProjectChangeEvent[] = [];
+    unwatch = watchProject(dir, (event) => events.push(event));
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    await writeFile(join(dir, "assets", "hero.png"), "not-really-a-png");
+
+    await waitFor(events, (e) => e.path.includes("hero.png"), 500);
+    expect(events.find((e) => e.path.includes("hero.png"))?.category).toBe("asset");
+  });
+
   it("categorizes design-system/meta.json as \"design_system_meta\"", async () => {
     await mkdir(join(dir, "design-system"), { recursive: true });
     const events: ProjectChangeEvent[] = [];

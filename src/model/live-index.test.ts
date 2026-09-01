@@ -89,6 +89,9 @@ class FakeStore implements Store {
     return [];
   }
   async appendComment() {}
+  async readAsset(): Promise<Buffer> {
+    throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+  }
   async readCacheIndex(): Promise<unknown> {
     return this.cache;
   }

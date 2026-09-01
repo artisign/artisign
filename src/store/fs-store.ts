@@ -319,6 +319,26 @@ export class FsStore implements Store {
     await appendFile(this.path("comments.jsonl"), `${line}\n`);
   }
 
+  /**
+   * Unlike `path()`, this confines `relPath` to the `assets/` subtree
+   * specifically, not just the project directory — an asset reference is
+   * always `assets/<something>`, so a caller-supplied `relPath` that
+   * resolves anywhere else (via `..` or an absolute path) is rejected the
+   * same way `path()` rejects escaping the project root.
+   */
+  private assetPath(relPath: string): string {
+    const assetsRoot = resolve(this.projectDir, "assets");
+    const full = resolve(assetsRoot, relPath);
+    if (full !== assetsRoot && !full.startsWith(assetsRoot + sep)) {
+      throw new Error(`refusing to access path outside assets/: ${relPath}`);
+    }
+    return full;
+  }
+
+  async readAsset(relPath: string): Promise<Buffer> {
+    return readFile(this.assetPath(relPath));
+  }
+
   async readCacheIndex(): Promise<unknown | undefined> {
     try {
       const raw = await readFile(this.path(CACHE_DIR, "index.json"), "utf-8");

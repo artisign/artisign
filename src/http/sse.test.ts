@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { initProject } from "../init/init-project.js";
@@ -105,6 +105,17 @@ describe("GET /events (SSE)", () => {
 
     const evt = await waitForSseEvent(res, (e) => e.kind === "tokens", 500);
     expect(evt).toEqual({ type: "change", kind: "tokens", name: "tokens" });
+  });
+
+  it("categorizes a change under assets/ as \"asset\" — the preview needs this to know to re-render", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/events`);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    await mkdir(join(dir, "assets"), { recursive: true });
+    await writeFile(join(dir, "assets", "hero.png"), "not-really-a-png");
+
+    const evt = await waitForSseEvent(res, (e) => e.kind === "asset", 1000);
+    expect(evt).toEqual({ type: "change", kind: "asset", name: "hero.png" });
   });
 
   it("broadcasts a screen meta change under the screen's own name", async () => {

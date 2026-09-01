@@ -49,3 +49,4 @@ export {
   __setFetchForTests,
   __resetFontMemoForTests,
 } from "./fonts.js";
+export { assetContentType, resolveAssetRefs } from "./assets.js";

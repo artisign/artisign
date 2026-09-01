@@ -11,6 +11,7 @@ import {
   buildFontFaceCss,
   isMaterialSymbolsAvailable,
   resolveTokenRef,
+  resolveAssetRefs,
   type ComponentDefinitionSummary,
   type RenderContext,
   type ScreenDocument,
@@ -70,16 +71,21 @@ export type RenderedScreenDocument = {
 
 /**
  * Reads and renders a screen to a standalone HTML document: parse ->
- * resolve refs -> wrap with `@font-face` CSS. Shared by `/api/render/*`
- * (preview iframe) and `get_screenshot` (headless render), and by the
- * opt-in `rendered_html` field on `get_screen`. Propagates `store.readScreen`'s
- * ENOENT for the caller to translate into its own not-found response.
+ * resolve refs -> wrap with `@font-face` CSS -> resolve `assets/*`
+ * references. Shared by `/api/render/*` (preview iframe) and
+ * `get_screenshot` (headless render), and by the opt-in `rendered_html`
+ * field on `get_screen`. Propagates `store.readScreen`'s ENOENT for the
+ * caller to translate into its own not-found response.
  *
  * `fontMode: "url"` points `@font-face` at `/api/fonts/*` (for a page loaded
  * over HTTP, e.g. the preview iframe); `"inline"` embeds fonts as `data:`
  * URIs (for `page.setContent`, which has no HTTP base URL to resolve
  * relative font URLs against). Font resolution is failure-tolerant either
  * way — offline/uncached falls back to system fonts rather than throwing.
+ * `assets/*` references (`src` attributes, CSS `url()`) get the same
+ * two-mode treatment via `resolveAssetRefs` — `fontMode` doubles as the
+ * asset mode, since both exist for the same reason (a `setContent` page has
+ * no HTTP base URL).
  */
 export async function renderScreenDocument(
   store: Store,
@@ -93,7 +99,11 @@ export async function renderScreenDocument(
   const fontFaceCss = await resolveFontFaceCss(store, ctx.tokens, options.fontMode);
   ctx.iconFontAvailable = isMaterialSymbolsAvailable(store.projectDir);
 
-  const documentHtml = wrapRenderedHtml(renderScreen(doc, ctx), { fontFaceCss });
+  const documentHtml = await resolveAssetRefs(
+    wrapRenderedHtml(renderScreen(doc, ctx), { fontFaceCss }),
+    store,
+    options.fontMode,
+  );
   return { documentHtml, doc, ctx };
 }
 
@@ -119,7 +129,7 @@ export async function renderMockupDocument(
 ): Promise<RenderedMockupDocument> {
   const html = await store.readMockupVariant(name, variantId);
   if (FULL_DOCUMENT_RE.test(html)) {
-    return { documentHtml: html };
+    return { documentHtml: await resolveAssetRefs(html, store, options.fontMode) };
   }
   let tokens: TokensDocument = {};
   try {
@@ -130,7 +140,8 @@ export async function renderMockupDocument(
     tokens = {};
   }
   const fontFaceCss = await resolveFontFaceCss(store, tokens, options.fontMode);
-  return { documentHtml: wrapRenderedHtml(html, { fontFaceCss }) };
+  const documentHtml = await resolveAssetRefs(wrapRenderedHtml(html, { fontFaceCss }), store, options.fontMode);
+  return { documentHtml };
 }
 
 export type Viewport = { width: number; height: number };
@@ -210,7 +221,7 @@ export async function renderDefinitionForBrowser(store: Store, ref: DefinitionNo
   const fontFaceCss = await resolveFontFaceCss(store, ctx.tokens, "inline");
   ctx.iconFontAvailable = isMaterialSymbolsAvailable(store.projectDir);
 
-  const documentHtml = wrapRenderedHtml(renderScreen(source.doc, ctx), { fontFaceCss });
+  const documentHtml = await resolveAssetRefs(wrapRenderedHtml(renderScreen(source.doc, ctx), { fontFaceCss }), store, "inline");
   const rootNode = source.doc.nodes[source.doc.rootNodeId];
   const viewport = rootNode ? resolveViewport(rootNode, ctx.tokens) : DEFAULT_VIEWPORT;
   return { doc: source.doc, documentHtml, viewport };

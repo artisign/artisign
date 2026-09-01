@@ -151,6 +151,7 @@ It needs Playwright — see the optional dependency in [Install](#install) above
 ├── screens/<name>.html           # augmented HTML, one file per screen
 ├── mockups/<name>/mockup.json    # design explorations: variant titles/descriptions, outside the ref model
 ├── mockups/<name>/<variant>.html # raw HTML per variant, written verbatim
+├── assets/                       # local images, referenced as assets/<path>
 ├── flows.json                    # click routes between screens
 ├── comments.jsonl                # append-only, anchored to node ids
 └── .artisign/                    # derived cache, gitignored — safe to delete, rebuilt on next `serve`
@@ -193,6 +194,17 @@ Icons are Material Symbols Rounded, always cached alongside your typography font
 ```
 
 Never substitute a Unicode glyph for an icon — the `.icon` class and the ligature name are what make the rendered result deterministic.
+
+## Images
+
+Drop a local image into a project's `assets/` folder (subfolders are fine) and reference it as a project-relative path, `assets/<path>`, in an `src` attribute or a CSS `url()`:
+
+```html
+<img src="assets/hero.png">
+<div style="background-image: url(assets/icons/logo.svg)"></div>
+```
+
+The reference stays portable in the source file. At render time it resolves two ways, the same split webfonts use: a page loaded over HTTP (the preview iframe, `/api/render/*`) gets it rewritten to `/api/assets/<path>` unconditionally — a path that doesn't resolve to a file under `assets/` still gets the URL, and 404s there, rather than being checked against the filesystem twice; a headless render with no HTTP base URL (`get_screenshot`, `inspect_node`) gets it inlined as a `data:` URI instead, and there an unresolvable path is left as-is. Either way, the browser's own broken-image handling makes the problem visible rather than the image silently vanishing.
 
 ## Repo structure
 

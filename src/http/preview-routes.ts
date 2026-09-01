@@ -13,6 +13,8 @@ import {
   wrapRenderedHtml,
   isMaterialSymbolsAvailable,
   fontsDir,
+  resolveAssetRefs,
+  assetContentType,
 } from "../model/index.js";
 import { sendJson } from "./json.js";
 
@@ -121,27 +123,34 @@ export async function handlePreviewRoutes(req: IncomingMessage, res: ServerRespo
     const fontFaceCss = await resolveFontFaceCss(store, ctx.tokens, "url");
     ctx.iconFontAvailable = isMaterialSymbolsAvailable(store.projectDir);
     const renderVariants = (name: string, variants: { name: string; html_aug: string }[]) =>
-      variants.map((variant) => {
-        const { doc } = parseScreen(variant.html_aug, `__preview_${name}_${variant.name}__`, ctx.registry);
-        return { ...variant, rendered_html: wrapRenderedHtml(renderScreen(doc, ctx), { fontFaceCss }) };
-      });
+      Promise.all(
+        variants.map(async (variant) => {
+          const { doc } = parseScreen(variant.html_aug, `__preview_${name}_${variant.name}__`, ctx.registry);
+          const rendered_html = await resolveAssetRefs(wrapRenderedHtml(renderScreen(doc, ctx), { fontFaceCss }), store, "url");
+          return { ...variant, rendered_html };
+        }),
+      );
 
     const componentDefinitions = (summary.component_definitions as ComponentDefinitionJson[] | undefined) ?? [];
-    const rendered = componentDefinitions.map((component) => ({
-      ...component,
-      variants: renderVariants(component.name, component.variants),
-    }));
+    const rendered = await Promise.all(
+      componentDefinitions.map(async (component) => ({
+        ...component,
+        variants: await renderVariants(component.name, component.variants),
+      })),
+    );
 
     // The tool layer returns a pattern as its raw file contents — patterns have
     // no variant model of their own. The pane still has to show them, so the
     // same `<template data-variant>` grammar is applied here, at the preview
     // edge only, leaving the MCP response shape untouched.
     const patternDefinitions = (summary.pattern_definitions as PatternDefinitionJson[] | undefined) ?? [];
-    const renderedPatterns = patternDefinitions.map((pattern) => {
-      const def = parseComponentDefinition(pattern.name, pattern.html_aug);
-      const variants = def.variants.map((v) => ({ name: v.name, html_aug: v.htmlAug }));
-      return { ...pattern, variants: renderVariants(pattern.name, variants) };
-    });
+    const renderedPatterns = await Promise.all(
+      patternDefinitions.map(async (pattern) => {
+        const def = parseComponentDefinition(pattern.name, pattern.html_aug);
+        const variants = def.variants.map((v) => ({ name: v.name, html_aug: v.htmlAug }));
+        return { ...pattern, variants: await renderVariants(pattern.name, variants) };
+      }),
+    );
 
     sendJson(res, 200, { ...summary, component_definitions: rendered, pattern_definitions: renderedPatterns });
     return true;
@@ -164,6 +173,40 @@ export async function handlePreviewRoutes(req: IncomingMessage, res: ServerRespo
         return true;
       }
       throw err;
+    }
+    return true;
+  }
+
+  const assetMatch = /^\/api\/assets\/(.+)$/.exec(url.pathname);
+  if (assetMatch) {
+    let relPath: string;
+    try {
+      relPath = decodeURIComponent(assetMatch[1]!);
+    } catch {
+      sendJson(res, 404, { code: "not_found", message: "asset was not found" });
+      return true;
+    }
+    try {
+      const body = await store.readAsset(relPath);
+      const contentType = assetContentType(relPath) ?? "application/octet-stream";
+      res.writeHead(200, {
+        "content-type": contentType,
+        // A project asset can be an SVG a user downloaded from the web and
+        // dropped into `assets/` — served bare, it would run as script on
+        // the daemon's own origin (same-origin requests reach the full tool
+        // API, per `isAllowedOrigin`). These two headers close that off:
+        // `sandbox` (no scripts, no same-origin) if it's ever opened as a
+        // top-level navigation, `nosniff` so a non-image extension never
+        // gets sniffed into something executable.
+        "content-security-policy": "default-src 'none'; sandbox",
+        "x-content-type-options": "nosniff",
+      });
+      res.end(body);
+    } catch {
+      // `store.readAsset` throws both for a missing file (ENOENT) and for a
+      // path that escapes `assets/` (e.g. `../..`) — either way, 404 rather
+      // than leaking which one it was.
+      sendJson(res, 404, { code: "not_found", message: "asset was not found" });
     }
     return true;
   }

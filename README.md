@@ -28,13 +28,16 @@ npm install artisign
 
 The commands below are written as `npx artisign`. With a local install, run `./node_modules/.bin/artisign` instead — or `npm install -g artisign` and just `artisign`.
 
-**Canonical quickstart.** Install, start the daemon, then register the MCP server — in that order, since the HTTP registration below runs against an already-running daemon:
+**Canonical quickstart.** The local install, from an empty directory to a connected agent. Start the daemon before registering the MCP server — the HTTP registration below runs against an already-running daemon:
 
 ```bash
+mkdir artisign && cd artisign
 npm install artisign
-npx artisign start ./my-project
+./node_modules/.bin/artisign start ./my-project
 claude mcp add --transport http artisign "http://127.0.0.1:4711/mcp?project=/absolute/path/to/my-project"
 ```
+
+The first two lines repeat the install above on purpose: the point of this block is that nothing has to be assembled from elsewhere. On the npx path, drop them and start with `npx artisign start ./my-project` instead — the screenshot tools are then unavailable, as described below.
 
 **Optional: screenshots.** `get_screenshot` and `inspect_node` need a real browser, which is intentionally not bundled (`npx artisign` stays light without it). Playwright is an **optional peer dependency** — npm neither installs it nor its ~150 MB of browser binaries unless you ask for them. Run this **in the same directory you installed `artisign` into**:
 

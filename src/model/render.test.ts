@@ -414,6 +414,118 @@ describe("renderScreen — recursive component guard", () => {
   });
 });
 
+describe("renderScreen — instance attributes on an expanded component", () => {
+  it("keeps a plain attribute authored on the instance", () => {
+    const ctx = makeContext();
+    const { doc } = parseScreen(
+      `<div id="n1"><a id="n2" class="$btn-primary" href="/imprint"><span data-slot="label">Imprint</span></a></div>`,
+      "s",
+      ctx.registry,
+    );
+    // The href is the whole point of the element; dropping it renders a link to nowhere.
+    expect(renderScreen(doc, ctx)).toContain('href="/imprint"');
+  });
+
+  it("keeps several instance attributes at once", () => {
+    const ctx = makeContext();
+    const { doc } = parseScreen(
+      `<div id="n1"><a id="n2" class="$btn-primary" href="/x" aria-label="Go now" target="_blank"><span data-slot="label">Go</span></a></div>`,
+      "s",
+      ctx.registry,
+    );
+    const html = renderScreen(doc, ctx);
+    expect(html).toContain('href="/x"');
+    expect(html).toContain('aria-label="Go now"');
+    expect(html).toContain('target="_blank"');
+  });
+
+  it("appends the instance's own style after the component's, so the instance wins the inline cascade", () => {
+    const ctx = makeContext();
+    const { doc } = parseScreen(
+      `<div id="n1"><button id="n2" class="$btn-primary" style="flex: 1"><span data-slot="label">Go</span></button></div>`,
+      "s",
+      ctx.registry,
+    );
+    expect(renderScreen(doc, ctx)).toContain('style="color: #ffffff; flex: 1"');
+  });
+
+  it("resolves a token ref used in the instance's own style", () => {
+    const ctx = makeContext();
+    const { doc } = parseScreen(
+      `<div id="n1"><button id="n2" class="$btn-primary" style="margin-top: $space.md"><span data-slot="label">Go</span></button></div>`,
+      "s",
+      ctx.registry,
+    );
+    expect(renderScreen(doc, ctx)).toContain("margin-top: 16px");
+  });
+
+  it("marks an unresolved token used in the instance's own style", () => {
+    const ctx = makeContext({ tokens: { color: { "on-primary": "#ffffff" } } });
+    const { doc } = parseScreen(
+      `<div id="n1"><button id="n2" class="$btn-primary" style="margin-top: $space.md"><span data-slot="label">Go</span></button></div>`,
+      "s",
+      makeContext().registry,
+    );
+    expect(renderScreen(doc, ctx)).toContain('data-unresolved-token="space.md"');
+  });
+
+  it("merges an extra class on the instance with the component's own", () => {
+    const classDef = parseComponentDefinition(
+      "btn-primary",
+      `<button class="btn" style="color: $color.on-primary"><span data-slot="label">Default label</span></button>`,
+    );
+    const ctx = makeContext({ componentDefs: new Map([["btn-primary", classDef]]) });
+    const { doc } = parseScreen(
+      `<div id="n1"><button id="n2" class="$btn-primary wide"><span data-slot="label">Go</span></button></div>`,
+      "s",
+      ctx.registry,
+    );
+    expect(renderScreen(doc, ctx)).toContain('class="btn wide"');
+  });
+
+  it("never emits data-variant twice when the instance names a variant", () => {
+    const hoverDef = parseComponentDefinition(
+      "btn-primary",
+      `<button style="color: $color.on-primary"><span data-slot="label">Default</span></button>\n<template data-variant="hover"><button><span data-slot="label">Default</span></button></template>`,
+    );
+    const ctx = makeContext({ componentDefs: new Map([["btn-primary", hoverDef]]) });
+    const { doc } = parseScreen(
+      `<div id="n1"><a id="n2" class="$btn-primary" data-variant="hover" href="/x"><span data-slot="label">Go</span></a></div>`,
+      "s",
+      ctx.registry,
+    );
+    const html = renderScreen(doc, ctx);
+    expect(html.match(/data-variant=/g)).toHaveLength(1);
+    expect(html).toContain('data-variant="hover"');
+    expect(html).toContain('href="/x"');
+  });
+
+  it("applies the instance's attributes to the expanded root only, not to descendants", () => {
+    const ctx = makeContext();
+    const { doc } = parseScreen(
+      `<div id="n1"><a id="n2" class="$btn-primary" href="/x"><span data-slot="label">Go</span></a></div>`,
+      "s",
+      ctx.registry,
+    );
+    // One href in the whole document — the expansion's inner <span> must not inherit it.
+    expect(renderScreen(doc, ctx).match(/href=/g)).toHaveLength(1);
+  });
+
+  it("carries instance attributes on a component nested inside another component's template", () => {
+    const cardDef = parseComponentDefinition("card", `<div style="padding: $space.md"><a id="cta" class="$btn-primary" href="/nested"><span data-slot="label">Go</span></a></div>`);
+    const btnDef = parseComponentDefinition("btn-primary", `<a style="color: $color.on-primary"><span data-slot="label">Default</span></a>`);
+    const ctx = makeContext({
+      componentDefs: new Map([
+        ["card", cardDef],
+        ["btn-primary", btnDef],
+      ]),
+      registry: { ...makeContext().registry, componentNames: new Set(["card", "btn-primary"]) },
+    });
+    const { doc } = parseScreen(`<div id="n1"><div id="n2" class="$card"></div></div>`, "s", ctx.registry);
+    expect(renderScreen(doc, ctx)).toContain('href="/nested"');
+  });
+});
+
 describe("renderScreen — component robustness", () => {
   it("does not emit a duplicate data-variant attribute", () => {
     const def = parseComponentDefinition(

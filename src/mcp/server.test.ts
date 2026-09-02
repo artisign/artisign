@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { createRequire } from "node:module";
 import { PLAYWRIGHT_MISSING_MESSAGE } from "../tools/browser.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -35,6 +36,14 @@ describe("MCP server — protocol-level", () => {
   afterEach(async () => {
     await client.close();
     await fx.cleanup();
+  });
+
+  // The version an MCP client displays. It lived as a second, hand-maintained
+  // copy next to package.json and would have been left behind by the next
+  // release; this pins the two together so a bump cannot silently miss one.
+  it("reports the installed package version to the client", async () => {
+    const { version } = createRequire(import.meta.url)("../../package.json") as { version: string };
+    expect(client.getServerVersion()).toMatchObject({ name: "artisign", version });
   });
 
   it("lists all 23 tools", async () => {

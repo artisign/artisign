@@ -6,7 +6,7 @@ Local-first UX design tool for AI agents. Agents design through MCP, the human r
 
 One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
-**Status:** Beta (`0.9.0`) — CLI, store, parser/model, the 23-tool MCP surface, browser preview with live reload/flows/comments, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. Artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
+**Status:** Beta (`0.10.0`) — CLI, store, parser/model, the 23-tool MCP surface, browser preview with live reload/flows/comments, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. Artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
 
 ## Why
 

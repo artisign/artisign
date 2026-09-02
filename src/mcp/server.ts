@@ -1,9 +1,18 @@
+import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Store } from "../store/index.js";
 import { TOOLS, ToolError, type ToolHandlerContext } from "../tools/index.js";
 import { INSTRUCTIONS } from "./instructions.js";
 
-const SERVER_INFO = { name: "artisign", version: "0.9.0" };
+// Read from package.json rather than repeated here: this string is what every
+// MCP client shows as the server's version, and a second copy of it drifts the
+// moment a release bumps one and not the other — it sat at 0.9.0 while the
+// package moved on. Resolved relative to this module, the same way
+// `src/tools/guide.ts` reaches the shipped docs, so it works identically from
+// `src/mcp/` under tsx and from `dist/mcp/` in the published package.
+const packageJson = createRequire(import.meta.url)("../../package.json") as { version: string };
+
+const SERVER_INFO = { name: "artisign", version: packageJson.version };
 
 /** Marker shape a tool result can return (see `get_screenshot`) to be sent back as an MCP image content block instead of JSON text. */
 type ImageResult = { __image: { data: string; mimeType: string } };

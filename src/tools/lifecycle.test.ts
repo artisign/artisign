@@ -164,10 +164,12 @@ describe("promote_to_system", () => {
     expect(await fx.store.readScreen("home")).not.toContain("$card");
   });
 
-  // The check runs on the file about to be written, not on the input list —
-  // variant names are interpolated into the markup unescaped, so a name
-  // carrying a quote can manufacture a duplicate the raw list never shows.
-  it("rejects a variant name whose markup injection manufactures a duplicate", async () => {
+  // A name carrying a quote used to reach the markup unescaped and could
+  // manufacture a duplicate the raw list never shows; the duplicate check on
+  // the assembled file caught that shape (CHR-555). Since CHR-556 the name is
+  // refused before the file is assembled at all, so the quote never gets that
+  // far — the duplicate check stays as the second line behind it.
+  it("rejects a variant name whose markup injection would manufacture a duplicate, before assembling the file", async () => {
     await fx.store.writeScreen("home", `<div id="card"><h3 id="t">T</h3></div>`);
 
     await expect(
@@ -177,7 +179,7 @@ describe("promote_to_system", () => {
         name: "card",
         variants: [`a"></template><template data-variant="default`],
       }),
-    ).rejects.toMatchObject({ code: "validation_failed", message: 'duplicate variant name "default"' });
+    ).rejects.toMatchObject({ code: "validation_failed", message: expect.stringMatching(/^variant name .* must not contain/) });
 
     expect(await fx.store.listComponents()).not.toContain("card");
   });

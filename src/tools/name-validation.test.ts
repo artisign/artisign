@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { writeHtml } from "./writes.js";
 import { importHtml, promoteToSystem, initProjectTool } from "./lifecycle.js";
-import { assertValidEntityName } from "./name-validation.js";
+import { assertValidEntityName, assertValidVariantName } from "./name-validation.js";
 
 describe("assertValidEntityName", () => {
   it.each([":", "#", "."])('rejects a name containing "%s"', (char) => {
@@ -18,6 +18,96 @@ describe("assertValidEntityName", () => {
     for (const name of ["new-note", "notes", "welcome"]) assertValidEntityName("screen", name);
     assertValidEntityName("component", "btn-primary");
     assertValidEntityName("pattern", "card_grid");
+  });
+});
+
+describe("assertValidVariantName", () => {
+  it.each([":", "#", ".", '"', "<", ">", "&"])('rejects a variant name containing "%s"', (char) => {
+    expect(() => assertValidVariantName(`hov${char}er`)).toThrowError(expect.objectContaining({ code: "validation_failed" }));
+  });
+
+  it("rejects an empty name and one carrying whitespace — neither survives a #variant address", () => {
+    expect(() => assertValidVariantName("")).toThrowError(expect.objectContaining({ code: "validation_failed" }));
+    expect(() => assertValidVariantName("size lg")).toThrowError(expect.objectContaining({ code: "validation_failed" }));
+  });
+
+  it("accepts ordinary variant names unchanged", () => {
+    for (const name of ["default", "hover", "disabled", "size-lg", "dark_mode", "v2"]) assertValidVariantName(name);
+  });
+});
+
+describe("variant names at both doors (CHR-556)", () => {
+  let fx: ProjectFixture;
+
+  beforeEach(async () => {
+    fx = await setupProject();
+    await fx.store.writeScreen("home", `<div id="card"><h3 id="t">T</h3></div>`);
+  });
+  afterEach(() => fx.cleanup());
+
+  it.each([`ho"ver`, "hov<er", "hov>er", "hov:er", "hov#er", "hov.er"])(
+    "promote_to_system rejects variant %j with validation_failed and writes nothing",
+    async (variant) => {
+      await expect(
+        promoteToSystem(fx.store, { node: "home.card", kind: "component", name: "card", variants: [variant] }),
+      ).rejects.toMatchObject({ code: "validation_failed", message: expect.stringContaining("variant name") });
+      expect(await fx.store.listComponents()).not.toContain("card");
+      expect(await fx.store.readScreen("home")).not.toContain("$card");
+    },
+  );
+
+  // The CHR-555 review case, in the shape that used to slip through: the
+  // injected markup manufactures a *distinct* second variant, so the
+  // duplicate check never fired and two templates the caller never asked for
+  // reached the file.
+  it("promote_to_system rejects a markup injection that manufactures a distinct variant", async () => {
+    await expect(
+      promoteToSystem(fx.store, {
+        node: "home.card",
+        kind: "component",
+        name: "card",
+        variants: [`a"></template><template data-variant="hover`],
+      }),
+    ).rejects.toMatchObject({ code: "validation_failed", message: expect.stringContaining("variant name") });
+    expect(await fx.store.listComponents()).not.toContain("card");
+  });
+
+  it("promote_to_system still accepts ordinary variant names", async () => {
+    const res = await promoteToSystem(fx.store, {
+      node: "home.card",
+      kind: "component",
+      name: "card",
+      variants: ["hover", "disabled", "size-lg"],
+    });
+    expect(res).toMatchObject({ entity: { kind: "component", name: "card" } });
+    const file = await fx.store.readComponent("card");
+    for (const v of ["hover", "disabled", "size-lg"]) expect(file).toContain(`data-variant="${v}"`);
+  });
+
+  it.each(["hov#er", "hov:er", "hov.er", "size lg"])(
+    "write_html rejects a definition whose data-variant is %j with validation_failed",
+    async (variant) => {
+      const res = await writeHtml(fx.store, {
+        screen: "card",
+        mode: "create",
+        kind: "component",
+        html_aug: `<div id="n1"><span id="n2" data-slot="label">T</span></div>\n<template data-variant="${variant}"><div id="n1"><span id="n2" data-slot="label">T</span></div></template>`,
+      });
+      expect(res).toMatchObject({ commit: null, errors: [{ code: "validation_failed", message: expect.stringContaining("variant name") }] });
+      expect(await fx.store.listComponents()).not.toContain("card");
+    },
+  );
+
+  it("write_html still accepts ordinary variant names", async () => {
+    const res = await writeHtml(fx.store, {
+      screen: "card",
+      mode: "create",
+      kind: "component",
+      html_aug: `<div id="n1"><span id="n2" data-slot="label">T</span></div>\n<template data-variant="size-lg"><div id="n1"><span id="n2" data-slot="label">T</span></div></template>`,
+    });
+    expect(res).toMatchObject({ variants: ["default", "size-lg"] });
+    expect(res).not.toHaveProperty("errors");
+    expect(await fx.store.listComponents()).toContain("card");
   });
 });
 
@@ -107,7 +197,8 @@ describe("all call sites share one validator", () => {
 
   it("calls assertValidEntityName from write_html, import_html and promote_to_system", async () => {
     const spy = vi.fn();
-    vi.doMock("./name-validation.js", () => ({ assertValidEntityName: spy }));
+    const variantSpy = vi.fn();
+    vi.doMock("./name-validation.js", () => ({ assertValidEntityName: spy, assertValidVariantName: variantSpy }));
 
     const writes = await import("./writes.js");
     const lifecycle = await import("./lifecycle.js");
@@ -124,5 +215,26 @@ describe("all call sites share one validator", () => {
 
     await lifecycle.promoteToSystem(fx.store, { node: "home.n2", kind: "component", name: "heading" });
     expect(spy).toHaveBeenCalledWith("component", "heading");
+  });
+
+  it("calls assertValidVariantName from write_html and promote_to_system — one rule, both doors", async () => {
+    const variantSpy = vi.fn();
+    vi.doMock("./name-validation.js", () => ({ assertValidEntityName: vi.fn(), assertValidVariantName: variantSpy }));
+
+    const writes = await import("./writes.js");
+    const lifecycle = await import("./lifecycle.js");
+
+    await writes.writeHtml(fx.store, {
+      screen: "btn-primary",
+      mode: "create",
+      kind: "component",
+      html_aug: `<button id="n1">Go</button>\n<template data-variant="hover"><button id="n1">Go</button></template>`,
+    });
+    expect(variantSpy).toHaveBeenCalledWith("default");
+    expect(variantSpy).toHaveBeenCalledWith("hover");
+
+    await writes.writeHtml(fx.store, { screen: "home", mode: "create", title: "Home", html_aug: `<section id="n1"><h1 id="n2">Hi</h1></section>` });
+    await lifecycle.promoteToSystem(fx.store, { node: "home.n2", kind: "component", name: "heading", variants: ["large"] });
+    expect(variantSpy).toHaveBeenCalledWith("large");
   });
 });

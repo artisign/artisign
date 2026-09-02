@@ -306,7 +306,8 @@ describe("renderScreen — slot substitution", () => {
       ctx.registry,
     );
     const html = renderScreen(doc, ctx);
-    expect(html).toContain("<strong>Bold</strong>");
+    // The fill keeps its authored id (CHR-581) and replaces the placeholder whole.
+    expect(html).toContain('<strong id="n3">Bold</strong>');
     expect(html).not.toMatch(/<span[^>]*><strong/); // not nested inside the placeholder's own <span>
   });
 
@@ -511,6 +512,46 @@ describe("renderScreen — instance attributes on an expanded component", () => 
     expect(renderScreen(doc, ctx).match(/href=/g)).toHaveLength(1);
   });
 
+  // README "Screens are augmented HTML" example, verbatim: a component ref, a
+  // variant, an instance-level style with a token ref, and a flow target on
+  // one element. CHR-582 found the documented example did not render its
+  // padding-inline at all; this keeps the README's own example executable.
+  it("renders the README's canonical instance example with its own padding-inline, variant and flow intact", () => {
+    const readmeTokens: TokensDocument = { spacing: { md: "16px" }, color: { "on-primary": "#ffffff" } };
+    const registry: DesignSystemRegistry = {
+      componentNames: new Set(["btn-primary"]),
+      tokenPaths: new Set(["spacing.md", "color.on-primary"]),
+      tokenFlatNames: new Set(["md", "on-primary"]),
+    };
+    const def = parseComponentDefinition(
+      "btn-primary",
+      `<button style="color: $color.on-primary; padding-inline: 8px">Default</button>\n<template data-variant="hover"><button style="color: $color.on-primary; padding-inline: 8px; opacity: 0.9">Default</button></template>`,
+    );
+    const ctx: RenderContext = { tokens: readmeTokens, registry, componentDefs: new Map([["btn-primary", def]]) };
+    const { doc, errors } = parseScreen(
+      `<div id="root"><button id="btn-login" class="$btn-primary" data-variant="hover"
+        style="padding-inline: $spacing.md" data-flow-target="dashboard">
+  Log in
+</button></div>`,
+      "s",
+      registry,
+    );
+    expect(errors).toEqual([]);
+    const html = renderScreen(doc, ctx);
+
+    // The hover variant was expanded, and the instance's padding-inline comes
+    // last so it wins the inline cascade over the definition's 8px.
+    expect(html).toContain("opacity: 0.9");
+    expect(html).toMatch(/style="[^"]*padding-inline: 8px[^"]*padding-inline: 16px"/);
+    expect(html).toContain("Log in");
+    expect(html.match(/data-variant=/g)).toHaveLength(1);
+    expect(html).toContain('data-variant="hover"');
+    expect(html.match(/data-flow-target=/g)).toHaveLength(1);
+    expect(html).toContain('data-flow-target="dashboard"');
+    expect(html).toContain('id="btn-login"');
+    expect(html).not.toContain("$");
+  });
+
   it("carries instance attributes on a component nested inside another component's template", () => {
     const cardDef = parseComponentDefinition("card", `<div style="padding: $space.md"><a id="cta" class="$btn-primary" href="/nested"><span data-slot="label">Go</span></a></div>`);
     const btnDef = parseComponentDefinition("btn-primary", `<a style="color: $color.on-primary"><span data-slot="label">Default</span></a>`);
@@ -606,5 +647,143 @@ describe("renderScreen — determinism", () => {
     const first = renderScreen(doc, ctx);
     const second = renderScreen(doc, makeContext());
     expect(second).toBe(first);
+  });
+});
+
+describe("renderScreen — component instances inside slot fills (CHR-581)", () => {
+  const cardDef = parseComponentDefinition("card", `<div style="padding: $space.md"><span data-slot="content">C</span></div>`);
+  const btnDef = parseComponentDefinition(
+    "btn-primary",
+    `<button style="color: $color.on-primary"><span data-slot="label">Default label</span></button>\n<template data-variant="hover"><button style="color: $color.on-primary; opacity: 0.9"><span data-slot="label">Default label</span></button></template>`,
+  );
+
+  function slotContext(extraDefs: [string, ReturnType<typeof parseComponentDefinition>][] = []): RenderContext {
+    const ctx = makeContext({ componentDefs: new Map([["card", cardDef], ["btn-primary", btnDef], ...extraDefs]) });
+    const componentNames = new Set(["card", "btn-primary", ...extraDefs.map(([name]) => name)]);
+    return { ...ctx, registry: { ...ctx.registry, componentNames } };
+  }
+
+  it("expands a component instance that fills another component's slot, with its id, and never leaks the $ref", () => {
+    const ctx = slotContext();
+    const { doc, errors } = parseScreen(
+      `<div id="n1"><div id="n2" class="$card"><button id="n3" data-slot="content" class="$btn-primary"><span data-slot="label">Go</span></button></div></div>`,
+      "s",
+      ctx.registry,
+    );
+    expect(errors).toEqual([]);
+    const html = renderScreen(doc, ctx);
+    expect(html).toContain('<div id="n2" style="padding: 16px" data-variant="default">');
+    expect(html).toMatch(/<button id="n3" style="color: #ffffff" data-variant="default">/);
+    expect(html).toContain(">Go<");
+    expect(html).not.toContain("Default label");
+    expect(html).not.toContain("$");
+  });
+
+  it("resolves the nested instance's own variant and nested slots", () => {
+    const ctx = slotContext();
+    const { doc } = parseScreen(
+      `<div id="n1"><div id="n2" class="$card"><button id="n3" data-slot="content" class="$btn-primary" data-variant="hover"><span data-slot="label">Hover me</span></button></div></div>`,
+      "s",
+      ctx.registry,
+    );
+    const html = renderScreen(doc, ctx);
+    expect(html).toContain("opacity: 0.9");
+    expect(html).toContain('id="n3" style="color: #ffffff; opacity: 0.9" data-variant="hover"');
+    expect(html).toContain(">Hover me<");
+    expect(html.match(/data-variant=/g)).toHaveLength(2); // the card's and the button's, once each
+  });
+
+  it("carries the nested instance's own attributes onto its expanded root (CHR-583 applies inside fills too)", () => {
+    const ctx = slotContext();
+    const { doc } = parseScreen(
+      `<div id="n1"><div id="n2" class="$card"><a id="n3" data-slot="content" class="$btn-primary" href="/go" style="flex: 1"><span data-slot="label">Go</span></a></div></div>`,
+      "s",
+      ctx.registry,
+    );
+    const html = renderScreen(doc, ctx);
+    expect(html).toContain('href="/go"');
+    expect(html).toContain('style="color: #ffffff; flex: 1"');
+  });
+
+  it("expands a fill instance nested deeper inside plain slot content", () => {
+    const ctx = slotContext();
+    const { doc } = parseScreen(
+      `<div id="n1"><div id="n2" class="$card"><div data-slot="content" id="w"><p id="p"><a id="n3" class="$btn-primary"><span data-slot="label">Deep</span></a></p></div></div></div>`,
+      "s",
+      ctx.registry,
+    );
+    const html = renderScreen(doc, ctx);
+    // The definition's root tag wins over the instance's <a>, as it does for a top-level instance.
+    expect(html).toContain('<div id="w"><p id="p"><button id="n3" style="color: #ffffff" data-variant="default">');
+    expect(html).toContain(">Deep<");
+    expect(html).not.toContain("$btn-primary");
+  });
+
+  it("gives an id-less fill instance an id under the expansion it fills", () => {
+    const ctx = slotContext();
+    const { doc } = parseScreen(
+      `<div id="n1"><div id="n2" class="$card"><button data-slot="content" class="$btn-primary"><span data-slot="label">Go</span></button></div></div>`,
+      "s",
+      ctx.registry,
+    );
+    expect(renderScreen(doc, ctx)).toContain('<button id="n2--fill1" style="color: #ffffff"');
+  });
+
+  it("keeps the ids of plain elements inside a slot fill", () => {
+    const ctx = slotContext();
+    const { doc } = parseScreen(
+      `<div id="n1"><div id="n2" class="$card"><div data-slot="content" id="x1"><b id="x2">t</b></div></div></div>`,
+      "s",
+      ctx.registry,
+    );
+    const html = renderScreen(doc, ctx);
+    expect(html).toContain('<div id="x1"><b id="x2">t</b></div>');
+  });
+
+  it("treats the same component nested through a screen-authored fill as nesting, not recursion", () => {
+    const ctx = slotContext();
+    const { doc } = parseScreen(
+      `<div id="n1"><div id="n2" class="$card"><div id="n3" data-slot="content" class="$card"><span data-slot="content">inner</span></div></div></div>`,
+      "s",
+      ctx.registry,
+    );
+    const html = renderScreen(doc, ctx);
+    expect(html).not.toContain("data-recursive-component");
+    expect(html.match(/padding: 16px/g)).toHaveLength(2);
+    expect(html).toContain(">inner<");
+  });
+
+  it("guards a cycle that runs through a template's own slot fill", () => {
+    // wrap's template puts a `$wrap` inside a `$card`'s slot: expanding wrap
+    // expands card, whose fill instantiates wrap again — forever, without
+    // the fill carrying its author's expansion path.
+    const wrapDef = parseComponentDefinition("wrap", `<div><div class="$card"><div class="$wrap" data-slot="content">x</div></div></div>`);
+    const ctx = slotContext([["wrap", wrapDef]]);
+    const { doc } = parseScreen(`<div id="n1"><div id="n2" class="$wrap"></div></div>`, "s", ctx.registry);
+    const html = renderScreen(doc, ctx);
+    expect(html).toContain('data-recursive-component="wrap"');
+    expect(html.match(/padding: 16px/g)).toHaveLength(1);
+  });
+
+  it("namespaces the ids of a fill authored inside a template under that expansion", () => {
+    const shellDef = parseComponentDefinition("shell", `<div><div class="$card"><b id="inner" data-slot="content">t</b></div></div>`);
+    const ctx = slotContext([["shell", shellDef]]);
+    const { doc } = parseScreen(`<div id="n1"><div id="n2" class="$shell"></div><div id="n4" class="$shell"></div></div>`, "s", ctx.registry);
+    const html = renderScreen(doc, ctx);
+    expect(html).toContain('<b id="n2--inner">t</b>');
+    expect(html).toContain('<b id="n4--inner">t</b>');
+  });
+
+  it("marks an unresolved component ref inside a fill instead of leaking it, and the parser reports it", () => {
+    const ctx = slotContext();
+    const { doc, errors } = parseScreen(
+      `<div id="n1"><div id="n2" class="$card"><button id="n3" data-slot="content" class="$btn-ghost">Go</button></div></div>`,
+      "s",
+      ctx.registry,
+    );
+    expect(errors).toContainEqual(expect.objectContaining({ code: "unresolved_ref", message: expect.stringContaining("$btn-ghost") }));
+    const html = renderScreen(doc, ctx);
+    expect(html).not.toContain("$btn-ghost");
+    expect(html).toContain('<button id="n3">Go</button>');
   });
 });

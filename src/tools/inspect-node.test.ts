@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { createRequire } from "node:module";
 import { setupProject, estimateTokens, type ProjectFixture } from "./test-fixtures.js";
 import { inspectNode } from "./inspect-node.js";
+import { PLAYWRIGHT_MISSING_MESSAGE } from "./browser.js";
 import { __setPlaywrightImportForTests, __resetBrowserForTests } from "./browser.js";
 import { FsStore } from "../store/index.js";
 import { ToolError } from "./types.js";
@@ -75,7 +76,7 @@ describe("inspectNode — missing Playwright", () => {
 
     await expect(inspectNode(fx.store, { node: "home.n1" })).rejects.toMatchObject({
       code: "io_error",
-      message: "Playwright is not installed. Run: npm install playwright && npx playwright install chromium",
+      message: PLAYWRIGHT_MISSING_MESSAGE,
     });
   });
 });
@@ -165,11 +166,10 @@ describe.skipIf(!isPlaywrightAvailable())("inspectNode — e2e (real Chromium)",
 // Same fd-3/4 fallback story as get_screenshot — inspect_node
 // shares the launch path via browser.ts, so a single smoke test here is
 // enough; the exhaustive fallback coverage lives in screenshot.test.ts.
-// Skipped on CI: the manual spawn omits `--no-sandbox`, so Chromium dies
-// on a sandboxed Linux runner before printing its websocket endpoint. That
-// is a real weakness of the fallback — tracked in CHR-562 — not a fault of
-// these tests, which still run on a developer machine.
-describe.skipIf(!isPlaywrightAvailable() || process.env.CI)("inspectNode — fallback launch (real Chromium)", () => {
+// Runs on CI too: the manual spawn passes `--no-sandbox` (see
+// MANUAL_LAUNCH_ARGS in browser.ts), so a sandboxed Linux runner — the kind of
+// host the fallback exists for — is exactly where this has to keep passing.
+describe.skipIf(!isPlaywrightAvailable())("inspectNode — fallback launch (real Chromium)", () => {
   let dir: string;
   let store: FsStore;
 

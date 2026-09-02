@@ -39,13 +39,27 @@ claude mcp add --transport http artisign "http://127.0.0.1:4711/mcp?project=/abs
 
 The first two lines repeat the install above on purpose: the point of this block is that nothing has to be assembled from elsewhere. On the npx path, drop them and start with `npx artisign start ./my-project` instead — the screenshot tools are then unavailable, as described below.
 
-**Optional: screenshots.** `get_screenshot` and `inspect_node` need a real browser, which is intentionally not bundled (`npx artisign` stays light without it). Playwright is an **optional peer dependency** — npm neither installs it nor its ~150 MB of browser binaries unless you ask for them. Run this **in the same directory you installed `artisign` into**:
+**Optional: screenshots.** `get_screenshot` and `inspect_node` need a real browser, which is intentionally not bundled (`npx artisign` stays light without it). Playwright is an **optional peer dependency** — npm neither installs it nor its ~150 MB of browser binaries unless you ask for them by name. Two ways to do that:
 
-```bash
-npm install playwright && npx playwright install chromium
-```
+1. **Next to Artisign.** In the directory you installed `artisign` into:
 
-`artisign` imports Playwright dynamically, so Node resolves it from the tree `artisign` itself lives in: installing Playwright into your design project has no effect, and no placement works at all while `artisign` runs from npx's cache. The npx path and the screenshot tools are mutually exclusive — that is the one thing the two install options above actually decide. If Playwright isn't installed, both tools fail with the install command in the error message rather than crashing the server; every other tool works without it.
+   ```bash
+   npm install --no-save playwright && npx playwright install chromium
+   ```
+
+   `--no-save` matters: it installs the package without writing it into `package.json` or the lockfile, which is the whole point of Playwright being optional. Without the flag npm edits both files; with some npm versions a plain `npm install playwright` even reports `up to date` and installs nothing, because an optional peer counts as satisfied when absent.
+
+2. **Anywhere, named by `ARTISIGN_PLAYWRIGHT_DIR`.** Install Playwright once into a directory of its own and point Artisign at it:
+
+   ```bash
+   mkdir -p ~/.artisign-playwright && cd ~/.artisign-playwright
+   npm init -y >/dev/null && npm install playwright && npx playwright install chromium
+   export ARTISIGN_PLAYWRIGHT_DIR=~/.artisign-playwright   # in the shell that starts the daemon
+   ```
+
+   This is the route that also works when `artisign` runs from npx's cache, and the one to use when the first route leaves the repo dirty. The variable has to be set for the process that runs the daemon — for a stdio MCP server, that is the `env` block of the host's config.
+
+`artisign` imports Playwright dynamically, so without the variable Node resolves it from the tree `artisign` itself lives in: installing Playwright into your design project has no effect. If Playwright isn't installed, or is installed but broken (a partial copy, a symlink whose target is gone), both tools fail with the fix in the error message rather than crashing the server; every other tool works without it. A Playwright installed *after* the daemon started is picked up on the next call; a *repaired* one needs a daemon restart, and the error says so.
 
 **Register the MCP server.**
 
@@ -165,6 +179,15 @@ Screens are augmented HTML — `$name` in `class` is a component ref, `$name` in
   Log in
 </button>
 ```
+
+What an instance contributes is exactly what it writes: the component ref picks
+the definition, `data-variant` picks the template, its children fill the slots,
+and every other attribute on the element — `style`, extra classes, `href`,
+`aria-*`, `data-flow-target` — lands on the expanded root. The instance wins
+over the definition on a conflict; `style` and `class` accumulate, with the
+instance's declarations last so they win the inline cascade. Only the tag is
+the definition's call. The example above therefore renders the hover template
+with `padding-inline: 16px` on top of whatever the definition sets.
 
 Everything is human-readable and diffable. With `autoCommit` on (the `init` default), every write op becomes one git commit named after the tool and its target (`write_html: dashboard`, `set_tokens: color.primary`, ...) — that is the audit log.
 

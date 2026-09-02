@@ -338,6 +338,65 @@ function resolveSlotSubstitutions(templateDoc: ScreenDocument, instance: Interna
  * instantiating itself would otherwise recurse until the stack overflows.
  * On re-entry, a marker element is rendered instead of recursing further.
  */
+/** Attribute values that accumulate across a merge instead of one replacing the other, and the separator each accumulates with. */
+const MERGED_ATTRS = new Map([
+  ["style", "; "],
+  ["class", " "],
+  ["data-unresolved-token", ","],
+]);
+
+/**
+ * Merges the attributes authored on an instance element onto the component's
+ * expanded root. Without this they are dropped: `renderTemplateNode` renders
+ * the definition's own look and nothing the screen wrote around it — so
+ * `<a class="$footer-link" href="/imprint">` renders as a link to nowhere.
+ *
+ * Precedence: the instance wins over the definition, being the more specific
+ * of the two. `style`, `class` and `data-unresolved-token` accumulate rather
+ * than replace, because the definition's look is the base an instance adjusts
+ * rather than discards; the instance's style declarations come last, which is
+ * what makes them win in the inline cascade.
+ *
+ * `data-variant` and the flow attributes are deliberately not merged, and the
+ * caller passes no flow when building the instance's attributes: the variant
+ * the instance names is already resolved into *which* template got expanded,
+ * and the flow is already applied to the root by `renderTemplateNode`. Taking
+ * either again would emit the attribute twice.
+ *
+ * The instance's *tag* is still discarded — the definition's root tag wins, as
+ * it always has. Which tag a component renders as is the definition's call,
+ * not the screen's.
+ */
+function mergeInstanceAttrs(templateAttrs: [string, string][], instanceAttrs: [string, string][]): [string, string][] {
+  const merged: [string, string][] = templateAttrs.map(([key, value]): [string, string] => [key, value]);
+  const indexOf = new Map<string, number>(merged.map(([key], i): [string, number] => [key, i]));
+
+  for (const [key, value] of instanceAttrs) {
+    if (key === "data-variant" || key === "data-flow-target" || key === "data-flow-trigger") continue;
+
+    const existing = indexOf.get(key);
+    if (existing === undefined) {
+      indexOf.set(key, merged.length);
+      merged.push([key, value]);
+      continue;
+    }
+
+    const entry = merged[existing];
+    if (entry === undefined) continue;
+
+    const separator = MERGED_ATTRS.get(key);
+    if (separator === undefined) {
+      entry[1] = value;
+      continue;
+    }
+
+    const parts = [...entry[1].split(separator), ...value.split(separator)].map((part) => part.trim()).filter(Boolean);
+    entry[1] = [...new Set(parts)].join(separator);
+  }
+
+  return merged;
+}
+
 function renderComponentInstance(
   instance: InternalNode,
   ctx: RenderContext,
@@ -376,7 +435,10 @@ function renderComponentInstance(
   const substitutions = resolveSlotSubstitutions(templateDoc, instance);
   const nextPath = new Set(expansionPath);
   nextPath.add(componentName);
-  return renderTemplateNode(templateDoc.rootNodeId, templateDoc, ctx, rootId, variantName, flow, substitutions, nextPath);
+  // No flow here: `renderTemplateNode` already applies it to the expanded
+  // root, and `mergeInstanceAttrs` would otherwise emit it a second time.
+  const instanceAttrs = buildAttrs(instance, ctx.tokens, undefined, ctx.iconFontAvailable);
+  return renderTemplateNode(templateDoc.rootNodeId, templateDoc, ctx, rootId, variantName, flow, substitutions, nextPath, instanceAttrs);
 }
 
 function renderTemplateNode(
@@ -388,6 +450,7 @@ function renderTemplateNode(
   flow: Flow | undefined,
   substitutions: Map<string, NodeSubtree>,
   expansionPath: ReadonlySet<string>,
+  instanceAttrs: [string, string][],
 ): string {
   const node = templateDoc.nodes[nodeId];
   if (!node) return "";
@@ -417,7 +480,11 @@ function renderTemplateNode(
 
   const tag = node.tag ?? "div";
 
-  const attrs: [string, string][] = [["id", renderedId], ...buildAttrs(node, ctx.tokens, isRoot ? flow : undefined, ctx.iconFontAvailable)];
+  const templateAttrs = buildAttrs(node, ctx.tokens, isRoot ? flow : undefined, ctx.iconFontAvailable);
+  const attrs: [string, string][] = [
+    ["id", renderedId],
+    ...(isRoot ? mergeInstanceAttrs(templateAttrs, instanceAttrs) : templateAttrs),
+  ];
   // buildAttrs already emitted data-variant if the template's own root
   // happens to declare one — only add the selected variant's name if it didn't.
   if (isRoot && !node.refs.variant) attrs.push(["data-variant", variantName]);
@@ -425,7 +492,7 @@ function renderTemplateNode(
   if (VOID_ELEMENTS.has(tag)) return `<${tag}${attrStr ? ` ${attrStr}` : ""}>`;
 
   const inner = node.childIds
-    .map((childId) => renderTemplateNode(childId, templateDoc, ctx, rootId, variantName, flow, substitutions, expansionPath))
+    .map((childId) => renderTemplateNode(childId, templateDoc, ctx, rootId, variantName, flow, substitutions, expansionPath, instanceAttrs))
     .join("");
 
   return `<${tag}${attrStr ? ` ${attrStr}` : ""}>${inner}</${tag}>`;

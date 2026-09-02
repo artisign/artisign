@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { PLAYWRIGHT_MISSING_MESSAGE } from "../tools/browser.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -141,7 +142,7 @@ describe("MCP server — protocol-level", () => {
       const content = result.content as Array<{ type: string; text: string }>;
       expect(JSON.parse(content[0]!.text)).toEqual({
         code: "io_error",
-        message: "Playwright is not installed. Run: npm install playwright && npx playwright install chromium",
+        message: PLAYWRIGHT_MISSING_MESSAGE,
       });
     } finally {
       __setPlaywrightImportForTests(undefined);

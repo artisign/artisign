@@ -557,3 +557,54 @@ describe("parseScreen — <template> content model", () => {
     expect(li.doc.nodes["i1"]).toBeDefined();
   });
 });
+
+describe("component instances inside slot fills (CHR-581)", () => {
+  const cardRegistry: DesignSystemRegistry = {
+    ...registry,
+    componentNames: new Set([...registry.componentNames, "card"]),
+  };
+
+  it("models a $ref inside slot content as a component_instance with its id, variant and nested slots", () => {
+    const { doc, errors } = parseScreen(
+      `<div id="n1"><div id="n2" class="$card"><button id="n3" data-slot="content" class="$btn-primary wide" data-variant="hover"><span id="n4" data-slot="label">Go</span></button></div></div>`,
+      "s",
+      cardRegistry,
+    );
+    expect(errors).toEqual([]);
+    const fill = doc.nodes["n2"]!.slotOverrides!["content"]!;
+    expect(fill).toMatchObject({
+      kind: "component_instance",
+      id: "n3",
+      tag: "button",
+      attributes: { class: "wide" },
+      refs: { component: "btn-primary", variant: "hover" },
+      children: [],
+    });
+    expect(fill.slotOverrides!["label"]).toMatchObject({ kind: "element", id: "n4", tag: "span" });
+    // Slot content stays out of the flat node map, as before.
+    expect(doc.nodes["n3"]).toBeUndefined();
+  });
+
+  it("round-trips a fill instance's id, ref and variant through the serializer", () => {
+    const source = `<div id="n1"><div id="n2" class="$card"><button id="n3" data-slot="content" class="$btn-primary" data-variant="hover"><span id="n4" data-slot="label">Go</span></button></div></div>`;
+    const { doc } = parseScreen(source, "s", cardRegistry);
+    const out = serializeScreen(doc);
+    expect(out).toContain('<button id="n3" data-slot="content" class="$btn-primary" data-variant="hover">');
+    expect(out).toContain('<span id="n4" data-slot="label">Go</span>');
+    // And it parses back to the same model.
+    const again = parseScreen(out, "s", cardRegistry);
+    expect(again.doc.nodes["n2"]!.slotOverrides).toEqual(doc.nodes["n2"]!.slotOverrides);
+  });
+
+  it("reports an unresolved $ref inside slot content instead of keeping it as a class", () => {
+    const { doc, errors } = parseScreen(
+      `<div id="n1"><div id="n2" class="$card"><button data-slot="content" class="$btn-ghost">Go</button></div></div>`,
+      "s",
+      cardRegistry,
+    );
+    expect(errors).toContainEqual(expect.objectContaining({ code: "unresolved_ref" }));
+    const fill = doc.nodes["n2"]!.slotOverrides!["content"]!;
+    expect(fill.kind).toBe("element");
+    expect(fill.attributes.class).toBeUndefined();
+  });
+});

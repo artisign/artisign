@@ -19,7 +19,7 @@ import { findBySelector, spliceFragment, removeNode } from "./patch.js";
 import { convertToComponentInstance, revertComponentInstanceToElement } from "./node-convert.js";
 import { isBlockingIssue, issueToWarning } from "./issue-filter.js";
 import { slotStylingWarnings } from "./definition-checks.js";
-import { assertValidEntityName } from "./name-validation.js";
+import { assertValidEntityName, assertValidVariantName } from "./name-validation.js";
 import { patchDefinitionHtml, updateRefsDefinition } from "./definition-patch.js";
 import {
   ToolError,
@@ -97,6 +97,16 @@ async function writeDefinition(
   }
   const seenVariantNames = new Set<string>();
   for (const variant of definition.variants) {
+    // The same rule promote_to_system applies to its caller's list, on the
+    // other door: a `data-variant` parsed out of the markup can carry a
+    // reserved character just as well, and the resulting `name#variant`
+    // address would not parse back (CHR-556).
+    try {
+      assertValidVariantName(variant.name);
+    } catch (err) {
+      if (!(err instanceof ToolError)) throw err;
+      return { kind, screen: input.screen, path, commit: null, errors: [{ code: err.code, message: err.message }], warnings: [] };
+    }
     if (seenVariantNames.has(variant.name)) {
       return {
         kind,

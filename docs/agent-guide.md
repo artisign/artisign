@@ -45,7 +45,11 @@ On a fresh project the order is: **tokens → base components → screens.**
   The slot's **tag** goes the same way as its styling: `<h3 data-slot>`
   filled by a `<span>` renders as a `<span>`. Nothing warns about that —
   put semantics on the wrapper too.
-- Only then design screens, composed of refs.
+- Only then design screens, composed of refs. An instance may carry its own
+  `style`, extra classes and plain attributes (`href`, `aria-*`, a flow
+  target) — they land on the expanded root, the instance winning over the
+  definition on a conflict, `style` and `class` accumulating. Its children
+  fill the slots, including with other component instances.
 
 **Exploration mode:** for the *first* screen of a new direction you may sketch
 with inline values to find the design. That is a draft, not a deliverable.
@@ -107,13 +111,14 @@ Never chain multiple writes without looking. One write, one look.
 
 Both tools need Playwright, which is optional and not bundled. It has to resolve
 from where Artisign itself is installed — Playwright added to a different
-project tree is not seen. With a local install of Artisign, that is:
+project tree is not seen — unless `ARTISIGN_PLAYWRIGHT_DIR` names a directory
+that holds it. With a local install of Artisign, run in that directory:
 
-`npm install playwright && npx playwright install chromium`
+`npm install --no-save playwright && npx playwright install chromium`
 
 Everything else in this guide works without it, so treat a
-`Playwright is not installed` error as a setup gap to report, not as a bug in
-your design work.
+`Playwright is not installed` (or `installed but unusable`) error as a setup
+gap to report — the message carries the fix — not as a bug in your design work.
 
 ### Reviewing a component before a screen uses it
 

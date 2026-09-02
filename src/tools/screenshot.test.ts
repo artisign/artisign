@@ -13,6 +13,8 @@ import {
   __setPlaywrightImportForTests,
   __resetBrowserForTests,
 } from "./screenshot.js";
+import { PLAYWRIGHT_MISSING_MESSAGE, PLAYWRIGHT_DIR_ENV, resolvePlaywrightSpecifier } from "./browser.js";
+import { mkdir, writeFile } from "node:fs/promises";
 import { parseScreen, loadRegistry } from "../model/index.js";
 import { FsStore } from "../store/index.js";
 import { ToolError } from "./types.js";
@@ -232,14 +234,83 @@ describe("getScreenshot — missing Playwright", () => {
     __setPlaywrightImportForTests(undefined);
   });
 
-  it("throws a ToolError naming the install command when playwright can't be imported", async () => {
+  it("throws a ToolError naming a working install route when playwright can't be imported", async () => {
     __setPlaywrightImportForTests(() => Promise.reject(new Error("Cannot find module 'playwright'")));
 
     await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toMatchObject({
       code: "io_error",
-      message: "Playwright is not installed. Run: npm install playwright && npx playwright install chromium",
+      message: PLAYWRIGHT_MISSING_MESSAGE,
     });
     await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toBeInstanceOf(ToolError);
+    // The command has to be the one that works in a checkout: a plain
+    // `npm install playwright` is a no-op against an optional peer on some npm
+    // versions and edits package.json on the others (CHR-576).
+    expect(PLAYWRIGHT_MISSING_MESSAGE).toContain("npm install --no-save playwright && npx playwright install chromium");
+    expect(PLAYWRIGHT_MISSING_MESSAGE).toContain(PLAYWRIGHT_DIR_ENV);
+  });
+
+  // A half-reaped symlink or a partial copy still *imports* — as a module
+  // without `chromium`, or one whose `chromium` has no `launch`. Before the
+  // usability check that surfaced as a raw TypeError from inside the launch
+  // path; it has to be the same clean, actionable ToolError as the absent case.
+  it.each([
+    ["an empty module", {}],
+    ["a module whose chromium has no launch", { chromium: { executablePath: () => "/x", connectOverCDP: () => Promise.reject(new Error("x")) } }],
+    ["a module whose chromium has no executablePath", { chromium: { launch: () => Promise.reject(new Error("x")), connectOverCDP: () => Promise.reject(new Error("x")) } }],
+  ])("throws a clean ToolError, not a TypeError, for %s", async (_label, partial) => {
+    __setPlaywrightImportForTests(() => Promise.resolve(partial as never));
+
+    const err = await getScreenshot(fx.store, { screen: "home" }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ToolError);
+    expect(err).toMatchObject({ code: "io_error", message: expect.stringMatching(/Playwright is installed but unusable/) });
+    expect((err as Error).message).toContain("restart the Artisign daemon");
+    expect((err as Error).message).not.toMatch(/Cannot read properties/);
+    await __resetBrowserForTests();
+  });
+
+  it("does not cache the failure: a later call re-imports and succeeds once playwright is there", async () => {
+    let calls = 0;
+    __setPlaywrightImportForTests(() => {
+      calls += 1;
+      return Promise.reject(new Error("Cannot find module 'playwright'"));
+    });
+    await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toMatchObject({ code: "io_error" });
+    await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toMatchObject({ code: "io_error" });
+    expect(calls).toBe(2);
+  });
+});
+
+describe("resolvePlaywrightSpecifier — ARTISIGN_PLAYWRIGHT_DIR", () => {
+  it("resolves the bare specifier when the variable is unset or blank", () => {
+    expect(resolvePlaywrightSpecifier({})).toBe("playwright");
+    expect(resolvePlaywrightSpecifier({ [PLAYWRIGHT_DIR_ENV]: "   " })).toBe("playwright");
+  });
+
+  it("resolves playwright from the named directory's own node_modules, as a file URL", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "artisign-pw-dir-"));
+    try {
+      const pkgDir = join(dir, "node_modules", "playwright");
+      await mkdir(pkgDir, { recursive: true });
+      await writeFile(join(pkgDir, "package.json"), JSON.stringify({ name: "playwright", main: "index.js" }));
+      await writeFile(join(pkgDir, "index.js"), "module.exports = {};");
+
+      const spec = resolvePlaywrightSpecifier({ [PLAYWRIGHT_DIR_ENV]: dir });
+      expect(spec.startsWith("file://")).toBe(true);
+      expect(spec).toContain("/node_modules/playwright/index.js");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("names the directory and the fix when it holds no playwright", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "artisign-pw-empty-"));
+    try {
+      expect(() => resolvePlaywrightSpecifier({ [PLAYWRIGHT_DIR_ENV]: dir })).toThrowError(
+        expect.objectContaining({ code: "io_error", message: expect.stringContaining(dir) }),
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -434,11 +505,10 @@ describe.skipIf(!isPlaywrightAvailable())("getScreenshot — e2e (real Chromium)
 // with `spawn EBADF` — not reproducible from a plain Node child process, so
 // this forces the primary launch to fail and asserts the fallback (manual
 // spawn + connectOverCDP, clean 3-fd stdio) still produces a screenshot.
-// Skipped on CI: the manual spawn omits `--no-sandbox`, so Chromium dies
-// on a sandboxed Linux runner before printing its websocket endpoint. That
-// is a real weakness of the fallback — tracked in CHR-562 — not a fault of
-// these tests, which still run on a developer machine.
-describe.skipIf(!isPlaywrightAvailable() || process.env.CI)("getScreenshot — fallback launch (real Chromium)", () => {
+// Runs on CI too: the manual spawn passes `--no-sandbox` (see
+// MANUAL_LAUNCH_ARGS in browser.ts), so a sandboxed Linux runner — the kind of
+// host the fallback exists for — is exactly where this has to keep passing.
+describe.skipIf(!isPlaywrightAvailable())("getScreenshot — fallback launch (real Chromium)", () => {
   let dir: string;
   let store: FsStore;
 

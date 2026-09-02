@@ -40,6 +40,13 @@ export type NodeRefs = {
 
 export type NodeSubtree = {
   kind: NodeKind;
+  /**
+   * The id authored on a slot-fill element, when there is one. Slot content is
+   * never entered into the flat node map, so this is not a `NodeId` anyone can
+   * address — it is kept so the id survives into the render (CHR-581) and
+   * back into the file on serialization, instead of being dropped.
+   */
+  id?: string;
   tag?: string;
   text?: string;
   attributes: Record<string, string>;

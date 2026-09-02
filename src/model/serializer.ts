@@ -117,6 +117,7 @@ function serializeSubtree(sub: NodeSubtree, slotKey?: string): string {
 
   const isSvgDomain = sub.kind === "svg" || sub.kind === "svg_path";
   const attrs: [string, string][] = [];
+  if (sub.id !== undefined) attrs.push(["id", sub.id]);
   if (slotKey !== undefined) attrs.push(["data-slot", slotKey]);
   const cls = subtreeClassAttrValue(sub);
   if (cls) attrs.push(["class", cls]);

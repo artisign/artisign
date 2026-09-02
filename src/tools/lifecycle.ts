@@ -21,7 +21,7 @@ import { syncScreenFlows, belongsToScreen } from "./flows.js";
 import { nodeToSubtree, convertToComponentInstance, subtreesStructurallyEqual } from "./node-convert.js";
 import { deleteMockupEntity } from "./mockups.js";
 import { slotStylingWarnings } from "./definition-checks.js";
-import { assertValidEntityName } from "./name-validation.js";
+import { assertValidEntityName, assertValidVariantName } from "./name-validation.js";
 import { ToolError, commitFields, type Warning, type ToolHandlerContext } from "./types.js";
 
 function contentHash(html: string): string {
@@ -394,6 +394,11 @@ async function promoteComponentOrPattern(
   // same way collectSlotOverrides/convertToComponentInstance already do
   // for an instance's own un-slotted children.
   const defaultHtml = serializeDetachedSubtree(originalSubtree);
+  // Checked before the file is assembled: the names below are interpolated
+  // into `<template data-variant="…">` unescaped, so this is the only point at
+  // which a quote or a reserved character can still be refused rather than
+  // written (CHR-556).
+  for (const variantName of variantNames ?? []) assertValidVariantName(variantName);
   const extraVariants = (variantNames ?? [])
     .filter((v) => v !== "default")
     .map((v) => `<template data-variant="${v}">${defaultHtml}</template>`)

@@ -4,7 +4,7 @@ import { isMixedTokenValue } from "./token-ref.js";
 import { VOID_ELEMENTS, escapeAttr, escapeText } from "./html-syntax.js";
 import type { DesignSystemRegistry } from "./registry.js";
 import type { ComponentDefinitionSummary } from "./component.js";
-import type { Flow, ModifierFn, Node as InternalNode, NodeSubtree, ScreenDocument, TokenRef, TokenRefAtom } from "./types.js";
+import type { Flow, ModifierFn, NodeSubtree, ScreenDocument, TokenRef, TokenRefAtom } from "./types.js";
 
 /**
  * The `html` render adapter (Tool-Palette-Schemas `output_format: "html"`):
@@ -175,12 +175,57 @@ function attrsToString(attrs: [string, string][]): string {
   return attrs.map(([key, value]) => `${key}="${escapeAttr(value)}"`).join(" ");
 }
 
-function renderSubtree(sub: NodeSubtree, ctx: RenderContext): string {
+/**
+ * Where a piece of authored markup comes from — the screen itself, or the
+ * template of a component currently being expanded. Two things follow from
+ * it, and both matter for slot fills, which are rendered where they are
+ * *substituted* rather than where they were *written*:
+ *
+ * - `path`: the component names being expanded at the authoring point. It is
+ *   the cycle guard for an instance found in that markup. A screen's own
+ *   `<div class="$card">` filling another `$card`'s slot is finite nesting,
+ *   not recursion, so screen-authored content starts from an empty path;
+ *   only content written inside a component's template can loop back into
+ *   that component, and there the path already holds it.
+ * - `idPrefix`: the namespace authored ids live in. Screen ids are the
+ *   screen's own; ids inside a template are namespaced under the expansion
+ *   root, exactly like the template's other nodes.
+ */
+type Origin = { path: ReadonlySet<string>; idPrefix?: string };
+const SCREEN_ORIGIN: Origin = { path: new Set() };
+
+/** Allocates ids for slot-fill instances that carry none of their own, namespaced under the expansion they fill. */
+type FillIds = { base: string; count: number };
+
+/** What `renderComponentInstance` reads off an instance — the same fields on a live node and on a slot-fill subtree. */
+type InstanceSource = Pick<NodeSubtree, "kind" | "attributes" | "refs" | "inlineStyles" | "slotOverrides">;
+
+/**
+ * Renders slot-fill content. A `component_instance` in it expands exactly like
+ * one anywhere else (CHR-581) — before this branch existed, such an instance
+ * fell through to the plain-element path below and its `$ref` leaked into
+ * the output as a literal class. The fill's authored ids are emitted too,
+ * namespaced by where the fill was written (`origin`).
+ */
+function renderSubtree(sub: NodeSubtree, ctx: RenderContext, origin: Origin, fillIds: FillIds): string {
   if (sub.kind === "text") return escapeText(sub.text ?? "");
+
+  const authoredId = sub.id === undefined ? undefined : origin.idPrefix === undefined ? sub.id : `${origin.idPrefix}--${sub.id}`;
+
+  if (sub.kind === "component_instance") {
+    fillIds.count += 1;
+    const rootId = authoredId ?? `${fillIds.base}--fill${fillIds.count}`;
+    return renderComponentInstance(sub, ctx, undefined, origin, rootId);
+  }
+
   const tag = sub.tag ?? "div";
-  const attrStr = attrsToString(buildAttrs(sub, ctx.tokens, undefined, ctx.iconFontAvailable));
+  const attrs: [string, string][] = [
+    ...(authoredId === undefined ? [] : [["id", authoredId] as [string, string]]),
+    ...buildAttrs(sub, ctx.tokens, undefined, ctx.iconFontAvailable),
+  ];
+  const attrStr = attrsToString(attrs);
   if (VOID_ELEMENTS.has(tag)) return `<${tag}${attrStr ? ` ${attrStr}` : ""}>`;
-  const inner = sub.children.map((child) => renderSubtree(child, ctx)).join("");
+  const inner = sub.children.map((child) => renderSubtree(child, ctx, origin, fillIds)).join("");
   return `<${tag}${attrStr ? ` ${attrStr}` : ""}>${inner}</${tag}>`;
 }
 
@@ -189,7 +234,7 @@ function renderNode(nodeId: string, doc: ScreenDocument, ctx: RenderContext, flo
   if (!node) return "";
   if (node.kind === "text") return escapeText(node.text ?? "");
   if (node.kind === "component_instance") {
-    return renderComponentInstance(node, ctx, flowsByTrigger.get(node.id), new Set(), node.id);
+    return renderComponentInstance(node, ctx, flowsByTrigger.get(node.id), SCREEN_ORIGIN, node.id);
   }
 
   const tag = node.tag ?? "div";
@@ -293,7 +338,7 @@ function collectTemplateSlots(templateDoc: ScreenDocument): { nodeId: string; na
  * exact name matches win first, then whatever's left on both sides is
  * zipped together in document order.
  */
-function resolveSlotSubstitutions(templateDoc: ScreenDocument, instance: InternalNode): Map<string, NodeSubtree> {
+function resolveSlotSubstitutions(templateDoc: ScreenDocument, instance: Pick<NodeSubtree, "slotOverrides">): Map<string, NodeSubtree> {
   const templateSlots = collectTemplateSlots(templateDoc);
   const overrideEntries = Object.entries(instance.slotOverrides ?? {});
 
@@ -333,10 +378,12 @@ function resolveSlotSubstitutions(templateDoc: ScreenDocument, instance: Interna
  * component's own source file, which collides across sibling expansions of
  * the same component if used directly.
  *
- * `expansionPath` is the set of component names currently being expanded on
- * the current call stack — a component (directly or transitively)
+ * `origin.path` is the set of component names being expanded where this
+ * instance was authored — a component (directly or transitively)
  * instantiating itself would otherwise recurse until the stack overflows.
  * On re-entry, a marker element is rendered instead of recursing further.
+ * See `Origin` for why a slot fill carries its author's path, not the
+ * template's.
  */
 /** Attribute values that accumulate across a merge instead of one replacing the other, and the separator each accumulates with. */
 const MERGED_ATTRS = new Map([
@@ -398,15 +445,15 @@ function mergeInstanceAttrs(templateAttrs: [string, string][], instanceAttrs: [s
 }
 
 function renderComponentInstance(
-  instance: InternalNode,
+  instance: InstanceSource,
   ctx: RenderContext,
   flow: Flow | undefined,
-  expansionPath: ReadonlySet<string>,
+  origin: Origin,
   rootId: string,
 ): string {
   const componentName = instance.refs.component ?? "";
 
-  if (expansionPath.has(componentName)) {
+  if (origin.path.has(componentName)) {
     return `<div id="${escapeAttr(rootId)}" data-recursive-component="${escapeAttr(componentName)}"></div>`;
   }
 
@@ -433,12 +480,17 @@ function renderComponentInstance(
   }
 
   const substitutions = resolveSlotSubstitutions(templateDoc, instance);
-  const nextPath = new Set(expansionPath);
+  const nextPath = new Set(origin.path);
   nextPath.add(componentName);
   // No flow here: `renderTemplateNode` already applies it to the expanded
   // root, and `mergeInstanceAttrs` would otherwise emit it a second time.
   const instanceAttrs = buildAttrs(instance, ctx.tokens, undefined, ctx.iconFontAvailable);
-  return renderTemplateNode(templateDoc.rootNodeId, templateDoc, ctx, rootId, variantName, flow, substitutions, nextPath, instanceAttrs);
+  // The slot fills were authored where the instance sits, not inside the
+  // template they are substituted into — so they render under `origin`, the
+  // instance's own authoring context, while the template renders under the
+  // extended path. Id-less instances among them get ids under this root.
+  const fillIds: FillIds = { base: rootId, count: 0 };
+  return renderTemplateNode(templateDoc.rootNodeId, templateDoc, ctx, rootId, variantName, flow, substitutions, nextPath, instanceAttrs, origin, fillIds);
 }
 
 function renderTemplateNode(
@@ -451,6 +503,8 @@ function renderTemplateNode(
   substitutions: Map<string, NodeSubtree>,
   expansionPath: ReadonlySet<string>,
   instanceAttrs: [string, string][],
+  fillOrigin: Origin,
+  fillIds: FillIds,
 ): string {
   const node = templateDoc.nodes[nodeId];
   if (!node) return "";
@@ -465,7 +519,7 @@ function renderTemplateNode(
   // have no attributes to carry a data-slot marker, so this is the only
   // way a promoted <button>Click me</button>'s text is ever substitutable.
   const override = substitutions.get(nodeId);
-  if (override !== undefined) return renderSubtree(override, ctx);
+  if (override !== undefined) return renderSubtree(override, ctx, fillOrigin, fillIds);
 
   if (node.kind === "text") return escapeText(node.text ?? "");
 
@@ -476,7 +530,11 @@ function renderTemplateNode(
   // instance, but namespaced under `renderedId` — the same namespacing this
   // node would get as a plain element (below) — so a nested instance root
   // never collides with a sibling expansion of the same component.
-  if (node.kind === "component_instance") return renderComponentInstance(node, ctx, undefined, expansionPath, renderedId);
+  // Its own slot fills were written in this template, so they carry this
+  // expansion's path (the cycle guard) and live in its id namespace.
+  if (node.kind === "component_instance") {
+    return renderComponentInstance(node, ctx, undefined, { path: expansionPath, idPrefix: rootId }, renderedId);
+  }
 
   const tag = node.tag ?? "div";
 
@@ -492,7 +550,9 @@ function renderTemplateNode(
   if (VOID_ELEMENTS.has(tag)) return `<${tag}${attrStr ? ` ${attrStr}` : ""}>`;
 
   const inner = node.childIds
-    .map((childId) => renderTemplateNode(childId, templateDoc, ctx, rootId, variantName, flow, substitutions, expansionPath, instanceAttrs))
+    .map((childId) =>
+      renderTemplateNode(childId, templateDoc, ctx, rootId, variantName, flow, substitutions, expansionPath, instanceAttrs, fillOrigin, fillIds),
+    )
     .join("");
 
   return `<${tag}${attrStr ? ` ${attrStr}` : ""}>${inner}</${tag}>`;

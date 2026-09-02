@@ -301,6 +301,18 @@ function checkTokenRefsResolved(
  * Builds the un-indexed subtree used for `slot_overrides` content. Slot
  * content nodes are not entered into the flat `ScreenDocument.nodes` map —
  * they live inline inside the instance's `slot_overrides`, per Schema-Spec.
+ *
+ * The element-kind decision is the same one `buildElement` makes, through
+ * the same `classifyElement`: a `$class` or `data-component` inside slot
+ * content is a component instance and is modelled as one, with its own
+ * `refs.component`, `refs.variant` and nested `slotOverrides` — the renderer
+ * expands it exactly like a top-level instance (CHR-581). Before this, the
+ * `$ref` stayed a plain class here and leaked verbatim into the render.
+ * Unresolved and ambiguous refs are reported like their top-level
+ * counterparts, minus a node id: slot content has none to point at.
+ *
+ * The authored id is kept on the subtree (not allocated — see `id` on
+ * `NodeSubtree`) so it reaches the render and round-trips through the file.
  */
 function buildSubtree(
   node: P5ChildNode,
@@ -326,15 +338,61 @@ function buildSubtree(
   const tag = node.tagName;
   const isSvgRoot = tag === "svg";
   const svgDomain = inSvg || isSvgRoot;
-  const kind: NodeKind = svgDomain ? (isSvgRoot ? "svg" : "svg_path") : "element";
+
+  const explicitId = attrs.get("id") ?? attrs.get("data-node-id");
+  const classAttr = attrs.get("class");
+  const classParts = classAttr ? classAttr.split(/\s+/).filter(Boolean) : [];
+  const plainClasses = classParts.filter((p) => !p.startsWith("$"));
+
+  let kind: NodeKind;
+  let component: string | undefined;
+  const tokens: Record<string, TokenRef> = {};
+
+  const classification = classifyElement(attrs, tag, inSvg, registry);
+  switch (classification.kind) {
+    case "svg":
+    case "svg_path":
+      kind = classification.kind;
+      break;
+    case "component_instance":
+      kind = "component_instance";
+      component = classification.component;
+      if (classification.instanceSyntax === "data-attr") {
+        if (!registry.componentNames.has(component)) {
+          errors.push({ code: "unresolved_ref", message: `component "${component}" (data-component) is not in the design system` });
+        }
+        if (classification.conflictingClassToken) {
+          plainClasses.push(classification.conflictingClassToken);
+          errors.push({
+            code: "ambiguous_class_ref",
+            message: `data-component="${component}" takes precedence over class="${classification.conflictingClassToken}"; the $-class token is kept as a plain class`,
+          });
+        }
+      }
+      break;
+    case "token_class":
+      kind = "element";
+      tokens.class = classification.classRef;
+      break;
+    case "ambiguous_class":
+      kind = "element";
+      errors.push({ code: "ambiguous_class_ref", message: `"$${classification.classRef}" resolves to both a component and a token` });
+      break;
+    case "unresolved_class":
+      kind = "element";
+      errors.push({ code: "unresolved_ref", message: `"$${classification.classRef}" does not resolve in the design system` });
+      break;
+    case "element":
+      kind = "element";
+      break;
+  }
 
   const styleAttr = attrs.get("style");
   const styleResult = styleAttr
     ? parseStyleAttribute(styleAttr, "slot-content", errors)
     : { tokens: {}, inlineStyles: {} };
-  attrs.delete("style");
+  Object.assign(tokens, styleResult.tokens);
 
-  const tokens: Record<string, TokenRef> = { ...styleResult.tokens };
   if (kind === "svg" || kind === "svg_path") {
     for (const attrName of ["fill", "stroke"] as const) {
       const value = attrs.get(attrName);
@@ -349,22 +407,36 @@ function buildSubtree(
       }
     }
   }
-  attrs.delete("id");
-  attrs.delete("data-node-id");
-  attrs.delete("data-slot");
+
+  const variant = attrs.get("data-variant");
+  for (const reserved of ["id", "data-node-id", "data-slot", "class", "style", "data-variant", "data-component"]) attrs.delete(reserved);
+  if (plainClasses.length > 0) attrs.set("class", plainClasses.join(" "));
 
   checkTokenRefsResolved(tokens, registry, undefined, errors);
 
-  const children = node.childNodes.map((child) => buildSubtree(child, svgDomain, registry, errors));
+  const refs: NodeRefs = { tokens };
+  if (component) refs.component = component;
+  if (variant) refs.variant = variant;
 
-  return {
+  const sub: NodeSubtree = {
     kind,
     tag,
     attributes: Object.fromEntries(attrs),
-    refs: { tokens },
+    refs,
     inlineStyles: styleResult.inlineStyles,
-    children,
+    children: [],
   };
+  if (explicitId) sub.id = explicitId;
+
+  if (kind === "component_instance") {
+    // Same rule as a top-level instance: its content is slot fills, never
+    // children — and those fills may again be instances, at any depth.
+    sub.slotOverrides = collectSlotOverrides(childNodesOf(node), svgDomain, registry, errors);
+  } else {
+    sub.children = childNodesOf(node).map((child) => buildSubtree(child, svgDomain, registry, errors));
+  }
+
+  return sub;
 }
 
 /**

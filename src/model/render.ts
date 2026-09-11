@@ -201,6 +201,28 @@ type FillIds = { base: string; count: number };
 type InstanceSource = Pick<NodeSubtree, "kind" | "attributes" | "refs" | "inlineStyles" | "slotOverrides">;
 
 /**
+ * The id a slot-fill subtree's own tag carries — its authored id, namespaced
+ * under `origin.idPrefix` when the fill was authored inside a template
+ * expansion rather than on a screen. Shared with `resolveSlotFillEntries`
+ * (the read side, CHR-584) so the two never assign a fill a different id.
+ */
+function fillAuthoredId(sub: NodeSubtree, origin: Origin): string | undefined {
+  return sub.id === undefined ? undefined : origin.idPrefix === undefined ? sub.id : `${origin.idPrefix}--${sub.id}`;
+}
+
+/**
+ * The id a `component_instance` slot fill gets: its authored id, or an
+ * allocated `<base>--fill<n>` under this expansion's counter. A counter slot
+ * is consumed even when the instance carries its own id — this and
+ * `resolveSlotFillEntries` (read side, CHR-584) must agree on that quirk too,
+ * or the numbering the two report drifts apart.
+ */
+function fillInstanceId(sub: NodeSubtree, origin: Origin, fillIds: FillIds): string {
+  fillIds.count += 1;
+  return fillAuthoredId(sub, origin) ?? `${fillIds.base}--fill${fillIds.count}`;
+}
+
+/**
  * Renders slot-fill content. A `component_instance` in it expands exactly like
  * one anywhere else (CHR-581) — before this branch existed, such an instance
  * fell through to the plain-element path below and its `$ref` leaked into
@@ -210,14 +232,11 @@ type InstanceSource = Pick<NodeSubtree, "kind" | "attributes" | "refs" | "inline
 function renderSubtree(sub: NodeSubtree, ctx: RenderContext, origin: Origin, fillIds: FillIds): string {
   if (sub.kind === "text") return escapeText(sub.text ?? "");
 
-  const authoredId = sub.id === undefined ? undefined : origin.idPrefix === undefined ? sub.id : `${origin.idPrefix}--${sub.id}`;
-
   if (sub.kind === "component_instance") {
-    fillIds.count += 1;
-    const rootId = authoredId ?? `${fillIds.base}--fill${fillIds.count}`;
-    return renderComponentInstance(sub, ctx, undefined, origin, rootId);
+    return renderComponentInstance(sub, ctx, undefined, origin, fillInstanceId(sub, origin, fillIds));
   }
 
+  const authoredId = fillAuthoredId(sub, origin);
   const tag = sub.tag ?? "div";
   const attrs: [string, string][] = [
     ...(authoredId === undefined ? [] : [["id", authoredId] as [string, string]]),
@@ -561,4 +580,80 @@ function renderTemplateNode(
 export function renderScreen(doc: ScreenDocument, ctx: RenderContext): string {
   const flowsByTrigger = new Map(doc.flows.map((flow) => [flow.triggerNodeId, flow]));
   return renderNode(doc.rootNodeId, doc, ctx, flowsByTrigger);
+}
+
+export type SlotFillEntry = { slot: string; id: string | undefined; subtree: NodeSubtree };
+
+/**
+ * The slot fills of a component instance, with the id each carries in an
+ * actual render — the read side of `fillAuthoredId`/`fillInstanceId` above,
+ * resolved without producing any HTML. `get_node` reports this under its
+ * `slots` field (CHR-584) so it never drifts from what `renderScreen`
+ * actually emits.
+ *
+ * Walks the resolved template in document order and records a fill the
+ * moment `renderTemplateNode` would substitute it — that walk order, not
+ * `instance.slotOverrides`' own key order, is what the `--fill<n>` counter
+ * follows. `rootId` is always the instance's own node id here: `get_node`
+ * addresses a component instance directly out of `ScreenDocument.nodes`
+ * (screen or definition source), which is exactly the un-namespaced,
+ * `idPrefix: undefined` position `SCREEN_ORIGIN` renders it at (screens) or
+ * `renderDefinitionForBrowser` previews it at (definitions) — never as a
+ * fill nested inside some other instance, since fill content is never in
+ * that map to begin with.
+ *
+ * Returns `[]` when the instance's component or variant doesn't resolve,
+ * same "nothing to expand" case the render falls back to a marker element
+ * for instead of throwing.
+ */
+export function resolveSlotFillEntries(
+  instance: InstanceSource,
+  ctx: Pick<RenderContext, "registry" | "componentDefs">,
+  rootId: string,
+): SlotFillEntry[] {
+  const componentName = instance.refs.component ?? "";
+  const def = ctx.componentDefs.get(componentName);
+  if (!def) return [];
+  const variantName = instance.refs.variant ?? def.defaultVariant;
+  const variant = def.variants.find((v) => v.name === variantName) ?? def.variants[0];
+  if (!variant) return [];
+
+  const { doc: templateDoc, errors } = parseScreen(variant.htmlAug, "__component__", ctx.registry);
+  if (errors.some((e) => e.code === "malformed_html")) return [];
+
+  const substitutions = resolveSlotSubstitutions(templateDoc, instance);
+  const nameByNodeId = new Map(collectTemplateSlots(templateDoc).map((s) => [s.nodeId, s.name]));
+  const fillIds: FillIds = { base: rootId, count: 0 };
+  const entries: SlotFillEntry[] = [];
+
+  const visit = (nodeId: string): void => {
+    const override = substitutions.get(nodeId);
+    if (override !== undefined) {
+      entries.push({ slot: nameByNodeId.get(nodeId) ?? nodeId, id: resolveFillId(override, fillIds), subtree: override });
+      return;
+    }
+    const node = templateDoc.nodes[nodeId];
+    // A template's own component_instance (not a fill) expands under its own
+    // rootId/fillIds — none of that belongs to this instance's slots, so it
+    // isn't walked into, same as `renderTemplateNode` renders it separately.
+    if (!node || node.kind === "text" || node.kind === "component_instance") return;
+    for (const childId of node.childIds) visit(childId);
+  };
+  visit(templateDoc.rootNodeId);
+
+  return entries;
+}
+
+/**
+ * `fillAuthoredId`/`fillInstanceId` computed for a screen-authored fill
+ * (`SCREEN_ORIGIN` — see the doc comment on `resolveSlotFillEntries` for
+ * why `idPrefix` is always `undefined` here), including for an id-less
+ * instance nested inside a plain-element fill's own children — mirrors
+ * `renderSubtree`'s recursion through `.children`, sharing the same counter.
+ */
+function resolveFillId(sub: NodeSubtree, fillIds: FillIds): string | undefined {
+  if (sub.kind === "text") return undefined;
+  if (sub.kind === "component_instance") return fillInstanceId(sub, SCREEN_ORIGIN, fillIds);
+  for (const child of sub.children) resolveFillId(child, fillIds);
+  return fillAuthoredId(sub, SCREEN_ORIGIN);
 }

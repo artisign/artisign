@@ -106,7 +106,12 @@ export const TOOLS: ToolDefinition[] = [
     "get_node",
     "Subtree of one node, addressed as \"<screen>.<node-id>\", or " +
       "\"component:<name>#<variant>.<node-id>\" / \"pattern:<name>.<node-id>\" for a design-system " +
-      "definition node. Tiered + field selection.",
+      "definition node. Tiered + field selection. On a component instance, view \"full\" also carries " +
+      "\"slots\": a list of its slot fills in document order, each with its slot name, tag, refs and the id it " +
+      "renders with where this node is addressed (on the screen for a screen ref; in the standalone " +
+      "definition render for a definition ref, where a screen namespaces it further). Slot content is never " +
+      "addressable by node ref (not in \"children\", not patchable by update_refs/patch_html) — change it by " +
+      "rewriting the screen or the instance's enclosing node.",
     { node: z.string(), view: viewSchema.optional(), fields: z.array(z.string()).optional() },
     (store, input) => getNode(store, input as never),
   ),
@@ -125,7 +130,10 @@ export const TOOLS: ToolDefinition[] = [
       "id_stability:\"explicit\"|\"derived\" instead of a screen match's implicit stability: its node ref IS " +
       "addressable by get_node/update_refs/patch_html, but only reliably resolves to the same element across " +
       "a later write when id_stability is \"explicit\" — a \"derived\" id is only guaranteed for this one call. " +
-      "reply_comment stays screen-only. The headline token-saver.",
+      "reply_comment stays screen-only. A predicate can also match inside a component instance's slot fills; " +
+      "that match carries node: null, addressable: false, and inside: \"<screen>.<node-id>\" pointing at the " +
+      "enclosing instance — fill content has no node ref of its own, so change it by rewriting the screen or the " +
+      "instance's enclosing node, never by addressing the match itself. The headline token-saver.",
     {
       where: z.array(predicateSchema),
       screens: z.array(z.string()).optional(),

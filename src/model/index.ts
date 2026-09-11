@@ -38,7 +38,14 @@ export {
   type PatchDefinitionOperation,
   type PatchDefinitionResult,
 } from "./patch-definition.js";
-export { renderScreen, resolveTokenRef, slotsWithDiscardedStyling, type RenderContext } from "./render.js";
+export {
+  renderScreen,
+  resolveTokenRef,
+  resolveSlotFillEntries,
+  slotsWithDiscardedStyling,
+  type RenderContext,
+  type SlotFillEntry,
+} from "./render.js";
 export { wrapRenderedHtml, RENDER_BASELINE_CSS, type WrapRenderedHtmlOptions } from "./render-document.js";
 export {
   extractFontFamilies,

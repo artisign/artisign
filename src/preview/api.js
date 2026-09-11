@@ -55,6 +55,18 @@ export async function fetchMockupRender(name, variant) {
 }
 
 /**
+ * Every tag in the project carrying its own notes (CHR-596) — a spec that
+ * spans several screens, set once via set_meta({target:{kind:"tag",tag}})
+ * instead of duplicated into every tagged screen's own notes.
+ * @returns {Promise<{ tag: string, notes: string }[]>}
+ */
+export async function fetchTags() {
+  const res = await fetch("/api/tags");
+  const body = await res.json();
+  return body.tags ?? [];
+}
+
+/**
  * All flow edges across every screen, for the Board view.
  * @returns {Promise<{ from: string, event: string, to: string, to_kind: string }[]>}
  */

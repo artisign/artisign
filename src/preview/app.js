@@ -10,6 +10,7 @@ import {
   fetchDesignSystem,
   fetchComments,
   fetchFlows,
+  fetchTags,
   fetchScreenNodes,
   postComment,
   fetchProjects,
@@ -19,6 +20,7 @@ import {
 } from "./api.js";
 import { renderScreenList, filterScreens } from "./screens.js";
 import { renderMockupList, filterMockups } from "./mockups.js";
+import { renderTagNotes } from "./notes-panel.js";
 import { renderMockupView } from "./mockup-view.js";
 import { applyMockupZoom } from "./mockup-zoom.js";
 import { applyFlowMode } from "./flows.js";
@@ -54,6 +56,7 @@ const notesPanelEl = document.getElementById("notes-panel");
 const notesPanelHeader = document.getElementById("notes-panel-header");
 const notesPanelScreen = document.getElementById("notes-panel-screen");
 const notesPanelText = document.getElementById("notes-panel-text");
+const notesPanelTagsEl = document.getElementById("notes-panel-tags");
 const screenFrame = document.getElementById("screen-frame");
 const canvasEl = document.getElementById("canvas");
 const screenHolderEl = document.getElementById("screen-holder");
@@ -112,6 +115,8 @@ const initProjectDialogEl = document.getElementById("init-project-dialog");
 
 /** @type {{ name: string, tags: string[], notes: string }[]} */
 let screens = [];
+/** @type {{ tag: string, notes: string }[]} — every project tag with its own notes (CHR-596). */
+let tagNotes = [];
 let currentScreen = null;
 /** @type {{ name: string, title?: string, description?: string, tags: string[], variants: { id: string, title: string, description?: string }[] }[]} */
 let mockups = [];
@@ -259,6 +264,7 @@ function resetProjectState() {
   warningCount = 0;
   clearSelection();
   screens = [];
+  tagNotes = []; // else one project's tag notes leak into the panel of the next
   currentScreen = null;
   screenFilter = "";
   screenFilterInput.value = "";
@@ -296,8 +302,13 @@ function lastScreenKey(projectRoot) {
   return `artisign.last-screen:${projectRoot}`;
 }
 
+async function loadTags() {
+  tagNotes = await fetchTags();
+  updateNotesPanel();
+}
+
 async function bootScreens() {
-  await Promise.all([loadScreens(), loadMockups()]);
+  await Promise.all([loadScreens(), loadMockups(), loadTags()]);
   const persisted = parseLastSelection(readStringPref(prefsStorage, lastScreenKey(activeProjectRoot), null));
   if (persisted?.kind === "mockup" && mockups.some((m) => m.name === persisted.name)) {
     await selectMockup(persisted.name);
@@ -310,6 +321,7 @@ async function bootScreens() {
 /** Re-fetches everything the current view depends on — used after an SSE reconnect, where the gap while disconnected is invisible to us. */
 async function resyncCurrentProject() {
   loadScreens();
+  loadTags();
   const mockupsOk = await loadMockups();
   if (currentScreen) {
     loadCurrentScreen();
@@ -382,6 +394,11 @@ async function handleChangeEvent(event) {
     // refreshes. The board draws edges from flows.json separately, so it
     // needs its own refetch here.
     if (boardBuilt) board.setFlows(await fetchFlows());
+  } else if (event.kind === "tag_meta") {
+    // Re-tagging a screen needs nothing extra here — a "screen" event above
+    // already refreshes the panel with the (unchanged) tag list; this branch
+    // only fires when a tag's own notes change.
+    await loadTags();
   }
 }
 
@@ -433,11 +450,21 @@ function refreshSidebar() {
 function updateNotesPanel() {
   const screen = screens.find((s) => s.name === currentScreen);
   const notes = screen?.notes ?? "";
-  notesPanelEl.hidden = notes.length === 0;
-  if (notes.length === 0) return;
+  const screenTags = screen?.tags ?? [];
+  const screenTagsLower = new Set(screenTags.map((t) => t.toLowerCase()));
+  const matchingTagNotes = tagNotes.filter((t) => screenTagsLower.has(t.tag.toLowerCase()));
+  // A screen with no notes of its own but a tagged spec still gets a panel —
+  // the tag section is the whole point, not an addendum to the screen's own
+  // notes.
+  notesPanelEl.hidden = notes.length === 0 && matchingTagNotes.length === 0;
+  if (notesPanelEl.hidden) return;
   notesPanelScreen.textContent = screen.name;
+  // notesPanelText only ever holds the screen's own notes — setMarkdown
+  // replaces its children wholesale, so the tag sections render into their
+  // own sibling element (notesPanelTagsEl), never inside this one.
   setMarkdown(notesPanelText, notes);
   notesPanelHeader.setAttribute("aria-expanded", String(notesExpanded));
+  renderTagNotes(notesPanelTagsEl, screenTags, tagNotes);
 }
 
 screenFilterInput.addEventListener("input", () => {

@@ -288,6 +288,10 @@ design later. Your handoff channel is `set_meta`:
 | design system | `idea`, `decisions` | The design direction and settled choices, so they are not relitigated |
 | screen | `notes`, `tags` | What a screenshot cannot carry: states, empty/error cases, content rules |
 | mockup | `tags`, `title`, `description` | Makes an exploration findable via `get_project {tags: [...]}` before it is promoted |
+| tag | `notes` | A spec spanning several screens, set once (`target: {kind: "tag", tag}`) instead of duplicated into every tagged screen's own notes; surfaced back as `tag_notes` on `get_project`/`get_screen` |
+
+Every `notes`/`idea`/`decisions`/`usage` body — including a tag's own `notes`
+— renders as Markdown in the preview.
 
 Write metadata **when the decision is fresh**. A cleanup pass at the end
 reliably produces vague metadata, because the reasoning is gone.

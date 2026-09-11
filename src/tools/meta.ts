@@ -1,13 +1,15 @@
 import type { Store, DesignDecision, MockupMeta } from "../store/index.js";
 import { ToolError, commitFields } from "./types.js";
 import { readMockupMetaOrDefault } from "./mockups.js";
+import { assertValidTagName } from "./name-validation.js";
 
 export type SetMetaTarget =
   | { kind: "screen"; screen: string }
   | { kind: "mockup"; mockup: string }
   | { kind: "design_system" }
   | { kind: "component"; name: string }
-  | { kind: "pattern"; name: string };
+  | { kind: "pattern"; name: string }
+  | { kind: "tag"; tag: string };
 
 export type SetMetaDecisionInput = {
   id: string;
@@ -45,6 +47,8 @@ function describeTarget(target: SetMetaTarget): string {
       return `component:${target.name}`;
     case "pattern":
       return `pattern:${target.name}`;
+    case "tag":
+      return `tag:${target.tag}`;
   }
 }
 
@@ -130,26 +134,49 @@ export async function setMeta(store: Store, input: SetMetaInput): Promise<Record
     return { target, meta: { idea: meta.idea, decisions: meta.decisions }, ...commitFields(commitResult) };
   }
 
-  // target.kind === "component" | "pattern"
-  if (input.notes !== undefined || input.tags !== undefined || input.idea !== undefined || input.decisions !== undefined || input.title !== undefined || input.description !== undefined) {
-    throw new ToolError("validation_failed", "notes/tags/idea/decisions/title/description only apply to screen/design_system/mockup targets, not component/pattern");
-  }
-  if (input.usage === undefined) {
-    throw new ToolError("validation_failed", `usage is required for target kind "${target.kind}"`);
+  if (target.kind === "component" || target.kind === "pattern") {
+    if (input.notes !== undefined || input.tags !== undefined || input.idea !== undefined || input.decisions !== undefined || input.title !== undefined || input.description !== undefined) {
+      throw new ToolError("validation_failed", "notes/tags/idea/decisions/title/description only apply to screen/design_system/mockup targets, not component/pattern");
+    }
+    if (input.usage === undefined) {
+      throw new ToolError("validation_failed", `usage is required for target kind "${target.kind}"`);
+    }
+
+    const names = target.kind === "component" ? await store.listComponents() : await store.listPatterns();
+    if (!names.includes(target.name)) {
+      throw new ToolError("not_found", `${target.kind} "${target.name}" was not found`);
+    }
+
+    const current = await store.readDesignSystemMeta();
+    if (target.kind === "component") {
+      current.component_usage[target.name] = input.usage;
+    } else {
+      current.pattern_usage[target.name] = input.usage;
+    }
+    await store.writeDesignSystemMeta(current);
+    const commitResult = await store.commit(`set_meta: ${describeTarget(target)}`);
+    return { target, meta: { usage: input.usage }, ...commitFields(commitResult) };
   }
 
-  const names = target.kind === "component" ? await store.listComponents() : await store.listPatterns();
-  if (!names.includes(target.name)) {
-    throw new ToolError("not_found", `${target.kind} "${target.name}" was not found`);
+  // target.kind === "tag" — notes only. Deliberately no not_found check: a
+  // tag is not an on-disk entity of its own, it exists only because screens
+  // (or mockups) carry it, so writing its spec before any screen is tagged
+  // yet is a legitimate order, not an error.
+  if (
+    input.tags !== undefined ||
+    input.title !== undefined ||
+    input.description !== undefined ||
+    input.idea !== undefined ||
+    input.decisions !== undefined ||
+    input.usage !== undefined
+  ) {
+    throw new ToolError("validation_failed", "tags/title/description/idea/decisions/usage only apply to screen/mockup/design_system/component/pattern targets, not tag");
   }
-
-  const current = await store.readDesignSystemMeta();
-  if (target.kind === "component") {
-    current.component_usage[target.name] = input.usage;
-  } else {
-    current.pattern_usage[target.name] = input.usage;
+  if (input.notes === undefined) {
+    throw new ToolError("validation_failed", 'notes is required for target kind "tag"');
   }
-  await store.writeDesignSystemMeta(current);
+  assertValidTagName(target.tag);
+  await store.writeTagMeta(target.tag, { notes: input.notes });
   const commitResult = await store.commit(`set_meta: ${describeTarget(target)}`);
-  return { target, meta: { usage: input.usage }, ...commitFields(commitResult) };
+  return { target, meta: { notes: input.notes }, ...commitFields(commitResult) };
 }

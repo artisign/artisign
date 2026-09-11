@@ -669,6 +669,61 @@ body {
   line-height: 1.5;
 }
 
+#notes-panel-tags:not(:empty) {
+  margin-top: var(--space-md);
+}
+
+.tag-notes-section + .tag-notes-section {
+  margin-top: var(--space-sm);
+}
+
+.tag-notes-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tag-notes-chevron {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-bottom: 3px;
+  border-right: 1.5px solid var(--color-text-faint);
+  border-bottom: 1.5px solid var(--color-text-faint);
+  transform: rotate(45deg);
+  transition: transform 0.1s ease;
+}
+
+.tag-notes-header[aria-expanded="false"] .tag-notes-chevron {
+  transform: rotate(-45deg);
+  margin-bottom: 0;
+}
+
+.tag-notes-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+}
+
+.tag-notes-header[aria-expanded="false"] + .tag-notes-body {
+  display: none;
+}
+
+.tag-notes-body {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: #444;
+  line-height: 1.5;
+}
+
 #comments-panel {
   padding: var(--space-lg) var(--space-md);
 }

@@ -134,7 +134,7 @@ Daemon-level state — that config plus the `daemon.lock` holding the running pi
 | Writes | `update_refs` | Change a node's token/component/variant bindings without a full HTML parse. |
 | Writes | `set_tokens` | Design-system token mutation — one call re-resolves every bound screen. |
 | Writes | `set_flow` | Mutate a flow edge in `flows.json` without touching any screen file. |
-| Writes | `set_meta` | Screen notes/tags, design-system idea/decisions, component/pattern usage — the handoff contract. |
+| Writes | `set_meta` | Screen notes/tags, design-system idea/decisions, component/pattern usage, a tag's own notes — the handoff contract. |
 | Writes | `write_mockup` | Create or revise one variant of a mockup — raw HTML, outside the design system. |
 | Lifecycle | `init_project` | Scaffold a project directory: empty, from HTML, or from a Stitch export URL. |
 | Lifecycle | `import_html` | Incremental HTML ingest into an existing project, with content-hash dedup. |

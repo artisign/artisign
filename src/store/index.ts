@@ -5,6 +5,7 @@ export type {
   ProjectChangeEvent,
   ChangeCategory,
   ScreenMeta,
+  TagMeta,
   MockupVariantMeta,
   MockupMeta,
   DesignDecision,

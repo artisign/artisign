@@ -38,6 +38,7 @@ const metaTargetSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("design_system") }),
   z.object({ kind: z.literal("component"), name: z.string() }),
   z.object({ kind: z.literal("pattern"), name: z.string() }),
+  z.object({ kind: z.literal("tag"), tag: z.string() }),
 ]);
 const setMetaDecisionSchema = z.object({
   id: z.string(),
@@ -245,11 +246,13 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "set_meta",
-    "Set screen notes/tags, mockup tags/title/description, design-system idea/decisions, or component/pattern " +
-      "usage guidance — the handoff contract coding agents rely on. One field group per call: notes/tags for a " +
-      "screen target, tags/title/description for a mockup target, idea/decisions for design_system, usage for a " +
-      "component/pattern target. tags and decisions replace the full list, not just add to it — read the current " +
-      "value first if you need to append.",
+    "Set screen notes/tags, mockup tags/title/description, design-system idea/decisions, component/pattern " +
+      "usage guidance, or a tag's own notes — the handoff contract coding agents rely on. One field group per " +
+      "call: notes/tags for a screen target, tags/title/description for a mockup target, idea/decisions for " +
+      "design_system, usage for a component/pattern target, notes for a tag target ({kind:\"tag\", tag}) — a " +
+      "spec that spans several screens, set once instead of duplicated into every tagged screen's own notes; no " +
+      "screen has to carry the tag yet. tags and decisions replace the full list, not just add to it — read the " +
+      "current value first if you need to append.",
     {
       target: metaTargetSchema,
       notes: z.string().optional(),

@@ -44,6 +44,7 @@ describe("initProject", () => {
     expect((await stat(join(dir, "design-system", "components"))).isDirectory()).toBe(true);
     expect((await stat(join(dir, "design-system", "patterns"))).isDirectory()).toBe(true);
     expect((await stat(join(dir, "screens"))).isDirectory()).toBe(true);
+    expect((await stat(join(dir, "tags"))).isDirectory()).toBe(true);
     expect((await stat(join(dir, "mockups"))).isDirectory()).toBe(true);
     expect((await stat(join(dir, "assets"))).isDirectory()).toBe(true);
 

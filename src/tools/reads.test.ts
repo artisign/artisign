@@ -161,6 +161,51 @@ describe("get_project", () => {
     expect(filtered.mockups).toEqual([{ mockup: "hero-options", variant_count: 0, tags: ["checkout"] }]);
     expect(filtered.mockup_count).toBe(1);
   });
+
+  it("tag_notes carries exactly one entry for a tag shared by several screens", async () => {
+    await fx.store.writeTagMeta("chr-244", { notes: "spec lives here" });
+    await fx.store.writeScreen("a", `<div id="n1"></div>`);
+    await fx.store.writeScreen("b", `<div id="n1"></div>`);
+    await fx.store.writeScreen("c", `<div id="n1"></div>`);
+    await fx.store.writeScreenMeta("a", { notes: "", tags: ["chr-244"] });
+    await fx.store.writeScreenMeta("b", { notes: "", tags: ["chr-244"] });
+    await fx.store.writeScreenMeta("c", { notes: "", tags: ["chr-244"] });
+
+    const res = await getProject(fx.store, { tags: ["chr-244"] });
+    expect(res.tag_notes).toEqual([{ tag: "chr-244", notes: "spec lives here" }]);
+  });
+
+  it("tag_notes request is case-insensitive and dedupes CHR-244/chr-244 to one entry", async () => {
+    await fx.store.writeTagMeta("chr-244", { notes: "spec lives here" });
+    const res = await getProject(fx.store, { tags: ["CHR-244", "chr-244"] });
+    expect(res.tag_notes).toEqual([{ tag: "CHR-244", notes: "spec lives here" }]);
+  });
+
+  it("omits tag_notes entirely for an unknown or empty-notes tag, rather than a notes: \"\" entry", async () => {
+    const res = await getProject(fx.store, { tags: ["nope"] });
+    expect(res).not.toHaveProperty("tag_notes");
+  });
+
+  it("carries no tag_notes at all when tags isn't requested", async () => {
+    await fx.store.writeTagMeta("chr-244", { notes: "spec lives here" });
+    const res = await getProject(fx.store, {});
+    expect(res).not.toHaveProperty("tag_notes");
+  });
+
+  it("tree/full views also carry tag_notes when tags is given (inherited from the summary spread)", async () => {
+    await fx.store.writeTagMeta("chr-244", { notes: "spec lives here" });
+    const tree = await getProject(fx.store, { view: "tree", tags: ["chr-244"] });
+    expect(tree.tag_notes).toEqual([{ tag: "chr-244", notes: "spec lives here" }]);
+    const full = await getProject(fx.store, { view: "full", tags: ["chr-244"] });
+    expect(full.tag_notes).toEqual([{ tag: "chr-244", notes: "spec lives here" }]);
+  });
+
+  it("the no-tags summary key set stays byte-identical (≤500 token cold-start budget)", async () => {
+    const res = await getProject(fx.store, {});
+    expect(Object.keys(res).sort()).toEqual(
+      ["name", "root", "screen_count", "token_count", "component_count", "mockup_count", "flow_count", "open_comment_count", "head", "head_reason", "last_write_at"].sort(),
+    );
+  });
 });
 
 describe("get_screen", () => {
@@ -208,6 +253,46 @@ describe("get_screen", () => {
 
   it("throws not_found for a missing screen", async () => {
     await expect(getScreen(fx.store, { screen: "nope" })).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("full carries notes and tag_notes as separate fields for a tagged screen", async () => {
+    await fx.store.writeScreenMeta("home", { notes: "own notes", tags: ["chr-244"] });
+    await fx.store.writeTagMeta("chr-244", { notes: "spec lives here" });
+
+    const full = await getScreen(fx.store, { screen: "home", view: "full" });
+    expect(full.notes).toBe("own notes");
+    expect(full.tag_notes).toEqual([{ tag: "chr-244", notes: "spec lives here" }]);
+  });
+
+  it("fields:[\"notes\"] also yields tag_notes (the acceptance-criterion wart, documented above SCREEN_OPTIONAL)", async () => {
+    await fx.store.writeScreenMeta("home", { notes: "own notes", tags: ["chr-244"] });
+    await fx.store.writeTagMeta("chr-244", { notes: "spec lives here" });
+
+    const res = await getScreen(fx.store, { screen: "home", view: "full", fields: ["notes"] });
+    expect(res.notes).toBe("own notes");
+    expect(res.tag_notes).toEqual([{ tag: "chr-244", notes: "spec lives here" }]);
+  });
+
+  it("omits tag_notes for an untagged screen, or a tag with no notes", async () => {
+    const full = await getScreen(fx.store, { screen: "home", view: "full" });
+    expect(full).not.toHaveProperty("tag_notes");
+
+    await fx.store.writeScreenMeta("home", { notes: "", tags: ["chr-244"] });
+    const stillNone = await getScreen(fx.store, { screen: "home", view: "full" });
+    expect(stillNone).not.toHaveProperty("tag_notes");
+  });
+
+  it("summary/tree views carry neither notes nor tag_notes", async () => {
+    await fx.store.writeScreenMeta("home", { notes: "own notes", tags: ["chr-244"] });
+    await fx.store.writeTagMeta("chr-244", { notes: "spec lives here" });
+
+    const summary = await getScreen(fx.store, { screen: "home" });
+    expect(summary).not.toHaveProperty("notes");
+    expect(summary).not.toHaveProperty("tag_notes");
+
+    const tree = await getScreen(fx.store, { screen: "home", view: "tree" });
+    expect(tree).not.toHaveProperty("notes");
+    expect(tree).not.toHaveProperty("tag_notes");
   });
 
   it("rejects output_format jsx as unimplemented", async () => {

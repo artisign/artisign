@@ -173,8 +173,13 @@ describe("MCP server — instructions budget", () => {
   // block (ceiling 850 → 870): styling a data-slot element is silently
   // discarded, and the slot syntax it traps sits right there. The
   // write_html warning is the primary teacher; this line is what an agent
-  // sees before it makes the mistake, since get_guide is optional.
-  it("stays within the ~870 token cheat-sheet budget (chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(870);
+  // sees before it makes the mistake, since get_guide is optional. The
+  // METADATA block's tag target + Markdown-rendering note (CHR-596) raised
+  // the budget from 870 to 910 — a documentation entity above the screen is
+  // a new place metadata can live, and an agent that doesn't know it exists
+  // duplicates the spec into every screen instead; measured at 907 when this
+  // line was added.
+  it("stays within the ~910 token cheat-sheet budget (chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(910);
   });
 });

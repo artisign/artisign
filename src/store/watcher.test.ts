@@ -114,6 +114,18 @@ describe("watchProject", () => {
     expect(events.find((e) => e.path.includes("hero.png"))?.category).toBe("asset");
   });
 
+  it("categorizes tags/<tag>.meta.json as \"tag_meta\"", async () => {
+    await mkdir(join(dir, "tags"), { recursive: true });
+    const events: ProjectChangeEvent[] = [];
+    unwatch = watchProject(dir, (event) => events.push(event));
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    await writeFile(join(dir, "tags", "chr-244.meta.json"), "{}");
+
+    await waitFor(events, (e) => e.path.includes("chr-244.meta.json"), 500);
+    expect(events.find((e) => e.path.includes("chr-244.meta.json"))?.category).toBe("tag_meta");
+  });
+
   it("categorizes design-system/meta.json as \"design_system_meta\"", async () => {
     await mkdir(join(dir, "design-system"), { recursive: true });
     const events: ProjectChangeEvent[] = [];

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { writeHtml } from "./writes.js";
 import { importHtml, promoteToSystem, initProjectTool } from "./lifecycle.js";
-import { assertValidEntityName, assertValidVariantName } from "./name-validation.js";
+import { assertValidEntityName, assertValidVariantName, assertValidTagName } from "./name-validation.js";
 
 describe("assertValidEntityName", () => {
   it.each([":", "#", "."])('rejects a name containing "%s"', (char) => {
@@ -33,6 +33,30 @@ describe("assertValidVariantName", () => {
 
   it("accepts ordinary variant names unchanged", () => {
     for (const name of ["default", "hover", "disabled", "size-lg", "dark_mode", "v2"]) assertValidVariantName(name);
+  });
+});
+
+describe("assertValidTagName (CHR-596)", () => {
+  it("accepts an ordinary tag name", () => {
+    for (const name of ["chr-244", "CHR-244", "release_1", "wip"]) assertValidTagName(name);
+  });
+
+  it("rejects the empty string", () => {
+    expect(() => assertValidTagName("")).toThrowError(expect.objectContaining({ code: "validation_failed" }));
+  });
+
+  it("rejects whitespace, which assertValidEntityName would let through", () => {
+    expect(() => assertValidTagName("not a tag")).toThrowError(expect.objectContaining({ code: "validation_failed" }));
+  });
+
+  it("rejects a leading slash or a path-traversal attempt, which assertValidEntityName would let through", () => {
+    expect(() => assertValidTagName("/etc/passwd")).toThrowError(expect.objectContaining({ code: "validation_failed" }));
+    expect(() => assertValidTagName("../evil")).toThrowError(expect.objectContaining({ code: "validation_failed" }));
+  });
+
+  it("rejects a name starting with - or _", () => {
+    expect(() => assertValidTagName("-leading")).toThrowError(expect.objectContaining({ code: "validation_failed" }));
+    expect(() => assertValidTagName("_leading")).toThrowError(expect.objectContaining({ code: "validation_failed" }));
   });
 });
 

@@ -67,6 +67,16 @@ export async function handlePreviewRoutes(req: IncomingMessage, res: ServerRespo
     return true;
   }
 
+  if (url.pathname === "/api/tags") {
+    // Its own route, not folded into /api/screens — a spec tag shared by
+    // every screen in a project would otherwise ride along in each of their
+    // responses, the exact duplication this feature exists to remove.
+    const tags = await store.listTagMetas();
+    const notes = await Promise.all(tags.map((tag) => store.readTagMeta(tag)));
+    sendJson(res, 200, { tags: tags.map((tag, i) => ({ tag, notes: notes[i]!.notes })) });
+    return true;
+  }
+
   if (url.pathname === "/api/mockups") {
     const names = await store.listMockups();
     const mockups = await Promise.all(

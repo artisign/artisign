@@ -86,6 +86,19 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
     expect(json).toEqual({ flows: [{ from: "home.n2", event: "tap", to: "checkout", to_kind: "screen" }] });
   });
 
+  it("GET /api/tags returns [] when no tag has notes", async () => {
+    const { status, json } = await getJson("/api/tags");
+    expect(status).toBe(200);
+    expect(json).toEqual({ tags: [] });
+  });
+
+  it("GET /api/tags lists every tag with notes", async () => {
+    await store.writeTagMeta("chr-244", { notes: "spec lives here" });
+    const { status, json } = await getJson("/api/tags");
+    expect(status).toBe(200);
+    expect(json).toEqual({ tags: [{ tag: "chr-244", notes: "spec lives here" }] });
+  });
+
   it("GET /api/render/<screen> returns resolved (token-free) HTML", async () => {
     const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/home`);
     expect(res.status).toBe(200);

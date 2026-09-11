@@ -179,7 +179,9 @@ export const TOOLS: ToolDefinition[] = [
       "full grammar. Example: html_aug: '<section id=\"s1\" style=\"padding: $spacing.md\">...</section>'. " +
       "kind:\"component\"|\"pattern\" writes a design-system definition file instead of a screen: " +
       "a default-variant root element plus optional sibling <template data-variant=\"x\"> blocks; " +
-      "screen names the definition.",
+      "screen names the definition. In a definition, never style the data-slot element itself " +
+      "— an instance filling it discards that style; style a wrapper around it instead " +
+      "(an <img> slot: size the <img> per instance, not in the definition).",
     {
       screen: z.string(),
       mode: z.enum(["create", "replace"]),
@@ -194,7 +196,8 @@ export const TOOLS: ToolDefinition[] = [
     "patch_html",
     "Surgical patch by node ref or CSS selector: replace, insert_before, insert_after, delete, set_attr. " +
       "html_aug for replace/insert_* is a fragment in the same augmented-HTML grammar as write_html " +
-      "(see server instructions). node also accepts a component:<name>#<variant>.<node-id> / " +
+      "(see server instructions), including its data-slot rule — never style the slot element itself " +
+      "when patching into a definition. node also accepts a component:<name>#<variant>.<node-id> / " +
       "pattern:<name>.<node-id> ref (css_selector targeting stays screen-only); touching a node with no " +
       "explicit id in source returns a missing_id warning, not blocking. response_mode \"diff\"/\"full\" " +
       "are rejected against a definition ref — only \"summary\" is supported there. " +

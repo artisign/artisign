@@ -27,11 +27,20 @@
 // Supported inline (inside headings, paragraphs, list items, table cells;
 // never inside a fence):
 //   - `` `code` ``            -> code, highest precedence
-//   - `**x**` / `__x__`       -> strong; `*x*` / `_x_` -> em
+//   - `**x**` / `__x__`       -> strong; `*x*` / `_x_` -> em (an opening
+//                                delimiter must not be followed by
+//                                whitespace; `_`/`__` additionally must not
+//                                be preceded by an alphanumeric, so
+//                                `data_flow_target` and `2 * 3 * 4` survive
+//                                unmodified — this project's own vocabulary
+//                                is full of snake_case identifiers)
 //   - `[text](url)`           -> a, only if url matches ^(https?:|mailto:)
 //                                or starts with "/" or "#"; anything else
 //                                (javascript:, data:, //...) renders as
-//                                plain text, not a stripped-href anchor
+//                                plain text, not a stripped-href anchor.
+//                                Parens inside the url are balanced, so
+//                                `[docs](https://x.com/a_(b))` keeps its
+//                                whole url.
 //
 // Deliberately unsupported: images `![]()` (keeps an `src` sink out of this
 // module entirely), autolinks, blockquotes, reference links, backslash
@@ -81,6 +90,56 @@ function cellAlignmentClass(cell) {
   return null;
 }
 
+/**
+ * Whether a delimiter run starting at `text[i]` (length `delimLen`, first
+ * character `delimChar`) is allowed to *open* emphasis/strong. Two flanking
+ * rules, both required so `data_flow_target` and `2 * 3 * 4` read back
+ * unmodified instead of silently losing characters:
+ *   - the content must not start with whitespace (also rejects an
+ *     immediately-closing empty run)
+ *   - for `_`/`__` specifically, the character before the delimiter must
+ *     not be alphanumeric (GFM's intraword-underscore rule) — `*`/`**` stay
+ *     intraword-legal, matching this project's own `$token`-in-prose style
+ * @param {string} text @param {number} i @param {number} delimLen @param {string} delimChar
+ * @returns {boolean}
+ */
+function canOpenEmphasis(text, i, delimLen, delimChar) {
+  const nextChar = text[i + delimLen];
+  if (nextChar === undefined || /\s/.test(nextChar)) return false;
+  if (delimChar === "_") {
+    const prevChar = text[i - 1];
+    if (prevChar !== undefined && /[A-Za-z0-9]/.test(prevChar)) return false;
+  }
+  return true;
+}
+
+/**
+ * Matches `[label](url)` at `text[i]`, counting balanced parens inside the
+ * url so `[docs](https://x.com/a_(b))` keeps its whole url instead of
+ * truncating at the first `)`.
+ * @param {string} text @param {number} i
+ * @returns {{ whole: string, label: string, url: string } | null}
+ */
+function matchLink(text, i) {
+  if (text[i] !== "[") return null;
+  const closeBracket = text.indexOf("]", i + 1);
+  if (closeBracket === -1 || text[closeBracket + 1] !== "(") return null;
+  const label = text.slice(i + 1, closeBracket);
+  let depth = 0;
+  let j = closeBracket + 2;
+  while (j < text.length) {
+    if (text[j] === "(") {
+      depth++;
+    } else if (text[j] === ")") {
+      if (depth === 0) break;
+      depth--;
+    }
+    j++;
+  }
+  if (text[j] !== ")") return null;
+  return { whole: text.slice(i, j + 1), label, url: text.slice(closeBracket + 2, j) };
+}
+
 /** Parses one run of inline text and appends the resulting nodes to `el`. */
 function appendInline(el, text) {
   let i = 0;
@@ -99,9 +158,9 @@ function appendInline(el, text) {
     }
 
     if (text[i] === "[") {
-      const m = /^\[([^\]]*)\]\(([^)]*)\)/.exec(rest);
+      const m = matchLink(text, i);
       if (m) {
-        const [whole, label, url] = m;
+        const { whole, label, url } = m;
         if (/^(https?:|mailto:)/.test(url) || url.startsWith("/") || url.startsWith("#")) {
           const a = document.createElement("a");
           a.href = url;
@@ -118,7 +177,7 @@ function appendInline(el, text) {
     }
 
     const strongMatch = /^(\*\*|__)(.+?)\1/.exec(rest);
-    if (strongMatch) {
+    if (strongMatch && canOpenEmphasis(text, i, 2, strongMatch[1][0])) {
       const strong = document.createElement("strong");
       appendInline(strong, strongMatch[2]);
       el.appendChild(strong);
@@ -127,7 +186,7 @@ function appendInline(el, text) {
     }
 
     const emMatch = /^(\*|_)(.+?)\1/.exec(rest);
-    if (emMatch) {
+    if (emMatch && canOpenEmphasis(text, i, 1, emMatch[1])) {
       const em = document.createElement("em");
       appendInline(em, emMatch[2]);
       el.appendChild(em);
@@ -203,8 +262,18 @@ function consumeTable(lines, start) {
   return { element: table, next: i };
 }
 
-/** @param {string[]} lines @param {number} start @returns {{ element: HTMLElement, next: number }} */
+/**
+ * @param {string[]} lines @param {number} start @returns {{ element: HTMLElement, next: number }}
+ *
+ * Indent is normalized against `lines[start]`'s own indent, not against
+ * column 0 — an indented line that *opens* a block (e.g. a bullet under a
+ * heading) is this list's top level, not an orphaned nested item. That
+ * normalization is also what guarantees progress: `lines[start]` always
+ * matches at `indent === baseIndent`, so the first loop iteration always
+ * takes the top-level branch and advances `i`.
+ */
 function consumeList(lines, start) {
+  const baseIndent = matchListItem(lines[start]).indent;
   const top = matchListItem(lines[start]);
   const list = document.createElement(top.ordered ? "ol" : "ul");
   let currentLi = null;
@@ -212,8 +281,8 @@ function consumeList(lines, start) {
   let i = start;
   while (i < lines.length) {
     const item = matchListItem(lines[i]);
-    if (!item) break;
-    if (item.indent === 0) {
+    if (!item || item.indent < baseIndent) break;
+    if (item.indent === baseIndent) {
       currentLi = document.createElement("li");
       appendInline(currentLi, item.content);
       list.appendChild(currentLi);
@@ -262,46 +331,39 @@ export function renderMarkdown(text) {
   const lines = text.replace(/\r\n?/g, "\n").split("\n");
   let i = 0;
   while (i < lines.length) {
-    switch (blockType(lines[i], lines[i + 1])) {
-      case "blank": {
-        i++;
-        break;
-      }
-      case "fence": {
-        const { element, next } = consumeFence(lines, i);
-        fragment.appendChild(element);
-        i = next;
-        break;
-      }
-      case "hr": {
-        fragment.appendChild(document.createElement("hr"));
-        i++;
-        break;
-      }
-      case "heading": {
-        const { element, next } = consumeHeading(lines, i);
-        fragment.appendChild(element);
-        i = next;
-        break;
-      }
-      case "table": {
-        const { element, next } = consumeTable(lines, i);
-        fragment.appendChild(element);
-        i = next;
-        break;
-      }
-      case "list": {
-        const { element, next } = consumeList(lines, i);
-        fragment.appendChild(element);
-        i = next;
-        break;
-      }
-      default: {
-        const { element, next } = consumeParagraph(lines, i);
-        fragment.appendChild(element);
-        i = next;
-      }
+    const type = blockType(lines[i], lines[i + 1]);
+    if (type === "blank") {
+      i++;
+      continue;
     }
+
+    let element;
+    let next;
+    switch (type) {
+      case "fence":
+        ({ element, next } = consumeFence(lines, i));
+        break;
+      case "hr":
+        element = document.createElement("hr");
+        next = i + 1;
+        break;
+      case "heading":
+        ({ element, next } = consumeHeading(lines, i));
+        break;
+      case "table":
+        ({ element, next } = consumeTable(lines, i));
+        break;
+      case "list":
+        ({ element, next } = consumeList(lines, i));
+        break;
+      default:
+        ({ element, next } = consumeParagraph(lines, i));
+    }
+    fragment.appendChild(element);
+    // Safety net: no consume* function is allowed to stand still. A bug
+    // that returns next <= i would otherwise re-dispatch the same line
+    // forever instead of just mis-rendering it.
+    i = next > i ? next : i + 1;
   }
   return fragment;
 }

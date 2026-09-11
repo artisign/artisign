@@ -72,7 +72,62 @@ describe("renderMarkdown", () => {
   it("renders a javascript: link as plain text with no anchor at all", () => {
     const div = render("[x](javascript:alert(1))");
     expect(div.querySelector("a")).toBeNull();
-    expect(div.textContent).toContain("x");
+    expect(div.textContent).toBe("x");
+  });
+
+  it("keeps a url with balanced parens intact instead of truncating at the first )", () => {
+    const div = render("[docs](https://x.com/a_(b))");
+    const a = div.querySelector("a");
+    expect(a.getAttribute("href")).toBe("https://x.com/a_(b)");
+  });
+
+  it("does not corrupt intraword underscore identifiers with emphasis", () => {
+    const div = render("Set data_flow_target and data_slot values.");
+    expect(div.querySelector("em")).toBeNull();
+    expect(div.textContent).toBe("Set data_flow_target and data_slot values.");
+  });
+
+  it("leaves a run of underscore-joined words entirely untouched", () => {
+    const div = render("snake_case_word");
+    expect(div.querySelector("em")).toBeNull();
+    expect(div.textContent).toBe("snake_case_word");
+  });
+
+  it("does not treat a bare multiplication asterisk as emphasis", () => {
+    const div = render("2 * 3 * 4 = 24");
+    expect(div.querySelector("em")).toBeNull();
+    expect(div.textContent).toBe("2 * 3 * 4 = 24");
+  });
+
+  it("still renders normal *emphasis* and _emphasis_", () => {
+    const div = render("*emphasis* and _emphasis_");
+    const ems = [...div.querySelectorAll("em")];
+    expect(ems.map((el) => el.textContent)).toEqual(["emphasis", "emphasis"]);
+  });
+
+  it("does not hang on an indented list item that opens a block (regression)", () => {
+    // Before the fix, matchListItem's indent was compared against column 0,
+    // so an indented line opening a block hit consumeList's `else break`
+    // without ever advancing `i` — renderMarkdown re-dispatched the same
+    // line forever.
+    const div = render("Intro\n\n  - indented item\n");
+    const li = div.querySelector("li");
+    expect(li.textContent).toBe("indented item");
+  });
+
+  it.each([
+    ["heading", "# heading text"],
+    ["fence", "```\ncode\n```"],
+    ["hr", "---"],
+    ["table", "| a |\n|---|\n| 1 |"],
+    ["indented list", "  - indented item"],
+    ["paragraph", "plain text"],
+  ])("makes progress for %s as the very first line of the input", (_name, text) => {
+    // A regression guard for the class of bug above: every block type must
+    // consume at least its own first line, producing exactly one top-level
+    // node for a single-block input instead of looping or skipping.
+    const div = render(text);
+    expect(div.children).toHaveLength(1);
   });
 
   it("never creates a script element, and its content survives as text", () => {

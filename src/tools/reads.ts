@@ -24,6 +24,7 @@ import { parseNodeRef, formatNodeRef } from "./node-ref.js";
 import { readAllFlows, readScreenFlows, toPublicFlowRecord } from "./flows.js";
 import { readCommentRecords, readCommentRecordsWithStats, groupThreads, threadStatus, toPublicComment, type CommentRecord } from "./comments.js";
 import { selectFields } from "./fields.js";
+import { isValidTagName } from "./name-validation.js";
 import { ToolError, type View, type Predicate, type PublicComment } from "./types.js";
 
 // mtime/since are approximated for now. Neither is
@@ -94,6 +95,33 @@ function matchesAnyTag(tags: string[], requested: string[]): boolean {
   return tags.some((t) => requestedLower.has(t.toLowerCase()));
 }
 
+/**
+ * Tag-level notes for `requested`, in request order, deduped case-insensitively
+ * (`CHR-244`/`chr-244` yield one entry) — built from the requested tags
+ * themselves, not from the screens that carry them, so a tag shared by ten
+ * screens still yields exactly one entry. A tag with no sidecar file, or an
+ * empty one, is omitted entirely rather than returned with `notes: ""` — the
+ * caller asked "which of these tags have something to say", not a
+ * fixed-shape row per tag.
+ */
+async function readTagNotes(store: Store, requested: string[]): Promise<{ tag: string; notes: string }[]> {
+  const seenLower = new Set<string>();
+  const deduped = requested.filter((tag) => {
+    const key = tag.toLowerCase();
+    if (seenLower.has(key)) return false;
+    seenLower.add(key);
+    return true;
+  });
+  // A tag reaches the filesystem as tags/<tag>.meta.json, and this list comes
+  // either from a caller or from a screen sidecar written before tags were
+  // validated — so a name that could never be a file is skipped here rather
+  // than allowed to fail the whole read at the store's path guard. Reads stay
+  // readable; the write path is where a bad tag is refused.
+  const usable = deduped.filter(isValidTagName);
+  const metas = await Promise.all(usable.map((tag) => store.readTagMeta(tag)));
+  return usable.map((tag, i) => ({ tag, notes: metas[i]!.notes })).filter((t) => t.notes.length > 0);
+}
+
 const PROJECT_ALWAYS = [
   "name",
   "root",
@@ -107,7 +135,7 @@ const PROJECT_ALWAYS = [
   "head_reason",
   "last_write_at",
 ];
-const PROJECT_OPTIONAL = ["screens", "design_system", "flows", "mockups"];
+const PROJECT_OPTIONAL = ["screens", "design_system", "flows", "mockups", "tag_notes"];
 
 export async function getProject(store: Store, input: GetProjectInput): Promise<Record<string, unknown>> {
   const view = input.view ?? "summary";
@@ -143,6 +171,16 @@ export async function getProject(store: Store, input: GetProjectInput): Promise<
     ...(head.head_reason !== undefined ? { head_reason: head.head_reason } : {}),
     last_write_at: now(),
   };
+
+  // Tag notes ride along with a tags query, at every tier — tree/full inherit
+  // this from `summary` via their own `...summary` spread below, so this is
+  // the only call site. Guarded by `input.tags` so a caller that never asked
+  // about tags never pays for it, and the no-tags summary shape (pinned by
+  // the ≤500 token cold-start budget test) stays byte-identical.
+  if (input.tags && input.tags.length > 0) {
+    const tagNotes = await readTagNotes(store, input.tags);
+    if (tagNotes.length > 0) summary.tag_notes = tagNotes;
+  }
 
   // Tags queries hit even at summary tier — a minimal { screen, tags } list
   // rather than the richer tiered screens array, to stay within the ≤500
@@ -229,7 +267,13 @@ export type GetScreenInput = {
 };
 
 const SCREEN_ALWAYS = ["screen", "path", "node_count", "ref_count", "flow_count", "open_comment_count", "last_commit", "mtime", "tags"];
-const SCREEN_OPTIONAL = ["nodes", "html_aug", "refs", "flows", "comments", "notes", "rendered_html"];
+// `tag_notes` is its own field, not folded into `notes` — that would break
+// selectFields' one-name-one-key contract (fields:["notes","tag_notes"] would
+// read oddly if "notes" alone silently carried both). Instead the "notes"
+// request is expanded to also ask for "tag_notes" at the call boundary below
+// — a wart, kept rather than hidden, per the acceptance criterion that
+// fields:["notes"] alone still surfaces a tagged screen's spec.
+const SCREEN_OPTIONAL = ["nodes", "html_aug", "refs", "flows", "comments", "notes", "tag_notes", "rendered_html"];
 
 export async function getScreen(store: Store, input: GetScreenInput): Promise<Record<string, unknown>> {
   if (input.output_format === "jsx") {
@@ -284,6 +328,8 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
     flows: screenFlows.map(toPublicFlowRecord),
     notes: meta.notes,
   };
+  const tagNotes = await readTagNotes(store, meta.tags);
+  if (tagNotes.length > 0) full.tag_notes = tagNotes;
   if (input.fields?.includes("comments")) {
     full.comments = commentsForScreen(commentRecords, input.screen, true);
   }
@@ -294,7 +340,12 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
     const { documentHtml } = await renderScreenDocument(store, input.screen, { fontMode: "url" });
     full.rendered_html = documentHtml;
   }
-  return selectFields(full, SCREEN_ALWAYS, SCREEN_OPTIONAL, input.fields);
+  // "notes" implies "tag_notes" — a tag's spec is part of what "the screen's
+  // notes" means to a caller, even though it lives in a different field (see
+  // the SCREEN_OPTIONAL comment above for why it isn't the same field).
+  const fields =
+    input.fields?.includes("notes") && !input.fields.includes("tag_notes") ? [...input.fields, "tag_notes"] : input.fields;
+  return selectFields(full, SCREEN_ALWAYS, SCREEN_OPTIONAL, fields);
 }
 
 function commentsForScreen(records: CommentRecord[], screen: string, includeReplies: boolean): PublicComment[] {

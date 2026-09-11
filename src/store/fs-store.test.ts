@@ -87,6 +87,50 @@ describe("FsStore", () => {
     expect(await store.readScreenMeta("home")).toEqual({ notes: "x", tags: [] });
   });
 
+  it("readTagMeta yields empty defaults when the sidecar is missing", async () => {
+    expect(await store.readTagMeta("chr-244")).toEqual({ notes: "" });
+  });
+
+  it("round-trips tag meta", async () => {
+    await store.writeTagMeta("chr-244", { notes: "spec lives here" });
+    expect(await store.readTagMeta("chr-244")).toEqual({ notes: "spec lives here" });
+  });
+
+  it("readTagMeta yields defaults instead of throwing on malformed JSON (hand-edited sidecar)", async () => {
+    await mkdir(join(dir, "tags"), { recursive: true });
+    await writeFile(join(dir, "tags", "chr-244.meta.json"), "{ not valid json");
+    expect(await store.readTagMeta("chr-244")).toEqual({ notes: "" });
+  });
+
+  it("readTagMeta coerces a wrong-typed notes field to the default instead of passing it through", async () => {
+    await mkdir(join(dir, "tags"), { recursive: true });
+    await writeFile(join(dir, "tags", "chr-244.meta.json"), JSON.stringify({ notes: 42 }));
+    expect(await store.readTagMeta("chr-244")).toEqual({ notes: "" });
+  });
+
+  it("listTagMetas returns [] when tags/ is empty", async () => {
+    expect(await store.listTagMetas()).toEqual([]);
+  });
+
+  it("listTagMetas returns sorted tag names", async () => {
+    await store.writeTagMeta("zeta", { notes: "z" });
+    await store.writeTagMeta("alpha", { notes: "a" });
+    expect(await store.listTagMetas()).toEqual(["alpha", "zeta"]);
+  });
+
+  it("CHR-244 and chr-244 write/read the same file (tag names are case-insensitive on disk)", async () => {
+    await store.writeTagMeta("CHR-244", { notes: "upper" });
+    expect(await store.readTagMeta("chr-244")).toEqual({ notes: "upper" });
+    await store.writeTagMeta("chr-244", { notes: "lower" });
+    expect(await store.readTagMeta("CHR-244")).toEqual({ notes: "lower" });
+    expect(await store.listTagMetas()).toEqual(["chr-244"]);
+  });
+
+  it("rejects a tag name that would escape the project directory", async () => {
+    await expect(store.readTagMeta("../../evil")).rejects.toThrow();
+    await expect(store.writeTagMeta("../../evil", { notes: "x" })).rejects.toThrow();
+  });
+
   it("readDesignSystemMeta yields empty defaults when meta.json is missing", async () => {
     expect(await store.readDesignSystemMeta()).toEqual({ idea: "", decisions: [], component_usage: {}, pattern_usage: {} });
   });

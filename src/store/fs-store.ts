@@ -6,10 +6,14 @@ import { CONFIG_FILENAME, CACHE_DIR } from "../init/artisign-config.js";
 import { atomicWrite, ensureCacheGitignore } from "./atomic-write.js";
 import { autoCommit, getHeadCommit } from "./git.js";
 import { watchProject } from "./watcher.js";
-import type { Store, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, DesignSystemMeta, DesignDecision, CommitResult, HeadCommitResult, MockupMeta, MockupVariantMeta } from "./types.js";
+import type { Store, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, TagMeta, DesignSystemMeta, DesignDecision, CommitResult, HeadCommitResult, MockupMeta, MockupVariantMeta } from "./types.js";
 
 function emptyScreenMeta(): ScreenMeta {
   return { notes: "", tags: [] };
+}
+
+function emptyTagMeta(): TagMeta {
+  return { notes: "" };
 }
 
 function emptyMockupMeta(): MockupMeta {
@@ -90,6 +94,12 @@ function sanitizeScreenMeta(value: unknown): ScreenMeta {
     notes: typeof v.notes === "string" ? v.notes : "",
     tags: Array.isArray(v.tags) ? v.tags.filter((t): t is string => typeof t === "string") : [],
   };
+}
+
+/** Same leniency as `sanitizeScreenMeta`: coerce a bad shape (or a hand-edited wrong type) to defaults rather than throw. */
+function sanitizeTagMeta(value: unknown): TagMeta {
+  const v = asRecord(value);
+  return { notes: typeof v.notes === "string" ? v.notes : "" };
 }
 
 function sanitizeMockupVariant(value: unknown): MockupVariantMeta | undefined {
@@ -209,6 +219,26 @@ export class FsStore implements Store {
 
   async writeScreenMeta(name: string, meta: ScreenMeta): Promise<void> {
     await atomicWrite(this.path("screens", `${name}.meta.json`), `${JSON.stringify(meta, null, 2)}\n`);
+  }
+
+  async listTagMetas(): Promise<string[]> {
+    return listEntries(this.path("tags"), (entry) => (entry.name.endsWith(".meta.json") ? entry.name.slice(0, -".meta.json".length) : undefined));
+  }
+
+  /** Lowercases `tag` before touching disk — see the type's doc comment for why. */
+  async readTagMeta(tag: string): Promise<TagMeta> {
+    try {
+      const raw = await readFile(this.path("tags", `${tag.toLowerCase()}.meta.json`), "utf-8");
+      return sanitizeTagMeta(JSON.parse(raw));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return emptyTagMeta();
+      if (err instanceof SyntaxError) return emptyTagMeta();
+      throw err;
+    }
+  }
+
+  async writeTagMeta(tag: string, meta: TagMeta): Promise<void> {
+    await atomicWrite(this.path("tags", `${tag.toLowerCase()}.meta.json`), `${JSON.stringify(meta, null, 2)}\n`);
   }
 
   async listMockups(): Promise<string[]> {

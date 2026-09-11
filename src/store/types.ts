@@ -12,6 +12,9 @@ export type FlowRecord = {
 
 export type ScreenMeta = { notes: string; tags: string[] };
 
+/** A field object, not a bare string, so a later field (e.g. a title) is additive without a breaking shape change. */
+export type TagMeta = { notes: string };
+
 export type MockupVariantMeta = { id: string; title: string; description: string };
 
 export type MockupMeta = { title?: string; description?: string; tags?: string[]; variants: MockupVariantMeta[] };
@@ -42,6 +45,7 @@ export type ChangeCategory =
   | "design_system_meta"
   | "mockup"
   | "asset"
+  | "tag_meta"
   | "other";
 
 export type ProjectChangeEvent = {
@@ -90,6 +94,18 @@ export interface Store {
   /** Missing sidecar file yields `{ notes: "", tags: [] }`, never an error. */
   readScreenMeta(name: string): Promise<ScreenMeta>;
   writeScreenMeta(name: string, meta: ScreenMeta): Promise<void>;
+
+  /**
+   * Tag-level notes (`tags/<tag>.meta.json`, filename lowercased — see
+   * `readTagMeta`) — a feature spec spanning several screens, set once
+   * instead of duplicated into every tagged screen's own notes. Every tag
+   * name here is whatever screens/mockups happen to carry; there is no
+   * separate "list of tags" concept.
+   */
+  listTagMetas(): Promise<string[]>;
+  /** Missing sidecar file yields `{ notes: "" }`, never an error. */
+  readTagMeta(tag: string): Promise<TagMeta>;
+  writeTagMeta(tag: string, meta: TagMeta): Promise<void>;
 
   listComponents(): Promise<string[]>;
   readComponent(name: string): Promise<string>;

@@ -49,9 +49,12 @@ unresolved token, component, or variant ref.
 
 METADATA: set_meta writes notes/tags (target: {kind:"screen", screen}),
 tags/title/description (target: {kind:"mockup", mockup}), idea/decisions
-(target: {kind:"design_system"}), or usage guidance on a component/pattern
-(target: {kind:"component"|"pattern", name}, field: usage) — the handoff
-contract to coding agents; find screens or mockups by tag via get_project
+(target: {kind:"design_system"}), usage guidance on a component/pattern
+(target: {kind:"component"|"pattern", name}, field: usage), or a tag's own
+notes (target: {kind:"tag", tag}) — a spec spanning several screens, set
+once instead of duplicated into each one's own notes; get_project/get_screen
+surface it as tag_notes. All notes/idea/decisions/usage bodies render as
+Markdown in the preview. Find screens or mockups by tag via get_project
 {tags: [...]}.
 
 LIFECYCLE: write_html kind:"component"|"pattern" writes a definition

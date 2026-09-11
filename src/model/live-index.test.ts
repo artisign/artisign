@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FsStore } from "../store/fs-store.js";
-import type { Store, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, MockupMeta, DesignSystemMeta, CommitResult, HeadCommitResult } from "../store/index.js";
+import type { Store, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, TagMeta, MockupMeta, DesignSystemMeta, CommitResult, HeadCommitResult } from "../store/index.js";
 import { initProject } from "../init/init-project.js";
 import { watchAndReindex } from "./live-index.js";
 import type { ProjectIndex } from "./index-builder.js";
@@ -41,6 +41,13 @@ class FakeStore implements Store {
     return { notes: "", tags: [] };
   }
   async writeScreenMeta() {}
+  async listTagMetas(): Promise<string[]> {
+    return [];
+  }
+  async readTagMeta(): Promise<TagMeta> {
+    return { notes: "" };
+  }
+  async writeTagMeta() {}
   async listMockups(): Promise<string[]> {
     return [];
   }

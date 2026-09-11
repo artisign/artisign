@@ -183,6 +183,56 @@ describe("set_meta — design_system target", () => {
   });
 });
 
+describe("set_meta — tag target", () => {
+  let fx: ProjectFixture;
+
+  beforeEach(async () => {
+    fx = await setupProject();
+  });
+  afterEach(() => fx.cleanup());
+
+  it("sets notes on a tag no screen carries yet — deliberately no not_found check", async () => {
+    const res = await setMeta(fx.store, { target: { kind: "tag", tag: "chr-244" }, notes: "spec lives here" });
+    expect(res.meta).toEqual({ notes: "spec lives here" });
+    expect(await fx.store.readTagMeta("chr-244")).toEqual({ notes: "spec lives here" });
+  });
+
+  it("notes is a full replace, not an append", async () => {
+    await setMeta(fx.store, { target: { kind: "tag", tag: "chr-244" }, notes: "first draft" });
+    const res = await setMeta(fx.store, { target: { kind: "tag", tag: "chr-244" }, notes: "revised" });
+    expect(res.meta).toEqual({ notes: "revised" });
+  });
+
+  it("lowercases the tag name on disk (CHR-244 and chr-244 are the same document)", async () => {
+    await setMeta(fx.store, { target: { kind: "tag", tag: "CHR-244" }, notes: "upper" });
+    expect(await fx.store.readTagMeta("chr-244")).toEqual({ notes: "upper" });
+  });
+
+  it("throws validation_failed when notes is missing", async () => {
+    await expect(setMeta(fx.store, { target: { kind: "tag", tag: "chr-244" } })).rejects.toMatchObject({ code: "validation_failed" });
+  });
+
+  it("throws validation_failed when a screen/mockup/design_system/component field is set on a tag target", async () => {
+    await expect(setMeta(fx.store, { target: { kind: "tag", tag: "chr-244" }, tags: ["x"], notes: "y" } as never)).rejects.toThrow(ToolError);
+    await expect(setMeta(fx.store, { target: { kind: "tag", tag: "chr-244" }, title: "x", notes: "y" } as never)).rejects.toThrow(ToolError);
+    await expect(setMeta(fx.store, { target: { kind: "tag", tag: "chr-244" }, idea: "x", notes: "y" } as never)).rejects.toThrow(ToolError);
+    await expect(setMeta(fx.store, { target: { kind: "tag", tag: "chr-244" }, usage: "x", notes: "y" } as never)).rejects.toThrow(ToolError);
+  });
+
+  it("throws validation_failed for a tag name that fails assertValidTagName", async () => {
+    await expect(setMeta(fx.store, { target: { kind: "tag", tag: "not a tag" }, notes: "x" })).rejects.toMatchObject({ code: "validation_failed" });
+  });
+
+  it("commits with a set_meta message including the target", async () => {
+    const config = await fx.store.readArtisignConfig();
+    config.settings.autoCommit = true;
+    await fx.store.writeArtisignConfig(config);
+
+    const res = await setMeta(fx.store, { target: { kind: "tag", tag: "chr-244" }, notes: "x" });
+    expect(res.commit).toMatch(/^[0-9a-f]{40}$/);
+  });
+});
+
 describe("set_meta — component/pattern target", () => {
   let fx: ProjectFixture;
 
@@ -219,5 +269,27 @@ describe("set_meta — component/pattern target", () => {
     await expect(setMeta(fx.store, { target: { kind: "component", name: "btn-primary" }, idea: "x", usage: "y" } as never)).rejects.toThrow(ToolError);
     await expect(setMeta(fx.store, { target: { kind: "component", name: "btn-primary" }, title: "x", usage: "y" } as never)).rejects.toThrow(ToolError);
     await expect(setMeta(fx.store, { target: { kind: "component", name: "btn-primary" }, description: "x", usage: "y" } as never)).rejects.toThrow(ToolError);
+  });
+});
+
+describe("set_meta — a screen tag has to be a usable tag name (CHR-596)", () => {
+  let fx: ProjectFixture;
+  beforeEach(async () => {
+    fx = await setupProject();
+    await fx.store.writeScreen("home", `<div id="n1"></div>`);
+  });
+  afterEach(() => fx.cleanup());
+
+  it("refuses a screen tag that could not be a filename", async () => {
+    // A tag is tags/<tag>.meta.json now. Unvalidated, this would be written
+    // happily and then break every later get_screen on this screen.
+    await expect(setMeta(fx.store, { target: { kind: "screen", screen: "home" }, tags: ["../../evil"] })).rejects.toThrow(ToolError);
+    await expect(setMeta(fx.store, { target: { kind: "screen", screen: "home" }, tags: ["has space"] })).rejects.toThrow(ToolError);
+    expect((await fx.store.readScreenMeta("home")).tags).toEqual([]);
+  });
+
+  it("still accepts the ordinary ones", async () => {
+    await setMeta(fx.store, { target: { kind: "screen", screen: "home" }, tags: ["chr-244", "empty-state", "design-system"] });
+    expect((await fx.store.readScreenMeta("home")).tags).toEqual(["chr-244", "empty-state", "design-system"]);
   });
 });

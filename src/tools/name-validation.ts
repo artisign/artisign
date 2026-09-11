@@ -39,6 +39,26 @@ export function assertValidEntityName(kind: "screen" | "component" | "pattern", 
  */
 const VARIANT_FORBIDDEN_CHARS = [...RESERVED_CHARS, '"', "<", ">", "&"];
 
+/**
+ * A tag is not part of the node address scheme (`assertValidEntityName`'s
+ * job) — it never appears in a ref, only as a filter/document key — but it
+ * does become a filename (`tags/<tag>.meta.json`, CHR-596), so it needs its
+ * own, stricter rule: `assertValidEntityName` lets "/", whitespace and the
+ * empty string straight through, any of which would otherwise surface as a
+ * raw filesystem `io_error` instead of a clean `validation_failed` here.
+ */
+const TAG_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
+
+export function isValidTagName(tag: string): boolean {
+  return TAG_NAME_RE.test(tag);
+}
+
+export function assertValidTagName(tag: string): void {
+  if (!isValidTagName(tag)) {
+    throw new ToolError("validation_failed", `tag "${tag}" must match ${TAG_NAME_RE.source}`);
+  }
+}
+
 export function assertValidVariantName(name: string): void {
   if (name.length === 0) {
     throw new ToolError("validation_failed", "variant name must not be empty");

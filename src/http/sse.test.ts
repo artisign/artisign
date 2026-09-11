@@ -171,6 +171,18 @@ describe("GET /events (SSE)", () => {
     expect(evt.kind).toBe("design_system_meta");
   });
 
+  it("broadcasts a tag meta write under the tag's own name (baseName strips .meta.json the same way it does for a screen)", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/events`);
+    const store = new FsStore(dir);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    await store.writeTagMeta("CHR-244", { notes: "spec lives here" });
+    const evt = await waitForSseEvent(res, (e) => e.kind === "tag_meta", 1000);
+    // The file on disk is lowercased (readTagMeta/writeTagMeta), so the
+    // broadcast name is too — it is not the caller's original casing.
+    expect(evt).toEqual({ type: "change", kind: "tag_meta", name: "chr-244" });
+  });
+
   it("rejects a cross-origin /events connection", async () => {
     const res = await fetch(`http://127.0.0.1:${daemon.port}/events`, {
       headers: { origin: "https://evil.example" },

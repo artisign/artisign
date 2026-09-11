@@ -4,6 +4,7 @@
 // renderVariantCell).
 
 import { createFittingIframe } from "./iframe-fit.js";
+import { setMarkdown } from "./markdown.js";
 
 /**
  * @param {HTMLElement} container
@@ -27,9 +28,9 @@ export function renderMockupView(container, mockup, { fetchRenderFor, onColumnMe
   title.textContent = mockup.title ?? mockup.name;
   header.appendChild(title);
   if (mockup.description) {
-    const description = document.createElement("p");
-    description.className = "mockup-view-description";
-    description.textContent = mockup.description;
+    const description = document.createElement("div");
+    description.className = "mockup-view-description md";
+    setMarkdown(description, mockup.description);
     header.appendChild(description);
   }
   container.appendChild(header);
@@ -79,8 +80,8 @@ function renderColumn(variant, index, fetchRenderFor, onColumnMeasured) {
 
   if (variant.description) {
     const description = document.createElement("div");
-    description.className = "mockup-column-description";
-    description.textContent = variant.description;
+    description.className = "mockup-column-description md";
+    setMarkdown(description, variant.description);
     column.appendChild(description);
   }
 

@@ -235,6 +235,16 @@ comments and flows anchor to them.
   (states, edge cases, content rules).
 - On **mockups**: `tags`/`title`/`description` so an exploration is findable
   via `get_project {tags: [...]}` before it is promoted.
+- On a **tag** (`target: {kind: "tag", tag}`): `notes` — a spec spanning
+  several screens (e.g. a ticket), set once instead of duplicated into every
+  tagged screen's own notes. No screen has to carry the tag yet.
+  `get_project`/`get_screen` surface it as `tag_notes`. Renaming a tag
+  orphans its old `tags/<old>.meta.json` — there is deliberately no GC, so
+  re-tag the notes yourself under the new name if you rename a tag in use.
+
+All of `notes`/`idea`/`decisions`/`usage`/a tag's own `notes` render as
+Markdown in the preview — plain prose is fine, but headings/lists/code fences
+show up formatted for the human reviewing.
 
 Write metadata when the decision is fresh, not as a cleanup pass.
 

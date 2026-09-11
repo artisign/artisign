@@ -512,6 +512,95 @@ body {
   color: var(--color-text-faint);
 }
 
+/* Shared block for every renderMarkdown() output — notes panel,
+   design-system idea/decisions/usage, mockup descriptions. Call sites keep
+   only their colour/size role on top of this. */
+.md h3,
+.md h4,
+.md h5,
+.md h6 {
+  margin: var(--space-md) 0 var(--space-sm);
+  font-weight: 600;
+}
+
+.md p {
+  margin: var(--space-sm) 0;
+}
+
+.md p:first-child,
+.md h3:first-child,
+.md h4:first-child,
+.md h5:first-child,
+.md h6:first-child {
+  margin-top: 0;
+}
+
+.md ul,
+.md ol {
+  margin: var(--space-sm) 0;
+  padding-left: var(--space-xl);
+}
+
+.md li {
+  margin: var(--space-xs) 0;
+}
+
+.md table {
+  border-collapse: collapse;
+  margin: var(--space-sm) 0;
+  max-width: 100%;
+  overflow-x: auto;
+  display: block;
+}
+
+.md th,
+.md td {
+  border: 1px solid var(--color-border);
+  padding: var(--space-xs) var(--space-sm);
+  text-align: left;
+}
+
+.md th {
+  font-weight: 600;
+}
+
+.md .md-align-center {
+  text-align: center;
+}
+
+.md .md-align-right {
+  text-align: right;
+}
+
+.md pre {
+  margin: var(--space-sm) 0;
+  padding: var(--space-sm);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+.md code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+}
+
+.md pre code {
+  font-family: ui-monospace, monospace;
+}
+
+.md a {
+  color: var(--color-accent);
+}
+
+.md hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-md) 0;
+}
+
 #notes-panel {
   padding: var(--space-lg);
 }
@@ -578,7 +667,61 @@ body {
   font-size: 0.8rem;
   color: #444;
   line-height: 1.5;
-  white-space: pre-wrap;
+}
+
+#notes-panel-tags:not(:empty) {
+  margin-top: var(--space-md);
+}
+
+.tag-notes-section + .tag-notes-section {
+  margin-top: var(--space-sm);
+}
+
+.tag-notes-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tag-notes-chevron {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-bottom: 3px;
+  border-right: 1.5px solid var(--color-text-faint);
+  border-bottom: 1.5px solid var(--color-text-faint);
+  transform: rotate(45deg);
+  transition: transform 0.1s ease;
+}
+
+.tag-notes-header[aria-expanded="false"] .tag-notes-chevron {
+  transform: rotate(-45deg);
+  margin-bottom: 0;
+}
+
+.tag-notes-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+}
+
+.tag-notes-header[aria-expanded="false"] + .tag-notes-body {
+  display: none;
+}
+
+.tag-notes-body {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: #444;
+  line-height: 1.5;
 }
 
 #comments-panel {
@@ -1232,13 +1375,13 @@ body {
   border-radius: 8px;
   padding: var(--space-xl);
   max-width: 820px;
-}
-
-.ds-idea-body p {
-  margin: 0;
   font-size: 0.85rem;
   color: var(--color-text-secondary);
   line-height: 1.6;
+}
+
+.ds-idea-body p:first-child {
+  margin-top: 0;
 }
 
 .ds-decisions-list {

@@ -7,9 +7,14 @@ import {
   serializeNodeSubtree,
   tokenRefPaths,
   explicitNodeIds,
+  resolveSlotFillEntries,
   type Node as InternalNode,
+  type NodeSubtree,
+  type NodeRefs,
   type ScreenDocument,
   type TokenRef,
+  type ComponentDefinitionSummary,
+  type DesignSystemRegistry,
 } from "../model/index.js";
 import { loadScreen } from "./context.js";
 import { readMockupMetaOrDefault } from "./mockups.js";
@@ -46,8 +51,8 @@ function nodesInDocumentOrder(doc: ScreenDocument): InternalNode[] {
   return result;
 }
 
-/** Same shape as get_node's summary `refs` — reused so get_screen's full view never drifts from it. */
-function serializeNodeRefs(node: InternalNode): Record<string, unknown> {
+/** Same shape as get_node's summary `refs` — reused so get_screen's full view (and get_node's `slots` entries, which carry a slot-fill `NodeSubtree`'s refs, not a live `Node`'s) never drift from it. */
+function serializeNodeRefs(node: { refs: NodeRefs }): Record<string, unknown> {
   const refs: Record<string, unknown> = {};
   if (node.refs.component) refs.component_ref = node.refs.component;
   if (node.refs.variant) refs.variant = node.refs.variant;
@@ -315,7 +320,25 @@ export type GetNodeInput = {
 };
 
 const NODE_ALWAYS = ["node", "screen", "tag", "parent", "refs"];
-const NODE_OPTIONAL = ["children", "html_aug", "flow", "comments"];
+const NODE_OPTIONAL = ["children", "html_aug", "flow", "comments", "slots"];
+
+/**
+ * Loads just the one component a `component_instance` node names — not the
+ * whole design system (`buildRenderContext`'s job for a full render) — since
+ * `slots` only ever needs the single definition its own instance resolves
+ * against. A component that no longer exists (unresolved ref) yields an
+ * empty map, matching `resolveSlotFillEntries`'s own "nothing to resolve"
+ * fallback rather than throwing.
+ */
+async function loadOneComponentDef(store: Store, name: string | undefined): Promise<Map<string, ComponentDefinitionSummary>> {
+  if (!name) return new Map();
+  try {
+    const html = await store.readComponent(name);
+    return new Map([[name, parseComponentDefinition(name, html)]]);
+  } catch {
+    return new Map();
+  }
+}
 
 export async function getNode(store: Store, input: GetNodeInput): Promise<Record<string, unknown>> {
   const view = input.view ?? "summary";
@@ -324,11 +347,12 @@ export async function getNode(store: Store, input: GetNodeInput): Promise<Record
 
   let doc: ScreenDocument;
   let address: string;
+  let registry: DesignSystemRegistry;
   if (ref.kind === "screen") {
-    ({ doc } = await loadScreen(store, ref.screen));
+    ({ doc, registry } = await loadScreen(store, ref.screen));
     address = ref.screen;
   } else {
-    const registry = await loadRegistry(store);
+    registry = await loadRegistry(store);
     ({ doc } = await loadDefinitionSource(store, registry, ref));
     address = ref.address;
   }
@@ -357,6 +381,19 @@ export async function getNode(store: Store, input: GetNodeInput): Promise<Record
     ...tree,
     html_aug: serializeNodeSubtree(doc, nodeId),
   };
+  // A component instance's slot fills live in `slotOverrides`, never in
+  // `childIds` (model invariant, CHR-584) — `children` above is correctly
+  // empty for one, and this is the only place their content is addressable
+  // at all, by slot name rather than by node ref (they carry none). The id
+  // reported per fill is the id the fill actually gets in a render, not a
+  // fresh one — reads and renders share the same rule (`resolveSlotFillEntries`).
+  if (node.slotOverrides) {
+    const componentDefs = await loadOneComponentDef(store, node.refs.component);
+    const entries = resolveSlotFillEntries(node, { registry, componentDefs }, nodeId);
+    full.slots = Object.fromEntries(
+      entries.map(({ slot, id, subtree }) => [slot, { id: id ?? null, tag: subtree.tag ?? null, refs: serializeNodeRefs(subtree) }]),
+    );
+  }
   // Flows and comments only ever anchor to a screen node (flows.json,
   // comments.jsonl) — a component/pattern definition node structurally
   // cannot have either, so both stay omitted for a definition ref, same as
@@ -494,33 +531,79 @@ function hasDescendantTextMatch(doc: ScreenDocument, node: InternalNode, pattern
   return false;
 }
 
-function matchesPredicate(
-  predicate: Predicate,
-  node: InternalNode,
-  screen: string,
-  doc: ScreenDocument,
-  commentsByNode: Map<string, boolean>,
-  flowFroms: Set<string>,
-): boolean {
+/** A fill subtree's own children, plus any further nested slot fills of its own — a fill can itself be a component instance (CHR-581). The full descendant set `find_nodes` walks when matching inside slot content. */
+function fillDescendants(sub: NodeSubtree): NodeSubtree[] {
+  return [...sub.children, ...Object.values(sub.slotOverrides ?? {})];
+}
+
+/** `hasDescendantTextMatch`'s counterpart for a slot-fill subtree — its content lives in `children`/`slotOverrides` on the `NodeSubtree` itself, never in `ScreenDocument.nodes` (CHR-584). */
+function hasDescendantTextMatchInFill(sub: NodeSubtree, pattern: string): boolean {
+  for (const child of fillDescendants(sub)) {
+    if (child.kind === "text" && (child.text ?? "").includes(pattern)) return true;
+    if (hasDescendantTextMatchInFill(child, pattern)) return true;
+  }
+  return false;
+}
+
+/** Every node inside a component instance's slot fills, at any depth (CHR-584) — `find_nodes` matches against each of these too, in addition to the instance node itself. */
+function collectFillDescendants(node: InternalNode): NodeSubtree[] {
+  const out: NodeSubtree[] = [];
+  const visit = (sub: NodeSubtree): void => {
+    out.push(sub);
+    for (const child of fillDescendants(sub)) visit(child);
+  };
+  for (const sub of Object.values(node.slotOverrides ?? {})) visit(sub);
+  return out;
+}
+
+/**
+ * Everything `matchesPredicate` needs off a match candidate — a live `Node`
+ * (`nodeSubject`) or a slot-fill `NodeSubtree` (`fillSubject`, CHR-584). One
+ * predicate switch serves both rather than a second copy of it: `nodeRef`
+ * carries the formatted node ref `has_comments`/`has_flow` key by, or
+ * `undefined` for a fill, which is never addressable and so can never
+ * match either — the same way a text node never matches them.
+ */
+type MatchSubject = {
+  kind: InternalNode["kind"];
+  refs: NodeRefs;
+  nodeRef: string | undefined;
+  hasTextMatch: (pattern: string) => boolean;
+};
+
+function nodeSubject(node: InternalNode, screen: string, doc: ScreenDocument): MatchSubject {
+  return {
+    kind: node.kind,
+    refs: node.refs,
+    nodeRef: formatNodeRef(screen, node.id),
+    hasTextMatch: (pattern) => hasDescendantTextMatch(doc, node, pattern),
+  };
+}
+
+function fillSubject(sub: NodeSubtree): MatchSubject {
+  return { kind: sub.kind, refs: sub.refs, nodeRef: undefined, hasTextMatch: (pattern) => hasDescendantTextMatchInFill(sub, pattern) };
+}
+
+function matchesPredicate(predicate: Predicate, subject: MatchSubject, commentsByNode: Map<string, boolean>, flowFroms: Set<string>): boolean {
   switch (predicate.kind) {
     case "style_ref": {
       const path = predicate.ref_path.startsWith("$") ? predicate.ref_path.slice(1) : predicate.ref_path;
-      return Object.entries(node.refs.tokens).some(([key, ref]) => key !== "class" && tokenRefMatchesPath(ref, path));
+      return Object.entries(subject.refs.tokens).some(([key, ref]) => key !== "class" && tokenRefMatchesPath(ref, path));
     }
     case "component_ref":
-      return node.refs.component === predicate.component_name;
+      return subject.refs.component === predicate.component_name;
     case "variant":
-      return node.refs.variant === predicate.variant;
+      return subject.refs.variant === predicate.variant;
     case "has_comments":
-      return commentsByNode.get(formatNodeRef(screen, node.id)) === true;
+      return subject.nodeRef !== undefined && commentsByNode.get(subject.nodeRef) === true;
     case "text_match":
       // Matches the containing element, not the text node itself — a
       // find_nodes result should be an addressable, patchable node, and
       // text nodes AND'd with any other predicate (which never matches a
       // text node) would always return empty.
-      return node.kind !== "text" && hasDescendantTextMatch(doc, node, predicate.pattern);
+      return subject.kind !== "text" && subject.hasTextMatch(predicate.pattern);
     case "has_flow":
-      return flowFroms.has(formatNodeRef(screen, node.id));
+      return subject.nodeRef !== undefined && flowFroms.has(subject.nodeRef);
     default:
       return false;
   }
@@ -575,7 +658,7 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
   const matches: Record<string, unknown>[] = [];
   for (const source of sources) {
     for (const node of Object.values(source.doc.nodes)) {
-      if (input.where.every((p) => matchesPredicate(p, node, source.address, source.doc, commentedNodes, flowFroms))) {
+      if (input.where.every((p) => matchesPredicate(p, nodeSubject(node, source.address, source.doc), commentedNodes, flowFroms))) {
         matches.push({
           node: formatNodeRef(source.address, node.id),
           screen: source.kind === "screen" ? source.name : null,
@@ -598,6 +681,30 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
           matched_predicates: input.where.map((p) => p.kind),
           ...(view === "full" ? { refs: node.refs, inline_styles: node.inlineStyles } : {}),
         });
+      }
+
+      // Slot-fill content (CHR-584): matched against the same predicates, but
+      // never addressable by node ref — a fill has none of its own
+      // (`slotOverrides` is deliberately kept out of `ScreenDocument.nodes`).
+      // `addressable: false` marks that, in the spirit of `id_stability`
+      // above; `inside` points at the enclosing instance's own node ref
+      // instead, since that's the closest addressable thing a caller could
+      // act on (rewrite the screen, or the instance's enclosing node).
+      for (const fillNode of collectFillDescendants(node)) {
+        if (input.where.every((p) => matchesPredicate(p, fillSubject(fillNode), commentedNodes, flowFroms))) {
+          matches.push({
+            node: null,
+            inside: formatNodeRef(source.address, node.id),
+            addressable: false,
+            screen: source.kind === "screen" ? source.name : null,
+            source: source.kind,
+            ...(source.kind === "component" ? { component: source.name, variant: source.variant } : {}),
+            ...(source.kind === "pattern" ? { pattern: source.name } : {}),
+            tag: fillNode.tag,
+            matched_predicates: input.where.map((p) => p.kind),
+            ...(view === "full" ? { refs: fillNode.refs, inline_styles: fillNode.inlineStyles } : {}),
+          });
+        }
       }
     }
   }

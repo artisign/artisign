@@ -107,9 +107,11 @@ export const TOOLS: ToolDefinition[] = [
     "Subtree of one node, addressed as \"<screen>.<node-id>\", or " +
       "\"component:<name>#<variant>.<node-id>\" / \"pattern:<name>.<node-id>\" for a design-system " +
       "definition node. Tiered + field selection. On a component instance, view \"full\" also carries " +
-      "\"slots\": its slot-fill content keyed by slot name, each with the id it actually renders with, its tag, " +
-      "and its refs. Slot content is never addressable by node ref (not in \"children\", not patchable by " +
-      "update_refs/patch_html) — change it by rewriting the screen or the instance's enclosing node.",
+      "\"slots\": a list of its slot fills in document order, each with its slot name, tag, refs and the id it " +
+      "renders with where this node is addressed (on the screen for a screen ref; in the standalone " +
+      "definition render for a definition ref, where a screen namespaces it further). Slot content is never " +
+      "addressable by node ref (not in \"children\", not patchable by update_refs/patch_html) — change it by " +
+      "rewriting the screen or the instance's enclosing node.",
     { node: z.string(), view: viewSchema.optional(), fields: z.array(z.string()).optional() },
     (store, input) => getNode(store, input as never),
   ),

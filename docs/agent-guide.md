@@ -68,8 +68,9 @@ On a fresh project the order is: **tokens → base components → screens.**
   target) — they land on the expanded root, the instance winning over the
   definition on a conflict, `style` and `class` accumulating. Its children
   fill the slots, including with other component instances. Slot-fill content
-  is readable — `get_node` (view `full`) reports it under `slots`, keyed by
-  slot name; `find_nodes` matches inside it too — but it is **not**
+  is readable — `get_node` (view `full`) lists it under `slots`, one entry per
+  fill in document order with its slot name; `find_nodes` matches inside it
+  too — but it is **not**
   addressable by node ref: it never appears in `children`, and no write tool
   accepts a node ref that points into it. To change it, rewrite the screen or
   the instance's enclosing node.

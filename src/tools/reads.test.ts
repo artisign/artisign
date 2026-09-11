@@ -435,7 +435,7 @@ describe("get_node — slot fills (CHR-584)", () => {
       `<div id="n1"><div id="n2" class="$card"><p id="p1" data-slot="content">hello</p></div></div>`,
     );
     const res = await getNode(fx.store, { node: "home.n2", view: "full" });
-    expect(res.slots).toEqual({ content: { id: "p1", tag: "p", refs: {} } });
+    expect(res.slots).toEqual([{ slot: "content", id: "p1", tag: "p", refs: {} }]);
   });
 
   it("reports a positional fill under its slot-N key", async () => {
@@ -446,7 +446,7 @@ describe("get_node — slot fills (CHR-584)", () => {
     await fx.store.writeComponent("row", `<div id="root"><span>left</span><span>right</span></div>`);
     await fx.store.writeScreen("home", `<div id="n1"><div id="n2" class="$row"><b id="b1">hi</b></div></div>`);
     const res = await getNode(fx.store, { node: "home.n2", view: "full" });
-    expect(res.slots).toEqual({ "slot-0": { id: "b1", tag: "b", refs: {} } });
+    expect(res.slots).toEqual([{ slot: "slot-0", id: "b1", tag: "b", refs: {} }]);
   });
 
   it("reports a fill that is itself a component instance, with the id it would render with, and its own refs", async () => {
@@ -455,7 +455,7 @@ describe("get_node — slot fills (CHR-584)", () => {
       `<div id="n1"><div id="n2" class="$card"><button id="n3" data-slot="content" class="$btn-primary"></button></div></div>`,
     );
     const res = await getNode(fx.store, { node: "home.n2", view: "full" });
-    expect(res.slots).toEqual({ content: { id: "n3", tag: "button", refs: { component_ref: "btn-primary" } } });
+    expect(res.slots).toEqual([{ slot: "content", id: "n3", tag: "button", refs: { component_ref: "btn-primary" } }]);
   });
 
   it("parity: the id get_node reports for an id-less instance fill is the id renderScreen() actually emits", async () => {
@@ -464,12 +464,35 @@ describe("get_node — slot fills (CHR-584)", () => {
       `<div id="n1"><div id="n2" class="$card"><button data-slot="content" class="$btn-primary"></button></div></div>`,
     );
     const nodeRes = await getNode(fx.store, { node: "home.n2", view: "full" });
-    const slots = nodeRes.slots as Record<string, { id: string | null }>;
-    const reportedId = slots.content!.id;
+    const slots = nodeRes.slots as { slot: string; id: string | null }[];
+    const reportedId = slots.find((s) => s.slot === "content")!.id;
     expect(reportedId).not.toBeNull();
 
     const { documentHtml } = await renderScreenDocument(fx.store, "home", { fontMode: "url" });
     expect(documentHtml).toContain(`id="${reportedId}"`);
+  });
+
+  it("keeps both fills when a template declares the same slot name twice, instead of dropping one", async () => {
+    // `collectTemplateSlots` collects every data-slot element, and
+    // `resolveSlotSubstitutions` fills the second one by position — so the
+    // render emits both. A map keyed by slot name would report only the last.
+    await fx.store.writeComponent("list", `<div id="root"><span data-slot="item">d1</span><span data-slot="item">d2</span></div>`);
+    await fx.store.writeScreen(
+      "home",
+      `<div id="n1"><div id="n2" class="$list"><p id="pA" data-slot="item">A</p><p id="pB">B</p></div></div>`,
+    );
+    const res = await getNode(fx.store, { node: "home.n2", view: "full" });
+    expect((res.slots as { id: string }[]).map((s) => s.id)).toEqual(["pA", "pB"]);
+
+    const { documentHtml } = await renderScreenDocument(fx.store, "home", { fontMode: "url" });
+    expect(documentHtml).toContain('id="pA"');
+    expect(documentHtml).toContain('id="pB"');
+  });
+
+  it("omits slots entirely for an instance with no fill content", async () => {
+    await fx.store.writeScreen("home", `<div id="n1"><div id="n2" class="$card"></div></div>`);
+    const res = await getNode(fx.store, { node: "home.n2", view: "full" });
+    expect(res).not.toHaveProperty("slots");
   });
 
   it("does not fold slot fills into children — children stays empty for a component instance", async () => {

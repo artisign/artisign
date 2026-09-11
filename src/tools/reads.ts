@@ -387,12 +387,28 @@ export async function getNode(store: Store, input: GetNodeInput): Promise<Record
   // at all, by slot name rather than by node ref (they carry none). The id
   // reported per fill is the id the fill actually gets in a render, not a
   // fresh one — reads and renders share the same rule (`resolveSlotFillEntries`).
-  if (node.slotOverrides) {
+  //
+  // That id is the one this node renders with *where it is addressed*: on a
+  // screen for a screen ref, and in the standalone definition render
+  // (`renderDefinitionForBrowser`, what `get_screenshot` on a definition ref
+  // produces) for a definition ref. A definition's instance rendered as part
+  // of a screen is namespaced under the outer expansion instead
+  // (`<outer>--<id>`), so a definition-ref id does not address a node on a
+  // screen — the tool description says so rather than promising one id.
+  // A list rather than a map keyed by slot name: a template may declare the
+  // same `data-slot` name twice, and `resolveSlotSubstitutions` fills the
+  // second one positionally, so a map would silently drop a fill the render
+  // does emit. Document order is also the order the `--fill<n>` counter runs
+  // in, which a map would not preserve either.
+  if (Object.keys(node.slotOverrides ?? {}).length > 0) {
     const componentDefs = await loadOneComponentDef(store, node.refs.component);
     const entries = resolveSlotFillEntries(node, { registry, componentDefs }, nodeId);
-    full.slots = Object.fromEntries(
-      entries.map(({ slot, id, subtree }) => [slot, { id: id ?? null, tag: subtree.tag ?? null, refs: serializeNodeRefs(subtree) }]),
-    );
+    full.slots = entries.map(({ slot, id, subtree }) => ({
+      slot,
+      id: id ?? null,
+      tag: subtree.tag ?? null,
+      refs: serializeNodeRefs(subtree),
+    }));
   }
   // Flows and comments only ever anchor to a screen node (flows.json,
   // comments.jsonl) — a component/pattern definition node structurally
@@ -658,7 +674,8 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
   const matches: Record<string, unknown>[] = [];
   for (const source of sources) {
     for (const node of Object.values(source.doc.nodes)) {
-      if (input.where.every((p) => matchesPredicate(p, nodeSubject(node, source.address, source.doc), commentedNodes, flowFroms))) {
+      const subject = nodeSubject(node, source.address, source.doc);
+      if (input.where.every((p) => matchesPredicate(p, subject, commentedNodes, flowFroms))) {
         matches.push({
           node: formatNodeRef(source.address, node.id),
           screen: source.kind === "screen" ? source.name : null,
@@ -691,7 +708,8 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
       // instead, since that's the closest addressable thing a caller could
       // act on (rewrite the screen, or the instance's enclosing node).
       for (const fillNode of collectFillDescendants(node)) {
-        if (input.where.every((p) => matchesPredicate(p, fillSubject(fillNode), commentedNodes, flowFroms))) {
+        const fill = fillSubject(fillNode);
+        if (input.where.every((p) => matchesPredicate(p, fill, commentedNodes, flowFroms))) {
           matches.push({
             node: null,
             inside: formatNodeRef(source.address, node.id),

@@ -178,3 +178,19 @@ describe("MCP server — instructions budget", () => {
     expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(870);
   });
 });
+
+describe("MCP server — slot-styling rule on the tool surface", () => {
+  // CHR-578: the rule already lived in INSTRUCTIONS and the agent guide, but
+  // neither is guaranteed to be read before a first `kind: "component"`
+  // write — the tool description is. Pinning it here so a future edit can't
+  // silently trim the clause back out.
+  it("tells the agent not to style a data-slot element before it writes a definition", () => {
+    const writeHtml = TOOLS.find((t) => t.name === "write_html")!;
+    expect(writeHtml.description).toMatch(/never style the data-slot element/);
+  });
+
+  it("points patch_html at the same rule for definition patches", () => {
+    const patchHtml = TOOLS.find((t) => t.name === "patch_html")!;
+    expect(patchHtml.description).toMatch(/never style the slot element/);
+  });
+});

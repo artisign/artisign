@@ -162,6 +162,14 @@ Two rules of thumb:
 - **Slots for content.** `data-slot="label"` marks where instances inject
   content. Everything else in the component is structure the instance should
   not repeat.
+- **Never style the `data-slot` element itself.** An instance fills a slot by
+  replacing that element wholesale, so any `style`/`class` on it in the
+  definition is silently discarded. Style a wrapper around the slot instead —
+  `write_html` warns if a definition does this anyway. An `<img>` slot is not
+  an exception: a wrapper around it carries the frame (`max-width`,
+  `overflow`, `border-radius`), and each instance's own `<img>` carries its
+  own sizing (`width`, `height`, `display`) — see `docs/agent-guide.md` for
+  the worked example.
 
 `get_screenshot` renders screens, not component definitions — so you review a
 component through its first instance: place it on the screen that needs it,

@@ -203,3 +203,16 @@ describe("setMarkdown", () => {
     expect(el.querySelector("strong")).not.toBeNull();
   });
 });
+
+describe("renderMarkdown — protocol-relative links (CHR-596 review)", () => {
+  it("does not turn //host/path into an anchor, despite it starting with a slash", () => {
+    const frag = renderMarkdown("see [a](//evil.example/x) here");
+    expect(frag.querySelector("a")).toBeNull();
+    expect(frag.textContent).toContain("a");
+  });
+
+  it("still links an ordinary site-root-relative path", () => {
+    const frag = renderMarkdown("see [a](/docs/x) here");
+    expect(frag.querySelector("a").getAttribute("href")).toBe("/docs/x");
+  });
+});

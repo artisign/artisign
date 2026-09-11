@@ -974,3 +974,25 @@ describe("list_comments", () => {
     expect(res.skipped_malformed_lines).toBe(1);
   });
 });
+
+describe("tag notes — an unusable tag name never breaks a read (CHR-596)", () => {
+  let fx: ProjectFixture;
+  beforeEach(async () => {
+    fx = await setupProject();
+    await fx.store.writeScreen("home", `<div id="n1"></div>`);
+  });
+  afterEach(() => fx.cleanup());
+
+  it("skips a caller-supplied tag that could not be a filename instead of failing", async () => {
+    const res = await getProject(fx.store, { tags: ["../../evil"] });
+    expect(res).not.toHaveProperty("tag_notes");
+  });
+
+  it("still reads a screen whose sidecar carries a tag written before tags were validated", async () => {
+    // Written straight through the store, the way an older version could.
+    await fx.store.writeScreenMeta("home", { notes: "screen note", tags: ["../../evil"] });
+    const res = await getScreen(fx.store, { screen: "home", view: "full" });
+    expect(res.notes).toBe("screen note");
+    expect(res).not.toHaveProperty("tag_notes");
+  });
+});

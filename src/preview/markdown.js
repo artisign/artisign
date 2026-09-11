@@ -161,7 +161,11 @@ function appendInline(el, text) {
       const m = matchLink(text, i);
       if (m) {
         const { whole, label, url } = m;
-        if (/^(https?:|mailto:)/.test(url) || url.startsWith("/") || url.startsWith("#")) {
+        // "/" means site-root-relative, and "//" does not: a protocol-relative
+        // URL points at another host, which is what the allowlist exists to
+        // keep out. Checked before the single-slash case, not after.
+        const siteRelative = url.startsWith("/") && !url.startsWith("//");
+        if (/^(https?:|mailto:)/.test(url) || siteRelative || url.startsWith("#")) {
           const a = document.createElement("a");
           a.href = url;
           a.target = "_blank";

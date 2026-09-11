@@ -49,8 +49,12 @@ const VARIANT_FORBIDDEN_CHARS = [...RESERVED_CHARS, '"', "<", ">", "&"];
  */
 const TAG_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 
+export function isValidTagName(tag: string): boolean {
+  return TAG_NAME_RE.test(tag);
+}
+
 export function assertValidTagName(tag: string): void {
-  if (!TAG_NAME_RE.test(tag)) {
+  if (!isValidTagName(tag)) {
     throw new ToolError("validation_failed", `tag "${tag}" must match ${TAG_NAME_RE.source}`);
   }
 }

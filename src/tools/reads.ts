@@ -24,6 +24,7 @@ import { parseNodeRef, formatNodeRef } from "./node-ref.js";
 import { readAllFlows, readScreenFlows, toPublicFlowRecord } from "./flows.js";
 import { readCommentRecords, readCommentRecordsWithStats, groupThreads, threadStatus, toPublicComment, type CommentRecord } from "./comments.js";
 import { selectFields } from "./fields.js";
+import { isValidTagName } from "./name-validation.js";
 import { ToolError, type View, type Predicate, type PublicComment } from "./types.js";
 
 // mtime/since are approximated for now. Neither is
@@ -111,8 +112,14 @@ async function readTagNotes(store: Store, requested: string[]): Promise<{ tag: s
     seenLower.add(key);
     return true;
   });
-  const metas = await Promise.all(deduped.map((tag) => store.readTagMeta(tag)));
-  return deduped.map((tag, i) => ({ tag, notes: metas[i]!.notes })).filter((t) => t.notes.length > 0);
+  // A tag reaches the filesystem as tags/<tag>.meta.json, and this list comes
+  // either from a caller or from a screen sidecar written before tags were
+  // validated — so a name that could never be a file is skipped here rather
+  // than allowed to fail the whole read at the store's path guard. Reads stay
+  // readable; the write path is where a bad tag is refused.
+  const usable = deduped.filter(isValidTagName);
+  const metas = await Promise.all(usable.map((tag) => store.readTagMeta(tag)));
+  return usable.map((tag, i) => ({ tag, notes: metas[i]!.notes })).filter((t) => t.notes.length > 0);
 }
 
 const PROJECT_ALWAYS = [

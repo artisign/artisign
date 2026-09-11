@@ -82,3 +82,32 @@ describe("renderTagNotes", () => {
     expect(container.querySelectorAll(".tag-notes-section")).toHaveLength(1);
   });
 });
+
+describe("renderTagNotes — expand state across re-renders (CHR-596)", () => {
+  const allTagNotes = [{ tag: "chr-244", notes: "spec lives here" }];
+
+  it("keeps a section the reader opened open when the panel re-renders", () => {
+    // updateNotesPanel runs again on every SSE screen event and on every
+    // sidebar filter keystroke — a spec must not snap shut mid-read.
+    const container = document.createElement("div");
+    const expanded = new Set();
+    renderTagNotes(container, ["chr-244"], allTagNotes, expanded);
+    container.querySelector(".tag-notes-header").click();
+    expect(container.querySelector(".tag-notes-header").getAttribute("aria-expanded")).toBe("true");
+    expect([...expanded]).toEqual(["chr-244"]);
+
+    renderTagNotes(container, ["chr-244"], allTagNotes, expanded);
+    expect(container.querySelector(".tag-notes-header").getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("collapses again on a second click, and stays collapsed across a re-render", () => {
+    const container = document.createElement("div");
+    const expanded = new Set();
+    renderTagNotes(container, ["chr-244"], allTagNotes, expanded);
+    container.querySelector(".tag-notes-header").click();
+    container.querySelector(".tag-notes-header").click();
+    expect([...expanded]).toEqual([]);
+    renderTagNotes(container, ["chr-244"], allTagNotes, expanded);
+    expect(container.querySelector(".tag-notes-header").getAttribute("aria-expanded")).toBe("false");
+  });
+});

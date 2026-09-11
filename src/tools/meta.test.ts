@@ -271,3 +271,25 @@ describe("set_meta — component/pattern target", () => {
     await expect(setMeta(fx.store, { target: { kind: "component", name: "btn-primary" }, description: "x", usage: "y" } as never)).rejects.toThrow(ToolError);
   });
 });
+
+describe("set_meta — a screen tag has to be a usable tag name (CHR-596)", () => {
+  let fx: ProjectFixture;
+  beforeEach(async () => {
+    fx = await setupProject();
+    await fx.store.writeScreen("home", `<div id="n1"></div>`);
+  });
+  afterEach(() => fx.cleanup());
+
+  it("refuses a screen tag that could not be a filename", async () => {
+    // A tag is tags/<tag>.meta.json now. Unvalidated, this would be written
+    // happily and then break every later get_screen on this screen.
+    await expect(setMeta(fx.store, { target: { kind: "screen", screen: "home" }, tags: ["../../evil"] })).rejects.toThrow(ToolError);
+    await expect(setMeta(fx.store, { target: { kind: "screen", screen: "home" }, tags: ["has space"] })).rejects.toThrow(ToolError);
+    expect((await fx.store.readScreenMeta("home")).tags).toEqual([]);
+  });
+
+  it("still accepts the ordinary ones", async () => {
+    await setMeta(fx.store, { target: { kind: "screen", screen: "home" }, tags: ["chr-244", "empty-state", "design-system"] });
+    expect((await fx.store.readScreenMeta("home")).tags).toEqual(["chr-244", "empty-state", "design-system"]);
+  });
+});

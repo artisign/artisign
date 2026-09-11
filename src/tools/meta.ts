@@ -71,6 +71,11 @@ export async function setMeta(store: Store, input: SetMetaInput): Promise<Record
     if (!(await store.listScreens()).includes(target.screen)) {
       throw new ToolError("not_found", `screen "${target.screen}" was not found`);
     }
+    // A tag is a filename now (tags/<tag>.meta.json, CHR-596), so a screen
+    // tag has to clear the same bar as a tag target. Unvalidated, a tag like
+    // "../../x" would be written happily and then make every later
+    // get_screen on this screen fail at the store's path guard.
+    for (const tag of input.tags ?? []) assertValidTagName(tag);
 
     const current = await store.readScreenMeta(target.screen);
     const meta = { notes: input.notes ?? current.notes, tags: input.tags ?? current.tags };

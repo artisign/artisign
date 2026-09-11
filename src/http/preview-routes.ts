@@ -71,9 +71,15 @@ export async function handlePreviewRoutes(req: IncomingMessage, res: ServerRespo
     // Its own route, not folded into /api/screens — a spec tag shared by
     // every screen in a project would otherwise ride along in each of their
     // responses, the exact duplication this feature exists to remove.
+    // Empty notes are dropped, the same way readTagNotes drops them for
+    // get_project/get_screen: a sidecar left behind with notes:"" is not a
+    // tag that has a spec, and shipping it here would open the notes panel
+    // on an empty section for every screen carrying that tag.
     const tags = await store.listTagMetas();
     const notes = await Promise.all(tags.map((tag) => store.readTagMeta(tag)));
-    sendJson(res, 200, { tags: tags.map((tag, i) => ({ tag, notes: notes[i]!.notes })) });
+    sendJson(res, 200, {
+      tags: tags.map((tag, i) => ({ tag, notes: notes[i]!.notes })).filter((t) => t.notes.length > 0),
+    });
     return true;
   }
 

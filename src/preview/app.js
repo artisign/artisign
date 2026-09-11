@@ -117,6 +117,9 @@ const initProjectDialogEl = document.getElementById("init-project-dialog");
 let screens = [];
 /** @type {{ tag: string, notes: string }[]} — every project tag with its own notes (CHR-596). */
 let tagNotes = [];
+// Which tag specs the reader has opened. Survives a re-render of the panel,
+// which happens on every SSE screen event and sidebar filter keystroke.
+const expandedTagNotes = new Set();
 let currentScreen = null;
 /** @type {{ name: string, title?: string, description?: string, tags: string[], variants: { id: string, title: string, description?: string }[] }[]} */
 let mockups = [];
@@ -464,7 +467,7 @@ function updateNotesPanel() {
   // own sibling element (notesPanelTagsEl), never inside this one.
   setMarkdown(notesPanelText, notes);
   notesPanelHeader.setAttribute("aria-expanded", String(notesExpanded));
-  renderTagNotes(notesPanelTagsEl, screenTags, tagNotes);
+  renderTagNotes(notesPanelTagsEl, screenTags, tagNotes, expandedTagNotes);
 }
 
 screenFilterInput.addEventListener("input", () => {

@@ -99,6 +99,17 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
     expect(json).toEqual({ tags: [{ tag: "chr-244", notes: "spec lives here" }] });
   });
 
+  it("GET /api/tags omits a tag whose notes are empty, as the read tools do", async () => {
+    // A leftover sidecar with notes:"" is not a tag that has a spec. Shipping
+    // it would open the notes panel on an empty section for every screen
+    // carrying that tag, while get_project/get_screen report nothing.
+    await store.writeTagMeta("chr-999", { notes: "" });
+    await store.writeTagMeta("chr-244", { notes: "spec lives here" });
+    const { status, json } = await getJson("/api/tags");
+    expect(status).toBe(200);
+    expect(json).toEqual({ tags: [{ tag: "chr-244", notes: "spec lives here" }] });
+  });
+
   it("GET /api/render/<screen> returns resolved (token-free) HTML", async () => {
     const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/home`);
     expect(res.status).toBe(200);

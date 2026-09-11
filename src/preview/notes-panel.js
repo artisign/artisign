@@ -15,8 +15,10 @@ import { setMarkdown } from "./markdown.js";
  * @param {{ tag: string, notes: string }[]} allTagNotes — every tag in the
  *   project that carries notes (fetchTags()); entries whose tag isn't in
  *   `screenTags` are not rendered here.
+ * @param {Set<string>} [expandedTags] — tags the reader has opened, mutated
+ *   in place as they toggle, so the state survives the next re-render.
  */
-export function renderTagNotes(container, screenTags, allTagNotes) {
+export function renderTagNotes(container, screenTags, allTagNotes, expandedTags = new Set()) {
   container.innerHTML = "";
   const screenTagsLower = new Set(screenTags.map((t) => t.toLowerCase()));
   const matches = allTagNotes.filter((t) => screenTagsLower.has(t.tag.toLowerCase()));
@@ -29,8 +31,13 @@ export function renderTagNotes(container, screenTags, allTagNotes) {
     header.type = "button";
     header.className = "tag-notes-header";
     // Collapsed by default, independently of the screen-notes header's own
-    // expand state and of every other tag section's — no shared state here.
-    header.setAttribute("aria-expanded", "false");
+    // expand state and of every other tag section's. `expandedTags` carries
+    // the reader's own choice across a re-render: this runs again on every
+    // SSE screen event and on every keystroke in the sidebar filter, and a
+    // spec that snapped shut while the agent wrote one line of HTML would be
+    // unreadable in exactly the situation it exists for.
+    const isExpanded = expandedTags.has(tag);
+    header.setAttribute("aria-expanded", String(isExpanded));
 
     const chevron = document.createElement("span");
     chevron.className = "tag-notes-chevron";
@@ -45,6 +52,8 @@ export function renderTagNotes(container, screenTags, allTagNotes) {
     header.addEventListener("click", () => {
       const expanded = header.getAttribute("aria-expanded") === "true";
       header.setAttribute("aria-expanded", String(!expanded));
+      if (expanded) expandedTags.delete(tag);
+      else expandedTags.add(tag);
     });
 
     section.appendChild(header);

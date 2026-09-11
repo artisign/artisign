@@ -6,6 +6,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-11
+
+Three changes an agent notices and one a human does. Component slot fills stop
+being a blind spot for the read tools, the rule that trips most people writing
+their first component now reaches them before they write it, and the prose
+fields in the preview — screen notes, component usage, the design-system idea
+and its decision bodies — render as Markdown instead of one flat paragraph.
+Tag-level notes give a feature spec one home instead of a copy in every screen
+that belongs to it.
+
+### Added
+
+- `set_meta` takes a `tag` target: `{kind:"tag", tag:"chr-244"}` with `notes`,
+  stored as `tags/<tag>.meta.json`. A spec spanning several screens is written
+  once against its ticket tag instead of duplicated into each screen's notes.
+  `get_project {tags:[…]}` returns those notes exactly once, and `get_screen`
+  at `view:"full"` carries them beside the screen's own under `tag_notes`. The
+  tool surface stays at 23 — this is a target, not a tool. (CHR-596)
+- The preview renders `notes`, component and pattern `usage`, the design-system
+  `idea` and decision bodies, and mockup descriptions as Markdown — headings,
+  lists, tables, inline and fenced code, links. The renderer builds DOM nodes
+  and never parses an HTML string, so markup in a note can only ever become
+  text; a link renders as an anchor only for http(s), mailto, `/` or `#`.
+  (CHR-596)
+- `get_node` reports a component instance's slot fills under `slots` at
+  `view:"full"`, keyed by slot name, each carrying the id that fill actually
+  gets in the render. `find_nodes` matches inside fills and marks such a match
+  `addressable: false` with `inside` pointing at the enclosing instance.
+  Fill content stays out of the flat node map, so it remains readable but not
+  patchable by node ref — the tool descriptions and the agent guide now say so.
+  (CHR-584)
+
+### Changed
+
+- `write_html` and `patch_html` state the rule that a definition must never
+  style its own `data-slot` element. It was only in the server instructions and
+  the agent guide before, neither of which an agent is guaranteed to read
+  before its first component — the rule tripped 3 of 5 components in a real
+  dogfooding run. The image-filling case gets one documented form instead of an
+  undocumented attribute workaround. (CHR-578)
+
+### Fixed
+
+- The Markdown renderer no longer hangs on a list item that opens a block while
+  indented, and no longer italicises the middle of `data_flow_target` or
+  `2 * 3 * 4`. Found in review before release. (CHR-596)
+
 ## [0.10.0] - 2026-09-02
 
 Six fixes from the backlog, in the renderer, the Playwright setup and the

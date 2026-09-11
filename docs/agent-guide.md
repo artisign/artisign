@@ -45,6 +45,24 @@ On a fresh project the order is: **tokens → base components → screens.**
   The slot's **tag** goes the same way as its styling: `<h3 data-slot>`
   filled by a `<span>` renders as a `<span>`. Nothing warns about that —
   put semantics on the wrapper too.
+  **Image-filling slots are not an exception.** An `<img>` needs `width`,
+  `height`, `display` to lay out correctly, which looks exactly like the
+  styling this rule forbids — but the fix is the same wrapper, not a
+  carve-out: the wrapper carries the frame (`max-width`, `overflow`,
+  `border-radius`, `line-height: 0`), the definition's `data-slot` element
+  stays bare, and each instance's own `<img>` carries its own sizing style.
+  An instance styling the content it supplies is normal; only the
+  *definition* styling the slot node is the bug.
+  ```html
+  <!-- definition -->
+  <div style="max-width: 560px; border-radius: $radius.lg; overflow: hidden; line-height: 0">
+    <div data-slot="image"></div>
+  </div>
+  <!-- instance -->
+  <div class="$screenshot-frame">
+    <img data-slot="image" style="display: block; width: 100%; height: auto" src="assets/hero.png" alt="">
+  </div>
+  ```
 - Only then design screens, composed of refs. An instance may carry its own
   `style`, extra classes and plain attributes (`href`, `aria-*`, a flow
   target) — they land on the expanded root, the instance winning over the

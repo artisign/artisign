@@ -24,6 +24,7 @@ import { applyMockupZoom } from "./mockup-zoom.js";
 import { applyFlowMode } from "./flows.js";
 import { applyCommentMode, highlightSelection, openNodeIds, renderCommentsPanel, resolveSelectionAfterReload } from "./comments.js";
 import { renderDesignSystem } from "./design-system.js";
+import { setMarkdown } from "./markdown.js";
 import { connectEvents } from "./sse.js";
 import { applyCanvas } from "./canvas.js";
 import { updateWarningBadge } from "./warnings.js";
@@ -435,7 +436,7 @@ function updateNotesPanel() {
   notesPanelEl.hidden = notes.length === 0;
   if (notes.length === 0) return;
   notesPanelScreen.textContent = screen.name;
-  notesPanelText.textContent = notes;
+  setMarkdown(notesPanelText, notes);
   notesPanelHeader.setAttribute("aria-expanded", String(notesExpanded));
 }
 

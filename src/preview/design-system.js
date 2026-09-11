@@ -4,6 +4,7 @@
 // each variant cell is just a sandboxed iframe with that HTML as srcdoc.
 
 import { createFittingIframe } from "./iframe-fit.js";
+import { setMarkdown } from "./markdown.js";
 
 /** @param {string} camel */
 function toKebabCase(camel) {
@@ -87,10 +88,8 @@ function renderIdeaSection(idea) {
   section.appendChild(heading);
 
   const body = document.createElement("div");
-  body.className = "ds-idea-body";
-  const p = document.createElement("p");
-  p.textContent = idea;
-  body.appendChild(p);
+  body.className = "ds-idea-body md";
+  setMarkdown(body, idea);
   section.appendChild(body);
   return section;
 }
@@ -135,9 +134,9 @@ function renderDecisionsSection(decisions) {
     body.appendChild(titleRow);
 
     if (decision.body) {
-      const text = document.createElement("p");
-      text.className = "ds-decision-text";
-      text.textContent = decision.body;
+      const text = document.createElement("div");
+      text.className = "ds-decision-text md";
+      setMarkdown(text, decision.body);
       body.appendChild(text);
     }
 
@@ -151,10 +150,10 @@ function renderDecisionsSection(decisions) {
 /** @param {unknown} usage @returns {HTMLElement | null} */
 function renderUsage(usage) {
   if (typeof usage !== "string" || usage.length === 0) return null;
-  const p = document.createElement("p");
-  p.className = "ds-usage";
-  p.textContent = usage;
-  return p;
+  const div = document.createElement("div");
+  div.className = "ds-usage md";
+  setMarkdown(div, usage);
+  return div;
 }
 
 /**

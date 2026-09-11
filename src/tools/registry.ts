@@ -107,7 +107,12 @@ export const TOOLS: ToolDefinition[] = [
     "get_node",
     "Subtree of one node, addressed as \"<screen>.<node-id>\", or " +
       "\"component:<name>#<variant>.<node-id>\" / \"pattern:<name>.<node-id>\" for a design-system " +
-      "definition node. Tiered + field selection.",
+      "definition node. Tiered + field selection. On a component instance, view \"full\" also carries " +
+      "\"slots\": a list of its slot fills in document order, each with its slot name, tag, refs and the id it " +
+      "renders with where this node is addressed (on the screen for a screen ref; in the standalone " +
+      "definition render for a definition ref, where a screen namespaces it further). Slot content is never " +
+      "addressable by node ref (not in \"children\", not patchable by update_refs/patch_html) — change it by " +
+      "rewriting the screen or the instance's enclosing node.",
     { node: z.string(), view: viewSchema.optional(), fields: z.array(z.string()).optional() },
     (store, input) => getNode(store, input as never),
   ),
@@ -126,7 +131,10 @@ export const TOOLS: ToolDefinition[] = [
       "id_stability:\"explicit\"|\"derived\" instead of a screen match's implicit stability: its node ref IS " +
       "addressable by get_node/update_refs/patch_html, but only reliably resolves to the same element across " +
       "a later write when id_stability is \"explicit\" — a \"derived\" id is only guaranteed for this one call. " +
-      "reply_comment stays screen-only. The headline token-saver.",
+      "reply_comment stays screen-only. A predicate can also match inside a component instance's slot fills; " +
+      "that match carries node: null, addressable: false, and inside: \"<screen>.<node-id>\" pointing at the " +
+      "enclosing instance — fill content has no node ref of its own, so change it by rewriting the screen or the " +
+      "instance's enclosing node, never by addressing the match itself. The headline token-saver.",
     {
       where: z.array(predicateSchema),
       screens: z.array(z.string()).optional(),
@@ -174,7 +182,9 @@ export const TOOLS: ToolDefinition[] = [
       "full grammar. Example: html_aug: '<section id=\"s1\" style=\"padding: $spacing.md\">...</section>'. " +
       "kind:\"component\"|\"pattern\" writes a design-system definition file instead of a screen: " +
       "a default-variant root element plus optional sibling <template data-variant=\"x\"> blocks; " +
-      "screen names the definition.",
+      "screen names the definition. In a definition, never style the data-slot element itself " +
+      "— an instance filling it discards that style; style a wrapper around it instead " +
+      "(an <img> slot: size the <img> per instance, not in the definition).",
     {
       screen: z.string(),
       mode: z.enum(["create", "replace"]),
@@ -189,7 +199,8 @@ export const TOOLS: ToolDefinition[] = [
     "patch_html",
     "Surgical patch by node ref or CSS selector: replace, insert_before, insert_after, delete, set_attr. " +
       "html_aug for replace/insert_* is a fragment in the same augmented-HTML grammar as write_html " +
-      "(see server instructions). node also accepts a component:<name>#<variant>.<node-id> / " +
+      "(see server instructions), including its data-slot rule — never style the slot element itself " +
+      "when patching into a definition. node also accepts a component:<name>#<variant>.<node-id> / " +
       "pattern:<name>.<node-id> ref (css_selector targeting stays screen-only); touching a node with no " +
       "explicit id in source returns a missing_id warning, not blocking. response_mode \"diff\"/\"full\" " +
       "are rejected against a definition ref — only \"summary\" is supported there. " +

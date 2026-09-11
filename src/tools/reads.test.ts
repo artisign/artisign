@@ -493,6 +493,100 @@ describe("get_node — component/pattern refs", () => {
   });
 });
 
+// CHR-584 — read-side access to a component instance's slot fills. Fill
+// content is deliberately never in ScreenDocument.nodes (parser.test.ts's
+// invariant, "component instances inside slot fills"), so it needs its own
+// address-free path through get_node/find_nodes.
+describe("get_node — slot fills (CHR-584)", () => {
+  let fx: ProjectFixture;
+
+  beforeEach(async () => {
+    fx = await setupProject();
+    await fx.store.writeComponent(
+      "card",
+      `<div id="root" style="padding: $space.md"><span data-slot="content">default</span></div>`,
+    );
+    await fx.store.writeComponent("btn-primary", `<button style="color: $color.primary"><span data-slot="label">Default</span></button>`);
+    const tokens = await fx.store.readTokens();
+    tokens.space = { md: "16px" };
+    tokens.color = { primary: "#3366ff" };
+    await fx.store.writeTokens(tokens);
+  });
+  afterEach(() => fx.cleanup());
+
+  it("reports a named fill under its slot name, with the tag and refs of the fill content", async () => {
+    await fx.store.writeScreen(
+      "home",
+      `<div id="n1"><div id="n2" class="$card"><p id="p1" data-slot="content">hello</p></div></div>`,
+    );
+    const res = await getNode(fx.store, { node: "home.n2", view: "full" });
+    expect(res.slots).toEqual([{ slot: "content", id: "p1", tag: "p", refs: {} }]);
+  });
+
+  it("reports a positional fill under its slot-N key", async () => {
+    // "row" declares two implicit positional slots (no data-slot on either
+    // child) — an instance filling only the first zips onto "slot-0" by
+    // position, unlike "card" above where the single named "content" slot
+    // wins the zip regardless of how the instance's own child was authored.
+    await fx.store.writeComponent("row", `<div id="root"><span>left</span><span>right</span></div>`);
+    await fx.store.writeScreen("home", `<div id="n1"><div id="n2" class="$row"><b id="b1">hi</b></div></div>`);
+    const res = await getNode(fx.store, { node: "home.n2", view: "full" });
+    expect(res.slots).toEqual([{ slot: "slot-0", id: "b1", tag: "b", refs: {} }]);
+  });
+
+  it("reports a fill that is itself a component instance, with the id it would render with, and its own refs", async () => {
+    await fx.store.writeScreen(
+      "home",
+      `<div id="n1"><div id="n2" class="$card"><button id="n3" data-slot="content" class="$btn-primary"></button></div></div>`,
+    );
+    const res = await getNode(fx.store, { node: "home.n2", view: "full" });
+    expect(res.slots).toEqual([{ slot: "content", id: "n3", tag: "button", refs: { component_ref: "btn-primary" } }]);
+  });
+
+  it("parity: the id get_node reports for an id-less instance fill is the id renderScreen() actually emits", async () => {
+    await fx.store.writeScreen(
+      "home",
+      `<div id="n1"><div id="n2" class="$card"><button data-slot="content" class="$btn-primary"></button></div></div>`,
+    );
+    const nodeRes = await getNode(fx.store, { node: "home.n2", view: "full" });
+    const slots = nodeRes.slots as { slot: string; id: string | null }[];
+    const reportedId = slots.find((s) => s.slot === "content")!.id;
+    expect(reportedId).not.toBeNull();
+
+    const { documentHtml } = await renderScreenDocument(fx.store, "home", { fontMode: "url" });
+    expect(documentHtml).toContain(`id="${reportedId}"`);
+  });
+
+  it("keeps both fills when a template declares the same slot name twice, instead of dropping one", async () => {
+    // `collectTemplateSlots` collects every data-slot element, and
+    // `resolveSlotSubstitutions` fills the second one by position — so the
+    // render emits both. A map keyed by slot name would report only the last.
+    await fx.store.writeComponent("list", `<div id="root"><span data-slot="item">d1</span><span data-slot="item">d2</span></div>`);
+    await fx.store.writeScreen(
+      "home",
+      `<div id="n1"><div id="n2" class="$list"><p id="pA" data-slot="item">A</p><p id="pB">B</p></div></div>`,
+    );
+    const res = await getNode(fx.store, { node: "home.n2", view: "full" });
+    expect((res.slots as { id: string }[]).map((s) => s.id)).toEqual(["pA", "pB"]);
+
+    const { documentHtml } = await renderScreenDocument(fx.store, "home", { fontMode: "url" });
+    expect(documentHtml).toContain('id="pA"');
+    expect(documentHtml).toContain('id="pB"');
+  });
+
+  it("omits slots entirely for an instance with no fill content", async () => {
+    await fx.store.writeScreen("home", `<div id="n1"><div id="n2" class="$card"></div></div>`);
+    const res = await getNode(fx.store, { node: "home.n2", view: "full" });
+    expect(res).not.toHaveProperty("slots");
+  });
+
+  it("does not fold slot fills into children — children stays empty for a component instance", async () => {
+    await fx.store.writeScreen("home", `<div id="n1"><div id="n2" class="$card"><b id="b1">hi</b></div></div>`);
+    const res = await getNode(fx.store, { node: "home.n2", view: "tree" });
+    expect(res.children).toEqual([]);
+  });
+});
+
 describe("get_design_system", () => {
   let fx: ProjectFixture;
 
@@ -704,6 +798,43 @@ describe("find_nodes", () => {
       screens: ["checkout"],
     });
     expect(estimateTokens(res)).toBeLessThanOrEqual(250);
+  });
+});
+
+describe("find_nodes — matches inside slot fills (CHR-584)", () => {
+  let fx: ProjectFixture;
+
+  beforeEach(async () => {
+    fx = await setupProject();
+    await fx.store.writeComponent("card", `<div id="root"><span data-slot="content">default</span></div>`);
+    await fx.store.writeScreen(
+      "home",
+      `<div id="n1"><div id="n2" class="$card"><p id="p1" data-slot="content">unique fill text</p></div></div>`,
+    );
+  });
+  afterEach(() => fx.cleanup());
+
+  it("finds text that only exists inside a fill, marking the match not addressable", async () => {
+    const res = await findNodes(fx.store, { where: [{ kind: "text_match", pattern: "unique fill text" }] });
+    const nodes = res.nodes as Array<{ node: null; inside: string; addressable: boolean; tag: string }>;
+    expect(nodes).toEqual([
+      {
+        node: null,
+        inside: "home.n2",
+        addressable: false,
+        screen: "home",
+        source: "screen",
+        tag: "p",
+        matched_predicates: ["text_match"],
+      },
+    ]);
+  });
+
+  it("does not match a screen node's own text_match predicate against fill content twice", async () => {
+    // "unique fill text" lives only inside n2's fill — n2 itself (the
+    // instance) has no descendant text of its own to match against.
+    const res = await findNodes(fx.store, { where: [{ kind: "text_match", pattern: "unique fill text" }] });
+    expect(res.nodes).toHaveLength(1);
   });
 });
 

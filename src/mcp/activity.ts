@@ -138,6 +138,9 @@ function deriveTargetAndNodes(tool: string, input: Record<string, unknown>, resu
       return { target: base, nodes: strArray(r.affected_nodes) };
     }
     case "promote_to_system": {
+      // The source screen, not the component/pattern it creates: the
+      // rewritten nodes live on the screen, and that is where a follower
+      // should look.
       const node = str(input.node);
       const target = node ? fromNodeRef(node).target : null;
       return { target, nodes: strArray(r.rewritten_nodes) };
@@ -149,6 +152,9 @@ function deriveTargetAndNodes(tool: string, input: Record<string, unknown>, resu
       return { target: { kind: "screen", name: screen }, nodes: rootNodeId ? [formatNodeRef(screen, rootNodeId)] : [] };
     }
     case "import_html": {
+      // A dedupe hit writes nothing and returns `imported: []` without
+      // `errors`, so it reads as `ok: true` with no target — the one write
+      // whose null target means "skipped", not "too broad to model".
       const imported = Array.isArray(r.imported) ? (r.imported[0] as Record<string, unknown> | undefined) : undefined;
       const screen = str(imported?.screen);
       return screen ? { target: { kind: "screen", name: screen }, nodes: [] } : NONE;
@@ -177,13 +183,14 @@ function deriveTargetAndNodes(tool: string, input: Record<string, unknown>, resu
       const kind = input.kind;
       const name = str(input.name);
       if ((kind === "screen" || kind === "component" || kind === "pattern" || kind === "mockup") && name) {
-        const variant = str(input.variant);
+        const variant = kind === "mockup" ? str(input.variant) : undefined; // only mockups have variants to delete
         return { target: { kind, name, ...(variant ? { variant } : {}) }, nodes: [] };
       }
       return NONE;
     }
     // get_project, find_nodes, get_design_system, list_comments, get_guide —
-    // project-wide reads with no single target.
+    // broad reads: feed-only per ADR-005, never a navigation target — also
+    // `list_comments` when filtered to one screen or node.
     // set_tokens — rewrites across many screens/components/patterns at once.
     // init_project, reply_comment — no target shape this event models fits.
     default:

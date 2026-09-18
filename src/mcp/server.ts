@@ -57,7 +57,8 @@ function emitActivity(activity: ActivitySink | undefined, tool: string, input: R
  * `activity` (CHR-630/ADR-005) is the resolved project's activity sink, fed
  * one derived event per tool call — reads included — after the handler
  * settles either way (success or `ToolError`). Absent for the stdio
- * transport, which has no hub to broadcast to.
+ * transport, which has no hub to broadcast to. A call the SDK rejects for
+ * an invalid input schema never reaches this callback and emits nothing.
  */
 export function createMcpServer(store: Store | undefined, ctx?: ToolHandlerContext, activity?: ActivitySink): McpServer {
   const server = new McpServer(SERVER_INFO, { instructions: INSTRUCTIONS });

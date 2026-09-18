@@ -186,6 +186,13 @@ describe("deriveActivityEvent", () => {
       expect(evt.nodes).toEqual([]);
     });
 
+    it("delete_entity carries a variant only for a mockup", () => {
+      const mockup = deriveActivityEvent("delete_entity", { kind: "mockup", name: "m", variant: "a" }, true, {});
+      expect(mockup.target).toEqual({ kind: "mockup", name: "m", variant: "a" });
+      const screen = deriveActivityEvent("delete_entity", { kind: "screen", name: "home", variant: "a" }, true, {});
+      expect(screen.target).toEqual({ kind: "screen", name: "home" });
+    });
+
     it("import_html targets the imported screen from the response, since the name isn't always in the input", () => {
       const evt = deriveActivityEvent(
         "import_html",

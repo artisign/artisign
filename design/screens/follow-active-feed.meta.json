@@ -1,0 +1,7 @@
+{
+  "notes": "CHR-628/CHR-629 primary reference screen: follow toggle in the \"following\" state (topbar `follow` variant), a whole-screen write highlight (`write_html` just landed, no node-level target to localize to — dashed violet frame + \"Updated\" badge, deliberately not error-red so it doesn't read as broken), and the right panel's Activity tab populated with a realistic mixed feed: 2 write entries, 3 read entries, 1 error entry (`patch_html` failed), 1 deleted-target entry (`inspect_node` on a node that no longer exists). Right panel now has an Elements/Activity tab header (`$panel-tabs`) instead of a fixed \"Elements\" title — Activity is active here. See `chr-628` tag notes for the full interaction spec (pause/resume conditions, feed-click behavior, highlight timings, feed length N).",
+  "tags": [
+    "chr-628",
+    "chr-629"
+  ]
+}

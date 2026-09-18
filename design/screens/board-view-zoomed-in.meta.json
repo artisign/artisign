@@ -1,0 +1,7 @@
+{
+  "notes": "CHR-618/CHR-621 ticket state 7 (zoomed in half): `$board-toolbar` `zoomedin` variant — 200% active, edges on. One tile (`app-shell`) fills most of the canvas at 640px wide, unpinned and the sole filter match (\\\"1 shown — 1 match · 0 pinned\\\"). No edges are drawn because there is only one tile on screen — nothing to connect — even though the toolbar's edge toggle itself stays on, since edge visibility and tile count are independent (a single-tile view with edges enabled just has none to render, which is a legitimate state, not one this screen fakes with a special edges-off variant).",
+  "tags": [
+    "chr-621",
+    "chr-618"
+  ]
+}

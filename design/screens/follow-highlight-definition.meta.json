@@ -1,0 +1,7 @@
+{
+  "notes": "CHR-628/CHR-629: a `component:`/`pattern:` target (here, `promote_to_system` on `tag-chip#active`) navigates to the Design System view and highlights the node in its standalone-variant render — same write-highlight treatment (dashed violet outline + wash) as a screen node, just applied inside the Design System canvas instead of a screen frame. Built as a new screen rather than editing the shared `design-system-view` reference screen, so that screen's permanent content stays untouched for its normal browsing purpose — I initially patched `design-system-view` directly, caught that it would leave a permanent highlight baked into a widely-referenced screen, and reverted before creating this dedicated screen instead (re-verified `design-system-view` renders unchanged via screenshot).",
+  "tags": [
+    "chr-628",
+    "chr-629"
+  ]
+}

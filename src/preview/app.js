@@ -557,7 +557,7 @@ function resetProjectState() {
   commentModeToggle.setAttribute("aria-pressed", "false");
   inspectModeToggle.setAttribute("aria-pressed", "false");
   screenFrame.srcdoc = "";
-  board.setScreens([], []);
+  board.setScreens([], [], activeProjectRoot);
   iframeRenderedScreen = null;
   pendingRenderScreen = null;
   inspectorRequestId++; // discards any in-flight fetch from the project we just left — see loadInspectorEntries
@@ -608,7 +608,7 @@ function lastScreenKey(projectRoot) {
 }
 
 async function loadTags() {
-  tagNotes = await fetchTags();
+  tagNotes = await fetchTags(activeProjectRoot);
   updateNotesPanel();
 }
 
@@ -767,7 +767,7 @@ async function handleChangeEvent(event) {
         !arraysEqual(previousVisibility.visibleNames, nextVisibility.visibleNames) ||
         !arraysEqual(previousVisibility.outsideFilterNames, nextVisibility.outsideFilterNames);
       if (visibilityChanged) await loadBoard();
-      else await board.refreshScreen(event.name);
+      else await board.refreshScreen(event.name, activeProjectRoot);
     }
   } else if (event.kind === "tokens" || event.kind === "component" || event.kind === "pattern" || event.kind === "asset") {
     // Tokens/components/patterns can affect any screen's render (refs
@@ -802,7 +802,7 @@ async function handleChangeEvent(event) {
     // rendered HTML (see flows.js), which a "screen" event above already
     // refreshes. The board draws edges from flows.json separately, so it
     // needs its own refetch here.
-    if (boardBuilt) board.setFlows(await fetchFlows());
+    if (boardBuilt) board.setFlows(await fetchFlows(activeProjectRoot));
   } else if (event.kind === "tag_meta") {
     // Re-tagging a screen needs nothing extra here — a "screen" event above
     // already refreshes the panel with the (unchanged) tag list; this branch
@@ -1282,7 +1282,7 @@ notesPanelHeader.addEventListener("click", () => {
 });
 
 async function loadScreens() {
-  screens = await fetchScreens();
+  screens = await fetchScreens(activeProjectRoot);
   refreshSidebar();
   emptyState.hidden = screens.length > 0;
   screenFrame.hidden = screens.length === 0;
@@ -1345,7 +1345,7 @@ function escapeHtml(text) {
 async function loadCurrentScreen() {
   if (!currentScreen) return;
   const requestId = ++renderRequestId;
-  const result = await fetchRender(currentScreen);
+  const result = await fetchRender(currentScreen, activeProjectRoot);
   if (requestId !== renderRequestId) return; // a newer request has since started — drop this stale result
   pendingRenderScreen = currentScreen; // read by the `load` handler below once this srcdoc assignment actually lands
   screenFrame.srcdoc = result.ok
@@ -1355,7 +1355,7 @@ async function loadCurrentScreen() {
 
 async function loadComments() {
   const requestId = ++commentsRequestId;
-  const result = currentScreen ? await fetchComments(currentScreen) : [];
+  const result = currentScreen ? await fetchComments(currentScreen, activeProjectRoot) : [];
   if (requestId !== commentsRequestId) return; // a newer request has since started — drop this stale result
   comments = result;
   renderCommentsPanel(commentsListEl, comments, handleReply);
@@ -1374,7 +1374,7 @@ async function loadInspectorEntries() {
     syncInspectOverlay();
     return;
   }
-  const result = await fetchScreenNodes(currentScreen);
+  const result = await fetchScreenNodes(currentScreen, activeProjectRoot);
   if (requestId !== inspectorRequestId) return; // a newer request has since started — drop this stale result
   if (result.ok) inspectorPanel.setEntries(buildEntries(result.nodes), currentScreen);
   else inspectorPanel.setError(result.message);
@@ -1395,7 +1395,7 @@ function syncInspectOverlay() {
 
 /** @type {(rootId: string, text: string, onError: (message: string) => void) => void} */
 async function handleReply(rootId, text, onError) {
-  const result = await postComment({ parent_id: rootId, text });
+  const result = await postComment({ parent_id: rootId, text }, activeProjectRoot);
   if (!result.ok) {
     onError(result.message);
     return;
@@ -1669,7 +1669,7 @@ commentComposeForm.addEventListener("submit", async (evt) => {
   evt.preventDefault();
   const text = commentBodyInput.value.trim();
   if (!text || !currentScreen) return;
-  const result = await postComment({ screen: currentScreen, node_id: selectedNode ?? null, text });
+  const result = await postComment({ screen: currentScreen, node_id: selectedNode ?? null, text }, activeProjectRoot);
   if (!result.ok) {
     commentErrorEl.textContent = result.message;
     commentErrorEl.hidden = false;
@@ -1687,7 +1687,7 @@ commentComposeForm.addEventListener("submit", async (evt) => {
  *   as a deletion (see fetchMockups).
  */
 async function loadMockups() {
-  const result = await fetchMockups();
+  const result = await fetchMockups(activeProjectRoot);
   if (!result.ok) {
     console.error(result.message);
     return false;
@@ -1704,9 +1704,10 @@ async function loadCurrentMockup() {
   const mockup = mockups.find((m) => m.name === currentMockup);
   if (!mockup) return; // vanished — the SSE mockup handler/resync fall back themselves
   const mockupName = currentMockup;
+  const projectRoot = activeProjectRoot;
   renderMockupView(mockupViewEl, mockup, {
     fetchRenderFor: async (variantId) => {
-      const result = await fetchMockupRender(mockupName, variantId);
+      const result = await fetchMockupRender(mockupName, variantId, projectRoot);
       return requestId === mockupRequestId ? result : { ok: false, message: "stale mockup selection" };
     },
     onColumnMeasured: updateMockupZoom,
@@ -1715,20 +1716,25 @@ async function loadCurrentMockup() {
 }
 
 async function loadDesignSystem() {
-  const data = await fetchDesignSystem();
+  const data = await fetchDesignSystem(activeProjectRoot);
   renderDesignSystem(designSystemViewEl, data);
 }
 
 /** Builds the board from scratch — screens + flows. Only called once, lazily; SSE handlers keep it in sync afterward (see connectEvents below). */
 async function loadBoard() {
-  const flows = await fetchFlows();
+  // Captured up front and re-checked after the await (CHR-651, same pattern
+  // as loadBoardState) — a project switch landing mid-fetch would otherwise
+  // pair the NEW project's screens/root with the OLD project's flows below.
+  const project = activeProjectRoot;
+  const flows = await fetchFlows(project);
+  if (project !== activeProjectRoot) return;
   // CHR-624: the board's tile set is filter matches ∪ pinned, not every
   // screen — renderBoardStatus() (called by refreshSidebar, which every
   // caller of loadBoard already runs first) recomputes the identical
   // visibility, but board.setScreens also needs the pin/outside-filter
   // classification per tile, not just the counts renderBoardStatus keeps.
   const visibility = computeBoardVisibility(screens, screenFilter, pinnedScreens);
-  await board.setScreens(visibility.visibleNames, flows, {
+  await board.setScreens(visibility.visibleNames, flows, project, {
     pinned: visibility.pinnedNames,
     outsideFilter: visibility.outsideFilterNames,
     filter: screenFilter,

@@ -182,6 +182,90 @@ describe("write_html", () => {
     ]);
     expect(await fx.store.readScreen("home")).toContain("padding: 16px");
   });
+
+  it("warns repeated_pattern for an ad-hoc styled node whose style already occurs on another screen — full-doc scope (CHR-635)", async () => {
+    await fx.store.writeScreen("checkout", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div>`);
+
+    const res = await writeHtml(fx.store, {
+      screen: "home",
+      mode: "create",
+      title: "Home",
+      html_aug: `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div>`,
+    });
+
+    expect(res.errors).toBeUndefined();
+    expect(res.warnings).toEqual([
+      {
+        kind: "repeated_pattern",
+        target: "home.n1",
+        message: 'inline style repeated on 1 other screen (checkout): "background:rgba(0,0,0,.4);color:#fff;position:fixed"',
+        suggestion: "promote_to_system",
+      },
+    ]);
+  });
+
+  it("never warns repeated_pattern for a pure layout wrapper, even one repeated everywhere", async () => {
+    await fx.store.writeScreen("checkout", `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`);
+    await fx.store.writeScreen("cart", `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`);
+
+    const res = await writeHtml(fx.store, {
+      screen: "home",
+      mode: "create",
+      title: "Home",
+      html_aug: `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`,
+    });
+
+    expect((res.warnings as unknown[]).filter((w) => (w as { kind: string }).kind === "repeated_pattern")).toEqual([]);
+  });
+
+  it("names a component whose default-variant root matches the repeated style", async () => {
+    await fx.store.writeComponent("modal-scrim", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div>`);
+    await fx.store.writeScreen("checkout", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div>`);
+
+    const res = await writeHtml(fx.store, {
+      screen: "home",
+      mode: "create",
+      title: "Home",
+      html_aug: `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div>`,
+    });
+
+    const repeated = (res.warnings as Array<{ kind: string; suggestion?: string }>).find((w) => w.kind === "repeated_pattern");
+    expect(repeated?.suggestion).toBe("$modal-scrim");
+  });
+
+  it("caps repeated_pattern warnings at 8 per response, reporting the rest as repeated_pattern_omitted_count (CHR-635 review)", async () => {
+    // 10 distinct patterns, each with a matching node on "checkout" too —
+    // ten qualifying, sorted-first candidates, only 8 of which fit.
+    const nodes: string[] = [];
+    const decls: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      decls.push(`<div id="n${i}" style="color: #${i}${i}${i}; border-color: #${i}${i}${i}"></div>`);
+      nodes.push(`n${i}`);
+    }
+    await fx.store.writeScreen("checkout", `<section id="root">${decls.join("")}</section>`);
+
+    const res = await writeHtml(fx.store, {
+      screen: "home",
+      mode: "create",
+      title: "Home",
+      html_aug: `<section id="root">${decls.join("")}</section>`,
+    });
+
+    const repeated = (res.warnings as Array<{ kind: string }>).filter((w) => w.kind === "repeated_pattern");
+    expect(repeated).toHaveLength(8);
+    expect(res.repeated_pattern_omitted_count).toBe(2);
+  });
+
+  it("omits repeated_pattern_omitted_count entirely when nothing was cut", async () => {
+    await fx.store.writeScreen("checkout", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>`);
+    const res = await writeHtml(fx.store, {
+      screen: "home",
+      mode: "create",
+      title: "Home",
+      html_aug: `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>`,
+    });
+    expect(res).not.toHaveProperty("repeated_pattern_omitted_count");
+  });
 });
 
 describe("write_html kind component/pattern", () => {
@@ -432,6 +516,85 @@ describe("patch_html", () => {
       { kind: "drift", target: "home.n1", message: 'inline value "16px" for "padding" matches token $spacing.md', suggestion: "$spacing.md" },
     ]);
     expect(res.preexisting_drift_count).toBe(1); // n2's drift, untouched by this patch
+  });
+
+  it("scopes repeated_pattern warnings to affected_nodes and counts the rest (CHR-635)", async () => {
+    await fx.store.writeScreen("checkout", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div>`);
+    await fx.store.writeScreen("cart", `<div id="n1" style="border: 1px solid #000; color: #111"></div>`);
+    // n1 and n2 carry two DISTINCT repeated patterns — this patch only
+    // touches n1, so n2's own (different) pattern is what
+    // preexisting_repeated_pattern_count reports; grouping n1 with n2 would
+    // hide the case this test exists to cover.
+    await fx.store.writeScreen(
+      "home",
+      `<section id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div><div id="n2" style="border: 1px solid #000; color: #111"></div></section>`,
+    );
+
+    const res = await patchHtml(fx.store, {
+      target: { kind: "node", node: "home.n1" },
+      operation: "set_attr",
+      attr: { name: "data-testid", value: "one" },
+    });
+
+    expect(res.affected_nodes).toEqual(["home.n1"]);
+    expect(res.warnings).toEqual([
+      {
+        kind: "repeated_pattern",
+        target: "home.n1",
+        message: 'inline style repeated on 1 other screen (checkout): "background:rgba(0,0,0,.4);color:#fff;position:fixed"',
+        suggestion: "promote_to_system",
+      },
+    ]);
+    // n2's own repeated pattern (matching "cart") is untouched by this
+    // patch — counted, not spelled out.
+    expect(res.preexisting_repeated_pattern_count).toBe(1);
+  });
+
+  it("skips buildStyleOccurrenceIndex's project-wide scan entirely when the patch touches no ad-hoc styled node (cheap pre-check)", async () => {
+    // The default beforeEach screen's n3 carries only a bare class, no
+    // inline style at all — set_attr on it must never pay for the
+    // repeated_pattern scan.
+    const listScreensSpy = vi.spyOn(fx.store, "listScreens");
+    const res = await patchHtml(fx.store, {
+      target: { kind: "node", node: "home.n3" },
+      operation: "set_attr",
+      attr: { name: "data-testid", value: "body-copy" },
+    });
+    expect(listScreensSpy).not.toHaveBeenCalled();
+    // Absent, not `0` — nothing was measured, so the response must not claim
+    // the screen is free of repeated patterns.
+    expect(res).not.toHaveProperty("preexisting_repeated_pattern_count");
+  });
+
+  it("pays for buildStyleOccurrenceIndex's scan when the patch touches an ad-hoc styled node (cheap pre-check)", async () => {
+    await fx.store.writeScreen(
+      "home",
+      `<section id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div></section>`,
+    );
+    const listScreensSpy = vi.spyOn(fx.store, "listScreens");
+    await patchHtml(fx.store, {
+      target: { kind: "node", node: "home.n1" },
+      operation: "set_attr",
+      attr: { name: "data-testid", value: "one" },
+    });
+    expect(listScreensSpy).toHaveBeenCalled();
+  });
+
+  it("caps repeated_pattern warnings at 8 within the affected scope too, reporting the rest via repeated_pattern_omitted_count", async () => {
+    const decls: string[] = [];
+    for (let i = 0; i < 10; i++) decls.push(`<div id="n${i}" style="color: #${i}${i}${i}; border-color: #${i}${i}${i}"></div>`);
+    await fx.store.writeScreen("checkout", `<section id="root">${decls.join("")}</section>`);
+    await fx.store.writeScreen("home", `<section id="root">${decls.join("")}</section>`);
+
+    const res = await patchHtml(fx.store, {
+      target: { kind: "selector", screen: "home", css_selector: "div" },
+      operation: "set_attr",
+      attr: { name: "data-testid", value: "all" },
+    });
+
+    const repeated = (res.warnings as Array<{ kind: string }>).filter((w) => w.kind === "repeated_pattern");
+    expect(repeated).toHaveLength(8);
+    expect(res.repeated_pattern_omitted_count).toBe(2);
   });
 
   it("warns instead of throwing when an inserted fragment references an unresolved ref", async () => {

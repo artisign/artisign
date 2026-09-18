@@ -19,7 +19,15 @@ export type WarningKind =
   // its discriminating power. Warns, never blocks — most definition nodes
   // are never individually addressed again, so blocking every write on
   // every un-ided node would punish the common case to guard the rare one.
-  | "missing_id";
+  | "missing_id"
+  // An ad-hoc, visually styled element this write just touched already
+  // matches (byte-for-byte after normalization) a style on ≥1 other screen,
+  // or a component's default-variant root (CHR-635). Its own kind, not
+  // folded into `drift`: `drift` is about a *value* matching a known
+  // *token*, this is about a whole *style block* matching another *element*
+  // — different data, different remedy (`$<component>` vs. a promote call
+  // vs. a token ref). Advisory only, never blocks a write.
+  | "repeated_pattern";
 
 export type Warning = {
   kind: WarningKind;

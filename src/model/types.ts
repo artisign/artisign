@@ -101,7 +101,7 @@ export type ValidationErrorCode =
   | "unknown_flow_trigger"
   | "suspicious_attr";
 
-export type ValidationWarningKind = "drift";
+export type ValidationWarningKind = "drift" | "repeated_pattern";
 
 export type ValidationIssue = {
   code: ValidationErrorCode;

@@ -5,6 +5,8 @@ import {
   parseComponentDefinition,
   serializeScreen,
   computeDriftWarnings,
+  computeRepeatedPatternWarnings,
+  isRepeatedPatternCandidate,
   resolveTokenRef,
   tokenRefPaths,
   type ScreenDocument,
@@ -12,6 +14,7 @@ import {
 } from "../model/index.js";
 import { loadScreen } from "./context.js";
 import { loadAllDocuments } from "./definitions.js";
+import { buildStyleOccurrenceIndex } from "./style-index.js";
 import { parseNodeRef, formatNodeRef, requireScreenNodeRef } from "./node-ref.js";
 import { syncScreenFlows } from "./flows.js";
 import { diffScreenDocuments } from "./diff.js";
@@ -43,6 +46,27 @@ function shapeWriteResponse(
   if (responseMode === "diff") return { ...base, diff };
   const nodes = Object.values(doc.nodes).map((n) => ({ id: n.id, tag: n.tag, parent_id: n.parentId }));
   return { ...base, diff, nodes };
+}
+
+// At most this many repeated_pattern warnings ride in one response (CHR-635
+// review) — `computeRepeatedPatternWarnings` already returns them sorted by
+// other-screen occurrence count descending, so the cap keeps the ones most
+// worth an agent's attention; the rest are counted, not spelled out
+// (`repeated_pattern_omitted_count`), the same way `preexisting_drift_count`
+// already summarizes what a response doesn't enumerate.
+const REPEATED_PATTERN_CAP = 8;
+
+function mapRepeatedPatternWarnings(
+  warnings: ReturnType<typeof computeRepeatedPatternWarnings>,
+  screen: string,
+  rootNodeId: string,
+): Warning[] {
+  return warnings.map((w) => ({
+    kind: "repeated_pattern" as const,
+    target: formatNodeRef(screen, w.nodeId ?? rootNodeId),
+    message: w.message,
+    suggestion: w.suggestion,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +236,25 @@ export async function writeHtml(store: Store, input: WriteHtmlInput): Promise<Re
     message: w.message,
     suggestion: w.suggestion,
   }));
-  const warnings = [...refWarnings, ...driftWarnings];
+
+  // Cheap pre-check before paying for buildStyleOccurrenceIndex's
+  // project-wide loadAllDocuments scan (CHR-635): most writes touch no
+  // visually-styled ad-hoc node at all (a component instance, a pure
+  // layout wrapper, plain text) and pay nothing for repeated_pattern.
+  let repeatedPatternWarnings: Warning[] = [];
+  let repeatedPatternOmittedCount = 0;
+  if (Object.values(doc.nodes).some((n) => isRepeatedPatternCandidate(n))) {
+    const styleIndex = await buildStyleOccurrenceIndex(store, registry);
+    const allRepeatedPatternWarnings = mapRepeatedPatternWarnings(
+      computeRepeatedPatternWarnings(doc, input.screen, styleIndex),
+      input.screen,
+      doc.rootNodeId,
+    );
+    repeatedPatternWarnings = allRepeatedPatternWarnings.slice(0, REPEATED_PATTERN_CAP);
+    repeatedPatternOmittedCount = allRepeatedPatternWarnings.length - repeatedPatternWarnings.length;
+  }
+
+  const warnings = [...refWarnings, ...driftWarnings, ...repeatedPatternWarnings];
 
   const base = {
     screen: input.screen,
@@ -221,6 +263,7 @@ export async function writeHtml(store: Store, input: WriteHtmlInput): Promise<Re
     root_node_id: doc.rootNodeId,
     node_count: Object.keys(doc.nodes).length,
     warnings,
+    ...(repeatedPatternOmittedCount > 0 ? { repeated_pattern_omitted_count: repeatedPatternOmittedCount } : {}),
   };
   return shapeWriteResponse(base, doc, before, responseMode);
 }
@@ -331,13 +374,52 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
   const scopedDriftWarnings = allDriftWarnings.filter((w) => affected.has(w.target!));
   const preexistingDriftCount = allDriftWarnings.length - scopedDriftWarnings.length;
 
+  // Cheap pre-check, scoped to only the raw ids this call actually touched
+  // (formatNodeRef(screen, id) === `${screen}.${id}`, so stripping the
+  // shared screen prefix recovers them from `affected` without a second
+  // set) — the common `set_attr` on a layout-only node, a flow-target
+  // change, a text edit, pays nothing for repeated_pattern at all.
+  const affectedNodeIds = [...affected].map((ref) => ref.slice(screen.length + 1));
+  const hasAffectedCandidate = affectedNodeIds.some((id) => {
+    const node = doc.nodes[id];
+    return node !== undefined && isRepeatedPatternCandidate(node);
+  });
+  let scopedRepeatedPatternWarnings: Warning[] = [];
+  let preexistingRepeatedPatternCount = 0;
+  let repeatedPatternOmittedCount = 0;
+  if (hasAffectedCandidate) {
+    const styleIndex = await buildStyleOccurrenceIndex(store, registry);
+    // Two calls, not one filtered by target: a group warning names only its
+    // FIRST member as `target`, so filtering the unscoped list by
+    // `affected.has(target)` would silently drop a group this patch did
+    // touch whenever that first member happens to sit outside `affected`
+    // (see computeRepeatedPatternWarnings's own doc comment). Passing
+    // `scopeNodeIds` in re-derives the right representative/count from the
+    // affected subset itself instead.
+    const allCount = computeRepeatedPatternWarnings(doc, screen, styleIndex).length;
+    const scopedAll = mapRepeatedPatternWarnings(
+      computeRepeatedPatternWarnings(doc, screen, styleIndex, { scopeNodeIds: new Set(affectedNodeIds) }),
+      screen,
+      doc.rootNodeId,
+    );
+    preexistingRepeatedPatternCount = allCount - scopedAll.length;
+    scopedRepeatedPatternWarnings = scopedAll.slice(0, REPEATED_PATTERN_CAP);
+    repeatedPatternOmittedCount = scopedAll.length - scopedRepeatedPatternWarnings.length;
+  }
+
   const base = {
     screen,
     path: `screens/${screen}.html`,
     ...commitFields(commitResult),
     affected_nodes: [...affected],
-    warnings: [...refWarnings, ...scopedDriftWarnings],
+    warnings: [...refWarnings, ...scopedDriftWarnings, ...scopedRepeatedPatternWarnings],
     preexisting_drift_count: preexistingDriftCount,
+    // Only when the index was actually built: absent means "not measured",
+    // `0` means "measured, nothing repeated". Reporting a flat `0` on the
+    // skipped path would claim a clean screen the scan never looked at, and
+    // would grow every ordinary patch response by a field (CHR-635 review).
+    ...(hasAffectedCandidate ? { preexisting_repeated_pattern_count: preexistingRepeatedPatternCount } : {}),
+    ...(repeatedPatternOmittedCount > 0 ? { repeated_pattern_omitted_count: repeatedPatternOmittedCount } : {}),
   };
   return shapeWriteResponse(base, doc, before, responseMode);
 }

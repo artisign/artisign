@@ -153,11 +153,12 @@
           <div id="design-system-view" class="main-view" hidden></div>
           <div id="board-view" class="main-view" hidden>
             <!--
-              Board-tab-only bar (CHR-623): a continuous zoom slider (5%-
-              200%) with Fit-all/100% quick jumps, and a flow-edge visibility
-              toggle. #board-toolbar-status/#board-toolbar-actions are CHR-624's
-              (filter/pins result count, Clear pins) — present and empty here,
-              deliberately unfilled by this ticket.
+              Board-tab-only bar: a continuous zoom slider (5%-200%) with
+              Fit-all/100% quick jumps and a flow-edge visibility toggle
+              (CHR-623), plus the shared filter's result readout and Clear
+              pins (CHR-624) — the filter INPUT itself lives only in the
+              sidebar (#screen-filter-input), never duplicated here; see the
+              chr-621 design-system tag notes' "Filter ∪ pins" section.
             -->
             <div id="board-toolbar">
               <button type="button" id="board-fitall-btn" class="board-quickjump">Fit all</button>
@@ -172,7 +173,9 @@
               <button type="button" id="board-edges-toggle" class="toggle-button" aria-pressed="true">Edges: On</button>
               <span id="board-toolbar-spacer"></span>
               <span id="board-toolbar-status"></span>
-              <span id="board-toolbar-actions"></span>
+              <span id="board-toolbar-actions">
+                <button type="button" id="board-clear-pins-btn" class="board-quickjump" hidden>Clear pins</button>
+              </span>
             </div>
             <!--
               One scrollable surface holding every screen as a tile
@@ -188,6 +191,20 @@
               here — see board-view.js's module comment.
             -->
             <div id="board-surface">
+              <!--
+                CHR-624/ADR-005 — shown instead of the (empty) tile canvas
+                when filter matches ∪ pinned is empty: either the project has
+                no screens at all, or the filter matches nothing and nothing
+                is pinned. Overlays #board-surface directly (position:
+                absolute, outside #board-canvas's zoom-transform coordinate
+                space) rather than trying to center it inside the zoomed
+                canvas — see the `board-view-empty` design screen.
+              -->
+              <div id="board-empty-state" hidden>
+                <span id="board-empty-icon" aria-hidden="true">▤</span>
+                <div id="board-empty-title">No screens to show</div>
+                <div id="board-empty-body"></div>
+              </div>
               <div id="board-canvas">
                 <div id="board-canvas-inner">
                   <div id="board-tiles"></div>

@@ -197,7 +197,7 @@ Served at `http://127.0.0.1:<port>` once the daemon is running — plain ES modu
 
 - **Project picker** — switch between open projects in the topbar; open an existing folder or create a new project through an in-app folder browser (no restart needed). With nothing open, an empty state offers both actions plus recent projects.
 - **Screens** — sidebar screen list, rendered source (preview = output, by construction)
-- **Board** — every screen laid out as a tile on one scrollable surface, with flow edges drawn between them (toggleable) and a 5%–200% zoom slider (Fit all, 100%, or Ctrl/Cmd+wheel/pinch to zoom around the cursor), so a flow is something you see rather than something you reconstruct
+- **Board** — every screen laid out as a tile on one scrollable surface, with flow edges drawn between them (toggleable), a 5%–200% zoom slider (Fit all, 100%, or Ctrl/Cmd+wheel/pinch to zoom around the cursor), and the sidebar's shared filter plus any screen pinned onto the board regardless of the filter, so a flow is something you see rather than something you reconstruct
 - **Elements panel** — the selected screen's nodes listed by the id an agent addresses them with
 - **Notes panel** — the screen's own notes plus any tag notes that apply to it, both rendered as Markdown
 - **Flow mode** — click an element with `data-flow-target` to jump to the screen it points at

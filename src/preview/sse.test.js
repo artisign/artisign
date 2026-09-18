@@ -57,6 +57,26 @@ describe("connectEvents", () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it("dispatches parsed board_state events to onBoardState, not onChange or onLifecycle (CHR-624)", () => {
+    const onChange = vi.fn();
+    const onLifecycle = vi.fn();
+    const onBoardState = vi.fn();
+    connectEvents({ onChange, onLifecycle, onBoardState });
+    const [source] = FakeEventSource.instances;
+
+    source.emit({ type: "board_state", filter: "dialog", pinned: ["app-shell"], source: "human" });
+
+    expect(onBoardState).toHaveBeenCalledWith({ type: "board_state", filter: "dialog", pinned: ["app-shell"], source: "human" });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onLifecycle).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when a board_state event arrives with no onBoardState handler", () => {
+    connectEvents({ onChange: vi.fn() });
+    const [source] = FakeEventSource.instances;
+    expect(() => source.emit({ type: "board_state", filter: null, pinned: [], source: "agent" })).not.toThrow();
+  });
+
   it("ignores unparseable message payloads instead of throwing", () => {
     const onChange = vi.fn();
     connectEvents({ onChange });

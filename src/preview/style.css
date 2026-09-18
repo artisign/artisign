@@ -374,6 +374,10 @@ body {
 
 #screen-list li {
   margin-bottom: 2px;
+  /* Positioning context for .screen-item-pin (CHR-624) — a SIBLING of
+     .screen-item, not a child (see screens.js's renderScreenList), so the
+     positioned ancestor has to be one level up. */
+  position: relative;
 }
 
 .screen-item {
@@ -382,7 +386,9 @@ body {
   text-align: left;
   border: none;
   background: transparent;
-  padding: var(--space-md) 10px;
+  /* Right padding wider than the other three sides (CHR-624) — clears
+     .screen-item-pin, which overlaps this corner. */
+  padding: var(--space-md) 30px var(--space-md) 10px;
   border-radius: 6px;
   font-size: 0.85rem;
   color: var(--color-text-secondary);
@@ -427,6 +433,37 @@ body {
 .screen-item[aria-current="true"] .tag-chip:not(:first-child) {
   background: var(--color-surface);
   color: var(--color-accent);
+}
+
+/* Shared `$pin-button` look (CHR-624) — the sidebar row's own pin button
+   (.screen-item-pin) and the board tile's (.board-tile-pin) both carry this
+   base class, then add their own positioning on top (a sidebar row and a
+   board tile size/place it differently, but the button itself — the 22px
+   box, the icon, the pinned/unpinned color swap — is identical). */
+.pin-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-faded);
+  cursor: pointer;
+  padding: 0;
+}
+
+.pin-button.pinned {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-surface);
+}
+
+.screen-item-pin {
+  position: absolute;
+  top: 9px;
+  right: 8px;
 }
 
 /* Mockup sidebar section — always visually distinct from #screen-list, even
@@ -1680,6 +1717,44 @@ body {
   overflow: auto;
 }
 
+/* CHR-624 — centered over #board-surface, independent of #board-canvas's
+   zoom transform/scroll position (a "no tiles" message has no zoom level of
+   its own). */
+#board-empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  max-width: 360px;
+  margin: 0 auto;
+  padding: var(--space-2xl);
+  text-align: center;
+}
+
+#board-empty-state[hidden] {
+  display: none;
+}
+
+#board-empty-icon {
+  color: var(--color-text-faint);
+  font-size: 2rem;
+}
+
+#board-empty-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+#board-empty-body {
+  font-size: 0.85rem;
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
+}
+
 /* Sizing wrapper only — no transform of its own, so its layout box (which
    #board-surface's scrollable overflow is computed from) is exactly the
    post-zoom pixel size set in JS. #board-canvas-inner underneath carries
@@ -1734,6 +1809,59 @@ body {
   background: var(--color-surface);
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* CHR-624 — a tile on the board SOLELY because it's pinned, not because it
+   also matches the shared filter (the `$board-tile` `outside-filter`
+   variant). Dashed, not solid, so it reads as distinct from every
+   filter-matching tile's own (undashed) box-shadow-only default look at a
+   glance. `outline`, not `border` (review fix 7) — .board-tile's own
+   width/height are set inline by board-view.js to an exact pixel size, and
+   a `border` is part of the box (even under this file's global
+   `box-sizing: border-box`, it still insets the padding box those
+   dimensions are relative to); .board-tile-frame is positioned `top: 0;
+   left: 0` against that padding box, so a `border` here shifted it 2px
+   down/right and let it overhang. `outline` never participates in the box
+   model — `outline-offset: -2px` keeps the same visual position a `border`
+   would have had. */
+.board-tile.outside-filter {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: -2px;
+}
+
+/* `margin-bottom` clears .board-tile-label's own row entirely, not just a
+   small gap (review fix 7): both used to sit on the same `bottom: 100%`
+   line, right-aligned here vs. left-aligned + nowrap there, so a long
+   screen name grew straight into this badge's text; and at the old,
+   smaller margin the badge's own bottom edge came within 2px of
+   .board-tile-pin's top (`top: -8px`), overlapping it. --space-2xl clears
+   the label's ~20px total footprint (its own margin-bottom + line box)
+   with a few px to spare, which also puts this well clear of the pin. */
+.board-tile-badge {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: var(--space-2xl);
+  font-size: 0.65rem;
+  line-height: 17px;
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+/* Overlaps the tile's own top-right corner, unclipped — same reasoning as
+   .board-tile-label's overflow-visible placement above the tile: .board-tile
+   itself doesn't clip (only .board-tile-frame, for the iframe's rounded
+   corners, does), so a child positioned partly outside the tile's own box
+   still renders in full. Hidden below LOW_ZOOM_AFFORDANCE_THRESHOLD when
+   NOT pinned — see board-view.js's applyZoomDependentTileChrome; a pinned
+   tile's button always stays visible, at any zoom. */
+.board-tile-pin {
+  position: absolute;
+  top: -8px;
+  right: -8px;
 }
 
 .board-tile-label {

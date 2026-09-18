@@ -23,6 +23,9 @@ import {
   DEFAULT_BOARD_ZOOM,
   DEFAULT_COLUMNS,
   BOARD_ZOOM_STEP,
+  computeBoardVisibility,
+  formatBoardStatusText,
+  LOW_ZOOM_AFFORDANCE_THRESHOLD,
 } from "./board.js";
 
 describe("screenIdFromRef", () => {
@@ -582,5 +585,77 @@ describe("stepZoomUp", () => {
   it("clamps at the ceiling and does not go above it", () => {
     expect(stepZoomUp(200, BOARD_ZOOM_STEP)).toBe(MAX_BOARD_ZOOM);
     expect(stepZoomUp(198, BOARD_ZOOM_STEP, 199)).toBe(199); // custom ceiling below the natural grid point
+  });
+});
+
+describe("computeBoardVisibility", () => {
+  const screens = [
+    { name: "open-project-dialog", tags: ["dialog"] },
+    { name: "init-project-dialog", tags: ["dialog"] },
+    { name: "no-project-empty-state", tags: ["empty-state", "dialog"] },
+    { name: "app-shell", tags: ["shell"] },
+  ];
+
+  it("shows every screen for an empty filter and no pins", () => {
+    const v = computeBoardVisibility(screens, "", []);
+    expect(v.visibleNames).toEqual(screens.map((s) => s.name));
+    expect(v).toMatchObject({ outsideFilterNames: [], pinnedNames: [], matchCount: 4, pinnedCount: 0, shownCount: 4 });
+  });
+
+  it("matches filter matches ∪ pinned, preserving the project's own screen order — the board-view design screen's own numbers", () => {
+    // "dialog" matches the first 3; app-shell is pinned but doesn't match.
+    const v = computeBoardVisibility(screens, "dialog", ["open-project-dialog", "app-shell"]);
+    expect(v.visibleNames).toEqual(["open-project-dialog", "init-project-dialog", "no-project-empty-state", "app-shell"]);
+    expect(v.matchCount).toBe(3);
+    expect(v.pinnedCount).toBe(2);
+    expect(v.shownCount).toBe(4);
+  });
+
+  it("classifies a pinned screen that doesn't match the filter as outsideFilterNames, and one that does match as neither", () => {
+    const v = computeBoardVisibility(screens, "dialog", ["open-project-dialog", "app-shell"]);
+    expect(v.outsideFilterNames).toEqual(["app-shell"]);
+  });
+
+  it("does not double-count a screen that both matches and is pinned", () => {
+    const v = computeBoardVisibility(screens, "dialog", ["open-project-dialog"]);
+    expect(v.visibleNames).toEqual(["open-project-dialog", "init-project-dialog", "no-project-empty-state"]);
+    expect(v.shownCount).toBe(3);
+  });
+
+  it("drops a pinned name with no matching screen — silently, from every field", () => {
+    const v = computeBoardVisibility(screens, "", ["ghost-screen"]);
+    expect(v.visibleNames).toEqual(screens.map((s) => s.name));
+    expect(v.pinnedNames).toEqual([]);
+    expect(v.pinnedCount).toBe(0);
+    expect(v.outsideFilterNames).toEqual([]);
+  });
+
+  it("shows nothing for a filter that matches no screen and no pins", () => {
+    const v = computeBoardVisibility(screens, "nope", []);
+    expect(v).toMatchObject({ visibleNames: [], matchCount: 0, pinnedCount: 0, shownCount: 0 });
+  });
+
+  it("never removes a pin when the filter changes — pinned screens stay pinned regardless of the current filter text", () => {
+    const withFilter = computeBoardVisibility(screens, "dialog", ["app-shell"]);
+    const withoutFilter = computeBoardVisibility(screens, "", ["app-shell"]);
+    expect(withFilter.pinnedNames).toEqual(["app-shell"]);
+    expect(withoutFilter.pinnedNames).toEqual(["app-shell"]);
+  });
+});
+
+describe("formatBoardStatusText", () => {
+  it("matches the approved design's exact phrasing", () => {
+    expect(formatBoardStatusText({ shownCount: 4, matchCount: 3, pinnedCount: 2 })).toBe("4 shown — 3 matches · 2 pinned");
+  });
+
+  it("formats a zero-everything empty state", () => {
+    expect(formatBoardStatusText({ shownCount: 0, matchCount: 0, pinnedCount: 0 })).toBe("0 shown — 0 matches · 0 pinned");
+  });
+});
+
+describe("LOW_ZOOM_AFFORDANCE_THRESHOLD", () => {
+  it("is the same threshold labelDisplayMode uses to hide the label", () => {
+    expect(labelDisplayMode(LOW_ZOOM_AFFORDANCE_THRESHOLD)).not.toBe("hidden");
+    expect(labelDisplayMode(LOW_ZOOM_AFFORDANCE_THRESHOLD - 1)).toBe("hidden");
   });
 });

@@ -33,6 +33,8 @@ export function renderMockupList(listEl, mockups, { activeName, onSelect }) {
     button.type = "button";
     button.className = "mockup-item";
     button.setAttribute("aria-current", String(mockup.name === activeName));
+    // CHR-631 — lets follow mode cue this row for a mockup activity target.
+    button.dataset.mockupName = mockup.name;
 
     const nameRow = document.createElement("div");
     nameRow.className = "mockup-item-name-row";

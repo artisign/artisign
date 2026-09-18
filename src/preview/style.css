@@ -12,7 +12,11 @@
   --color-accent: #2a3edb;
   --color-accent-subtle: #eef1ff;
   --color-warning: #d97706;
+  --color-warning-subtle: #fdf1e0;
   --color-error: #b91c1c;
+  /* CHR-628/CHR-629/CHR-631 — follow mode's read/write activity colors. */
+  --color-activity-read: #0d9488;
+  --color-activity-write: #7c3aed;
   --color-danger: #c0392b;
   --color-edge: #9aa0c0;
   --color-text: #1a1a1a;
@@ -120,8 +124,94 @@ body {
   cursor: not-allowed;
 }
 
-#flow-mode-toggle {
+/* CHR-628/CHR-629/CHR-631 — the follow toggle. Review fix 4: two SIBLING
+   <button>s (the toggle itself, and "Resume") inside a plain, non-
+   interactive <span> pill — not one button with a span nested inside it
+   masquerading as a second control, which is both invalid HTML (no
+   interactive descendants inside a button) and mouse-only (a keyboard
+   activation's own event.target is the outer button, never the inner
+   span, so `.closest("#follow-toggle-resume")` could never match). The
+   pill's border/background/padding/color live on the outer span (still
+   carries the "push the mode-button cluster right" job `#flow-mode-toggle`
+   used to do on its own — $follow-toggle's usage note / $topbar's
+   `follow`/`follow-paused` variants); the two buttons are UA-reset to look
+   like plain inline content sharing it. */
+.follow-toggle {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.follow-toggle-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.follow-toggle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-text-faint);
+}
+
+.follow-toggle[data-state="following"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.follow-toggle[data-state="following"] .follow-toggle-dot {
+  background: var(--color-accent);
+}
+
+.follow-toggle[data-state="paused"] {
+  border-color: var(--color-warning);
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
+
+.follow-toggle[data-state="paused"] .follow-toggle-dot {
+  background: var(--color-warning);
+}
+
+/* Only meaningful while paused — the "Follow paused | Resume" split. */
+.follow-toggle-divider {
+  display: none;
+  width: 1px;
+  align-self: stretch;
+  background: var(--color-warning);
+  opacity: 0.35;
+}
+
+.follow-toggle-resume {
+  display: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.follow-toggle[data-state="paused"] .follow-toggle-divider,
+.follow-toggle[data-state="paused"] .follow-toggle-resume {
+  display: inline-flex;
 }
 
 #comment-mode-toggle[aria-pressed="true"] {
@@ -243,6 +333,40 @@ body {
 }
 
 .side-panel[data-collapsed="true"] .side-panel-title {
+  display: none;
+}
+
+/* CHR-628/CHR-629/CHR-631 — $panel-tabs: the Elements/Activity split in the
+   right-hand panel. Same flex:1/hidden-when-collapsed role as
+   .side-panel-title above, which it replaces in that header. */
+.panel-tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.side-panel[data-collapsed="true"] .panel-tabs {
+  display: none;
+}
+
+.panel-tab {
+  border: none;
+  background: none;
+  padding: 0 0 9px;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.panel-tab[aria-pressed="true"] {
+  font-weight: 600;
+  color: var(--color-accent);
+  border-bottom: 2px solid var(--color-accent);
+}
+
+#panel-body-activity[hidden] {
   display: none;
 }
 
@@ -1113,6 +1237,183 @@ body {
 
 #inspect-overlay[hidden] {
   display: none;
+}
+
+/* CHR-631 — follow mode's whole-screen write highlight, shown after
+   write_html on the currently displayed screen ($activity-highlight's
+   `write-screen` variant). Sized with `inset: 0`, not a copied bounding
+   rect (see index.html's comment): the iframe already fills #screen-holder
+   exactly, so this sibling does too. */
+#activity-screen-highlight {
+  position: absolute;
+  inset: 0;
+  border: 3px dashed var(--color-activity-write);
+  border-radius: inherit;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+#activity-screen-highlight[hidden] {
+  display: none;
+}
+
+/* A whole-screen READ (get_screen/get_mockup with no specific node) — solid teal, no badge (see highlightScreen's own doc for why this can't just be an outline on the iframe's root element instead). */
+#activity-screen-highlight.activity-screen-highlight-read {
+  border: 2px solid var(--color-activity-read);
+  border-style: solid;
+}
+
+#activity-screen-highlight.activity-screen-highlight-read #activity-screen-highlight-badge {
+  display: none;
+}
+
+#activity-screen-highlight-badge {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  background: var(--color-activity-write);
+  color: var(--color-surface);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-pill);
+}
+
+/* CHR-628/CHR-629/CHR-631 — activity feed ($activity-entry). */
+
+#activity-feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+#activity-feed-empty {
+  padding: 0 var(--space-xl);
+  font-size: 0.8rem;
+  color: var(--color-text-faint);
+  text-align: center;
+}
+
+/* .activity-entry is now the <button> itself (review fix 4 — a real button gets keyboard focus/activation for free), so it needs the same UA-reset properties as .screen-item/.mockup-item's own list-row buttons on top of its existing look. */
+.activity-entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-sm) var(--space-lg);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.activity-entry[aria-disabled="true"] {
+  cursor: default;
+}
+
+.activity-entry-mark {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-activity-read);
+}
+
+.activity-entry-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.activity-entry-tool {
+  font-family: monospace;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.activity-entry-target {
+  font-size: 0.7rem;
+  color: var(--color-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-entry-time {
+  flex: none;
+  font-size: 0.7rem;
+  color: var(--color-text-faint);
+}
+
+/* write — a square dot instead of a circle (shape, not just hue, keeps it distinct for colorblind users), same activity-write color as the write node/screen highlight. */
+.activity-entry-write .activity-entry-mark {
+  border-radius: 2px;
+  background: var(--color-activity-write);
+}
+
+/* error (ok:false) — never navigates; a scanning eye should catch it without reading the text. */
+.activity-entry-error {
+  cursor: default;
+  background: rgba(185, 28, 28, 0.05);
+  border-left: 3px solid var(--color-error);
+}
+
+.activity-entry-error .activity-entry-mark {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--color-error);
+  color: var(--color-surface);
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+}
+
+.activity-entry-error .activity-entry-mark::before {
+  content: "\2715";
+}
+
+.activity-entry-error .activity-entry-tool {
+  color: var(--color-error);
+}
+
+/* deleted (the call's own target no longer exists) — dimmed, never navigates. */
+.activity-entry-deleted {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.activity-entry-deleted .activity-entry-mark {
+  background: var(--color-text-faint);
+}
+
+.activity-entry-deleted .activity-entry-target {
+  font-style: italic;
+}
+
+/* CHR-631 — a transient cue on a sidebar mockup row / design-system card
+   for an activity event whose target has no per-node box (a mockup has no
+   nodes; a component/pattern's own render is out of this ticket's scope —
+   see activity.js's module doc). Same read/write colors as the node/screen
+   highlight, applied as a left border + faint wash instead of an outline. */
+.activity-cue-read,
+.activity-cue-write {
+  transition: none;
+}
+
+.activity-cue-read {
+  border-left: 3px solid var(--color-activity-read) !important;
+  background: rgba(13, 148, 136, 0.08) !important;
+}
+
+.activity-cue-write {
+  border-left: 3px solid var(--color-activity-write) !important;
+  background: rgba(124, 58, 237, 0.08) !important;
 }
 
 /* Elements inspector panel */

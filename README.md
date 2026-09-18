@@ -205,6 +205,7 @@ Served at `http://127.0.0.1:<port>` once the daemon is running — plain ES modu
 - **Comment mode** — click an element to anchor a comment; appended to `comments.jsonl`, picked up by `list_comments` / answered via `reply_comment`
 - **Design System** — token swatches by bucket, every component with every variant rendered side by side
 - **Mockup view** — a mockup's variants rendered live, side by side in columns, each with its title and description
+- **Follow mode** — off by default; the topbar's Follow toggle (three states: off / Following / Follow paused) makes the preview track a live agent session's own MCP tool calls, switching the view/selection to whatever it touches and briefly outlining the affected nodes (solid teal for a read, dashed violet + wash for a write, or a dashed border + "Updated" badge around the whole screen after `write_html`). Every tool call also lands in the right panel's new Activity tab (last 50, in-memory, newest first) regardless of follow's own state; clicking an entry navigates there without pausing follow. Human navigation (a screen/tab click) or opening comment/inspect mode pauses it — only the toggle's own "Resume" un-pauses it
 - Live reload over SSE — any file change on disk shows up in the browser within ~200 ms
 
 ## Deterministic render baseline

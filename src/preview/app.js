@@ -26,7 +26,23 @@ import { renderTagNotes } from "./notes-panel.js";
 import { renderMockupView } from "./mockup-view.js";
 import { applyMockupZoom } from "./mockup-zoom.js";
 import { applyFlowMode } from "./flows.js";
-import { applyCommentMode, highlightSelection, openNodeIds, renderCommentsPanel, resolveSelectionAfterReload } from "./comments.js";
+import { applyCommentMode, highlightSelection, bareNodeId, openNodeIds, renderCommentsPanel, resolveSelectionAfterReload } from "./comments.js";
+import {
+  pushActivityEntry,
+  activityTargetExists,
+  activityIsNavigable,
+  resolveFollowNavigation,
+  feedClickPausesFollow,
+  highlightDurationMs,
+  highlightNodes,
+  highlightScreen,
+  renderActivityFeed,
+  renderFollowToggle,
+  nextFollowState,
+  followToggleClickAction,
+  FOLLOW_OFF,
+  WRITE_RERENDER_GRACE_MS,
+} from "./activity.js";
 import { renderDesignSystem } from "./design-system.js";
 import { setMarkdown } from "./markdown.js";
 import { connectEvents } from "./sse.js";
@@ -98,6 +114,17 @@ const boardClearPinsBtn = document.getElementById("board-clear-pins-btn");
 const boardPresentedBannerEl = document.getElementById("board-presented-banner");
 const boardPresentedTextEl = document.getElementById("board-presented-text");
 const boardPresentedDismissBtn = document.getElementById("board-presented-dismiss");
+const followToggleEl = document.getElementById("follow-toggle");
+const followToggleToggleEl = document.getElementById("follow-toggle-toggle");
+const followToggleResumeEl = document.getElementById("follow-toggle-resume");
+const followToggleLabelEl = document.getElementById("follow-toggle-label");
+const activityScreenHighlightEl = document.getElementById("activity-screen-highlight");
+const panelTabElementsEl = document.getElementById("panel-tab-elements");
+const panelTabActivityEl = document.getElementById("panel-tab-activity");
+const panelBodyElementsEl = document.getElementById("panel-body-elements");
+const panelBodyActivityEl = document.getElementById("panel-body-activity");
+const activityFeedListEl = document.getElementById("activity-feed-list");
+const activityFeedEmptyEl = document.getElementById("activity-feed-empty");
 const flowModeToggle = document.getElementById("flow-mode-toggle");
 const commentModeToggle = document.getElementById("comment-mode-toggle");
 const canvasControlsEl = document.getElementById("canvas-controls");
@@ -190,6 +217,38 @@ let zoom = "fit";
 // screen canvas, but each remembers its own level (see setZoom/isMockupZoomActive).
 /** @type {"fit" | number} */
 let mockupZoom = "fit";
+// CHR-628/CHR-629/CHR-630/CHR-631, ADR-005 — follow mode. `followState`
+// itself is off/following/paused (see activity.js's nextFollowState);
+// `activityFeed` is the last ACTIVITY_FEED_LIMIT tool calls, newest first,
+// in-memory only — cleared on reload and on every project switch, never
+// persisted. Only `followState.enabled` is a per-browser preference
+// (readBoolPref below); `paused` always starts false on boot/project
+// switch — there's nothing pending to have paused for yet.
+let followState = FOLLOW_OFF;
+// The last `enabled` value actually written to localStorage (review fix 7)
+// — `null` up front so the very first renderFollowUI() call (boot, reading
+// the persisted pref back in) still writes once; every OTHER call only
+// writes when `enabled` actually changed, since renderFollowUI() runs on
+// every pauseFollow() (a sidebar/tab/mode click, an agent Board
+// presentation), none of which touch `enabled` at all.
+let persistedFollowEnabled = null;
+let activityFeed = [];
+let activityNodeHighlightCleanup = () => {}; // clears the current node-level read/write outline early (screen switch, a newer highlight superseding it)
+let activityScreenHighlightCleanup = () => {}; // same, for the whole-screen write-html highlight
+// A write's highlight waits for the re-render it caused (never landing on
+// the stale pre-write DOM) — this is what it's waiting on: the screen the
+// pending event targets, applied once that screen's `load` event fires, or
+// after WRITE_RERENDER_GRACE_MS as a fallback if the load never arrives.
+// See applyPendingActivityHighlight/scheduleActivityHighlight.
+let pendingActivityHighlight = null; // { screen: string, event: object } | null
+let activityHighlightGraceTimer = null;
+// Follow-mode navigation is coalesced to at most once per 300ms (ADR-005) —
+// a trailing throttle: within a burst, only the LAST event still navigates,
+// after the window closes, not every one of them.
+const ACTIVITY_NAVIGATE_THROTTLE_MS = 300;
+let lastActivityNavigateAt = 0;
+let throttledActivityEvent = null;
+let activityNavigateThrottleTimer = null;
 let boardBuilt = false; // built lazily on first activation, then kept in sync via SSE — see loadBoard()
 let activeProjectRoot = null; // the project root currently displayed; null while the empty state shows
 let eventSource; // current /events connection — closed and reopened with a fresh ?project= on every switch
@@ -509,6 +568,29 @@ function resetProjectState() {
   currentMockup = null;
   mockupViewEl.innerHTML = "";
   mockupRequestId++; // discards any in-flight render from the project we just left — see loadCurrentMockup
+  // CHR-631 — the activity feed is in-memory only, per the design spec
+  // ("cleared on reload and on project switch"); `enabled` is the one bit
+  // that IS a per-browser preference and survives (see the module doc on
+  // followState), so only `paused` resets here — nothing is pending a
+  // resume for in the project we're leaving.
+  activityFeed = [];
+  renderActivityFeedPanel();
+  clearActivityHighlights();
+  mockupCueCleanup();
+  mockupCueCleanup = () => {};
+  designSystemCueCleanup();
+  designSystemCueCleanup = () => {};
+  pendingActivityHighlight = null;
+  clearTimeout(activityHighlightGraceTimer);
+  // review fix 1 — a navigate already queued in the OLD project's throttle
+  // window must not fire against the new one once it switches in: its
+  // target screen may not even exist here, and selectScreen has no reason
+  // to expect a name from a project it never asked about.
+  clearTimeout(activityNavigateThrottleTimer);
+  activityNavigateThrottleTimer = null;
+  throttledActivityEvent = null;
+  followState = { enabled: followState.enabled, paused: false };
+  renderFollowUI();
   applyMainVisibility();
 }
 
@@ -750,11 +832,10 @@ async function handleLifecycleEvent(event) {
  * own echoed write, or another tab/browser) only re-renders the filter/pins
  * as usual — no tab switch, no banner.
  *
- * CHR-631 (follow mode) is unshipped and not implemented here — this branch
- * (`setView("board")`) is the one place an agent presentation would need to
- * win over a follow-mode jump if the two ever raced; that's the hook, left
- * as small as the current code allows since there's nothing on the other
- * side of it yet to coordinate with.
+ * CHR-631 (follow mode) — pause precedence rule 2 (ADR-005): an explicit
+ * agent presentation on the Board wins over follow, so a `source: "agent"`
+ * event pauses follow the same way any other human-navigation trigger does,
+ * before `setView("board")` runs.
  */
 function handleBoardStateEvent(event) {
   if (event.source === "agent") {
@@ -766,12 +847,337 @@ function handleBoardStateEvent(event) {
     // later and silently discarding the agent's own filter (see the
     // screenFilterInput "input" listener below).
     clearTimeout(boardFilterWriteTimer);
+    pauseFollow();
     applyBoardState(event.filter, event.pinned, true);
     setView("board"); // also persists "board" as the last-viewed tab (artisign.view) — same side effect a manual tab click has, just triggered by the agent instead
     showAgentPresentedBanner();
   } else {
     applyBoardState(event.filter, event.pinned);
   }
+}
+
+// --- CHR-628/CHR-629/CHR-630/CHR-631, ADR-005 — follow mode -----------------
+
+/** Re-renders the follow toggle from the current `followState`, and persists its `enabled` bit (never `paused`, which is session-local — see the module-level doc comment) only when it actually changed (review fix 7) — this runs on every pauseFollow() call, most of which are a sidebar/tab/mode click that never touches `enabled` at all. */
+function renderFollowUI() {
+  renderFollowToggle(followToggleEl, followToggleToggleEl, followToggleLabelEl, followState);
+  if (followState.enabled !== persistedFollowEnabled) {
+    writeBoolPref(prefsStorage, "artisign.followEnabled", followState.enabled);
+    persistedFollowEnabled = followState.enabled;
+  }
+}
+
+/**
+ * Pause precedence rule 1/2 (ADR-005) — a no-op unless follow is currently
+ * enabled and not already paused, so every trigger (human screen/tab
+ * selection, entering comment/inspect mode, an agent Board presentation)
+ * can call this unconditionally.
+ */
+function pauseFollow() {
+  followState = nextFollowState(followState, "pause");
+  renderFollowUI();
+}
+
+/** Applies a follow-toggle action (see followToggleClickAction) — shared by the toggle button and the separate Resume button (review fix 4: two sibling buttons, not one button with "Resume" nested inside it — see index.html's own comment on why). */
+function applyFollowToggleAction(action) {
+  const wasOff = !followState.enabled;
+  followState = nextFollowState(followState, action);
+  renderFollowUI();
+  // Turning follow on, or resuming it, jumps to the agent's latest known
+  // target right away — same "re-arms and jumps" wording as $follow-toggle's
+  // own usage note for Resume; applied to the initial "off -> on" turn-on
+  // too, for the same reason (there's no point following blind when the
+  // feed already has a target waiting).
+  if (action === "resume" || (action === "toggle-on" && wasOff)) jumpToLatestActivity();
+}
+
+followToggleToggleEl.addEventListener("click", () => applyFollowToggleAction(followToggleClickAction(followState, false)));
+followToggleResumeEl.addEventListener("click", () => applyFollowToggleAction(followToggleClickAction(followState, true)));
+
+/** Finds the most recent feed entry with a live, navigable target and jumps to it — used when follow is turned on or resumed. A no-op if the feed has nothing navigable yet. */
+function jumpToLatestActivity() {
+  const lists = currentActivityLists();
+  // activityIsNavigable, not the bare activityNavigationTarget (review fix
+  // 3) — the last write in the feed can be a `delete_entity` (or any other
+  // write) whose own target no longer exists; jumping to it would show an
+  // error render instead of the agent's actual latest live target.
+  const latest = activityFeed.find((event) => event.ok && activityIsNavigable(event, lists));
+  if (latest) navigateToActivity(latest);
+}
+
+panelTabElementsEl.addEventListener("click", () => setRightPanelTab("elements"));
+panelTabActivityEl.addEventListener("click", () => setRightPanelTab("activity"));
+
+/** Switches the right panel between the Elements list and the new Activity feed ($panel-tabs) — a plain client-side split, not persisted (the feed itself resets on reload anyway). */
+function setRightPanelTab(tab) {
+  panelTabElementsEl.setAttribute("aria-pressed", String(tab === "elements"));
+  panelTabActivityEl.setAttribute("aria-pressed", String(tab === "activity"));
+  panelBodyElementsEl.hidden = tab !== "elements";
+  panelBodyActivityEl.hidden = tab !== "activity";
+  // review fix 4 — the collapse button's label named a fixed "Elements
+  // panel" from before this panel could show two different tabs; keep it
+  // naming whichever one is actually active instead of going stale the
+  // moment Activity is selected.
+  inspectorCollapseBtn.setAttribute("aria-label", `Collapse ${tab === "elements" ? "Elements" : "Activity"} panel`);
+}
+
+/** The `{ screenNames, mockupNames }` shape activityTargetExists/activityIsNavigable both take — read fresh at call time, never cached, since `screens`/`mockups` change under it. */
+function currentActivityLists() {
+  return { screenNames: screens.map((s) => s.name), mockupNames: mockups.map((m) => m.name) };
+}
+
+/** Re-renders the activity feed from the current `activityFeed` + the live screens/mockups lists (a target's existence can change independently of the feed itself — see activityTargetExists). */
+function renderActivityFeedPanel() {
+  renderActivityFeed(activityFeedListEl, activityFeedEmptyEl, activityFeed, {
+    exists: (event) => activityTargetExists(event, currentActivityLists()),
+    onSelect: handleActivityFeedSelect,
+  });
+}
+
+/** A feed row's click always navigates, regardless of follow's own on/off/paused state — feedClickPausesFollow is always false (ADR-005 amendment, decided by Christian on 2026-09-18: the human is browsing the agent's own history, not designing something themselves, so the next live navigating call still pulls the view back to the agent's current target), kept as an explicit call rather than simply never calling pauseFollow here — see review fix 8. */
+function handleActivityFeedSelect(event) {
+  if (feedClickPausesFollow()) pauseFollow();
+  navigateToActivity(event);
+}
+
+/**
+ * One per MCP tool call (src/mcp/activity.ts), regardless of follow's own
+ * state — the feed fills even while follow is off/paused; only navigation
+ * is gated on actually following (throttledActivityNavigate).
+ * @param {object} event
+ */
+function handleActivityEvent(event) {
+  activityFeed = pushActivityEntry(activityFeed, event);
+  renderActivityFeedPanel();
+  // A failed call never navigates or highlights — by design, not an
+  // oversight (ADR-005: "never navigate or highlight — there is nothing
+  // confirmed to point at").
+  if (!event.ok) return;
+  throttledActivityNavigate(event);
+}
+
+/**
+ * Trailing 300ms throttle on follow-mode navigation (ADR-005) — within a
+ * burst, only the LAST event still navigates, once the window closes.
+ *
+ * Calls `resolveFollowNavigation` (activity.js) at BOTH decision points —
+ * the immediate-elapsed branch and the delayed timer-fire branch — instead
+ * of re-deriving "is follow even on right now" itself at either one
+ * (review fix 1/8): every one of review round 1's three bugs came from
+ * exactly that kind of scattered, untested re-derivation. Whatever pauses
+ * or turns off follow during the open window (a human sidebar click, an
+ * agent Board presentation via handleBoardStateEvent's own pauseFollow
+ * call) is picked up by the SAME check the timer-fire branch runs, not a
+ * separate one that could drift from it.
+ *
+ * `lastActivityNavigateAt` only advances on an ACTUAL navigate, in either
+ * branch — never merely because a check ran — so a burst that never
+ * results in a navigate (follow off/paused the whole time) never
+ * artificially throttles a later one once follow turns back on.
+ */
+function throttledActivityNavigate(event) {
+  const now = Date.now();
+  const elapsed = now - lastActivityNavigateAt;
+  if (elapsed >= ACTIVITY_NAVIGATE_THROTTLE_MS) {
+    if (resolveFollowNavigation(event, followState, currentActivityLists())) {
+      lastActivityNavigateAt = now;
+      navigateToActivity(event);
+    }
+    return;
+  }
+  throttledActivityEvent = event;
+  if (activityNavigateThrottleTimer) return;
+  activityNavigateThrottleTimer = setTimeout(() => {
+    activityNavigateThrottleTimer = null;
+    const pending = throttledActivityEvent;
+    throttledActivityEvent = null;
+    if (pending && resolveFollowNavigation(pending, followState, currentActivityLists())) {
+      lastActivityNavigateAt = Date.now();
+      navigateToActivity(pending);
+    }
+  }, ACTIVITY_NAVIGATE_THROTTLE_MS - elapsed);
+}
+
+/**
+ * Navigates to (and schedules a highlight for) an activity event's target —
+ * shared by live follow (handleActivityEvent, gated on actually following)
+ * and a feed click (handleActivityFeedSelect, unconditional). Uses
+ * activityIsNavigable, not the bare activityNavigationTarget (review fix
+ * 2) — a write whose own target has already vanished by the time this
+ * fires (`delete_entity`, most notably) must not jump to an error render.
+ * A broad read, a component/pattern target, or a vanished target all fall
+ * through to the same `!target` branch below — a component/pattern still
+ * gets a best-effort cue in the Design System view instead of a silent
+ * no-op; the other two are silent no-ops, correctly.
+ * @param {object} event
+ */
+async function navigateToActivity(event) {
+  const target = activityIsNavigable(event, currentActivityLists());
+  if (!target) {
+    if (event.target?.kind === "component" || event.target?.kind === "pattern") {
+      setView("design-system");
+      await loadDesignSystem(); // setView's own fire-and-forget call already kicked this off too — cueDesignSystemEntry needs the render to actually have landed before it can find the card, so it awaits its own call rather than racing that one
+      cueDesignSystemEntry(event.target, event.kind);
+    }
+    return;
+  }
+  if (target.kind === "mockup") {
+    selectMockup(target.name); // navigation-only, per the design spec — a mockup has no nodes to box
+    cueMockupSidebarEntry(target.name, event.kind);
+    return;
+  }
+  // selectScreen clears any still-pending highlight for the screen it's
+  // leaving (clearActivityHighlights) — schedule THIS highlight only after
+  // that call returns, so its own clear can't wipe what we just asked for.
+  if (currentScreen !== target.name) {
+    selectScreen(target.name); // the resulting `load` event applies the pending highlight — see applyPendingActivityHighlight
+    scheduleActivityHighlight(target.name, event);
+  } else if (event.kind === "write") {
+    // Already showing the target screen — the write itself is already on
+    // disk (the daemon only broadcasts `activity` after the tool handler
+    // returns), but THIS document was rendered before it landed. Force a
+    // fresh render rather than hoping the `change` SSE event's own
+    // loadCurrentScreen() call wins the race against this one — see
+    // scheduleActivityHighlight's own comment on why the highlight itself
+    // still waits for the resulting `load` event (or the grace timer).
+    scheduleActivityHighlight(target.name, event);
+    loadCurrentScreen();
+  } else {
+    scheduleActivityHighlight(target.name, event);
+    applyPendingActivityHighlight(); // a read on the already-current screen — nothing to reload, apply now
+  }
+}
+
+/**
+ * Records which screen/event a highlight is waiting for. A write always
+ * gets a WRITE_RERENDER_GRACE_MS fallback timer — the write's own re-render
+ * normally arrives well within that (loadCurrentScreen resolves and its
+ * `load` event fires), but if it somehow doesn't (a slow/failed fetch),
+ * the highlight still lands rather than silently never appearing. A read
+ * needing navigation has no such fallback: selectScreen's own fetch always
+ * completes and fires `load`, so there's nothing to fall back from.
+ * @param {string} screenName
+ * @param {object} event
+ */
+function scheduleActivityHighlight(screenName, event) {
+  clearTimeout(activityHighlightGraceTimer);
+  pendingActivityHighlight = { screen: screenName, event, appliedAt: null };
+  if (event.kind === "write") {
+    activityHighlightGraceTimer = setTimeout(applyPendingActivityHighlight, WRITE_RERENDER_GRACE_MS);
+  }
+}
+
+/**
+ * Applies the pending highlight (see scheduleActivityHighlight) if one is
+ * still waiting AND still targets the currently displayed screen — a later
+ * switch/event moving on in the meantime makes this a no-op, never a
+ * highlight landing on the wrong (or stale) document. Called from the
+ * iframe's `load` handler and, for a same-screen read, immediately.
+ *
+ * Deliberately does NOT clear `pendingActivityHighlight` on a normal apply
+ * (only on expiry, or a screen switch elsewhere) — the SSE `change` event
+ * for the very write that scheduled this highlight often triggers ITS OWN
+ * redundant reload a moment after ours (handleChangeEvent's own
+ * loadCurrentScreen, once `event.name === currentScreen`), which replaces
+ * the iframe document wholesale and would otherwise wipe an already-applied
+ * highlight with nothing left to reapply it. Re-running the same
+ * highlightNodes/highlightScreen call on every such `load` (restarting its
+ * own timer) keeps it visible through that; letting it restart rather than
+ * counting down exactly is an acceptable approximation for something
+ * described as "brief" rather than precisely timed.
+ */
+function applyPendingActivityHighlight() {
+  clearTimeout(activityHighlightGraceTimer);
+  const pending = pendingActivityHighlight;
+  if (!pending || pending.screen !== currentScreen) return;
+  if (pending.appliedAt !== null && Date.now() - pending.appliedAt >= highlightDurationMs(pending.event.kind)) {
+    pendingActivityHighlight = null; // already fully faded — nothing left for a later redundant reload to reapply
+    return;
+  }
+  const doc = getRenderedDocForScreen(currentScreen);
+  if (!doc) return;
+  activityNodeHighlightCleanup();
+  activityScreenHighlightCleanup();
+  pending.appliedAt = Date.now();
+  if (pending.event.tool === "write_html") {
+    activityScreenHighlightCleanup = highlightScreen(activityScreenHighlightEl, "write");
+    return;
+  }
+  const bareIds = pending.event.nodes.map((ref) => bareNodeId(ref)).filter((id) => doc.getElementById(id));
+  if (bareIds.length === 0) {
+    // No specific node (get_screen/get_mockup, or nothing resolved) — the
+    // whole-screen overlay, not an outline on the iframe's own root
+    // element, which would sit exactly on the iframe's edge and get
+    // clipped by its nested browsing context (see highlightScreen's doc).
+    activityScreenHighlightCleanup = highlightScreen(activityScreenHighlightEl, pending.event.kind);
+  } else {
+    activityNodeHighlightCleanup = highlightNodes(doc, bareIds, pending.event.kind);
+  }
+}
+
+/** Clears both highlight kinds early — used on a screen/mockup switch and on project reset, so an old highlight never lingers over a document it no longer describes. */
+function clearActivityHighlights() {
+  activityNodeHighlightCleanup();
+  activityNodeHighlightCleanup = () => {};
+  activityScreenHighlightCleanup();
+  activityScreenHighlightCleanup = () => {};
+}
+
+// Cancel handles for the two sidebar/design-system "cue" flashes below
+// (review fix 7) — same pattern as activityNodeHighlightCleanup/
+// activityScreenHighlightCleanup: a bare setTimeout with no handle means a
+// SECOND cue on the same element cuts the first one's timer short (both
+// add/remove the identical class, so the earlier timer's removal fires
+// while the later cue still wants it showing) or, after a refreshSidebar/
+// loadDesignSystem rebuild, keeps a reference to an element already
+// detached from the DOM. Clearing the previous one before starting a new
+// one fixes both — the class add is always paired with the matching timer
+// that will eventually remove it, never an orphaned one from a prior call.
+let mockupCueCleanup = () => {};
+let designSystemCueCleanup = () => {};
+
+/** Transient left-border cue on a mockup's sidebar row (CHR-631) — a mockup target gets navigation-only otherwise, since it has no nodes for the node-box highlight. */
+function cueMockupSidebarEntry(name, kind) {
+  mockupCueCleanup();
+  mockupCueCleanup = () => {};
+  const button = [...mockupListEl.querySelectorAll(".mockup-item")].find((el) => el.dataset.mockupName === name);
+  if (!button) return;
+  const cls = kind === "write" ? "activity-cue-write" : "activity-cue-read";
+  button.classList.add(cls);
+  const timer = setTimeout(() => button.classList.remove(cls), highlightDurationMs(kind));
+  mockupCueCleanup = () => {
+    clearTimeout(timer);
+    button.classList.remove(cls);
+  };
+}
+
+/**
+ * Best-effort Design System cue for a component/pattern activity target
+ * (CHR-631) — scrolls to and briefly cues the whole component/pattern
+ * card (or, when a variant is named, that one variant cell), rather than
+ * the exact per-node outline inside its standalone-variant render: this
+ * project's design-system view renders each variant in its own separate
+ * iframe with no addressable node-highlight surface today, so a card-level
+ * cue is what's actually feasible here — see the module's own follow-up
+ * note for the full per-node treatment the design spec describes.
+ * @param {{ name: string, variant?: string }} target
+ * @param {"read" | "write"} kind
+ */
+function cueDesignSystemEntry(target, kind) {
+  designSystemCueCleanup();
+  designSystemCueCleanup = () => {};
+  const block = [...designSystemViewEl.querySelectorAll(".ds-component")].find((el) => el.dataset.componentName === target.name);
+  if (!block) return;
+  const cell = target.variant ? [...block.querySelectorAll(".ds-variant-cell")].find((el) => el.dataset.variantName === target.variant) : null;
+  const cueEl = cell ?? block;
+  cueEl.scrollIntoView({ block: "center", behavior: "smooth" });
+  const cls = kind === "write" ? "activity-cue-write" : "activity-cue-read";
+  cueEl.classList.add(cls);
+  const timer = setTimeout(() => cueEl.classList.remove(cls), highlightDurationMs(kind));
+  designSystemCueCleanup = () => {
+    clearTimeout(timer);
+    cueEl.classList.remove(cls);
+  };
 }
 
 function reconnectSse(project) {
@@ -781,6 +1187,7 @@ function reconnectSse(project) {
     onChange: handleChangeEvent,
     onLifecycle: handleLifecycleEvent,
     onBoardState: handleBoardStateEvent,
+    onActivity: handleActivityEvent,
     onOpen: (isReconnect) => {
       connectionStatus.classList.remove("disconnected");
       // The SSE gap while disconnected is invisible to us — EventSource only
@@ -803,19 +1210,32 @@ let commentsRequestId = 0;
 let inspectorRequestId = 0;
 let mockupRequestId = 0;
 
+/** Pause precedence rule 1 (ADR-005) — a manual sidebar screen pick is human navigation, so it pauses follow before selecting, unlike navigateToActivity's own (unwrapped) calls to selectScreen. */
+function selectScreenHuman(screen) {
+  pauseFollow();
+  return selectScreen(screen);
+}
+
+/** Same as selectScreenHuman, for a manual sidebar mockup pick. */
+function selectMockupHuman(name) {
+  pauseFollow();
+  return selectMockup(name);
+}
+
 /** Re-renders the screen list and the mockup list (both filtered by the same sidebar search), plus everything in the sidebar derived from them/the current selection, plus the board toolbar's status text/Clear pins (CHR-624 — cheap and pure, so it's simplest to always keep in sync here rather than gate it on the Board tab actually showing). */
 function refreshSidebar() {
-  renderScreenList(screenListEl, screens, currentScreen, selectScreen, screenFilter, {
+  renderScreenList(screenListEl, screens, currentScreen, selectScreenHuman, screenFilter, {
     pinned: new Set(pinnedScreens),
     onTogglePin: toggleScreenPin,
   });
   const filteredMockups = filterMockups(mockups, screenFilter);
-  renderMockupList(mockupListEl, filteredMockups, { activeName: currentMockup, onSelect: selectMockup });
+  renderMockupList(mockupListEl, filteredMockups, { activeName: currentMockup, onSelect: selectMockupHuman });
   mockupSectionEl.hidden = filteredMockups.length === 0;
   const filteredScreenCount = filterScreens(screens, screenFilter).length;
   screenFilterHint.textContent = `${filteredScreenCount} screen${filteredScreenCount === 1 ? "" : "s"} · ${filteredMockups.length} mockup${filteredMockups.length === 1 ? "" : "s"} · matches name and tags`;
   updateNotesPanel();
   renderBoardStatus();
+  renderActivityFeedPanel(); // CHR-631 — a screen/mockup's deletion can flip a feed row to the inert "deleted" look; recompute alongside everything else refreshSidebar already keeps in sync
 }
 
 function updateNotesPanel() {
@@ -877,6 +1297,9 @@ async function selectScreen(screen) {
   // reload (see resolveSelectionAfterReload); an actual screen switch has to
   // clear it up front instead.
   clearSelection();
+  clearActivityHighlights(); // CHR-631 — an old highlight must never linger over a screen it no longer describes; navigateToActivity schedules THIS screen's own highlight only after this call returns (see its own comment)
+  pendingActivityHighlight = null;
+  clearTimeout(activityHighlightGraceTimer);
   currentScreen = screen;
   currentMockup = null; // screens and mockups are never selected at the same time
   if (activeProjectRoot) writeStringPref(prefsStorage, lastScreenKey(activeProjectRoot), screen);
@@ -895,6 +1318,9 @@ async function selectScreen(screen) {
 async function selectMockup(name) {
   setMode(activeMode); // passing the CURRENT mode always resolves to "none" — see setMode
   clearInspectFocus();
+  clearActivityHighlights(); // CHR-631 — no screen highlight applies to the mockup view
+  pendingActivityHighlight = null;
+  clearTimeout(activityHighlightGraceTimer);
   currentScreen = null;
   currentMockup = name;
   if (activeProjectRoot) writeStringPref(prefsStorage, lastScreenKey(activeProjectRoot), `mockup:${name}`);
@@ -1030,7 +1456,7 @@ function applyActiveMode() {
   if (!doc) {
     modeCleanup = () => {};
   } else if (activeMode === "flow") {
-    modeCleanup = applyFlowMode(doc, true, selectScreen);
+    modeCleanup = applyFlowMode(doc, true, selectScreenHuman); // a flow click-through is human navigation too (ADR-005 pause rule 1)
   } else if (activeMode === "comment") {
     modeCleanup = applyCommentMode(doc, true, openNodeIds(comments), selectCommentTarget);
   } else if (activeMode === "inspect") {
@@ -1107,6 +1533,12 @@ setupSidePanel(inspectorEl, inspectorCollapseBtn, "artisign.inspector.collapsed"
 zoom = parseZoomPref(readStringPref(prefsStorage, "artisign.zoom", null), zoom);
 mockupZoom = parseZoomPref(readStringPref(prefsStorage, "artisign.mockupZoom", null), mockupZoom);
 syncZoomButtons(zoom);
+
+// CHR-631 — follow's `enabled` bit is the one per-browser preference here
+// (off by default); `paused` never persists — see the module-level doc.
+followState = { enabled: readBoolPref(prefsStorage, "artisign.followEnabled", false), paused: false };
+renderFollowUI();
+renderActivityFeedPanel(); // shows the empty state before boot() ever loads a project
 updateCanvas();
 
 screenFrame.addEventListener("load", () => {
@@ -1135,6 +1567,7 @@ screenFrame.addEventListener("load", () => {
   iframeRenderedScreen = pendingRenderScreen;
   inspectorPanel.refreshExpanded(); // re-reads computed values for whatever's still expanded against the fresh document
   syncInspectOverlay(); // repositions the overlay if something's still focused on this same screen, hides it otherwise
+  applyPendingActivityHighlight(); // CHR-631 — the re-render a pending write/navigate highlight was waiting for has now landed
   applyActiveMode();
   // Restoring the selection AFTER applyActiveMode matters when the selected
   // node also anchors an open thread marker: applyCommentMode must capture
@@ -1209,6 +1642,8 @@ function setMode(next) {
   const resulting = activeMode === next ? "none" : next;
   if (activeMode === "comment" && resulting !== "comment") clearSelection();
   if (activeMode === "inspect" && resulting !== "inspect") clearInspectFocus();
+  // ADR-005 pause rule 1 — an open comment or inspect mode pauses follow.
+  if (resulting === "comment" || resulting === "inspect") pauseFollow();
   activeMode = resulting;
   flowModeToggle.setAttribute("aria-pressed", String(activeMode === "flow"));
   commentModeToggle.setAttribute("aria-pressed", String(activeMode === "comment"));
@@ -1365,7 +1800,10 @@ function setView(view) {
 }
 
 for (const tab of viewTabs) {
-  tab.addEventListener("click", () => setView(tab.dataset.view));
+  tab.addEventListener("click", () => {
+    pauseFollow(); // ADR-005 pause rule 1 — a manual tab switch is human navigation, unlike handleBoardStateEvent's own agent-triggered setView("board")
+    setView(tab.dataset.view);
+  });
 }
 
 /**

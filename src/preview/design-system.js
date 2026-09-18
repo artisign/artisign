@@ -71,6 +71,10 @@ function renderVariantCell(variant) {
   label.textContent = variant.name;
   cell.appendChild(label);
 
+  // CHR-631 — lets follow mode locate and cue this cell for a component/
+  // pattern activity target (see activity.js's cueDesignSystemEntry).
+  cell.dataset.variantName = variant.name;
+
   const iframe = createFittingIframe();
   iframe.srcdoc = variant.rendered_html;
   cell.appendChild(iframe);
@@ -221,6 +225,9 @@ function renderDefinitionSection(heading, definitions) {
   for (const def of defs) {
     const block = document.createElement("div");
     block.className = "ds-component";
+    // CHR-631 — lets follow mode locate and cue this component/pattern's
+    // block for a component/pattern activity target.
+    block.dataset.componentName = def.name;
 
     const name = document.createElement("h3");
     name.textContent = def.name;

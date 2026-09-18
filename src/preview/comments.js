@@ -22,7 +22,7 @@ const COMMENT_MARKER_STYLE = "outline: 2px dashed #d97706; outline-offset: 1px; 
  * @param {string | null} nodeId
  * @returns {string | null}
  */
-function bareNodeId(nodeId) {
+export function bareNodeId(nodeId) {
   if (nodeId === null) return null;
   const dot = nodeId.indexOf(".");
   return dot === -1 ? nodeId : nodeId.slice(dot + 1);
@@ -120,20 +120,24 @@ export function resolveSelectionAfterReload({ selectedNode, selectionScreen, rel
 }
 
 /**
- * Highlights the currently selected comment target (the element the
- * compose form will post to) so the human can see what they're commenting
- * on. Returns a cleanup that restores the element's original style.
+ * Highlights an element by capturing its current inline style and appending
+ * an outline style on top, returning a cleanup that restores the original.
+ * Used for the currently selected comment target (the element the compose
+ * form will post to) with the default style; CHR-631's follow-mode activity
+ * highlight reuses this same mechanism with its own read/write styles
+ * instead of a third from-scratch implementation.
  *
  * @param {Document} doc
  * @param {string | null} nodeId — null highlights the screen root
+ * @param {string} [style] — defaults to the comment-selection outline
  * @returns {() => void}
  */
-export function highlightSelection(doc, nodeId) {
+export function highlightSelection(doc, nodeId, style = COMMENT_SELECTED_STYLE) {
   const root = doc.body.firstElementChild;
   const el = nodeId === null ? root : doc.getElementById(nodeId);
   if (!el) return () => {};
   const original = el.getAttribute("style");
-  el.setAttribute("style", original ? `${original}; ${COMMENT_SELECTED_STYLE}` : COMMENT_SELECTED_STYLE);
+  el.setAttribute("style", original ? `${original}; ${style}` : style);
   return () => {
     if (original === null) el.removeAttribute("style");
     else el.setAttribute("style", original);

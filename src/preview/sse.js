@@ -18,6 +18,11 @@
  *     // "agent" (CHR-625's tab-switch/banner, not this ticket) from "human" — always re-render
  *     // from the event regardless of which; there's no cheaper way to tell "another tab" apart
  *     // from "this one, echoed back", and trying to suppress the echo isn't worth the complexity.
+ *   onActivity?: (event: { type: "activity", tool: string, kind: "read" | "write", target: object | null, nodes: string[], ok: boolean, at: number }) => void,
+ *     // CHR-630/CHR-631/ADR-005 — one per MCP tool call (src/mcp/activity.ts), regardless of
+ *     // follow mode's own on/off/paused state — the activity feed fills even while follow is
+ *     // off; only navigation/highlighting is gated on follow state, and that gating lives in
+ *     // the caller (app.js), not here.
  *   onOpen?: (isReconnect: boolean) => void, // fires on every successful (re)connect;
  *     `isReconnect` is false for the very first connect and true for every one after a drop, so
  *     the caller can resync state it may have missed while disconnected (EventSource itself only
@@ -26,7 +31,7 @@
  * }} options
  * @returns {EventSource}
  */
-export function connectEvents({ project, onChange, onLifecycle, onBoardState, onOpen, onDisconnect }) {
+export function connectEvents({ project, onChange, onLifecycle, onBoardState, onActivity, onOpen, onDisconnect }) {
   const url = project ? `/events?project=${encodeURIComponent(project)}` : "/events";
   const source = new EventSource(url);
   let hasOpenedBefore = false;
@@ -42,6 +47,7 @@ export function connectEvents({ project, onChange, onLifecycle, onBoardState, on
       const parsed = JSON.parse(evt.data);
       if (parsed.type === "change") onChange(parsed);
       else if (parsed.type === "board_state") onBoardState?.(parsed);
+      else if (parsed.type === "activity") onActivity?.(parsed);
       else if (
         parsed.type === "project-switched" ||
         parsed.type === "project-opened" ||

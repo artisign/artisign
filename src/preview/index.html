@@ -35,6 +35,21 @@
           <button type="button" class="view-tab" data-view="design-system" aria-pressed="false">Design System</button>
           <button type="button" class="view-tab" data-view="board" aria-pressed="false">Board</button>
         </nav>
+        <!-- CHR-628/CHR-629/CHR-631: one always-present follow-mode toggle, not a fork per
+             tab/state — see the `$follow-toggle` component's usage note. data-state (off/
+             following/paused) drives the look; the divider + "Resume" button only show
+             while paused (style.css). Two sibling buttons, not one button with the "Resume"
+             affordance nested inside it (review fix 4) — a button can't contain another
+             interactive descendant, and a keyboard activation's own event.target is the
+             outer button either way, never a nested span. -->
+        <span id="follow-toggle" class="follow-toggle" data-state="off">
+          <button type="button" id="follow-toggle-toggle" class="follow-toggle-toggle" aria-pressed="false">
+            <span id="follow-toggle-dot" class="follow-toggle-dot" aria-hidden="true"></span>
+            <span id="follow-toggle-label" class="follow-toggle-label">Follow</span>
+          </button>
+          <span id="follow-toggle-divider" class="follow-toggle-divider" aria-hidden="true"></span>
+          <button type="button" id="follow-toggle-resume" class="follow-toggle-resume">Resume</button>
+        </span>
         <button type="button" id="flow-mode-toggle" class="toggle-button" aria-pressed="false">Flow mode</button>
         <button type="button" id="comment-mode-toggle" class="toggle-button" aria-pressed="false">Comment mode</button>
         <button
@@ -145,6 +160,18 @@
                   #screen-holder carries the zoom transform both share.
                 -->
                 <div id="inspect-overlay" hidden></div>
+                <!--
+                  CHR-631 — the whole-screen follow-mode write highlight, shown
+                  after a write_html on the currently displayed screen. Same
+                  layering rationale as #inspect-overlay, but sized with a
+                  plain `inset: 0` (style.css) instead of a copied bounding
+                  rect: unlike a single node's box, this always exactly
+                  matches #screen-frame, since the iframe already fills
+                  #screen-holder.
+                -->
+                <div id="activity-screen-highlight" hidden>
+                  <span id="activity-screen-highlight-badge">Updated</span>
+                </div>
               </div>
             </div>
             <p id="empty-state" hidden>No screens yet.</p>
@@ -231,16 +258,31 @@
         </main>
         <aside id="inspector" class="side-panel side-panel-right" data-collapsed="false">
           <div class="side-panel-header">
-            <span class="side-panel-title">Elements</span>
+            <!-- CHR-631: $panel-tabs — Elements is the default active tab; Activity is new.
+                 aria-pressed, not role="tablist"/"tab" (review fix 4): a real tabs pattern
+                 also needs aria-controls, role="tabpanel" on each body and arrow-key
+                 navigation, none of which this two-button toggle has — a half-implemented
+                 ARIA pattern reads worse to a screen reader than a plain toggle-button pair,
+                 the same convention .view-tab/.toggle-button already use elsewhere here. -->
+            <div id="panel-tabs" class="panel-tabs">
+              <button type="button" id="panel-tab-elements" class="panel-tab" aria-pressed="true">Elements</button>
+              <button type="button" id="panel-tab-activity" class="panel-tab" aria-pressed="false">Activity</button>
+            </div>
             <span class="side-panel-rail-icon" aria-hidden="true">☰</span>
             <button type="button" id="inspector-collapse" class="side-panel-collapse" aria-expanded="true" aria-label="Collapse Elements panel">
               <span class="side-panel-collapse-chevron" aria-hidden="true">▸</span>
             </button>
           </div>
           <div class="side-panel-body">
-            <ul id="inspector-list"></ul>
-            <p id="inspector-empty" hidden>No elements.</p>
-            <p id="inspector-error" hidden></p>
+            <div id="panel-body-elements">
+              <ul id="inspector-list"></ul>
+              <p id="inspector-empty" hidden>No elements.</p>
+              <p id="inspector-error" hidden></p>
+            </div>
+            <div id="panel-body-activity" hidden>
+              <ul id="activity-feed-list"></ul>
+              <p id="activity-feed-empty" hidden>No agent activity yet this session.</p>
+            </div>
           </div>
         </aside>
       </div>

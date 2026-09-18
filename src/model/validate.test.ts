@@ -155,4 +155,118 @@ describe("computeDriftWarnings", () => {
     const { doc } = parseScreen(html, "s", spacingRegistry);
     expect(computeDriftWarnings(doc, spacingTokens)).toEqual([]);
   });
+
+  // CHR-634: letter-spacing, width/height and shorthand values were missed.
+
+  it("matches letter-spacing against a dedicated tracking bucket (CHR-634)", () => {
+    const trackingRegistry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["tracking.wider"]),
+      tokenFlatNames: new Set(["wider"]),
+    };
+    const trackingTokens: TokensDocument = { tracking: { wider: "0.18em" } };
+    const html = `<div id="n1" style="letter-spacing: 0.18em"></div>`;
+    const { doc } = parseScreen(html, "s", trackingRegistry);
+    const warnings = computeDriftWarnings(doc, trackingTokens);
+    expect(warnings).toEqual([
+      {
+        kind: "drift",
+        message: 'inline value "0.18em" for "letter-spacing" matches token $tracking.wider',
+        nodeId: "n1",
+        suggestion: "$tracking.wider",
+      },
+    ]);
+  });
+
+  it("matches width against a size bucket (CHR-634)", () => {
+    const sizeRegistry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["size.tap"]),
+      tokenFlatNames: new Set(["tap"]),
+    };
+    const sizeTokens: TokensDocument = { size: { tap: "44px" } };
+    const html = `<div id="n1" style="width: 44px"></div>`;
+    const { doc } = parseScreen(html, "s", sizeRegistry);
+    const warnings = computeDriftWarnings(doc, sizeTokens);
+    expect(warnings).toEqual([
+      {
+        kind: "drift",
+        message: 'inline value "44px" for "width" matches token $size.tap',
+        nodeId: "n1",
+        suggestion: "$size.tap",
+      },
+    ]);
+  });
+
+  it("matches each part of a shorthand value independently (CHR-634)", () => {
+    const spacingRegistry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["spacing.clip-gap", "spacing.feed"]),
+      tokenFlatNames: new Set(["clip-gap", "feed"]),
+    };
+    const spacingTokens: TokensDocument = { spacing: { "clip-gap": "14px", feed: "20px" } };
+    const html = `<div id="n1" style="padding: 14px 20px"></div>`;
+    const { doc } = parseScreen(html, "s", spacingRegistry);
+    const warnings = computeDriftWarnings(doc, spacingTokens);
+    expect(warnings).toEqual([
+      {
+        kind: "drift",
+        message: 'inline value "14px 20px" for "padding" matches tokens $spacing.clip-gap $spacing.feed',
+        nodeId: "n1",
+        suggestion: "$spacing.clip-gap $spacing.feed",
+      },
+    ]);
+  });
+
+  it("still does not match width against a typography-only 11px token (CHR-495 regression guard)", () => {
+    const typographyRegistry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["typography.size-xxs"]),
+      tokenFlatNames: new Set(["size-xxs"]),
+    };
+    const typographyTokens: TokensDocument = { typography: { "size-xxs": "11px" } };
+    const html = `<div id="n1" style="width: 11px"></div>`;
+    const { doc } = parseScreen(html, "s", typographyRegistry);
+    expect(computeDriftWarnings(doc, typographyTokens)).toEqual([]);
+  });
+
+  it("only replaces the matching parts of a shorthand, leaving the rest literal (CHR-634)", () => {
+    const spacingRegistry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["spacing.clip-gap"]),
+      tokenFlatNames: new Set(["clip-gap"]),
+    };
+    const spacingTokens: TokensDocument = { spacing: { "clip-gap": "14px" } };
+    const html = `<div id="n1" style="padding: 14px 20px"></div>`;
+    const { doc } = parseScreen(html, "s", spacingRegistry);
+    const warnings = computeDriftWarnings(doc, spacingTokens);
+    expect(warnings).toEqual([
+      {
+        kind: "drift",
+        message: 'inline value "14px 20px" for "padding" matches tokens $spacing.clip-gap 20px',
+        nodeId: "n1",
+        suggestion: "$spacing.clip-gap 20px",
+      },
+    ]);
+  });
+
+  it("does not split a value inside a function call (calc/rgb/alpha) (CHR-634)", () => {
+    const radiusRegistry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["radius.pill"]),
+      tokenFlatNames: new Set(["pill"]),
+    };
+    const radiusTokens: TokensDocument = { radius: { pill: "calc(1px + 2px)" } };
+    const html = `<div id="n1" style="border-radius: calc(1px + 2px)"></div>`;
+    const { doc } = parseScreen(html, "s", radiusRegistry);
+    const warnings = computeDriftWarnings(doc, radiusTokens);
+    expect(warnings).toEqual([
+      {
+        kind: "drift",
+        message: 'inline value "calc(1px + 2px)" for "border-radius" matches token $radius.pill',
+        nodeId: "n1",
+        suggestion: "$radius.pill",
+      },
+    ]);
+  });
 });

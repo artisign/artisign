@@ -1717,6 +1717,50 @@ body {
   overflow: auto;
 }
 
+/* CHR-625 — pill banner over #board-surface, independent of #board-canvas's
+   zoom transform/scroll position, same rationale as #board-empty-state
+   below. z-index above #board-tiles (1) so it stays readable over a tile
+   scrolled underneath it. */
+#board-presented-banner {
+  position: absolute;
+  top: var(--space-lg);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  padding: var(--space-sm) var(--space-lg);
+  box-shadow: var(--shadow-menu);
+}
+
+#board-presented-banner[hidden] {
+  display: none;
+}
+
+#board-presented-icon,
+#board-presented-text {
+  color: var(--color-accent);
+  font-size: 0.85rem;
+}
+
+#board-presented-text {
+  font-weight: 600;
+}
+
+#board-presented-dismiss {
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0 0 0 var(--space-xs);
+  cursor: pointer;
+}
+
 /* CHR-624 — centered over #board-surface, independent of #board-canvas's
    zoom transform/scroll position (a "no tiles" message has no zoom level of
    its own). */

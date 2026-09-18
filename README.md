@@ -6,7 +6,7 @@ Local-first UX design tool for AI agents. Agents design through MCP, the human r
 
 One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
-**Status:** Beta (`0.11.0`) — CLI, store, parser/model, the 23-tool MCP surface, browser preview with live reload/flows/comments, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. Artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
+**Status:** Beta (`0.11.0`) — CLI, store, parser/model, the 24-tool MCP surface, browser preview with live reload/flows/comments, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. Artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
 
 ## Why
 
@@ -117,7 +117,7 @@ The daemon is **multi-project**: it runs permanently on `127.0.0.1:4711` and can
 
 Daemon-level state — that config plus the `daemon.lock` holding the running pid and port — lives in `~/.artisign`. Set `ARTISIGN_HOME` to move it somewhere else; that, together with `--port`, is what lets a second daemon run fully isolated from the first, which is worth doing before you try anything destructive against projects you care about.
 
-## The 23 tools
+## The 24 tools
 
 | Bucket | Tool | Does |
 |---|---|---|
@@ -136,6 +136,7 @@ Daemon-level state — that config plus the `daemon.lock` holding the running pi
 | Writes | `set_flow` | Mutate a flow edge in `flows.json` without touching any screen file. |
 | Writes | `set_meta` | Screen notes/tags, design-system idea/decisions, component/pattern usage, a tag's own notes — the handoff contract. |
 | Writes | `write_mockup` | Create or revise one variant of a mockup — raw HTML, outside the design system. |
+| Writes | `set_board_state` | Read or mutate the Board's shared filter and pinned screens — daemon memory only, not available over stdio. |
 | Lifecycle | `init_project` | Scaffold a project directory: empty, from HTML, or from a Stitch export URL. |
 | Lifecycle | `import_html` | Incremental HTML ingest into an existing project, with content-hash dedup. |
 | Lifecycle | `promote_to_system` | Lift an inline value or a repeated element into a token, component, or pattern. |
@@ -241,7 +242,7 @@ src/daemon/          daemon lifecycle — project registry, global config/lock (
 src/init/            project scaffolding (init) and artisign.json
 src/store/           Store interface, FsStore, watcher, atomic writes, git auto-commit
 src/model/           HTML parser, canonical ref model, index
-src/tools/           the 23 tools (reads, writes, lifecycle, comments, visual review)
+src/tools/           the 24 tools (reads, writes, lifecycle, comments, visual review)
 src/mcp/             MCP server — stdio + streamable HTTP
 src/http/            internal JSON API + SSE, consumed by the preview
 src/preview/         browser preview — plain ES modules, no build step

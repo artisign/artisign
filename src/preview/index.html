@@ -192,6 +192,21 @@
             -->
             <div id="board-surface">
               <!--
+                CHR-625/ADR-005 — shown when an agent's set_board_state call
+                (source "agent") switches the human here; see
+                handleBoardStateEvent in app.js. Positioned like
+                #board-empty-state below: overlays #board-surface directly,
+                outside #board-canvas's zoom-transform coordinate space, so it
+                stays put regardless of scroll/zoom — see the
+                `board-view-presented` design screen. Stays visible until
+                dismissed (no auto-dismiss timer).
+              -->
+              <div id="board-presented-banner" role="status" hidden>
+                <span id="board-presented-icon" aria-hidden="true">◆</span>
+                <span id="board-presented-text"></span>
+                <button type="button" id="board-presented-dismiss" aria-label="Dismiss agent presentation notice">✕</button>
+              </div>
+              <!--
                 CHR-624/ADR-005 — shown instead of the (empty) tile canvas
                 when filter matches ∪ pinned is empty: either the project has
                 no screens at all, or the filter matches nothing and nothing

@@ -95,6 +95,9 @@ const boardZoomReadoutEl = document.getElementById("board-zoom-readout");
 const boardEdgesToggleBtn = document.getElementById("board-edges-toggle");
 const boardToolbarStatusEl = document.getElementById("board-toolbar-status");
 const boardClearPinsBtn = document.getElementById("board-clear-pins-btn");
+const boardPresentedBannerEl = document.getElementById("board-presented-banner");
+const boardPresentedTextEl = document.getElementById("board-presented-text");
+const boardPresentedDismissBtn = document.getElementById("board-presented-dismiss");
 const flowModeToggle = document.getElementById("flow-mode-toggle");
 const commentModeToggle = document.getElementById("comment-mode-toggle");
 const canvasControlsEl = document.getElementById("canvas-controls");
@@ -283,6 +286,57 @@ boardClearPinsBtn.addEventListener("click", () => {
   if (activeProjectRoot) reportBoardStateFailure(setBoardState(activeProjectRoot, { pins: { op: "clear" } }));
 });
 
+// CHR-625/ADR-005 review fix — whether the "agent switched you here" banner
+// is currently up. The banner's own `hidden` attribute is derived DOM state;
+// this flag is the source of truth updateAgentPresentedBannerText() (called
+// from renderBoardStatus, on every board-state-relevant change) reads to
+// decide whether to keep re-deriving the banner's own count. A captured
+// count read once at presentation time can go stale: the agent's usual
+// sequence is `write_html` then `set_board_state`, two SSE messages in
+// quick succession, and handleChangeEvent's loadScreens() isn't serialised
+// against handleBoardStateEvent — the board_state event can fire against
+// the OLD `screens` array, then loadScreens() resolves and the board grows
+// a tile the banner's text never learns about. Re-deriving it the same way
+// the toolbar status text already does (same computeBoardVisibility call)
+// keeps the two in permanent agreement instead.
+let agentPresentationActive = false;
+
+/**
+ * CHR-625/ADR-005 — the "Agent switched you here" pill banner (see the
+ * `board-view-presented` design screen). Shown over the Board tab whenever a
+ * `board_state` SSE event's `source` is `"agent"`; stays up until the human
+ * dismisses it, no auto-dismiss timer, and a further agent presentation
+ * while it's already showing just refreshes the count in place.
+ */
+function showAgentPresentedBanner() {
+  agentPresentationActive = true;
+  // Unhide BEFORE writing the text: a screen reader generally doesn't
+  // announce a text change made to a still-hidden live region (role="status"
+  // on #board-presented-banner in index.html) — the unhide itself is what
+  // must trigger the announcement.
+  boardPresentedBannerEl.hidden = false;
+  updateAgentPresentedBannerText();
+}
+
+function hideAgentPresentedBanner() {
+  agentPresentationActive = false;
+  boardPresentedBannerEl.hidden = true;
+}
+
+boardPresentedDismissBtn.addEventListener("click", () => hideAgentPresentedBanner());
+
+/** No-op while the banner isn't showing — called from renderBoardStatus (see agentPresentationActive's own doc comment for why this needs to re-derive rather than hold a captured count). */
+function updateAgentPresentedBannerText() {
+  if (!agentPresentationActive) return;
+  const shownCount = computeBoardVisibility(screens, screenFilter, pinnedScreens).shownCount;
+  // CHR-625 review fix 3 — a filter matching nothing sits right above the
+  // board's own empty state ("matches nothing"); "to show 0 screens" reads
+  // like a machine repeating itself. The approved copy's count covers the
+  // case where there's something to point at; drop it for the zero case.
+  boardPresentedTextEl.textContent =
+    shownCount === 0 ? "Agent switched you here" : `Agent switched you here to show ${shownCount} screen${shownCount === 1 ? "" : "s"}`;
+}
+
 /** Re-renders the board toolbar's status text + Clear pins visibility from the current screens/screenFilter/pinnedScreens — cheap and pure, so it's fine to call unconditionally on every board-state-relevant change, not just while the Board tab is actually showing. */
 function renderBoardStatus() {
   const visibility = computeBoardVisibility(screens, screenFilter, pinnedScreens);
@@ -294,6 +348,7 @@ function renderBoardStatus() {
   // switch or a hand-deleted file the daemon never pruned — would hide the
   // one button that can get rid of them.
   boardClearPinsBtn.hidden = pinnedScreens.length === 0;
+  updateAgentPresentedBannerText(); // CHR-625 — keeps the banner's own count from drifting away from this same visibility computation
 }
 
 /** Syncs every toolbar control (range input + its fill/aria-valuetext, readout, quick-jump active states, step-button aria-disabled states) from the current `boardZoom`. */
@@ -436,6 +491,7 @@ function resetProjectState() {
   // guards against it firing (with the OLD project's filter text) after
   // activeProjectRoot has already moved on to the new project.
   clearTimeout(boardFilterWriteTimer);
+  hideAgentPresentedBanner(); // CHR-625 — a presentation is per-project; don't carry it over to the next
   comments = [];
   boardBuilt = false;
   activeMode = "none";
@@ -481,8 +537,14 @@ async function loadTags() {
  * round-trip is needed there) — and re-renders everything derived from it.
  * @param {string | null} filter
  * @param {string[]} pinned
+ * @param {boolean} [forceInputSync] CHR-625 review fix 3 — an agent
+ *   presentation writes the filter INPUT even while it has focus, overriding
+ *   whatever the human was mid-typing (handleBoardStateEvent already clears
+ *   the pending debounced write for the same reason — see its own comment).
+ *   `false` for every other caller (loadBoardState, a `source: "human"`
+ *   event), which keep the focus guard below.
  */
-function applyBoardState(filter, pinned) {
+function applyBoardState(filter, pinned, forceInputSync = false) {
   screenFilter = filter ?? "";
   // Skip while the human is typing in this very input (review fix 1) — the
   // broadcast this fires from is an echo of ITS OWN write (or a whitespace-
@@ -490,8 +552,9 @@ function applyBoardState(filter, pinned) {
   // `.value` here would replace half-typed text and jump the cursor. Every
   // other consumer of `screenFilter` below still re-renders from the
   // broadcast as usual; only the input element itself is an input, not a
-  // pure output.
-  if (document.activeElement !== screenFilterInput) screenFilterInput.value = screenFilter;
+  // pure output. `forceInputSync` overrides this for an agent presentation,
+  // which is a takeover, not an echo — see its own doc above.
+  if (forceInputSync || document.activeElement !== screenFilterInput) screenFilterInput.value = screenFilter;
   pinnedScreens = pinned ?? [];
   refreshSidebar();
   if (boardBuilt) loadBoard();
@@ -680,13 +743,35 @@ async function handleLifecycleEvent(event) {
  * write echoed back) and regardless of `source`: the simplest correct
  * client re-renders from the broadcast every time, rather than trying to
  * detect and suppress its own echo (CHR-624 ticket brief).
- * `source === "agent"` is CHR-625's cue to switch to the Board tab and show
- * the "agent switched you here" banner — deliberately not built here;
- * `source` is threaded this far so that ticket doesn't need to touch
- * sse.js or this handler's own signature again.
+ *
+ * `source === "agent"` is CHR-625: switch to the Board tab and show the
+ * "agent switched you here" banner, so the human sees exactly what the
+ * agent presented without a manual reload. A `"human"` source (this tab's
+ * own echoed write, or another tab/browser) only re-renders the filter/pins
+ * as usual — no tab switch, no banner.
+ *
+ * CHR-631 (follow mode) is unshipped and not implemented here — this branch
+ * (`setView("board")`) is the one place an agent presentation would need to
+ * win over a follow-mode jump if the two ever raced; that's the hook, left
+ * as small as the current code allows since there's nothing on the other
+ * side of it yet to coordinate with.
  */
 function handleBoardStateEvent(event) {
-  applyBoardState(event.filter, event.pinned);
+  if (event.source === "agent") {
+    // CHR-625 review fix 3 — an agent presentation is an explicit takeover,
+    // not an echo of the human's own typing: it must win over whatever's
+    // still half-typed in the filter input, both on screen (forceInputSync)
+    // and on the wire — clearing the pending debounced write stops it from
+    // firing the HUMAN's now-superseded text back to the daemon a moment
+    // later and silently discarding the agent's own filter (see the
+    // screenFilterInput "input" listener below).
+    clearTimeout(boardFilterWriteTimer);
+    applyBoardState(event.filter, event.pinned, true);
+    setView("board"); // also persists "board" as the last-viewed tab (artisign.view) — same side effect a manual tab click has, just triggered by the agent instead
+    showAgentPresentedBanner();
+  } else {
+    applyBoardState(event.filter, event.pinned);
+  }
 }
 
 function reconnectSse(project) {

@@ -10,11 +10,65 @@
 
 import { fetchRender } from "./api.js";
 import { applyFlowMode } from "./flows.js";
-import { computeBoardLayout, findTile, elementSideAnchor, tileAnchor, edgeSides, bezierPath, computeCenterScroll, edgesFromNode, screenIdFromRef } from "./board.js";
+import {
+  computeBoardLayout,
+  findTile,
+  elementSideAnchor,
+  tileAnchor,
+  edgeSides,
+  bezierPath,
+  computeCenterScroll,
+  edgesFromNode,
+  screenIdFromRef,
+  clampZoom,
+  computeFitAllZoom,
+  computeBoardColumns,
+  computeZoomAroundCursor,
+  computeWheelZoomFactor,
+  labelDisplayMode,
+  BASE_GAP,
+  BASE_PADDING,
+  DEFAULT_BOARD_ZOOM,
+} from "./board.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+// The base layout (tile positions, gaps, padding) is always computed at
+// native (unscaled) tile size, with the board's own 100%-zoom reference
+// gap/padding. Board zoom (5%-200%) is then a single CSS `transform:
+// scale()` applied to #board-canvas-inner on top of that fixed layout (see
+// applyZoomSizing) — never a re-layout — which is what makes zoom-around-
+// cursor exact (computeZoomAroundCursor) instead of an approximation.
+// `columns` is NOT fixed here (CHR-623 review) — it's chosen dynamically by
+// computeBoardColumns, see relayout()/GRID_OPTIONS.
+const GRID_OPTIONS = { gapX: BASE_GAP, gapY: BASE_GAP, padding: BASE_PADDING };
+// A batch of near-simultaneous iframe `load` events (e.g. ~186 screens all
+// finishing at once) coalesces into a single relayout — see
+// scheduleRelayout's own comment.
+const RELAYOUT_COALESCE_MS = 50;
+// If a wheel/pinch zoom gesture fired more recently than this, a coalesced
+// relayout defers instead of running — the grid shape (in particular the
+// column count) must not change mid-gesture, or tiles jump under the
+// cursor (CHR-623 review finding 3).
+const ZOOM_GESTURE_QUIET_MS = 150;
 
-export function createBoardView({ surfaceEl, tilesEl, edgesEl }) {
+/**
+ * @param {{
+ *   surfaceEl: HTMLElement, canvasEl: HTMLElement, canvasInnerEl: HTMLElement,
+ *   tilesEl: HTMLElement, edgesEl: SVGElement,
+ *   onZoomChange?: (zoomPercent: number, source: "manual" | "fitall") => void,
+ *   onRelayout?: () => void,
+ * }} args `onZoomChange` fires whenever zoom changes for ANY reason —
+ *   quick-jump/step buttons, Fit all, the range input, or Ctrl/Cmd+wheel/
+ *   pinch on the canvas — so app.js can keep the toolbar's range input,
+ *   readout and quick-jump active states in sync regardless of the source.
+ *   `onRelayout` (CHR-623 review finding 6) fires whenever relayout()
+ *   actually runs (screen-list/resize/project-switch/tab-switch — never a
+ *   zoom-only action) — app.js uses it to invalidate its "Fit all was the
+ *   last zoom applied" bookkeeping, since a grid-shape change can leave a
+ *   previously-exact `lastFitAllZoom` no longer matching what Fit all would
+ *   compute now.
+ */
+export function createBoardView({ surfaceEl, canvasEl, canvasInnerEl, tilesEl, edgesEl, onZoomChange, onRelayout }) {
   /** @type {string[]} */
   let screens = [];
   /** @type {{ from: string, event: string, to: string, to_kind: string }[]} */
@@ -23,6 +77,11 @@ export function createBoardView({ surfaceEl, tilesEl, edgesEl }) {
   const measuredSizes = {};
   /** @type {{ tiles: ReturnType<typeof computeBoardLayout>["tiles"], contentWidth: number, contentHeight: number }} */
   let layout = { tiles: [], contentWidth: 0, contentHeight: 0 };
+  // The column count the CURRENT `layout` was built with — set only by
+  // relayout() (see its own comment on when that runs). fitAll() reads
+  // this rather than recomputing it, so a zoom-only action never itself
+  // changes the grid shape.
+  let currentColumns = 1;
   /** @type {Map<string, HTMLIFrameElement>} */
   const iframesByScreen = new Map();
   /** @type {Map<string, () => void>} */
@@ -31,6 +90,16 @@ export function createBoardView({ surfaceEl, tilesEl, edgesEl }) {
   /** @type {{ from: string } | null} */
   let highlightedSource = null;
   let resizeObserver;
+  let zoom = DEFAULT_BOARD_ZOOM;
+  let edgesVisible = true;
+  // CHR-623 review findings 3/5: a single coalescing timer shared by every
+  // relayout TRIGGER that isn't already synchronous/immediate (an iframe
+  // `load`, a surface resize) — see scheduleRelayout. `lastWheelAt` is read
+  // by it to defer a coalesced relayout while a zoom gesture is in
+  // progress; `handleWheel` and `handleClick`/`handleWheel` themselves are
+  // named (not inline) so mount()'s teardown can actually remove them.
+  let relayoutTimer = null;
+  let lastWheelAt = 0;
 
   function screenIdToNodeId(el) {
     return el.getAttribute("id");
@@ -39,7 +108,15 @@ export function createBoardView({ surfaceEl, tilesEl, edgesEl }) {
   function centerOnScreen(screenId) {
     const tile = findTile(layout.tiles, screenId);
     if (!tile) return;
-    const { left, top } = computeCenterScroll(tile, surfaceEl.clientWidth, surfaceEl.clientHeight, layout.contentWidth, layout.contentHeight);
+    const scale = zoom / 100;
+    const scaledTile = { x: tile.x * scale, y: tile.y * scale, width: tile.width * scale, height: tile.height * scale };
+    const { left, top } = computeCenterScroll(
+      scaledTile,
+      surfaceEl.clientWidth,
+      surfaceEl.clientHeight,
+      layout.contentWidth * scale,
+      layout.contentHeight * scale,
+    );
     surfaceEl.scrollTo({ left, top, behavior: "smooth" });
   }
 
@@ -95,8 +172,39 @@ export function createBoardView({ surfaceEl, tilesEl, edgesEl }) {
     return { width: root?.offsetWidth || 390, height: root?.offsetHeight || 844 };
   }
 
+  /** Applies the current `zoom` as a canvas-level transform on top of the fixed base layout — never a re-layout, see GRID_OPTIONS's module comment. */
+  function applyZoomSizing() {
+    const scale = zoom / 100;
+    canvasInnerEl.style.transform = `scale(${scale})`;
+    canvasEl.style.width = `${layout.contentWidth * scale}px`;
+    canvasEl.style.height = `${layout.contentHeight * scale}px`;
+  }
+
+  /** Sets each tile label's zoom-dependent display mode (board.js's labelDisplayMode) — hidden/truncated/full, per the chr-621 tag notes. */
+  function applyLabelModes() {
+    const mode = labelDisplayMode(zoom);
+    for (const tile of layout.tiles) {
+      const el = tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(tile.screen)}"]`);
+      const label = el?.querySelector(".board-tile-label");
+      if (!label) continue;
+      label.dataset.mode = mode;
+      label.style.maxWidth = mode === "truncated" ? `${tile.width}px` : "";
+    }
+  }
+
+  /**
+   * Re-lays out the whole grid: column count AND tile positions, both from
+   * scratch. The only place the column count is decided (computeBoardColumns
+   * — CHR-623 review) — called on a screen-list change, a (debounced)
+   * surface resize, and a project switch, i.e. whenever the set of tiles or
+   * the viewport shape changes, but NEVER from setZoom/the wheel handler:
+   * the grid shape must stay put while the human is mid-drag on the zoom
+   * slider or mid-pinch on the canvas, or tiles would visibly jump under
+   * their cursor.
+   */
   function relayout() {
-    layout = computeBoardLayout(screens, measuredSizes);
+    currentColumns = computeBoardColumns(screens, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, GRID_OPTIONS);
+    layout = computeBoardLayout(screens, measuredSizes, { ...GRID_OPTIONS, scale: 1, columns: currentColumns });
     tilesEl.style.width = `${layout.contentWidth}px`;
     tilesEl.style.height = `${layout.contentHeight}px`;
     edgesEl.setAttribute("width", String(layout.contentWidth));
@@ -114,6 +222,122 @@ export function createBoardView({ surfaceEl, tilesEl, edgesEl }) {
       frame.style.height = `${tile.naturalHeight}px`;
       frame.style.transform = `scale(${tile.width / tile.naturalWidth})`;
     }
+    applyZoomSizing();
+    applyLabelModes();
+    drawEdges();
+    onRelayout?.();
+  }
+
+  /**
+   * Coalesces relayout triggers that can fire many times in a short burst —
+   * a batch of iframe `load` events (up to one per tile: ~186 for a large
+   * project, most arriving within the same handful of milliseconds) and a
+   * dragged/animated surface resize — into a single relayout() call
+   * (CHR-623 review finding 3: calling relayout() — and inside it,
+   * computeBoardColumns, itself O(n) — once PER TILE LOAD made the
+   * 186-screen case O(n²) relayouts on top of computeBoardColumns' own
+   * O(n) work, the real source of the multi-second load time). Each call
+   * resets the timer, so only the LAST one in a burst actually schedules
+   * a run, using measuredSizes/viewport as they stand once the burst
+   * settles.
+   *
+   * Also defers (reschedules further out, not run-then-forget) while a
+   * zoom gesture is in progress (a wheel/pinch tick within the last
+   * ZOOM_GESTURE_QUIET_MS) — the whole point of relayout() never running
+   * from setZoom/handleWheel is to keep the grid shape stable while the
+   * human is mid-gesture; a coalesced relayout landing mid-gesture (e.g.
+   * from a screen reloading via SSE while the human happens to be
+   * pinching) would silently break that same promise.
+   */
+  function scheduleRelayout() {
+    clearTimeout(relayoutTimer);
+    relayoutTimer = setTimeout(runRelayoutIfQuiet, RELAYOUT_COALESCE_MS);
+  }
+
+  /**
+   * scheduleRelayout's timer callback — re-checks gesture recency AT FIRE
+   * TIME (using the latest `lastWheelAt`, not one captured back when the
+   * timer was armed) and, if a wheel/pinch tick has landed since, re-defers
+   * instead of running: a gesture that's still going when the FIRST
+   * RELAYOUT_COALESCE_MS elapses must keep pushing the relayout out, not
+   * just delay it once by a fixed amount computed at schedule time (which
+   * would still let a mid-gesture relayout land if the gesture outlasted
+   * that one computed delay).
+   */
+  function runRelayoutIfQuiet() {
+    const sinceWheel = performance.now() - lastWheelAt;
+    if (sinceWheel < ZOOM_GESTURE_QUIET_MS) {
+      relayoutTimer = setTimeout(runRelayoutIfQuiet, ZOOM_GESTURE_QUIET_MS - sinceWheel);
+      return;
+    }
+    relayout();
+  }
+
+  /**
+   * Sets board zoom, clamped to [5, 200]. `cursor`, when given (Ctrl/Cmd+
+   * wheel, pinch), is a `{ clientX, clientY }` viewport point to zoom
+   * around — see board.js's computeZoomAroundCursor — instead of leaving
+   * the scroll position untouched. `source` is passed straight through to
+   * `onZoomChange` — app.js uses it to tell a `fitAll()`-driven change apart
+   * from every other one, which is the only way it can know whether the
+   * "Fit all" quick-jump should read as active (its target value isn't a
+   * fixed constant like 100%'s).
+   * @param {number} next
+   * @param {{ cursor?: { clientX: number, clientY: number }, source?: "manual" | "fitall" }} [opts]
+   */
+  function setZoom(next, { cursor, source = "manual" } = {}) {
+    const clamped = clampZoom(next);
+    if (clamped === zoom) {
+      // Nothing to re-render, but still tell the caller — a fitAll() (or
+      // any other) call landing on the value already active is still a
+      // meaningful event for e.g. the "Fit all" quick-jump's active state,
+      // which depends on `source` even when the number itself didn't move.
+      onZoomChange?.(zoom, source);
+      return;
+    }
+    if (cursor) {
+      const rect = surfaceEl.getBoundingClientRect();
+      const { left, top } = computeZoomAroundCursor({
+        cursorX: cursor.clientX - rect.left,
+        cursorY: cursor.clientY - rect.top,
+        scrollLeft: surfaceEl.scrollLeft,
+        scrollTop: surfaceEl.scrollTop,
+        oldZoomPercent: zoom,
+        newZoomPercent: clamped,
+        contentWidth: layout.contentWidth,
+        contentHeight: layout.contentHeight,
+        viewportWidth: surfaceEl.clientWidth,
+        viewportHeight: surfaceEl.clientHeight,
+      });
+      zoom = clamped;
+      applyZoomSizing();
+      applyLabelModes();
+      surfaceEl.scrollLeft = left;
+      surfaceEl.scrollTop = top;
+    } else {
+      zoom = clamped;
+      applyZoomSizing();
+      applyLabelModes();
+    }
+    onZoomChange?.(zoom, source);
+  }
+
+  /**
+   * One-shot: zooms to the largest value at which every current tile fits
+   * inside the viewport — see board.js's computeFitAllZoom. Uses
+   * `currentColumns`, NOT a fresh computeBoardColumns call: the grid shape
+   * is relayout()'s job (screen-list/resize/project-switch), not a zoom
+   * action's — see relayout()'s own comment.
+   */
+  function fitAll() {
+    setZoom(
+      computeFitAllZoom(screens, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, { ...GRID_OPTIONS, columns: currentColumns }),
+      { source: "fitall" },
+    );
+  }
+
+  function setEdgesVisible(visible) {
+    edgesVisible = visible;
     drawEdges();
   }
 
@@ -152,6 +376,10 @@ export function createBoardView({ surfaceEl, tilesEl, edgesEl }) {
 
   function drawEdges() {
     edgesEl.innerHTML = "";
+    // With edges hidden, flow-mode centering (attachTileClicks/applyFlowMode
+    // -> centerOnScreen) and highlight-on-click still work exactly as
+    // before — setHighlight just has nothing to paint while this is false.
+    if (!edgesVisible) return;
     const defs = document.createElementNS(SVG_NS, "defs");
     defs.appendChild(buildArrowMarker("board-arrowhead"));
     defs.appendChild(buildArrowMarker("board-arrowhead-highlighted", "highlighted"));
@@ -193,7 +421,7 @@ export function createBoardView({ surfaceEl, tilesEl, edgesEl }) {
     iframe.addEventListener("load", () => {
       measuredSizes[screen] = readNaturalSize(iframe);
       applyTileMode(iframe, screen);
-      relayout();
+      scheduleRelayout();
     });
     frame.appendChild(iframe);
     tile.appendChild(frame);
@@ -201,23 +429,69 @@ export function createBoardView({ surfaceEl, tilesEl, edgesEl }) {
     return tile;
   }
 
-  /** @returns {() => void} teardown for resize observers etc. */
+  /**
+   * Ctrl/Cmd+scroll-wheel and trackpad pinch (Chrome/Firefox synthesize
+   * pinch as a `wheel` event with `ctrlKey: true`) zoom around the cursor —
+   * a plain wheel/two-finger scroll (neither modifier) is left alone so
+   * #board-surface's native scroll still pans the canvas.
+   */
+  function handleWheel(evt) {
+    if (!evt.ctrlKey && !evt.metaKey) return;
+    evt.preventDefault();
+    lastWheelAt = performance.now();
+    const factor = computeWheelZoomFactor(evt.deltaY, evt.deltaMode, surfaceEl.clientHeight);
+    setZoom(zoom * factor, { cursor: { clientX: evt.clientX, clientY: evt.clientY } });
+  }
+
+  function handleSurfaceClick(evt) {
+    if (evt.target === surfaceEl || evt.target === tilesEl) setHighlight(null);
+  }
+
+  /** @returns {() => void} teardown for every listener/observer/timer mount() sets up. */
   function mount() {
-    surfaceEl.addEventListener("click", (evt) => {
-      if (evt.target === surfaceEl || evt.target === tilesEl) setHighlight(null);
-    });
-    resizeObserver = new ResizeObserver(() => drawEdges());
+    surfaceEl.addEventListener("click", handleSurfaceClick);
+    // Not passive: handleWheel calls preventDefault() to stop the browser's
+    // own page-zoom/native-scroll response to a Ctrl/Cmd+wheel or pinch.
+    surfaceEl.addEventListener("wheel", handleWheel, { passive: false });
+    // A resized #board-surface (window resize, side-panel collapse) also
+    // goes through scheduleRelayout — see its own comment; recomputing the
+    // column count on every intermediate resize-observer tick (there can be
+    // dozens during a drag-resize or a side-panel collapse animation) would
+    // be wasted, possibly janky work.
+    resizeObserver = new ResizeObserver(() => scheduleRelayout());
     resizeObserver.observe(surfaceEl);
-    return () => resizeObserver?.disconnect();
+    return () => {
+      surfaceEl.removeEventListener("click", handleSurfaceClick);
+      surfaceEl.removeEventListener("wheel", handleWheel);
+      clearTimeout(relayoutTimer);
+      resizeObserver?.disconnect();
+    };
   }
 
   /**
    * Rebuilds tiles from scratch — called on first activation and whenever
    * the screen list changes, since new/removed screens change the grid.
+   *
+   * An empty `nextScreens` is app.js's project-switch reset (resetProjectState
+   * calls `setScreens([], [])` before loading the new project's own screens)
+   * — the one point where clearing `measuredSizes` is both safe and
+   * necessary (CHR-623 review finding 4): safe, because there's nothing
+   * left on the board to need its old size; necessary, because two
+   * projects can share a screen NAME (`home`, `login`, ...), and without
+   * this the new project's `home` would inherit the old project's `home`'s
+   * measured size for its very first (pre-iframe-load) relayout — wrong
+   * unless they happen to be the same size by coincidence. An ordinary
+   * same-project `setScreens` call (adding/removing/reordering screens)
+   * must NOT clear it — that would throw away sizes for screens that are
+   * still on the board and haven't reloaded, forcing every tile back to
+   * FALLBACK_SIZE until each one's iframe fires `load` again.
    * @param {string[]} nextScreens
    * @param {{ from: string, event: string, to: string, to_kind: string }[]} nextFlows
    */
   async function setScreens(nextScreens, nextFlows) {
+    if (nextScreens.length === 0) {
+      for (const key of Object.keys(measuredSizes)) delete measuredSizes[key];
+    }
     screens = nextScreens;
     flows = nextFlows;
     for (const cleanup of modeCleanupByScreen.values()) cleanup();
@@ -262,5 +536,22 @@ export function createBoardView({ surfaceEl, tilesEl, edgesEl }) {
     for (const [screen, iframe] of iframesByScreen) applyTileMode(iframe, screen);
   }
 
-  return { mount, setScreens, refreshScreen, setFlows, setFlowMode };
+  return {
+    mount,
+    setScreens,
+    refreshScreen,
+    setFlows,
+    setFlowMode,
+    setZoom,
+    fitAll,
+    setEdgesVisible,
+    // CHR-623 review finding 7: switching TO an already-built board tab
+    // must relayout immediately, not through scheduleRelayout's coalescing
+    // delay — #board-view is `hidden` (clientWidth 0) while another tab
+    // shows, so any relayout that happened while hidden used a
+    // zero-viewport `computeBoardColumns`, and the wrong (DEFAULT_COLUMNS)
+    // grid would otherwise persist for RELAYOUT_COALESCE_MS+ after
+    // switching back. app.js's setView calls this directly.
+    relayout,
+  };
 }

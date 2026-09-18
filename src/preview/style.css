@@ -1508,17 +1508,190 @@ body {
 
 #board-view {
   background: var(--color-canvas);
+  display: flex;
+  flex-direction: column;
+  /* .main-view sets overflow: auto/height: 100% for the single-pane views
+     (screens/mockup/design-system) — the board has its own toolbar sibling
+     above the scrollable surface, so it must not scroll as a whole. */
+  overflow: hidden;
 }
 
-/* The scroll container — its content (#board-tiles/#board-edges) is sized
-   in JS (board-view.js) to enclose every tile at its computed position, so
-   native scrolling (including smooth-scroll centering on flow navigation)
-   just works without any extra pan/zoom logic. */
+/* Board-tab-only bar (CHR-623), same chrome tokens as #topbar. */
+#board-toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-sm) var(--space-xl);
+  height: 40px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.board-quickjump {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  padding: var(--space-sm) 10px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Active only when the slider's current value exactly matches this
+   shortcut's target — see board.js's updateBoardToolbar in board-view.js. */
+.board-quickjump[aria-pressed="true"] {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: 600;
+  border-color: var(--color-accent);
+}
+
+/* "Edges: On" is the resting state, so it takes the quiet tinted look of the
+   design (chr-621) rather than .toggle-button's filled accent. */
+#board-edges-toggle[aria-pressed="true"] {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+#board-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--color-border);
+}
+
+#board-zoom-slider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.board-zoom-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* aria-disabled, not the disabled attribute (CHR-623 review finding 8) — a
+   hard-disabled button can't hold keyboard focus; see app.js's
+   updateBoardToolbar for the full reasoning. Same look as :disabled used
+   to have. */
+.board-zoom-step[aria-disabled="true"] {
+  background: var(--color-surface-subtle);
+  color: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
+/* A native <input type="range"> styled to the $zoom-slider design (a thin
+   filled track + a round thumb) rather than a hand-built track/thumb pair —
+   keyboard control and accessible semantics come for free this way. The
+   filled portion is a background gradient recomputed in JS on every value
+   change (updateZoomRangeFill in board-view.js), since a plain <input
+   type=range> has no CSS-only way to color only the "filled" side of the
+   track. */
+#board-zoom-range {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 140px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+#board-zoom-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--radius-pill);
+}
+
+#board-zoom-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-menu);
+  cursor: pointer;
+}
+
+#board-zoom-range::-moz-range-track {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border);
+}
+
+#board-zoom-range::-moz-range-progress {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+}
+
+#board-zoom-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-menu);
+  cursor: pointer;
+}
+
+#board-zoom-readout {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  min-width: 36px;
+}
+
+#board-toolbar-spacer {
+  flex: 1;
+}
+
+#board-toolbar-status {
+  font-size: 0.75rem;
+  color: var(--color-text-faint);
+}
+
+#board-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+/* The scroll container — #board-canvas is sized in JS (board-view.js) to
+   the tile content's SCALED (zoomed) pixel size, so native scrolling
+   (including smooth-scroll centering on flow navigation and zoom-around-
+   cursor) just works without any extra pan/zoom logic. */
 #board-surface {
   position: relative;
-  width: 100%;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
+}
+
+/* Sizing wrapper only — no transform of its own, so its layout box (which
+   #board-surface's scrollable overflow is computed from) is exactly the
+   post-zoom pixel size set in JS. #board-canvas-inner underneath carries
+   the actual `transform: scale()` at the content's true (100%-zoom) size —
+   same wrapper/transform split as mockup-zoom.js's applyMockupZoom. */
+#board-canvas {
+  position: relative;
+}
+
+#board-canvas-inner {
+  position: relative;
+  transform-origin: top left;
 }
 
 #board-tiles {
@@ -1572,6 +1745,20 @@ body {
   font-weight: 600;
   color: var(--color-text-secondary);
   white-space: nowrap;
+}
+
+/* Zoom-dependent label rendering (CHR-623, board.js's labelDisplayMode):
+   hidden below 60% board zoom (illegible at that scale), truncated to the
+   tile's own width from 60% up to 100%, full (this block's plain
+   white-space: nowrap above) at 100% and above. `max-width` is set inline
+   per tile (board-view.js) since it depends on that tile's own width. */
+.board-tile-label[data-mode="hidden"] {
+  display: none;
+}
+
+.board-tile-label[data-mode="truncated"] {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .board-tile-frame {

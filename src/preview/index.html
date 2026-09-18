@@ -153,15 +153,47 @@
           <div id="design-system-view" class="main-view" hidden></div>
           <div id="board-view" class="main-view" hidden>
             <!--
+              Board-tab-only bar (CHR-623): a continuous zoom slider (5%-
+              200%) with Fit-all/100% quick jumps, and a flow-edge visibility
+              toggle. #board-toolbar-status/#board-toolbar-actions are CHR-624's
+              (filter/pins result count, Clear pins) — present and empty here,
+              deliberately unfilled by this ticket.
+            -->
+            <div id="board-toolbar">
+              <button type="button" id="board-fitall-btn" class="board-quickjump">Fit all</button>
+              <button type="button" id="board-100-btn" class="board-quickjump">100%</button>
+              <span id="board-toolbar-divider" aria-hidden="true"></span>
+              <div id="board-zoom-slider">
+                <button type="button" id="board-zoom-minus" class="board-zoom-step" aria-label="Zoom out">−</button>
+                <input type="range" id="board-zoom-range" min="5" max="200" step="1" value="80" aria-label="Board zoom" />
+                <button type="button" id="board-zoom-plus" class="board-zoom-step" aria-label="Zoom in">+</button>
+                <span id="board-zoom-readout">80%</span>
+              </div>
+              <button type="button" id="board-edges-toggle" class="toggle-button" aria-pressed="true">Edges: On</button>
+              <span id="board-toolbar-spacer"></span>
+              <span id="board-toolbar-status"></span>
+              <span id="board-toolbar-actions"></span>
+            </div>
+            <!--
               One scrollable surface holding every screen as a tile
               (#board-tiles) plus an SVG overlay drawing flow edges between
-              them (#board-edges), sized in JS to the full tile content so
-              edges stay aligned while scrolling. Comment mode has no effect
+              them (#board-edges). #board-canvas is sized in JS to the tile
+              content's SCALED (zoomed) pixel size — its child #board-canvas-inner
+              carries the actual `transform: scale()` and stays at the
+              content's unscaled (100%-zoom) size, same wrapper/transform
+              split as mockup-zoom.js's applyMockupZoom, so native scrolling
+              (including smooth-scroll centering on flow navigation and
+              zoom-around-cursor) works against the real post-zoom size
+              without any extra pan/zoom logic. Comment mode has no effect
               here — see board-view.js's module comment.
             -->
             <div id="board-surface">
-              <div id="board-tiles"></div>
-              <svg id="board-edges"></svg>
+              <div id="board-canvas">
+                <div id="board-canvas-inner">
+                  <div id="board-tiles"></div>
+                  <svg id="board-edges"></svg>
+                </div>
+              </div>
             </div>
           </div>
         </main>

@@ -31,6 +31,7 @@ import { connectEvents } from "./sse.js";
 import { applyCanvas } from "./canvas.js";
 import { updateWarningBadge } from "./warnings.js";
 import { createBoardView } from "./board-view.js";
+import { MIN_BOARD_ZOOM, MAX_BOARD_ZOOM, DEFAULT_BOARD_ZOOM, clampZoom, zoomSliderOffset, stepZoomDown, stepZoomUp } from "./board.js";
 import { createProjectUI } from "./projects.js";
 import { createProjectDialogs } from "./project-dialogs.js";
 import {
@@ -42,6 +43,7 @@ import {
   parseLastSelection,
   parseZoomPref,
   parseEnumPref,
+  parseBoardZoomPref,
 } from "./prefs.js";
 import { createInspectorPanel, applyInspectMode, updateInspectOverlay } from "./inspector.js";
 import { buildEntries } from "./inspector-data.js";
@@ -66,8 +68,17 @@ const screensViewEl = document.getElementById("screens-view");
 const designSystemViewEl = document.getElementById("design-system-view");
 const boardViewEl = document.getElementById("board-view");
 const boardSurfaceEl = document.getElementById("board-surface");
+const boardCanvasEl = document.getElementById("board-canvas");
+const boardCanvasInnerEl = document.getElementById("board-canvas-inner");
 const boardTilesEl = document.getElementById("board-tiles");
 const boardEdgesEl = document.getElementById("board-edges");
+const boardFitallBtn = document.getElementById("board-fitall-btn");
+const board100Btn = document.getElementById("board-100-btn");
+const boardZoomMinusBtn = document.getElementById("board-zoom-minus");
+const boardZoomPlusBtn = document.getElementById("board-zoom-plus");
+const boardZoomRangeInput = document.getElementById("board-zoom-range");
+const boardZoomReadoutEl = document.getElementById("board-zoom-readout");
+const boardEdgesToggleBtn = document.getElementById("board-edges-toggle");
 const flowModeToggle = document.getElementById("flow-mode-toggle");
 const commentModeToggle = document.getElementById("comment-mode-toggle");
 const canvasControlsEl = document.getElementById("canvas-controls");
@@ -177,8 +188,96 @@ const prefsStorage = (() => {
   }
 })();
 
-const board = createBoardView({ surfaceEl: boardSurfaceEl, tilesEl: boardTilesEl, edgesEl: boardEdgesEl });
+// Board zoom's own value (CHR-623) — separate from `zoom`/`mockupZoom`
+// (the screen canvas / mockup row) since it's a different surface with its
+// own persisted level; see prefs.parseBoardZoomPref.
+let boardZoom = DEFAULT_BOARD_ZOOM;
+let boardEdgesVisible = true;
+// The zoom "Fit all" last computed, if any — the only way to know whether
+// its quick-jump button should read active, since (unlike "100%") its
+// target isn't a fixed constant. Set from board.setZoom's onZoomChange
+// callback (source === "fitall"), read by updateBoardToolbar.
+let lastFitAllZoom = null;
+// Debounces the board zoom preference write (CHR-623 review finding 3) — a
+// slider drag fires onZoomChange, and so a localStorage write, on every
+// `input` tick; only the LAST value in a burst is worth persisting.
+let boardZoomPrefWriteTimer = null;
+const BOARD_ZOOM_PREF_WRITE_DEBOUNCE_MS = 300;
+
+function scheduleBoardZoomPrefWrite(value) {
+  clearTimeout(boardZoomPrefWriteTimer);
+  boardZoomPrefWriteTimer = setTimeout(
+    () => writeStringPref(prefsStorage, "artisign.boardZoom", String(value)),
+    BOARD_ZOOM_PREF_WRITE_DEBOUNCE_MS,
+  );
+}
+
+const board = createBoardView({
+  surfaceEl: boardSurfaceEl,
+  canvasEl: boardCanvasEl,
+  canvasInnerEl: boardCanvasInnerEl,
+  tilesEl: boardTilesEl,
+  edgesEl: boardEdgesEl,
+  onZoomChange: (value, source) => {
+    if (source === "fitall") lastFitAllZoom = value;
+    boardZoom = value;
+    scheduleBoardZoomPrefWrite(value);
+    updateBoardToolbar();
+  },
+  // CHR-623 review finding 2: a relayout can change the grid shape under a
+  // `lastFitAllZoom` that was exact for the PREVIOUS shape — invalidate it
+  // so "Fit all" stops reading as active for a value it wouldn't actually
+  // compute anymore.
+  onRelayout: () => {
+    lastFitAllZoom = null;
+    updateBoardToolbar();
+  },
+});
 board.mount();
+
+/** Syncs every toolbar control (range input + its fill/aria-valuetext, readout, quick-jump active states, step-button aria-disabled states) from the current `boardZoom`. */
+function updateBoardToolbar() {
+  boardZoomRangeInput.value = String(boardZoom);
+  const rounded = Math.round(boardZoom);
+  boardZoomReadoutEl.textContent = `${rounded}%`;
+  // The raw value ("80") reads to a screen reader as the plain number
+  // eighty — aria-valuetext overrides that with the actual unit (CHR-623
+  // review finding 8).
+  boardZoomRangeInput.setAttribute("aria-valuetext", `${rounded}%`);
+  const fillPct = zoomSliderOffset(boardZoom, 100);
+  boardZoomRangeInput.style.background = `linear-gradient(to right, var(--color-accent) ${fillPct}%, var(--color-border) ${fillPct}%)`;
+  board100Btn.setAttribute("aria-pressed", String(boardZoom === 100));
+  boardFitallBtn.setAttribute("aria-pressed", String(lastFitAllZoom !== null && boardZoom === lastFitAllZoom));
+  // aria-disabled, not the `disabled` attribute (CHR-623 review finding 8):
+  // a hard-disabled button can't hold focus, so tabbing onto "−" right as
+  // it hits the floor bumps focus to <body>. Styled the same as :disabled
+  // used to look (style.css); a click while aria-disabled stays a harmless
+  // no-op — stepZoomDown/stepZoomUp already clamp at the floor/ceiling, so
+  // there's nothing to guard in the handlers below.
+  boardZoomMinusBtn.setAttribute("aria-disabled", String(boardZoom <= MIN_BOARD_ZOOM));
+  boardZoomPlusBtn.setAttribute("aria-disabled", String(boardZoom >= MAX_BOARD_ZOOM));
+}
+
+boardFitallBtn.addEventListener("click", () => board.fitAll());
+board100Btn.addEventListener("click", () => board.setZoom(100));
+boardZoomMinusBtn.addEventListener("click", () => board.setZoom(stepZoomDown(boardZoom)));
+boardZoomPlusBtn.addEventListener("click", () => board.setZoom(stepZoomUp(boardZoom)));
+boardZoomRangeInput.addEventListener("input", () => board.setZoom(Number(boardZoomRangeInput.value)));
+boardEdgesToggleBtn.addEventListener("click", () => {
+  boardEdgesVisible = !boardEdgesVisible;
+  writeBoolPref(prefsStorage, "artisign.boardEdgesVisible", boardEdgesVisible);
+  board.setEdgesVisible(boardEdgesVisible);
+  boardEdgesToggleBtn.setAttribute("aria-pressed", String(boardEdgesVisible));
+  boardEdgesToggleBtn.textContent = boardEdgesVisible ? "Edges: On" : "Edges: Off";
+});
+
+boardZoom = clampZoom(parseBoardZoomPref(readStringPref(prefsStorage, "artisign.boardZoom", null), boardZoom, MIN_BOARD_ZOOM, MAX_BOARD_ZOOM));
+boardEdgesVisible = readBoolPref(prefsStorage, "artisign.boardEdgesVisible", boardEdgesVisible);
+board.setZoom(boardZoom);
+board.setEdgesVisible(boardEdgesVisible);
+boardEdgesToggleBtn.setAttribute("aria-pressed", String(boardEdgesVisible));
+boardEdgesToggleBtn.textContent = boardEdgesVisible ? "Edges: On" : "Edges: Off";
+updateBoardToolbar();
 
 /** @param {string | null} screen */
 function getRenderedDocForScreen(screen) {
@@ -963,6 +1062,12 @@ function setView(view) {
   if (view === "board" && activeMode === "inspect") setMode("inspect");
   if (view === "design-system") loadDesignSystem();
   if (view === "board" && !boardBuilt) loadBoard();
+  // CHR-623 review finding 5: an already-built board was `hidden` (clientWidth
+  // 0) while another tab showed, so any relayout that ran while hidden used
+  // a zero-viewport computeBoardColumns and would otherwise stay wrong until
+  // the next scheduleRelayout trigger fires — relayout immediately instead
+  // of waiting on that.
+  if (view === "board" && boardBuilt) board.relayout();
   // A sidebar toggle while another view was active runs against a
   // display:none canvas (clientWidth 0) — re-fit now that it's visible
   // again, in case its available width changed while we were away.

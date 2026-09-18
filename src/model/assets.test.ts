@@ -43,14 +43,16 @@ describe("resolveAssetRefs", () => {
 
   it("url mode rewrites src= to /api/assets/*, unconditionally (no filesystem check)", async () => {
     const html = `<img src="assets/does-not-exist.png">`;
-    expect(await resolveAssetRefs(html, store, "url")).toBe(`<img src="/api/assets/does-not-exist.png">`);
+    expect(await resolveAssetRefs(html, store, "url")).toBe(
+      `<img src="/api/assets/does-not-exist.png?project=${encodeURIComponent(store.projectDir)}">`,
+    );
   });
 
   it("url mode rewrites both src= and a background-image url()", async () => {
     const html = `<img src="assets/hero.png"><div style="background-image: url(assets/icons/logo.svg)"></div>`;
     const out = await resolveAssetRefs(html, store, "url");
-    expect(out).toContain('src="/api/assets/hero.png"');
-    expect(out).toContain("url('/api/assets/icons/logo.svg')");
+    expect(out).toContain(`src="/api/assets/hero.png?project=${encodeURIComponent(store.projectDir)}"`);
+    expect(out).toContain(`url('/api/assets/icons/logo.svg?project=${encodeURIComponent(store.projectDir)}')`);
   });
 
   it("inline mode embeds the file as a data: URI", async () => {
@@ -67,21 +69,21 @@ describe("resolveAssetRefs", () => {
   it("preserves the original quote style on src", async () => {
     const html = `<img src='assets/hero.png'>`;
     const out = await resolveAssetRefs(html, store, "url");
-    expect(out).toBe(`<img src='/api/assets/hero.png'>`);
+    expect(out).toBe(`<img src='/api/assets/hero.png?project=${encodeURIComponent(store.projectDir)}'>`);
   });
 
   it("url mode percent-encodes a filename with a space (macOS's own default when duplicating a file)", async () => {
     await writeFile(join(dir, "assets", "hero copy.png"), Buffer.from([1, 2, 3, 4]));
     const html = `<img src="assets/hero copy.png">`;
     const out = await resolveAssetRefs(html, store, "url");
-    expect(out).toBe(`<img src="/api/assets/hero%20copy.png">`);
+    expect(out).toBe(`<img src="/api/assets/hero%20copy.png?project=${encodeURIComponent(store.projectDir)}">`);
   });
 
   it("url mode percent-encodes a '#' in a filename so it doesn't get read as a URL fragment", async () => {
     await writeFile(join(dir, "assets", "hero#2.png"), Buffer.from([1, 2, 3, 4]));
     const html = `<img src="assets/hero#2.png">`;
     const out = await resolveAssetRefs(html, store, "url");
-    expect(out).toBe(`<img src="/api/assets/hero%232.png">`);
+    expect(out).toBe(`<img src="/api/assets/hero%232.png?project=${encodeURIComponent(store.projectDir)}">`);
   });
 
   it("inline mode is unaffected by spaces/# — it reads the file directly, no URL involved", async () => {
@@ -100,7 +102,9 @@ describe("resolveAssetRefs", () => {
   it("rewrites a &quot;-delimited url() (a double-quoted CSS url() after HTML attribute escaping)", async () => {
     const html = `<div style="background-image: url(&quot;assets/icons/logo.svg&quot;)"></div>`;
     const out = await resolveAssetRefs(html, store, "url");
-    expect(out).toBe(`<div style="background-image: url('/api/assets/icons/logo.svg')"></div>`);
+    expect(out).toBe(
+      `<div style="background-image: url('/api/assets/icons/logo.svg?project=${encodeURIComponent(store.projectDir)}')"></div>`,
+    );
   });
 
   it("&quot; rewrite never introduces a literal \" that would close the enclosing style attribute early", async () => {
@@ -117,7 +121,7 @@ describe("resolveAssetRefs", () => {
     // once escapeAttr has run over it.
     const html = `<img src="assets/a&amp;b.png">`;
     const out = await resolveAssetRefs(html, store, "url");
-    expect(out).toBe(`<img src="/api/assets/a%26b.png">`);
+    expect(out).toBe(`<img src="/api/assets/a%26b.png?project=${encodeURIComponent(store.projectDir)}">`);
   });
 
   it("unescapes &amp; in an inline-mode reference too, so the file is actually found", async () => {
@@ -130,6 +134,35 @@ describe("resolveAssetRefs", () => {
   it("trims interior whitespace CSS permits around an unquoted url() argument", async () => {
     const html = `<div style="background-image: url( assets/icons/logo.svg )"></div>`;
     const out = await resolveAssetRefs(html, store, "url");
-    expect(out).toBe(`<div style="background-image: url('/api/assets/icons/logo.svg')"></div>`);
+    expect(out).toBe(
+      `<div style="background-image: url('/api/assets/icons/logo.svg?project=${encodeURIComponent(store.projectDir)}')"></div>`,
+    );
+  });
+
+  it("inline mode carries no ?project= — it never leaves an HTTP reference behind", async () => {
+    const html = `<img src="assets/hero.png">`;
+    const out = await resolveAssetRefs(html, store, "inline");
+    expect(out).not.toContain("project=");
+  });
+
+  it("a project dir with a space, an apostrophe and parentheses survives inside src=\"…\" and inside url(…)", async () => {
+    const weirdDir = `${dir}/Christian's (alt)`;
+    await mkdir(join(weirdDir, "assets"), { recursive: true });
+    await writeFile(join(weirdDir, "assets", "hero.png"), Buffer.from([1, 2, 3, 4]));
+    const weirdStore = new FsStore(weirdDir);
+
+    const srcHtml = `<img src="assets/hero.png">`;
+    const srcOut = await resolveAssetRefs(srcHtml, weirdStore, "url");
+    const srcMatch = /src="([^"]+)"/.exec(srcOut);
+    expect(srcMatch).not.toBeNull();
+    expect(srcMatch![1]).not.toMatch(/['"()]/);
+    expect(new URL(srcMatch![1]!, "http://127.0.0.1").searchParams.get("project")).toBe(weirdDir);
+
+    const urlHtml = `<div style="background-image: url(assets/hero.png)"></div>`;
+    const urlOut = await resolveAssetRefs(urlHtml, weirdStore, "url");
+    const urlMatch = /url\('([^']+)'\)/.exec(urlOut);
+    expect(urlMatch).not.toBeNull();
+    expect(urlMatch![1]).not.toMatch(/['()]/);
+    expect(new URL(urlMatch![1]!, "http://127.0.0.1").searchParams.get("project")).toBe(weirdDir);
   });
 });

@@ -118,7 +118,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "get_design_system",
-    "Tokens, components (with variants and slot names), and patterns. tree groups token values by " +
+    "Tokens, components (with variants and the default variant's slot names), and patterns. tree groups token values by " +
       "bucket into one compact string per bucket, not one entry per token path — full adds the " +
       "flat per-path form plus definition markup.",
     { view: viewSchema.optional(), fields: z.array(z.string()).optional() },

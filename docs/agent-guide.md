@@ -22,7 +22,7 @@ discipline in copying values.
    pattern **before** designing anything. You cannot reuse what you have not
    read. Reach for `full` only once you're about to edit a definition's
    actual markup — `tree` already carries every token's value and every
-   component's slot names.
+   component's slot names (those of its default variant).
 
 Do not read full screens upfront. Load detail lazily with tiered reads.
 

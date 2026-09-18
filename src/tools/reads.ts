@@ -568,12 +568,16 @@ export async function getDesignSystem(store: Store, input: GetDesignSystemInput)
     // this tier's LLM reader, not a machine parser. The flat, unambiguously
     // parseable {path,value}[] form stays available unchanged at `full`
     // (`token_values`, below). Breaking change — see Tool-Palette.md.
-    tokens: Object.entries(tokens).map(([bucket, members]) => ({
-      bucket,
-      values: Object.entries(members)
-        .map(([member, value]) => `${member} ${formatTokenMemberValue(value)}`)
-        .join(" · "),
-    })),
+    // An empty bucket (a fresh project has six) is left out — it would cost
+    // tokens to say nothing.
+    tokens: Object.entries(tokens)
+      .filter(([, members]) => Object.keys(members).length > 0)
+      .map(([bucket, members]) => ({
+        bucket,
+        values: Object.entries(members)
+          .map(([member, value]) => `${member} ${formatTokenMemberValue(value)}`)
+          .join(" · "),
+      })),
     components: componentDefs.map(({ name, def, slots }) => ({
       name,
       file: `design-system/components/${name}.html`,

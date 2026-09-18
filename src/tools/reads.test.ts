@@ -647,6 +647,16 @@ describe("get_design_system", () => {
     expect(components.find((c) => c.name === "icon")?.slots).toEqual([]);
   });
 
+  it("leaves empty buckets out and writes a composite token value as compact JSON (CHR-636)", async () => {
+    const tokens = await fx.store.readTokens();
+    for (const bucket of Object.keys(tokens)) tokens[bucket] = {};
+    tokens.typography = { body: { fontSize: "16px", lineHeight: 1.5 } as unknown as string, weight: 400 as unknown as string };
+    await fx.store.writeTokens(tokens);
+
+    const res = await getDesignSystem(fx.store, { view: "tree" });
+    expect(res.tokens).toEqual([{ bucket: "typography", values: 'body {"fontSize":"16px","lineHeight":1.5} · weight 400' }]);
+  });
+
   it("reconstructs every bucket.member -> value from the grouped tree.tokens strings, matching tokens.json exactly", async () => {
     const tokens = await fx.store.readTokens();
     tokens.spacing = { xs: "4px", sm: "8px", lg: "1rem 2rem" };

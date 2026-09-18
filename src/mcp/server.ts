@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Store } from "../store/index.js";
 import { TOOLS, ToolError, type ToolHandlerContext } from "../tools/index.js";
 import { INSTRUCTIONS } from "./instructions.js";
+import { deriveActivityEvent, type ActivitySink } from "./activity.js";
 
 // Read from package.json rather than repeated here: this string is what every
 // MCP client shows as the server's version, and a second copy of it drifts the
@@ -24,6 +25,22 @@ function isImageResult(value: unknown): value is ImageResult {
 }
 
 /**
+ * Derives and broadcasts one `activity` event (CHR-630/ADR-005) for a tool
+ * call. Called from a `finally`, after the MCP response is already built —
+ * an exception here (derivation or the broadcast itself) must never alter
+ * that response, so it's caught and logged, not rethrown. A no-op when
+ * `activity` is undefined (stdio transport, or no project resolved).
+ */
+function emitActivity(activity: ActivitySink | undefined, tool: string, input: Record<string, unknown>, ok: boolean, result: unknown): void {
+  if (!activity) return;
+  try {
+    activity.broadcastActivity(deriveActivityEvent(tool, input, ok, result));
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : err);
+  }
+}
+
+/**
  * Builds the MCP server exposing all tools, backed by `store`. Shared by the
  * stdio and streamable-HTTP transports. `ctx` is the daemon-only extra
  * context a handful of tools need — omitted by the stdio transport, which has no registry.
@@ -36,8 +53,14 @@ function isImageResult(value: unknown): value is ImageResult {
  * clean `invalid_state` error in that mode instead of crashing on a missing
  * store, so an agent can still discover and call `init_project` to create
  * its first project without the whole route 503ing before dispatch.
+ *
+ * `activity` (CHR-630/ADR-005) is the resolved project's activity sink, fed
+ * one derived event per tool call — reads included — after the handler
+ * settles either way (success or `ToolError`). Absent for the stdio
+ * transport, which has no hub to broadcast to. A call the SDK rejects for
+ * an invalid input schema never reaches this callback and emits nothing.
  */
-export function createMcpServer(store: Store | undefined, ctx?: ToolHandlerContext): McpServer {
+export function createMcpServer(store: Store | undefined, ctx?: ToolHandlerContext, activity?: ActivitySink): McpServer {
   const server = new McpServer(SERVER_INFO, { instructions: INSTRUCTIONS });
 
   for (const toolDef of TOOLS) {
@@ -45,11 +68,13 @@ export function createMcpServer(store: Store | undefined, ctx?: ToolHandlerConte
       toolDef.name,
       { description: toolDef.description, inputSchema: toolDef.inputShape },
       async (input: Record<string, unknown>) => {
+        let ok = true;
+        let result: unknown;
         try {
           if (!store && toolDef.requiresProject !== false) {
             throw new ToolError("invalid_state", "no project open — pass ?project=<path>, or call init_project to create one");
           }
-          const result = await toolDef.handler(store as Store, input, ctx);
+          result = await toolDef.handler(store as Store, input, ctx);
           if (isImageResult(result)) {
             const { __image, ...rest } = result;
             const content: ({ type: "image"; data: string; mimeType: string } | { type: "text"; text: string })[] = [
@@ -60,11 +85,14 @@ export function createMcpServer(store: Store | undefined, ctx?: ToolHandlerConte
           }
           return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
         } catch (err) {
+          ok = false;
           const body =
             err instanceof ToolError
               ? { code: err.code, message: err.message }
               : { code: "io_error", message: err instanceof Error ? err.message : String(err) };
           return { content: [{ type: "text" as const, text: JSON.stringify(body) }], isError: true };
+        } finally {
+          emitActivity(activity, toolDef.name, input, ok, result);
         }
       },
     );

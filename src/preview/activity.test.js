@@ -9,7 +9,6 @@ import {
   activityIsNavigable,
   canFollowNavigate,
   resolveFollowNavigation,
-  feedClickPausesFollow,
   formatActivityTarget,
   formatActivityTime,
   nextFollowState,
@@ -241,12 +240,6 @@ describe("resolveFollowNavigation", () => {
   });
 });
 
-describe("feedClickPausesFollow", () => {
-  it("is always false — a feed click never pauses follow (ADR-005 amendment, 2026-09-18)", () => {
-    expect(feedClickPausesFollow()).toBe(false);
-  });
-});
-
 describe("nextFollowState", () => {
   it("toggle-on always enables, unpaused", () => {
     expect(nextFollowState(FOLLOW_OFF, "toggle-on")).toEqual({ enabled: true, paused: false });
@@ -258,6 +251,11 @@ describe("nextFollowState", () => {
     expect(nextFollowState({ enabled: true, paused: false }, "toggle-off")).toEqual(FOLLOW_OFF);
   });
 
+  // A feed click now takes this exact "pause" transition too (ADR-005, the
+  // 2026-09-18 feed exemption reversed the same day) — app.js's
+  // handleActivityFeedSelect calls pauseFollow() unconditionally, same as a
+  // sidebar click or a tab switch, so there is no separate pure fact left
+  // to pin for the feed specifically; this is the one it now shares.
   it("pause only takes effect while enabled and not already paused", () => {
     const following = { enabled: true, paused: false };
     expect(nextFollowState(following, "pause")).toEqual({ enabled: true, paused: true });

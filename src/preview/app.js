@@ -32,7 +32,6 @@ import {
   activityTargetExists,
   activityIsNavigable,
   resolveFollowNavigation,
-  feedClickPausesFollow,
   highlightDurationMs,
   highlightNodes,
   highlightScreen,
@@ -934,9 +933,9 @@ function renderActivityFeedPanel() {
   });
 }
 
-/** A feed row's click always navigates, regardless of follow's own on/off/paused state — feedClickPausesFollow is always false (ADR-005 amendment, decided by Christian on 2026-09-18: the human is browsing the agent's own history, not designing something themselves, so the next live navigating call still pulls the view back to the agent's current target), kept as an explicit call rather than simply never calling pauseFollow here — see review fix 8. */
+/** A feed row's click is human navigation like any other (ADR-005 pause rule 1) — a click landing here means the human wants to look at that entry's target, so it pauses follow the same way a sidebar click or a tab switch does, then navigates there. The 2026-09-18 exemption that let a feed click skip pauseFollow is reversed: it pulled the view right back to the agent's current target on the next live call, which is wrong the moment the human actually clicked something. */
 function handleActivityFeedSelect(event) {
-  if (feedClickPausesFollow()) pauseFollow();
+  pauseFollow();
   navigateToActivity(event);
 }
 

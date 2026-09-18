@@ -1,6 +1,7 @@
 import type { TokensDocument } from "../store/index.js";
-import type { Node, NodeKind, NodeRefs, ScreenDocument, ScreenId, ValidationWarning } from "./types.js";
+import type { Node, NodeKind, NodeRefs, ScreenDocument, ScreenId, TokenRef, ValidationWarning } from "./types.js";
 import { serializeTokenRef } from "./serializer.js";
+import { isMixedTokenValue } from "./token-ref.js";
 
 const HEX_COLOR_RE = /^#[0-9a-f]{3,8}$/i;
 
@@ -229,12 +230,39 @@ const LAYOUT_ONLY_PROPERTIES: ReadonlySet<string> = new Set([
   "inset-inline-end",
 ]);
 
+/** A live `Node` or a slot-fill `NodeSubtree` — both carry the three fields every predicate here looks at. */
+type StyleableNode = { kind: NodeKind; refs: NodeRefs; inlineStyles: Record<string, string> };
+
+/**
+ * CHR-637's `component_coverage`/`token_coverage` denominator: an element
+ * (or `svg`/`svg_path`) carrying no component ref, with at least one
+ * non-layout property in its *literal* `inlineStyles` — `refs.tokens`
+ * deliberately not consulted here, unlike `isRepeatedPatternCandidate`
+ * below. `token_coverage`'s whole point is literal-vs-token-ref usage, so a
+ * node styled entirely through token refs must not itself also count as
+ * "ad-hoc" (hand-built) on the `component_coverage` side — a
+ * `$ref`-driven declaration is design-system usage, not the un-refactored
+ * scaffolding this predicate exists to flag. `kind === "component_instance"`
+ * always implies `refs.component` is set (parser invariant); both checks
+ * are kept anyway since they're free, and the `kind` check alone also
+ * correctly excludes text nodes.
+ */
+export function isAdHocDesignElement(node: StyleableNode): boolean {
+  if (!(node.kind === "element" || node.kind === "svg" || node.kind === "svg_path")) return false;
+  if (node.refs.component !== undefined) return false;
+  const props = Object.keys(node.inlineStyles);
+  return props.some((p) => !LAYOUT_ONLY_PROPERTIES.has(p.toLowerCase()));
+}
+
 /**
  * Counted as layout on top of the set above (CTO decision, CHR-633
  * review): a fixed-size ad-hoc spacer/wrapper (`<div style="height:
  * 16px">`) repeated across screens is exactly the kind of warning an agent
  * can't act on — there's no component to name and nothing to promote a
- * bare height to.
+ * bare height to. `repeated_pattern`-only (`isRepeatedPatternCandidate`
+ * below) — `isAdHocDesignElement` above deliberately does NOT get this
+ * treatment, since CHR-637's own reference figures depend on treating
+ * `height`/`width` as real, countable design decisions.
  */
 const REPEATED_PATTERN_SIZE_PROPERTIES: ReadonlySet<string> = new Set([
   "width",
@@ -245,9 +273,6 @@ const REPEATED_PATTERN_SIZE_PROPERTIES: ReadonlySet<string> = new Set([
   "max-height",
   "box-sizing",
 ]);
-
-/** A live `Node` or a slot-fill `NodeSubtree` — both carry the three fields every predicate here looks at. */
-type StyleableNode = { kind: NodeKind; refs: NodeRefs; inlineStyles: Record<string, string> };
 
 /**
  * Every CSS declaration a node actually carries — literal values from
@@ -442,4 +467,70 @@ export function computeRepeatedPatternWarnings(
       suggestion: componentName ? `$${componentName}` : "promote_to_system",
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// CHR-637 — reuse metric's literal-design-value counter, for token_coverage.
+// A separate classification system from LAYOUT_ONLY_PROPERTIES above — see
+// countLiteralDesignValues's own doc comment for why the two don't share a
+// filter.
+// ---------------------------------------------------------------------------
+
+// Deliberately narrow, and understated on real projects because of it:
+// `LITERAL_COLOR_RE` misses named colors (`color: white`) and any
+// non-hex/rgb/hsl function; `LITERAL_DIMENSION_RE` misses `%`/`vh`/`vw`/`ch`
+// units and, notably, a unitless `line-height` (`line-height: 1.4`) — even
+// though `line-height` is one of the properties this metric is meant to
+// penalize (see `countLiteralDesignValues`'s doc comment below, which lists
+// it among the calibration project's top-5 literal properties). A screen
+// styled entirely with named colors and unitless line-heights reads as more
+// reused than it is. Widening the match is future work, not a defect to
+// silently patch here — ticket scope was hex/rgb/hsl and px/em/rem.
+const LITERAL_COLOR_RE = /#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)/gi;
+const LITERAL_DIMENSION_RE = /(?<![\w.-])(-?(?:\d*\.\d+|\d+))(px|em|rem)\b/gi;
+
+/** Every color/dimension literal in `text`, one count per regex match (a shorthand's `1px solid #333` counts 2) — a `0` dimension (`margin: 0`) is not a "design value" worth flagging, so it's filtered out; a `0` color match can't occur (the color pattern always needs a color-shaped token). */
+function countLiteralMatchesInText(text: string): number {
+  let count = (text.match(LITERAL_COLOR_RE) ?? []).length;
+  for (const match of text.matchAll(LITERAL_DIMENSION_RE)) {
+    if (Number(match[1]) !== 0) count += 1;
+  }
+  return count;
+}
+
+/**
+ * Counts every literal color/dimension value on a node — CHR-637's
+ * `token_coverage` denominator. No layout-property exclusion here, unlike
+ * `isAdHocDesignElement`'s gate above: `padding`/`height` literal
+ * values are real, common, and exactly what `token_coverage` should be
+ * penalizing (the calibration reference project's own top-5 literal
+ * properties — font-size, line-height, height, padding, border-radius —
+ * include two `LAYOUT_ONLY_PROPERTIES` treats as layout for the *other*
+ * metric). These are two independent classification systems over the same
+ * `inlineStyles`/`refs.tokens` data, not one shared filter.
+ *
+ * `refsTokens` — not just `inlineStyles` — is required because any `$ref`,
+ * even one mixed with literal text, routes the *entire* declaration into
+ * `refs.tokens` (parser invariant, never split across both dicts):
+ * `padding: 12px $spacing.page` puts `12px` out of `inlineStyles`' reach
+ * entirely. Every `MixedTokenValue` in `refsTokens` (`"class"` excluded —
+ * a component/token-class ref, never a style declaration) is scanned for
+ * its literal chunks (`parts`' even indices — see `MixedTokenValue`'s own
+ * doc comment) the same way a plain `inlineStyles` value is; a
+ * non-mixed ref (a bare `$path`/modifier call, no literal text at all)
+ * contributes nothing, correctly.
+ */
+export function countLiteralDesignValues(inlineStyles: Record<string, string>, refsTokens: Record<string, TokenRef>): number {
+  let count = 0;
+  for (const value of Object.values(inlineStyles)) {
+    count += countLiteralMatchesInText(value);
+  }
+  for (const [prop, ref] of Object.entries(refsTokens)) {
+    if (prop === "class") continue;
+    if (!isMixedTokenValue(ref)) continue;
+    for (let i = 0; i < ref.parts.length; i += 2) {
+      count += countLiteralMatchesInText(ref.parts[i] as string);
+    }
+  }
+  return count;
 }

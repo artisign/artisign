@@ -20,6 +20,7 @@ import {
 import { loadScreen } from "./context.js";
 import { readMockupMetaOrDefault } from "./mockups.js";
 import { loadAllDocuments, loadDefinitionSource, type SourceDoc } from "./definitions.js";
+import { computeReuseMetrics } from "./reuse.js";
 import { renderScreenDocument } from "./render-context.js";
 import { parseNodeRef, formatNodeRef } from "./node-ref.js";
 import { readAllFlows, readScreenFlows, toPublicFlowRecord } from "./flows.js";
@@ -136,7 +137,7 @@ const PROJECT_ALWAYS = [
   "head_reason",
   "last_write_at",
 ];
-const PROJECT_OPTIONAL = ["screens", "design_system", "flows", "mockups", "tag_notes"];
+const PROJECT_OPTIONAL = ["screens", "design_system", "flows", "mockups", "tag_notes", "reuse"];
 
 export async function getProject(store: Store, input: GetProjectInput): Promise<Record<string, unknown>> {
   const view = input.view ?? "summary";
@@ -181,6 +182,16 @@ export async function getProject(store: Store, input: GetProjectInput): Promise<
   if (input.tags && input.tags.length > 0) {
     const tagNotes = await readTagNotes(store, input.tags);
     if (tagNotes.length > 0) summary.tag_notes = tagNotes;
+  }
+
+  // reuse rides along the same way tag_notes does — computed (and its one
+  // project-wide loadAllDocuments cost paid) only when actually requested,
+  // available at every view tier since tree/full both spread `summary`
+  // below. Never touches the ≤500-token cold-start budget when it isn't
+  // requested: the field simply doesn't exist on `summary` in that case.
+  if (input.fields?.includes("reuse")) {
+    const registry = await loadRegistry(store);
+    summary.reuse = await computeReuseMetrics(store, registry);
   }
 
   // Tags queries hit even at summary tier — a minimal { screen, tags } list

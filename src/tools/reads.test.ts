@@ -208,6 +208,208 @@ describe("get_project", () => {
   });
 });
 
+describe("get_project reuse field", () => {
+  let fx: ProjectFixture;
+
+  beforeEach(async () => {
+    fx = await setupProject();
+  });
+  afterEach(() => fx.cleanup());
+
+  it("is not present without fields:[\"reuse\"], at any view tier", async () => {
+    await fx.store.writeScreen("home", `<div id="n1" style="color: #fff"></div>`);
+    for (const view of ["summary", "tree", "full"] as const) {
+      const res = await getProject(fx.store, { view });
+      expect(res).not.toHaveProperty("reuse");
+    }
+  });
+
+  it("computes component_coverage/token_coverage/score arithmetic on a hand-computable fixture", async () => {
+    await fx.store.writeComponent("btn-primary", `<button id="root">Go</button>`);
+    // instances=3 (a,b,f); adhoc=2 — "c" (a keyword-only non-layout style,
+    // no countable literal) AND "e" (a literal color, which is inherently
+    // also ad-hoc styling — a node contributing a literal design value is,
+    // by definition, hand-built) -> component_coverage = 3/(3+2) = 0.6
+    // token_refs=1 ("d"'s plain token ref, no literal text, not ad-hoc since
+    // its inlineStyles is empty); literal_values=1 ("e"'s "#fff")
+    // -> token_coverage = 1/(1+1) = 0.5
+    // reuse = mean(0.6, 0.5) = 0.55
+    await fx.store.writeScreen(
+      "home",
+      `<section id="root">` +
+        `<div id="a" class="$btn-primary"></div>` +
+        `<div id="b" class="$btn-primary"></div>` +
+        `<div id="f" class="$btn-primary"></div>` +
+        `<div id="c" style="overflow: hidden"></div>` + // ad-hoc, no literal design value
+        `<div id="d" style="color: $color.primary"></div>` + // token ref only, not ad-hoc (empty inlineStyles)
+        `<div id="e" style="color: #fff"></div>` + // literal design value, also ad-hoc
+        `</section>`,
+    );
+    const tokens = await fx.store.readTokens();
+    tokens.color = { primary: "#000" };
+    await fx.store.writeTokens(tokens);
+
+    const res = await getProject(fx.store, { fields: ["reuse"] });
+    const reuse = res.reuse as Record<string, unknown>;
+    expect(reuse.component_coverage).toBeCloseTo(0.6, 2);
+    expect(reuse.token_coverage).toBeCloseTo(0.5, 2);
+    expect(reuse.score).toBeCloseTo(0.55, 2);
+  });
+
+  it("is the mean of per-screen ratios, not an aggregate weighted by node count", async () => {
+    // Screen A: 9 instances + 1 ad-hoc node -> component_coverage 0.9 (10 nodes)
+    const instances = Array.from({ length: 9 }, (_, i) => `<div id="i${i}" class="$btn-primary"></div>`).join("");
+    await fx.store.writeComponent("btn-primary", `<button id="root">Go</button>`);
+    await fx.store.writeScreen("busy", `<section id="root">${instances}<div id="adhoc" style="overflow: hidden"></div></section>`);
+    // Screen B: 1 ad-hoc node, 0 instances -> component_coverage 0 (1 node)
+    await fx.store.writeScreen("quiet", `<div id="root" style="overflow: hidden"></div>`);
+
+    const res = await getProject(fx.store, { fields: ["reuse"] });
+    const reuse = res.reuse as Record<string, unknown>;
+    // Mean of 0.9 and 0 = 0.45 — a pooled/aggregate figure would instead be
+    // 9/11 ≈ 0.818 (heavily skewed by "busy"'s ten nodes vs. "quiet"'s one).
+    // This is the opposite of what an aggregate would compute — worth
+    // pinning precisely because it's easy to get backwards.
+    expect(reuse.component_coverage).toBeCloseTo(0.45, 2);
+  });
+
+  it("a screen's own slot-fill content counts toward that screen's adhoc/instances/token_refs/literal_values", async () => {
+    await fx.store.writeComponent("card", `<div id="root"><span data-slot="content">default</span></div>`);
+    // The fill (p1) is never in doc.nodes at all (CHR-584) — it only shows
+    // up via the slotOverrides walk. Without walking fills, this screen
+    // would read as instances=1, adhoc=0 (component_coverage null-denominator-free 1.0);
+    // with fills walked, adhoc=1 too (the fill's own ad-hoc styling).
+    await fx.store.writeScreen(
+      "home",
+      `<div id="n1"><div id="n2" class="$card"><p id="p1" data-slot="content" style="overflow: hidden">fill</p></div></div>`,
+    );
+    const res = await getProject(fx.store, { fields: ["reuse"] });
+    const reuse = res.reuse as Record<string, unknown>;
+    expect(reuse.component_coverage).toBeCloseTo(0.5, 2); // 1 instance / (1 instance + 1 ad-hoc fill)
+  });
+
+  it("unused_components/unused_tokens scan screens + component definitions + patterns", async () => {
+    await fx.store.writeComponent("used-in-screen", `<button id="root">Go</button>`);
+    await fx.store.writeComponent("used-only-in-pattern", `<button id="root">Go</button>`);
+    await fx.store.writeComponent("truly-unused", `<button id="root">Go</button>`);
+    await fx.store.writePattern("some-pattern", `<div id="n1" class="$used-only-in-pattern"></div>`);
+    await fx.store.writeScreen("home", `<div id="n1" class="$used-in-screen"></div>`);
+
+    const res = await getProject(fx.store, { fields: ["reuse"] });
+    const reuse = res.reuse as Record<string, unknown>;
+    // A pattern reference is still real usage — delete_entity refuses to
+    // delete a component a pattern references, so the unused list must not
+    // name one either.
+    expect(reuse.unused_components).toEqual(["truly-unused"]);
+  });
+
+  it("a token referenced only from a pattern counts as used", async () => {
+    const tokens = await fx.store.readTokens();
+    tokens.color = { "only-in-pattern": "#123456", "truly-unused": "#654321" };
+    await fx.store.writeTokens(tokens);
+    await fx.store.writePattern("some-pattern", `<div id="n1" style="color: $color.only-in-pattern"></div>`);
+    await fx.store.writeScreen("home", `<div id="n1"></div>`);
+
+    const res = await getProject(fx.store, { fields: ["reuse"] });
+    const reuse = res.reuse as Record<string, unknown>;
+    expect(reuse.unused_tokens).toEqual(["color.truly-unused"]);
+  });
+
+  it("a component referenced only from a pattern appears in components_used_only_in_patterns, not in unused_components", async () => {
+    await fx.store.writeComponent("used-only-in-pattern", `<button id="root">Go</button>`);
+    await fx.store.writeComponent("used-in-screen", `<button id="root">Go</button>`);
+    await fx.store.writePattern("some-pattern", `<div id="n1" class="$used-only-in-pattern"></div>`);
+    await fx.store.writeScreen("home", `<div id="n1" class="$used-in-screen"></div>`);
+
+    const res = await getProject(fx.store, { fields: ["reuse"] });
+    const reuse = res.reuse as Record<string, unknown>;
+    expect(reuse.components_used_only_in_patterns).toEqual(["used-only-in-pattern"]);
+    expect(reuse.unused_components).toEqual([]);
+  });
+
+  it("omits components_used_only_in_patterns entirely when there is nothing to report", async () => {
+    await fx.store.writeComponent("used-in-screen", `<button id="root">Go</button>`);
+    await fx.store.writeScreen("home", `<div id="n1" class="$used-in-screen"></div>`);
+
+    const res = await getProject(fx.store, { fields: ["reuse"] });
+    const reuse = res.reuse as Record<string, unknown>;
+    expect(reuse).not.toHaveProperty("components_used_only_in_patterns");
+  });
+
+  it("a component reachable only via another component's slot content in a screen (not a pattern) counts as used", async () => {
+    await fx.store.writeComponent("badge", `<span id="root">New</span>`);
+    await fx.store.writeComponent("card", `<div id="root"><span data-slot="content">default</span></div>`);
+    // "badge" is only ever referenced inside a screen's fill content, never
+    // directly on a screen node or inside a component/pattern definition's
+    // own template markup.
+    await fx.store.writeScreen("home", `<div id="n1" class="$card"><div id="p1" data-slot="content" class="$badge"></div></div>`);
+
+    const res = await getProject(fx.store, { fields: ["reuse"] });
+    const reuse = res.reuse as Record<string, unknown>;
+    expect(reuse.unused_components).not.toContain("badge");
+  });
+
+  it("screens[] is capped at 10, sorted ascending by reuse, with screens_omitted correct", async () => {
+    for (let i = 0; i < 12; i++) {
+      // Descending reuse as i increases: s0 has the most ad-hoc noise
+      // (lowest reuse), s11 the least.
+      const adhocCount = 12 - i;
+      const adhoc = Array.from({ length: adhocCount }, (_, j) => `<div id="a${j}" style="overflow: hidden"></div>`).join("");
+      await fx.store.writeScreen(`s${i}`, `<section id="root">${adhoc}<div id="inst" class="$btn"></div></section>`);
+    }
+    await fx.store.writeComponent("btn", `<button id="root">Go</button>`);
+
+    const res = await getProject(fx.store, { fields: ["reuse"] });
+    const reuse = res.reuse as { screens: Array<{ screen: string }>; screens_omitted: number };
+    expect(reuse.screens).toHaveLength(10);
+    expect(reuse.screens_omitted).toBe(2);
+    // Ascending reuse -> s0 (most ad-hoc noise, lowest coverage) sorts first.
+    expect(reuse.screens[0]!.screen).toBe("s0");
+  });
+
+  it("screens_omitted is 0 when there are 10 or fewer screens", async () => {
+    await fx.store.writeScreen("home", `<div id="root" style="overflow: hidden"></div>`);
+
+    const res = await getProject(fx.store, { fields: ["reuse"] });
+    const reuse = res.reuse as { screens: Array<{ screen: string }>; screens_omitted: number };
+    expect(reuse.screens).toHaveLength(1);
+    expect(reuse.screens_omitted).toBe(0);
+  });
+
+  it("a screen with nothing to divide by (no instances, no ad-hoc styling, no token refs) has null coverage and sorts last", async () => {
+    // "empty" has zero styleable declarations at all -> both ratios are
+    // 0/0 -> null, not 0. "styled" has a real (non-null) reuse value.
+    await fx.store.writeScreen("empty", `<div id="root"></div>`);
+    await fx.store.writeScreen("styled", `<div id="root" style="overflow: hidden"></div>`);
+
+    const res = await getProject(fx.store, { fields: ["reuse"] });
+    const reuse = res.reuse as {
+      screens: Array<{ screen: string; component_coverage: number | null; token_coverage: number | null; reuse: number | null }>;
+    };
+    const empty = reuse.screens.find((s) => s.screen === "empty")!;
+    expect(empty.component_coverage).toBeNull();
+    expect(empty.token_coverage).toBeNull();
+    expect(empty.reuse).toBeNull();
+    // A null-reuse screen isn't a low-reuse offender to act on, so it sorts
+    // after every screen with a real (however low) reuse value.
+    expect(reuse.screens[reuse.screens.length - 1]!.screen).toBe("empty");
+  });
+
+  it("two null-reuse screens keep their relative input order (stable sort; NaN comparator result is not a real ordering)", async () => {
+    // Both screens are fully empty -> both null -> the comparator computes
+    // Infinity - Infinity = NaN for this pair specifically. Array.sort
+    // treats a NaN result as 0 (stable, order preserved) rather than
+    // reordering them — pinning that so it's never "fixed" into a rule.
+    await fx.store.writeScreen("empty-a", `<div id="root"></div>`);
+    await fx.store.writeScreen("empty-b", `<div id="root"></div>`);
+
+    const res = await getProject(fx.store, { fields: ["reuse"] });
+    const reuse = res.reuse as { screens: Array<{ screen: string }> };
+    const names = reuse.screens.map((s) => s.screen);
+    expect(names.indexOf("empty-a")).toBeLessThan(names.indexOf("empty-b"));
+  });
+});
+
 describe("get_screen", () => {
   let fx: ProjectFixture;
 

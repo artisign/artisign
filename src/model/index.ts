@@ -30,6 +30,8 @@ export {
   computeDriftWarnings,
   computeRepeatedPatternWarnings,
   isRepeatedPatternCandidate,
+  isAdHocDesignElement,
+  countLiteralDesignValues,
   repeatedPatternFingerprint,
   type StyleOccurrenceIndex,
 } from "./validate.js";

@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { parseScreen } from "./parser.js";
-import { computeDriftWarnings, computeRepeatedPatternWarnings, type StyleOccurrenceIndex } from "./validate.js";
+import {
+  computeDriftWarnings,
+  computeRepeatedPatternWarnings,
+  countLiteralDesignValues,
+  isAdHocDesignElement,
+  type StyleOccurrenceIndex,
+} from "./validate.js";
 import type { DesignSystemRegistry } from "./registry.js";
 import type { TokensDocument } from "../store/index.js";
 
@@ -529,5 +535,124 @@ describe("computeRepeatedPatternWarnings", () => {
     const html = `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>`;
     const { doc } = parseScreen(html, "home", noopRegistry);
     expect(computeRepeatedPatternWarnings(doc, "home", emptyIndex)).toEqual([]);
+  });
+});
+
+describe("countLiteralDesignValues", () => {
+  it("counts a plain literal value once", () => {
+    expect(countLiteralDesignValues({ color: "#3366ff" }, {})).toBe(1);
+  });
+
+  it("counts a shorthand per embedded literal, not per property (border: 1px solid #333 -> 2)", () => {
+    expect(countLiteralDesignValues({ border: "1px solid #333" }, {})).toBe(2);
+  });
+
+  it("counts every color/dimension literal across every declaration", () => {
+    const inlineStyles = { padding: "8px 16px", color: "#fff" };
+    // padding: 8px, 16px -> 2; color: #fff -> 1
+    expect(countLiteralDesignValues(inlineStyles, {})).toBe(3);
+  });
+
+  it("filters out a zero-value dimension (margin: 0 is not a design value)", () => {
+    expect(countLiteralDesignValues({ margin: "0" }, {})).toBe(0);
+    expect(countLiteralDesignValues({ margin: "0 8px" }, {})).toBe(1);
+  });
+
+  it("applies no layout-property exclusion — height/padding count like any other property", () => {
+    // Unlike isAdHocDesignElement's gate, every property counts here.
+    expect(countLiteralDesignValues({ height: "44px", padding: "8px" }, {})).toBe(2);
+  });
+
+  it("a value carrying only a token ref (no literal text) contributes 0", () => {
+    const registry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["spacing.md"]),
+      tokenFlatNames: new Set(["md"]),
+    };
+    const { doc } = parseScreen(`<div id="n1" style="padding: $spacing.md"></div>`, "s", registry);
+    const node = doc.nodes.n1!;
+    expect(countLiteralDesignValues(node.inlineStyles, node.refs.tokens)).toBe(0);
+  });
+
+  it("a MixedTokenValue's literal text still counts, even though the whole property lives in refs.tokens, not inlineStyles", () => {
+    const registry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["spacing.page"]),
+      tokenFlatNames: new Set(["page"]),
+    };
+    const { doc } = parseScreen(`<div id="n1" style="padding: 12px $spacing.page"></div>`, "s", registry);
+    const node = doc.nodes.n1!;
+    // The whole "padding" declaration is a MixedTokenValue in refs.tokens —
+    // absent from inlineStyles entirely (parser invariant) — yet its "12px"
+    // literal chunk must still be counted.
+    expect(node.inlineStyles).toEqual({});
+    expect(countLiteralDesignValues(node.inlineStyles, node.refs.tokens)).toBe(1);
+  });
+
+  it("excludes the \"class\" key in refsTokens — a component/token-class ref, never a style declaration", () => {
+    const registry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["color.primary"]),
+      tokenFlatNames: new Set(["primary"]),
+    };
+    // class="$color.primary" resolves as a token-class ref (refs.tokens.class) — never mixed with literal text in practice, but even if it were, it must not count.
+    const { doc } = parseScreen(`<div id="n1" class="$color.primary"></div>`, "s", registry);
+    const node = doc.nodes.n1!;
+    expect(countLiteralDesignValues(node.inlineStyles, node.refs.tokens)).toBe(0);
+  });
+});
+
+describe("isAdHocDesignElement", () => {
+  const noopRegistry: DesignSystemRegistry = { componentNames: new Set(), tokenPaths: new Set(), tokenFlatNames: new Set() };
+
+  it("true for an element with at least one non-layout literal declaration", () => {
+    const { doc } = parseScreen(`<div id="n1" style="color: #fff"></div>`, "s", noopRegistry);
+    expect(isAdHocDesignElement(doc.nodes.n1!)).toBe(true);
+  });
+
+  it("false for a layout-only element (any combination of display/flex/gap/padding/position/inset)", () => {
+    const { doc } = parseScreen(
+      `<div id="n1" style="display: flex; gap: 8px; padding: 16px; position: absolute; inset: 0"></div>`,
+      "s",
+      noopRegistry,
+    );
+    expect(isAdHocDesignElement(doc.nodes.n1!)).toBe(false);
+  });
+
+  it("a single non-layout declaration is enough — unlike isRepeatedPatternCandidate's two-declaration floor, this predicate stays at the original ≥1", () => {
+    const { doc } = parseScreen(`<div id="n1" style="display: flex; text-transform: uppercase"></div>`, "s", noopRegistry);
+    expect(isAdHocDesignElement(doc.nodes.n1!)).toBe(true);
+  });
+
+  it("false for a node styled entirely through token refs — token_coverage's whole point is literal-vs-ref usage, so a $ref-only node must not also count as ad-hoc", () => {
+    const registry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["color.primary"]),
+      tokenFlatNames: new Set(["primary"]),
+    };
+    const { doc } = parseScreen(`<div id="n1" style="color: $color.primary"></div>`, "s", registry);
+    // The whole declaration lives in refs.tokens, not inlineStyles (parser
+    // invariant) — this predicate deliberately only ever looks at
+    // inlineStyles, unlike isRepeatedPatternCandidate.
+    expect(doc.nodes.n1!.inlineStyles).toEqual({});
+    expect(isAdHocDesignElement(doc.nodes.n1!)).toBe(false);
+  });
+
+  it("false for a component_instance node, even with a visually-styled root element otherwise", () => {
+    const registry: DesignSystemRegistry = { componentNames: new Set(["card"]), tokenPaths: new Set(), tokenFlatNames: new Set() };
+    const { doc } = parseScreen(`<div id="n1" class="$card" style="color: #fff"></div>`, "s", registry);
+    expect(isAdHocDesignElement(doc.nodes.n1!)).toBe(false);
+  });
+
+  it("false for a text node", () => {
+    const { doc } = parseScreen(`<div id="n1">Hello</div>`, "s", noopRegistry);
+    const textNode = Object.values(doc.nodes).find((n) => n.kind === "text");
+    expect(textNode).toBeDefined();
+    expect(isAdHocDesignElement(textNode!)).toBe(false);
+  });
+
+  it("true for an svg/svg_path node with a non-layout style", () => {
+    const { doc } = parseScreen(`<svg id="n1" style="fill: #000"></svg>`, "s", noopRegistry);
+    expect(isAdHocDesignElement(doc.nodes.n1!)).toBe(true);
   });
 });

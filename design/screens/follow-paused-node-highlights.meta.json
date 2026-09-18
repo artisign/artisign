@@ -1,0 +1,7 @@
+{
+  "notes": "CHR-628/CHR-629: follow paused (topbar `follow-paused` variant, \"Follow paused | Resume\" — human navigated away, per ADR-005 precedence rule 1). Canvas shows the two node-level highlight kinds side by side on the same mock for direct comparison: `line-1` = read highlight (solid 2px teal outline, appears immediately), `line-2` = write highlight (2px dashed violet outline + translucent violet wash, appears after the write's re-render or a 1s grace). `line-3` is unhighlighted, for contrast. Feed shows the two corresponding calls.",
+  "tags": [
+    "chr-628",
+    "chr-629"
+  ]
+}

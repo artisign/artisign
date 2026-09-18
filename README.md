@@ -125,7 +125,7 @@ Daemon-level state — that config plus the `daemon.lock` holding the running pi
 | Reads | `get_project` | Screen list, design-system pointer, counts. Tiered, cold-start read. |
 | Reads | `get_screen` | One screen with comment/flow indicators. Tiered + field selection. |
 | Reads | `get_node` | Subtree of one node, addressed as `<screen>.<node-id>`. Tiered + field selection. |
-| Reads | `get_design_system` | Tokens, components (with variants), and patterns. |
+| Reads | `get_design_system` | Tokens, components (with variants and the default variant's slot names), and patterns. `tree` carries every token value, grouped by bucket. |
 | Reads | `find_nodes` | Where-query across screens (style ref, component ref, variant, comments, text, flow). |
 | Reads | `list_comments` | Open/resolved comments, filtered by screen or node. |
 | Reads | `get_mockup` | A mockup's variants — raw HTML, outside the ref model. |

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseScreen } from "./parser.js";
-import { computeDriftWarnings } from "./validate.js";
+import { computeDriftWarnings, computeRepeatedPatternWarnings, type StyleOccurrenceIndex } from "./validate.js";
 import type { DesignSystemRegistry } from "./registry.js";
 import type { TokensDocument } from "../store/index.js";
 
@@ -304,5 +304,230 @@ describe("computeDriftWarnings", () => {
         suggestion: "$radius.pill",
       },
     ]);
+  });
+});
+
+describe("computeRepeatedPatternWarnings", () => {
+  const noopRegistry: DesignSystemRegistry = { componentNames: new Set(), tokenPaths: new Set(), tokenFlatNames: new Set() };
+  const emptyIndex: StyleOccurrenceIndex = { byScreen: new Map(), byComponent: new Map() };
+
+  /** Builds a `StyleOccurrenceIndex` reporting one fingerprint as present on `screens`, with `component` (if given) as its default-variant-root match. */
+  function indexFor(fingerprint: string, screens: string[], component?: string): StyleOccurrenceIndex {
+    const byComponent = new Map<string, string>();
+    if (component) byComponent.set(fingerprint, component);
+    return { byScreen: new Map([[fingerprint, new Set(screens)]]), byComponent };
+  }
+
+  it("warns when a node's normalized style matches ≥1 other screen's ad-hoc node", () => {
+    const html = `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    const fingerprint = "background:rgba(0,0,0,.4);color:#fff";
+    const index = indexFor(fingerprint, ["home", "checkout"]);
+
+    const warnings = computeRepeatedPatternWarnings(doc, "home", index);
+    expect(warnings).toEqual([
+      {
+        kind: "repeated_pattern",
+        nodeId: "n1",
+        message: `inline style repeated on 1 other screen (checkout): "${fingerprint}"`,
+        suggestion: "promote_to_system",
+      },
+    ]);
+  });
+
+  it("does not warn below threshold — style unique to this screen", () => {
+    const html = `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    // Only "home" itself holds the fingerprint — no OTHER screen does.
+    const index = indexFor("background:rgba(0,0,0,.4);color:#fff", ["home"]);
+    expect(computeRepeatedPatternWarnings(doc, "home", index)).toEqual([]);
+  });
+
+  it("does not warn for a layout-only wrapper (any combination of display/flex/gap/padding/position/inset/size)", () => {
+    const html = `<div id="n1" style="display: flex; gap: 8px; padding: 16px; position: absolute; inset: 0; width: 320px; height: 180px"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    // Even a full occurrence-index match must never fire — the node itself
+    // is excluded by the candidate gate before any lookup happens.
+    const index = indexFor(
+      "display:flex;gap:8px;height:180px;inset:0;padding:16px;position:absolute;width:320px",
+      ["checkout", "cart"],
+    );
+    expect(computeRepeatedPatternWarnings(doc, "home", index)).toEqual([]);
+  });
+
+  it("a single non-layout declaration alone never warns — needs at least two (CHR-635 review)", () => {
+    // One real visual declaration (color) plus a pile of layout ones — on a
+    // real, dense project a bare single declaration like this matched
+    // dozens of screens by coincidence and produced nothing an agent could
+    // act on.
+    const html = `<div id="n1" style="display: flex; padding: 16px; color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    const index = indexFor("color:#fff;display:flex;padding:16px", ["checkout", "cart", "cash"]);
+    expect(computeRepeatedPatternWarnings(doc, "home", index)).toEqual([]);
+  });
+
+  it("warns once two non-layout declarations are present, even mixed with layout props", () => {
+    const html = `<div id="n1" style="position: fixed; background: rgba(0,0,0,.4); color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    const fingerprint = "background:rgba(0,0,0,.4);color:#fff;position:fixed";
+    const index = indexFor(fingerprint, ["checkout"]);
+    expect(computeRepeatedPatternWarnings(doc, "home", index)).toHaveLength(1);
+  });
+
+  it("fingerprints a token-ref declaration in its as-written form, not just literal ones (CHR-635 review)", () => {
+    // The real-world case that motivated this: a scrim whose only visual
+    // declaration is a token ref (`alpha($color.x, n)`) — invisible to
+    // `inlineStyles` entirely, since any `$ref` routes the whole property
+    // into `refs.tokens` instead.
+    const registry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["color.inverse-surface"]),
+      tokenFlatNames: new Set(["inverse-surface"]),
+    };
+    const html = `<div id="n1" style="background: alpha($color.inverse-surface, 0.32); color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", registry);
+    const fingerprint = "background:alpha($color.inverse-surface, 0.32);color:#fff";
+    const index = indexFor(fingerprint, ["checkout"]);
+    const warnings = computeRepeatedPatternWarnings(doc, "home", index);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.message).toContain(fingerprint);
+  });
+
+  it("names the component when a default-variant root matches", () => {
+    const html = `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    const fingerprint = "background:rgba(0,0,0,.4);color:#fff";
+    const index = indexFor(fingerprint, ["checkout"], "modal-scrim");
+    const warnings = computeRepeatedPatternWarnings(doc, "home", index);
+    expect(warnings[0]!.suggestion).toBe("$modal-scrim");
+  });
+
+  it("omits the component suggestion when no default-variant root matches — falls back to promote_to_system", () => {
+    const html = `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    const index = indexFor("background:rgba(0,0,0,.4);color:#fff", ["checkout"]); // no component
+    const warnings = computeRepeatedPatternWarnings(doc, "home", index);
+    expect(warnings[0]!.suggestion).toBe("promote_to_system");
+  });
+
+  it("excludes component_instance nodes and nodes already carrying refs.component", () => {
+    const registry: DesignSystemRegistry = {
+      componentNames: new Set(["card"]),
+      tokenPaths: new Set(),
+      tokenFlatNames: new Set(),
+    };
+    const html = `<div id="n1" class="$card" style="background: rgba(0,0,0,.4); color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", registry);
+    const index = indexFor("background:rgba(0,0,0,.4);color:#fff", ["checkout", "cart"]);
+    expect(computeRepeatedPatternWarnings(doc, "home", index)).toEqual([]);
+  });
+
+  it("excludes text nodes", () => {
+    const html = `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff">Some text</div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    // The text node itself carries no inline style at all, so it could never
+    // match a real fingerprint anyway — this proves the kind check still
+    // excludes it rather than relying on that coincidence.
+    const index: StyleOccurrenceIndex = { byScreen: new Map([["", new Set(["checkout"])]]), byComponent: new Map() };
+    const warnings = computeRepeatedPatternWarnings(doc, "home", index);
+    // Only n1 (the styled div) can possibly warn; confirm no warning names
+    // a text-node id.
+    expect(warnings.every((w) => w.nodeId === "n1")).toBe(true);
+  });
+
+  it("carries hex-color case-insensitivity over from drift's normalizer", () => {
+    const html = `<div id="n1" style="background: #ABCDEF; color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    // Index built with the lowercase form — the node's own uppercase value
+    // must still normalize to the same fingerprint and match.
+    const index = indexFor("background:#abcdef;color:#fff", ["checkout"]);
+    expect(computeRepeatedPatternWarnings(doc, "home", index)).toHaveLength(1);
+  });
+
+  it("orders example screens deterministically and caps them at 3", () => {
+    const html = `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    const index = indexFor("background:rgba(0,0,0,.4);color:#fff", ["zeta", "alpha", "delta", "beta"]);
+    const warnings = computeRepeatedPatternWarnings(doc, "home", index);
+    expect(warnings[0]!.message).toContain("repeated on 4 other screens (alpha, beta, delta):");
+  });
+
+  it("respects minOtherScreens when raised above the default of 1", () => {
+    const html = `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    const index = indexFor("background:rgba(0,0,0,.4);color:#fff", ["checkout"]);
+    expect(computeRepeatedPatternWarnings(doc, "home", index, { minOtherScreens: 2 })).toEqual([]);
+  });
+
+  it("groups several matching nodes on this screen into ONE warning, targeted at the first in document order, node count folded into the message", () => {
+    const html =
+      `<section id="root">` +
+      `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>` +
+      `<div id="n2" style="background: rgba(0,0,0,.4); color: #fff"></div>` +
+      `</section>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    const fingerprint = "background:rgba(0,0,0,.4);color:#fff";
+    const index = indexFor(fingerprint, ["checkout"]);
+    const warnings = computeRepeatedPatternWarnings(doc, "home", index);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.nodeId).toBe("n1");
+    expect(warnings[0]!.message).toContain("(2 nodes here)");
+  });
+
+  it("a lone match (group of one) never adds the node-count suffix", () => {
+    const html = `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    const index = indexFor("background:rgba(0,0,0,.4);color:#fff", ["checkout"]);
+    const warnings = computeRepeatedPatternWarnings(doc, "home", index);
+    expect(warnings[0]!.message).not.toContain("nodes here");
+  });
+
+  it("scopeNodeIds re-derives the representative and count from the scoped subset — the case a post-hoc target filter would get wrong", () => {
+    const html =
+      `<section id="root">` +
+      `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>` +
+      `<div id="n2" style="background: rgba(0,0,0,.4); color: #fff"></div>` +
+      `</section>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    const fingerprint = "background:rgba(0,0,0,.4);color:#fff";
+    const index = indexFor(fingerprint, ["checkout"]);
+
+    // Only n2 is "in scope" (e.g. the one node a patch_html call actually
+    // touched) — the warning must target n2, not n1 (document order's
+    // earlier member), and must not claim "2 nodes here".
+    const warnings = computeRepeatedPatternWarnings(doc, "home", index, { scopeNodeIds: new Set(["n2"]) });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.nodeId).toBe("n2");
+    expect(warnings[0]!.message).not.toContain("nodes here");
+  });
+
+  it("scopeNodeIds excludes a group entirely when none of its members fall inside it", () => {
+    const html = `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    const index = indexFor("background:rgba(0,0,0,.4);color:#fff", ["checkout"]);
+    const warnings = computeRepeatedPatternWarnings(doc, "home", index, { scopeNodeIds: new Set(["some-other-node"]) });
+    expect(warnings).toEqual([]);
+  });
+
+  it("sorts distinct patterns by other-screen occurrence count descending", () => {
+    const html =
+      `<section id="root">` +
+      `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>` +
+      `<div id="n2" style="border: 1px solid #000; color: #111"></div>` +
+      `</section>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    const byScreen = new Map([
+      ["background:rgba(0,0,0,.4);color:#fff", new Set(["a"])],
+      ["border:1px solid #000;color:#111", new Set(["a", "b", "c"])],
+    ]);
+    const index: StyleOccurrenceIndex = { byScreen, byComponent: new Map() };
+    const warnings = computeRepeatedPatternWarnings(doc, "home", index);
+    expect(warnings.map((w) => w.nodeId)).toEqual(["n2", "n1"]); // n2's pattern: 3 other screens vs. n1's 1
+  });
+
+  it("an empty index never warns", () => {
+    const html = `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff"></div>`;
+    const { doc } = parseScreen(html, "home", noopRegistry);
+    expect(computeRepeatedPatternWarnings(doc, "home", emptyIndex)).toEqual([]);
   });
 });

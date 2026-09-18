@@ -8,8 +8,15 @@ function serializeTokenRefAtom(atom: TokenRefAtom): string {
   return `${atom.fn}(${args.join(", ")})`;
 }
 
-/** `parts` alternates literal/atom/literal/... (see MixedTokenValue) — literal chunks concatenate verbatim, atoms get re-`$`-prefixed/re-called. */
-function serializeTokenRef(ref: TokenRef): string {
+/**
+ * `parts` alternates literal/atom/literal/... (see MixedTokenValue) — literal
+ * chunks concatenate verbatim, atoms get re-`$`-prefixed/re-called. Exported
+ * for `model/validate.ts`'s `repeated_pattern` fingerprint (CHR-635), which
+ * needs a token-ref declaration's as-authored text alongside a literal
+ * declaration's — the same canonical rendering this module already uses to
+ * write a node's `style="..."` attribute back to disk.
+ */
+export function serializeTokenRef(ref: TokenRef): string {
   if (isMixedTokenValue(ref)) {
     return ref.parts.map((part, i) => (i % 2 === 0 ? (part as string) : serializeTokenRefAtom(part as TokenRefAtom))).join("");
   }

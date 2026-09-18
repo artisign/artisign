@@ -179,6 +179,20 @@ someone has to maintain.
 - Name promoted entities by role, not appearance: `color.accent`, not
   `color.orange`; `btn-primary`, not `btn-rounded-blue`.
 
+`write_html`/`patch_html` also enforce the second-occurrence rule
+automatically: a `repeated_pattern` warning fires when an ad-hoc, visually
+styled element you just wrote (at least two real declarations — one alone
+never counts) matches (after normalization) a style already used on another
+screen, or a component's default-variant root. Several nodes in the same
+write sharing the exact pattern collapse into one warning naming how many;
+a response carries at most 8, with the rest counted in
+`repeated_pattern_omitted_count`. It names the occurrence count and up to
+three other screens, plus a `suggestion` — `$<component>` when one matches,
+`promote_to_system` otherwise. Advisory only, like `drift` — it never blocks
+the write. A purely layout-styled wrapper (positioning, spacing, sizing —
+nothing visual) never triggers it; treat it as the tool catching what the
+rule above already asks you to do yourself.
+
 ## Token efficiency
 
 These tools are built for small contexts — use the levers:

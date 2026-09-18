@@ -29,13 +29,8 @@ export { serializeScreen, serializeNodeSubtree, serializeDetachedSubtree, serial
 export {
   computeDriftWarnings,
   computeRepeatedPatternWarnings,
-  isLayoutOnlyStyle,
-  isVisuallyStyledAdHocNode,
   isRepeatedPatternCandidate,
-  normalizeForComparison,
-  normalizedStyleFingerprint,
   repeatedPatternFingerprint,
-  LAYOUT_ONLY_PROPERTIES,
   type StyleOccurrenceIndex,
 } from "./validate.js";
 export { buildIndex, rebuildAndPersistIndex, type ProjectIndex, type IndexedNode } from "./index-builder.js";

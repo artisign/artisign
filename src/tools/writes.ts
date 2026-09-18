@@ -414,7 +414,11 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
     affected_nodes: [...affected],
     warnings: [...refWarnings, ...scopedDriftWarnings, ...scopedRepeatedPatternWarnings],
     preexisting_drift_count: preexistingDriftCount,
-    preexisting_repeated_pattern_count: preexistingRepeatedPatternCount,
+    // Only when the index was actually built: absent means "not measured",
+    // `0` means "measured, nothing repeated". Reporting a flat `0` on the
+    // skipped path would claim a clean screen the scan never looked at, and
+    // would grow every ordinary patch response by a field (CHR-635 review).
+    ...(hasAffectedCandidate ? { preexisting_repeated_pattern_count: preexistingRepeatedPatternCount } : {}),
     ...(repeatedPatternOmittedCount > 0 ? { repeated_pattern_omitted_count: repeatedPatternOmittedCount } : {}),
   };
   return shapeWriteResponse(base, doc, before, responseMode);

@@ -561,7 +561,9 @@ describe("patch_html", () => {
       attr: { name: "data-testid", value: "body-copy" },
     });
     expect(listScreensSpy).not.toHaveBeenCalled();
-    expect(res.preexisting_repeated_pattern_count).toBe(0);
+    // Absent, not `0` — nothing was measured, so the response must not claim
+    // the screen is free of repeated patterns.
+    expect(res).not.toHaveProperty("preexisting_repeated_pattern_count");
   });
 
   it("pays for buildStyleOccurrenceIndex's scan when the patch touches an ad-hoc styled node (cheap pre-check)", async () => {

@@ -9,10 +9,10 @@ const HEX_COLOR_RE = /^#[0-9a-f]{3,8}$/i;
  * case-insensitively (`#3366FF` and `#3366ff` are the same color to every
  * consumer of CSS), everything else compares as an exact trimmed string —
  * spacing/typography/etc. values are free-form and it isn't safe to guess
- * an equivalence rule for them. Exported for `normalizedStyleFingerprint`
+ * an equivalence rule for them. Also backs `normalizedStyleFingerprint`
  * (CHR-635), which reuses the same equivalence rule per-property.
  */
-export function normalizeForComparison(value: string): string {
+function normalizeForComparison(value: string): string {
   const trimmed = value.trim();
   return HEX_COLOR_RE.test(trimmed) ? trimmed.toLowerCase() : trimmed;
 }
@@ -177,32 +177,21 @@ export function computeDriftWarnings(doc: ScreenDocument, tokens: TokensDocument
 }
 
 // ---------------------------------------------------------------------------
-// CHR-635 — repeated_pattern warning. Shared with CHR-637's reuse metric
-// (component_coverage/token_coverage): both are built on the same "is this
-// an ad-hoc, visually styled element?" predicate, so it — and the
-// layout-only gate it's built on — lives here rather than duplicated per
-// ticket.
+// CHR-635 — repeated_pattern warning.
 // ---------------------------------------------------------------------------
 
 /**
  * A hand-built element styled with nothing but layout — positioning and
- * spacing, never anything visual — is scaffolding, not a design decision:
- * it's excluded from both `repeated_pattern` (below) and CHR-637's
- * component_coverage, so a hundred structurally-identical `<div
- * style="display:flex; padding:16px">` wrappers never register as
- * duplicated/hand-built "design", the way a hundred identical
- * `background:...` blocks would. Calibrated against a real project's
- * reference figures (CHR-633 review) — `margin` stays excluded (a margin
- * value is exactly the kind of decision this gate should not wave through
- * as "just layout"), and `size` is deliberately NOT in this base set
- * (CHR-637 needs it excluded to match its own reference numbers). `inset`
- * and its logical variants *are* here, alongside top/right/bottom/left —
- * they're positioning offsets, not a size property; the original CHR-633
- * pass had grouped `inset` in with `size` and dropped both together as an
- * unverified sweep, which was simply wrong about what `inset` is (CHR-635
- * review).
+ * spacing, never anything visual — is scaffolding, not a design decision,
+ * so a hundred structurally-identical `<div style="display:flex;
+ * padding:16px">` wrappers never register as a duplicated pattern the way
+ * a hundred identical `background:...` blocks would. `margin` stays
+ * excluded (a margin value is exactly the kind of decision this gate should
+ * not wave through as "just layout"); `inset` and its logical variants
+ * *are* here, alongside top/right/bottom/left — they're positioning
+ * offsets, not size properties (CHR-635 review).
  */
-export const LAYOUT_ONLY_PROPERTIES: ReadonlySet<string> = new Set([
+const LAYOUT_ONLY_PROPERTIES: ReadonlySet<string> = new Set([
   "display",
   "flex",
   "flex-direction",
@@ -241,15 +230,11 @@ export const LAYOUT_ONLY_PROPERTIES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * `repeated_pattern`-only addition to the layout-only set above (CTO
- * decision, CHR-633 review): a fixed-size ad-hoc spacer/wrapper (`<div
- * style="height: 16px">`) repeated across screens is exactly the kind of
- * warning an agent can't act on — there's no component to name and nothing
- * to promote a bare height to. CHR-637's coverage metric deliberately does
- * NOT get this treatment (its own reference figures depend on treating
- * `height`/`width` as real, countable design decisions) — kept as a private
- * addition consulted only by `isRepeatedPatternCandidate` below, not a
- * general "layout, take 2" set anything else can opt into.
+ * Counted as layout on top of the set above (CTO decision, CHR-633
+ * review): a fixed-size ad-hoc spacer/wrapper (`<div style="height:
+ * 16px">`) repeated across screens is exactly the kind of warning an agent
+ * can't act on — there's no component to name and nothing to promote a
+ * bare height to.
  */
 const REPEATED_PATTERN_SIZE_PROPERTIES: ReadonlySet<string> = new Set([
   "width",
@@ -261,39 +246,8 @@ const REPEATED_PATTERN_SIZE_PROPERTIES: ReadonlySet<string> = new Set([
   "box-sizing",
 ]);
 
-/** True iff `inlineStyles` is empty or every property in it is layout-only (case-insensitive) — `extraProperties`, when given, extends the layout-only set for this one call. */
-export function isLayoutOnlyStyle(inlineStyles: Record<string, string>, extraProperties?: ReadonlySet<string>): boolean {
-  const props = Object.keys(inlineStyles);
-  if (props.length === 0) return true;
-  return props.every((p) => {
-    const key = p.toLowerCase();
-    return LAYOUT_ONLY_PROPERTIES.has(key) || (extraProperties?.has(key) ?? false);
-  });
-}
-
+/** A live `Node` or a slot-fill `NodeSubtree` — both carry the three fields every predicate here looks at. */
 type StyleableNode = { kind: NodeKind; refs: NodeRefs; inlineStyles: Record<string, string> };
-
-/**
- * An element (or `svg`/`svg_path`) carrying no component ref, styled with
- * at least one non-layout property — a candidate for CHR-637's
- * `component_coverage`. `kind === "component_instance"` always implies
- * `refs.component` is set (parser invariant); both checks are kept anyway
- * since they're free, and the `kind` check alone also correctly excludes
- * text nodes. Works on a live `Node` or a slot-fill `NodeSubtree` — both
- * carry the same three fields — so a caller walking `slotOverrides` content
- * (screen-supplied markup inside a component instance, which never appears
- * in `doc.nodes` at all) can apply the same predicate to it. `inlineStyles`
- * only — CHR-637's own reference figures were calibrated against literal
- * values alone; `repeated_pattern`'s own candidate gate (below) needs a
- * stricter, differently-scoped rule and does not reuse this one directly.
- */
-export function isVisuallyStyledAdHocNode(node: StyleableNode, extraLayoutProperties?: ReadonlySet<string>): boolean {
-  return (
-    (node.kind === "element" || node.kind === "svg" || node.kind === "svg_path") &&
-    node.refs.component === undefined &&
-    !isLayoutOnlyStyle(node.inlineStyles, extraLayoutProperties)
-  );
-}
 
 /**
  * Every CSS declaration a node actually carries — literal values from
@@ -333,8 +287,7 @@ function styleDeclarations(node: StyleableNode): Record<string, string> {
  * `svg`/`svg_path`) carrying no component ref, with at least TWO non-layout
  * declarations — literal or token-ref, per `styleDeclarations` above, size
  * counted as layout (`REPEATED_PATTERN_SIZE_PROPERTIES`). The two-
- * declaration floor (CHR-635 review, raised from CHR-637's shared ≥1) is
- * `repeated_pattern`-only: a single incidental declaration
+ * declaration floor (CHR-635 review): a single incidental declaration
  * (`text-transform: uppercase` alone, `font-weight: 500` alone) is not a
  * promotable block — on a real, dense project it matched *dozens* of
  * screens purely by coincidence and produced warnings with nothing an
@@ -364,12 +317,12 @@ export function isRepeatedPatternCandidate(node: StyleableNode): boolean {
  * join as `prop:value` pairs with `;`. Operates on the *full* declaration
  * set passed in — layout properties included, never filtered here — the
  * layout-only gate is a caller-side *skip this node entirely* decision
- * (`isVisuallyStyledAdHocNode`/`isRepeatedPatternCandidate`), not a filter
- * inside the fingerprint: two elements matching on every visual property but
- * differing only in, say, `padding` are legitimately different patterns, not
- * the same one with noise removed.
+ * (`isRepeatedPatternCandidate`), not a filter inside the fingerprint: two
+ * elements matching on every visual property but differing only in, say,
+ * `padding` are legitimately different patterns, not the same one with
+ * noise removed.
  */
-export function normalizedStyleFingerprint(declarations: Record<string, string>): string {
+function normalizedStyleFingerprint(declarations: Record<string, string>): string {
   return Object.keys(declarations)
     .sort()
     .map((prop) => `${prop}:${normalizeForComparison(declarations[prop]!)}`)

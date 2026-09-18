@@ -18,8 +18,11 @@ discipline in copying values.
 ## Session start
 
 1. `get_project` (default `summary` view) — screens, counts, design-system pointer.
-2. `get_design_system` — know every token, component, and pattern **before**
-   designing anything. You cannot reuse what you have not read.
+2. `get_design_system` at `view: "tree"` — know every token, component, and
+   pattern **before** designing anything. You cannot reuse what you have not
+   read. Reach for `full` only once you're about to edit a definition's
+   actual markup — `tree` already carries every token's value and every
+   component's slot names.
 
 Do not read full screens upfront. Load detail lazily with tiered reads.
 

@@ -43,6 +43,7 @@ export {
   resolveTokenRef,
   resolveSlotFillEntries,
   slotsWithDiscardedStyling,
+  collectTemplateSlots,
   type RenderContext,
   type SlotFillEntry,
 } from "./render.js";

@@ -1,11 +1,15 @@
 import type { ServerResponse } from "node:http";
 import type { Store, ChangeCategory } from "../store/index.js";
+import type { ActivityEvent } from "../mcp/activity.js";
 
 export type ChangeSseEvent = {
   type: "change";
   kind: ChangeCategory;
   name: string;
 };
+
+/** CHR-630/ADR-005 — one per MCP tool call. Additive to the union; see src/mcp/activity.ts for the shape and derivation. */
+export type ActivitySseEvent = ActivityEvent;
 
 /**
  * Project lifecycle events — unlike `ChangeSseEvent`, which is
@@ -20,7 +24,7 @@ export type LifecycleSseEvent =
   | { type: "project-opened"; root: string }
   | { type: "project-closed"; root: string };
 
-export type SseEvent = ChangeSseEvent | LifecycleSseEvent;
+export type SseEvent = ChangeSseEvent | LifecycleSseEvent | ActivitySseEvent;
 
 const HEARTBEAT_MS = 25_000;
 
@@ -117,6 +121,8 @@ export type SseHub = {
   addClient: (res: ServerResponse) => () => void;
   /** Stops the store watcher and ends every client registered with this hub — a client watching a project that goes away must not hang forever (see src/daemon/project-registry.ts `close()`). */
   close: () => void;
+  /** Fan-out only (CHR-630/ADR-005) — the caller (mcp/server.ts's tool wrapper) derives the event; this hub just broadcasts it to the same clients a `change` event reaches. */
+  broadcastActivity: (event: ActivityEvent) => void;
 };
 
 /**
@@ -145,7 +151,11 @@ export function createSseHub(store: Store): SseHub {
     clients.endAll();
   }
 
-  return { addClient: clients.add, close };
+  function broadcastActivity(event: ActivityEvent): void {
+    clients.broadcast(`data: ${JSON.stringify(event)}\n\n`);
+  }
+
+  return { addClient: clients.add, close, broadcastActivity };
 }
 
 export type LifecycleHub = {

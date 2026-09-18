@@ -28,6 +28,12 @@ export const MAX_BOARD_ZOOM = 200;
 // Reproduces the pre-CHR-623 fixed board layout pixel-for-pixel (native
 // tile size * 0.8, 64px gap, 48px padding) — see BASE_GAP/BASE_PADDING.
 export const DEFAULT_BOARD_ZOOM = 80;
+// 5, not 10 (CHR-623 review): with MIN_BOARD_ZOOM=5, a 10-point step from
+// the floor's neighboring multiples of 10 (15, 25, ...) would need an
+// uneven final 5-point step to land exactly on the 5% floor. Every value
+// 5, 10, 15, ..., 200 is a clean multiple of 5 (40 even steps end to end),
+// so +/- always lands on a "round" number, at the floor/ceiling too.
+export const BOARD_ZOOM_STEP = 5;
 
 /**
  * A flow's `to` (like `data-flow-target`) is either a bare screen id or a
@@ -392,6 +398,84 @@ export function computeBoardColumns(screens, sizes, viewportWidth, viewportHeigh
 export function zoomSliderOffset(zoomPercent, trackWidth = 140, min = MIN_BOARD_ZOOM, max = MAX_BOARD_ZOOM) {
   const clamped = clampZoom(zoomPercent, min, max);
   return ((clamped - min) / (max - min)) * trackWidth;
+}
+
+// Solved so that one mouse wheel "notch" (100 raw px — Chrome/Safari/Edge's
+// deltaMode-0 convention for a physical wheel click) changes zoom by
+// exactly ×1.2 (zooming in) or ÷1.2 (zooming out): exp(-100 * k) = 1/1.2.
+const WHEEL_ZOOM_K = Math.log(1.2) / 100;
+
+/**
+ * The multiplicative zoom factor for a `wheel` event's raw `deltaY` and
+ * `deltaMode` (CHR-623 review — the old handler was additive and ignored
+ * `deltaMode`, so it was ~2x too fast on Chrome, ~30x too fast on Firefox's
+ * line-mode wheel deltas, and wrong at the low end of the range: an
+ * additive `zoom - 5` from 7% hits the 5% floor while `zoom + 5` reaches
+ * 12%, a lopsided step size purely because 7 happens to sit near the
+ * floor).
+ *
+ * First normalizes `deltaY` to the same "pixel" units regardless of
+ * `deltaMode` (0 = pixel, already there; 1 = line, browsers report this for
+ * a physical mouse wheel notch on Firefox — approximated at 16px/line, a
+ * common browser default line-height; 2 = page — one `viewportHeight`),
+ * then converts that pixel delta to a multiplicative factor via
+ * `exp(-px * k)`, `k` chosen so one 100px (deltaMode-0) notch is exactly
+ * ×1.2 / ÷1.2 — smooth and scale-invariant, unlike an additive delta (which
+ * has no sensible "percent per pixel" that's both usable at 5% and at
+ * 200%). A trackpad pinch (deltaMode 0, deltaY typically 2-10 per event)
+ * gets proportionally smaller per-event steps, accumulating smoothly across
+ * the many events a real pinch gesture fires.
+ *
+ * Positive `deltaY` (wheel down / pinch out on most platforms) zooms OUT
+ * (factor < 1); negative zooms in (factor > 1) — same direction convention
+ * the old additive handler used (`zoom - deltaY * sensitivity`).
+ *
+ * @param {number} deltaY
+ * @param {number} deltaMode 0 (pixel), 1 (line), or 2 (page) — `WheelEvent.deltaMode`
+ * @param {number} viewportHeight only used for deltaMode 2 (page)
+ * @returns {number} multiplicative factor — apply as `zoom * factor`, then clampZoom
+ */
+export function computeWheelZoomFactor(deltaY, deltaMode, viewportHeight) {
+  const LINE_HEIGHT_PX = 16;
+  const px = deltaMode === 1 ? deltaY * LINE_HEIGHT_PX : deltaMode === 2 ? deltaY * viewportHeight : deltaY;
+  return Math.exp(-px * WHEEL_ZOOM_K);
+}
+
+/**
+ * The next board zoom below `zoom` that's a multiple of `step` (CHR-623
+ * review — the `−` button must land ON the 5-grid, even from a fractional
+ * or off-grid value a wheel/pinch gesture left behind, not just subtract
+ * `step` from whatever `zoom` currently is: from 7 with step 5, `zoom -
+ * step` would give 2 — off-grid and needlessly close to the floor — where
+ * this gives 5, the nearest grid point below). Snaps down to the nearest
+ * multiple of `step`; if `zoom` is ALREADY exactly on the grid, steps one
+ * further down (otherwise the button would do nothing from an on-grid
+ * value). Clamped to `min`.
+ * @param {number} zoom
+ * @param {number} [step]
+ * @param {number} [min]
+ * @returns {number}
+ */
+export function stepZoomDown(zoom, step = BOARD_ZOOM_STEP, min = MIN_BOARD_ZOOM) {
+  const snapped = Math.floor(zoom / step) * step;
+  const next = snapped < zoom ? snapped : snapped - step;
+  return Math.max(min, next);
+}
+
+/**
+ * The next board zoom above `zoom` that's a multiple of `step` — see
+ * `stepZoomDown`, the mirror image (snaps UP to the nearest grid point
+ * above `zoom`, stepping one further if already exactly on the grid).
+ * Clamped to `max`.
+ * @param {number} zoom
+ * @param {number} [step]
+ * @param {number} [max]
+ * @returns {number}
+ */
+export function stepZoomUp(zoom, step = BOARD_ZOOM_STEP, max = MAX_BOARD_ZOOM) {
+  const snapped = Math.ceil(zoom / step) * step;
+  const next = snapped > zoom ? snapped : snapped + step;
+  return Math.min(max, next);
 }
 
 /**

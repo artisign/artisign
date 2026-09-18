@@ -186,8 +186,11 @@ export function parseEnumPref(raw, allowed, fallback) {
 /**
  * Parses a persisted board zoom percentage (CHR-623): a plain finite
  * number, clamped to [min, max] — unlike parseZoomPref's screen/mockup
- * zoom, board zoom has no "fit" mode. Falls back on a missing key or a
- * value that doesn't parse to a finite number.
+ * zoom, board zoom has no "fit" mode. Falls back on a missing key, an empty
+ * string (CHR-623 review: `Number("")` is `0`, which is finite, so this
+ * must be checked explicitly or an empty string silently clamps to `min`
+ * instead of falling back), or a value that doesn't parse to a finite
+ * number.
  *
  * @param {string | null} raw
  * @param {number} fallback
@@ -196,7 +199,7 @@ export function parseEnumPref(raw, allowed, fallback) {
  * @returns {number}
  */
 export function parseBoardZoomPref(raw, fallback, min, max) {
-  if (raw === null) return fallback;
+  if (raw === null || raw.trim() === "") return fallback;
   const value = Number(raw);
   return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
 }

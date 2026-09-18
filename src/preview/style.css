@@ -1583,7 +1583,11 @@ body {
   cursor: pointer;
 }
 
-.board-zoom-step:disabled {
+/* aria-disabled, not the disabled attribute (CHR-623 review finding 8) — a
+   hard-disabled button can't hold keyboard focus; see app.js's
+   updateBoardToolbar for the full reasoning. Same look as :disabled used
+   to have. */
+.board-zoom-step[aria-disabled="true"] {
   background: var(--color-surface-subtle);
   color: var(--color-text-faint);
   cursor: not-allowed;

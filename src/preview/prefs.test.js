@@ -8,6 +8,7 @@ import {
   parseLastSelection,
   parseZoomPref,
   parseEnumPref,
+  parseBoardZoomPref,
 } from "./prefs.js";
 
 function fakeStorage(initial = {}) {
@@ -254,5 +255,29 @@ describe("parseEnumPref", () => {
   it("falls back when missing or no longer a valid option", () => {
     expect(parseEnumPref(null, allowed, "screens")).toBe("screens");
     expect(parseEnumPref("removed-view", allowed, "screens")).toBe("screens");
+  });
+});
+
+describe("parseBoardZoomPref", () => {
+  it("parses a plain finite number", () => {
+    expect(parseBoardZoomPref("80", 50, 5, 200)).toBe(80);
+  });
+
+  it("clamps to the given bounds", () => {
+    expect(parseBoardZoomPref("1", 50, 5, 200)).toBe(5);
+    expect(parseBoardZoomPref("9999", 50, 5, 200)).toBe(200);
+  });
+
+  it("falls back for a missing value", () => {
+    expect(parseBoardZoomPref(null, 50, 5, 200)).toBe(50);
+  });
+
+  it("falls back for an empty string instead of clamping Number('')'s 0 to the floor", () => {
+    expect(parseBoardZoomPref("", 50, 5, 200)).toBe(50);
+    expect(parseBoardZoomPref("   ", 50, 5, 200)).toBe(50);
+  });
+
+  it("falls back for a non-numeric value", () => {
+    expect(parseBoardZoomPref("banana", 50, 5, 200)).toBe(50);
   });
 });

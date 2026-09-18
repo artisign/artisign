@@ -15,10 +15,14 @@ import {
   zoomSliderOffset,
   labelDisplayMode,
   computeZoomAroundCursor,
+  computeWheelZoomFactor,
+  stepZoomDown,
+  stepZoomUp,
   MIN_BOARD_ZOOM,
   MAX_BOARD_ZOOM,
   DEFAULT_BOARD_ZOOM,
   DEFAULT_COLUMNS,
+  BOARD_ZOOM_STEP,
 } from "./board.js";
 
 describe("screenIdFromRef", () => {
@@ -469,5 +473,114 @@ describe("computeZoomAroundCursor", () => {
       viewportHeight: 500,
     };
     expect(computeZoomAroundCursor(args)).toEqual({ left: 0, top: 0 });
+  });
+
+  it("keeps the exact same content point under a NON-ORIGIN cursor when zooming in (CHR-623 review — every prior test used cursor (0,0) or an unchanged zoom, where the formula collapses and a sign error on the cursor term would still pass)", () => {
+    const args = {
+      cursorX: 250,
+      cursorY: 120,
+      scrollLeft: 300,
+      scrollTop: 150,
+      oldZoomPercent: 80,
+      newZoomPercent: 120,
+      contentWidth: 2000,
+      contentHeight: 2000,
+      viewportWidth: 800,
+      viewportHeight: 800,
+    };
+    const result = computeZoomAroundCursor(args);
+    // content point at 80%: ((300+250)/0.8, (150+120)/0.8) = (687.5, 337.5);
+    // at 120%: 687.5*1.2 - 250 = 575, 337.5*1.2 - 120 = 285.
+    expect(result).toEqual({ left: 575, top: 285 });
+    // The invariant itself, not just this one worked example: the content
+    // point under the cursor is identical before and after.
+    const contentBefore = { x: (args.scrollLeft + args.cursorX) / 0.8, y: (args.scrollTop + args.cursorY) / 0.8 };
+    const contentAfter = { x: (result.left + args.cursorX) / 1.2, y: (result.top + args.cursorY) / 1.2 };
+    expect(contentAfter.x).toBeCloseTo(contentBefore.x, 6);
+    expect(contentAfter.y).toBeCloseTo(contentBefore.y, 6);
+  });
+
+  it("clamps to 0 with a NON-ORIGIN cursor too, when the zoomed content is smaller than the viewport", () => {
+    const args = {
+      cursorX: 40,
+      cursorY: 20,
+      scrollLeft: 0,
+      scrollTop: 0,
+      oldZoomPercent: 100,
+      newZoomPercent: 50,
+      contentWidth: 100,
+      contentHeight: 100,
+      viewportWidth: 500,
+      viewportHeight: 500,
+    };
+    expect(computeZoomAroundCursor(args)).toEqual({ left: 0, top: 0 });
+  });
+});
+
+describe("computeWheelZoomFactor", () => {
+  it("makes one Chrome/Safari mouse-wheel notch (deltaY 100, deltaMode 0) exactly ÷1.2 zooming out", () => {
+    expect(computeWheelZoomFactor(100, 0, 800)).toBeCloseTo(1 / 1.2, 10);
+  });
+
+  it("makes one notch in the other direction exactly ×1.2 zooming in", () => {
+    expect(computeWheelZoomFactor(-100, 0, 800)).toBeCloseTo(1.2, 10);
+  });
+
+  it("is the identity (factor 1) for a zero delta", () => {
+    expect(computeWheelZoomFactor(0, 0, 800)).toBe(1);
+  });
+
+  it("normalizes deltaMode 1 (line — Firefox's physical-wheel convention) via a 16px line height", () => {
+    // 3 lines * 16px = 48px -> exp(-48 * ln(1.2)/100)
+    expect(computeWheelZoomFactor(3, 1, 800)).toBeCloseTo(Math.exp((-48 * Math.log(1.2)) / 100), 10);
+  });
+
+  it("normalizes deltaMode 2 (page) via the given viewport height", () => {
+    // 1 page * 800px viewport -> exp(-800 * ln(1.2)/100) = 1.2^-8
+    expect(computeWheelZoomFactor(1, 2, 800)).toBeCloseTo(Math.pow(1.2, -8), 10);
+  });
+
+  it("gives a trackpad-pinch-sized delta (a few px, deltaMode 0) a proportionally small, smooth factor", () => {
+    const factor = computeWheelZoomFactor(4, 0, 800);
+    expect(factor).toBeLessThan(1); // still zooms out
+    expect(factor).toBeGreaterThan(1 / 1.2); // but far more gently than a full notch
+  });
+});
+
+describe("stepZoomDown", () => {
+  it("snaps DOWN to the nearest grid point below an off-grid value — the review's own example", () => {
+    expect(stepZoomDown(7, BOARD_ZOOM_STEP)).toBe(5);
+  });
+
+  it("snaps down from a fractional (wheel-driven) value", () => {
+    expect(stepZoomDown(83.2, BOARD_ZOOM_STEP)).toBe(80);
+  });
+
+  it("steps one full grid unit further down from a value already exactly on the grid", () => {
+    expect(stepZoomDown(80, BOARD_ZOOM_STEP)).toBe(75);
+  });
+
+  it("clamps at the floor and does not go below it", () => {
+    expect(stepZoomDown(5, BOARD_ZOOM_STEP)).toBe(MIN_BOARD_ZOOM);
+    expect(stepZoomDown(7, BOARD_ZOOM_STEP, 6)).toBe(6); // custom floor above the natural grid point
+  });
+});
+
+describe("stepZoomUp", () => {
+  it("snaps UP to the nearest grid point above an off-grid value — the review's own example", () => {
+    expect(stepZoomUp(7, BOARD_ZOOM_STEP)).toBe(10);
+  });
+
+  it("snaps up from a fractional (wheel-driven) value — the review's own example", () => {
+    expect(stepZoomUp(83.2, BOARD_ZOOM_STEP)).toBe(85);
+  });
+
+  it("steps one full grid unit further up from a value already exactly on the grid", () => {
+    expect(stepZoomUp(80, BOARD_ZOOM_STEP)).toBe(85);
+  });
+
+  it("clamps at the ceiling and does not go above it", () => {
+    expect(stepZoomUp(200, BOARD_ZOOM_STEP)).toBe(MAX_BOARD_ZOOM);
+    expect(stepZoomUp(198, BOARD_ZOOM_STEP, 199)).toBe(199); // custom ceiling below the natural grid point
   });
 });

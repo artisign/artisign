@@ -6,6 +6,88 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-09-18
+
+The version number is the news: every milestone from the PRD is implemented, so
+Artisign stops calling itself beta. What it takes to get there in this release
+is the board becoming a review surface the agent and the human share — filter,
+pins, zoom, and a presentation the agent can put on — plus follow mode, which
+lets the human watch an agent work in the preview rather than reload to find out
+what changed. Two new signals help an agent keep a design system coherent: a
+reuse metric it can ask for, and a warning when it hand-builds something that
+already exists. Four fixes close the multi-project correctness gaps that surfaced
+once a daemon could hold several projects open at once.
+
+### Added
+
+- The board's filter and pinned screens live in daemon memory, one store per open
+  project, and are written through a new tool, `set_board_state` — the same one
+  tool for agents over MCP and for the browser. Every reader renders from the
+  `board_state` SSE broadcast, so two tabs and an agent never drift apart, and
+  `GET /api/board-state` serves the initial paint. Board state is deliberately
+  daemon state, not project state: nothing of it reaches the project folder. The
+  tool surface goes from 23 to 24. (CHR-624, ADR-005)
+- A board toolbar: a continuous 5-200 % zoom slider with step buttons and a live
+  readout, `Fit all` and `100 %` as quick jumps, and a toggle that hides the flow
+  edges. Ctrl/Cmd + wheel and pinch zoom around the cursor; zoom and the edge
+  toggle persist per browser. Fit all is exact, so every tile is guaranteed
+  inside the viewport — a real 186-screen project needs about 7.6 %, which is why
+  the floor is 5 % rather than the designed 10 %. (CHR-623)
+- An agent can present screens: a `board_state` change that came from an agent
+  switches the open browser to the Board tab and names, in a dismissible banner,
+  how many screens are on display. A change made by a human behaves exactly as
+  before. (CHR-625)
+- Follow mode: a topbar toggle, off by default and persisted per browser, makes
+  the preview follow the agent — the view and selection move to what the agent
+  touched and the affected nodes are highlighted briefly. An Activity tab beside
+  Elements lists the last 50 calls and navigates on click, whether or not follow
+  is on. Human navigation, comment mode and inspect mode pause following.
+  (CHR-631)
+- Every MCP tool call now emits one `activity` SSE event, derived from the tool
+  name, its input and the handler's own response. Emission runs in a `finally`
+  and can neither fail a call nor alter its response; the browser's own
+  `/api/tools` path never goes through it. (CHR-630, ADR-005)
+- `get_project` takes `fields:["reuse"]`: component and token coverage per screen
+  and project-wide, the two as a combined score, unused components and tokens,
+  and the ten screens with the lowest reuse. Project figures are the mean over
+  screens, so one large screen cannot dominate. It costs nothing when not asked
+  for; measured at 442 tokens against a 600 budget. (CHR-637)
+- `write_html` and `patch_html` return `repeated_pattern` warnings when an ad-hoc
+  element's full declaration set already occurs on another screen or matches a
+  component root — the second occurrence of a pattern is exactly where it should
+  be promoted. One warning per distinct pattern, capped at 8. (CHR-635)
+
+### Changed
+
+- `get_design_system` at `view:"tree"` now carries token values, grouped per
+  bucket into one compact string, and every component's slot names beside its
+  variants and usage. **Breaking:** `tree.tokens` was a `{path, kind}[]` list
+  without values. On a 186-screen project the tree measures 8,974 tokens against
+  a 10,000 budget, versus 70,042 for `full` — the agent guide now steers agents
+  to `tree` before their first write. (CHR-636)
+- The README documents the Board, Elements and Notes views and the mockup
+  surface. (CHR-648)
+
+### Fixed
+
+- Drift warnings cover tracking, size and shorthand values, which previously
+  passed unnoticed. (CHR-634)
+- The project registry keys an open project by its real path, so a symlink and
+  its target no longer produce two handles for one folder — two watchers, two SSE
+  hubs and two board states, with an agent pinning screens the human's browser
+  never saw. (CHR-650)
+- Every project-scoped call the preview makes names its project instead of
+  relying on the daemon-wide active-project fallback, which could answer a
+  request with a different project than the tab was showing. (CHR-651)
+- A rendered screen's asset and font URLs name the project they were rendered
+  from. They reach the iframes as `srcdoc`, so their subresource requests hit the
+  same daemon-wide fallback: a tab on project A could be served project B's image
+  bytes, silently. `get_screenshot` and `inspect_node` inline their assets and
+  were never affected. (CHR-653)
+- A click in the activity feed pauses following, the way a sidebar click or a tab
+  switch already did. Without it the view was pulled back to the agent's target
+  on the next call, right after the human clicked something to look at. (CHR-652)
+
 ## [0.11.0] - 2026-09-11
 
 Three changes an agent notices and one a human does. Component slot fills stop

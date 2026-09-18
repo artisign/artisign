@@ -1,0 +1,7 @@
+{
+  "notes": "CHR-618/CHR-621 ticket state 6: the browser switches to the Board tab when an agent presents screens (standing decision, not modelled as an Artisign flow since it is a tool-driven UI transition, not a user click). Shows a dismissible pill banner (\\\"Agent switched you here to show 3 screens\\\") positioned inside the canvas, clearly below the toolbar's bottom border (not overlapping it — first version straddled the border and read as misplaced chrome rather than an intentional overlay). All three tiles carry the unpinned `default` `$pin-button` — none is pinned here, demonstrating the affordance's resting state, not just its pinned state. No new component for the banner: this is a one-off, not a repeated pattern yet, so it is built directly from `$color.accent`/`$spacing`/`$radius.pill` tokens rather than promoted — promote it if a second occurrence appears.",
+  "tags": [
+    "chr-621",
+    "chr-618"
+  ]
+}

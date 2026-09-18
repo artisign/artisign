@@ -1,0 +1,7 @@
+{
+  "notes": "CHR-628/CHR-629: proves the read/write highlight tokens hold up over a dark-content mock — `screen-frame`, `frame-bar` and the card backgrounds here use literal dark colors (#14151a / #1f2029 / #2a2c35) rather than design-system tokens, since this frame represents an arbitrary dark-themed screen someone else designed, not our own tool's chrome (which has no dark mode). `$color.activity-read` (teal) and `$color.activity-write` (violet) were picked to read clearly against both light and dark surfaces without needing separate dark-mode variants of the highlight itself.",
+  "tags": [
+    "chr-628",
+    "chr-629"
+  ]
+}

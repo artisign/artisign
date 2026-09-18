@@ -101,7 +101,7 @@ async function handleMcpRoute(req: IncomingMessage, res: ServerResponse, registr
     handle = registry.get(registry.activeProject);
   }
 
-  const mcpHandler = createMcpHttpHandler(handle?.store, { openProject: (dir: string) => registry.open(dir) });
+  const mcpHandler = createMcpHttpHandler(handle?.store, { openProject: (dir: string) => registry.open(dir) }, handle?.sseHub);
   await mcpHandler(req, res);
 }
 

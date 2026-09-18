@@ -52,5 +52,47 @@
     "event": "tap",
     "to": "init-project-dialog",
     "to_kind": "screen"
+  },
+  {
+    "from": "board-view.si-open",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.si-init",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.si-empty",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.bc-init",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.bc-empty",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.bc-open",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.bc-1",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
   }
 ]

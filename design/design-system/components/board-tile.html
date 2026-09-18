@@ -1,0 +1,8 @@
+<div id="board-tile" style="background: $color.surface; border: 1px solid $color.border-strong; border-radius: $radius.sm; box-shadow: $shadow.menu; width: 180px; overflow: hidden">
+  <div id="bt-thumb" style="background: $color.surface-subtle; border-bottom: 1px solid $color.border; height: 120px"></div>
+  <div id="bt-name-wrap" style="padding: $spacing.md 10px; font-size: $typography.size-xs; color: $color.text-secondary"><span data-slot="name"></span></div>
+</div><template data-variant="outside-filter"><div id="board-tile" style="background: $color.surface; border: 2px dashed $color.accent; border-radius: $radius.sm; box-shadow: $shadow.menu; width: 180px; overflow: hidden">
+  <div id="bt-thumb" style="background: $color.surface-subtle; border-bottom: 1px solid $color.border; height: 120px"></div>
+  <div id="bt-name-wrap" style="padding: $spacing.md 10px 0 10px; font-size: $typography.size-xs; color: $color.text-secondary"><span data-slot="name"></span></div>
+  <div id="bt-badge-wrap" style="padding: $spacing.sm 10px $spacing.md"><span id="bt-badge" class="$tag-chip" data-variant="badge"><span data-slot="label">pinned · outside filter</span></span></div>
+</div></template><template data-variant="mini"><div id="board-tile" style="background: $color.surface-subtle; border: 1px solid $color.border-strong; border-radius: $radius.sm; width: 76px; height: 63px"></div></template>

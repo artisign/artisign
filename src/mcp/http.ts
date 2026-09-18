@@ -3,6 +3,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { Store } from "../store/index.js";
 import type { ToolHandlerContext } from "../tools/index.js";
 import { createMcpServer } from "./server.js";
+import type { ActivitySink } from "./activity.js";
 
 /**
  * Builds a `/mcp` request handler backed by the streamable-HTTP transport,
@@ -18,9 +19,10 @@ import { createMcpServer } from "./server.js";
 export function createMcpHttpHandler(
   store: Store | undefined,
   ctx?: ToolHandlerContext,
+  activity?: ActivitySink,
 ): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
-    const server = createMcpServer(store, ctx);
+    const server = createMcpServer(store, ctx, activity);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on("close", () => {
       void transport.close();

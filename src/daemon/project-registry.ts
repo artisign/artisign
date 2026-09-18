@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { realpathSync } from "node:fs";
 import { FsStore } from "../store/index.js";
 import { watchAndReindex, type WatchAndReindexHandle } from "../model/index.js";
 import { clearFontMemo } from "../model/fonts.js";
@@ -61,23 +62,28 @@ export class ProjectRegistry {
    */
   async open(dir: string): Promise<ProjectHandle> {
     const root = resolve(dir);
-    const existing = this.projects.get(root);
+    const existing = this.findEntry(root);
     if (existing) {
-      await this.rememberRecent(root);
-      return existing.handle;
+      // Re-remember the *existing* handle's root, not the caller's spelling
+      // of it — two callers opening the same folder through different
+      // spellings (a symlink and its target) must not push two different
+      // strings to the front of recentProjects for one folder.
+      await this.rememberRecent(existing.entry.handle.root);
+      return existing.entry.handle;
     }
 
-    const inFlight = this.pending.get(root);
+    const key = projectKey(root);
+    const inFlight = this.pending.get(key);
     if (inFlight) return inFlight;
 
-    const openPromise = this.openNew(root).finally(() => {
-      this.pending.delete(root);
+    const openPromise = this.openNew(root, key).finally(() => {
+      this.pending.delete(key);
     });
-    this.pending.set(root, openPromise);
+    this.pending.set(key, openPromise);
     return openPromise;
   }
 
-  private async openNew(root: string): Promise<ProjectHandle> {
+  private async openNew(root: string, key: string): Promise<ProjectHandle> {
     const config = await validateProjectRoot(root);
 
     const store = new FsStore(root);
@@ -147,7 +153,7 @@ export class ProjectRegistry {
     );
     await index.ready;
 
-    this.projects.set(root, { handle, index });
+    this.projects.set(key, { handle, index });
     this.lifecycle.broadcast({ type: "project-opened", root });
     // Routed through the public setter (not a direct field write) so the
     // very first project a daemon opens also broadcasts project-switched —
@@ -187,7 +193,30 @@ export class ProjectRegistry {
   }
 
   get(root: string): ProjectHandle | undefined {
-    return this.projects.get(resolve(root))?.handle;
+    return this.findEntry(root)?.entry.handle;
+  }
+
+  /**
+   * Looks up the open project matching `root`, regardless of spelling
+   * (CHR-650). The map is keyed by `projectKey()`, which is exact for the
+   * common case — but a project's directory can vanish between open() and
+   * a later call (eviction runs *after* the directory it's evicting is
+   * already gone), and at that point `realpath` can no longer reproduce the
+   * key computed while the directory still existed; it falls back to a
+   * bare `resolve()` instead, a spelling that only matches the original key
+   * by chance. The scan fallback below covers that case by matching on the
+   * handle's own root, which is fixed at open() and never recomputed.
+   */
+  private findEntry(root: string): { key: string; entry: OpenProject } | undefined {
+    const key = projectKey(root);
+    const direct = this.projects.get(key);
+    if (direct) return { key, entry: direct };
+
+    const resolved = resolve(root);
+    for (const [k, entry] of this.projects) {
+      if (entry.handle.root === resolved) return { key: k, entry };
+    }
+    return undefined;
   }
 
   list(): ProjectHandle[] {
@@ -204,17 +233,21 @@ export class ProjectRegistry {
       this.active = undefined;
       return;
     }
-    const key = resolve(root);
-    if (!this.projects.has(key)) {
-      throw new Error(`cannot set active project: not open: ${key}`);
+    const found = this.findEntry(root);
+    if (!found) {
+      throw new Error(`cannot set active project: not open: ${resolve(root)}`);
     }
-    const changed = this.active !== key;
-    this.active = key;
+    // Stored as the handle's own root, not the caller's spelling of it —
+    // two spellings of the same folder must always show the same active
+    // root, whichever one was used to set it.
+    const canonicalRoot = found.entry.handle.root;
+    const changed = this.active !== canonicalRoot;
+    this.active = canonicalRoot;
     // Broadcasts to every connected /events client regardless of which
     // project's change stream it's on — a client watching project A still
     // needs to learn the daemon switched to B, since that's not a file
     // change inside any one project's own SseHub.
-    if (changed) this.lifecycle.broadcast({ type: "project-switched", root: key });
+    if (changed) this.lifecycle.broadcast({ type: "project-switched", root: canonicalRoot });
   }
 
   /**
@@ -225,20 +258,19 @@ export class ProjectRegistry {
    * rather than let it linger). A no-op for a root that isn't open.
    */
   async close(root: string): Promise<void> {
-    const key = resolve(root);
-    const entry = this.projects.get(key);
-    if (!entry) return;
+    const found = this.findEntry(root);
+    if (!found) return;
+    const { key, entry } = found;
 
     this.projects.delete(key);
     await entry.index.stop();
     entry.handle.sseHub.close();
-    // The font memo is keyed by (projectRoot, family) and otherwise never
-    // shrinks for the daemon's lifetime — without this, reopening a project
-    // whose fonts previously failed (e.g. offline) would keep serving the
-    // stale "failed" status instead of retrying.
-    clearFontMemo(key);
+    // The font memo is keyed by store.projectDir, i.e. handle.root — not
+    // the (possibly realpath'd) lookup key — so clearing it must use the
+    // same value the store itself was constructed with.
+    clearFontMemo(entry.handle.root);
 
-    if (this.active === key) {
+    if (this.active === entry.handle.root) {
       this.active = undefined;
     }
   }
@@ -294,10 +326,11 @@ export class ProjectRegistry {
    * no-op if `root` was already closed/evicted (guards double eviction).
    */
   private async evict(root: string): Promise<void> {
-    const key = resolve(root);
-    if (!this.projects.has(key)) return;
+    const found = this.findEntry(root);
+    if (!found) return;
+    const canonicalRoot = found.entry.handle.root;
 
-    const wasActive = this.active === key;
+    const wasActive = this.active === canonicalRoot;
     // Re-seat the active slot synchronously, before "project-closed" goes
     // out — close() below doesn't clear `this.active` until after
     // `index.stop()`'s real filesystem work (tens of ms on a large
@@ -310,16 +343,38 @@ export class ProjectRegistry {
     // separate "project-switched" here would just double every client's
     // project-switch handling for the same state transition.
     if (wasActive) {
-      const next = this.list().find((h) => h.root !== key);
+      const next = this.list().find((h) => h.root !== canonicalRoot);
       this.active = next?.root;
     }
 
-    this.lifecycle.broadcast({ type: "project-closed", root: key });
+    this.lifecycle.broadcast({ type: "project-closed", root: canonicalRoot });
 
-    // `this.active` is no longer `key` by this point (either replaced
-    // above, or never was), so close()'s own "if (this.active === key)
-    // reset" is a no-op here — the value we just set survives it.
-    await this.close(key);
+    // `this.active` is no longer `canonicalRoot` by this point (either
+    // replaced above, or never was), so close()'s own "if (this.active ===
+    // entry.handle.root) reset" is a no-op here — the value we just set
+    // survives it.
+    await this.close(canonicalRoot);
+  }
+}
+
+/**
+ * Canonical identity for a project root (CHR-650) — `realpath` collapses a
+ * symlink and its target, or macOS's `/tmp` vs. `/private/tmp`, onto the
+ * same key, so opening one folder under two spellings finds the same
+ * `ProjectHandle` instead of building a second watcher/`sseHub`/board state
+ * for it. Falls back to a plain `resolve()` when the path doesn't exist yet
+ * — `init_project` legitimately names a directory before it's scaffolded,
+ * and lookups like `get()` must not throw for a path that simply isn't
+ * open. Used only to key the registry's internal map; `ProjectHandle.root`
+ * itself stays whatever `resolve()` produced for the root's first caller,
+ * so callers keep seeing the same spelling back that they're used to.
+ */
+function projectKey(dir: string): string {
+  const root = resolve(dir);
+  try {
+    return realpathSync(root);
+  } catch {
+    return root;
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile, writeFile, stat } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile, stat, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { initProject } from "../init/init-project.js";
@@ -83,6 +83,54 @@ describe("ProjectRegistry", () => {
     expect(second).toBe(first);
     expect(third).toBe(first);
     expect(registry.list()).toHaveLength(1);
+  });
+
+  it("opens the same folder once whether reached through a symlink or its target (CHR-650)", async () => {
+    const dir = await makeProject(`<div id="n1"></div>`);
+    const linkContainer = await mkdtemp(join(tmpdir(), "artisign-registry-link-"));
+    dirs.push(linkContainer);
+    const link = join(linkContainer, "via-symlink");
+    await symlink(dir, link);
+
+    const viaTarget = await registry.open(dir);
+    const viaSymlink = await registry.open(link);
+
+    expect(viaSymlink).toBe(viaTarget);
+    expect(registry.list()).toHaveLength(1);
+
+    // Board state and the SSE hub are the whole point of a shared handle
+    // (CHR-624/ADR-005 follow mode, pinned screens) — assert on the actual
+    // instances, not just reference equality of the handle that wraps them.
+    expect(viaSymlink.boardState).toBe(viaTarget.boardState);
+    expect(viaSymlink.sseHub).toBe(viaTarget.sseHub);
+
+    const recentProjects = (await readGlobalConfig()).recentProjects ?? [];
+    expect(recentProjects.filter((p) => p === viaTarget.root)).toHaveLength(1);
+  });
+
+  it("finds an open project by its own root once the directory it was opened through is gone (CHR-650 eviction path)", async () => {
+    const dir = await makeProject();
+    const linkContainer = await mkdtemp(join(tmpdir(), "artisign-registry-link-"));
+    dirs.push(linkContainer);
+    const link = join(linkContainer, "via-symlink");
+    await symlink(dir, link);
+
+    // Opened via the symlink, so handle.root is the symlink's own spelling
+    // — the registry's map key, computed while `dir` still existed, is
+    // `dir`'s realpath instead, a different string. That gap is exactly
+    // what eviction hits: it runs *after* the directory is already gone,
+    // when realpath can no longer reproduce that key at all.
+    const handle = await registry.open(link);
+    expect(handle.root).toBe(link);
+
+    await rm(dir, { recursive: true, force: true });
+
+    // realpath on a now-dangling symlink fails, so a lookup by handle.root
+    // can no longer hit the map directly — it only succeeds via
+    // findEntry()'s scan fallback, matching on the handle's own root.
+    expect(registry.get(handle.root)).toBe(handle);
+    await expect(registry.close(handle.root)).resolves.toBeUndefined();
+    expect(registry.get(handle.root)).toBeUndefined();
   });
 
   it("opens two projects in parallel with independent indices", async () => {

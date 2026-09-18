@@ -49,6 +49,36 @@ describe("set_board_state", () => {
     await expect(setBoardState(fx.store, {}, {})).rejects.toBeInstanceOf(ToolError);
   });
 
+  it("a write drops a pin whose screen vanished outside delete_entity; a pure read leaves the state alone", async () => {
+    const { ctx, broadcasts } = fakeViewState();
+    await setBoardState(fx.store, { pins: { op: "set", screens: ["home", "checkout"] } }, ctx);
+    await fx.store.deleteScreen("home"); // e.g. a branch switch — no delete_entity, so no prune hook ran
+    broadcasts.length = 0;
+
+    const read = await setBoardState(fx.store, {}, ctx);
+    expect(read.pinned).toEqual(["home", "checkout"]);
+    expect(read.shown_screens).toEqual(["checkout"]);
+    expect(broadcasts).toEqual([]);
+
+    const write = await setBoardState(fx.store, { filter: "pay" }, ctx);
+    expect(write.pinned).toEqual(["checkout"]);
+    expect(broadcasts.at(-1)).toEqual({ filter: "pay", pinned: ["checkout"] });
+  });
+
+  it("op:set naming only unknown screens leaves the existing pins alone instead of clearing them", async () => {
+    const { ctx, broadcasts } = fakeViewState();
+    await setBoardState(fx.store, { pins: { op: "set", screens: ["home"] } }, ctx);
+    broadcasts.length = 0;
+
+    const res = await setBoardState(fx.store, { pins: { op: "set", screens: ["chekout"] } }, ctx);
+    expect(res.pinned).toEqual(["home"]);
+    expect(res.warnings).toEqual([{ kind: "unknown_ref", message: 'screen "chekout" was not found' }]);
+    expect(broadcasts).toEqual([]);
+
+    const cleared = await setBoardState(fx.store, { pins: { op: "set", screens: [] } }, ctx);
+    expect(cleared.pinned).toEqual([]);
+  });
+
   it("a call with every field omitted is a pure read — filter/pinned reflect current state, no broadcast", async () => {
     const { ctx, broadcasts } = fakeViewState();
     await setBoardState(fx.store, { filter: "checkout" }, ctx);

@@ -50,7 +50,8 @@ const setMetaDecisionSchema = z.object({
 });
 
 const pinsPatchSchema = z.union([
-  z.object({ op: z.enum(["add", "remove", "set"]), screens: z.array(z.string()) }),
+  // Capped: every unknown name costs a warning in the response.
+  z.object({ op: z.enum(["add", "remove", "set"]), screens: z.array(z.string()).max(500) }),
   z.object({ op: z.literal("clear") }),
 ]);
 
@@ -314,7 +315,8 @@ export const TOOLS: ToolDefinition[] = [
       "field omitted is a pure read — no broadcast, no side effect. The response always reports the current " +
       "filter/pinned plus shown_screens (filter matches ∪ pinned, restricted to screens that currently " +
       "exist). An unknown screen name in an add/set never enters pinned — it's dropped with a warning, never " +
-      "blocking; the known names in the same call still apply. Not available over the stdio MCP server " +
+      "blocking; the known names in the same call still apply, and a set whose names are all unknown changes " +
+      "nothing. Not available over the stdio MCP server " +
       "(invalid_state) — board state lives in the daemon, which stdio has no connection to.",
     {
       filter: z.string().nullable().optional(),

@@ -65,15 +65,16 @@ export async function setBoardState(store: Store, input: SetBoardStateInput, ctx
       // unresolved token ref (written into a file the human can see and
       // fix): a ghost pin has nowhere to be noticed or cleaned up. Warn for
       // every unknown name in the *original* input, but only pass the
-      // known ones through — an add/set made entirely of unknown names is
-      // then naturally a no-op (add: nothing new to union in; set: an
-      // empty pinned list, same as `{op:"clear"}`).
+      // known ones through. A call that named screens but got none of them
+      // right changes nothing: for `add` that falls out naturally, for
+      // `set` the patch is skipped — a typo must not clear the pins a human
+      // set. `set` with an empty list still clears.
       const known: string[] = [];
       for (const name of input.pins.screens) {
         if (knownScreens.has(name)) known.push(name);
         else warnings.push({ kind: "unknown_ref", message: `screen "${name}" was not found` });
       }
-      patch.pins = { op: input.pins.op, screens: known };
+      if (known.length > 0 || input.pins.screens.length === 0) patch.pins = { op: input.pins.op, screens: known };
     } else {
       patch.pins = input.pins; // remove / clear — nothing to validate
     }
@@ -85,7 +86,17 @@ export async function setBoardState(store: Store, input: SetBoardStateInput, ctx
   // reports changed:false — the distinction that matters here is "did the
   // caller ask for a write at all", not "did the write turn out to change
   // anything").
-  const state = Object.keys(patch).length > 0 ? ctx.viewState.setBoardState(patch) : ctx.viewState.getBoardState();
+  const isWrite = Object.keys(patch).length > 0;
+  if (isWrite) {
+    // delete_entity prunes a deleted screen's pin, but a screen can also
+    // vanish without it (a branch switch, a hand edit). Any write drops
+    // such pins first, so the shared state converges instead of carrying
+    // them forever.
+    for (const name of ctx.viewState.getBoardState().pinned) {
+      if (!knownScreens.has(name)) ctx.viewState.pruneScreen(name);
+    }
+  }
+  const state = isWrite ? ctx.viewState.setBoardState(patch) : ctx.viewState.getBoardState();
 
   const metas = await Promise.all(screenNames.map((name) => store.readScreenMeta(name)));
   const needle = (state.filter ?? "").trim().toLowerCase();

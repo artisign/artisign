@@ -218,16 +218,52 @@ describe("computeDriftWarnings", () => {
     ]);
   });
 
-  it("still does not match width against a typography-only 11px token (CHR-495 regression guard)", () => {
-    const typographyRegistry: DesignSystemRegistry = {
+  it("matches width against size and never falls back to typography when both hold the value (CHR-495 regression guard)", () => {
+    const bothRegistry: DesignSystemRegistry = {
       componentNames: new Set(),
-      tokenPaths: new Set(["typography.size-xxs"]),
-      tokenFlatNames: new Set(["size-xxs"]),
+      tokenPaths: new Set(["size.tap", "typography.size-xxs"]),
+      tokenFlatNames: new Set(["tap", "size-xxs"]),
     };
-    const typographyTokens: TokensDocument = { typography: { "size-xxs": "11px" } };
+    const bothTokens: TokensDocument = { size: { tap: "11px" }, typography: { "size-xxs": "11px" } };
     const html = `<div id="n1" style="width: 11px"></div>`;
-    const { doc } = parseScreen(html, "s", typographyRegistry);
-    expect(computeDriftWarnings(doc, typographyTokens)).toEqual([]);
+    const { doc } = parseScreen(html, "s", bothRegistry);
+    const warnings = computeDriftWarnings(doc, bothTokens);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.suggestion).toBe("$size.tap");
+  });
+
+  it("still matches a multi-part value against a token holding the whole value (CHR-634)", () => {
+    const shadowRegistry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["shadow.card"]),
+      tokenFlatNames: new Set(["card"]),
+    };
+    const shadowTokens: TokensDocument = { shadow: { card: "0 1px 2px rgba(0,0,0,0.1)" } };
+    const html = `<div id="n1" style="box-shadow: 0 1px 2px rgba(0,0,0,0.1)"></div>`;
+    const { doc } = parseScreen(html, "s", shadowRegistry);
+    const warnings = computeDriftWarnings(doc, shadowTokens);
+    expect(warnings).toEqual([
+      {
+        kind: "drift",
+        message: 'inline value "0 1px 2px rgba(0,0,0,0.1)" for "box-shadow" matches token $shadow.card',
+        nodeId: "n1",
+        suggestion: "$shadow.card",
+      },
+    ]);
+  });
+
+  it("prefers a token holding the whole value over per-part matches (CHR-634)", () => {
+    const spacingRegistry: DesignSystemRegistry = {
+      componentNames: new Set(),
+      tokenPaths: new Set(["spacing.gutter", "spacing.sm"]),
+      tokenFlatNames: new Set(["gutter", "sm"]),
+    };
+    const spacingTokens: TokensDocument = { spacing: { gutter: "8px 16px", sm: "8px" } };
+    const html = `<div id="n1" style="padding: 8px 16px"></div>`;
+    const { doc } = parseScreen(html, "s", spacingRegistry);
+    const warnings = computeDriftWarnings(doc, spacingTokens);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]!.suggestion).toBe("$spacing.gutter");
   });
 
   it("only replaces the matching parts of a shorthand, leaving the rest literal (CHR-634)", () => {

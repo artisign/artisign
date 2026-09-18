@@ -147,15 +147,21 @@ export function computeDriftWarnings(doc: ScreenDocument, tokens: TokensDocument
       const affinityBuckets = bucketsForProperty(prop);
       if (affinityBuckets.length === 0) continue; // no bucket affinity — conservative, never cross-suggest
 
-      const parts = splitShorthandParts(value);
-      const resolved = parts.map((part) => resolvePart(part, affinityBuckets, byNormalizedValue));
-      if (!resolved.some((r) => r.path)) continue; // no part matched any candidate bucket
+      // The whole value first: a token may itself hold a multi-part value
+      // (every shadow, `motion.fast: "0.2s ease"`, `spacing.gutter: "8px 16px"`),
+      // and that exact token beats any per-part replacement. Parts are only
+      // the fallback.
+      const whole = resolvePart(value.trim(), affinityBuckets, byNormalizedValue);
+      const resolved = whole.path
+        ? [whole]
+        : splitShorthandParts(value).map((part) => resolvePart(part, affinityBuckets, byNormalizedValue));
+      if (!resolved.some((r) => r.path)) continue; // neither the value nor any part matched a candidate bucket
 
       const suggestion = resolved.map((r) => (r.path ? `$${r.path}` : r.text)).join(" ");
       // Multi-part shorthands (`padding: 14px 20px`) always say "tokens",
       // even when only one part matched — the suggestion is still a
       // multi-value string, not a single `$path`.
-      const noun = parts.length > 1 ? "tokens" : "token";
+      const noun = resolved.length > 1 ? "tokens" : "token";
 
       warnings.push({
         kind: "drift",

@@ -489,6 +489,12 @@ describe("asset routes (/api/assets/*, src/url() rewriting)", () => {
       expect(assetRes.status).toBe(200);
       expect(Buffer.from(await assetRes.arrayBuffer())).toEqual(Buffer.from([1, 2, 3, 4])); // A's bytes, not B's
     } finally {
+      // Close B (watcher + index) and hand `active` back to A before the
+      // directory disappears — deleting an open project root out from under
+      // the daemon is the registry's async eviction path, which would
+      // otherwise race this file's `afterEach` daemon.stop().
+      daemon.registry.activeProject = dir;
+      await daemon.registry.close(dirB);
       await rm(dirB, { recursive: true, force: true });
     }
   });

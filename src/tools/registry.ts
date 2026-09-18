@@ -17,6 +17,7 @@ import { inspectNode } from "./inspect-node.js";
 import { setMeta } from "./meta.js";
 import { getGuide } from "./guide.js";
 import { writeMockup, getMockup, promoteMockup } from "./mockups.js";
+import { setBoardState } from "./board-state.js";
 
 const viewSchema = z.enum(["summary", "tree", "full"]);
 const responseModeSchema = z.enum(["summary", "diff", "full"]);
@@ -47,6 +48,11 @@ const setMetaDecisionSchema = z.object({
   body: z.string(),
   status: z.enum(["active", "superseded"]).optional(),
 });
+
+const pinsPatchSchema = z.union([
+  z.object({ op: z.enum(["add", "remove", "set"]), screens: z.array(z.string()) }),
+  z.object({ op: z.literal("clear") }),
+]);
 
 const predicateSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("style_ref"), ref_path: z.string() }),
@@ -295,6 +301,25 @@ export const TOOLS: ToolDefinition[] = [
     },
     (store, input) => writeMockup(store, input as never),
   ),
+  tool(
+    "set_board_state",
+    "Reads or mutates the Board's shared filter and pinned screens — held in daemon memory only, shared by " +
+      "every client (browser and agents) currently viewing this project; never persisted, never written to " +
+      "the project folder. filter: omit to leave it unchanged, a string to set it (case-insensitive substring " +
+      "match against a screen's name or any of its tags), null (or an empty/whitespace-only string — the same " +
+      "state as null) to clear it. pins: {op:\"add\"|\"remove\"|\"set\", screens} to add/remove/replace the " +
+      "pinned set, or {op:\"clear\"} to unpin everything; omit to leave pins unchanged. A call with every " +
+      "field omitted is a pure read — no broadcast, no side effect. The response always reports the current " +
+      "filter/pinned plus shown_screens (filter matches ∪ pinned, restricted to screens that currently " +
+      "exist). An unknown screen name in an add/set never enters pinned — it's dropped with a warning, never " +
+      "blocking; the known names in the same call still apply. Not available over the stdio MCP server " +
+      "(invalid_state) — board state lives in the daemon, which stdio has no connection to.",
+    {
+      filter: z.string().nullable().optional(),
+      pins: pinsPatchSchema.optional(),
+    },
+    (store, input, ctx) => setBoardState(store, input as never, ctx),
+  ),
 
   // Visual review -----------------------------------------------------------
   tool(
@@ -396,7 +421,10 @@ export const TOOLS: ToolDefinition[] = [
       "drop their outgoing flow edges and meta sidecar (comments are kept as history). A component still " +
       "referenced by any screen, component, or pattern is refused with the referencing nodes listed.",
     { kind: z.enum(["screen", "component", "pattern", "mockup"]), name: z.string(), variant: z.string().optional() },
-    (store, input) => deleteEntity(store, input as never),
+    // ctx threaded through the way init_project's is — deleteEntity uses
+    // ctx.viewState.pruneScreen(name) to drop a deleted screen from the
+    // Board's pinned set (CHR-624), a no-op when ctx/viewState is absent.
+    (store, input, ctx) => deleteEntity(store, input as never, ctx),
   ),
 
   // Comments ---------------------------------------------------------------

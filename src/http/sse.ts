@@ -1,6 +1,7 @@
 import type { ServerResponse } from "node:http";
 import type { Store, ChangeCategory } from "../store/index.js";
 import type { ActivityEvent } from "../mcp/activity.js";
+import type { BoardState } from "../daemon/board-state.js";
 
 export type ChangeSseEvent = {
   type: "change";
@@ -10,6 +11,9 @@ export type ChangeSseEvent = {
 
 /** CHR-630/ADR-005 — one per MCP tool call. Additive to the union; see src/mcp/activity.ts for the shape and derivation. */
 export type ActivitySseEvent = ActivityEvent;
+
+/** CHR-624/ADR-005 — the Board's shared filter/pinned state changed. `source` names which door the change came through (`set_board_state` over `/mcp` vs. `POST /api/tools/set_board_state`), not who made it. */
+export type BoardStateSseEvent = { type: "board_state"; filter: string | null; pinned: string[]; source: "agent" | "human" };
 
 /**
  * Project lifecycle events — unlike `ChangeSseEvent`, which is
@@ -24,7 +28,7 @@ export type LifecycleSseEvent =
   | { type: "project-opened"; root: string }
   | { type: "project-closed"; root: string };
 
-export type SseEvent = ChangeSseEvent | LifecycleSseEvent | ActivitySseEvent;
+export type SseEvent = ChangeSseEvent | LifecycleSseEvent | ActivitySseEvent | BoardStateSseEvent;
 
 const HEARTBEAT_MS = 25_000;
 
@@ -123,6 +127,8 @@ export type SseHub = {
   close: () => void;
   /** Fan-out only (CHR-630/ADR-005) — the caller (mcp/server.ts's tool wrapper) derives the event; this hub just broadcasts it to the same clients a `change` event reaches. */
   broadcastActivity: (event: ActivityEvent) => void;
+  /** Fan-out only (CHR-624/ADR-005) — the caller (the composed `ViewState` in http/server.ts) already decided the state actually changed; this hub just broadcasts it. */
+  broadcastBoardState: (state: BoardState, source: "agent" | "human") => void;
 };
 
 /**
@@ -155,7 +161,12 @@ export function createSseHub(store: Store): SseHub {
     clients.broadcast(`data: ${JSON.stringify(event)}\n\n`);
   }
 
-  return { addClient: clients.add, close, broadcastActivity };
+  function broadcastBoardState(state: BoardState, source: "agent" | "human"): void {
+    const sseEvent: BoardStateSseEvent = { type: "board_state", filter: state.filter, pinned: state.pinned, source };
+    clients.broadcast(`data: ${JSON.stringify(sseEvent)}\n\n`);
+  }
+
+  return { addClient: clients.add, close, broadcastActivity, broadcastBoardState };
 }
 
 export type LifecycleHub = {

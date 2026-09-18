@@ -193,6 +193,10 @@ function deriveTargetAndNodes(tool: string, input: Record<string, unknown>, resu
     // `list_comments` when filtered to one screen or node.
     // set_tokens — rewrites across many screens/components/patterns at once.
     // init_project, reply_comment — no target shape this event models fits.
+    // set_board_state (CHR-624) — classified "write" (not in READ_TOOLS
+    // above) even for its pure-read form (every field omitted); target
+    // stays null either way — the Board's filter/pins aren't a single
+    // screen/mockup/component/pattern.
     default:
       return NONE;
   }

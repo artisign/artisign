@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Store } from "../store/index.js";
+import type { BoardStateStore } from "../daemon/board-state.js";
 import { getDesignSystem } from "../tools/reads.js";
 import { buildRenderContext, renderScreenDocument, renderMockupDocument, resolveFontFaceCss } from "../tools/render-context.js";
 import { readMockupMetaOrDefault } from "../tools/mockups.js";
@@ -44,10 +45,20 @@ type PatternDefinitionJson = {
  * /api/flows exposes flows.json (via the tool layer's `readAllFlows`) for
  * the Board view, which lists click paths across screens rather than
  * inspecting one rendered screen's DOM at a time.
+ *
+ * /api/board-state (CHR-624/ADR-005) is a read-only mirror of the Board's
+ * shared filter/pinned state, for the browser's initial paint / resync — a
+ * write goes through `POST /api/tools/set_board_state` instead (the one
+ * tool, shared with MCP agents), not a dedicated write route here.
  */
-export async function handlePreviewRoutes(req: IncomingMessage, res: ServerResponse, store: Store): Promise<boolean> {
+export async function handlePreviewRoutes(req: IncomingMessage, res: ServerResponse, store: Store, boardState: BoardStateStore): Promise<boolean> {
   if (req.method !== "GET") return false;
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
+
+  if (url.pathname === "/api/board-state") {
+    sendJson(res, 200, boardState.get());
+    return true;
+  }
 
   if (url.pathname === "/api/screens") {
     const names = await store.listScreens();

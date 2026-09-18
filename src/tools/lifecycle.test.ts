@@ -11,7 +11,8 @@ import { getDesignSystem, listComments } from "./reads.js";
 import { buildRenderContext } from "./render-context.js";
 import { parseScreen, renderScreen, loadRegistry } from "../model/index.js";
 import { FsStore } from "../store/index.js";
-import { ToolError, type Warning } from "./types.js";
+import { createBoardStateStore } from "../daemon/board-state.js";
+import { ToolError, type Warning, type ToolHandlerContext } from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -752,5 +753,30 @@ describe("delete_entity", () => {
     const res = await deleteEntity(fx.store, { kind: "mockup", name: "hero-options" });
     expect(res).toMatchObject({ kind: "mockup", name: "hero-options" });
     expect(await fx.store.listMockups()).toEqual([]);
+  });
+
+  // CHR-624: deleting a pinned screen must leave no stale pin on the Board.
+  it("prunes a deleted screen from ctx.viewState's pinned set", async () => {
+    await fx.store.writeScreen("home", `<div id="n1"></div>`);
+    const boardState = createBoardStateStore();
+    boardState.set({ pins: { op: "add", screens: ["home", "checkout"] } });
+    const ctx: ToolHandlerContext = {
+      viewState: {
+        getBoardState: () => boardState.get(),
+        setBoardState: (patch) => boardState.set(patch).state,
+        pruneScreen: (name) => {
+          boardState.pruneScreen(name);
+        },
+      },
+    };
+
+    await deleteEntity(fx.store, { kind: "screen", name: "home" }, ctx);
+
+    expect(boardState.get().pinned).toEqual(["checkout"]);
+  });
+
+  it("deleting a screen with no ctx (or an unpinned screen) is a no-op on board state — never throws", async () => {
+    await fx.store.writeScreen("home", `<div id="n1"></div>`);
+    await expect(deleteEntity(fx.store, { kind: "screen", name: "home" })).resolves.toMatchObject({ kind: "screen" });
   });
 });

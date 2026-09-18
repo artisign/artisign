@@ -46,13 +46,13 @@ describe("MCP server — protocol-level", () => {
     expect(client.getServerVersion()).toMatchObject({ name: "artisign", version });
   });
 
-  it("lists all 23 tools", async () => {
+  it("lists all 24 tools", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(TOOLS.map((t) => t.name).sort());
-    expect(tools).toHaveLength(23);
+    expect(tools).toHaveLength(24);
   });
 
-  it("successfully calls every one of the 21 tools that don't need a browser (get_screenshot/inspect_node excluded)", async () => {
+  it("successfully calls every one of the 21 tools that don't need a browser or daemon board-state context (get_screenshot/inspect_node/set_board_state excluded)", async () => {
     async function call(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
       const result = await client.callTool({ name, arguments: args });
       expect(result.isError, `${name} returned an error: ${JSON.stringify(result.content)}`).not.toBe(true);
@@ -130,6 +130,18 @@ describe("MCP server — protocol-level", () => {
   it("surfaces a not_found tool error as an MCP tool-level error, not a protocol crash", async () => {
     const result = await client.callTool({ name: "get_screen", arguments: { screen: "does-not-exist" } });
     expect(result.isError).toBe(true);
+  });
+
+  // CHR-624: `createMcpServer(fx.store)` above is built with no `ctx` at
+  // all — exactly what the stdio transport does (no registry, no board
+  // state to compose a ViewState over). set_board_state has no fallback
+  // the way init_project's ctx.openProject has one; it reports a clean
+  // error instead of silently pretending a filter/pin took effect.
+  it("set_board_state reports invalid_state over a context with no board state (stdio-equivalent)", async () => {
+    const result = await client.callTool({ name: "set_board_state", arguments: { filter: "checkout" } });
+    expect(result.isError).toBe(true);
+    const content = result.content as Array<{ type: string; text: string }>;
+    expect(JSON.parse(content[0]!.text)).toMatchObject({ code: "invalid_state" });
   });
 
   it("advertises the augmentation-grammar instructions to the connected client", () => {

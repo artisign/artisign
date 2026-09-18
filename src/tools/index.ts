@@ -12,6 +12,9 @@ export type {
   Predicate,
   TokenValue,
   ToolHandlerContext,
+  BoardState,
+  BoardStatePatch,
+  ViewState,
 } from "./types.js";
 export { ToolError } from "./types.js";
 export { createToolContext, loadScreen, type ToolContext, type LoadedScreen } from "./context.js";
@@ -28,3 +31,4 @@ export {
   type GetMockupInput,
   type PromoteMockupInput,
 } from "./mockups.js";
+export { setBoardState, type SetBoardStateInput } from "./board-state.js";

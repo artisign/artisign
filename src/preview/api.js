@@ -1,9 +1,17 @@
 // Thin wrappers over the preview's internal HTTP API. No caching here —
 // each SSE change event triggers a fresh fetch of whatever it invalidates.
 
-/** @returns {Promise<{ name: string, tags: string[], notes: string }[]>} */
-export async function fetchScreens() {
-  const res = await fetch("/api/screens");
+/**
+ * @param {string} project REQUIRED — every call in this module is scoped to
+ *   the project the calling tab is displaying (`activeProjectRoot` in
+ *   app.js), same convention as sse.js's `connectEvents` and fetchBoardState/
+ *   setBoardState below: an omitted `?project=` falls back to the daemon-WIDE
+ *   active project, which is a real gap with two tabs open on different
+ *   projects (CHR-651).
+ * @returns {Promise<{ name: string, tags: string[], notes: string }[]>}
+ */
+export async function fetchScreens(project) {
+  const res = await fetch(`/api/screens?project=${encodeURIComponent(project)}`);
   const body = await res.json();
   return body.screens;
 }
@@ -26,17 +34,19 @@ async function fetchRenderAt(url) {
 
 /**
  * @param {string} screen
+ * @param {string} project see fetchScreens's own note — required here too.
  * @returns {Promise<{ ok: true, html: string } | { ok: false, status: number, message: string }>}
  */
-export async function fetchRender(screen) {
-  return fetchRenderAt(`/api/render/${encodeURIComponent(screen)}`);
+export async function fetchRender(screen, project) {
+  return fetchRenderAt(`/api/render/${encodeURIComponent(screen)}?project=${encodeURIComponent(project)}`);
 }
 
 /**
+ * @param {string} project see fetchScreens's own note — required here too.
  * @returns {Promise<{ ok: true, mockups: { name: string, title?: string, description?: string, tags: string[], variants: { id: string, title: string, description?: string }[] }[] } | { ok: false, status: number, message: string }>}
  */
-export async function fetchMockups() {
-  const res = await fetch("/api/mockups");
+export async function fetchMockups(project) {
+  const res = await fetch(`/api/mockups?project=${encodeURIComponent(project)}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ message: res.statusText }));
     return { ok: false, status: res.status, message: body.message ?? res.statusText };
@@ -48,37 +58,43 @@ export async function fetchMockups() {
 /**
  * @param {string} name
  * @param {string} variant
+ * @param {string} project see fetchScreens's own note — required here too.
  * @returns {Promise<{ ok: true, html: string } | { ok: false, status: number, message: string }>}
  */
-export async function fetchMockupRender(name, variant) {
-  return fetchRenderAt(`/api/render/mockup/${encodeURIComponent(name)}/${encodeURIComponent(variant)}`);
+export async function fetchMockupRender(name, variant, project) {
+  return fetchRenderAt(`/api/render/mockup/${encodeURIComponent(name)}/${encodeURIComponent(variant)}?project=${encodeURIComponent(project)}`);
 }
 
 /**
  * Every tag in the project carrying its own notes (CHR-596) — a spec that
  * spans several screens, set once via set_meta({target:{kind:"tag",tag}})
  * instead of duplicated into every tagged screen's own notes.
+ * @param {string} project see fetchScreens's own note — required here too.
  * @returns {Promise<{ tag: string, notes: string }[]>}
  */
-export async function fetchTags() {
-  const res = await fetch("/api/tags");
+export async function fetchTags(project) {
+  const res = await fetch(`/api/tags?project=${encodeURIComponent(project)}`);
   const body = await res.json();
   return body.tags ?? [];
 }
 
 /**
  * All flow edges across every screen, for the Board view.
+ * @param {string} project see fetchScreens's own note — required here too.
  * @returns {Promise<{ from: string, event: string, to: string, to_kind: string }[]>}
  */
-export async function fetchFlows() {
-  const res = await fetch("/api/flows");
+export async function fetchFlows(project) {
+  const res = await fetch(`/api/flows?project=${encodeURIComponent(project)}`);
   const body = await res.json();
   return body.flows ?? [];
 }
 
-/** @returns {Promise<Record<string, unknown>>} */
-export async function fetchDesignSystem() {
-  const res = await fetch("/api/design-system");
+/**
+ * @param {string} project see fetchScreens's own note — required here too.
+ * @returns {Promise<Record<string, unknown>>}
+ */
+export async function fetchDesignSystem(project) {
+  const res = await fetch(`/api/design-system?project=${encodeURIComponent(project)}`);
   return res.json();
 }
 
@@ -87,10 +103,11 @@ export async function fetchDesignSystem() {
  * dedicated preview route — the storage-facing shape (`node_id`/`text`/
  * `resolved`/`ts`), not the MCP-facing `PublicComment` shape.
  * @param {string} screen
+ * @param {string} project see fetchScreens's own note — required here too.
  * @returns {Promise<{ id: string, screen: string, node_id: string | null, text: string, author: "human" | "agent", parent_id: string | null, resolved: boolean, ts: string }[]>}
  */
-export async function fetchComments(screen) {
-  const res = await fetch(`/api/comments?screen=${encodeURIComponent(screen)}`);
+export async function fetchComments(screen, project) {
+  const res = await fetch(`/api/comments?screen=${encodeURIComponent(screen)}&project=${encodeURIComponent(project)}`);
   const body = await res.json();
   return body.comments ?? [];
 }
@@ -174,10 +191,11 @@ export async function fetchFsDirs(path) {
  * model node's id/tag plus its refs (component/variant/token), the same
  * shape `get_node`'s summary view returns per node — see reads.ts.
  * @param {string} screen
+ * @param {string} project see fetchScreens's own note — required here too.
  * @returns {Promise<{ ok: true, nodes: { id: string, tag: string, parent_id: string | null, refs?: { component_ref?: string, variant?: string, token_refs?: Record<string, unknown> } }[] } | { ok: false, message: string }>}
  */
-export async function fetchScreenNodes(screen) {
-  const res = await fetch("/api/tools/get_screen", {
+export async function fetchScreenNodes(screen, project) {
+  const res = await fetch(`/api/tools/get_screen?project=${encodeURIComponent(project)}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ screen, view: "full", fields: ["nodes"] }),
@@ -197,10 +215,11 @@ export async function fetchScreenNodes(screen) {
  * (screen/node are inherited from the thread's root). Agents only ever
  * reply through the separate `reply_comment` MCP tool.
  * @param {{ screen: string, node_id: string | null, text: string } | { parent_id: string, text: string }} input
+ * @param {string} project see fetchScreens's own note — required here too.
  * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
  */
-export async function postComment(input) {
-  const res = await fetch("/api/comments", {
+export async function postComment(input, project) {
+  const res = await fetch(`/api/comments?project=${encodeURIComponent(project)}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),

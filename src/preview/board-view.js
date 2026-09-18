@@ -572,6 +572,10 @@ export function createBoardView({
    * FALLBACK_SIZE until each one's iframe fires `load` again.
    * @param {string[]} nextScreens
    * @param {{ from: string, event: string, to: string, to_kind: string }[]} nextFlows
+   * @param {string} project the project the calling tab is displaying
+   *   (`activeProjectRoot` in app.js) — CHR-651, same convention as api.js's
+   *   other calls; every tile's own render fetch below must stay scoped to
+   *   it, not the daemon-wide active project.
    * @param {{ pinned?: Iterable<string>, outsideFilter?: Iterable<string>, filter?: string }} [pinInfo]
    *   All default to empty/"" — a caller with no filter/pins concept at all
    *   (there is none left in app.js, but tests may still omit it) gets tiles
@@ -579,7 +583,7 @@ export function createBoardView({
    *   is used only for the empty-state message's own copy (CHR-624, the
    *   `board-view-empty` design) when `nextScreens` is empty.
    */
-  async function setScreens(nextScreens, nextFlows, pinInfo = {}) {
+  async function setScreens(nextScreens, nextFlows, project, pinInfo = {}) {
     if (nextScreens.length === 0) {
       for (const key of Object.keys(measuredSizes)) delete measuredSizes[key];
     }
@@ -605,7 +609,7 @@ export function createBoardView({
       screens.map(async (screen) => {
         const iframe = iframesByScreen.get(screen);
         if (!iframe) return;
-        const result = await fetchRender(screen);
+        const result = await fetchRender(screen, project);
         // The screen list may have changed again by the time this resolves
         // (setScreens re-entered) — iframesByScreen was cleared/rebuilt in
         // that case, so this iframe is stale; skip assigning to it.
@@ -617,11 +621,16 @@ export function createBoardView({
     );
   }
 
-  /** Re-renders a single screen's tile (e.g. on an SSE "screen" change) without rebuilding the whole grid. */
-  async function refreshScreen(screen) {
+  /**
+   * Re-renders a single screen's tile (e.g. on an SSE "screen" change)
+   * without rebuilding the whole grid.
+   * @param {string} screen
+   * @param {string} project see setScreens's own note — required here too.
+   */
+  async function refreshScreen(screen, project) {
     const iframe = iframesByScreen.get(screen);
     if (!iframe) return;
-    const result = await fetchRender(screen);
+    const result = await fetchRender(screen, project);
     if (iframesByScreen.get(screen) !== iframe) return;
     iframe.srcdoc = result.ok ? result.html : iframe.srcdoc;
   }

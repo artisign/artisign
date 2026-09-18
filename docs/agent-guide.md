@@ -193,6 +193,12 @@ the write. A purely layout-styled wrapper (positioning, spacing, sizing —
 nothing visual) never triggers it; treat it as the tool catching what the
 rule above already asks you to do yourself.
 
+`get_project {fields: ["reuse"]}` gives the same signal at project scope:
+component/token coverage per screen and overall, plus the lowest-reuse
+screens. Pull it before a review to find screens that bypassed the design
+system, not as a score to chase — a low number on one screen you're actively
+exploring in is expected, not a defect.
+
 ## Token efficiency
 
 These tools are built for small contexts — use the levers:

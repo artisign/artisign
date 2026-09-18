@@ -95,7 +95,7 @@ export const TOOLS: ToolDefinition[] = [
   // Reads ---------------------------------------------------------------
   tool(
     "get_project",
-    "Project root: screen list, design-system pointer, counts. Tiered, cold-start read.",
+    "Project root: screen list, design-system pointer, counts. Tiered, cold-start read. fields: [\"reuse\"] adds design-system reuse coverage (component/token, project-wide and per screen) plus unused components/tokens and the lowest-reuse screens.",
     { view: viewSchema.optional(), fields: z.array(z.string()).optional(), tags: z.array(z.string()).optional() },
     (store, input) => getProject(store, input),
   ),

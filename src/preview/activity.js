@@ -119,9 +119,10 @@ export function canFollowNavigate(state) {
  * concern (it decides WHEN to call this, not what it decides), but the
  * actual navigate-or-not verdict for either call is exactly this.
  *
- * Deliberately NOT used for a feed click (see feedClickPausesFollow and
- * navigateToActivity in app.js) — a feed click navigates unconditionally,
- * regardless of follow's own state; only the LIVE path is gated on it.
+ * Deliberately NOT used for a feed click (see navigateToActivity and
+ * handleActivityFeedSelect in app.js) — a feed click navigates
+ * unconditionally, having already paused follow like every other human
+ * navigation; only the LIVE path is gated on it.
  * @param {object} event
  * @param {FollowState} followState
  * @param {{ screenNames: string[], mockupNames: string[] }} lists
@@ -130,21 +131,6 @@ export function canFollowNavigate(state) {
 export function resolveFollowNavigation(event, followState, lists) {
   if (!canFollowNavigate(followState)) return null;
   return activityIsNavigable(event, lists);
-}
-
-/**
- * Whether clicking a feed entry should pause follow — it never does
- * (ADR-005 amendment, decided by Christian on 2026-09-18): browsing the
- * agent's own history is not the human navigating away to design
- * something themselves, so the next live navigating call still pulls the
- * view back to the agent's current target. Pinned here as one pure,
- * tested fact — handleActivityFeedSelect's only job is to honour it —
- * rather than a comment at a call site that simply never calls
- * pauseFollow, which is exactly the shape every review-round-1 bug had.
- * @returns {false}
- */
-export function feedClickPausesFollow() {
-  return false;
 }
 
 /** The one short node id worth showing after the target label (e.g. "line-4") — omitted for `write_html` (its one node IS the screen root, not a specific element to point at) and whenever there isn't exactly one affected node. */

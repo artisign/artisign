@@ -146,20 +146,28 @@ describe("ensureFontsCached / buildFontFaceCss", () => {
     expect(await buildFontFaceCss(dir, { mode: "url" })).toBe("");
   });
 
-  it("buildFontFaceCss in url mode references /api/fonts/<file>", async () => {
+  it("buildFontFaceCss in url mode references /api/fonts/<file>, tagged with ?project= so a subresource request from an iframe srcdoc can be resolved to the right project", async () => {
     __setFetchForTests(mockFetch());
     await ensureFontsCached(store, ["Inter"]);
     const css = await buildFontFaceCss(dir, { mode: "url" });
     expect(css).toContain("url(/api/fonts/");
+    expect(css).toContain(`?project=${encodeURIComponent(dir)}`);
     expect(css).not.toContain("data:font/woff2");
+
+    // The persisted manifest on disk stays project-path-free — it's derived
+    // cache and must survive a moved/copied project.
+    const manifestRaw = await readFile(join(fontsDir(dir), "manifest.json"), "utf-8");
+    expect(manifestRaw).not.toContain("?project=");
+    expect(manifestRaw).not.toContain(dir);
   });
 
-  it("buildFontFaceCss in inline mode embeds the woff2 as base64 data URIs", async () => {
+  it("buildFontFaceCss in inline mode embeds the woff2 as base64 data URIs, no ?project=", async () => {
     __setFetchForTests(mockFetch());
     await ensureFontsCached(store, ["Inter"]);
     const css = await buildFontFaceCss(dir, { mode: "inline" });
     expect(css).toContain("data:font/woff2;base64,");
     expect(css).not.toContain("/api/fonts/");
+    expect(css).not.toContain("project=");
   });
 
   it("always includes Material Symbols Rounded even when no families are requested", async () => {

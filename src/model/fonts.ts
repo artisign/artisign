@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { CACHE_DIR } from "../init/artisign-config.js";
 import { ensureCacheGitignore } from "../store/index.js";
 import type { Store, TokensDocument } from "../store/index.js";
+import { escapeProjectParam } from "./assets.js";
 
 /**
  * Webfont caching: families named in a project's typography
@@ -334,7 +335,15 @@ export async function buildFontFaceCss(projectRoot: string, options: BuildFontFa
   const blocks: string[] = [];
   for (const entry of Object.values(manifest)) {
     if (options.mode === "url") {
-      blocks.push(entry.css);
+      // The manifest on disk stores plain `/api/fonts/<file>` references —
+      // it's derived cache and must survive a moved/copied project, so the
+      // `?project=` tag is added here, on read, rather than baked into the
+      // persisted css.
+      let css = entry.css;
+      for (const f of entry.files) {
+        css = css.split(`/api/fonts/${f.file}`).join(`/api/fonts/${f.file}?project=${escapeProjectParam(projectRoot)}`);
+      }
+      blocks.push(css);
       continue;
     }
     let css = entry.css;

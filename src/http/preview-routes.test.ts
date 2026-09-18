@@ -343,13 +343,13 @@ describe("webfont routes (/api/fonts/*, @font-face injection)", () => {
     expect(res.status).toBe(404);
   });
 
-  it("GET /api/render/<screen> includes the cached family's @font-face rule", async () => {
+  it("GET /api/render/<screen> includes the cached family's @font-face rule, tagged with ?project=", async () => {
     const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/home`);
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("@font-face");
     expect(html).toContain("font-family: 'Inter'");
-    expect(html).toContain("url(/api/fonts/inter-400-normal-0.woff2)");
+    expect(html).toContain(`url(/api/fonts/inter-400-normal-0.woff2?project=${encodeURIComponent(dir)})`);
   });
 });
 
@@ -408,7 +408,7 @@ describe("asset routes (/api/assets/*, src/url() rewriting)", () => {
 
     const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/home`);
     const html = await res.text();
-    expect(html).toContain("url('/api/assets/icons/logo.svg')");
+    expect(html).toContain(`url('/api/assets/icons/logo.svg?project=${encodeURIComponent(dir)}')`);
     expect(html).not.toContain("&quot;");
 
     const assetMatch = /url\('([^']+)'\)/.exec(html);
@@ -431,7 +431,7 @@ describe("asset routes (/api/assets/*, src/url() rewriting)", () => {
     const renderRes = await fetch(`http://127.0.0.1:${daemon.port}/api/render/home`);
     const html = await renderRes.text();
     const srcMatch = /id="hero2" src="([^"]+)"/.exec(html);
-    expect(srcMatch?.[1]).toBe("/api/assets/hero%20copy.png");
+    expect(srcMatch?.[1]).toBe(`/api/assets/hero%20copy.png?project=${encodeURIComponent(dir)}`);
 
     const assetRes = await fetch(`http://127.0.0.1:${daemon.port}${srcMatch![1]}`);
     expect(assetRes.status).toBe(200);
@@ -455,11 +455,47 @@ describe("asset routes (/api/assets/*, src/url() rewriting)", () => {
     expect(res.status).toBe(404);
   });
 
-  it("GET /api/render/<screen> rewrites src and url() asset refs to /api/assets/*", async () => {
+  it("GET /api/render/<screen> rewrites src and url() asset refs to /api/assets/*, tagged with ?project=", async () => {
     const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/home`);
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain('src="/api/assets/hero.png"');
-    expect(html).toContain("url('/api/assets/icons/logo.svg')");
+    expect(html).toContain(`src="/api/assets/hero.png?project=${encodeURIComponent(dir)}"`);
+    expect(html).toContain(`url('/api/assets/icons/logo.svg?project=${encodeURIComponent(dir)}')`);
+  });
+
+  it("two projects open at once: rendering project A's screen tags asset URLs with A's project — not the daemon's active project — so an iframe showing A never gets served B's asset bytes", async () => {
+    const dirB = await mkdtemp(join(tmpdir(), "artisign-preview-assets-b-"));
+    try {
+      await initProject(dirB);
+      const storeB = new FsStore(dirB);
+      await mkdir(join(dirB, "assets"), { recursive: true });
+      // Same relative path, different bytes — proves the served asset came
+      // from the project named in ?project=, not whichever project happens
+      // to be active.
+      await writeFile(join(dirB, "assets", "hero.png"), Buffer.from([9, 9, 9, 9]));
+      await storeB.writeScreen("home", `<div id="n1"><img id="hero" src="assets/hero.png"></div>`);
+
+      await daemon.registry.open(dirB);
+      daemon.registry.activeProject = dirB; // B active; A is still the one requested explicitly below
+
+      const renderRes = await fetch(`http://127.0.0.1:${daemon.port}/api/render/home?project=${encodeURIComponent(dir)}`);
+      expect(renderRes.status).toBe(200);
+      const html = await renderRes.text();
+      const srcMatch = /id="hero" src="([^"]+)"/.exec(html);
+      expect(srcMatch).not.toBeNull();
+      expect(srcMatch![1]).toContain(`project=${encodeURIComponent(dir)}`);
+
+      const assetRes = await fetch(`http://127.0.0.1:${daemon.port}${srcMatch![1]}`);
+      expect(assetRes.status).toBe(200);
+      expect(Buffer.from(await assetRes.arrayBuffer())).toEqual(Buffer.from([1, 2, 3, 4])); // A's bytes, not B's
+    } finally {
+      // Close B (watcher + index) and hand `active` back to A before the
+      // directory disappears — deleting an open project root out from under
+      // the daemon is the registry's async eviction path, which would
+      // otherwise race this file's `afterEach` daemon.stop().
+      daemon.registry.activeProject = dir;
+      await daemon.registry.close(dirB);
+      await rm(dirB, { recursive: true, force: true });
+    }
   });
 });

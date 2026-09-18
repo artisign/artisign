@@ -40,6 +40,11 @@ function unescapeHtmlAttr(text: string): string {
   return text.replace(/&quot;/g, '"').replace(/&amp;/g, "&");
 }
 
+/** Percent-encodes a `?project=` query value for use inside an already-serialized `src="…"` attribute or an unquoted CSS `url(…)` — `encodeURIComponent` alone leaves `'`, `(`, and `)` unescaped, and a project directory can plausibly contain any of them (e.g. `Christian's (alt)`), which would otherwise break out of the attribute or the url() token. */
+export function escapeProjectParam(value: string): string {
+  return encodeURIComponent(value).replace(/['()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
 /** Every distinct `assets/<path>` reference in `html` — an `src` attribute or a CSS `url()`, quoted or not — with the `assets/` prefix stripped. Still HTML-escaped as captured; unescaped later, in `resolveOneAssetRef`. */
 function collectAssetRefs(html: string): Set<string> {
   const refs = new Set<string>();
@@ -63,7 +68,7 @@ async function resolveOneAssetRef(store: Store, rawRelPath: string, mode: "url" 
     // route's `decodeURIComponent` on the way back wouldn't round-trip it
     // (a bare "#" even truncates the path into a fragment, dropping the
     // image silently — the exact failure mode this ticket exists to fix).
-    return `/api/assets/${relPath.split("/").map(encodeURIComponent).join("/")}`;
+    return `/api/assets/${relPath.split("/").map(encodeURIComponent).join("/")}?project=${escapeProjectParam(store.projectDir)}`;
   }
   try {
     const buffer = await store.readAsset(relPath);

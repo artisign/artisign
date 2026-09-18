@@ -607,18 +607,104 @@ describe("get_design_system", () => {
     expect(res).toMatchObject({ token_count: 2, component_count: 1, pattern_count: 0 });
   });
 
-  it("tree lists tokens/components/patterns", async () => {
+  // CHR-636: tree.tokens is grouped by bucket (one compact string per
+  // bucket) instead of one {path,kind} entry per token path, and
+  // tree.components carries slot names — a deliberate breaking change to
+  // the tree shape (Tool-Palette.md).
+  it("tree groups tokens by bucket as a compact 'member value · member value' string, bucket-then-member order", async () => {
     const res = await getDesignSystem(fx.store, { view: "tree" });
-    expect(res.tokens).toEqual([
-      { path: "color.primary", kind: "color" },
-      { path: "color.secondary", kind: "color" },
-    ]);
-    expect(res.components).toEqual([{ name: "btn-primary", file: "design-system/components/btn-primary.html", variants: ["default", "hover"] }]);
+    // setupProject's scaffold seeds every other bucket empty
+    // (design-system/tokens.json's default shape, init-project.ts) — this
+    // asserts the one populated bucket's shape and member order, not the
+    // full array (which also carries the empty buckets untouched).
+    const grouped = res.tokens as Array<{ bucket: string; values: string }>;
+    expect(grouped.find((g) => g.bucket === "color")).toEqual({ bucket: "color", values: "primary #000 · secondary #111" });
   });
 
-  it("full includes token values and component definitions", async () => {
+  it("tree components carry slots (named + positional) alongside variants/usage", async () => {
+    await fx.store.writeComponent(
+      "card",
+      `<div id="n1"><span data-slot="title" id="n2"></span><span id="n3"></span><span id="n4"></span></div>`,
+    );
+    const res = await getDesignSystem(fx.store, { view: "tree" });
+    const components = res.components as Array<{ name: string; slots: string[] }>;
+    const card = components.find((c) => c.name === "card")!;
+    // "title" is the explicit data-slot; the root's two remaining
+    // un-slotted children become the implicit positional slots, named by
+    // their own position among ALL of the root's children (not renumbered
+    // among just the un-slotted ones) — collectTemplateSlots' existing,
+    // unchanged behavior.
+    expect(card.slots).toEqual(["title", "slot-1", "slot-2"]);
+  });
+
+  it("a component with zero declared slots gets slots: [], not an omitted key", async () => {
+    // A root with no children at all has no implicit positional slots
+    // either (unlike btn-primary's default variant, which has one for its
+    // text child) — the genuinely slot-less case.
+    await fx.store.writeComponent("icon", `<svg id="n1"></svg>`);
+    const res = await getDesignSystem(fx.store, { view: "tree" });
+    const components = res.components as Array<{ name: string; slots: string[] }>;
+    expect(components.find((c) => c.name === "icon")?.slots).toEqual([]);
+  });
+
+  it("leaves empty buckets out and writes a composite token value as compact JSON (CHR-636)", async () => {
+    const tokens = await fx.store.readTokens();
+    for (const bucket of Object.keys(tokens)) tokens[bucket] = {};
+    tokens.typography = { body: { fontSize: "16px", lineHeight: 1.5 } as unknown as string, weight: 400 as unknown as string };
+    await fx.store.writeTokens(tokens);
+
+    const res = await getDesignSystem(fx.store, { view: "tree" });
+    expect(res.tokens).toEqual([{ bucket: "typography", values: 'body {"fontSize":"16px","lineHeight":1.5} · weight 400' }]);
+  });
+
+  it("reconstructs every bucket.member -> value from the grouped tree.tokens strings, matching tokens.json exactly", async () => {
+    const tokens = await fx.store.readTokens();
+    tokens.spacing = { xs: "4px", sm: "8px", lg: "1rem 2rem" };
+    tokens.shadow = { card: "0 2px 4px rgba(0,0,0,.1)" };
+    await fx.store.writeTokens(tokens);
+
+    const res = await getDesignSystem(fx.store, { view: "tree" });
+    const grouped = res.tokens as Array<{ bucket: string; values: string }>;
+
+    // Reconstruction rule stated in reads.ts: split a bucket's `values` on
+    // " · " into member entries, then split each entry on its FIRST space —
+    // the member name is always a plain identifier (never contains a
+    // space), so this recovers the value exactly even when the value
+    // itself contains spaces (a shadow, a two-part spacing value). The one
+    // theoretical ambiguity — a value containing the literal " · "
+    // separator itself — doesn't arise for any real CSS value (color,
+    // length, shadow, font-stack) and is a deliberate token-economy trade
+    // for this LLM-facing tier, not a machine-parseable guarantee (see the
+    // comment in reads.ts).
+    const reconstructed: Record<string, string> = {};
+    for (const { bucket, values } of grouped) {
+      if (values === "") continue;
+      for (const entry of values.split(" · ")) {
+        const space = entry.indexOf(" ");
+        const member = entry.slice(0, space);
+        const value = entry.slice(space + 1);
+        reconstructed[`${bucket}.${member}`] = value;
+      }
+    }
+
+    const expected: Record<string, string> = {};
+    for (const [bucket, members] of Object.entries(tokens)) {
+      for (const [member, value] of Object.entries(members)) {
+        expected[`${bucket}.${member}`] = String(value);
+      }
+    }
+    expect(reconstructed).toEqual(expected);
+  });
+
+  it("full includes token values and component definitions, on top of tree's grouped tokens and slotted components", async () => {
+    const treeRes = await getDesignSystem(fx.store, { view: "tree" });
     const res = await getDesignSystem(fx.store, { view: "full" });
     expect(res.token_values).toContainEqual({ path: "color.primary", value: "#000" });
+    // full inherits tree's grouped-by-bucket tokens and slotted components
+    // as-is (CHR-636) — it adds token_values/component_definitions/
+    // pattern_definitions on top, it doesn't fall back to a weaker shape.
+    expect(res.tokens).toEqual(treeRes.tokens);
+    expect(res.components).toEqual(treeRes.components);
     const defs = res.component_definitions as Array<{ name: string; variants: unknown[] }>;
     expect(defs[0]!.name).toBe("btn-primary");
     expect(defs[0]!.variants).toHaveLength(2);

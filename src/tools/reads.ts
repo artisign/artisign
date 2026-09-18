@@ -8,6 +8,7 @@ import {
   tokenRefPaths,
   explicitNodeIds,
   resolveSlotFillEntries,
+  collectTemplateSlots,
   type Node as InternalNode,
   type NodeSubtree,
   type NodeRefs,
@@ -493,6 +494,24 @@ export type GetDesignSystemInput = {
 const DS_ALWAYS = ["token_count", "component_count", "pattern_count", "paths", "last_commit", "decision_count"];
 const DS_OPTIONAL = ["tokens", "components", "patterns", "token_values", "component_definitions", "pattern_definitions", "idea", "decisions"];
 
+/**
+ * A token's stored value, compacted to one line for `tree.tokens`'
+ * per-bucket string (CHR-636). Almost always a plain string (a CSS value) —
+ * `String()` covers a bare number too. A composite token (nested object,
+ * e.g. `{fontSize, lineHeight}`) is JSON-stringified compactly (no added
+ * whitespace) rather than dropped or expanded across multiple entries: it
+ * keeps every value honestly represented at this tier without inventing a
+ * second grouping scheme just for composites, and — since `JSON.stringify`
+ * with no `space` argument never inserts a space — it can't be mistaken for
+ * a second `"member value"` pair when a reader splits a bucket's string on
+ * whitespace.
+ */
+function formatTokenMemberValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value);
+}
+
 export async function getDesignSystem(store: Store, input: GetDesignSystemInput): Promise<Record<string, unknown>> {
   const view = input.view ?? "summary";
   const [tokens, componentNames, patternNames, lastCommit, meta] = await Promise.all([
@@ -517,10 +536,22 @@ export async function getDesignSystem(store: Store, input: GetDesignSystemInput)
   };
   if (view === "summary") return selectFields(summary, DS_ALWAYS, DS_OPTIONAL, input.fields);
 
+  const registry = await loadRegistry(store);
   const componentDefs = await Promise.all(
     componentNames.map(async (name) => {
       const html = await store.readComponent(name);
-      return { name, def: parseComponentDefinition(name, html) };
+      const def = parseComponentDefinition(name, html);
+      // Slots (CHR-636, tree only): every substitutable placeholder on the
+      // default-variant's own root — named `data-slot`s plus synthesized
+      // positional ones, the same set `collectTemplateSlots` already
+      // computes for slot-fill resolution. No new parsing logic; this is
+      // the one extra parse per component tree/full already didn't need
+      // before CHR-636.
+      const defaultVariantHtml = def.variants.find((v) => v.name === def.defaultVariant)?.htmlAug;
+      const slots = defaultVariantHtml
+        ? collectTemplateSlots(parseScreen(defaultVariantHtml, name, registry).doc).map((s) => s.name)
+        : [];
+      return { name, def, slots };
     }),
   );
 
@@ -530,13 +561,28 @@ export async function getDesignSystem(store: Store, input: GetDesignSystemInput)
     // No body at tree tier — decisions can be large; the full text is only
     // worth the tokens once the caller has drilled in.
     decisions: meta.decisions.map(({ id, date, title, status }) => ({ id, date, title, status })),
-    tokens: Object.entries(tokens).flatMap(([bucket, members]) =>
-      Object.keys(members).map((member) => ({ path: `${bucket}.${member}`, kind: bucket })),
-    ),
-    components: componentDefs.map(({ name, def }) => ({
+    // CHR-636: grouped by bucket, one compact "member value · member value"
+    // string per bucket, instead of one {path,kind} object per token path —
+    // "every token path with value" is satisfied by reconstruction
+    // (`${bucket}.${member}` = value), a deliberate token-economy trade for
+    // this tier's LLM reader, not a machine parser. The flat, unambiguously
+    // parseable {path,value}[] form stays available unchanged at `full`
+    // (`token_values`, below). Breaking change — see Tool-Palette.md.
+    // An empty bucket (a fresh project has six) is left out — it would cost
+    // tokens to say nothing.
+    tokens: Object.entries(tokens)
+      .filter(([, members]) => Object.keys(members).length > 0)
+      .map(([bucket, members]) => ({
+        bucket,
+        values: Object.entries(members)
+          .map(([member, value]) => `${member} ${formatTokenMemberValue(value)}`)
+          .join(" · "),
+      })),
+    components: componentDefs.map(({ name, def, slots }) => ({
       name,
       file: `design-system/components/${name}.html`,
       variants: def.variants.map((v) => v.name),
+      slots,
       ...(meta.component_usage[name] !== undefined ? { usage: meta.component_usage[name] } : {}),
     })),
     // No on-disk marker distinguishes layout vs. interaction patterns yet —
@@ -553,6 +599,12 @@ export async function getDesignSystem(store: Store, input: GetDesignSystemInput)
   const full: Record<string, unknown> = {
     ...tree,
     decisions: meta.decisions,
+    // `full` inherits `tree`'s grouped `tokens`/slotted `components`
+    // (spread above) rather than re-declaring the old per-path/no-slots
+    // shape — `token_values` right below is already the exact, parseable
+    // per-path form for anything that needs to consume a token's value
+    // precisely, and `full` is the one tier where an agent editing a
+    // definition's markup most needs its slot names.
     token_values: Object.entries(tokens).flatMap(([bucket, members]) =>
       Object.entries(members).map(([member, value]) => ({ path: `${bucket}.${member}`, value })),
     ),

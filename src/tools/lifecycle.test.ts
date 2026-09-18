@@ -448,8 +448,13 @@ describe("promote_to_system", () => {
     await promoteToSystem(fx.store, { node: "home.n2", kind: "component", name: "btn-primary" });
 
     const ds = await getDesignSystem(fx.store, { view: "tree" });
-    const components = ds.components as Array<{ name: string; variants: string[] }>;
-    expect(components).toEqual([{ name: "btn-primary", file: "design-system/components/btn-primary.html", variants: ["default"] }]);
+    const components = ds.components as Array<{ name: string; variants: string[]; slots: string[] }>;
+    // CHR-636: tree.components also carries slots (a promoted node's own
+    // content becomes one implicit positional slot, "slot-0" — its default
+    // variant's root has one child, the text node "Go").
+    expect(components).toEqual([
+      { name: "btn-primary", file: "design-system/components/btn-primary.html", variants: ["default"], slots: ["slot-0"] },
+    ]);
   });
 
   it("substitutes each instance's own content into a promoted component's slots (acceptance bug #1)", async () => {

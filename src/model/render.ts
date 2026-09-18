@@ -330,7 +330,7 @@ export function slotsWithDiscardedStyling(templateDoc: ScreenDocument): { nodeId
  * substitutable slots, and every instance would render the template's own
  * original content verbatim regardless of what it actually authored.
  */
-function collectTemplateSlots(templateDoc: ScreenDocument): { nodeId: string; name: string }[] {
+export function collectTemplateSlots(templateDoc: ScreenDocument): { nodeId: string; name: string }[] {
   const explicit: { nodeId: string; name: string }[] = [];
   collectExplicitTemplateSlots(templateDoc.rootNodeId, templateDoc, explicit);
   const explicitIds = new Set(explicit.map((s) => s.nodeId));

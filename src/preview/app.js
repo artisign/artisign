@@ -31,6 +31,7 @@ import { connectEvents } from "./sse.js";
 import { applyCanvas } from "./canvas.js";
 import { updateWarningBadge } from "./warnings.js";
 import { createBoardView } from "./board-view.js";
+import { MIN_BOARD_ZOOM, MAX_BOARD_ZOOM, DEFAULT_BOARD_ZOOM, clampZoom, zoomSliderOffset } from "./board.js";
 import { createProjectUI } from "./projects.js";
 import { createProjectDialogs } from "./project-dialogs.js";
 import {
@@ -42,6 +43,7 @@ import {
   parseLastSelection,
   parseZoomPref,
   parseEnumPref,
+  parseBoardZoomPref,
 } from "./prefs.js";
 import { createInspectorPanel, applyInspectMode, updateInspectOverlay } from "./inspector.js";
 import { buildEntries } from "./inspector-data.js";
@@ -66,8 +68,17 @@ const screensViewEl = document.getElementById("screens-view");
 const designSystemViewEl = document.getElementById("design-system-view");
 const boardViewEl = document.getElementById("board-view");
 const boardSurfaceEl = document.getElementById("board-surface");
+const boardCanvasEl = document.getElementById("board-canvas");
+const boardCanvasInnerEl = document.getElementById("board-canvas-inner");
 const boardTilesEl = document.getElementById("board-tiles");
 const boardEdgesEl = document.getElementById("board-edges");
+const boardFitallBtn = document.getElementById("board-fitall-btn");
+const board100Btn = document.getElementById("board-100-btn");
+const boardZoomMinusBtn = document.getElementById("board-zoom-minus");
+const boardZoomPlusBtn = document.getElementById("board-zoom-plus");
+const boardZoomRangeInput = document.getElementById("board-zoom-range");
+const boardZoomReadoutEl = document.getElementById("board-zoom-readout");
+const boardEdgesToggleBtn = document.getElementById("board-edges-toggle");
 const flowModeToggle = document.getElementById("flow-mode-toggle");
 const commentModeToggle = document.getElementById("comment-mode-toggle");
 const canvasControlsEl = document.getElementById("canvas-controls");
@@ -177,8 +188,70 @@ const prefsStorage = (() => {
   }
 })();
 
-const board = createBoardView({ surfaceEl: boardSurfaceEl, tilesEl: boardTilesEl, edgesEl: boardEdgesEl });
+// Board zoom's own value (CHR-623) — separate from `zoom`/`mockupZoom`
+// (the screen canvas / mockup row) since it's a different surface with its
+// own persisted level; see prefs.parseBoardZoomPref.
+let boardZoom = DEFAULT_BOARD_ZOOM;
+let boardEdgesVisible = true;
+// The zoom "Fit all" last computed, if any — the only way to know whether
+// its quick-jump button should read active, since (unlike "100%") its
+// target isn't a fixed constant. Set from board.setZoom's onZoomChange
+// callback (source === "fitall"), read by updateBoardToolbar.
+let lastFitAllZoom = null;
+// 5, not 10 (CHR-623 review): with MIN_BOARD_ZOOM=5, a 10-point step from
+// the floor's neighboring multiples of 10 (15, 25, ...) would need an
+// uneven final 5-point step to land exactly on the 5% floor. Every value
+// 5, 10, 15, ..., 200 is a clean multiple of 5 (40 even steps end to end),
+// so +/- always lands on a "round" number, at the floor/ceiling too.
+const BOARD_ZOOM_STEP = 5;
+
+const board = createBoardView({
+  surfaceEl: boardSurfaceEl,
+  canvasEl: boardCanvasEl,
+  canvasInnerEl: boardCanvasInnerEl,
+  tilesEl: boardTilesEl,
+  edgesEl: boardEdgesEl,
+  onZoomChange: (value, source) => {
+    if (source === "fitall") lastFitAllZoom = value;
+    boardZoom = value;
+    writeStringPref(prefsStorage, "artisign.boardZoom", String(value));
+    updateBoardToolbar();
+  },
+});
 board.mount();
+
+/** Syncs every toolbar control (range input + its fill, readout, quick-jump active states, step-button disabled states) from the current `boardZoom`. */
+function updateBoardToolbar() {
+  boardZoomRangeInput.value = String(boardZoom);
+  boardZoomReadoutEl.textContent = `${Math.round(boardZoom)}%`;
+  const fillPct = zoomSliderOffset(boardZoom, 100);
+  boardZoomRangeInput.style.background = `linear-gradient(to right, var(--color-accent) ${fillPct}%, var(--color-border) ${fillPct}%)`;
+  board100Btn.setAttribute("aria-pressed", String(boardZoom === 100));
+  boardFitallBtn.setAttribute("aria-pressed", String(lastFitAllZoom !== null && boardZoom === lastFitAllZoom));
+  boardZoomMinusBtn.disabled = boardZoom <= MIN_BOARD_ZOOM;
+  boardZoomPlusBtn.disabled = boardZoom >= MAX_BOARD_ZOOM;
+}
+
+boardFitallBtn.addEventListener("click", () => board.fitAll());
+board100Btn.addEventListener("click", () => board.setZoom(100));
+boardZoomMinusBtn.addEventListener("click", () => board.setZoom(boardZoom - BOARD_ZOOM_STEP));
+boardZoomPlusBtn.addEventListener("click", () => board.setZoom(boardZoom + BOARD_ZOOM_STEP));
+boardZoomRangeInput.addEventListener("input", () => board.setZoom(Number(boardZoomRangeInput.value)));
+boardEdgesToggleBtn.addEventListener("click", () => {
+  boardEdgesVisible = !boardEdgesVisible;
+  writeBoolPref(prefsStorage, "artisign.boardEdgesVisible", boardEdgesVisible);
+  board.setEdgesVisible(boardEdgesVisible);
+  boardEdgesToggleBtn.setAttribute("aria-pressed", String(boardEdgesVisible));
+  boardEdgesToggleBtn.textContent = boardEdgesVisible ? "Edges: On" : "Edges: Off";
+});
+
+boardZoom = clampZoom(parseBoardZoomPref(readStringPref(prefsStorage, "artisign.boardZoom", null), boardZoom, MIN_BOARD_ZOOM, MAX_BOARD_ZOOM));
+boardEdgesVisible = readBoolPref(prefsStorage, "artisign.boardEdgesVisible", boardEdgesVisible);
+board.setZoom(boardZoom);
+board.setEdgesVisible(boardEdgesVisible);
+boardEdgesToggleBtn.setAttribute("aria-pressed", String(boardEdgesVisible));
+boardEdgesToggleBtn.textContent = boardEdgesVisible ? "Edges: On" : "Edges: Off";
+updateBoardToolbar();
 
 /** @param {string | null} screen */
 function getRenderedDocForScreen(screen) {

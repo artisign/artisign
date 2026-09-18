@@ -3,11 +3,31 @@
 // touching the DOM — tiles, iframes, the SVG edge layer — needs real
 // layout that even jsdom doesn't compute.
 
-export const DEFAULT_TILE_SCALE = 0.8;
 export const DEFAULT_COLUMNS = 4;
-export const DEFAULT_GAP = 64;
-export const DEFAULT_PADDING = 48;
+// The board's own 100%-zoom reference gap/padding (CHR-623). Tiles are laid
+// out at native (unscaled) size, and the whole canvas — tiles, gaps and
+// padding alike — is then zoomed as one unit by board-view.js's CSS
+// transform (see BASE_GAP/BASE_PADDING's usage there), so these are chosen
+// such that *0.8 reproduces the pre-CHR-623 fixed grid exactly: 80*0.8=64,
+// 60*0.8=48, matching the old DEFAULT_GAP/DEFAULT_PADDING at the new default
+// board zoom of 80% (see DEFAULT_BOARD_ZOOM) — "keep today's default look as
+// the default" from a CSS-transform architecture where gaps scale with zoom
+// instead of staying a fixed pixel amount (which used to swamp shrunk tiles
+// at low zoom).
+export const BASE_GAP = 80;
+export const BASE_PADDING = 60;
 const FALLBACK_SIZE = { width: 390, height: 844 };
+
+// 5%, not the approved design's original 10% — CHR-623 review, decided from
+// the 186-screen Lückenzeit measurement: real screens are taller than the
+// design's 180px mock tiles, so a 10% floor still couldn't get everything
+// on screen at Fit all for a large project. 5% does (see computeFitAllZoom/
+// computeBoardColumns' call sites for the measured before/after).
+export const MIN_BOARD_ZOOM = 5;
+export const MAX_BOARD_ZOOM = 200;
+// Reproduces the pre-CHR-623 fixed board layout pixel-for-pixel (native
+// tile size * 0.8, 64px gap, 48px padding) — see BASE_GAP/BASE_PADDING.
+export const DEFAULT_BOARD_ZOOM = 80;
 
 /**
  * A flow's `to` (like `data-flow-target`) is either a bare screen id or a
@@ -39,11 +59,11 @@ export function screenIdFromRef(ref) {
  * }}
  */
 export function computeBoardLayout(screens, sizes, options = {}) {
-  const scale = options.scale ?? DEFAULT_TILE_SCALE;
+  const scale = options.scale ?? 1;
   const columns = options.columns ?? DEFAULT_COLUMNS;
-  const gapX = options.gapX ?? DEFAULT_GAP;
-  const gapY = options.gapY ?? DEFAULT_GAP;
-  const padding = options.padding ?? DEFAULT_PADDING;
+  const gapX = options.gapX ?? BASE_GAP;
+  const gapY = options.gapY ?? BASE_GAP;
+  const padding = options.padding ?? BASE_PADDING;
 
   const tiles = [];
   let y = padding;
@@ -230,4 +250,205 @@ export function computeCenterScroll(tile, viewportWidth, viewportHeight, content
 export function edgesFromNode(flows, screen, nodeId) {
   const from = `${screen}.${nodeId}`;
   return flows.filter((flow) => flow.from === from);
+}
+
+/** Clamps a board zoom percentage into [min, max] (CHR-623: 5–200 by default). */
+export function clampZoom(value, min = MIN_BOARD_ZOOM, max = MAX_BOARD_ZOOM) {
+  return clamp(value, min, max);
+}
+
+/**
+ * The largest zoom FACTOR (UNCLAMPED — a raw multiplier, e.g. 1 = 100%, not
+ * a percentage) at which the board's ENTIRE base layout — same
+ * `screens`/`sizes`/layout `options`, tiles at their native (scale-1) size —
+ * fits inside a `viewportWidth`x`viewportHeight` viewport.
+ *
+ * Board zoom (board-view.js's `applyZoomSizing`) is a single CSS
+ * `transform: scale()` applied to the whole pre-computed base layout, so it
+ * scales tiles AND the gaps/padding between them by the exact same factor —
+ * unlike `computeBoardLayout`'s own `scale` option, which only resizes
+ * tiles while `gapX`/`gapY`/`padding` stay literal, fixed pixels. So "the
+ * ideal fit zoom" is NOT "the computeBoardLayout `scale` that fits" (an
+ * earlier version of this function got that wrong — it under-zoomed, since
+ * holding gaps fixed while shrinking tiles requires a smaller tile-scale
+ * than shrinking everything together does, and it skewed
+ * `computeBoardColumns` towards too few columns, since a layout's fixed-size
+ * gaps were overweighted relative to how small they actually render at a
+ * real, whole-canvas zoom). It's a single division: compute the base layout
+ * ONCE at scale 1, then find the largest uniform multiplier of THAT fixed
+ * box that still fits both axes.
+ *
+ * Returns 0 for an empty screen list, a degenerate (zero/negative)
+ * viewport, or a degenerate (zero/negative) base layout — nothing to fit,
+ * so no "ideal" scale exists; callers with a more specific fallback
+ * (computeFitAllZoom's DEFAULT_BOARD_ZOOM, computeBoardColumns'
+ * DEFAULT_COLUMNS) special-case that before calling this. Shared by
+ * computeFitAllZoom (the zoom for the CURRENT column count) and
+ * computeBoardColumns (which column count fits best, i.e. has the largest
+ * ideal scale — CHR-623 review).
+ *
+ * @param {string[]} screens
+ * @param {Record<string, { width: number, height: number }>} sizes
+ * @param {number} viewportWidth
+ * @param {number} viewportHeight
+ * @param {{ columns?: number, gapX?: number, gapY?: number, padding?: number }} [options]
+ * @returns {number}
+ */
+function idealFitScale(screens, sizes, viewportWidth, viewportHeight, options = {}) {
+  if (screens.length === 0 || viewportWidth <= 0 || viewportHeight <= 0) return 0;
+  const { contentWidth, contentHeight } = computeBoardLayout(screens, sizes, { ...options, scale: 1 });
+  if (contentWidth <= 0 || contentHeight <= 0) return 0;
+  return Math.min(viewportWidth / contentWidth, viewportHeight / contentHeight);
+}
+
+/**
+ * The largest board zoom (as a percentage, clamped to [min, max]) at which
+ * every tile fits inside a `viewportWidth`x`viewportHeight` viewport, for
+ * the grid `options` (in particular its `columns`) already describes — see
+ * `idealFitScale`. Empty screens or a degenerate viewport return
+ * DEFAULT_BOARD_ZOOM — there's nothing to fit, so there's no ideal value.
+ *
+ * @param {string[]} screens
+ * @param {Record<string, { width: number, height: number }>} sizes
+ * @param {number} viewportWidth
+ * @param {number} viewportHeight
+ * @param {{ columns?: number, gapX?: number, gapY?: number, padding?: number }} [options]
+ * @param {number} [min]
+ * @param {number} [max]
+ * @returns {number}
+ */
+export function computeFitAllZoom(screens, sizes, viewportWidth, viewportHeight, options = {}, min = MIN_BOARD_ZOOM, max = MAX_BOARD_ZOOM) {
+  if (screens.length === 0 || viewportWidth <= 0 || viewportHeight <= 0) return DEFAULT_BOARD_ZOOM;
+  const scale = idealFitScale(screens, sizes, viewportWidth, viewportHeight, options);
+  // Math.floor, not Math.round: this is a promise that "every tile is
+  // inside the viewport" (the acceptance criterion, and how the toolbar's
+  // "Fit all" quick-jump button decides it's active — it must exactly
+  // reproduce whatever zoom actually got applied). Rounding to the NEAREST
+  // integer percent can round up past the true fitting boundary — a
+  // genuine off-by-rounding bug caught while re-measuring after CHR-623's
+  // review lowered the floor to 5%: an ideal scale of 7.56% rounded up to
+  // 8%, which overflowed the viewport by a few px and needed a scrollbar.
+  return clampZoom(Math.floor(scale * 100), min, max);
+}
+
+/**
+ * The column count (>= 1) whose grid — same `screens`/`sizes`/gap/padding
+ * `options`, native (scale-1) tile size — has the LARGEST `idealFitScale`
+ * for a `viewportWidth`x`viewportHeight` viewport: the grid shape that puts
+ * the most pixels of actual content on screen at Fit all, rather than a
+ * fixed column count that's tall and skinny (or short and wide) regardless
+ * of how many screens there are or what shape the viewport is (CHR-623
+ * review — Christian's own requirement behind the zoom-slider redesign:
+ * "board-view-zoomed-out" shows 186 tiles as a 17x11 grid filling the
+ * viewport at Fit all, not a 4-wide, 47-row column).
+ *
+ * A full scan of every candidate from 1 to `screens.length` (more columns
+ * than tiles can't pack any differently than exactly `screens.length`
+ * columns already does — one row) rather than a directed search: the
+ * fit-per-column-count curve isn't guaranteed unimodal once tile sizes
+ * differ (a real project mixes phone/tablet/desktop screens), so a
+ * bisection or golden-section search could settle on a local optimum. Ties
+ * keep the SMALLER column count (fewer, taller columns over many, short
+ * ones) — the scan runs ascending and only replaces the best on a STRICT
+ * improvement, so the first column count to reach the best score wins.
+ * O(n) in screen count (n candidates, each an O(n) `idealFitScale` — a
+ * single `computeBoardLayout` call, no search of its own since CHR-623's
+ * review fix) — measured well under 5ms for a 186-screen project, see
+ * board-view.js's call site comment for where this runs (screen-list/
+ * resize/project-switch, never during a zoom drag).
+ *
+ * @param {string[]} screens
+ * @param {Record<string, { width: number, height: number }>} sizes
+ * @param {number} viewportWidth
+ * @param {number} viewportHeight
+ * @param {{ gapX?: number, gapY?: number, padding?: number }} [options]
+ * @returns {number}
+ */
+export function computeBoardColumns(screens, sizes, viewportWidth, viewportHeight, options = {}) {
+  if (screens.length === 0 || viewportWidth <= 0 || viewportHeight <= 0) return DEFAULT_COLUMNS;
+
+  let bestColumns = 1;
+  let bestScale = -Infinity;
+  for (let columns = 1; columns <= screens.length; columns++) {
+    const scale = idealFitScale(screens, sizes, viewportWidth, viewportHeight, { ...options, columns });
+    if (scale > bestScale) {
+      bestScale = scale;
+      bestColumns = columns;
+    }
+  }
+  return bestColumns;
+}
+
+/**
+ * Pixel offset of the zoom-slider thumb along its track — the linear
+ * mapping from the `$zoom-slider` design-system component (5%–200% ->
+ * 0–`trackWidth`px).
+ * @param {number} zoomPercent
+ * @param {number} [trackWidth]
+ * @param {number} [min]
+ * @param {number} [max]
+ * @returns {number}
+ */
+export function zoomSliderOffset(zoomPercent, trackWidth = 140, min = MIN_BOARD_ZOOM, max = MAX_BOARD_ZOOM) {
+  const clamped = clampZoom(zoomPercent, min, max);
+  return ((clamped - min) / (max - min)) * trackWidth;
+}
+
+/**
+ * Below this board zoom, a tile's name label is illegible at the canvas's
+ * own scale and isn't rendered at all; below 100% but at/above this, it's
+ * rendered truncated (ellipsis) to the tile's own width; at 100% and above,
+ * the full name always shows. See the `chr-621` design-system tag notes'
+ * "Label degradation by zoom" section.
+ * @param {number} zoomPercent
+ * @returns {"hidden" | "truncated" | "full"}
+ */
+export function labelDisplayMode(zoomPercent) {
+  if (zoomPercent < 60) return "hidden";
+  if (zoomPercent < 100) return "truncated";
+  return "full";
+}
+
+/**
+ * The scroll offset that keeps the same content point under the cursor
+ * across a zoom change — the "zoom around cursor" behavior for Ctrl/Cmd +
+ * wheel and trackpad pinch. Exact (not an approximation) because the board
+ * canvas is a single uniform CSS `scale()` transform from its own origin
+ * (0,0) — see board-view.js's `applyZoomSizing` — so content coordinates and
+ * screen coordinates relate by one multiplicative factor, unlike the tile
+ * grid's per-row layout math.
+ *
+ * @param {{
+ *   cursorX: number, cursorY: number,
+ *   scrollLeft: number, scrollTop: number,
+ *   oldZoomPercent: number, newZoomPercent: number,
+ *   contentWidth: number, contentHeight: number,
+ *   viewportWidth: number, viewportHeight: number,
+ * }} args `cursorX`/`cursorY` are relative to the scroll viewport's own
+ *   top-left (e.g. from `surfaceEl.getBoundingClientRect()`); `contentWidth`/
+ *   `contentHeight` are the UNSCALED (100%-zoom) board content size.
+ * @returns {{ left: number, top: number }}
+ */
+export function computeZoomAroundCursor({
+  cursorX,
+  cursorY,
+  scrollLeft,
+  scrollTop,
+  oldZoomPercent,
+  newZoomPercent,
+  contentWidth,
+  contentHeight,
+  viewportWidth,
+  viewportHeight,
+}) {
+  const oldScale = oldZoomPercent / 100;
+  const newScale = newZoomPercent / 100;
+  const contentX = (scrollLeft + cursorX) / oldScale;
+  const contentY = (scrollTop + cursorY) / oldScale;
+  const maxLeft = Math.max(0, contentWidth * newScale - viewportWidth);
+  const maxTop = Math.max(0, contentHeight * newScale - viewportHeight);
+  return {
+    left: clamp(contentX * newScale - cursorX, 0, maxLeft),
+    top: clamp(contentY * newScale - cursorY, 0, maxTop),
+  };
 }

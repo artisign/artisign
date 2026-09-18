@@ -197,9 +197,13 @@ Served at `http://127.0.0.1:<port>` once the daemon is running — plain ES modu
 
 - **Project picker** — switch between open projects in the topbar; open an existing folder or create a new project through an in-app folder browser (no restart needed). With nothing open, an empty state offers both actions plus recent projects.
 - **Screens** — sidebar screen list, rendered source (preview = output, by construction)
+- **Board** — every screen laid out as a tile on one scrollable surface, with flow edges drawn between them, so a flow is something you see rather than something you reconstruct
+- **Elements panel** — the selected screen's nodes listed by the id an agent addresses them with
+- **Notes panel** — the screen's own notes plus any tag notes that apply to it, both rendered as Markdown
 - **Flow mode** — click an element with `data-flow-target` to jump to the screen it points at
 - **Comment mode** — click an element to anchor a comment; appended to `comments.jsonl`, picked up by `list_comments` / answered via `reply_comment`
 - **Design System** — token swatches by bucket, every component with every variant rendered side by side
+- **Mockup view** — a mockup's variants rendered live, side by side in columns, each with its title and description
 - Live reload over SSE — any file change on disk shows up in the browser within ~200 ms
 
 ## Deterministic render baseline

@@ -1,0 +1,25 @@
+<span id="zoom-slider" style="display: flex; align-items: center; gap: $spacing.sm">
+  <span id="zs-minus" style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid $color.border-strong; border-radius: $radius.sm; background: $color.surface; color: $color.text-secondary; font-size: $typography.size-sm; line-height: 1">−</span>
+  <span id="zs-track" style="position: relative; width: 140px; height: 4px; border-radius: $radius.pill; background: $color.border">
+    <span id="zs-fill" style="position: absolute; left: 0; top: 0; height: 4px; border-radius: $radius.pill; background: $color.accent; width: 66px"></span>
+    <span id="zs-thumb" style="position: absolute; top: 50%; left: 66px; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: $radius.pill; background: $color.accent; border: 2px solid $color.surface; box-shadow: $shadow.menu"></span>
+  </span>
+  <span id="zs-plus" style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid $color.border-strong; border-radius: $radius.sm; background: $color.surface; color: $color.text-secondary; font-size: $typography.size-sm; line-height: 1">+</span>
+  <span id="zs-readout-wrap" style="font-size: $typography.size-sm; color: $color.text-secondary; min-width: 36px"><span data-slot="readout">100%</span></span>
+</span><template data-variant="min"><span id="zoom-slider" style="display: flex; align-items: center; gap: $spacing.sm">
+  <span id="zs-minus" style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid $color.border-strong; border-radius: $radius.sm; background: $color.surface-subtle; color: $color.text-faint; font-size: $typography.size-sm; line-height: 1">−</span>
+  <span id="zs-track" style="position: relative; width: 140px; height: 4px; border-radius: $radius.pill; background: $color.border">
+    <span id="zs-fill" style="position: absolute; left: 0; top: 0; height: 4px; border-radius: $radius.pill; background: $color.accent; width: 24px"></span>
+    <span id="zs-thumb" style="position: absolute; top: 50%; left: 24px; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: $radius.pill; background: $color.accent; border: 2px solid $color.surface; box-shadow: $shadow.menu"></span>
+  </span>
+  <span id="zs-plus" style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid $color.border-strong; border-radius: $radius.sm; background: $color.surface; color: $color.text-secondary; font-size: $typography.size-sm; line-height: 1">+</span>
+  <span id="zs-readout-wrap" style="font-size: $typography.size-sm; color: $color.text-secondary; min-width: 36px"><span data-slot="readout">100%</span></span>
+</span></template><template data-variant="max"><span id="zoom-slider" style="display: flex; align-items: center; gap: $spacing.sm">
+  <span id="zs-minus" style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid $color.border-strong; border-radius: $radius.sm; background: $color.surface; color: $color.text-secondary; font-size: $typography.size-sm; line-height: 1">−</span>
+  <span id="zs-track" style="position: relative; width: 140px; height: 4px; border-radius: $radius.pill; background: $color.border">
+    <span id="zs-fill" style="position: absolute; left: 0; top: 0; height: 4px; border-radius: $radius.pill; background: $color.accent; width: 140px"></span>
+    <span id="zs-thumb" style="position: absolute; top: 50%; left: 140px; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: $radius.pill; background: $color.accent; border: 2px solid $color.surface; box-shadow: $shadow.menu"></span>
+  </span>
+  <span id="zs-plus" style="display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 1px solid $color.border-strong; border-radius: $radius.sm; background: $color.surface-subtle; color: $color.text-faint; font-size: $typography.size-sm; line-height: 1">+</span>
+  <span id="zs-readout-wrap" style="font-size: $typography.size-sm; color: $color.text-secondary; min-width: 36px"><span data-slot="readout">100%</span></span>
+</span></template>

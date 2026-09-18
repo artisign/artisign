@@ -1,0 +1,7 @@
+{
+  "notes": "CHR-618/CHR-621 ticket state 5: filter matches nothing (\\\"xyzzy\\\") and nothing is pinned, so the union is empty. Toolbar `status` reads \\\"0 shown — 0 matches · 0 pinned\\\" and has no `actions` fill (no pins to clear, unlike `board-view`'s canonical state). Canvas centers a plain empty-state message rather than an empty board grid, telling the human the two ways out: clear the filter, or pin something from the sidebar.",
+  "tags": [
+    "chr-621",
+    "chr-618"
+  ]
+}

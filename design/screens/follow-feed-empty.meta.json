@@ -1,0 +1,7 @@
+{
+  "notes": "CHR-628/CHR-629: Activity feed empty state — no agent tool calls yet this session. Uses the plain `default` topbar (follow off, the default state) to show the feed fills/exists independent of the follow toggle's own state, per the ticket's \"fills even when follow is off\" requirement.",
+  "tags": [
+    "chr-628",
+    "chr-629"
+  ]
+}

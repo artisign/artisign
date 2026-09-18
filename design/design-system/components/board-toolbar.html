@@ -1,0 +1,28 @@
+<div id="board-toolbar" style="flex: none; display: flex; align-items: center; gap: $spacing.lg; padding: $spacing.sm $spacing.xl; height: 40px; border-bottom: 1px solid $color.border; background: $color.surface">
+  <span id="bt-fitall" style="border: 1px solid $color.border-strong; border-radius: $radius.sm; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.text-muted; background: $color.surface; white-space: nowrap">Fit all</span>
+  <span id="bt-100" style="border: 1px solid $color.accent; border-radius: $radius.sm; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.accent; background: $color.accent-subtle; font-weight: $typography.weight-semibold; white-space: nowrap">100%</span>
+  <span id="bt-divider" style="width: 1px; height: 20px; background: $color.border"></span>
+  <span id="bt-zoom-slider" class="$zoom-slider"><span data-slot="readout">100%</span></span>
+  <span id="bt-edges" style="display: flex; align-items: center; gap: $spacing.xs; border: 1px solid $color.border-strong; border-radius: $radius.sm; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.accent; background: $color.accent-subtle; font-weight: $typography.weight-semibold; white-space: nowrap">Edges: On</span>
+  <span id="bt-spacer" style="flex: 1"></span>
+  <span id="bt-status-wrap" style="font-size: $typography.size-hint; color: $color.text-faint"><span data-slot="status"></span></span>
+  <span id="bt-actions-wrap" style="display: flex; align-items: center; gap: $spacing.md"><span data-slot="actions"></span></span>
+</div><template data-variant="fitall-edgesoff"><div id="board-toolbar" style="flex: none; display: flex; align-items: center; gap: $spacing.lg; padding: $spacing.sm $spacing.xl; height: 40px; border-bottom: 1px solid $color.border; background: $color.surface">
+  <span id="bt-fitall" style="border: 1px solid $color.accent; border-radius: $radius.sm; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.accent; background: $color.accent-subtle; font-weight: $typography.weight-semibold; white-space: nowrap">Fit all</span>
+  <span id="bt-100" style="border: 1px solid $color.border-strong; border-radius: $radius.sm; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.text-muted; background: $color.surface; white-space: nowrap">100%</span>
+  <span id="bt-divider" style="width: 1px; height: 20px; background: $color.border"></span>
+  <span id="bt-zoom-slider" class="$zoom-slider" data-variant="min"><span data-slot="readout">42%</span></span>
+  <span id="bt-edges" style="display: flex; align-items: center; gap: $spacing.xs; border: 1px solid $color.border-strong; border-radius: $radius.sm; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.text-muted; background: $color.surface; white-space: nowrap">Edges: Off</span>
+  <span id="bt-spacer" style="flex: 1"></span>
+  <span id="bt-status-wrap" style="font-size: $typography.size-hint; color: $color.text-faint"><span data-slot="status"></span></span>
+  <span id="bt-actions-wrap" style="display: flex; align-items: center; gap: $spacing.md"><span data-slot="actions"></span></span>
+</div></template><template data-variant="zoomedin"><div id="board-toolbar" style="flex: none; display: flex; align-items: center; gap: $spacing.lg; padding: $spacing.sm $spacing.xl; height: 40px; border-bottom: 1px solid $color.border; background: $color.surface">
+  <span id="bt-fitall" style="border: 1px solid $color.border-strong; border-radius: $radius.sm; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.text-muted; background: $color.surface; white-space: nowrap">Fit all</span>
+  <span id="bt-100" style="border: 1px solid $color.border-strong; border-radius: $radius.sm; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.text-muted; background: $color.surface; white-space: nowrap">100%</span>
+  <span id="bt-divider" style="width: 1px; height: 20px; background: $color.border"></span>
+  <span id="bt-zoom-slider" class="$zoom-slider" data-variant="max"><span data-slot="readout">200%</span></span>
+  <span id="bt-edges" style="display: flex; align-items: center; gap: $spacing.xs; border: 1px solid $color.border-strong; border-radius: $radius.sm; padding: $spacing.sm 10px; font-size: $typography.size-sm; color: $color.accent; background: $color.accent-subtle; font-weight: $typography.weight-semibold; white-space: nowrap">Edges: On</span>
+  <span id="bt-spacer" style="flex: 1"></span>
+  <span id="bt-status-wrap" style="font-size: $typography.size-hint; color: $color.text-faint"><span data-slot="status"></span></span>
+  <span id="bt-actions-wrap" style="display: flex; align-items: center; gap: $spacing.md"><span data-slot="actions"></span></span>
+</div></template>

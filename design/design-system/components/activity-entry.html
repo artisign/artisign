@@ -1,0 +1,29 @@
+<div id="entry" style="display: flex; align-items: center; gap: $spacing.md; padding: $spacing.sm $spacing.lg; border-bottom: 1px solid $color.border; cursor: pointer">
+  <span id="entry-mark" style="flex: none; width: 8px; height: 8px; border-radius: $radius.pill; background: $color.activity-read"></span>
+  <span id="entry-body" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+    <span id="entry-tool-wrap" style="font-family: $typography.family-mono; font-size: $typography.size-xs; color: $color.text-secondary"><span data-slot="tool"></span></span>
+    <span id="entry-target-wrap" style="font-size: $typography.size-2xs; color: $color.text-faint"><span data-slot="target"></span></span>
+  </span>
+  <span id="entry-time-wrap" style="flex: none; font-size: $typography.size-2xs; color: $color.text-faint"><span data-slot="time"></span></span>
+</div><template data-variant="write"><div id="entry" style="display: flex; align-items: center; gap: $spacing.md; padding: $spacing.sm $spacing.lg; border-bottom: 1px solid $color.border; cursor: pointer">
+  <span id="entry-mark" style="flex: none; width: 8px; height: 8px; border-radius: 2px; background: $color.activity-write"></span>
+  <span id="entry-body" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+    <span id="entry-tool-wrap" style="font-family: $typography.family-mono; font-size: $typography.size-xs; color: $color.text-secondary"><span data-slot="tool"></span></span>
+    <span id="entry-target-wrap" style="font-size: $typography.size-2xs; color: $color.text-faint"><span data-slot="target"></span></span>
+  </span>
+  <span id="entry-time-wrap" style="flex: none; font-size: $typography.size-2xs; color: $color.text-faint"><span data-slot="time"></span></span>
+</div></template><template data-variant="error"><div id="entry" style="display: flex; align-items: center; gap: $spacing.md; padding: $spacing.sm $spacing.lg 9px; border-bottom: 1px solid $color.border; background: rgba(185,28,28,0.05); border-left: 3px solid $color.error; cursor: default">
+  <span id="entry-mark" style="flex: none; width: 14px; height: 14px; border-radius: $radius.pill; background: $color.error; color: $color.surface; font-size: 9px; line-height: 14px; text-align: center">&#10005;</span>
+  <span id="entry-body" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+    <span id="entry-tool-wrap" style="font-family: $typography.family-mono; font-size: $typography.size-xs; color: $color.error"><span data-slot="tool"></span></span>
+    <span id="entry-target-wrap" style="font-size: $typography.size-2xs; color: $color.text-faint"><span data-slot="target"></span></span>
+  </span>
+  <span id="entry-time-wrap" style="flex: none; font-size: $typography.size-2xs; color: $color.text-faint"><span data-slot="time"></span></span>
+</div></template><template data-variant="deleted"><div id="entry" style="display: flex; align-items: center; gap: $spacing.md; padding: $spacing.sm $spacing.lg; border-bottom: 1px solid $color.border; opacity: 0.5; cursor: default">
+  <span id="entry-mark" style="flex: none; width: 8px; height: 8px; border-radius: $radius.pill; background: $color.text-faint"></span>
+  <span id="entry-body" style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+    <span id="entry-tool-wrap" style="font-family: $typography.family-mono; font-size: $typography.size-xs; color: $color.text-secondary"><span data-slot="tool"></span></span>
+    <span id="entry-target-wrap" style="font-size: $typography.size-2xs; color: $color.text-faint; font-style: italic">target removed</span>
+  </span>
+  <span id="entry-time-wrap" style="flex: none; font-size: $typography.size-2xs; color: $color.text-faint"><span data-slot="time"></span></span>
+</div></template>

@@ -1,0 +1,7 @@
+{
+  "notes": "CHR-628/CHR-629: mockups have no node ids, so a `write_mockup`/`get_mockup` call navigates the canvas to the mockup preview but cannot highlight a specific node — instead the whole \"Mockups\" section of the Screens sidebar gets a transient cue: a `$color.activity-write` left border plus a faint wash over that section only (not the whole sidebar, not the \"Screens\" section above it), matching the write highlight's color language so it reads as the same kind of event as everywhere else. A read (`get_mockup`) would use the identical treatment in `$color.activity-read` — not shown as a second screen since the mechanism doesn't differ, only the color.",
+  "tags": [
+    "chr-628",
+    "chr-629"
+  ]
+}

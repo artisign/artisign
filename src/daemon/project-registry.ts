@@ -3,6 +3,7 @@ import { FsStore } from "../store/index.js";
 import { watchAndReindex, type WatchAndReindexHandle } from "../model/index.js";
 import { clearFontMemo } from "../model/fonts.js";
 import { createSseHub, createLifecycleHub, type SseHub, type LifecycleHub } from "../http/sse.js";
+import { createBoardStateStore, type BoardStateStore } from "./board-state.js";
 import { readGlobalConfig, writeGlobalConfig } from "./global-config.js";
 import type { ArtisignConfig } from "../init/artisign-config.js";
 import { CONFIG_FILENAME } from "../init/artisign-config.js";
@@ -11,6 +12,8 @@ export type ProjectHandle = {
   root: string;
   store: FsStore;
   sseHub: SseHub;
+  /** Board filter/pinned-screens (CHR-624/ADR-005) — daemon memory only, a sibling of `sseHub`, not owned by it. Starts at `{filter: null, pinned: []}`; dropped when the handle closes. */
+  boardState: BoardStateStore;
   /** Cached from `artisign.json`, kept live via `watchAndReindex`'s `onChange` hook — see `openNew()` — so routes that list open projects (`GET /api/projects`) never re-read the file per request. */
   name: string;
 };
@@ -83,7 +86,7 @@ export class ProjectRegistry {
     // so here lets `handle` exist, with a real `sseHub`, before
     // watchAndReindex's `onChange` closure (below) can possibly fire.
     const sseHub = createSseHub(store);
-    const handle: ProjectHandle = { root, store, sseHub, name: config.name };
+    const handle: ProjectHandle = { root, store, sseHub, boardState: createBoardStateStore(), name: config.name };
 
     // Builds .artisign/index.json (absent, or stale from a previous daemon
     // run) and keeps it live from then on — see src/model/live-index.ts.

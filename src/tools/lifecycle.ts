@@ -580,7 +580,7 @@ async function deletePattern(store: Store, name: string): Promise<Record<string,
   return { kind: "pattern", name, path, ...commitFields(commitResult), warnings: [] };
 }
 
-async function deleteScreenEntity(store: Store, name: string): Promise<Record<string, unknown>> {
+async function deleteScreenEntity(store: Store, name: string, ctx?: ToolHandlerContext): Promise<Record<string, unknown>> {
   const path = `screens/${name}.html`;
   if (!(await store.listScreens()).includes(name)) {
     throw new ToolError("not_found", `screen "${name}" was not found`);
@@ -601,12 +601,16 @@ async function deleteScreenEntity(store: Store, name: string): Promise<Record<st
   await store.deleteScreen(name);
   const commitResult = await store.commit(`delete_entity: screen:${name}`);
 
+  // CHR-624: a deleted screen leaves no stale pin on the Board — a no-op
+  // when ctx/viewState is absent (stdio has no board state to prune).
+  ctx?.viewState?.pruneScreen(name);
+
   return { kind: "screen", name, path, ...commitFields(commitResult), warnings, removed_flow_count: outgoing.length };
 }
 
-export async function deleteEntity(store: Store, input: DeleteEntityInput): Promise<Record<string, unknown>> {
+export async function deleteEntity(store: Store, input: DeleteEntityInput, ctx?: ToolHandlerContext): Promise<Record<string, unknown>> {
   if (input.kind === "component") return deleteComponent(store, input.name);
   if (input.kind === "pattern") return deletePattern(store, input.name);
   if (input.kind === "mockup") return deleteMockupEntity(store, input.name, input.variant);
-  return deleteScreenEntity(store, input.name);
+  return deleteScreenEntity(store, input.name, ctx);
 }

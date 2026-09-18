@@ -12,6 +12,7 @@ import { handleSseConnection } from "./sse.js";
 import { isAllowedOrigin, hasJsonContentType } from "./origin-guard.js";
 import { sendJson } from "./json.js";
 import type { ProjectRegistry, ProjectHandle } from "../daemon/project-registry.js";
+import type { ViewState, BoardStatePatch, ToolHandlerContext } from "../tools/index.js";
 
 // This module lives at src/http/server.ts (dev) or dist/http/server.js (build);
 // both are two directories below the package root, next to src/preview.
@@ -64,6 +65,36 @@ function sendMcpError(res: ServerResponse, message: string): void {
   res.end(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32602, message } }));
 }
 
+/**
+ * Composes the tools layer's `ViewState` (CHR-624/ADR-005) over one
+ * resolved project's `boardState` + `sseHub` — the one place a board-state
+ * mutation and its broadcast happen together: apply the patch, and only if
+ * it actually changed something, broadcast it, tagged with `source`.
+ */
+function buildViewState(handle: ProjectHandle, source: "agent" | "human"): ViewState {
+  return {
+    getBoardState: () => handle.boardState.get(),
+    setBoardState: (patch: BoardStatePatch) => {
+      const { state, changed } = handle.boardState.set(patch);
+      if (changed) handle.sseHub.broadcastBoardState(state, source);
+      return state;
+    },
+    pruneScreen: (name: string) => {
+      const { state, changed } = handle.boardState.pruneScreen(name);
+      if (changed) handle.sseHub.broadcastBoardState(state, source);
+    },
+  };
+}
+
+/** Builds the `ToolHandlerContext` for one request — `source` is set by the caller: `"agent"` for `/mcp`, `"human"` for `POST /api/tools/<name>`. `viewState` is undefined when no project resolved (bootstrap mode) — nothing to compose it over. */
+function buildToolContext(handle: ProjectHandle | undefined, registry: ProjectRegistry, source: "agent" | "human"): ToolHandlerContext {
+  return {
+    openProject: (dir: string) => registry.open(dir),
+    viewState: handle ? buildViewState(handle, source) : undefined,
+    source,
+  };
+}
+
 /** `?project=` with no value, or all whitespace, is treated the same as an absent param — otherwise it resolves to `resolve("")`, the daemon's own cwd, which is never the caller's intent. */
 function normalizeProjectParam(url: URL): string | undefined {
   const raw = url.searchParams.get("project");
@@ -101,7 +132,7 @@ async function handleMcpRoute(req: IncomingMessage, res: ServerResponse, registr
     handle = registry.get(registry.activeProject);
   }
 
-  const mcpHandler = createMcpHttpHandler(handle?.store, { openProject: (dir: string) => registry.open(dir) }, handle?.sseHub);
+  const mcpHandler = createMcpHttpHandler(handle?.store, buildToolContext(handle, registry, "agent"), handle?.sseHub);
   await mcpHandler(req, res);
 }
 
@@ -197,7 +228,7 @@ export function createServer(registry: ProjectRegistry): HttpServer {
       // (only when nothing was explicitly requested — an explicit miss
       // already returned above) rather than 503ing before dispatch.
       if (isToolsApi) {
-        handleToolsApi(req, res, handle?.store, { openProject: (dir: string) => registry.open(dir) })
+        handleToolsApi(req, res, handle?.store, buildToolContext(handle, registry, "human"))
           .then(respondUnhandled)
           .catch((err: unknown) => failSafe(res, err));
         return;
@@ -215,7 +246,7 @@ export function createServer(registry: ProjectRegistry): HttpServer {
       if (isCommentsApi) {
         handleCommentsRoutes(req, res, handle.store).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
       } else {
-        handlePreviewRoutes(req, res, handle.store).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
+        handlePreviewRoutes(req, res, handle.store, handle.boardState).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
       }
       return;
     }

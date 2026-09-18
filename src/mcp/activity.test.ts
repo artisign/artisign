@@ -180,6 +180,12 @@ describe("deriveActivityEvent", () => {
       expect(evt.target).toEqual({ kind: "mockup", name: "hero", variant: "a" });
     });
 
+    it("set_board_state is a read when no field is given, a write otherwise", () => {
+      expect(deriveActivityEvent("set_board_state", {}, true, {}).kind).toBe("read");
+      expect(deriveActivityEvent("set_board_state", { filter: null }, true, {}).kind).toBe("write");
+      expect(deriveActivityEvent("set_board_state", { pins: { op: "clear" } }, true, {}).kind).toBe("write");
+    });
+
     it("delete_entity targets the deleted entity, no nodes", () => {
       const evt = deriveActivityEvent("delete_entity", { kind: "screen", name: "home" }, true, {});
       expect(evt.target).toEqual({ kind: "screen", name: "home" });

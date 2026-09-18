@@ -30,17 +30,53 @@ export type Warning = {
 
 export type ToolErrorCode = "not_found" | "validation_failed" | "conflict" | "invalid_state" | "io_error" | "git_error";
 
+/** The Board's shared filter/pinned-screens state (CHR-624/ADR-005) — daemon memory only, per project. */
+export type BoardState = { filter: string | null; pinned: string[] };
+
+/** `filter: undefined` = unchanged, `null` = clear. `pins: undefined` = unchanged. */
+export type BoardStatePatch = {
+  filter?: string | null;
+  pins?: { op: "add" | "remove" | "set"; screens: string[] } | { op: "clear" };
+};
+
+/**
+ * The tools layer's own view onto the daemon's per-project board state
+ * (CHR-624/ADR-005) — the interface `set_board_state` (the only handler
+ * that touches it) is written against. The concrete object is composed
+ * fresh per request in `src/http/server.ts`, from the resolved project's
+ * `ProjectHandle.boardState` + `sseHub`: `setBoardState`/`pruneScreen`
+ * apply the patch and, only if it actually changed something, broadcast a
+ * `board_state` SSE event — the one place a mutation and its broadcast
+ * happen together. Absent for the stdio transport, which has no daemon
+ * state to hold this in at all.
+ */
+export type ViewState = {
+  getBoardState(): BoardState;
+  setBoardState(patch: BoardStatePatch): BoardState;
+  pruneScreen(name: string): void;
+};
+
 /**
  * Extra, optional context threaded into a tool handler alongside `(store,
  * input)` — used by tools that need daemon-level capabilities no single
- * project's `Store` can provide. Currently just `init_project` (registers
- * the newly scaffolded project with the daemon's `ProjectRegistry` so it
- * shows up without a restart). Present for MCP/HTTP requests served by the
- * daemon; absent for the stdio server, which has no registry — those tools
- * degrade to a scaffold-only behavior (no auto-open).
+ * project's `Store` can provide. `init_project` registers the newly
+ * scaffolded project with the daemon's `ProjectRegistry` so it shows up
+ * without a restart; `delete_entity` (screens) and `set_board_state` use
+ * `viewState` to keep the Board's pinned-screen set in sync. Present for
+ * MCP/HTTP requests served by the daemon; absent for the stdio server,
+ * which has no registry and no board state — those tools degrade
+ * accordingly (init_project: scaffold-only, no auto-open; delete_entity:
+ * no pin to prune since nothing holds one; set_board_state: reports
+ * `invalid_state` rather than silently pretending to hold state it can't).
+ * `source` names which door a request came through — `"agent"` for `/mcp`,
+ * `"human"` for `POST /api/tools/<name>` — and is set by the route that
+ * builds the context; only `set_board_state` reads it (to tag its
+ * broadcast), the activity sink (CHR-630) stays a separate parameter.
  */
 export type ToolHandlerContext = {
   openProject?: (dir: string) => Promise<unknown>;
+  viewState?: ViewState;
+  source?: "agent" | "human";
 };
 
 /** Thrown by a single-resource tool (get_*) when the target doesn't exist or input is invalid. */

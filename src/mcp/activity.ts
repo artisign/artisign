@@ -46,7 +46,9 @@ const READ_TOOLS = new Set([
   "inspect_node",
 ]);
 
-function toolKind(tool: string): "read" | "write" {
+function toolKind(tool: string, input: Record<string, unknown>): "read" | "write" {
+  // set_board_state with no field is its own read form — there is no get_board_state.
+  if (tool === "set_board_state" && input.filter === undefined && input.pins === undefined) return "read";
   return READ_TOOLS.has(tool) ? "read" : "write";
 }
 
@@ -193,6 +195,8 @@ function deriveTargetAndNodes(tool: string, input: Record<string, unknown>, resu
     // `list_comments` when filtered to one screen or node.
     // set_tokens — rewrites across many screens/components/patterns at once.
     // init_project, reply_comment — no target shape this event models fits.
+    // set_board_state (CHR-624) — the Board's filter/pins aren't a single
+    // screen/mockup/component/pattern; `toolKind` tells its read form apart.
     default:
       return NONE;
   }
@@ -217,5 +221,5 @@ function hasBlockingErrors(result: unknown): boolean {
 
 export function deriveActivityEvent(tool: string, input: Record<string, unknown>, ok: boolean, result: unknown): ActivityEvent {
   const { target, nodes } = deriveTargetAndNodes(tool, input, result);
-  return { type: "activity", tool, kind: toolKind(tool), target, nodes, ok: ok && !hasBlockingErrors(result), at: Date.now() };
+  return { type: "activity", tool, kind: toolKind(tool, input), target, nodes, ok: ok && !hasBlockingErrors(result), at: Date.now() };
 }

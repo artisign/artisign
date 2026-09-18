@@ -211,3 +211,53 @@ export async function postComment(input) {
   }
   return { ok: true };
 }
+
+/**
+ * The Board's shared filter/pinned state (CHR-624/ADR-005) — for initial
+ * paint and resync. Doesn't include `shown_screens` (only the write route
+ * echoes that, and only to whichever tab made the write) — every OTHER
+ * caller (this one, and every tab's SSE `board_state` handler) derives the
+ * visible set itself from `filter`+`pinned`+the already-loaded screen list,
+ * via board.js's `computeBoardVisibility`.
+ *
+ * @param {string} project REQUIRED, not optional — board state is
+ *   per-project daemon memory, and both this route and
+ *   `POST /api/tools/set_board_state` fall back to the daemon-WIDE active
+ *   project when `?project=` is omitted (a real gap found in review: with
+ *   two tabs open on different projects, an omitted `?project=` here would
+ *   silently read/write whichever project happens to be active elsewhere,
+ *   not the one this tab is showing). Always the project THIS tab is
+ *   displaying (`activeProjectRoot` in app.js) — same convention as
+ *   sse.js's `connectEvents`.
+ * @returns {Promise<{ filter: string | null, pinned: string[] }>}
+ */
+export async function fetchBoardState(project) {
+  const res = await fetch(`/api/board-state?project=${encodeURIComponent(project)}`);
+  return res.json();
+}
+
+/**
+ * Writes a Board-state patch — a filter change, a pin/unpin, or Clear pins
+ * — as `ctx.source: "human"` (an agent's equivalent write goes through MCP
+ * `set_board_state` instead). Broadcasts to every tab on this project via
+ * SSE, INCLUDING the one that called this; the response here is used only
+ * to detect a failed write, never applied directly — see sse.js's
+ * `board_state` handling in app.js for why (the "simplest correct client":
+ * always re-render from the broadcast, never try to suppress your own echo).
+ *
+ * @param {string} project see fetchBoardState's own note — required here too.
+ * @param {{ filter?: string | null, pins?: { op: "add" | "remove" | "set", screens: string[] } | { op: "clear" } }} patch
+ * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
+ */
+export async function setBoardState(project, patch) {
+  const res = await fetch(`/api/tools/set_board_state?project=${encodeURIComponent(project)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ message: res.statusText }));
+    return { ok: false, message: body.message ?? res.statusText };
+  }
+  return { ok: true };
+}

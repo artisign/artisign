@@ -11,6 +11,13 @@
  *     the right project's change stream (falls back to the daemon's active project when omitted)
  *   onChange: (event: { type: "change", kind: string, name: string }) => void,
  *   onLifecycle?: (event: { type: "project-switched" | "project-opened" | "project-closed", root: string }) => void,
+ *   onBoardState?: (event: { type: "board_state", filter: string | null, pinned: string[], source: "agent" | "human" }) => void,
+ *     // CHR-624/ADR-005 — the Board's shared filter/pinned state changed, from EITHER door
+ *     // (POST /api/tools/set_board_state, i.e. this browser or another tab, or an MCP agent's
+ *     // set_board_state). No event for a no-op patch or a pure read. `source` distinguishes
+ *     // "agent" (CHR-625's tab-switch/banner, not this ticket) from "human" — always re-render
+ *     // from the event regardless of which; there's no cheaper way to tell "another tab" apart
+ *     // from "this one, echoed back", and trying to suppress the echo isn't worth the complexity.
  *   onOpen?: (isReconnect: boolean) => void, // fires on every successful (re)connect;
  *     `isReconnect` is false for the very first connect and true for every one after a drop, so
  *     the caller can resync state it may have missed while disconnected (EventSource itself only
@@ -19,7 +26,7 @@
  * }} options
  * @returns {EventSource}
  */
-export function connectEvents({ project, onChange, onLifecycle, onOpen, onDisconnect }) {
+export function connectEvents({ project, onChange, onLifecycle, onBoardState, onOpen, onDisconnect }) {
   const url = project ? `/events?project=${encodeURIComponent(project)}` : "/events";
   const source = new EventSource(url);
   let hasOpenedBefore = false;
@@ -34,6 +41,7 @@ export function connectEvents({ project, onChange, onLifecycle, onOpen, onDiscon
     try {
       const parsed = JSON.parse(evt.data);
       if (parsed.type === "change") onChange(parsed);
+      else if (parsed.type === "board_state") onBoardState?.(parsed);
       else if (
         parsed.type === "project-switched" ||
         parsed.type === "project-opened" ||

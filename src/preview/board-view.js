@@ -10,6 +10,7 @@
 
 import { fetchRender } from "./api.js";
 import { applyFlowMode } from "./flows.js";
+import { PIN_ICON_SVG } from "./screens.js";
 import {
   computeBoardLayout,
   findTile,
@@ -26,6 +27,7 @@ import {
   computeZoomAroundCursor,
   computeWheelZoomFactor,
   labelDisplayMode,
+  LOW_ZOOM_AFFORDANCE_THRESHOLD,
   BASE_GAP,
   BASE_PADDING,
   DEFAULT_BOARD_ZOOM,
@@ -55,8 +57,10 @@ const ZOOM_GESTURE_QUIET_MS = 150;
  * @param {{
  *   surfaceEl: HTMLElement, canvasEl: HTMLElement, canvasInnerEl: HTMLElement,
  *   tilesEl: HTMLElement, edgesEl: SVGElement,
+ *   emptyStateEl?: HTMLElement, emptyStateBodyEl?: HTMLElement,
  *   onZoomChange?: (zoomPercent: number, source: "manual" | "fitall") => void,
  *   onRelayout?: () => void,
+ *   onTogglePin?: (screen: string) => void,
  * }} args `onZoomChange` fires whenever zoom changes for ANY reason —
  *   quick-jump/step buttons, Fit all, the range input, or Ctrl/Cmd+wheel/
  *   pinch on the canvas — so app.js can keep the toolbar's range input,
@@ -67,8 +71,25 @@ const ZOOM_GESTURE_QUIET_MS = 150;
  *   last zoom applied" bookkeeping, since a grid-shape change can leave a
  *   previously-exact `lastFitAllZoom` no longer matching what Fit all would
  *   compute now.
+ *   `onTogglePin` (CHR-624) fires when a tile's pin button is clicked —
+ *   app.js owns the actual pin/unpin write (setBoardState) and the
+ *   resulting SSE broadcast is what actually changes what's pinned; this
+ *   view never mutates its own pinned/outsideFilter sets outside setScreens.
+ *   `emptyStateEl`/`emptyStateBodyEl` (CHR-624) — shown/filled by setScreens
+ *   whenever the visible set is empty, per the `board-view-empty` design.
  */
-export function createBoardView({ surfaceEl, canvasEl, canvasInnerEl, tilesEl, edgesEl, onZoomChange, onRelayout }) {
+export function createBoardView({
+  surfaceEl,
+  canvasEl,
+  canvasInnerEl,
+  tilesEl,
+  edgesEl,
+  emptyStateEl,
+  emptyStateBodyEl,
+  onZoomChange,
+  onRelayout,
+  onTogglePin,
+}) {
   /** @type {string[]} */
   let screens = [];
   /** @type {{ from: string, event: string, to: string, to_kind: string }[]} */
@@ -91,6 +112,14 @@ export function createBoardView({ surfaceEl, canvasEl, canvasInnerEl, tilesEl, e
   let highlightedSource = null;
   let resizeObserver;
   let zoom = DEFAULT_BOARD_ZOOM;
+  // CHR-624 — which of the CURRENT `screens` are pinned, and which of
+  // those are pinned but don't match the shared filter (the `outside-filter`
+  // tile treatment). Set only by setScreens, same as `screens`/`flows`
+  // themselves — the visible set, pin state and outside-filter
+  // classification are always rebuilt together (see setScreens's own
+  // comment), never patched independently.
+  let pinnedScreens = new Set();
+  let outsideFilterScreens = new Set();
   let edgesVisible = true;
   // CHR-623 review findings 3/5: a single coalescing timer shared by every
   // relayout TRIGGER that isn't already synchronous/immediate (an iframe
@@ -180,15 +209,29 @@ export function createBoardView({ surfaceEl, canvasEl, canvasInnerEl, tilesEl, e
     canvasEl.style.height = `${layout.contentHeight * scale}px`;
   }
 
-  /** Sets each tile label's zoom-dependent display mode (board.js's labelDisplayMode) — hidden/truncated/full, per the chr-621 tag notes. */
-  function applyLabelModes() {
+  /**
+   * Two zoom-dependent tile chrome rules from the chr-621 tag notes, both
+   * driven by the same LOW_ZOOM_AFFORDANCE_THRESHOLD: the label's display
+   * mode (hidden/truncated/full — board.js's labelDisplayMode), and the
+   * UNPINNED pin button's visibility (CHR-624) — below the threshold it's
+   * hover-revealed instead of always shown (a static/headless check can't
+   * express hover, so it's simply absent below the threshold here); a
+   * PINNED tile's button always stays visible at any zoom, since it carries
+   * information ("this is here because it's pinned") a hover can't replace.
+   */
+  function applyZoomDependentTileChrome() {
     const mode = labelDisplayMode(zoom);
+    const showUnpinnedAffordance = zoom >= LOW_ZOOM_AFFORDANCE_THRESHOLD;
     for (const tile of layout.tiles) {
       const el = tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(tile.screen)}"]`);
-      const label = el?.querySelector(".board-tile-label");
-      if (!label) continue;
-      label.dataset.mode = mode;
-      label.style.maxWidth = mode === "truncated" ? `${tile.width}px` : "";
+      if (!el) continue;
+      const label = el.querySelector(".board-tile-label");
+      if (label) {
+        label.dataset.mode = mode;
+        label.style.maxWidth = mode === "truncated" ? `${tile.width}px` : "";
+      }
+      const pin = el.querySelector(".board-tile-pin");
+      if (pin) pin.hidden = !pinnedScreens.has(tile.screen) && !showUnpinnedAffordance;
     }
   }
 
@@ -223,7 +266,7 @@ export function createBoardView({ surfaceEl, canvasEl, canvasInnerEl, tilesEl, e
       frame.style.transform = `scale(${tile.width / tile.naturalWidth})`;
     }
     applyZoomSizing();
-    applyLabelModes();
+    applyZoomDependentTileChrome();
     drawEdges();
     onRelayout?.();
   }
@@ -311,13 +354,13 @@ export function createBoardView({ surfaceEl, canvasEl, canvasInnerEl, tilesEl, e
       });
       zoom = clamped;
       applyZoomSizing();
-      applyLabelModes();
+      applyZoomDependentTileChrome();
       surfaceEl.scrollLeft = left;
       surfaceEl.scrollTop = top;
     } else {
       zoom = clamped;
       applyZoomSizing();
-      applyLabelModes();
+      applyZoomDependentTileChrome();
     }
     onZoomChange?.(zoom, source);
   }
@@ -402,11 +445,26 @@ export function createBoardView({ surfaceEl, canvasEl, canvasInnerEl, tilesEl, e
     const tile = document.createElement("div");
     tile.className = "board-tile";
     tile.dataset.screen = screen;
+    const isPinned = pinnedScreens.has(screen);
+    // The dashed-border/badge `outside-filter` treatment (CHR-624) — a tile
+    // that's on the board SOLELY because it's pinned, not because it also
+    // matches the shared filter. Purely visual: `.board-tile`'s own
+    // overflow isn't clipped (unlike `.board-tile-frame`), so the label
+    // above and the badge/pin below/beside it can sit outside the tile's
+    // own box without affecting computeBoardLayout's geometry at all.
+    tile.classList.toggle("outside-filter", outsideFilterScreens.has(screen));
 
     const label = document.createElement("div");
     label.className = "board-tile-label";
     label.textContent = screen;
     tile.appendChild(label);
+
+    if (outsideFilterScreens.has(screen)) {
+      const badge = document.createElement("span");
+      badge.className = "board-tile-badge";
+      badge.textContent = "pinned · outside filter";
+      tile.appendChild(badge);
+    }
 
     const frame = document.createElement("div");
     frame.className = "board-tile-frame";
@@ -425,6 +483,30 @@ export function createBoardView({ surfaceEl, canvasEl, canvasInnerEl, tilesEl, e
     });
     frame.appendChild(iframe);
     tile.appendChild(frame);
+
+    // A <button>, not the design's plain <span> — this one is clickable, so
+    // it needs the native focus/keyboard-activation/role a real button
+    // gives for free. Visibility (hidden below LOW_ZOOM_AFFORDANCE_THRESHOLD
+    // when unpinned) is applied right after by applyZoomDependentTileChrome
+    // (called from relayout(), right after setScreens rebuilds every tile).
+    const pin = document.createElement("button");
+    pin.type = "button";
+    pin.className = "board-tile-pin pin-button";
+    pin.classList.toggle("pinned", isPinned);
+    pin.setAttribute("aria-label", isPinned ? `Unpin ${screen}` : `Pin ${screen}`);
+    pin.setAttribute("aria-pressed", String(isPinned));
+    pin.innerHTML = PIN_ICON_SVG;
+    pin.addEventListener("click", (evt) => {
+      // Tiles have their own click handling for flow-source highlighting
+      // (see attachTileClicks, wired inside the iframe's own document —
+      // unaffected by this) and centerOnScreen navigation; this button
+      // isn't inside the iframe, but stopPropagation keeps it from also
+      // reaching #board-surface's own click listener (setHighlight(null)).
+      evt.stopPropagation();
+      onTogglePin?.(screen);
+    });
+    tile.appendChild(pin);
+
     iframesByScreen.set(screen, iframe);
     return tile;
   }
@@ -470,7 +552,10 @@ export function createBoardView({ surfaceEl, canvasEl, canvasInnerEl, tilesEl, e
 
   /**
    * Rebuilds tiles from scratch — called on first activation and whenever
-   * the screen list changes, since new/removed screens change the grid.
+   * the VISIBLE screen set changes, since app.js already treats a filter or
+   * pinned-set change exactly like a screen-list change (CHR-623 review,
+   * AC8): `nextScreens` is board.js's `computeBoardVisibility().visibleNames`
+   * — filter matches ∪ pinned, not necessarily every screen in the project.
    *
    * An empty `nextScreens` is app.js's project-switch reset (resetProjectState
    * calls `setScreens([], [])` before loading the new project's own screens)
@@ -487,13 +572,29 @@ export function createBoardView({ surfaceEl, canvasEl, canvasInnerEl, tilesEl, e
    * FALLBACK_SIZE until each one's iframe fires `load` again.
    * @param {string[]} nextScreens
    * @param {{ from: string, event: string, to: string, to_kind: string }[]} nextFlows
+   * @param {{ pinned?: Iterable<string>, outsideFilter?: Iterable<string>, filter?: string }} [pinInfo]
+   *   All default to empty/"" — a caller with no filter/pins concept at all
+   *   (there is none left in app.js, but tests may still omit it) gets tiles
+   *   with no pin button state distinct from "unpinned, matching". `filter`
+   *   is used only for the empty-state message's own copy (CHR-624, the
+   *   `board-view-empty` design) when `nextScreens` is empty.
    */
-  async function setScreens(nextScreens, nextFlows) {
+  async function setScreens(nextScreens, nextFlows, pinInfo = {}) {
     if (nextScreens.length === 0) {
       for (const key of Object.keys(measuredSizes)) delete measuredSizes[key];
     }
     screens = nextScreens;
     flows = nextFlows;
+    pinnedScreens = new Set(pinInfo.pinned ?? []);
+    outsideFilterScreens = new Set(pinInfo.outsideFilter ?? []);
+    const isEmpty = screens.length === 0;
+    if (emptyStateEl) emptyStateEl.hidden = !isEmpty;
+    if (emptyStateBodyEl && isEmpty) {
+      const filter = pinInfo.filter ?? "";
+      emptyStateBodyEl.textContent = filter
+        ? `"${filter}" matches nothing, and nothing is pinned. Clear the filter or pin a screen from the sidebar to bring it onto the board.`
+        : "This project has no screens yet.";
+    }
     for (const cleanup of modeCleanupByScreen.values()) cleanup();
     modeCleanupByScreen.clear();
     iframesByScreen.clear();

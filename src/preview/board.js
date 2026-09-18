@@ -3,6 +3,8 @@
 // touching the DOM — tiles, iframes, the SVG edge layer — needs real
 // layout that even jsdom doesn't compute.
 
+import { filterScreens } from "./screens.js";
+
 export const DEFAULT_COLUMNS = 4;
 // The board's own 100%-zoom reference gap/padding (CHR-623). Tiles are laid
 // out at native (unscaled) size, and the whole canvas — tiles, gaps and
@@ -478,6 +480,14 @@ export function stepZoomUp(zoom, step = BOARD_ZOOM_STEP, max = MAX_BOARD_ZOOM) {
   return Math.min(max, next);
 }
 
+// The "low zoom" legibility threshold from the `chr-621` design-system tag
+// notes — shared by two unrelated-looking rules that are actually the same
+// rule: below this, a tile's name label is illegible at the canvas's own
+// scale (labelDisplayMode), AND the UNPINNED pin affordance is pure visual
+// noise that drowns the handful of pinned markers a human is scanning for
+// at an overview zoom (CHR-624 — see board-view.js's applyZoomDependentTileState).
+export const LOW_ZOOM_AFFORDANCE_THRESHOLD = 60;
+
 /**
  * Below this board zoom, a tile's name label is illegible at the canvas's
  * own scale and isn't rendered at all; below 100% but at/above this, it's
@@ -488,7 +498,7 @@ export function stepZoomUp(zoom, step = BOARD_ZOOM_STEP, max = MAX_BOARD_ZOOM) {
  * @returns {"hidden" | "truncated" | "full"}
  */
 export function labelDisplayMode(zoomPercent) {
-  if (zoomPercent < 60) return "hidden";
+  if (zoomPercent < LOW_ZOOM_AFFORDANCE_THRESHOLD) return "hidden";
   if (zoomPercent < 100) return "truncated";
   return "full";
 }
@@ -535,4 +545,61 @@ export function computeZoomAroundCursor({
     left: clamp(contentX * newScale - cursorX, 0, maxLeft),
     top: clamp(contentY * newScale - cursorY, 0, maxTop),
   };
+}
+
+/**
+ * The Board's visible tile set (CHR-624/ADR-005) — filter matches UNION
+ * pinned screens, in the project's own screen order (not filter-match order
+ * or pin order) — plus enough classification for the toolbar status text
+ * and the per-tile "pinned but outside the filter" treatment
+ * (`$board-tile` `outside-filter` variant: dashed border + badge). One
+ * function computing all of it together, rather than three separate passes
+ * over `screens`, so the tile list and the status text it's displayed next
+ * to can never disagree about what's actually shown.
+ *
+ * `pinned` is trusted no further than the screens that actually exist: a
+ * pinned name with no matching screen (the daemon didn't catch a delete —
+ * ADR-005 prunes on `delete_entity`, but a screen can also vanish without
+ * it, e.g. a branch switch or a hand-deleted file) is silently dropped from
+ * every result here rather than rendered as a ghost tile or counted in
+ * `pinnedCount`.
+ *
+ * @param {{ name: string, tags: string[] }[]} screens
+ * @param {string} filter
+ * @param {string[]} pinned
+ * @returns {{
+ *   visibleNames: string[],
+ *   outsideFilterNames: string[],
+ *   pinnedNames: string[],
+ *   matchCount: number,
+ *   pinnedCount: number,
+ *   shownCount: number,
+ * }}
+ */
+export function computeBoardVisibility(screens, filter, pinned) {
+  const matches = filterScreens(screens, filter);
+  const matchNames = new Set(matches.map((s) => s.name));
+  const pinnedNames = pinned.filter((name) => screens.some((s) => s.name === name));
+  const pinnedSet = new Set(pinnedNames);
+  const visible = screens.filter((s) => matchNames.has(s.name) || pinnedSet.has(s.name));
+  return {
+    visibleNames: visible.map((s) => s.name),
+    outsideFilterNames: visible.filter((s) => pinnedSet.has(s.name) && !matchNames.has(s.name)).map((s) => s.name),
+    pinnedNames,
+    matchCount: matches.length,
+    pinnedCount: pinnedSet.size,
+    shownCount: visible.length,
+  };
+}
+
+/**
+ * The `$board-toolbar` `status` slot's text — "N shown — M matches ·
+ * K pinned", exactly as the approved `board-view` design screen shows it.
+ * Takes `computeBoardVisibility`'s own return shape so the two can never
+ * drift apart.
+ * @param {{ shownCount: number, matchCount: number, pinnedCount: number }} visibility
+ * @returns {string}
+ */
+export function formatBoardStatusText({ shownCount, matchCount, pinnedCount }) {
+  return `${shownCount} shown — ${matchCount} matches · ${pinnedCount} pinned`;
 }

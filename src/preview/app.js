@@ -17,6 +17,8 @@ import {
   activateProject,
   openProject,
   initProject,
+  fetchBoardState,
+  setBoardState,
 } from "./api.js";
 import { renderScreenList, filterScreens } from "./screens.js";
 import { renderMockupList, filterMockups } from "./mockups.js";
@@ -31,7 +33,17 @@ import { connectEvents } from "./sse.js";
 import { applyCanvas } from "./canvas.js";
 import { updateWarningBadge } from "./warnings.js";
 import { createBoardView } from "./board-view.js";
-import { MIN_BOARD_ZOOM, MAX_BOARD_ZOOM, DEFAULT_BOARD_ZOOM, clampZoom, zoomSliderOffset, stepZoomDown, stepZoomUp } from "./board.js";
+import {
+  MIN_BOARD_ZOOM,
+  MAX_BOARD_ZOOM,
+  DEFAULT_BOARD_ZOOM,
+  clampZoom,
+  zoomSliderOffset,
+  stepZoomDown,
+  stepZoomUp,
+  computeBoardVisibility,
+  formatBoardStatusText,
+} from "./board.js";
 import { createProjectUI } from "./projects.js";
 import { createProjectDialogs } from "./project-dialogs.js";
 import {
@@ -72,6 +84,8 @@ const boardCanvasEl = document.getElementById("board-canvas");
 const boardCanvasInnerEl = document.getElementById("board-canvas-inner");
 const boardTilesEl = document.getElementById("board-tiles");
 const boardEdgesEl = document.getElementById("board-edges");
+const boardEmptyStateEl = document.getElementById("board-empty-state");
+const boardEmptyBodyEl = document.getElementById("board-empty-body");
 const boardFitallBtn = document.getElementById("board-fitall-btn");
 const board100Btn = document.getElementById("board-100-btn");
 const boardZoomMinusBtn = document.getElementById("board-zoom-minus");
@@ -79,6 +93,8 @@ const boardZoomPlusBtn = document.getElementById("board-zoom-plus");
 const boardZoomRangeInput = document.getElementById("board-zoom-range");
 const boardZoomReadoutEl = document.getElementById("board-zoom-readout");
 const boardEdgesToggleBtn = document.getElementById("board-edges-toggle");
+const boardToolbarStatusEl = document.getElementById("board-toolbar-status");
+const boardClearPinsBtn = document.getElementById("board-clear-pins-btn");
 const flowModeToggle = document.getElementById("flow-mode-toggle");
 const commentModeToggle = document.getElementById("comment-mode-toggle");
 const canvasControlsEl = document.getElementById("canvas-controls");
@@ -136,7 +152,17 @@ let currentScreen = null;
 let mockups = [];
 // Mutually exclusive with currentScreen — see selectScreen/selectMockup.
 let currentMockup = null;
+// The Board's shared filter (CHR-624/ADR-005) — daemon-held, per project,
+// not reset locally on a project switch (unlike the old purely-local
+// version of this variable): loadBoardState() populates it from
+// fetchBoardState() on boot/project-switch/resync, and every SSE
+// board_state event overwrites it again, from EITHER door (this browser's
+// own write, another tab, or an MCP agent). Renders instantly on every
+// keystroke (refreshSidebar/renderBoardStatus read this directly); the
+// write to the daemon is debounced — see screenFilterInput's listener.
 let screenFilter = "";
+/** @type {string[]} pinned screen names, same daemon-held/SSE-driven lifecycle as screenFilter. */
+let pinnedScreens = [];
 let notesExpanded = true;
 let currentView = "screens";
 /** @type {"none" | "flow" | "comment" | "inspect"} */
@@ -218,6 +244,8 @@ const board = createBoardView({
   canvasInnerEl: boardCanvasInnerEl,
   tilesEl: boardTilesEl,
   edgesEl: boardEdgesEl,
+  emptyStateEl: boardEmptyStateEl,
+  emptyStateBodyEl: boardEmptyBodyEl,
   onZoomChange: (value, source) => {
     if (source === "fitall") lastFitAllZoom = value;
     boardZoom = value;
@@ -232,8 +260,41 @@ const board = createBoardView({
     lastFitAllZoom = null;
     updateBoardToolbar();
   },
+  onTogglePin: (screen) => toggleScreenPin(screen),
 });
 board.mount();
+
+/**
+ * Pin/unpin one screen (CHR-624) — shared by the sidebar's pin button and
+ * the board tile's pin button, both of which call this the same way. Fires
+ * the write and returns; the actual UI update comes back through the SSE
+ * `board_state` broadcast (handleBoardStateEvent), same as every other
+ * client on this project including this one — see api.js's setBoardState
+ * for why this never applies its own result directly.
+ * @param {string} screen
+ */
+function toggleScreenPin(screen) {
+  if (!activeProjectRoot) return;
+  const op = pinnedScreens.includes(screen) ? "remove" : "add";
+  reportBoardStateFailure(setBoardState(activeProjectRoot, { pins: { op, screens: [screen] } }));
+}
+
+boardClearPinsBtn.addEventListener("click", () => {
+  if (activeProjectRoot) reportBoardStateFailure(setBoardState(activeProjectRoot, { pins: { op: "clear" } }));
+});
+
+/** Re-renders the board toolbar's status text + Clear pins visibility from the current screens/screenFilter/pinnedScreens — cheap and pure, so it's fine to call unconditionally on every board-state-relevant change, not just while the Board tab is actually showing. */
+function renderBoardStatus() {
+  const visibility = computeBoardVisibility(screens, screenFilter, pinnedScreens);
+  boardToolbarStatusEl.textContent = formatBoardStatusText(visibility);
+  // Gated on the raw pin list, not `visibility.pinnedCount` (review fix 5):
+  // the latter is the CLEANED count (a pin whose screen no longer exists is
+  // dropped from it), so a project whose pins are entirely ghosts — the
+  // JSDoc on `pinnedScreens` above already names the causes, a branch
+  // switch or a hand-deleted file the daemon never pruned — would hide the
+  // one button that can get rid of them.
+  boardClearPinsBtn.hidden = pinnedScreens.length === 0;
+}
 
 /** Syncs every toolbar control (range input + its fill/aria-valuetext, readout, quick-jump active states, step-button aria-disabled states) from the current `boardZoom`. */
 function updateBoardToolbar() {
@@ -368,8 +429,13 @@ function resetProjectState() {
   screens = [];
   tagNotes = []; // else one project's tag notes leak into the panel of the next
   currentScreen = null;
-  screenFilter = "";
-  screenFilterInput.value = "";
+  // screenFilter/pinnedScreens are deliberately NOT reset here (CHR-624) —
+  // they're daemon-held, per-project state now, not local-only; loadBoardState()
+  // (called from bootScreens, right after this) overwrites them with the
+  // NEW project's actual values. Clearing the pending debounced write
+  // guards against it firing (with the OLD project's filter text) after
+  // activeProjectRoot has already moved on to the new project.
+  clearTimeout(boardFilterWriteTimer);
   comments = [];
   boardBuilt = false;
   activeMode = "none";
@@ -409,8 +475,81 @@ async function loadTags() {
   updateNotesPanel();
 }
 
+/**
+ * Applies a filter/pinned pair — from loadBoardState's own GET, or directly
+ * from an SSE `board_state` event's payload (same shape, so no extra
+ * round-trip is needed there) — and re-renders everything derived from it.
+ * @param {string | null} filter
+ * @param {string[]} pinned
+ */
+function applyBoardState(filter, pinned) {
+  screenFilter = filter ?? "";
+  // Skip while the human is typing in this very input (review fix 1) — the
+  // broadcast this fires from is an echo of ITS OWN write (or a whitespace-
+  // only filter the daemon normalised to `null`, board-state.ts), so writing
+  // `.value` here would replace half-typed text and jump the cursor. Every
+  // other consumer of `screenFilter` below still re-renders from the
+  // broadcast as usual; only the input element itself is an input, not a
+  // pure output.
+  if (document.activeElement !== screenFilterInput) screenFilterInput.value = screenFilter;
+  pinnedScreens = pinned ?? [];
+  refreshSidebar();
+  if (boardBuilt) loadBoard();
+}
+
+/**
+ * Fires a Board-state write and reports a failure the way the rest of this
+ * file does (console.error) — every write is otherwise fire-and-forget
+ * since the UI only ever updates from the SSE broadcast (see setBoardState's
+ * own doc comment in api.js), so a rejected write would otherwise vanish
+ * silently (review fix 3). Also catches `fetch` itself throwing (e.g. a
+ * network drop), which would otherwise surface as an unhandled rejection.
+ * @param {Promise<{ ok: true } | { ok: false, message: string }>} writePromise
+ */
+function reportBoardStateFailure(writePromise) {
+  writePromise.then(
+    (result) => {
+      if (!result.ok) console.error(result.message);
+    },
+    (error) => console.error(error),
+  );
+}
+
+/**
+ * Re-fetches the Board's shared filter/pinned state (CHR-624/ADR-005) for
+ * the current project — called on boot/project-switch (bootScreens) and SSE
+ * reconnect (resyncCurrentProject); a live update while connected arrives as
+ * an SSE `board_state` event instead (handleBoardStateEvent), which applies
+ * its own payload directly rather than re-fetching.
+ *
+ * Captures `activeProjectRoot` up front and re-checks it after the await
+ * (review fix 2) — `switchToProject` isn't serialised, so a second switch
+ * can start while this fetch is still in flight; without the check, a slow
+ * response for the project we've since left would land in the NEW project's
+ * UI. Also never lets a failure propagate to its caller's `Promise.all`
+ * (review fix 4) — bootScreens awaits this alongside loadScreens/loadMockups/
+ * loadTags, and a rejection there would abort the rest of boot (including
+ * restoring the persisted screen selection); on failure this instead resets
+ * to empty so a fetch error can't leave the PREVIOUS project's filter/pins
+ * on screen (resetProjectState deliberately no longer clears them itself).
+ */
+async function loadBoardState() {
+  if (!activeProjectRoot) return;
+  const root = activeProjectRoot;
+  let state;
+  try {
+    state = await fetchBoardState(root);
+  } catch (error) {
+    console.error(error);
+    if (root === activeProjectRoot) applyBoardState(null, []);
+    return;
+  }
+  if (root !== activeProjectRoot) return; // a later switch has since moved on — this response is stale
+  applyBoardState(state.filter, state.pinned);
+}
+
 async function bootScreens() {
-  await Promise.all([loadScreens(), loadMockups(), loadTags()]);
+  await Promise.all([loadScreens(), loadMockups(), loadTags(), loadBoardState()]);
   const persisted = parseLastSelection(readStringPref(prefsStorage, lastScreenKey(activeProjectRoot), null));
   if (persisted?.kind === "mockup" && mockups.some((m) => m.name === persisted.name)) {
     await selectMockup(persisted.name);
@@ -424,6 +563,7 @@ async function bootScreens() {
 async function resyncCurrentProject() {
   loadScreens();
   loadTags();
+  loadBoardState(); // CHR-624 — the daemon's board state is empty after a restart; a reconnect must resync it same as everything else
   const mockupsOk = await loadMockups();
   if (currentScreen) {
     loadCurrentScreen();
@@ -448,6 +588,11 @@ async function fallbackFromVanishedMockup() {
   }
 }
 
+/** Order-sensitive string-array equality — used below to compare board visibility's own name arrays, which come from the same deterministic computation each time, so a reorder is as much a "change" as an add/remove for this purpose. */
+function arraysEqual(a, b) {
+  return a.length === b.length && a.every((item, i) => item === b[i]);
+}
+
 async function handleChangeEvent(event) {
   if (event.kind === "screen") {
     const previousScreens = screens;
@@ -457,9 +602,27 @@ async function handleChangeEvent(event) {
       await loadInspectorEntries(); // the screen's own source changed — refs may have too
     }
     if (boardBuilt) {
-      const screenListChanged =
-        previousScreens.length !== screens.length || previousScreens.some((s, i) => s.name !== screens[i].name);
-      if (screenListChanged) await loadBoard();
+      // Tags, not just names/membership/order (CHR-624): the board's
+      // visible set depends on the shared filter, which matches a screen's
+      // tags too (board.js's computeBoardVisibility, same rule as
+      // filterScreens) — a tag-only edit (same name, same position) can
+      // still move a screen in or out of the filter, or in/out of the
+      // outside-filter classification.
+      //
+      // Compare the ACTUAL computed visibility, not just names/tags (review
+      // fix 6) — a name/tag diff alone flags every tag edit as
+      // board-affecting even when the visible set doesn't move at all, and
+      // `set_meta` is something agents write often; that turned a routine
+      // tag touch into a full loadBoard() (re-fetch flows, re-render every
+      // tile) instead of the cheap single-tile refreshScreen. `screenFilter`/
+      // `pinnedScreens` themselves are unchanged by a "screen" event, so
+      // it's only `screens` that can move either name array.
+      const previousVisibility = computeBoardVisibility(previousScreens, screenFilter, pinnedScreens);
+      const nextVisibility = computeBoardVisibility(screens, screenFilter, pinnedScreens);
+      const visibilityChanged =
+        !arraysEqual(previousVisibility.visibleNames, nextVisibility.visibleNames) ||
+        !arraysEqual(previousVisibility.outsideFilterNames, nextVisibility.outsideFilterNames);
+      if (visibilityChanged) await loadBoard();
       else await board.refreshScreen(event.name);
     }
   } else if (event.kind === "tokens" || event.kind === "component" || event.kind === "pattern" || event.kind === "asset") {
@@ -510,12 +673,29 @@ async function handleLifecycleEvent(event) {
   if (event.type === "project-switched" || event.type === "project-closed") await switchToProject(state.active);
 }
 
+/**
+ * @param {{ type: "board_state", filter: string | null, pinned: string[], source: "agent" | "human" }} event
+ * Always applies the event's own payload directly (no re-fetch) — from
+ * EITHER door (another tab's write, an MCP agent's, or this very tab's own
+ * write echoed back) and regardless of `source`: the simplest correct
+ * client re-renders from the broadcast every time, rather than trying to
+ * detect and suppress its own echo (CHR-624 ticket brief).
+ * `source === "agent"` is CHR-625's cue to switch to the Board tab and show
+ * the "agent switched you here" banner — deliberately not built here;
+ * `source` is threaded this far so that ticket doesn't need to touch
+ * sse.js or this handler's own signature again.
+ */
+function handleBoardStateEvent(event) {
+  applyBoardState(event.filter, event.pinned);
+}
+
 function reconnectSse(project) {
   eventSource?.close();
   eventSource = connectEvents({
     project,
     onChange: handleChangeEvent,
     onLifecycle: handleLifecycleEvent,
+    onBoardState: handleBoardStateEvent,
     onOpen: (isReconnect) => {
       connectionStatus.classList.remove("disconnected");
       // The SSE gap while disconnected is invisible to us — EventSource only
@@ -538,15 +718,19 @@ let commentsRequestId = 0;
 let inspectorRequestId = 0;
 let mockupRequestId = 0;
 
-/** Re-renders the screen list and the mockup list (both filtered by the same sidebar search), plus everything in the sidebar derived from them/the current selection. */
+/** Re-renders the screen list and the mockup list (both filtered by the same sidebar search), plus everything in the sidebar derived from them/the current selection, plus the board toolbar's status text/Clear pins (CHR-624 — cheap and pure, so it's simplest to always keep in sync here rather than gate it on the Board tab actually showing). */
 function refreshSidebar() {
-  renderScreenList(screenListEl, screens, currentScreen, selectScreen, screenFilter);
+  renderScreenList(screenListEl, screens, currentScreen, selectScreen, screenFilter, {
+    pinned: new Set(pinnedScreens),
+    onTogglePin: toggleScreenPin,
+  });
   const filteredMockups = filterMockups(mockups, screenFilter);
   renderMockupList(mockupListEl, filteredMockups, { activeName: currentMockup, onSelect: selectMockup });
   mockupSectionEl.hidden = filteredMockups.length === 0;
   const filteredScreenCount = filterScreens(screens, screenFilter).length;
   screenFilterHint.textContent = `${filteredScreenCount} screen${filteredScreenCount === 1 ? "" : "s"} · ${filteredMockups.length} mockup${filteredMockups.length === 1 ? "" : "s"} · matches name and tags`;
   updateNotesPanel();
+  renderBoardStatus();
 }
 
 function updateNotesPanel() {
@@ -569,9 +753,23 @@ function updateNotesPanel() {
   renderTagNotes(notesPanelTagsEl, screenTags, tagNotes, expandedTagNotes);
 }
 
+// CHR-624/ADR-005: the sidebar (and, via refreshSidebar's renderBoardStatus,
+// the toolbar status text) filters locally and instantly on every
+// keystroke — `screenFilter` itself is the single source of truth for
+// rendering, updated synchronously here. The WRITE to the daemon (which is
+// what actually moves the Board's tile set, and what every other tab sees)
+// is debounced: each write fans out an SSE broadcast to every connected
+// client and costs the daemon one meta read per screen, both wasted if
+// re-run on every single keystroke.
+const BOARD_FILTER_WRITE_DEBOUNCE_MS = 200;
+let boardFilterWriteTimer;
 screenFilterInput.addEventListener("input", () => {
   screenFilter = screenFilterInput.value;
   refreshSidebar();
+  clearTimeout(boardFilterWriteTimer);
+  boardFilterWriteTimer = setTimeout(() => {
+    if (activeProjectRoot) reportBoardStateFailure(setBoardState(activeProjectRoot, { filter: screenFilter }));
+  }, BOARD_FILTER_WRITE_DEBOUNCE_MS);
 });
 
 notesPanelHeader.addEventListener("click", () => {
@@ -1005,10 +1203,17 @@ async function loadDesignSystem() {
 /** Builds the board from scratch — screens + flows. Only called once, lazily; SSE handlers keep it in sync afterward (see connectEvents below). */
 async function loadBoard() {
   const flows = await fetchFlows();
-  await board.setScreens(
-    screens.map((s) => s.name),
-    flows,
-  );
+  // CHR-624: the board's tile set is filter matches ∪ pinned, not every
+  // screen — renderBoardStatus() (called by refreshSidebar, which every
+  // caller of loadBoard already runs first) recomputes the identical
+  // visibility, but board.setScreens also needs the pin/outside-filter
+  // classification per tile, not just the counts renderBoardStatus keeps.
+  const visibility = computeBoardVisibility(screens, screenFilter, pinnedScreens);
+  await board.setScreens(visibility.visibleNames, flows, {
+    pinned: visibility.pinnedNames,
+    outsideFilter: visibility.outsideFilterNames,
+    filter: screenFilter,
+  });
   boardBuilt = true;
 }
 

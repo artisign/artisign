@@ -53,4 +53,48 @@ describe("renderScreenList", () => {
     renderScreenList(listEl, [screens[0]], null, () => {}, "");
     expect(listEl.querySelectorAll("li")).toHaveLength(1);
   });
+
+  it("renders no pin button at all when onTogglePin is omitted (CHR-624 — every caller before this ticket)", () => {
+    const listEl = document.createElement("ul");
+    renderScreenList(listEl, screens, null, () => {}, "");
+    expect(listEl.querySelector(".screen-item-pin")).toBeNull();
+  });
+
+  it("renders a pin button per row as a SIBLING of the select button, not nested inside it", () => {
+    const listEl = document.createElement("ul");
+    renderScreenList(listEl, screens, null, () => {}, "", { pinned: new Set(), onTogglePin: () => {} });
+    const row = listEl.querySelector("li");
+    expect(row.querySelector(".screen-item .screen-item-pin")).toBeNull(); // not nested
+    expect(row.children).toHaveLength(2); // button.screen-item, button.screen-item-pin
+  });
+
+  it("reflects the pinned set via aria-pressed and a pinned class", () => {
+    const listEl = document.createElement("ul");
+    renderScreenList(listEl, screens, null, () => {}, "", { pinned: new Set(["login"]), onTogglePin: () => {} });
+    const pins = [...listEl.querySelectorAll(".screen-item-pin")];
+    const [cartPin, loginPin] = pins;
+    expect(cartPin.getAttribute("aria-pressed")).toBe("false");
+    expect(cartPin.classList.contains("pinned")).toBe(false);
+    expect(loginPin.getAttribute("aria-pressed")).toBe("true");
+    expect(loginPin.classList.contains("pinned")).toBe(true);
+  });
+
+  it("calls onTogglePin with the screen name, and never onSelect, when the pin button is clicked", () => {
+    const listEl = document.createElement("ul");
+    const selected = [];
+    const toggled = [];
+    renderScreenList(listEl, screens, null, (name) => selected.push(name), "", {
+      pinned: new Set(),
+      onTogglePin: (name) => toggled.push(name),
+    });
+    listEl.querySelector(".screen-item-pin").click();
+    expect(toggled).toEqual(["checkout-cart"]);
+    expect(selected).toEqual([]);
+  });
+
+  it("only shows a pin button for rows the filter actually shows — pinned-outside-filter is a board-only distinction", () => {
+    const listEl = document.createElement("ul");
+    renderScreenList(listEl, screens, null, () => {}, "checkout", { pinned: new Set(["login"]), onTogglePin: () => {} });
+    expect(listEl.querySelectorAll("li")).toHaveLength(1); // "login" doesn't match "checkout" — not in the list at all
+  });
 });

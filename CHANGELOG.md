@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-21
+
+A packaging release with no behaviour change: npm version metadata is
+immutable, and the `mcpName` field that proves we own the package has to sit
+on a published version before the official MCP registry will accept a
+listing. 1.0.0 predates the field, so the listing needs this release to point
+at.
+
 ### Added
 
 - A `server.json` at the repo root and a matching `mcpName` field in

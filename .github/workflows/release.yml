@@ -57,6 +57,17 @@ jobs:
               exit 1
             fi
           fi
+
+          # A stale server.json version leaves the registry silently pointing
+          # at a release that is no longer current — catch the drift here,
+          # before it ever reaches npm.
+          server_version="$(node -p 'require("./server.json").version')"
+          server_package_version="$(node -p 'require("./server.json").packages[0].version')"
+          if [ "$server_version" != "$package_version" ] || [ "$server_package_version" != "$package_version" ]; then
+            echo "::error::server.json ($server_version / package $server_package_version) does not match package.json version $package_version."
+            exit 1
+          fi
+
           echo "version=$package_version" >> "$GITHUB_OUTPUT"
 
       - run: npm ci

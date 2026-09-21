@@ -48,6 +48,22 @@ describes for users, and it works for the test suite too (CI does the
 `--no-save` route). Without Playwright the browser-backed suites skip
 themselves; every other test runs.
 
+## Releasing
+
+For the maintainer, cutting a release:
+
+- `npm version <level>` bumps `package.json`.
+- `server.json` carries the version twice — the top-level `version` and
+  `packages[0].version` — and both are bumped in the same commit. The release
+  workflow fails the build if either drifts from `package.json`.
+- Update the CHANGELOG's `## [Unreleased]` section into a dated version
+  section, and the README's status line.
+- Push the `v*` tag. The Release workflow builds, tests, creates the GitHub
+  Release and publishes to npm with provenance.
+- Once npm has the new version, run `mcp-publisher publish` to update the
+  entry at registry.modelcontextprotocol.io — deliberately manual, not part
+  of CI.
+
 ## Forking
 
 The AGPL gives you every right it promises: fork it, modify it, run it, offer it

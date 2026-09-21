@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- A `server.json` at the repo root and a matching `mcpName` field in
+  `package.json` prepare Artisign for listing on the official MCP registry —
+  the registry verifies npm package ownership by reading `mcpName` back off
+  the published package metadata, which is why the two files carry it in
+  lockstep. The registry listing itself is a manual `mcp-publisher publish`
+  after the npm release ships, not part of this change. (CHR-663)
+
 ## [1.0.0] - 2026-09-18
 
 The version number is the news: every milestone from the PRD is implemented, so

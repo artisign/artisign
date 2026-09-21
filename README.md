@@ -19,7 +19,7 @@ One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
 Node.js ≥ 20.19, on **macOS or Linux**. **Windows is not supported** — the store's atomic writes (write temp file, then `rename`) and its path handling have never been verified there, so the tool is not shipped for it. `package.json` declares this via `os`, which makes `npm install` refuse the platform rather than fail somewhere later.
 
-**Two ways to run it, and the choice matters.** `npx artisign` fetches the package on first use and needs no setup — the fastest way to try it, and enough for everything except the two screenshot tools. Installing it into a directory of your own is the other path, and the one to pick if you want screenshots:
+**Two ways to run it.** `npx artisign` fetches the package on first use and needs no setup — the fastest way to try it. Installing it into a directory of your own is the other path, and the one the commands below are written for. Screenshots are not the difference between them: the two screenshot tools need Playwright, which a local install can sit next to and which the npx path reaches through `ARTISIGN_PLAYWRIGHT_DIR` — both routes are under **Optional: screenshots** below.
 
 ```bash
 mkdir artisign && cd artisign
@@ -37,7 +37,7 @@ npm install artisign
 claude mcp add --transport http artisign "http://127.0.0.1:4711/mcp?project=/absolute/path/to/my-project"
 ```
 
-The first two lines repeat the install above on purpose: the point of this block is that nothing has to be assembled from elsewhere. On the npx path, drop them and start with `npx artisign start ./my-project` instead — the screenshot tools are then unavailable, as described below.
+The first two lines repeat the install above on purpose: the point of this block is that nothing has to be assembled from elsewhere. On the npx path, drop them and start with `npx artisign start ./my-project` instead — the screenshot tools then need `ARTISIGN_PLAYWRIGHT_DIR`, as described below.
 
 **Optional: screenshots.** `get_screenshot` and `inspect_node` need a real browser, which is intentionally not bundled (`npx artisign` stays light without it). Playwright is an **optional peer dependency** — npm neither installs it nor its ~150 MB of browser binaries unless you ask for them by name. Two ways to do that:
 

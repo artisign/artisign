@@ -11,6 +11,7 @@ export const STATUS_BY_CODE: Record<ToolErrorCode, number> = {
   invalid_state: 409,
   io_error: 500,
   git_error: 500,
+  has_variants: 409,
 };
 
 /**

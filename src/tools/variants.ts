@@ -1,4 +1,4 @@
-import type { ScreenMeta } from "../store/index.js";
+import type { Store, ScreenMeta } from "../store/index.js";
 
 export type VariantLink = { of: string; kind: NonNullable<ScreenMeta["variant_kind"]> };
 
@@ -18,6 +18,12 @@ export function variantLinks(names: string[], metas: ScreenMeta[]): Map<string, 
     }
   });
   return links;
+}
+
+export async function readVariantLinks(store: Store): Promise<Map<string, VariantLink>> {
+  const names = await store.listScreens();
+  const metas = await Promise.all(names.map((name) => store.readScreenMeta(name)));
+  return variantLinks(names, metas);
 }
 
 /** Keys to spread into a screen entry: empty for a main screen. */

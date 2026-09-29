@@ -36,7 +36,7 @@ export type Warning = {
   suggestion?: string;
 };
 
-export type ToolErrorCode = "not_found" | "validation_failed" | "conflict" | "invalid_state" | "io_error" | "git_error";
+export type ToolErrorCode = "not_found" | "validation_failed" | "conflict" | "invalid_state" | "io_error" | "git_error" | "has_variants";
 
 /** The Board's shared filter/pinned-screens state (CHR-624/ADR-005) — daemon memory only, per project. */
 export type BoardState = { filter: string | null; pinned: string[]; expanded: string[] };

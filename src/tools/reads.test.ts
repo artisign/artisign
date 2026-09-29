@@ -1318,7 +1318,7 @@ describe("screen variants in reads (ADR-006)", () => {
     expect(await getScreen(fx.store, { screen: "other", view: "full" })).not.toHaveProperty("variants");
   });
 
-  it("get_screen full reached_from is deduped, sorted, includes the parent and excludes self-loops", async () => {
+  it("get_screen full reached_from lists flow sources (the parent via its flow edge), deduped, sorted, no self-loops", async () => {
     await fx.store.writeFlows([
       { from: "main.n1", event: "tap", to: "deep", to_kind: "screen" },
       { from: "main.n2", event: "tap", to: "deep", to_kind: "screen" },

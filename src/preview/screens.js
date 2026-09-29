@@ -181,6 +181,22 @@ function matchesFilter(screen, needle) {
 const KIND_GLYPH = { state: "", overlay: "", step: "↪" };
 
 /**
+ * The variant-kind glyph (state / overlay / step) shared by the sidebar tree
+ * and the screen view's breadcrumb, popover and tree map.
+ * @param {string | undefined} kind
+ * @returns {HTMLSpanElement | null} null for an unknown or absent kind
+ */
+export function createKindIcon(kind) {
+  if (!(kind in KIND_GLYPH)) return null;
+  const icon = document.createElement("span");
+  icon.className = `kind-icon kind-${kind}`;
+  icon.dataset.kind = kind;
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = KIND_GLYPH[kind];
+  return icon;
+}
+
+/**
  * @param {HTMLElement} listEl
  * @param {{ name: string, tags: string[], variant_of?: string, variant_kind?: "state" | "overlay" | "step" }[]} screens
  * @param {string | null} activeScreen
@@ -256,13 +272,9 @@ export function renderScreenList(
 
     const nameEl = document.createElement("div");
     nameEl.className = "screen-item-name";
-    if (treeMode && node.parent && screen.variant_kind in KIND_GLYPH) {
-      const icon = document.createElement("span");
-      icon.className = `kind-icon kind-${screen.variant_kind}`;
-      icon.dataset.kind = screen.variant_kind;
-      icon.setAttribute("aria-hidden", "true");
-      icon.textContent = KIND_GLYPH[screen.variant_kind];
-      nameEl.appendChild(icon);
+    if (treeMode && node.parent) {
+      const icon = createKindIcon(screen.variant_kind);
+      if (icon) nameEl.appendChild(icon);
     }
     const textEl = document.createElement("span");
     textEl.className = "screen-item-text";

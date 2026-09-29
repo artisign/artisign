@@ -1213,6 +1213,18 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 #screens-view {
   display: flex;
+  flex-direction: column;
+}
+
+/* CHR-732 — the breadcrumb bar sits above the canvas; the stage keeps the old canvas row (canvas + empty-state, now also the variant tree map). */
+#screens-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+#screens-stage > #canvas {
+  min-width: 0;
 }
 
 #screens-view[hidden],
@@ -2872,4 +2884,300 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 .btn-confirm:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* CHR-732 — variant breadcrumb bar (approved `variants-screen-view` c-breadcrumb-tree). */
+#variant-bar {
+  flex: none;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 0 var(--space-2xl);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.8rem;
+  position: relative;
+}
+
+#variant-bar[hidden],
+#variant-map[hidden],
+#variant-inspector[hidden] {
+  display: none;
+}
+
+.crumb-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 56px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+}
+
+.crumb-group.open {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+}
+
+.crumb-group.on {
+  flex-shrink: 0;
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.crumb,
+.crumb-toggle,
+.variant-back,
+.variant-pop-row,
+.variant-link,
+.map-node {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 4px 5px 9px;
+}
+
+.crumb-name {
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.crumb-toggle {
+  padding: 5px 8px 5px 2px;
+  font-size: 0.6rem;
+  color: var(--color-text-faded);
+}
+
+.crumb-home {
+  font-size: 0.7rem;
+}
+
+.crumb-sep {
+  color: var(--color-text-faded);
+}
+
+.variant-bar-spacer {
+  flex: 1;
+}
+
+.variant-chip {
+  flex: none;
+  white-space: nowrap;
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+}
+
+.variant-chip-overlay {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.variant-chip-step {
+  background: #fdf1e0;
+  color: #b45309;
+}
+
+.variant-back {
+  flex: none;
+  white-space: nowrap;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.variant-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  width: 262px;
+  padding: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.variant-pop h4 {
+  margin: 0;
+  padding: 6px 8px 4px;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.variant-pop-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 0.78rem;
+}
+
+.variant-pop-row:hover {
+  background: var(--color-surface-hover);
+}
+
+.variant-pop-row.current {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.variant-pop-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variant-pop-current {
+  margin-left: auto;
+  font-size: 0.65rem;
+  font-weight: 400;
+}
+
+.variant-pop-itself {
+  margin-top: 4px;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 6px 6px;
+  color: var(--color-accent);
+}
+
+/* Variant tree map beside the screen. */
+#variant-map {
+  flex: none;
+  width: 260px;
+  padding: var(--space-2xl) var(--space-2xl) var(--space-2xl) 0;
+  overflow: auto;
+  background: var(--color-canvas);
+}
+
+.variant-card,
+.variant-map-card {
+  padding: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.variant-card h3,
+.variant-map-card h3 {
+  margin: 0 0 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.map-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - var(--indent, 0px));
+  margin-left: var(--indent, 0px);
+  padding: 4px 6px;
+  border-radius: 5px;
+  text-align: left;
+  font-size: 0.75rem;
+}
+
+.map-node:hover {
+  background: var(--color-surface-hover);
+}
+
+.map-node.dim {
+  color: var(--color-text-faint);
+}
+
+.map-node.on {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.map-node-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-node-note {
+  margin-left: auto;
+  font-size: 0.62rem;
+  color: var(--color-text-faint);
+}
+
+/* Inspector cards (Elements tab, above the element list). */
+#variant-inspector {
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.variant-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: 3px 0;
+}
+
+.variant-kv b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.variant-link {
+  display: block;
+  width: 100%;
+  padding: 3px 0;
+  text-align: left;
+  color: var(--color-accent);
+  font-size: 0.75rem;
+}
+
+.variant-home-note {
+  margin: 4px 0 0;
+  font-size: 0.68rem;
+  color: var(--color-text-faint);
 }

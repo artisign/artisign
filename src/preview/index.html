@@ -137,6 +137,9 @@
         </aside>
         <main id="main">
           <div id="screens-view" class="main-view">
+            <!-- CHR-732: variant breadcrumb — filled and shown by variants.js only for a variant or a screen that has variants. -->
+            <nav id="variant-bar" aria-label="Variant path" hidden></nav>
+            <div id="screens-stage">
             <div id="canvas">
               <div id="screen-holder">
                 <!--
@@ -177,7 +180,9 @@
                 </div>
               </div>
             </div>
+            <aside id="variant-map" aria-label="Variant tree" hidden></aside>
             <p id="empty-state" hidden>No screens yet.</p>
+            </div>
           </div>
           <div id="mockup-view" class="main-view" hidden></div>
           <div id="design-system-view" class="main-view" hidden></div>
@@ -278,6 +283,7 @@
           </div>
           <div class="side-panel-body">
             <div id="panel-body-elements">
+              <section id="variant-inspector" hidden></section>
               <ul id="inspector-list"></ul>
               <p id="inspector-empty" hidden>No elements.</p>
               <p id="inspector-error" hidden></p>

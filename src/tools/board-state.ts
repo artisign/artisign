@@ -1,14 +1,13 @@
 // CHR-624 / ADR-005 — the Board's shared filter and pinned screens, plus the
 // expanded clusters (CHR-729 / ADR-006): one tool, `set_board_state`, used
 // by both the browser (POST /api/tools/, via ctx.source "human") and MCP
-// agents ("agent"). A call with every field
-// omitted is a pure read — it never touches ctx.viewState.setBoardState, so
-// it never broadcasts.
+// agents ("agent"). A call with every field omitted is a pure read — it
+// never touches ctx.viewState.setBoardState, so it never broadcasts.
 
 import type { Store } from "../store/index.js";
 import { ToolError, type Warning, type ToolHandlerContext, type BoardStatePatch } from "./types.js";
 
-type ScreenListPatch = { op: "add" | "remove" | "set"; screens: string[] } | { op: "clear" };
+type ScreenListPatch = NonNullable<BoardStatePatch["pins"]>;
 
 export type SetBoardStateInput = {
   filter?: string | null;

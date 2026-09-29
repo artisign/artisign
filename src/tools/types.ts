@@ -41,7 +41,7 @@ export type ToolErrorCode = "not_found" | "validation_failed" | "conflict" | "in
 /** The Board's shared filter/pinned-screens state (CHR-624/ADR-005) — daemon memory only, per project. */
 export type BoardState = { filter: string | null; pinned: string[]; expanded: string[] };
 
-/** `filter: undefined` = unchanged, `null` = clear. `pins: undefined` = unchanged. */
+/** `filter: undefined` = unchanged, `null` = clear. `pins` / `expanded`: `undefined` = unchanged. */
 export type BoardStatePatch = {
   filter?: string | null;
   pins?: { op: "add" | "remove" | "set"; screens: string[] } | { op: "clear" };

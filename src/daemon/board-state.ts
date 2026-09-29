@@ -4,12 +4,16 @@
 // touches `Store`: nothing here is written to the project folder or
 // `.artisign/`, and nothing survives a daemon restart or a project close.
 
-export type BoardState = { filter: string | null; pinned: string[] };
+export type BoardState = { filter: string | null; pinned: string[]; expanded: string[] };
 
 export type PinsPatch = { op: "add" | "remove" | "set"; screens: string[] } | { op: "clear" };
 
-/** `filter: undefined` = unchanged, `null` = clear. `pins: undefined` = unchanged. */
-export type BoardStatePatch = { filter?: string | null; pins?: PinsPatch };
+/**
+ * `filter: undefined` = unchanged, `null` = clear. `pins` / `expanded`:
+ * `undefined` = unchanged. `expanded` (CHR-729/ADR-006) is the list of
+ * expanded board clusters — same patch shape as `pins`.
+ */
+export type BoardStatePatch = { filter?: string | null; pins?: PinsPatch; expanded?: PinsPatch };
 
 export type BoardStateStore = {
   get(): BoardState;
@@ -26,7 +30,7 @@ export type BoardStateStore = {
    * one.
    */
   set(patch: BoardStatePatch): { state: BoardState; changed: boolean };
-  /** Drops `name` from `pinned` if present — the delete_entity hook. */
+  /** Drops `name` from `pinned` and `expanded` if present — the delete_entity hook. */
   pruneScreen(name: string): { state: BoardState; changed: boolean };
 };
 
@@ -49,9 +53,10 @@ function applyPins(current: string[], patch: PinsPatch): string[] {
 export function createBoardStateStore(): BoardStateStore {
   let filter: string | null = null;
   let pinned: string[] = [];
+  let expanded: string[] = [];
 
   function snapshot(): BoardState {
-    return { filter, pinned: [...pinned] };
+    return { filter, pinned: [...pinned], expanded: [...expanded] };
   }
 
   function get(): BoardState {
@@ -71,12 +76,20 @@ export function createBoardStateStore(): BoardStateStore {
         changed = true;
       }
     }
+    if (patch.expanded) {
+      const next = applyPins(expanded, patch.expanded);
+      if (!arraysEqual(expanded, next)) {
+        expanded = next;
+        changed = true;
+      }
+    }
     return { state: snapshot(), changed };
   }
 
   function pruneScreen(name: string): { state: BoardState; changed: boolean } {
-    if (!pinned.includes(name)) return { state: snapshot(), changed: false };
+    if (!pinned.includes(name) && !expanded.includes(name)) return { state: snapshot(), changed: false };
     pinned = pinned.filter((n) => n !== name);
+    expanded = expanded.filter((n) => n !== name);
     return { state: snapshot(), changed: true };
   }
 

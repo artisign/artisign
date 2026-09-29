@@ -239,6 +239,10 @@ Click routes are data, not annotations. Wire navigation with
 edit edges later with `set_flow`. A screen nobody can reach, or a CTA that goes
 nowhere, is an unfinished design.
 
+To present work on the Board, `set_board_state` filters and pins screens and
+takes `expanded` to open variant clusters (name the main screen or any of its
+variants).
+
 ## Comments
 
 The human reviews in the browser and comments on nodes. Each design session:

@@ -184,6 +184,7 @@ describe("deriveActivityEvent", () => {
       expect(deriveActivityEvent("set_board_state", {}, true, {}).kind).toBe("read");
       expect(deriveActivityEvent("set_board_state", { filter: null }, true, {}).kind).toBe("write");
       expect(deriveActivityEvent("set_board_state", { pins: { op: "clear" } }, true, {}).kind).toBe("write");
+      expect(deriveActivityEvent("set_board_state", { expanded: { op: "clear" } }, true, {}).kind).toBe("write");
     });
 
     it("delete_entity targets the deleted entity, no nodes", () => {

@@ -153,7 +153,7 @@ describe("CHR-624 board_state SSE + routes", () => {
   it("GET /api/board-state returns the default state for a project nothing has touched yet", async () => {
     const res = await fetch(`http://127.0.0.1:${daemon.port}/api/board-state?project=${encodeURIComponent(dirA)}`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ filter: null, pinned: [] });
+    expect(await res.json()).toEqual({ filter: null, pinned: [], expanded: [] });
   });
 
   it("POST /api/tools/set_board_state (browser) sets the filter and broadcasts board_state with source:human", async () => {
@@ -164,10 +164,10 @@ describe("CHR-624 board_state SSE + routes", () => {
       expect(json).toMatchObject({ filter: "checkout", shown_screens: ["checkout"] });
 
       const evt = await waitForSseEvent(reader, (e) => e.type === "board_state", 2000, carry);
-      expect(evt).toEqual({ type: "board_state", filter: "checkout", pinned: [], source: "human" });
+      expect(evt).toEqual({ type: "board_state", filter: "checkout", pinned: [], expanded: [], source: "human" });
 
       const mirrored = await fetch(`http://127.0.0.1:${daemon.port}/api/board-state?project=${encodeURIComponent(dirA)}`);
-      expect(await mirrored.json()).toEqual({ filter: "checkout", pinned: [] });
+      expect(await mirrored.json()).toEqual({ filter: "checkout", pinned: [], expanded: [] });
     } finally {
       await reader.cancel().catch(() => {});
     }
@@ -182,7 +182,7 @@ describe("CHR-624 board_state SSE + routes", () => {
       expect(body.pinned).toEqual(["home"]);
 
       const evt = await waitForSseEvent(reader, (e) => e.type === "board_state", 2000, carry);
-      expect(evt).toEqual({ type: "board_state", filter: null, pinned: ["home"], source: "agent" });
+      expect(evt).toEqual({ type: "board_state", filter: null, pinned: ["home"], expanded: [], source: "agent" });
     } finally {
       await reader.cancel().catch(() => {});
     }
@@ -224,6 +224,40 @@ describe("CHR-624 board_state SSE + routes", () => {
     expect(json.warnings).toEqual([{ kind: "unknown_ref", message: 'screen "ghost" was not found' }]);
   });
 
+  it("CHR-729: expanded over /mcp broadcasts source:agent, over POST /api/tools source:human, and GET /api/board-state returns it", async () => {
+    const { reader, carry } = await connectSse(daemon.port, dirA);
+    try {
+      const callResult = await mcpCall(daemon.port, dirA, toolCallBody("set_board_state", { expanded: { op: "add", screens: ["home"] } }));
+      expect(callResult.status).toBe(200);
+      const agentEvt = await waitForSseEvent(reader, (e) => e.type === "board_state", 2000, carry);
+      expect(agentEvt).toEqual({ type: "board_state", filter: null, pinned: [], expanded: ["home"], source: "agent" });
+
+      const { status, json } = await postToolsApi(daemon.port, "set_board_state", { expanded: { op: "add", screens: ["checkout"] } });
+      expect(status).toBe(200);
+      expect(json.expanded).toEqual(["home", "checkout"]);
+      const humanEvt = await waitForSseEvent(reader, (e) => e.type === "board_state" && e.source === "human", 2000, carry);
+      expect(humanEvt).toEqual({ type: "board_state", filter: null, pinned: [], expanded: ["home", "checkout"], source: "human" });
+
+      const mirrored = await fetch(`http://127.0.0.1:${daemon.port}/api/board-state?project=${encodeURIComponent(dirA)}`);
+      expect(await mirrored.json()).toEqual({ filter: null, pinned: [], expanded: ["home", "checkout"] });
+    } finally {
+      await reader.cancel().catch(() => {});
+    }
+  });
+
+  it("CHR-729: deleting an expanded screen prunes it from expanded and broadcasts", async () => {
+    await postToolsApi(daemon.port, "set_board_state", { expanded: { op: "add", screens: ["home", "checkout"] } });
+    const { reader, carry } = await connectSse(daemon.port, dirA);
+    try {
+      const callResult = await mcpCall(daemon.port, dirA, toolCallBody("delete_entity", { kind: "screen", name: "home" }));
+      expect(callResult.status).toBe(200);
+      const evt = await waitForSseEvent(reader, (e) => e.type === "board_state", 2000, carry);
+      expect(evt).toEqual({ type: "board_state", filter: null, pinned: [], expanded: ["checkout"], source: "agent" });
+    } finally {
+      await reader.cancel().catch(() => {});
+    }
+  });
+
   it("deleting a pinned screen prunes it and broadcasts the resulting board_state", async () => {
     await postToolsApi(daemon.port, "set_board_state", { pins: { op: "add", screens: ["home", "checkout"] } });
     const { reader, carry } = await connectSse(daemon.port, dirA);
@@ -232,10 +266,10 @@ describe("CHR-624 board_state SSE + routes", () => {
       expect(callResult.status).toBe(200);
 
       const evt = await waitForSseEvent(reader, (e) => e.type === "board_state", 2000, carry);
-      expect(evt).toEqual({ type: "board_state", filter: null, pinned: ["checkout"], source: "agent" });
+      expect(evt).toEqual({ type: "board_state", filter: null, pinned: ["checkout"], expanded: [], source: "agent" });
 
       const mirrored = await fetch(`http://127.0.0.1:${daemon.port}/api/board-state?project=${encodeURIComponent(dirA)}`);
-      expect(await mirrored.json()).toEqual({ filter: null, pinned: ["checkout"] });
+      expect(await mirrored.json()).toEqual({ filter: null, pinned: ["checkout"], expanded: [] });
     } finally {
       await reader.cancel().catch(() => {});
     }
@@ -249,7 +283,7 @@ describe("CHR-624 board_state SSE + routes", () => {
 
       const evt1 = await waitForSseEvent(client1.reader, (e) => e.type === "board_state", 2000, client1.carry);
       const evt2 = await waitForSseEvent(client2.reader, (e) => e.type === "board_state", 2000, client2.carry);
-      expect(evt1).toEqual({ type: "board_state", filter: "checkout", pinned: [], source: "human" });
+      expect(evt1).toEqual({ type: "board_state", filter: "checkout", pinned: [], expanded: [], source: "human" });
       expect(evt2).toEqual(evt1);
     } finally {
       await client1.reader.cancel().catch(() => {});
@@ -264,9 +298,9 @@ describe("CHR-624 board_state SSE + routes", () => {
       await postToolsApi(daemon.port, "set_board_state", { filter: "checkout" });
 
       const resA = await fetch(`http://127.0.0.1:${daemon.port}/api/board-state?project=${encodeURIComponent(dirA)}`);
-      expect(await resA.json()).toEqual({ filter: "checkout", pinned: [] });
+      expect(await resA.json()).toEqual({ filter: "checkout", pinned: [], expanded: [] });
       const resB = await fetch(`http://127.0.0.1:${daemon.port}/api/board-state?project=${encodeURIComponent(dirB)}`);
-      expect(await resB.json()).toEqual({ filter: null, pinned: [] });
+      expect(await resB.json()).toEqual({ filter: null, pinned: [], expanded: [] });
 
       // B's own /events connection stays silent — proves the broadcast never
       // crossed projects, not just that B's on-disk state is untouched.
@@ -299,12 +333,12 @@ describe("CHR-624 board_state SSE + routes", () => {
   it("after a daemon restart, a project's board state is empty again", async () => {
     await postToolsApi(daemon.port, "set_board_state", { filter: "checkout", pins: { op: "add", screens: ["home"] } });
     const before = await fetch(`http://127.0.0.1:${daemon.port}/api/board-state?project=${encodeURIComponent(dirA)}`);
-    expect(await before.json()).toEqual({ filter: "checkout", pinned: ["home"] });
+    expect(await before.json()).toEqual({ filter: "checkout", pinned: ["home"], expanded: [] });
 
     await daemon.stop();
     daemon = await startDaemon({ port: 0, projects: [dirA, dirB] });
 
     const after = await fetch(`http://127.0.0.1:${daemon.port}/api/board-state?project=${encodeURIComponent(dirA)}`);
-    expect(await after.json()).toEqual({ filter: null, pinned: [] });
+    expect(await after.json()).toEqual({ filter: null, pinned: [], expanded: [] });
   });
 });

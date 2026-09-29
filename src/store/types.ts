@@ -10,7 +10,10 @@ export type FlowRecord = {
   to_kind?: "screen" | "node";
 };
 
-export type ScreenMeta = { notes: string; tags: string[] };
+export type VariantKind = "state" | "overlay" | "step";
+
+/** `variant_of`/`variant_kind` (ADR-006) are both present or both absent; old sidecars carry neither. */
+export type ScreenMeta = { notes: string; tags: string[]; variant_of?: string; variant_kind?: VariantKind };
 
 /** A field object, not a bare string, so a later field (e.g. a title) is additive without a breaking shape change. */
 export type TagMeta = { notes: string };

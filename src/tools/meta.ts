@@ -1,4 +1,4 @@
-import type { Store, DesignDecision, MockupMeta } from "../store/index.js";
+import type { Store, DesignDecision, MockupMeta, ScreenMeta, VariantKind } from "../store/index.js";
 import { ToolError, commitFields } from "./types.js";
 import { readMockupMetaOrDefault } from "./mockups.js";
 import { assertValidTagName } from "./name-validation.js";
@@ -28,7 +28,58 @@ export type SetMetaInput = {
   idea?: string;
   decisions?: SetMetaDecisionInput[];
   usage?: string;
+  /** Screen target only. `null` clears the parent (and with it `variant_kind`). */
+  variant_of?: string | null;
+  variant_kind?: string;
 };
+
+const VARIANT_KINDS: readonly string[] = ["state", "overlay", "step"];
+
+/**
+ * Resolves the variant fields a screen ends up with (ADR-006), or throws
+ * before anything is written. Merge semantics like notes/tags: an omitted
+ * field keeps its stored value; `variant_of: null` clears both.
+ */
+async function resolveVariantMeta(store: Store, screen: string, current: ScreenMeta, input: SetMetaInput): Promise<Pick<ScreenMeta, "variant_of" | "variant_kind">> {
+  if (input.variant_kind !== undefined && !VARIANT_KINDS.includes(input.variant_kind)) {
+    throw new ToolError("validation_failed", `variant_kind must be one of state, overlay, step, got "${input.variant_kind}"`);
+  }
+  const parent = input.variant_of === undefined ? current.variant_of : (input.variant_of ?? undefined);
+  const kind = input.variant_of === null ? undefined : ((input.variant_kind as VariantKind | undefined) ?? current.variant_kind);
+
+  if (parent === undefined) {
+    if (input.variant_kind !== undefined) {
+      throw new ToolError("validation_failed", "variant_kind requires variant_of: this screen has no parent");
+    }
+    return {};
+  }
+  if (kind === undefined) {
+    throw new ToolError("validation_failed", "variant_of requires variant_kind (state, overlay or step)");
+  }
+  // Any variant write re-validates the parent, including a kind-only change
+  // on a screen whose stored parent has since been deleted.
+  if (input.variant_of !== undefined || input.variant_kind !== undefined) {
+    if (parent === screen) {
+      throw new ToolError("validation_failed", `screen "${screen}" cannot be a variant of itself`);
+    }
+    const names = await store.listScreens();
+    if (!names.includes(parent)) {
+      throw new ToolError("not_found", `parent screen "${parent}" was not found`);
+    }
+    // Walk up from the new parent: reaching this screen means it is a
+    // descendant of itself once re-parented. `seen` guards a hand-edited loop.
+    const parents = new Map<string, string | undefined>();
+    await Promise.all(names.map(async (name) => parents.set(name, (await store.readScreenMeta(name)).variant_of)));
+    const seen = new Set<string>();
+    for (let up: string | undefined = parent; up !== undefined && !seen.has(up); up = parents.get(up)) {
+      if (up === screen) {
+        throw new ToolError("validation_failed", `variant_of "${parent}" would create a cycle: it is already a descendant of "${screen}"`);
+      }
+      seen.add(up);
+    }
+  }
+  return { variant_of: parent, variant_kind: kind };
+}
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -61,12 +112,16 @@ function describeTarget(target: SetMetaTarget): string {
 export async function setMeta(store: Store, input: SetMetaInput): Promise<Record<string, unknown>> {
   const target = input.target;
 
+  if (target.kind !== "screen" && (input.variant_of !== undefined || input.variant_kind !== undefined)) {
+    throw new ToolError("validation_failed", "variant_of/variant_kind only apply to screen targets");
+  }
+
   if (target.kind === "screen") {
     if (input.idea !== undefined || input.decisions !== undefined || input.usage !== undefined || input.title !== undefined || input.description !== undefined) {
       throw new ToolError("validation_failed", "idea/decisions/usage/title/description only apply to design_system/component/pattern/mockup targets, not screen");
     }
-    if (input.notes === undefined && input.tags === undefined) {
-      throw new ToolError("validation_failed", "at least one of notes/tags is required for target kind \"screen\"");
+    if (input.notes === undefined && input.tags === undefined && input.variant_of === undefined && input.variant_kind === undefined) {
+      throw new ToolError("validation_failed", "at least one of notes/tags/variant_of/variant_kind is required for target kind \"screen\"");
     }
     if (!(await store.listScreens()).includes(target.screen)) {
       throw new ToolError("not_found", `screen "${target.screen}" was not found`);
@@ -78,7 +133,8 @@ export async function setMeta(store: Store, input: SetMetaInput): Promise<Record
     for (const tag of input.tags ?? []) assertValidTagName(tag);
 
     const current = await store.readScreenMeta(target.screen);
-    const meta = { notes: input.notes ?? current.notes, tags: input.tags ?? current.tags };
+    const variant = await resolveVariantMeta(store, target.screen, current, input);
+    const meta: ScreenMeta = { notes: input.notes ?? current.notes, tags: input.tags ?? current.tags, ...variant };
     await store.writeScreenMeta(target.screen, meta);
     const commitResult = await store.commit(`set_meta: ${describeTarget(target)}`);
     return { target, meta, ...commitFields(commitResult) };

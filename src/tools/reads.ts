@@ -26,6 +26,7 @@ import { parseNodeRef, formatNodeRef } from "./node-ref.js";
 import { readAllFlows, readScreenFlows, toPublicFlowRecord } from "./flows.js";
 import { readCommentRecords, readCommentRecordsWithStats, groupThreads, threadStatus, toPublicComment, type CommentRecord } from "./comments.js";
 import { selectFields } from "./fields.js";
+import { variantLinks, variantFields } from "./variants.js";
 import { isValidTagName } from "./name-validation.js";
 import { ToolError, type View, type Predicate, type PublicComment } from "./types.js";
 
@@ -218,17 +219,20 @@ export async function getProject(store: Store, input: GetProjectInput): Promise<
   }
 
   const registry = await loadRegistry(store);
+  const screenMetas = await Promise.all(screenNames.map((name) => store.readScreenMeta(name)));
+  const links = variantLinks(screenNames, screenMetas);
   let screens = await Promise.all(
-    screenNames.map(async (name) => {
+    screenNames.map(async (name, i) => {
       const html = await store.readScreen(name);
       const { doc } = parseScreen(html, name, registry);
-      const meta = await store.readScreenMeta(name);
+      const meta = screenMetas[i]!;
       return {
         screen: name,
         path: `screens/${name}.html`,
         node_count: Object.keys(doc.nodes).length,
         open_comment_count: openCommentCountByScreen.get(name) ?? 0,
         tags: meta.tags,
+        ...variantFields(links.get(name)),
       };
     }),
   );
@@ -285,7 +289,7 @@ const SCREEN_ALWAYS = ["screen", "path", "node_count", "ref_count", "flow_count"
 // request is expanded to also ask for "tag_notes" at the call boundary below
 // — a wart, kept rather than hidden, per the acceptance criterion that
 // fields:["notes"] alone still surfaces a tagged screen's spec.
-const SCREEN_OPTIONAL = ["nodes", "html_aug", "refs", "flows", "comments", "notes", "tag_notes", "rendered_html"];
+const SCREEN_OPTIONAL = ["nodes", "html_aug", "refs", "flows", "comments", "notes", "tag_notes", "rendered_html", "variants", "reached_from"];
 
 export async function getScreen(store: Store, input: GetScreenInput): Promise<Record<string, unknown>> {
   if (input.output_format === "jsx") {
@@ -342,6 +346,32 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
   };
   const tagNotes = await readTagNotes(store, meta.tags);
   if (tagNotes.length > 0) full.tag_notes = tagNotes;
+  // Derived from the other screens' sidecars and the flow graph, both
+  // omitted when empty like tag_notes so a plain screen's shape is unchanged.
+  // Only computed when the response can carry them — it reads every sidecar
+  // and flows.json.
+  const wantVariants = !input.fields || input.fields.includes("variants");
+  const wantReachedFrom = !input.fields || input.fields.includes("reached_from");
+  if (wantVariants) {
+    const allNames = await store.listScreens();
+    const allMetas = await Promise.all(allNames.map((name) => store.readScreenMeta(name)));
+    const variants = [...variantLinks(allNames, allMetas)]
+      .filter(([, link]) => link.of === input.screen)
+      .map(([name, link]) => ({ name, variant_kind: link.kind }))
+      .sort((a, b) => (a.name < b.name ? -1 : 1));
+    if (variants.length > 0) full.variants = variants;
+  }
+  if (wantReachedFrom) {
+    // Flow sources only (ADR-006 decision 3): the parent is listed when it
+    // has a flow edge into this screen, like any other source.
+    const reachedFrom = new Set<string>();
+    for (const flow of await readAllFlows(store)) {
+      const source = flow.from.split(".")[0]!;
+      const target = (flow.to_kind ?? "screen") === "node" ? flow.to.split(".")[0] : flow.to;
+      if (target === input.screen && source !== input.screen) reachedFrom.add(source);
+    }
+    if (reachedFrom.size > 0) full.reached_from = [...reachedFrom].sort();
+  }
   if (input.fields?.includes("comments")) {
     full.comments = commentsForScreen(commentRecords, input.screen, true);
   }

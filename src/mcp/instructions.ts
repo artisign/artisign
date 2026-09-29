@@ -47,7 +47,7 @@ REVIEW LOOP: after every write_html / patch_html, call get_screenshot
 {screen} and check the image before the next edit — red outlines mark an
 unresolved token, component, or variant ref.
 
-METADATA: set_meta writes notes/tags (target: {kind:"screen", screen}),
+METADATA: set_meta writes notes/tags/variant_of (target: {kind:"screen", screen}),
 tags/title/description (target: {kind:"mockup", mockup}), idea/decisions
 (target: {kind:"design_system"}), usage guidance on a component/pattern
 (target: {kind:"component"|"pattern", name}, field: usage), or a tag's own

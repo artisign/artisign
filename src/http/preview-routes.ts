@@ -6,6 +6,7 @@ import type { BoardStateStore } from "../daemon/board-state.js";
 import { getDesignSystem } from "../tools/reads.js";
 import { buildRenderContext, renderScreenDocument, renderMockupDocument, resolveFontFaceCss } from "../tools/render-context.js";
 import { readMockupMetaOrDefault } from "../tools/mockups.js";
+import { variantLinks, variantFields } from "../tools/variants.js";
 import { readAllFlows, toPublicFlowRecord } from "../tools/flows.js";
 import {
   parseScreen,
@@ -62,12 +63,9 @@ export async function handlePreviewRoutes(req: IncomingMessage, res: ServerRespo
 
   if (url.pathname === "/api/screens") {
     const names = await store.listScreens();
-    const screens = await Promise.all(
-      names.map(async (name) => {
-        const meta = await store.readScreenMeta(name);
-        return { name, tags: meta.tags, notes: meta.notes };
-      }),
-    );
+    const metas = await Promise.all(names.map((name) => store.readScreenMeta(name)));
+    const links = variantLinks(names, metas);
+    const screens = names.map((name, i) => ({ name, tags: metas[i]!.tags, notes: metas[i]!.notes, ...variantFields(links.get(name)) }));
     sendJson(res, 200, { screens });
     return true;
   }

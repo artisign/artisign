@@ -1,0 +1,90 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#1a1a1a;background:#fff;width:1440px}
+.app{width:1440px;height:900px;display:flex;flex-direction:column;overflow:hidden}
+.tb{height:48px;flex:none;display:flex;align-items:center;gap:16px;padding:0 16px;border-bottom:1px solid #e2e2e2;font-size:13.6px}
+.logo{font-weight:600;font-size:15px}.proj{border:1px solid #d6d6d6;border-radius:6px;padding:5px 12px;font-weight:600}
+.tab{padding:5px 10px;border-radius:6px;color:#555}.tab.on{background:#eef1ff;color:#2a3edb;font-weight:600}
+.btn{border:1px solid #d6d6d6;border-radius:6px;padding:6px 12px}.dot{width:8px;height:8px;border-radius:50%;background:#16a34a}
+.body{flex:1;display:flex;min-height:0}
+.side{width:280px;flex:none;background:#fff;display:flex;flex-direction:column;min-height:0}.side.l{border-right:1px solid #e2e2e2}.side.rt{border-left:1px solid #e2e2e2}
+.sbh{padding:10px 8px;border-bottom:1px solid #e2e2e2;display:flex;font-size:12.8px;font-weight:600;color:#333}.sbh span{margin-left:auto;color:#888}
+.fw{margin:12px 8px;display:flex;align-items:center;gap:8px;height:32px;border:1px solid #d6d6d6;border-radius:6px;background:#fafafa;padding:0 10px;font-size:12.8px;color:#999}
+.mg{width:11px;height:11px;border:1.5px solid #888;border-radius:50%}
+.list{padding:0 8px;overflow:hidden}
+.r{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:6px;font-size:13.6px;color:#333;margin-bottom:2px;white-space:nowrap}
+.r.sel{background:#eef1ff;color:#2a3edb;font-weight:600}.tri{width:10px;flex:none;font-size:9px;color:#999}
+.ch{margin-left:15px;padding-left:10px;border-left:2px solid #e2e2e2;border-radius:0 6px 6px 0;font-size:12.8px}
+.ic{display:inline-block;width:9px;height:13px;border:1.5px solid;border-radius:2px;position:relative;flex:none;color:#666}
+.ic.ov{color:#2a3edb}.ic.st::after{content:"";position:absolute;left:1px;right:1px;top:2px;height:1.5px;background:currentColor;box-shadow:0 3px 0 currentColor}.ic.ov::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:currentColor}
+.cb{width:13px;height:13px;border-radius:3px;border:1.5px solid #bbb;background:#fff;flex:none;color:#fff;font-size:9px;line-height:10px;text-align:center}.cb.on{background:#2a3edb;border-color:#2a3edb}.cb.lock{background:#888;border-color:#888}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;background:#e5e5e5;position:relative}
+.bc{flex:none;height:46px;background:#fff;border-bottom:1px solid #e2e2e2;display:flex;align-items:center;gap:6px;padding:0 16px;font-size:12.8px}
+.cr{display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:6px;color:#333;border:1px solid transparent}.cr.open{background:#f0f0f0;border-color:#d6d6d6}.cr small{font-size:9px;color:#888}.sep{color:#bbb;font-size:14px}
+.seg{display:flex;border:1px solid #d6d6d6;border-radius:6px;overflow:hidden;font-size:12.5px}.seg span{padding:5px 11px}.seg .on{background:#eef1ff;color:#2a3edb;font-weight:600}
+.bar{flex:none;background:#fff;border-bottom:1px solid #e2e2e2;padding:8px 16px;display:flex;align-items:center;gap:8px;font-size:12px;color:#555;white-space:nowrap}
+.ch2{display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:99px;background:#f0f0f0;color:#333;font-size:12px}.ch2.b{background:#eef1ff;color:#2a3edb}.ch2 x{color:#999}
+.chk{display:flex;align-items:center;gap:5px}
+.pop{position:absolute;left:16px;top:100px;width:290px;background:#fff;border:1px solid #d6d6d6;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;z-index:5;font-size:12.5px}
+.pop h4{font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:#888;padding:6px 8px 4px}.pop .r{font-size:12.5px;margin:0}.pop .z{margin-left:auto;color:#888;font-size:10.5px}.pop hr{border:0;border-top:1px solid #e2e2e2;margin:4px 0}
+.canvas{flex:1;display:flex;justify-content:center;gap:30px;padding:14px 20px 0;min-height:0;overflow:hidden}
+.col{width:230px;display:flex;flex-direction:column;gap:8px}
+.lab{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600}.lab small{font-weight:400;color:#777;font-size:10.5px}
+.mp{display:block;position:relative;width:230px;height:520px;border:1px solid #d6d6d6;border-radius:10px;background:#fff;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.14);font-size:11px;font-style:normal}
+.mp b.h{display:block;height:40px;padding:13px 12px;border-bottom:1px solid #e2e2e2;font-size:12px;font-weight:600}
+.mp b.c{display:block;position:relative;height:46px;margin:8px 10px;background:#fafafa;border:1px solid #e2e2e2;border-radius:6px;padding:8px 10px;color:#777;font-weight:400;line-height:1.5}
+.mp b.d{background:#fdf1e0;outline:2px dashed #d97706;outline-offset:1px;color:#8a4b00}
+.mp b.g{background:transparent;outline:2px dashed #d97706;outline-offset:1px;border-style:dashed;border-color:transparent;color:#d97706}
+.mp b.tabs{position:absolute;bottom:0;left:0;right:0;height:42px;margin:0;border:0;border-top:1px solid #e2e2e2;border-radius:0;background:#fff}
+.tagd{position:absolute;top:-8px;right:6px;font-size:9.5px;background:#d97706;color:#fff;padding:1px 6px;border-radius:99px;font-style:normal}
+.card{background:#fff;border:1px solid #e2e2e2;border-radius:10px;padding:12px}.card h3{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#888;margin-bottom:6px}
+.ins{padding:12px}.kv{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;color:#555}.kv b{color:#1a1a1a;font-weight:600}
+.df{font-family:monospace;font-size:11.5px;padding:5px 12px;border-bottom:1px solid #e2e2e2;color:#333;display:flex;gap:6px}.df b{color:#d97706;width:10px}.df i{margin-left:auto;font-style:normal;color:#999;font-family:system-ui}
+.lay{display:flex;gap:10px;align-items:flex-end;margin-top:6px}.lay div{text-align:center;font-size:10.5px;color:#666}.lay i{display:flex;gap:2px;height:44px;align-items:flex-end;margin-bottom:3px;justify-content:center}.lay u{display:block;background:#d6d6d6;border-radius:2px;height:100%}
+</style></head><body><div class="app">
+<div class="tb"><span class="logo">Artisign</span><span class="proj">Lückenzeit ▾</span><span class="tab on">Screens</span><span class="tab">Design System</span><span class="tab">Board</span><span style="flex:1"></span><span class="btn">Flow mode</span><span class="btn">Comment mode</span><span class="dot"></span></div>
+<div class="body">
+<div class="side l"><div class="sbh">Screens<span>◂</span></div><div class="fw"><i class="mg"></i>Search screens, mockups and tags…</div>
+<div class="list">
+<div class="r"><span class="tri">▸</span>dashboard</div>
+<div class="r sel"><span class="tri" style="color:#2a3edb">▾</span><i class="cb lock">✓</i>family-l2</div>
+<div class="r ch"><i class="cb on">✓</i><i class="ic st"></i>family-l2-two-parents</div>
+<div class="r ch"><i class="cb on">✓</i><i class="ic st"></i>family-l2-two-parents-solo</div>
+<div class="r ch"><i class="cb"></i><i class="ic ov"></i>family-l2-sheet-add-parent</div>
+<div class="r ch"><i class="cb"></i><i class="ic ov"></i>family-l2-sheet-name</div>
+<div class="r ch"><i class="cb"></i><i class="ic ov"></i>family-l2-sheet-leave</div>
+<div class="r"><span class="tri">▸</span>parent-l3</div>
+<div style="font-size:11px;color:#888;padding:10px 8px;line-height:1.5">Checkboxes appear on a variant family only while Compare is on. Base is the locked reference.</div>
+</div></div>
+
+<div class="main">
+<div class="bc"><span class="cr"><span style="font-size:11px">⌂</span>family-l2 <small>▾</small></span><span class="sep">›</span><span class="cr open"><i class="ic st" style="width:7px;height:10px"></i>family-l2-two-parents <small>▾</small></span>
+<span style="margin-left:auto" class="seg"><span>Single</span><span class="on">Compare · 3</span></span></div>
+<div class="bar"><b style="color:#1a1a1a;font-size:13px">Compare</b>
+<span class="ch2 b"><i class="cb lock" style="width:11px;height:11px;line-height:8px">✓</i>⌂ family-l2 · reference</span><span class="ch2"><i class="ic st" style="width:6px;height:9px"></i>two-parents <x>✕</x></span><span class="ch2"><i class="ic st" style="width:6px;height:9px"></i>two-parents-solo <x>✕</x></span><span class="ch2" style="background:#fff;border:1px dashed #bbb;color:#888">+ add</span>
+<span style="margin-left:auto" class="chk"><i class="cb on">✓</i>Diff</span><span class="seg"><span class="on">Fit</span><span>100%</span><span>150%</span></span></div>
+
+<div class="pop"><h4>Inside family-l2 · compare from here</h4>
+<div class="r"><i class="cb lock">✓</i>family-l2<span class="z">reference</span></div>
+<div class="r sel"><i class="cb on">✓</i><i class="ic st"></i>two-parents<span class="z">open</span></div>
+<div class="r"><i class="cb on">✓</i><i class="ic st"></i>two-parents-solo</div><hr>
+<div class="r"><i class="cb"></i><i class="ic ov"></i>sheet-add-parent</div>
+<div class="r"><i class="cb"></i><i class="ic ov"></i>sheet-leave</div><hr>
+<div class="r" style="color:#2a3edb">Compare all state variants · 3</div></div>
+
+<div class="canvas">
+<div class="col"><div class="lab">⌂ family-l2 <small>reference</small></div>
+<i class="mp"><b class="h">Familie</b><b class="c">Lena · Elternteil</b><b class="c">Tom · Kind</b><b class="c">Mia · Kind</b><b class="tabs"></b></i></div>
+<div class="col"><div class="lab"><i class="ic st"></i>two-parents <small>2 diffs</small></div>
+<i class="mp"><b class="h">Familie</b><b class="c">Lena · Elternteil</b><b class="c d">Jonas · Elternteil<em class="tagd">+ added</em></b><b class="c">Tom · Kind</b><b class="c">Mia · Kind</b><b class="tabs"></b></i></div>
+<div class="col"><div class="lab"><i class="ic st"></i>two-parents-solo <small>3 diffs</small></div>
+<i class="mp"><b class="h">Familie</b><b class="c d" style="height:30px;padding:6px 10px">Alleinerziehend: Lena<em class="tagd">+ added</em></b><b class="c">Lena · Elternteil</b><b class="c d">Jonas · Elternteil · Gast<em class="tagd">~ changed</em></b><b class="c">Tom · Kind</b><b class="c g">Mia · Kind<em class="tagd">− removed</em></b><b class="tabs"></b></i></div>
+</div></div>
+
+<div class="side rt"><div class="sbh">Compare<span>▸</span></div>
+<div class="ins"><div class="card"><h3>vs. reference family-l2</h3><div class="kv">two-parents<b>2 nodes</b></div><div class="kv">two-parents-solo<b>3 nodes</b></div></div></div>
+<div class="df"><b>+</b>card-parent-2<i>two-parents</i></div><div class="df"><b>+</b>banner-solo<i>solo</i></div><div class="df"><b>~</b>card-parent-2 · text<i>solo</i></div><div class="df"><b>−</b>card-child-2<i>solo</i></div>
+<div class="ins"><div class="card" style="font-size:12px;line-height:1.5;color:#333"><h3>Layout by count</h3>Columns are equal width, scaled to fit; zoom is shared.
+<div class="lay"><div><i><u style="width:34px"></u><u style="width:34px"></u></i>2 · ~100%</div><div><i><u style="width:22px"></u><u style="width:22px"></u><u style="width:22px"></u></i>3 · ~60%</div><div><i><u style="width:16px"></u><u style="width:16px"></u><u style="width:16px"></u><u style="width:16px"></u></i>4 · ~45%</div></div>
+<div style="margin-top:8px">Click a row: node lights up in every column. Flow mode leaves compare.</div></div></div>
+</div></div></div></body></html>

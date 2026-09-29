@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Store } from "../store/index.js";
+import type { Store, FlowRecord } from "../store/index.js";
 import { FsStore } from "../store/index.js";
 import { initProject } from "../init/init-project.js";
 import { CONFIG_FILENAME } from "../init/artisign-config.js";
@@ -18,6 +18,7 @@ import { loadScreen } from "./context.js";
 import { loadAllDocuments } from "./definitions.js";
 import { parseNodeRef, formatNodeRef, requireScreenNodeRef } from "./node-ref.js";
 import { syncScreenFlows, belongsToScreen } from "./flows.js";
+import { readVariantLinks } from "./variants.js";
 import { nodeToSubtree, convertToComponentInstance, subtreesStructurallyEqual } from "./node-convert.js";
 import { deleteMockupEntity } from "./mockups.js";
 import { slotStylingWarnings } from "./definition-checks.js";
@@ -523,7 +524,7 @@ export async function promoteToSystem(store: Store, input: PromoteToSystemInput)
 // L4 delete_entity
 // ---------------------------------------------------------------------------
 
-export type DeleteEntityInput = { kind: "screen" | "component" | "pattern" | "mockup"; name: string; variant?: string };
+export type DeleteEntityInput = { kind: "screen" | "component" | "pattern" | "mockup"; name: string; variant?: string; cascade?: boolean };
 
 async function deleteComponent(store: Store, name: string): Promise<Record<string, unknown>> {
   const path = `design-system/components/${name}.html`;
@@ -580,37 +581,77 @@ async function deletePattern(store: Store, name: string): Promise<Record<string,
   return { kind: "pattern", name, path, ...commitFields(commitResult), warnings: [] };
 }
 
-async function deleteScreenEntity(store: Store, name: string, ctx?: ToolHandlerContext): Promise<Record<string, unknown>> {
+/** `name` plus every screen below it at any depth, root first. `seen` keeps a hand-edited cycle in a sidecar from looping. */
+function variantSubtree(name: string, links: Map<string, { of: string }>): string[] {
+  const seen = new Set([name]);
+  const order = [name];
+  for (let i = 0; i < order.length; i++) {
+    for (const [child, link] of links) {
+      if (link.of === order[i] && !seen.has(child)) {
+        seen.add(child);
+        order.push(child);
+      }
+    }
+  }
+  return order;
+}
+
+async function deleteScreenEntity(store: Store, name: string, cascade: boolean, ctx?: ToolHandlerContext): Promise<Record<string, unknown>> {
   const path = `screens/${name}.html`;
   if (!(await store.listScreens()).includes(name)) {
     throw new ToolError("not_found", `screen "${name}" was not found`);
   }
 
+  const subtree = variantSubtree(name, await readVariantLinks(store));
+  const descendants = subtree.slice(1);
+  if (descendants.length > 0 && !cascade) {
+    const examples = descendants.slice(0, 5).join(", ");
+    const more = descendants.length > 5 ? `, +${descendants.length - 5} more` : "";
+    throw new ToolError(
+      "has_variants",
+      `screen "${name}" has ${descendants.length} variant screen(s) in its subtree (${examples}${more}) — delete them first or pass cascade: true to delete the whole subtree`,
+    );
+  }
+
   const allFlows = await store.readFlows();
-  const outgoing = allFlows.filter((r) => belongsToScreen(r, name));
-  const incoming = allFlows.filter((r) => !belongsToScreen(r, name) && (r.to === name || r.to.startsWith(`${name}.`)));
-  const remaining = allFlows.filter((r) => !belongsToScreen(r, name));
-  await store.writeFlows(remaining);
+  const inSubtree = (r: FlowRecord) => subtree.some((s) => belongsToScreen(r, s));
+  const targetsSubtree = (r: { to: string }) => subtree.some((s) => r.to === s || r.to.startsWith(`${s}.`));
+  const outgoing = allFlows.filter(inSubtree);
+  const incoming = allFlows.filter((r) => !inSubtree(r) && targetsSubtree(r));
+  await store.writeFlows(allFlows.filter((r) => !inSubtree(r)));
 
   const warnings: Warning[] = incoming.map((r) => ({
     kind: "dangling_flow",
     target: r.from,
-    message: `flow from "${r.from}" still targets deleted screen "${name}"`,
+    message: `flow from "${r.from}" still targets deleted screen "${r.to.split(".")[0]}"`,
   }));
 
-  await store.deleteScreen(name);
-  const commitResult = await store.commit(`delete_entity: screen:${name}`);
+  for (const screen of subtree) await store.deleteScreen(screen);
+  const commitResult = await store.commit(
+    descendants.length > 0 ? `delete_entity: screen:${name} (+${descendants.length} variants)` : `delete_entity: screen:${name}`,
+  );
 
   // CHR-624: a deleted screen leaves no stale pin on the Board — a no-op
   // when ctx/viewState is absent (stdio has no board state to prune).
-  ctx?.viewState?.pruneScreen(name);
+  for (const screen of subtree) ctx?.viewState?.pruneScreen(screen);
 
-  return { kind: "screen", name, path, ...commitFields(commitResult), warnings, removed_flow_count: outgoing.length };
+  return {
+    kind: "screen",
+    name,
+    path,
+    ...commitFields(commitResult),
+    warnings,
+    removed_flow_count: outgoing.length,
+    ...(descendants.length > 0 ? { deleted_screens: subtree } : {}),
+  };
 }
 
 export async function deleteEntity(store: Store, input: DeleteEntityInput, ctx?: ToolHandlerContext): Promise<Record<string, unknown>> {
+  if (input.cascade !== undefined && input.kind !== "screen") {
+    throw new ToolError("validation_failed", "cascade only applies to kind \"screen\"");
+  }
   if (input.kind === "component") return deleteComponent(store, input.name);
   if (input.kind === "pattern") return deletePattern(store, input.name);
   if (input.kind === "mockup") return deleteMockupEntity(store, input.name, input.variant);
-  return deleteScreenEntity(store, input.name, ctx);
+  return deleteScreenEntity(store, input.name, input.cascade === true, ctx);
 }

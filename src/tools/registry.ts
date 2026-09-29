@@ -430,8 +430,11 @@ export const TOOLS: ToolDefinition[] = [
     "delete_entity",
     "Delete a screen, component, pattern, or mockup (whole mockup, or one variant via variant). Screens also " +
       "drop their outgoing flow edges and meta sidecar (comments are kept as history). A component still " +
-      "referenced by any screen, component, or pattern is refused with the referencing nodes listed.",
-    { kind: z.enum(["screen", "component", "pattern", "mockup"]), name: z.string(), variant: z.string().optional() },
+      "referenced by any screen, component, or pattern is refused with the referencing nodes listed. A screen with " +
+      "variant screens below it is refused with has_variants (subtree size and example names) unless " +
+      "cascade: true, which deletes the whole variant subtree in one commit and returns deleted_screens; " +
+      "cascade is screen-only.",
+    { kind: z.enum(["screen", "component", "pattern", "mockup"]), name: z.string(), variant: z.string().optional(), cascade: z.boolean().optional() },
     // ctx threaded through the way init_project's is — deleteEntity uses
     // ctx.viewState.pruneScreen(name) to drop a deleted screen from the
     // Board's pinned set (CHR-624), a no-op when ctx/viewState is absent.

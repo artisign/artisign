@@ -151,6 +151,8 @@ export function flattenTree(tree, { expanded = new Set(), filter = "" } = {}) {
       depth: node.depth,
       state: matches.has(node) ? "match" : visible.has(node) ? "context" : "plain",
       expanded: open,
+      // Held open by the filter: a match lies below, so the toggle can't close it.
+      forcedOpen: open && pathNodes.has(node),
     });
     if (!open) return;
     // A node on a match's path folds its non-matching children even when the
@@ -325,11 +327,16 @@ export function renderScreenList(
       toggle.setAttribute("aria-expanded", String(row.expanded));
       toggle.setAttribute("aria-label", `${row.expanded ? "Collapse" : "Expand"} ${screen.name}`);
       toggle.textContent = row.expanded ? "▾" : "▸";
+      // Disabled while the filter holds the row open — a click would change
+      // the saved expand state without any visible effect.
+      if (row.forcedOpen) toggle.disabled = true;
       toggle.addEventListener("click", (evt) => {
         evt.stopPropagation();
         onToggleExpand?.(screen.name);
       });
-      li.appendChild(toggle);
+      // Before the select button in DOM order so Tab follows the visual
+      // order (the toggle is positioned at the row's left edge).
+      li.insertBefore(toggle, button);
     }
 
     if (onTogglePin) {
@@ -367,5 +374,5 @@ export function renderScreenList(
 
 /**
  * @typedef {{ screen: object, name: string, parent: TreeNode | null, children: TreeNode[], depth: number, total: number }} TreeNode
- * @typedef {{ type: "screen", node: TreeNode, depth: number, state: "plain" | "match" | "context", expanded: boolean } | { type: "hidden", depth: number, count: number }} SidebarRow
+ * @typedef {{ type: "screen", node: TreeNode, depth: number, state: "plain" | "match" | "context", expanded: boolean, forcedOpen: boolean } | { type: "hidden", depth: number, count: number }} SidebarRow
  */

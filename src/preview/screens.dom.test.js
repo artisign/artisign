@@ -215,6 +215,18 @@ describe("renderScreenList — variant tree", () => {
     expect(withSibling.querySelector(".screen-hidden-row")).toBeNull();
   });
 
+  it("while filtering: the toggle of a row held open by a match below is disabled", () => {
+    const listEl = render({}, { filter: "error" });
+    expect(listEl.querySelector('[data-screen="family"] .screen-item-toggle').disabled).toBe(true);
+    expect(render().querySelector('[data-screen="family"] .screen-item-toggle').disabled).toBe(false);
+  });
+
+  it("puts the disclosure toggle before the select button in DOM (tab) order", () => {
+    const li = render().querySelector('[data-screen="family"]');
+    const controls = [...li.children].filter((el) => el.tagName === "BUTTON").map((el) => el.className.split(" ")[0]);
+    expect(controls.indexOf("screen-item-toggle")).toBeLessThan(controls.indexOf("screen-item"));
+  });
+
   it("while filtering: a matching tag chip is promoted and highlighted", () => {
     const listEl = render({}, { filter: "d" });
     const chips = [...listEl.querySelectorAll('[data-screen="family"] .tag-chip')];

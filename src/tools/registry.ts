@@ -95,13 +95,13 @@ export const TOOLS: ToolDefinition[] = [
   // Reads ---------------------------------------------------------------
   tool(
     "get_project",
-    "Project root: screen list, design-system pointer, counts. Tiered, cold-start read. fields: [\"reuse\"] adds design-system reuse coverage (component/token, project-wide and per screen) plus unused components/tokens and the lowest-reuse screens.",
+    "Project root: screen list, design-system pointer, counts. Tiered, cold-start read. view \"tree\" marks a variant screen with variant_of/variant_kind. fields: [\"reuse\"] adds design-system reuse coverage (component/token, project-wide and per screen) plus unused components/tokens and the lowest-reuse screens.",
     { view: viewSchema.optional(), fields: z.array(z.string()).optional(), tags: z.array(z.string()).optional() },
     (store, input) => getProject(store, input),
   ),
   tool(
     "get_screen",
-    "One screen with comment/flow indicators. Tiered + field selection. fields: [\"rendered_html\"] at view \"full\" returns the resolved (component/token) render as a standalone HTML document — an MCP-only fallback for reading resolved output without Playwright; never included by default.",
+    "One screen with comment/flow indicators. Tiered + field selection. view \"full\" adds variants (direct child screens with their variant_kind) and reached_from (screens with a flow into this one), each only when non-empty. fields: [\"rendered_html\"] at view \"full\" returns the resolved (component/token) render as a standalone HTML document — an MCP-only fallback for reading resolved output without Playwright; never included by default.",
     {
       screen: z.string(),
       view: viewSchema.optional(),
@@ -272,7 +272,9 @@ export const TOOLS: ToolDefinition[] = [
       "design_system, usage for a component/pattern target, notes for a tag target ({kind:\"tag\", tag}) — a " +
       "spec that spans several screens, set once instead of duplicated into every tagged screen's own notes; no " +
       "screen has to carry the tag yet. tags and decisions replace the full list, not just add to it — read the " +
-      "current value first if you need to append.",
+      "current value first if you need to append. A screen target can also declare itself a variant of another " +
+      "screen: variant_of (parent screen name, null clears) plus variant_kind (state | overlay | step, required " +
+      "with variant_of). Rejected: missing parent, self, cycle.",
     {
       target: metaTargetSchema,
       notes: z.string().optional(),
@@ -282,6 +284,8 @@ export const TOOLS: ToolDefinition[] = [
       idea: z.string().optional(),
       decisions: z.array(setMetaDecisionSchema).optional(),
       usage: z.string().optional(),
+      variant_of: z.string().nullable().optional(),
+      variant_kind: z.enum(["state", "overlay", "step"]).optional(),
     },
     (store, input) => setMeta(store, input as never),
   ),

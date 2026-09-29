@@ -1,0 +1,66 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#1a1a1a;background:#fff;width:1440px}
+.app{width:1440px;height:900px;display:flex;flex-direction:column;overflow:hidden}
+.tb{height:48px;flex:none;display:flex;align-items:center;gap:16px;padding:0 16px;border-bottom:1px solid #e2e2e2;font-size:13.6px}
+.logo{font-weight:600;font-size:15px}.proj{border:1px solid #d6d6d6;border-radius:6px;padding:5px 12px;font-weight:600}
+.tab{padding:5px 10px;border-radius:6px;color:#555}.tab.on{background:#eef1ff;color:#2a3edb;font-weight:600}
+.btn{border:1px solid #d6d6d6;border-radius:6px;padding:6px 12px}.dot{width:8px;height:8px;border-radius:50%;background:#16a34a}
+.body{flex:1;display:flex;min-height:0}
+.rail{width:48px;flex:none;border-right:1px solid #e2e2e2;display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:12px;color:#888;font-size:12px}
+.rail i{display:block;width:28px;height:28px;border-radius:6px;background:#f0f0f0}.rail i.on{background:#eef1ff}
+.ic{display:inline-block;width:9px;height:13px;border:1.5px solid;border-radius:2px;position:relative;flex:none;color:#2a3edb}.ic.ov::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:currentColor}
+.gl{color:#d97706;font-weight:700;font-size:12px}
+.cb{width:13px;height:13px;border-radius:3px;border:1.5px solid #bbb;background:#2a3edb;border-color:#2a3edb;flex:none;color:#fff;font-size:9px;line-height:10px;text-align:center;display:inline-block}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;background:#e5e5e5;position:relative}
+.bc{flex:none;height:46px;background:#fff;border-bottom:1px solid #e2e2e2;display:flex;align-items:center;gap:6px;padding:0 16px;font-size:12.8px}
+.cr{display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:6px;color:#333}.cr small{font-size:9px;color:#888}.sep{color:#bbb;font-size:14px}
+.seg{display:flex;border:1px solid #d6d6d6;border-radius:6px;overflow:hidden;font-size:12.5px}.seg span{padding:5px 11px}.seg .on{background:#eef1ff;color:#2a3edb;font-weight:600}
+.bar{flex:none;background:#fff;border-bottom:1px solid #e2e2e2;padding:8px 16px;display:flex;align-items:center;gap:8px;font-size:12px;color:#555;white-space:nowrap}
+.ch2{display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:99px;background:#f0f0f0;color:#333;font-size:12px}.ch2.b{background:#eef1ff;color:#2a3edb}.ch2 x{color:#999}
+.chk{display:flex;align-items:center;gap:5px}
+.canvas{flex:1;display:flex;justify-content:center;gap:22px;padding:12px 24px 0;min-height:0;overflow:hidden}
+.col{width:300px;display:flex;flex-direction:column;gap:6px}
+.lab{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;white-space:nowrap}.lab small{font-weight:400;color:#777;font-size:10.5px}
+.mp{display:block;position:relative;width:300px;height:600px;border:1px solid #d6d6d6;border-radius:12px;background:#fff;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.14);font-size:11.5px;font-style:normal}
+.gh{font-style:normal;position:absolute;inset:0;opacity:.25}
+.mp b.h{display:block;height:44px;padding:15px 14px;border-bottom:1px solid #e2e2e2;font-size:12px;font-weight:600}
+.mp b.c{display:block;height:50px;margin:9px 12px;background:#fafafa;border:1px solid #e2e2e2;border-radius:6px;padding:10px 10px;color:#777;font-weight:400}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.38)}
+.sh{font-style:normal;position:absolute;left:0;right:0;bottom:0;top:250px;background:#fff;border-radius:16px 16px 0 0;padding:10px 18px;color:#333}
+.sh em{font-style:normal;display:block;width:36px;height:4px;border-radius:2px;background:#d6d6d6;margin:0 auto 14px}
+.sh strong{display:block;font-size:14px;margin-bottom:6px;padding:1px 3px;margin-left:-3px}.sh span{display:block;color:#777;line-height:1.5;margin-bottom:14px;padding:1px 3px;margin-left:-3px}
+.sh i.bt{display:block;position:relative;font-style:normal;text-align:center;border-radius:6px;padding:10px;margin-bottom:8px;border:1px solid #d6d6d6}
+.sh i.bt.p{background:#c0392b;border-color:#c0392b;color:#fff}
+.w{background:#fdf1e0;color:#8a4b00!important;border-radius:3px;box-shadow:0 0 0 2px #fdf1e0}
+.o{outline:2px dashed #d97706;outline-offset:2px}
+.g{outline:2px dashed #d97706;outline-offset:2px;background:transparent!important;border-color:transparent!important;color:#d97706!important}
+.lens{position:absolute;left:800px;top:640px;width:250px;height:120px;border-radius:12px;border:2px solid #2a3edb;background:#fff;box-shadow:0 12px 32px rgba(0,0,0,.28);overflow:hidden;font-size:18px;padding:12px 16px;z-index:5}
+.lens strong{display:block;font-size:22px;margin-bottom:6px}.lens .lb{position:absolute;left:8px;top:-1px;font-size:9.5px;background:#2a3edb;color:#fff;padding:1px 6px;border-radius:0 0 6px 6px}
+.sum{flex:none;height:64px;background:#fff;border-top:1px solid #e2e2e2;display:flex;align-items:center;gap:22px;padding:0 24px;font-size:12px;color:#555;white-space:nowrap}
+.sum b{color:#1a1a1a}.sum code{font-family:monospace;background:#f0f0f0;border-radius:4px;padding:1px 5px;color:#333}.sum s{text-decoration:none;color:#d97706;font-weight:700}
+</style></head><body><div class="app">
+<div class="tb"><span class="logo">Artisign</span><span class="proj">Lückenzeit ▾</span><span class="tab on">Screens</span><span class="tab">Design System</span><span class="tab">Board</span><span style="flex:1"></span><span class="btn">Flow mode</span><span class="btn">Comment mode</span><span class="dot"></span></div>
+<div class="body">
+<div class="rail"><span>▸</span><i class="on"></i><i></i><i></i></div>
+<div class="main">
+<div class="bc"><span class="cr">⌂ family-l2 <small>▾</small></span><span class="sep">›</span><span class="cr"><i class="ic ov" style="width:7px;height:10px"></i>family-l2-sheet-leave <small>▾</small></span>
+<span style="margin-left:14px;font-size:12px;color:#2a3edb;border:1px solid #2a3edb;border-radius:6px;padding:4px 10px">⇔ Compare siblings · 4</span>
+<span style="margin-left:auto" class="seg"><span>Single</span><span class="on">Compare · 4</span></span></div>
+<div class="bar"><b style="color:#1a1a1a;font-size:13px">Compare</b>
+<span class="ch2 b"><i class="ic ov" style="width:6px;height:9px"></i>sheet-leave · reference</span><span class="ch2"><span class="gl">↪</span>leave-confirm <x>✕</x></span><span class="ch2"><span class="gl">↪</span>leave-dissolve <x>✕</x></span><span class="ch2"><span class="gl">↪</span>leave-no-transfer <x>✕</x></span>
+<span style="margin-left:auto" class="chk"><i class="cb">✓</i>Diff</span><span class="chk"><i class="cb">✓</i>Ghost base</span><span class="chk"><i class="cb">✓</i>Lens (Z)</span><span class="seg"><span class="on">Fit</span><span>100%</span><span>150%</span></span></div>
+
+<div class="canvas">
+<div class="col"><div class="lab"><i class="ic ov" style="width:6px;height:9px"></i>sheet-leave <small>reference</small></div>
+<i class="mp"><i class="gh"><b class="h">Familie</b><b class="c">Lena · Elternteil</b><b class="c">Tom · Kind</b></i><i class="scrim"></i><i class="sh"><em></em><strong>Familie verlassen?</strong><span>Du verlierst den Zugriff auf alle geteilten Termine.</span><i class="bt p">Verlassen</i><i class="bt">Abbrechen</i></i></i></div>
+<div class="col"><div class="lab"><span class="gl">↪</span>leave-confirm <small>3 diffs</small></div>
+<i class="mp"><i class="gh"><b class="h">Familie</b><b class="c">Lena · Elternteil</b><b class="c">Tom · Kind</b></i><i class="scrim"></i><i class="sh"><em></em><strong class="w o">Wirklich verlassen?<em style="all:unset;position:absolute;top:0;right:18px;font-size:9.5px;background:#d97706;color:#fff;padding:1px 6px;border-radius:99px">~ text</em></strong><span class="w">Die Familie wird für dich gelöscht. Das kann nicht rückgängig gemacht werden.</span><i class="bt p o">Ja, verlassen</i><i class="bt">Zurück</i></i></i></div>
+<div class="col"><div class="lab"><span class="gl">↪</span>leave-dissolve <small>4 diffs</small></div>
+<i class="mp"><i class="gh"><b class="h">Familie</b><b class="c">Lena · Elternteil</b><b class="c">Tom · Kind</b></i><i class="scrim"></i><i class="sh"><em></em><strong class="w o">Familie auflösen?</strong><span class="w">Du bist die letzte Person. Die Familie wird gelöscht.</span><i class="bt p o">Auflösen</i><i class="bt">Abbrechen</i></i></i></div>
+<div class="col"><div class="lab"><span class="gl">↪</span>leave-no-transfer <small>4 diffs</small></div>
+<i class="mp"><i class="gh"><b class="h">Familie</b><b class="c">Lena · Elternteil</b><b class="c">Tom · Kind</b></i><i class="scrim"></i><i class="sh"><em></em><strong class="w o">Erst Leitung übergeben</strong><span class="w">Bestimme jemand anderes als Elternteil.</span><i class="bt o" style="border-style:solid">Leitung wählen<em style="all:unset;position:absolute;top:-9px;right:6px;font-size:9.5px;background:#d97706;color:#fff;padding:1px 6px;border-radius:99px">~ button</em></i><i class="bt g">Verlassen<em style="all:unset;position:absolute;top:-9px;right:6px;font-size:9.5px;background:#d97706;color:#fff;padding:1px 6px;border-radius:99px">− removed</em></i></i></i></div>
+</div>
+<div class="lens"><span class="lb">200% lens · leave-dissolve</span><strong style="margin-top:8px">Familie auflösen?</strong>Du bist die letzte Person. Die Familie wird gelöscht.</div>
+<div class="sum"><span><b>Diff scope:</b> sheet subtree only · base ghosted, not diffed</span><span><s>~</s> <code>sheet-title</code> in 3 of 3</span><span><s>~</s> <code>btn-confirm</code> in leave-no-transfer</span><span><s>−</s> <code>btn-leave</code> in leave-no-transfer</span><span style="margin-left:auto">click a chip: lights up in all columns</span></div>
+</div></div></div></body></html>

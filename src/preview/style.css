@@ -655,7 +655,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   font-size: 0.75rem;
   line-height: 1;
   font-weight: 700;
-  color: #d97706;
+  color: var(--color-warning);
 }
 
 #screen-list li.context .screen-item {
@@ -2884,6 +2884,11 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 .btn-confirm:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.screen-item-toggle:disabled {
+  cursor: default;
+  opacity: 0.4;
 }
 
 /* CHR-732 — variant breadcrumb bar (approved `variants-screen-view` c-breadcrumb-tree). */

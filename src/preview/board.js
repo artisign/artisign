@@ -3,7 +3,7 @@
 // touching the DOM — tiles, iframes, the SVG edge layer — needs real
 // layout that even jsdom doesn't compute.
 
-import { filterScreens } from "./screens.js";
+import { filterScreens, buildScreenTree } from "./screens.js";
 
 export const DEFAULT_COLUMNS = 4;
 // The board's own 100%-zoom reference gap/padding (CHR-623). Tiles are laid
@@ -304,7 +304,7 @@ export function clampZoom(value, min = MIN_BOARD_ZOOM, max = MAX_BOARD_ZOOM) {
  */
 function idealFitScale(screens, sizes, viewportWidth, viewportHeight, options = {}) {
   if (screens.length === 0 || viewportWidth <= 0 || viewportHeight <= 0) return 0;
-  const { contentWidth, contentHeight } = computeBoardLayout(screens, sizes, { ...options, scale: 1 });
+  const { contentWidth, contentHeight } = computeLayout(screens, sizes, { ...options, scale: 1 });
   if (contentWidth <= 0 || contentHeight <= 0) return 0;
   return Math.min(viewportWidth / contentWidth, viewportHeight / contentHeight);
 }
@@ -545,6 +545,343 @@ export function computeZoomAroundCursor({
     left: clamp(contentX * newScale - cursorX, 0, maxLeft),
     top: clamp(contentY * newScale - cursorY, 0, maxTop),
   };
+}
+
+// --- CHR-733: variant clusters ------------------------------------------
+//
+// Layout items are either a plain screen (a string, or `{ type: "tile" }`)
+// or a `{ type: "cluster" }` from buildBoardModel. A board of only plain
+// screens is laid out by computeBoardLayout exactly as before; anything with
+// a cluster goes through computeClusterLayout. `computeLayout` picks, so
+// Fit all / column search work on either without knowing which.
+
+/** Expanded clusters draw their tiles at this fraction of native size (the approved `c-clusters` design shrinks them ~60% so a subtree fits)... */
+export const CLUSTER_TILE_SCALE = 0.6;
+/** ...or smaller, when the fullest depth level of a cluster would otherwise stack taller than this many board px (a level with 8 tiles is ~4000px at 0.6). */
+export const MAX_LEVEL_HEIGHT = 1800;
+const MIN_CLUSTER_TILE_SCALE = 0.2;
+/** Tiles per depth level of an expanded cluster before the rest fold into a "+N more" tile. */
+export const MAX_TILES_PER_DEPTH = 8;
+const FRAME_PAD = 24;
+const FRAME_HEADER = 40;
+const FRAME_MIN_WIDTH = 220;
+const THUMB_ROW = 36;
+const DEPTH_GAP = 56;
+const TILE_GAP = 28;
+const MORE_HEIGHT = 56;
+const MAX_THUMBS = 8;
+
+function allNodes(node) {
+  return [node, ...node.children.flatMap(allNodes)];
+}
+
+/**
+ * Turns the visible screen set into the board's layout items.
+ *
+ * Visibility stays per screen (`visibleNames`, from computeBoardVisibility):
+ * a cluster exists as soon as ANY of its members is shown; members that are
+ * not shown are left out, and the ancestors of shown members are kept as
+ * `context` (dimmed) so a shown variant is never orphaned. A main screen
+ * without variants stays a plain tile. A cluster is expanded when ANY member
+ * of its subtree is named in `expandedNames` — the daemon stores the names as
+ * given (a main screen or any variant), so an entry naming a variant expands
+ * that variant's cluster.
+ *
+ * `clusters: false` returns the flat board: `visibleNames` as plain tiles in
+ * the given order, `expandedNames` ignored.
+ *
+ * @param {{ name: string, tags?: string[], variant_of?: string, variant_kind?: string }[]} screens every screen of the project
+ * @param {string[]} visibleNames
+ * @param {string[]} [expandedNames]
+ * @param {{ clusters?: boolean }} [options]
+ * @returns {{ items: object[], tileNames: string[], contextNames: Set<string>, clusters: object[] }}
+ */
+export function buildBoardModel(screens, visibleNames, expandedNames = [], { clusters = true } = {}) {
+  if (!clusters) {
+    return { items: visibleNames.map((screen) => ({ type: "tile", screen })), tileNames: [...visibleNames], contextNames: new Set(), clusters: [] };
+  }
+  const tree = buildScreenTree(screens);
+  const visible = new Set(visibleNames);
+  const expandedSet = new Set(expandedNames);
+  const items = [];
+  const tileNames = [];
+  const contextNames = new Set();
+  const clusterItems = [];
+
+  for (const root of tree.roots) {
+    const all = allNodes(root);
+    const shown = all.filter((n) => visible.has(n.name));
+    if (shown.length === 0) continue;
+    if (root.children.length === 0) {
+      items.push({ type: "tile", screen: root.name });
+      tileNames.push(root.name);
+      continue;
+    }
+    const shownSet = new Set(shown);
+    const displayedSet = new Set();
+    for (const n of shown) for (let p = n; p; p = p.parent) displayedSet.add(p);
+    const displayed = all.filter((n) => displayedSet.has(n));
+    const members = displayed.map((n) => ({
+      screen: n.name,
+      parent: n.parent?.name ?? null,
+      depth: n.depth,
+      kind: n.screen.variant_kind ?? null,
+      context: !shownSet.has(n),
+    }));
+    for (const m of members) if (m.context) contextNames.add(m.screen);
+    const expanded = all.some((n) => expandedSet.has(n.name));
+    const cluster = {
+      type: "cluster",
+      root: root.name,
+      size: root.total,
+      depth: 1 + Math.max(...all.map((n) => n.depth)),
+      expanded,
+      memberNames: all.map((n) => n.name),
+      members,
+      levels: [],
+    };
+    if (expanded) {
+      const byDepth = new Map();
+      for (const m of members) byDepth.set(m.depth, [...(byDepth.get(m.depth) ?? []), m]);
+      for (const [depth, list] of [...byDepth].sort((a, b) => a[0] - b[0])) {
+        cluster.levels.push({ depth, tiles: list.slice(0, MAX_TILES_PER_DEPTH), hidden: list.slice(MAX_TILES_PER_DEPTH) });
+      }
+      for (const level of cluster.levels) for (const m of level.tiles) tileNames.push(m.screen);
+    } else {
+      tileNames.push(root.name);
+    }
+    items.push(cluster);
+    clusterItems.push(cluster);
+  }
+  return { items, tileNames, contextNames, clusters: clusterItems };
+}
+
+/**
+ * The `set_board_state` `expanded` patch for a header click (CHR-733 CTO
+ * decision): an expanded cluster collapses by removing EVERY member
+ * currently listed in `expandedNames` (the daemon stores them un-normalised,
+ * so more than one can be there); a collapsed one expands by adding its main
+ * screen.
+ * @param {{ root: string, expanded: boolean, memberNames: string[] }} cluster
+ * @param {string[]} expandedNames
+ * @returns {{ op: "add" | "remove", screens: string[] }}
+ */
+export function clusterToggleWrite(cluster, expandedNames) {
+  if (!cluster.expanded) return { op: "add", screens: [cluster.root] };
+  const listed = new Set(expandedNames);
+  return { op: "remove", screens: cluster.memberNames.filter((name) => listed.has(name)) };
+}
+
+function screenSize(sizes, screen) {
+  return sizes[screen] ?? FALLBACK_SIZE;
+}
+
+function layoutTile(screen, x, y, sizes, scale) {
+  const natural = screenSize(sizes, screen);
+  return { screen, x, y, width: natural.width * scale, height: natural.height * scale, naturalWidth: natural.width, naturalHeight: natural.height };
+}
+
+function collapsedBlock(cluster, sizes) {
+  const main = screenSize(sizes, cluster.root);
+  const width = Math.max(FRAME_MIN_WIDTH, main.width + FRAME_PAD * 2);
+  const others = cluster.members.filter((m) => m.parent !== null);
+  const height = FRAME_HEADER + main.height + (others.length > 0 ? 12 + THUMB_ROW : 0) + FRAME_PAD;
+  return {
+    width,
+    height,
+    emit(x, y, out) {
+      out.frames.push({
+        root: cluster.root,
+        expanded: false,
+        size: cluster.size,
+        depth: cluster.depth,
+        x,
+        y,
+        width,
+        height,
+        headerHeight: FRAME_HEADER,
+        members: cluster.members.map((m) => m.screen),
+        thumbs: others.slice(0, MAX_THUMBS).map((m) => ({ screen: m.screen, kind: m.kind, deeper: m.depth >= 2 })),
+        moreThumbs: Math.max(0, others.length - MAX_THUMBS),
+      });
+      out.tiles.push(layoutTile(cluster.root, x + (width - main.width) / 2, y + FRAME_HEADER, sizes, 1));
+    },
+  };
+}
+
+/** The tile scale of one expanded cluster: CLUSTER_TILE_SCALE, shrunk so its fullest level stays within MAX_LEVEL_HEIGHT. */
+export function clusterTileScale(cluster, sizes) {
+  let tallest = 0;
+  for (const level of cluster.levels) {
+    const total = level.tiles.reduce((sum, m) => sum + screenSize(sizes, m.screen).height, 0);
+    tallest = Math.max(tallest, total + (level.hidden.length > 0 ? MORE_HEIGHT : 0) + TILE_GAP * level.tiles.length);
+  }
+  if (tallest <= 0) return CLUSTER_TILE_SCALE;
+  return Math.max(MIN_CLUSTER_TILE_SCALE, Math.min(CLUSTER_TILE_SCALE, MAX_LEVEL_HEIGHT / tallest));
+}
+
+function expandedBlock(cluster, sizes) {
+  const scale = clusterTileScale(cluster, sizes);
+  const columns = cluster.levels.map((level) => {
+    const entries = level.tiles.map((m) => ({ member: m, size: screenSize(sizes, m.screen) }));
+    const tileWidth = Math.max(...entries.map((e) => e.size.width * scale));
+    const moreWidth = level.hidden.length > 0 ? 140 : 0;
+    const width = Math.max(tileWidth, moreWidth);
+    const heights = entries.map((e) => e.size.height * scale);
+    if (level.hidden.length > 0) heights.push(MORE_HEIGHT);
+    const height = heights.reduce((sum, h) => sum + h, 0) + TILE_GAP * Math.max(0, heights.length - 1);
+    return { level, entries, width, height };
+  });
+  const innerWidth = columns.reduce((sum, c) => sum + c.width, 0) + DEPTH_GAP * Math.max(0, columns.length - 1);
+  const innerHeight = Math.max(...columns.map((c) => c.height));
+  const width = Math.max(FRAME_MIN_WIDTH, innerWidth + FRAME_PAD * 2);
+  const height = FRAME_HEADER + FRAME_PAD + innerHeight + FRAME_PAD;
+  return {
+    width,
+    height,
+    emit(x, y, out) {
+      out.frames.push({
+        root: cluster.root,
+        expanded: true,
+        size: cluster.size,
+        depth: cluster.depth,
+        x,
+        y,
+        width,
+        height,
+        headerHeight: FRAME_HEADER,
+        members: cluster.members.map((m) => m.screen),
+        thumbs: [],
+        moreThumbs: 0,
+      });
+      let cx = x + FRAME_PAD + (width - FRAME_PAD * 2 - innerWidth) / 2;
+      const placed = new Map();
+      for (const col of columns) {
+        let cy = y + FRAME_HEADER + FRAME_PAD + (innerHeight - col.height) / 2;
+        for (const { member, size } of col.entries) {
+          const tile = layoutTile(member.screen, cx + (col.width - size.width * scale) / 2, cy, sizes, scale);
+          out.tiles.push(tile);
+          placed.set(member.screen, tile);
+          cy += tile.height + TILE_GAP;
+        }
+        if (col.level.hidden.length > 0) {
+          out.mores.push({
+            id: `${cluster.root}:${col.level.depth}`,
+            root: cluster.root,
+            depth: col.level.depth,
+            names: col.level.hidden.map((m) => m.screen),
+            x: cx + (col.width - 140) / 2,
+            y: cy,
+            width: 140,
+            height: MORE_HEIGHT,
+          });
+        }
+        cx += col.width + DEPTH_GAP;
+      }
+      for (const member of cluster.members) {
+        const child = placed.get(member.screen);
+        const parent = member.parent ? placed.get(member.parent) : null;
+        if (child && parent) out.connectors.push({ from: parent.screen, to: child.screen });
+      }
+    },
+  };
+}
+
+/**
+ * Cluster-aware sibling of computeBoardLayout: plain tiles and cluster
+ * frames are packed into rows of `columns` items exactly like the flat grid
+ * (row height = tallest item). A collapsed cluster is a frame around its main
+ * tile at native size plus a thumbnail strip; an expanded one lays its
+ * subtree out left-to-right by depth at CLUSTER_TILE_SCALE with at most
+ * MAX_TILES_PER_DEPTH tiles per level (the rest become one "+N more" tile).
+ *
+ * @param {(string | { type: "tile", screen: string } | object)[]} items
+ * @param {Record<string, { width: number, height: number }>} sizes
+ * @param {{ columns?: number, gapX?: number, gapY?: number, padding?: number }} [options]
+ * @returns {{
+ *   tiles: ReturnType<typeof computeBoardLayout>["tiles"],
+ *   frames: object[], mores: object[], connectors: { from: string, to: string }[],
+ *   contentWidth: number, contentHeight: number,
+ * }}
+ */
+export function computeClusterLayout(items, sizes, options = {}) {
+  const columns = options.columns ?? DEFAULT_COLUMNS;
+  const gapX = options.gapX ?? BASE_GAP;
+  const gapY = options.gapY ?? BASE_GAP;
+  const padding = options.padding ?? BASE_PADDING;
+  const out = { tiles: [], frames: [], mores: [], connectors: [], contentWidth: padding * 2, contentHeight: padding * 2 };
+
+  const blocks = items.map((item) => {
+    if (typeof item === "string" || item.type === "tile") {
+      const screen = typeof item === "string" ? item : item.screen;
+      const natural = screenSize(sizes, screen);
+      return { width: natural.width, height: natural.height, emit: (x, y, o) => o.tiles.push(layoutTile(screen, x, y, sizes, 1)) };
+    }
+    return item.expanded ? expandedBlock(item, sizes) : collapsedBlock(item, sizes);
+  });
+
+  let y = padding;
+  for (let i = 0; i < blocks.length; i += columns) {
+    let x = padding;
+    let rowHeight = 0;
+    for (const block of blocks.slice(i, i + columns)) {
+      block.emit(x, y, out);
+      x += block.width + gapX;
+      rowHeight = Math.max(rowHeight, block.height);
+    }
+    out.contentWidth = Math.max(out.contentWidth, x - gapX + padding);
+    y += rowHeight + gapY;
+  }
+  out.contentHeight = blocks.length === 0 ? padding * 2 : y - gapY + padding;
+  return out;
+}
+
+/** Picks the flat grid for a board of only plain tiles (byte-for-byte today's layout) and the cluster layout otherwise. */
+export function computeLayout(items, sizes, options) {
+  const isPlain = (item) => typeof item === "string" || item.type === "tile";
+  if (items.every(isPlain)) return computeBoardLayout(items.map((i) => (typeof i === "string" ? i : i.screen)), sizes, options);
+  return computeClusterLayout(items, sizes, options);
+}
+
+/**
+ * Where an edge ending at `screen` lands on a cluster board: its own tile;
+ * else the "+N more" tile its (capped) depth level folded into; else the
+ * frame of its collapsed cluster. `null` when the screen isn't on the board.
+ * @returns {{ kind: "tile" | "more" | "frame", rect: object, screen: string, id: string } | null}
+ */
+export function resolveEdgeEnd(layout, screen) {
+  const tile = findTile(layout.tiles, screen);
+  if (tile) return { kind: "tile", rect: tile, screen, id: screen };
+  const more = layout.mores?.find((m) => m.names.includes(screen));
+  if (more) return { kind: "more", rect: more, screen, id: more.id };
+  const frame = layout.frames?.find((f) => !f.expanded && f.members.includes(screen));
+  if (frame) return { kind: "frame", rect: frame, screen, id: frame.root };
+  return null;
+}
+
+/**
+ * Both ends of a flow edge on a cluster board plus the sides it leaves/enters
+ * by; a docked end (`more` / `frame`) is labelled with the screen it really
+ * touches by the caller. `null` when an end isn't on the board, or when the
+ * edge stays inside one cluster and touches a docked end (both ends live in
+ * the same frame / "+N more" tile, so there is nothing to draw).
+ */
+export function resolveFlowEdge(layout, flow) {
+  const fromScreen = screenIdFromRef(flow.from);
+  const toScreen = screenIdFromRef(flow.to);
+  const from = resolveEdgeEnd(layout, fromScreen);
+  const to = resolveEdgeEnd(layout, toScreen);
+  if (!from || !to) return null;
+  if (from.kind !== "tile" || to.kind !== "tile") {
+    // Nothing to draw when both ends dock on the same rect, or the edge stays
+    // inside one collapsed frame. Inside an expanded cluster, an edge from a
+    // tile to its own "+N more" tile is two different rects and is drawn.
+    if (from.rect === to.rect) return null;
+    const frameOf = (screen) => layout.frames?.find((f) => f.members.includes(screen));
+    const fromFrame = frameOf(fromScreen);
+    if (fromFrame && !fromFrame.expanded && fromFrame === frameOf(toScreen)) return null;
+  }
+  return { from, to, sides: edgeSides(from.rect, to.rect) };
 }
 
 /**

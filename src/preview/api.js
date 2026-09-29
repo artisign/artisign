@@ -248,7 +248,7 @@ export async function postComment(input, project) {
  *   not the one this tab is showing). Always the project THIS tab is
  *   displaying (`activeProjectRoot` in app.js) — same convention as
  *   sse.js's `connectEvents`.
- * @returns {Promise<{ filter: string | null, pinned: string[] }>}
+ * @returns {Promise<{ filter: string | null, pinned: string[], expanded: string[] }>} `expanded` (CHR-729/733): the expanded board clusters, names stored as given (a main screen or any variant)
  */
 export async function fetchBoardState(project) {
   const res = await fetch(`/api/board-state?project=${encodeURIComponent(project)}`);
@@ -265,7 +265,11 @@ export async function fetchBoardState(project) {
  * always re-render from the broadcast, never try to suppress your own echo).
  *
  * @param {string} project see fetchBoardState's own note — required here too.
- * @param {{ filter?: string | null, pins?: { op: "add" | "remove" | "set", screens: string[] } | { op: "clear" } }} patch
+ * @param {{
+ *   filter?: string | null,
+ *   pins?: { op: "add" | "remove" | "set", screens: string[] } | { op: "clear" },
+ *   expanded?: { op: "add" | "remove" | "set", screens: string[] } | { op: "clear" },
+ * }} patch `expanded` (CHR-733) has the same shape as `pins`
  * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
  */
 export async function setBoardState(project, patch) {

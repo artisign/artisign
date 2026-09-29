@@ -21,6 +21,7 @@ import {
   setBoardState,
 } from "./api.js";
 import { renderScreenList, filterScreens, buildScreenTree, ancestorNames } from "./screens.js";
+import { createVariantUI } from "./variants.js";
 import { renderMockupList, filterMockups } from "./mockups.js";
 import { renderTagNotes } from "./notes-panel.js";
 import { renderMockupView } from "./mockup-view.js";
@@ -91,6 +92,22 @@ const notesPanelText = document.getElementById("notes-panel-text");
 const notesPanelTagsEl = document.getElementById("notes-panel-tags");
 const screenFrame = document.getElementById("screen-frame");
 const canvasEl = document.getElementById("canvas");
+// CHR-732 — variant breadcrumb / tree map / inspector cards. onSelect is the sidebar's own human-navigation path (pauses follow).
+let variantLayoutShown = false;
+const variantUI = createVariantUI({
+  barEl: document.getElementById("variant-bar"),
+  mapEl: document.getElementById("variant-map"),
+  inspectorEl: document.getElementById("variant-inspector"),
+  onSelect: (name) => selectScreenHuman(name),
+});
+function refreshVariantUI() {
+  const shown = variantUI.update(screens, screenFlows, currentScreen);
+  // The bar and map take canvas space, so the fit zoom has to be recomputed when they appear or go.
+  if (shown !== variantLayoutShown) {
+    variantLayoutShown = shown;
+    updateCanvas();
+  }
+}
 const screenHolderEl = document.getElementById("screen-holder");
 const statusBarOverlayEl = document.getElementById("status-bar-overlay");
 const emptyState = document.getElementById("empty-state");
@@ -174,6 +191,8 @@ const initProjectDialogEl = document.getElementById("init-project-dialog");
 
 /** @type {{ name: string, tags: string[], notes: string }[]} */
 let screens = [];
+/** @type {{ from: string, event: string, to: string, to_kind: string }[]} every flow edge of the project — the variant UI (CHR-732) reads "also reached from" and flow counts off it; kept fresh by loadScreens and the "flows" SSE event. */
+let screenFlows = [];
 /** @type {{ tag: string, notes: string }[]} — every project tag with its own notes (CHR-596). */
 let tagNotes = [];
 // Which tag specs the reader has opened. Survives a re-render of the panel,
@@ -548,6 +567,7 @@ function resetProjectState() {
   warningCount = 0;
   clearSelection();
   screens = [];
+  screenFlows = [];
   tagNotes = []; // else one project's tag notes leak into the panel of the next
   currentScreen = null;
   // screenFilter/pinnedScreens are deliberately NOT reset here (CHR-624) —
@@ -810,7 +830,10 @@ async function handleChangeEvent(event) {
     // rendered HTML (see flows.js), which a "screen" event above already
     // refreshes. The board draws edges from flows.json separately, so it
     // needs its own refetch here.
-    if (boardBuilt) board.setFlows(await fetchFlows(activeProjectRoot));
+    const nextFlows = await fetchFlows(activeProjectRoot);
+    screenFlows = nextFlows;
+    refreshVariantUI();
+    if (boardBuilt) board.setFlows(nextFlows);
   } else if (event.kind === "tag_meta") {
     // Re-tagging a screen needs nothing extra here — a "screen" event above
     // already refreshes the panel with the (unchanged) tag list; this branch
@@ -1296,6 +1319,7 @@ function refreshSidebar() {
   mockupSectionEl.hidden = filteredMockups.length === 0;
   const filteredScreenCount = filterScreens(screens, screenFilter).length;
   screenFilterHint.textContent = `${filteredScreenCount} screen${filteredScreenCount === 1 ? "" : "s"} · ${filteredMockups.length} mockup${filteredMockups.length === 1 ? "" : "s"} · matches name and tags`;
+  refreshVariantUI();
   updateNotesPanel();
   renderBoardStatus();
   renderActivityFeedPanel(); // CHR-631 — a screen/mockup's deletion can flip a feed row to the inert "deleted" look; recompute alongside everything else refreshSidebar already keeps in sync
@@ -1346,7 +1370,8 @@ notesPanelHeader.addEventListener("click", () => {
 });
 
 async function loadScreens() {
-  screens = await fetchScreens(activeProjectRoot);
+  // A failed flows read only leaves the variant UI without "also reached from".
+  [screens, screenFlows] = await Promise.all([fetchScreens(activeProjectRoot), fetchFlows(activeProjectRoot).catch(() => [])]);
   refreshSidebar();
   emptyState.hidden = screens.length > 0;
   screenFrame.hidden = screens.length === 0;

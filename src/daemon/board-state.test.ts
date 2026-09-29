@@ -4,13 +4,13 @@ import { createBoardStateStore } from "./board-state.js";
 describe("BoardStateStore", () => {
   it("starts at {filter: null, pinned: []}", () => {
     const store = createBoardStateStore();
-    expect(store.get()).toEqual({ filter: null, pinned: [] });
+    expect(store.get()).toEqual({ filter: null, pinned: [], expanded: [] });
   });
 
   it("sets the filter, reports changed:true", () => {
     const store = createBoardStateStore();
     const { state, changed } = store.set({ filter: "checkout" });
-    expect(state).toEqual({ filter: "checkout", pinned: [] });
+    expect(state).toEqual({ filter: "checkout", pinned: [], expanded: [] });
     expect(changed).toBe(true);
   });
 
@@ -72,7 +72,7 @@ describe("BoardStateStore", () => {
   it("a filter and a pins patch in the same call both apply", () => {
     const store = createBoardStateStore();
     const { state } = store.set({ filter: "cart", pins: { op: "add", screens: ["home"] } });
-    expect(state).toEqual({ filter: "cart", pinned: ["home"] });
+    expect(state).toEqual({ filter: "cart", pinned: ["home"], expanded: [] });
   });
 
   it("pruneScreen drops a pinned screen and reports changed:true", () => {
@@ -97,5 +97,42 @@ describe("BoardStateStore", () => {
     const snapshot = store.get();
     snapshot.pinned.push("checkout");
     expect(store.get().pinned).toEqual(["home"]);
+  });
+  describe("expanded (CHR-729)", () => {
+    it("add, remove, set and clear, each reporting changed:true", () => {
+      const store = createBoardStateStore();
+      expect(store.set({ expanded: { op: "add", screens: ["home", "checkout"] } })).toMatchObject({ state: { expanded: ["home", "checkout"] }, changed: true });
+      expect(store.set({ expanded: { op: "remove", screens: ["home"] } })).toMatchObject({ state: { expanded: ["checkout"] }, changed: true });
+      expect(store.set({ expanded: { op: "set", screens: ["cart"] } })).toMatchObject({ state: { expanded: ["cart"] }, changed: true });
+      expect(store.set({ expanded: { op: "clear" } })).toMatchObject({ state: { expanded: [] }, changed: true });
+    });
+
+    it("dedupes, and a patch that doesn't move the list is changed:false", () => {
+      const store = createBoardStateStore();
+      store.set({ expanded: { op: "add", screens: ["home", "home"] } });
+      expect(store.get().expanded).toEqual(["home"]);
+      expect(store.set({ expanded: { op: "add", screens: ["home"] } }).changed).toBe(false);
+      expect(store.set({ expanded: { op: "set", screens: ["home", "home"] } }).changed).toBe(false);
+    });
+
+    it("is independent of pinned", () => {
+      const store = createBoardStateStore();
+      store.set({ pins: { op: "add", screens: ["home"] }, expanded: { op: "add", screens: ["checkout"] } });
+      expect(store.get()).toEqual({ filter: null, pinned: ["home"], expanded: ["checkout"] });
+    });
+
+    it("pruneScreen drops an expanded screen (changed:true) and is a no-op for a name in neither list", () => {
+      const store = createBoardStateStore();
+      store.set({ expanded: { op: "add", screens: ["home", "checkout"] } });
+      const pruned = store.pruneScreen("checkout");
+      expect(pruned).toEqual({ state: { filter: null, pinned: [], expanded: ["home"] }, changed: true });
+      expect(store.pruneScreen("ghost").changed).toBe(false);
+    });
+
+    it("pruneScreen drops a name from pinned and expanded in one change", () => {
+      const store = createBoardStateStore();
+      store.set({ pins: { op: "add", screens: ["home"] }, expanded: { op: "add", screens: ["home"] } });
+      expect(store.pruneScreen("home")).toEqual({ state: { filter: null, pinned: [], expanded: [] }, changed: true });
+    });
   });
 });

@@ -48,7 +48,7 @@ const READ_TOOLS = new Set([
 
 function toolKind(tool: string, input: Record<string, unknown>): "read" | "write" {
   // set_board_state with no field is its own read form — there is no get_board_state.
-  if (tool === "set_board_state" && input.filter === undefined && input.pins === undefined) return "read";
+  if (tool === "set_board_state" && input.filter === undefined && input.pins === undefined && input.expanded === undefined) return "read";
   return READ_TOOLS.has(tool) ? "read" : "write";
 }
 

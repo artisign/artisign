@@ -1284,3 +1284,65 @@ describe("tag notes — an unusable tag name never breaks a read (CHR-596)", () 
     expect(res).not.toHaveProperty("tag_notes");
   });
 });
+
+describe("screen variants in reads (ADR-006)", () => {
+  let fx: ProjectFixture;
+
+  beforeEach(async () => {
+    fx = await setupProject();
+    for (const name of ["main", "b-state", "a-overlay", "deep", "other", "orphan"]) await fx.store.writeScreen(name, `<div id="n1"></div>`);
+    await fx.store.writeScreenMeta("b-state", { notes: "", tags: [], variant_of: "main", variant_kind: "state" });
+    await fx.store.writeScreenMeta("a-overlay", { notes: "", tags: [], variant_of: "main", variant_kind: "overlay" });
+    await fx.store.writeScreenMeta("deep", { notes: "", tags: [], variant_of: "a-overlay", variant_kind: "step" });
+    await fx.store.writeScreenMeta("orphan", { notes: "", tags: [], variant_of: "gone", variant_kind: "state" });
+  });
+  afterEach(() => fx.cleanup());
+
+  it("get_project tree carries both fields on variant screens only; dangling parent reads as main", async () => {
+    const res = (await getProject(fx.store, { view: "tree" })) as { screens: Record<string, unknown>[] };
+    const by = Object.fromEntries(res.screens.map((s) => [s.screen as string, s]));
+    expect(by["b-state"]).toMatchObject({ variant_of: "main", variant_kind: "state" });
+    expect(by["deep"]).toMatchObject({ variant_of: "a-overlay", variant_kind: "step" });
+    for (const name of ["main", "other", "orphan"]) {
+      expect(by[name]).not.toHaveProperty("variant_of");
+      expect(by[name]).not.toHaveProperty("variant_kind");
+    }
+  });
+
+  it("get_screen full lists direct children only, sorted by name", async () => {
+    const res = await getScreen(fx.store, { screen: "main", view: "full" });
+    expect(res.variants).toEqual([
+      { name: "a-overlay", variant_kind: "overlay" },
+      { name: "b-state", variant_kind: "state" },
+    ]);
+    expect(await getScreen(fx.store, { screen: "other", view: "full" })).not.toHaveProperty("variants");
+  });
+
+  it("get_screen full reached_from is deduped, sorted, includes the parent and excludes self-loops", async () => {
+    await fx.store.writeFlows([
+      { from: "main.n1", event: "tap", to: "deep", to_kind: "screen" },
+      { from: "main.n2", event: "tap", to: "deep", to_kind: "screen" },
+      { from: "other.n1", event: "tap", to: "deep.n1", to_kind: "node" },
+      { from: "a-overlay.n1", event: "tap", to: "deep", to_kind: "screen" },
+      { from: "deep.n1", event: "tap", to: "deep", to_kind: "screen" },
+    ]);
+    const res = await getScreen(fx.store, { screen: "deep", view: "full" });
+    expect(res.reached_from).toEqual(["a-overlay", "main", "other"]);
+    expect(await getScreen(fx.store, { screen: "main", view: "full" })).not.toHaveProperty("reached_from");
+  });
+
+  it("variants and reached_from respect fields", async () => {
+    await fx.store.writeFlows([{ from: "other.n1", event: "tap", to: "main", to_kind: "screen" }]);
+    const only = await getScreen(fx.store, { screen: "main", view: "full", fields: ["variants"] });
+    expect(only).toHaveProperty("variants");
+    expect(only).not.toHaveProperty("reached_from");
+    const both = await getScreen(fx.store, { screen: "main", view: "full", fields: ["reached_from"] });
+    expect(both.reached_from).toEqual(["other"]);
+    expect(both).not.toHaveProperty("variants");
+  });
+
+  it("get_screen on a dangling variant reads without error and shows no variants", async () => {
+    const res = await getScreen(fx.store, { screen: "orphan", view: "full" });
+    expect(res).not.toHaveProperty("variants");
+  });
+});

@@ -12,8 +12,8 @@ export type ChangeSseEvent = {
 /** CHR-630/ADR-005 — one per MCP tool call. Additive to the union; see src/mcp/activity.ts for the shape and derivation. */
 export type ActivitySseEvent = ActivityEvent;
 
-/** CHR-624/ADR-005 — the Board's shared filter/pinned state changed. `source` names which door the change came through (`set_board_state` over `/mcp` vs. `POST /api/tools/set_board_state`), not who made it. */
-export type BoardStateSseEvent = { type: "board_state"; filter: string | null; pinned: string[]; source: "agent" | "human" };
+/** CHR-624/ADR-005 (+ `expanded`, CHR-729/ADR-006) — the Board's shared filter/pinned/expanded state changed. `source` names which door the change came through (`set_board_state` over `/mcp` vs. `POST /api/tools/set_board_state`), not who made it. */
+export type BoardStateSseEvent = { type: "board_state"; filter: string | null; pinned: string[]; expanded: string[]; source: "agent" | "human" };
 
 /**
  * Project lifecycle events — unlike `ChangeSseEvent`, which is
@@ -162,7 +162,7 @@ export function createSseHub(store: Store): SseHub {
   }
 
   function broadcastBoardState(state: BoardState, source: "agent" | "human"): void {
-    const sseEvent: BoardStateSseEvent = { type: "board_state", filter: state.filter, pinned: state.pinned, source };
+    const sseEvent: BoardStateSseEvent = { type: "board_state", filter: state.filter, pinned: state.pinned, expanded: state.expanded, source };
     clients.broadcast(`data: ${JSON.stringify(sseEvent)}\n\n`);
   }
 

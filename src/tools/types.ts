@@ -39,12 +39,13 @@ export type Warning = {
 export type ToolErrorCode = "not_found" | "validation_failed" | "conflict" | "invalid_state" | "io_error" | "git_error";
 
 /** The Board's shared filter/pinned-screens state (CHR-624/ADR-005) — daemon memory only, per project. */
-export type BoardState = { filter: string | null; pinned: string[] };
+export type BoardState = { filter: string | null; pinned: string[]; expanded: string[] };
 
 /** `filter: undefined` = unchanged, `null` = clear. `pins: undefined` = unchanged. */
 export type BoardStatePatch = {
   filter?: string | null;
   pins?: { op: "add" | "remove" | "set"; screens: string[] } | { op: "clear" };
+  expanded?: { op: "add" | "remove" | "set"; screens: string[] } | { op: "clear" };
 };
 
 /**

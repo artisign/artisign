@@ -1,15 +1,20 @@
-// CHR-624 / ADR-005 — the Board's shared filter and pinned screens: one
-// tool, `set_board_state`, used by both the browser (POST /api/tools/, via
-// ctx.source "human") and MCP agents ("agent"). A call with every field
+// CHR-624 / ADR-005 — the Board's shared filter and pinned screens, plus the
+// expanded clusters (CHR-729 / ADR-006): one tool, `set_board_state`, used
+// by both the browser (POST /api/tools/, via ctx.source "human") and MCP
+// agents ("agent"). A call with every field
 // omitted is a pure read — it never touches ctx.viewState.setBoardState, so
 // it never broadcasts.
 
 import type { Store } from "../store/index.js";
 import { ToolError, type Warning, type ToolHandlerContext, type BoardStatePatch } from "./types.js";
 
+type ScreenListPatch = { op: "add" | "remove" | "set"; screens: string[] } | { op: "clear" };
+
 export type SetBoardStateInput = {
   filter?: string | null;
-  pins?: { op: "add" | "remove" | "set"; screens: string[] } | { op: "clear" };
+  pins?: ScreenListPatch;
+  /** CHR-729/ADR-006 — the expanded board clusters; same shape and gate as `pins`. */
+  expanded?: ScreenListPatch;
 };
 
 /**
@@ -39,6 +44,27 @@ function normalizeFilter(filter: string | null): string | null {
   return filter === null || filter.trim() === "" ? null : filter;
 }
 
+/**
+ * The gate for a `pins` / `expanded` patch. An unknown name never enters
+ * the list at all — it's broadcast to every connected browser and echoed to
+ * the agent, unlike, say, an unresolved token ref (written into a file the
+ * human can see and fix): a ghost entry has nowhere to be noticed or
+ * cleaned up. Warn for every unknown name in the *original* input, but only
+ * pass the known ones through. A call that named screens but got none of
+ * them right changes nothing: for `add` that falls out naturally, for `set`
+ * the patch is skipped (`undefined`) — a typo must not clear what a human
+ * set. `set` with an empty list still clears. remove / clear need no gate.
+ */
+function gateScreenList(input: ScreenListPatch, knownScreens: Set<string>, warnings: Warning[]): ScreenListPatch | undefined {
+  if (input.op !== "add" && input.op !== "set") return input;
+  const known: string[] = [];
+  for (const name of input.screens) {
+    if (knownScreens.has(name)) known.push(name);
+    else warnings.push({ kind: "unknown_ref", message: `screen "${name}" was not found` });
+  }
+  return known.length > 0 || input.screens.length === 0 ? { op: input.op, screens: known } : undefined;
+}
+
 export async function setBoardState(store: Store, input: SetBoardStateInput, ctx?: ToolHandlerContext): Promise<Record<string, unknown>> {
   if (!ctx?.viewState) {
     // Board state lives in daemon memory only (ProjectHandle.boardState) —
@@ -59,25 +85,12 @@ export async function setBoardState(store: Store, input: SetBoardStateInput, ctx
   const patch: BoardStatePatch = {};
   if (input.filter !== undefined) patch.filter = normalizeFilter(input.filter);
   if (input.pins !== undefined) {
-    if (input.pins.op === "add" || input.pins.op === "set") {
-      // An unknown name never enters `pinned` at all — it's broadcast to
-      // every connected browser and echoed to the agent, unlike, say, an
-      // unresolved token ref (written into a file the human can see and
-      // fix): a ghost pin has nowhere to be noticed or cleaned up. Warn for
-      // every unknown name in the *original* input, but only pass the
-      // known ones through. A call that named screens but got none of them
-      // right changes nothing: for `add` that falls out naturally, for
-      // `set` the patch is skipped — a typo must not clear the pins a human
-      // set. `set` with an empty list still clears.
-      const known: string[] = [];
-      for (const name of input.pins.screens) {
-        if (knownScreens.has(name)) known.push(name);
-        else warnings.push({ kind: "unknown_ref", message: `screen "${name}" was not found` });
-      }
-      if (known.length > 0 || input.pins.screens.length === 0) patch.pins = { op: input.pins.op, screens: known };
-    } else {
-      patch.pins = input.pins; // remove / clear — nothing to validate
-    }
+    const pins = gateScreenList(input.pins, knownScreens, warnings);
+    if (pins) patch.pins = pins;
+  }
+  if (input.expanded !== undefined) {
+    const expanded = gateScreenList(input.expanded, knownScreens, warnings);
+    if (expanded) patch.expanded = expanded;
   }
 
   // A call with every field omitted is a pure read: getBoardState() never
@@ -92,7 +105,8 @@ export async function setBoardState(store: Store, input: SetBoardStateInput, ctx
     // vanish without it (a branch switch, a hand edit). Any write drops
     // such pins first, so the shared state converges instead of carrying
     // them forever.
-    for (const name of ctx.viewState.getBoardState().pinned) {
+    const current = ctx.viewState.getBoardState();
+    for (const name of new Set([...current.pinned, ...current.expanded])) {
       if (!knownScreens.has(name)) ctx.viewState.pruneScreen(name);
     }
   }
@@ -103,5 +117,5 @@ export async function setBoardState(store: Store, input: SetBoardStateInput, ctx
   const pinnedSet = new Set(state.pinned);
   const shownScreens = screenNames.filter((name, i) => pinnedSet.has(name) || matchesFilter(name, metas[i]!.tags, needle));
 
-  return { filter: state.filter, pinned: state.pinned, shown_screens: shownScreens, warnings };
+  return { filter: state.filter, pinned: state.pinned, expanded: state.expanded, shown_screens: shownScreens, warnings };
 }

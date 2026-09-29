@@ -87,6 +87,31 @@ describe("variant breadcrumb", () => {
     expect(bar.querySelector(".variant-pop")).toBeNull();
   });
 
+  it("keyboard focus: opening moves it into the popover, Escape returns it to the toggle and stops there", () => {
+    const { bar } = setup("confirm");
+    const toggle = () => bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle");
+    toggle().focus();
+    toggle().click();
+    expect(document.activeElement.classList.contains("variant-pop-row")).toBe(true);
+    let laterListenerSaw = false;
+    const later = (evt) => {
+      if (evt.key === "Escape") laterListenerSaw = true;
+    };
+    document.addEventListener("keydown", later);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    document.removeEventListener("keydown", later);
+    expect(bar.querySelector(".variant-pop")).toBeNull();
+    expect(document.activeElement).toBe(toggle());
+    expect(laterListenerSaw).toBe(false);
+  });
+
+  it("keyboard focus survives a re-render from outside (e.g. an SSE refresh)", () => {
+    const { ui, bar } = setup("confirm");
+    bar.querySelector(".crumb-group[data-screen=leave] .crumb").focus();
+    ui.update(screens, flows, "confirm");
+    expect(document.activeElement).toBe(bar.querySelector(".crumb-group[data-screen=leave] .crumb"));
+  });
+
   it("a cluster root shows itself, its variant count and no back button", () => {
     const { bar } = setup("family");
     expect(crumbNames(bar)).toEqual(["family"]);

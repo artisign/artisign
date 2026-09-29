@@ -830,7 +830,15 @@ async function handleChangeEvent(event) {
     // rendered HTML (see flows.js), which a "screen" event above already
     // refreshes. The board draws edges from flows.json separately, so it
     // needs its own refetch here.
-    const nextFlows = await fetchFlows(activeProjectRoot);
+    const root = activeProjectRoot;
+    let nextFlows;
+    try {
+      nextFlows = await fetchFlows(root);
+    } catch (error) {
+      console.error(error);
+      return;
+    }
+    if (root !== activeProjectRoot) return; // a project switch moved on — stale response
     screenFlows = nextFlows;
     refreshVariantUI();
     if (boardBuilt) board.setFlows(nextFlows);

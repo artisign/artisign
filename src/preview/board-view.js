@@ -12,11 +12,13 @@ import { fetchRender } from "./api.js";
 import { applyFlowMode } from "./flows.js";
 import { PIN_ICON_SVG } from "./screens.js";
 import {
-  computeBoardLayout,
+  computeLayout,
+  buildBoardModel,
+  resolveEdgeEnd,
+  resolveFlowEdge,
   findTile,
   elementSideAnchor,
   tileAnchor,
-  edgeSides,
   bezierPath,
   computeCenterScroll,
   edgesFromNode,
@@ -61,6 +63,7 @@ const ZOOM_GESTURE_QUIET_MS = 150;
  *   onZoomChange?: (zoomPercent: number, source: "manual" | "fitall") => void,
  *   onRelayout?: () => void,
  *   onTogglePin?: (screen: string) => void,
+ *   onToggleCluster?: (cluster: { root: string, expanded: boolean, memberNames: string[] }) => void,
  * }} args `onZoomChange` fires whenever zoom changes for ANY reason —
  *   quick-jump/step buttons, Fit all, the range input, or Ctrl/Cmd+wheel/
  *   pinch on the canvas — so app.js can keep the toolbar's range input,
@@ -75,6 +78,9 @@ const ZOOM_GESTURE_QUIET_MS = 150;
  *   app.js owns the actual pin/unpin write (setBoardState) and the
  *   resulting SSE broadcast is what actually changes what's pinned; this
  *   view never mutates its own pinned/outsideFilter sets outside setScreens.
+ *   `onToggleCluster` (CHR-733) fires when a cluster frame's header is
+ *   clicked — like `onTogglePin`, app.js owns the write (`set_board_state`
+ *   `expanded`) and the SSE broadcast is what actually re-renders.
  *   `emptyStateEl`/`emptyStateBodyEl` (CHR-624) — shown/filled by setScreens
  *   whenever the visible set is empty, per the `board-view-empty` design.
  */
@@ -89,6 +95,7 @@ export function createBoardView({
   onZoomChange,
   onRelayout,
   onTogglePin,
+  onToggleCluster,
 }) {
   /** @type {string[]} */
   let screens = [];
@@ -96,8 +103,19 @@ export function createBoardView({
   let flows = [];
   /** @type {Record<string, { width: number, height: number }>} */
   const measuredSizes = {};
-  /** @type {{ tiles: ReturnType<typeof computeBoardLayout>["tiles"], contentWidth: number, contentHeight: number }} */
-  let layout = { tiles: [], contentWidth: 0, contentHeight: 0 };
+  // CHR-733 — the project's screen records (for variant_of), the shared
+  // `expanded` names and the "Clusters" toggle. `model` is what they and the
+  // visible set make of the board (plain tiles and clusters); with clusters
+  // off it is exactly the visible set as plain tiles, i.e. today's flat board.
+  let allScreens = [];
+  let expandedNames = [];
+  let clustersOn = false;
+  let currentProject = "";
+  let model = buildBoardModel([], [], [], { clusters: false });
+  /** @type {{ tiles: object[], frames: object[], mores: object[], connectors: { from: string, to: string }[], contentWidth: number, contentHeight: number }} */
+  let layout = { tiles: [], frames: [], mores: [], connectors: [], contentWidth: 0, contentHeight: 0 };
+  const framesEl = document.createElement("div");
+  framesEl.className = "board-frames";
   // The column count the CURRENT `layout` was built with — set only by
   // relayout() (see its own comment on when that runs). fitAll() reads
   // this rather than recomputing it, so a zoom-only action never itself
@@ -135,7 +153,9 @@ export function createBoardView({
   }
 
   function centerOnScreen(screenId) {
-    const tile = findTile(layout.tiles, screenId);
+    // A variant inside a collapsed cluster centres the cluster frame (it is
+    // never auto-expanded); one folded into "+N more" centres that tile.
+    const tile = resolveEdgeEnd(layout, screenId)?.rect;
     if (!tile) return;
     const scale = zoom / 100;
     const scaledTile = { x: tile.x * scale, y: tile.y * scale, width: tile.width * scale, height: tile.height * scale };
@@ -246,8 +266,9 @@ export function createBoardView({
    * their cursor.
    */
   function relayout() {
-    currentColumns = computeBoardColumns(screens, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, GRID_OPTIONS);
-    layout = computeBoardLayout(screens, measuredSizes, { ...GRID_OPTIONS, scale: 1, columns: currentColumns });
+    currentColumns = computeBoardColumns(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, GRID_OPTIONS);
+    layout = computeLayout(model.items, measuredSizes, { ...GRID_OPTIONS, scale: 1, columns: currentColumns });
+    layout = { frames: [], mores: [], connectors: [], ...layout };
     tilesEl.style.width = `${layout.contentWidth}px`;
     tilesEl.style.height = `${layout.contentHeight}px`;
     edgesEl.setAttribute("width", String(layout.contentWidth));
@@ -265,6 +286,7 @@ export function createBoardView({
       frame.style.height = `${tile.naturalHeight}px`;
       frame.style.transform = `scale(${tile.width / tile.naturalWidth})`;
     }
+    renderFrames();
     applyZoomSizing();
     applyZoomDependentTileChrome();
     drawEdges();
@@ -374,7 +396,7 @@ export function createBoardView({
    */
   function fitAll() {
     setZoom(
-      computeFitAllZoom(screens, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, { ...GRID_OPTIONS, columns: currentColumns }),
+      computeFitAllZoom(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, { ...GRID_OPTIONS, columns: currentColumns }),
       { source: "fitall" },
     );
   }
@@ -385,20 +407,42 @@ export function createBoardView({
   }
 
   function edgeEndpoints(flow) {
-    const fromScreen = screenIdFromRef(flow.from);
-    const fromTile = findTile(layout.tiles, fromScreen);
-    const toScreen = screenIdFromRef(flow.to);
-    const toTile = findTile(layout.tiles, toScreen);
-    if (!fromTile || !toTile) return null;
-
-    const sides = edgeSides(fromTile, toTile);
+    const resolved = resolveFlowEdge(layout, flow);
+    if (!resolved) return null;
+    const { from: fromEnd, to: toEnd, sides } = resolved;
     const dot = flow.from.indexOf(".");
     const nodeId = dot === -1 ? null : flow.from.slice(dot + 1);
-    const iframe = iframesByScreen.get(fromScreen);
+    // Only an edge leaving an exact tile can start at the element; one leaving
+    // a frame / "+N more" tile docks on its side.
+    const iframe = fromEnd.kind === "tile" ? iframesByScreen.get(fromEnd.screen) : null;
     const elementRect = nodeId && iframe?.contentDocument ? iframe.contentDocument.getElementById(nodeId)?.getBoundingClientRect() : null;
-    const from = elementRect ? elementSideAnchor(fromTile, elementRect, sides.from) : tileAnchor(fromTile, sides.from);
-    const to = tileAnchor(toTile, sides.to);
-    return { from, to, sides };
+    const from = elementRect ? elementSideAnchor(fromEnd.rect, elementRect, sides.from) : tileAnchor(fromEnd.rect, sides.from);
+    const to = tileAnchor(toEnd.rect, sides.to);
+    return { from, to, sides, fromEnd, toEnd };
+  }
+
+  /** A pill naming the variant a docked edge really touches: accent for the target end, grey for the source end. */
+  function buildEdgeLabel(point, side, text, role) {
+    const width = text.length * 6.2 + 14;
+    const height = 18;
+    const x = side === "left" ? point.x - width - 6 : side === "right" ? point.x + 6 : point.x - width / 2;
+    const y = side === "top" ? point.y - height - 6 : side === "bottom" ? point.y + 6 : point.y - height / 2;
+    const g = document.createElementNS(SVG_NS, "g");
+    g.setAttribute("class", `board-edge-label ${role}`);
+    const rect = document.createElementNS(SVG_NS, "rect");
+    rect.setAttribute("x", String(x));
+    rect.setAttribute("y", String(y));
+    rect.setAttribute("width", String(width));
+    rect.setAttribute("height", String(height));
+    rect.setAttribute("rx", "9");
+    const label = document.createElementNS(SVG_NS, "text");
+    label.setAttribute("x", String(x + width / 2));
+    label.setAttribute("y", String(y + height / 2));
+    label.setAttribute("text-anchor", "middle");
+    label.setAttribute("dominant-baseline", "central");
+    label.textContent = text;
+    g.append(rect, label);
+    return g;
   }
 
   /** A `<marker>` def for arrowheads — one per variant, since a single shared marker can't pick up its referencing path's own highlight class. */
@@ -419,6 +463,20 @@ export function createBoardView({
 
   function drawEdges() {
     edgesEl.innerHTML = "";
+    // Variant-of connectors are structure, not flow — drawn even with edges off.
+    for (const connector of layout.connectors) {
+      const parent = findTile(layout.tiles, connector.from);
+      const child = findTile(layout.tiles, connector.to);
+      if (!parent || !child) continue;
+      const startX = parent.x + parent.width;
+      const midX = (startX + child.x) / 2;
+      const startY = parent.y + parent.height / 2;
+      const endY = child.y + child.height / 2;
+      const path = document.createElementNS(SVG_NS, "path");
+      path.setAttribute("d", `M ${startX} ${startY} H ${midX} V ${endY} H ${child.x}`);
+      path.setAttribute("class", "board-connector");
+      edgesEl.appendChild(path);
+    }
     // With edges hidden, flow-mode centering (attachTileClicks/applyFlowMode
     // -> centerOnScreen) and highlight-on-click still work exactly as
     // before — setHighlight just has nothing to paint while this is false.
@@ -438,6 +496,72 @@ export function createBoardView({
       path.setAttribute("class", highlighted ? "board-edge highlighted" : "board-edge");
       path.setAttribute("marker-end", highlighted ? "url(#board-arrowhead-highlighted)" : "url(#board-arrowhead)");
       edgesEl.appendChild(path);
+      if (endpoints.toEnd.kind !== "tile") edgesEl.appendChild(buildEdgeLabel(endpoints.to, endpoints.sides.to, `→ ${endpoints.toEnd.screen}`, "target"));
+      if (endpoints.fromEnd.kind !== "tile") edgesEl.appendChild(buildEdgeLabel(endpoints.from, endpoints.sides.from, endpoints.fromEnd.screen, "source"));
+    }
+  }
+
+  /** Cluster frames (header, thumbnail strip) and "+N more" tiles — a layer under the tiles, rebuilt on every relayout. */
+  function renderFrames() {
+    framesEl.innerHTML = "";
+    for (const frame of layout.frames) {
+      const cluster = model.clusters.find((c) => c.root === frame.root);
+      const el = document.createElement("div");
+      el.className = frame.expanded ? "board-cluster-frame expanded" : "board-cluster-frame";
+      el.dataset.root = frame.root;
+      el.style.left = `${frame.x}px`;
+      el.style.top = `${frame.y}px`;
+      el.style.width = `${frame.width}px`;
+      el.style.height = `${frame.height}px`;
+      const header = document.createElement("button");
+      header.type = "button";
+      header.className = "board-cluster-header";
+      header.setAttribute("aria-expanded", String(frame.expanded));
+      header.setAttribute("aria-label", `${frame.expanded ? "Collapse" : "Expand"} ${frame.root}`);
+      header.style.height = `${frame.headerHeight}px`;
+      const name = document.createElement("b");
+      name.textContent = `${frame.expanded ? "▾" : "▸"} ${frame.root}`;
+      const meta = document.createElement("span");
+      meta.textContent = `${frame.size} in subtree · depth ${frame.depth}`;
+      header.append(name, meta);
+      header.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        if (cluster) onToggleCluster?.(cluster);
+      });
+      el.appendChild(header);
+      if (!frame.expanded && frame.thumbs.length > 0) {
+        const main = findTile(layout.tiles, frame.root);
+        const strip = document.createElement("div");
+        strip.className = "board-cluster-thumbs";
+        strip.style.top = `${frame.headerHeight + (main?.height ?? 0) + 12}px`;
+        for (const thumb of frame.thumbs) {
+          const micro = document.createElement("span");
+          micro.className = `board-cluster-thumb kind-${thumb.kind ?? "state"}`;
+          micro.classList.toggle("deeper", thumb.deeper);
+          micro.title = thumb.screen;
+          strip.appendChild(micro);
+        }
+        if (frame.moreThumbs > 0) {
+          const more = document.createElement("span");
+          more.className = "board-cluster-thumbs-more";
+          more.textContent = `+${frame.moreThumbs}`;
+          strip.appendChild(more);
+        }
+        el.appendChild(strip);
+      }
+      framesEl.appendChild(el);
+    }
+    for (const more of layout.mores) {
+      const el = document.createElement("div");
+      el.className = "board-more-tile";
+      el.dataset.id = more.id;
+      el.style.left = `${more.x}px`;
+      el.style.top = `${more.y}px`;
+      el.style.width = `${more.width}px`;
+      el.style.height = `${more.height}px`;
+      el.textContent = `+${more.names.length} more`;
+      el.title = more.names.join("\n");
+      framesEl.appendChild(el);
     }
   }
 
@@ -453,6 +577,7 @@ export function createBoardView({
     // above and the badge/pin below/beside it can sit outside the tile's
     // own box without affecting computeBoardLayout's geometry at all.
     tile.classList.toggle("outside-filter", outsideFilterScreens.has(screen));
+    tile.classList.toggle("context", model.contextNames.has(screen));
 
     const label = document.createElement("div");
     label.className = "board-tile-label";
@@ -576,7 +701,12 @@ export function createBoardView({
    *   (`activeProjectRoot` in app.js) — CHR-651, same convention as api.js's
    *   other calls; every tile's own render fetch below must stay scoped to
    *   it, not the daemon-wide active project.
-   * @param {{ pinned?: Iterable<string>, outsideFilter?: Iterable<string>, filter?: string }} [pinInfo]
+   * @param {{ pinned?: Iterable<string>, outsideFilter?: Iterable<string>, filter?: string,
+   *   screens?: { name: string, variant_of?: string, variant_kind?: string }[], expanded?: string[], clusters?: boolean }} [pinInfo]
+   *   CHR-733: `screens` (every screen of the project, with its variant
+   *   fields), `expanded` (the shared expanded names) and `clusters` (the
+   *   "Clusters" toggle) turn `nextScreens` — the visible set — into the
+   *   cluster board; all default to the flat board.
    *   All default to empty/"" — a caller with no filter/pins concept at all
    *   (there is none left in app.js, but tests may still omit it) gets tiles
    *   with no pin button state distinct from "unpinned, matching". `filter`
@@ -589,6 +719,11 @@ export function createBoardView({
     }
     screens = nextScreens;
     flows = nextFlows;
+    currentProject = project;
+    allScreens = pinInfo.screens ?? nextScreens.map((name) => ({ name, tags: [] }));
+    expandedNames = pinInfo.expanded ?? [];
+    clustersOn = pinInfo.clusters ?? false;
+    model = buildBoardModel(allScreens, screens, expandedNames, { clusters: clustersOn });
     pinnedScreens = new Set(pinInfo.pinned ?? []);
     outsideFilterScreens = new Set(pinInfo.outsideFilter ?? []);
     const isEmpty = screens.length === 0;
@@ -603,22 +738,52 @@ export function createBoardView({
     modeCleanupByScreen.clear();
     iframesByScreen.clear();
     tilesEl.innerHTML = "";
-    for (const screen of screens) tilesEl.appendChild(buildTile(screen));
+    tilesEl.appendChild(framesEl);
+    for (const screen of model.tileNames) tilesEl.appendChild(buildTile(screen));
     relayout();
-    await Promise.all(
-      screens.map(async (screen) => {
-        const iframe = iframesByScreen.get(screen);
-        if (!iframe) return;
-        const result = await fetchRender(screen, project);
-        // The screen list may have changed again by the time this resolves
-        // (setScreens re-entered) — iframesByScreen was cleared/rebuilt in
-        // that case, so this iframe is stale; skip assigning to it.
-        if (iframesByScreen.get(screen) !== iframe) return;
-        iframe.srcdoc = result.ok
-          ? result.html
-          : `<p style="font-family: system-ui, sans-serif; color: #900; padding: 16px;">${result.message}</p>`;
-      }),
-    );
+    await Promise.all(model.tileNames.map((screen) => loadTileRender(screen, project)));
+  }
+
+  async function loadTileRender(screen, project) {
+    const iframe = iframesByScreen.get(screen);
+    if (!iframe) return;
+    const result = await fetchRender(screen, project);
+    // The screen list may have changed again by the time this resolves
+    // (setScreens re-entered) — iframesByScreen was cleared/rebuilt in
+    // that case, so this iframe is stale; skip assigning to it.
+    if (iframesByScreen.get(screen) !== iframe) return;
+    iframe.srcdoc = result.ok
+      ? result.html
+      : `<p style="font-family: system-ui, sans-serif; color: #900; padding: 16px;">${result.message}</p>`;
+  }
+
+  /**
+   * CHR-733 — the shared `expanded` names or the "Clusters" toggle changed
+   * (the visible set did not): rebuilds the model and re-lays out, KEEPING
+   * every tile that stays on the board (no iframe reload) and only creating
+   * the ones a newly expanded cluster shows / dropping the ones a collapsed
+   * one hides.
+   * @param {{ expanded?: string[], clusters?: boolean }} next
+   */
+  async function setClusterState(next) {
+    if (next.expanded !== undefined) expandedNames = next.expanded;
+    if (next.clusters !== undefined) clustersOn = next.clusters;
+    model = buildBoardModel(allScreens, screens, expandedNames, { clusters: clustersOn });
+    const wanted = new Set(model.tileNames);
+    for (const screen of [...iframesByScreen.keys()]) {
+      if (wanted.has(screen)) continue;
+      modeCleanupByScreen.get(screen)?.();
+      modeCleanupByScreen.delete(screen);
+      iframesByScreen.delete(screen);
+      tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(screen)}"]`)?.remove();
+    }
+    const added = model.tileNames.filter((screen) => !iframesByScreen.has(screen));
+    for (const screen of added) tilesEl.appendChild(buildTile(screen));
+    for (const screen of model.tileNames) {
+      tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(screen)}"]`)?.classList.toggle("context", model.contextNames.has(screen));
+    }
+    relayout();
+    await Promise.all(added.map((screen) => loadTileRender(screen, currentProject)));
   }
 
   /**
@@ -649,6 +814,7 @@ export function createBoardView({
   return {
     mount,
     setScreens,
+    setClusterState,
     refreshScreen,
     setFlows,
     setFlowMode,

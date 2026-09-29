@@ -58,6 +58,7 @@ import {
   stepZoomDown,
   stepZoomUp,
   computeBoardVisibility,
+  clusterToggleWrite,
   formatBoardStatusText,
 } from "./board.js";
 import { createProjectUI } from "./projects.js";
@@ -130,6 +131,8 @@ const boardZoomReadoutEl = document.getElementById("board-zoom-readout");
 const boardEdgesToggleBtn = document.getElementById("board-edges-toggle");
 const boardToolbarStatusEl = document.getElementById("board-toolbar-status");
 const boardClearPinsBtn = document.getElementById("board-clear-pins-btn");
+const boardClustersToggleBtn = document.getElementById("board-clusters-toggle");
+const boardCollapseAllBtn = document.getElementById("board-collapse-all-btn");
 const boardPresentedBannerEl = document.getElementById("board-presented-banner");
 const boardPresentedTextEl = document.getElementById("board-presented-text");
 const boardPresentedDismissBtn = document.getElementById("board-presented-dismiss");
@@ -302,6 +305,11 @@ const prefsStorage = (() => {
 // own persisted level; see prefs.parseBoardZoomPref.
 let boardZoom = DEFAULT_BOARD_ZOOM;
 let boardEdgesVisible = true;
+// CHR-733 — the "Clusters" toggle is a per-browser preference like the edges
+// toggle; `expandedClusters` is the daemon-held, SSE-driven shared state (same
+// lifecycle as `pinnedScreens`), stored as given by the daemon.
+let boardClustersOn = true;
+let expandedClusters = [];
 // The zoom "Fit all" last computed, if any — the only way to know whether
 // its quick-jump button should read active, since (unlike "100%") its
 // target isn't a fixed constant. Set from board.setZoom's onZoomChange
@@ -322,6 +330,7 @@ function scheduleBoardZoomPrefWrite(value) {
 }
 
 const board = createBoardView({
+  onToggleCluster: toggleCluster,
   surfaceEl: boardSurfaceEl,
   canvasEl: boardCanvasEl,
   canvasInnerEl: boardCanvasInnerEl,
@@ -464,6 +473,32 @@ board100Btn.addEventListener("click", () => board.setZoom(100));
 boardZoomMinusBtn.addEventListener("click", () => board.setZoom(stepZoomDown(boardZoom)));
 boardZoomPlusBtn.addEventListener("click", () => board.setZoom(stepZoomUp(boardZoom)));
 boardZoomRangeInput.addEventListener("input", () => board.setZoom(Number(boardZoomRangeInput.value)));
+/** Header click on a cluster frame (CHR-733): expand adds the main screen, collapse removes every member listed in `expanded`. The re-render comes back through the `board_state` broadcast, like a pin. */
+function toggleCluster(cluster) {
+  if (!activeProjectRoot) return;
+  reportBoardStateFailure(setBoardState(activeProjectRoot, { expanded: clusterToggleWrite(cluster, expandedClusters) }));
+}
+
+boardCollapseAllBtn.addEventListener("click", () => {
+  if (activeProjectRoot) reportBoardStateFailure(setBoardState(activeProjectRoot, { expanded: { op: "clear" } }));
+});
+
+function renderBoardClustersToggle() {
+  boardClustersToggleBtn.setAttribute("aria-pressed", String(boardClustersOn));
+  boardClustersToggleBtn.textContent = boardClustersOn ? "Clusters: On" : "Clusters: Off";
+  boardCollapseAllBtn.hidden = !boardClustersOn;
+}
+
+boardClustersToggleBtn.addEventListener("click", () => {
+  boardClustersOn = !boardClustersOn;
+  writeBoolPref(prefsStorage, "artisign.boardClusters", boardClustersOn);
+  renderBoardClustersToggle();
+  if (boardBuilt) board.setClusterState({ clusters: boardClustersOn });
+});
+
+boardClustersOn = readBoolPref(prefsStorage, "artisign.boardClusters", boardClustersOn);
+renderBoardClustersToggle();
+
 boardEdgesToggleBtn.addEventListener("click", () => {
   boardEdgesVisible = !boardEdgesVisible;
   writeBoolPref(prefsStorage, "artisign.boardEdgesVisible", boardEdgesVisible);
@@ -653,8 +688,10 @@ async function loadTags() {
  *   `false` for every other caller (loadBoardState, a `source: "human"`
  *   event), which keep the focus guard below.
  */
-function applyBoardState(filter, pinned, forceInputSync = false) {
+function applyBoardState(filter, pinned, forceInputSync = false, expanded = []) {
+  const expandedOnly = boardBuilt && (filter ?? "") === screenFilter && arraysEqual(pinned ?? [], pinnedScreens);
   screenFilter = filter ?? "";
+  expandedClusters = expanded ?? [];
   // Skip while the human is typing in this very input (review fix 1) — the
   // broadcast this fires from is an echo of ITS OWN write (or a whitespace-
   // only filter the daemon normalised to `null`, board-state.ts), so writing
@@ -666,7 +703,12 @@ function applyBoardState(filter, pinned, forceInputSync = false) {
   if (forceInputSync || document.activeElement !== screenFilterInput) screenFilterInput.value = screenFilter;
   pinnedScreens = pinned ?? [];
   refreshSidebar();
-  if (boardBuilt) loadBoard();
+  // Only `expanded` moved: keep the tiles that stay and add/drop the rest
+  // instead of rebuilding (and re-rendering) the whole board.
+  if (boardBuilt) {
+    if (expandedOnly) board.setClusterState({ expanded: expandedClusters });
+    else loadBoard();
+  }
 }
 
 /**
@@ -713,11 +755,11 @@ async function loadBoardState() {
     state = await fetchBoardState(root);
   } catch (error) {
     console.error(error);
-    if (root === activeProjectRoot) applyBoardState(null, []);
+    if (root === activeProjectRoot) applyBoardState(null, [], false, []);
     return;
   }
   if (root !== activeProjectRoot) return; // a later switch has since moved on — this response is stale
-  applyBoardState(state.filter, state.pinned);
+  applyBoardState(state.filter, state.pinned, false, state.expanded ?? []);
 }
 
 async function bootScreens() {
@@ -794,7 +836,10 @@ async function handleChangeEvent(event) {
       const visibilityChanged =
         !arraysEqual(previousVisibility.visibleNames, nextVisibility.visibleNames) ||
         !arraysEqual(previousVisibility.outsideFilterNames, nextVisibility.outsideFilterNames);
-      if (visibilityChanged) await loadBoard();
+      // CHR-733 — a re-parent (set_meta variant_of) moves a tile between a
+      // plain tile and a cluster without touching visibility.
+      const variantLinks = (list) => list.map((s) => `${s.name}>${s.variant_of ?? ""}:${s.variant_kind ?? ""}`).join("|");
+      if (visibilityChanged || variantLinks(previousScreens) !== variantLinks(screens)) await loadBoard();
       else await board.refreshScreen(event.name, activeProjectRoot);
     }
   } else if (event.kind === "tokens" || event.kind === "component" || event.kind === "pattern" || event.kind === "asset") {
@@ -849,7 +894,7 @@ async function handleLifecycleEvent(event) {
 }
 
 /**
- * @param {{ type: "board_state", filter: string | null, pinned: string[], source: "agent" | "human" }} event
+ * @param {{ type: "board_state", filter: string | null, pinned: string[], expanded?: string[], source: "agent" | "human" }} event
  * Always applies the event's own payload directly (no re-fetch) — from
  * EITHER door (another tab's write, an MCP agent's, or this very tab's own
  * write echoed back) and regardless of `source`: the simplest correct
@@ -878,11 +923,11 @@ function handleBoardStateEvent(event) {
     // screenFilterInput "input" listener below).
     clearTimeout(boardFilterWriteTimer);
     pauseFollow();
-    applyBoardState(event.filter, event.pinned, true);
+    applyBoardState(event.filter, event.pinned, true, event.expanded ?? []);
     setView("board"); // also persists "board" as the last-viewed tab (artisign.view) — same side effect a manual tab click has, just triggered by the agent instead
     showAgentPresentedBanner();
   } else {
-    applyBoardState(event.filter, event.pinned);
+    applyBoardState(event.filter, event.pinned, false, event.expanded ?? []);
   }
 }
 
@@ -1828,6 +1873,9 @@ async function loadBoard() {
     pinned: visibility.pinnedNames,
     outsideFilter: visibility.outsideFilterNames,
     filter: screenFilter,
+    screens,
+    expanded: expandedClusters,
+    clusters: boardClustersOn,
   });
   boardBuilt = true;
 }

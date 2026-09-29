@@ -1,0 +1,89 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#1a1a1a;background:#fff;width:1440px}
+.app{width:1440px;height:900px;display:flex;flex-direction:column;overflow:hidden}
+.tb{height:48px;flex:none;display:flex;align-items:center;gap:16px;padding:0 16px;border-bottom:1px solid #e2e2e2;font-size:13.6px}
+.logo{font-weight:600;font-size:15px}.proj{border:1px solid #d6d6d6;border-radius:6px;padding:5px 12px;font-weight:600}
+.tab{padding:5px 10px;border-radius:6px;color:#555}.tab.on{background:#eef1ff;color:#2a3edb;font-weight:600}
+.btn{border:1px solid #d6d6d6;border-radius:6px;padding:6px 12px}.btn.on{background:#2a3edb;border-color:#2a3edb;color:#fff}.dot{width:8px;height:8px;border-radius:50%;background:#16a34a}
+.body{flex:1;display:flex;min-height:0}
+.side{width:280px;flex:none;background:#fff;display:flex;flex-direction:column;min-height:0}.side.l{border-right:1px solid #e2e2e2}.side.rt{border-left:1px solid #e2e2e2}
+.sbh{padding:10px 8px;border-bottom:1px solid #e2e2e2;display:flex;font-size:12.8px;font-weight:600;color:#333}.sbh span{margin-left:auto;color:#888}
+.fw{margin:12px 8px;display:flex;align-items:center;gap:8px;height:32px;border:1px solid #d6d6d6;border-radius:6px;background:#fafafa;padding:0 10px;font-size:12.8px;color:#999}
+.mg{width:11px;height:11px;border:1.5px solid #888;border-radius:50%}
+.list{padding:0 8px;overflow:hidden}
+.r{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:6px;font-size:13.6px;color:#333;margin-bottom:2px;white-space:nowrap}
+.r.sel{background:#eef1ff;color:#2a3edb;font-weight:600}.tri{width:10px;flex:none;font-size:9px;color:#999}
+.ch{margin-left:15px;padding-left:10px;border-left:2px solid #e2e2e2;border-radius:0 6px 6px 0;font-size:12.8px}
+.ic{display:inline-block;width:9px;height:13px;border:1.5px solid;border-radius:2px;position:relative;flex:none;color:#666}
+.ic.ov{color:#2a3edb}.ic.st::after{content:"";position:absolute;left:1px;right:1px;top:2px;height:1.5px;background:currentColor;box-shadow:0 3px 0 currentColor}.ic.ov::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:currentColor}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;background:#e5e5e5}
+.strip{flex:none;background:#fff;border-bottom:1px solid #e2e2e2;padding:10px 16px 12px}
+.sth{display:flex;align-items:center;gap:8px;font-size:12px;color:#555;margin-bottom:8px}.sth b{color:#1a1a1a;font-size:12.8px}.sth .r2{margin-left:auto;color:#999}
+.tiles{display:flex;gap:0;align-items:flex-start}
+.grp{display:flex;flex-direction:column;gap:4px;padding:0 10px;border-left:1px solid #e2e2e2}.grp:first-child{border-left:0;padding-left:0}
+.gl2{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#888;display:flex;align-items:center;gap:4px}
+.trow{display:flex;gap:6px}
+.vt{width:72px;padding:4px;border:1.5px solid transparent;border-radius:6px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;color:#555;text-align:center;line-height:1.2}
+.vt.on{border-color:#2a3edb;background:#eef1ff;color:#2a3edb;font-weight:600}
+.mp{display:block;position:relative;width:36px;height:78px;border:1px solid #d6d6d6;border-radius:5px;background:#fff;overflow:hidden;font-size:0;font-style:normal}
+.mp b.h{display:block;height:8px;background:#f0f0f0}.mp b.c{display:block;height:12px;margin:4px 3px;background:#fafafa;border:1px solid #e2e2e2;border-radius:2px}
+.mp u{position:absolute;inset:0;background:rgba(0,0,0,.38)}.mp s{position:absolute;left:0;right:0;bottom:0;height:34%;background:#fff;border-radius:5px 5px 0 0;text-decoration:none}
+.more{width:64px;white-space:nowrap;align-self:center;font-size:11px;color:#2a3edb;text-align:center}
+.fh{flex:none;display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:13px}
+.fh b{font-size:14px}.chip{font-size:11px;padding:2px 8px;border-radius:99px;background:#eef1ff;color:#2a3edb}.chip.g{background:#f0f0f0;color:#555}
+.canvas{flex:1;display:flex;align-items:flex-start;justify-content:center;gap:28px;padding:4px 24px 0;min-height:0;overflow:hidden}
+.mp.big{width:266px;height:592px;border-radius:12px;border:1px solid #d6d6d6;box-shadow:0 8px 24px rgba(0,0,0,.14);font-size:12px}
+.big b.h{height:46px;padding:15px 14px;font-size:13px;font-weight:600;color:#1a1a1a}.big b.c{height:56px;margin:10px 12px;border-radius:6px;padding:10px 12px;color:#777;line-height:1.5}
+.big s{height:250px;border-radius:16px 16px 0 0;padding:10px 18px;color:#333}.big s em{display:block;width:36px;height:4px;border-radius:2px;background:#d6d6d6;margin:0 auto 14px}.big s strong{display:block;font-size:14px;margin-bottom:6px}.big s span{display:block;color:#777;line-height:1.5;margin-bottom:14px}.big s i.bt{display:block;font-style:normal;text-align:center;border-radius:6px;padding:9px;margin-bottom:8px;border:1px solid #d6d6d6}.big s i.bt.p{background:#c0392b;border-color:#c0392b;color:#fff}
+.note{width:230px;font-size:12px;line-height:1.5;color:#333}
+.card{background:#fff;border:1px solid #e2e2e2;border-radius:10px;padding:12px}.card h3{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#888;margin-bottom:6px}
+.pill{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:#1a1a1a;color:#fff;font-size:12px;padding:7px 14px;border-radius:99px}
+.ins{padding:12px}.ins .kv{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;color:#555}.ins .kv b{color:#1a1a1a;font-weight:600}
+.el{display:flex;gap:8px;padding:7px 12px;border-bottom:1px solid #e2e2e2;font-family:monospace;font-size:12px;color:#333}.el i{font-style:normal;color:#999;font-size:9px;width:10px}
+</style></head><body><div class="app">
+<div class="tb"><span class="logo">Artisign</span><span class="proj">Lückenzeit ▾</span><span class="tab on">Screens</span><span class="tab">Design System</span><span class="tab">Board</span><span style="flex:1"></span><span class="btn on">Flow mode</span><span class="btn">Comment mode</span><span class="dot"></span></div>
+<div class="body">
+<div class="side l"><div class="sbh">Screens<span>◂</span></div><div class="fw"><i class="mg"></i>Search screens, mockups and tags…</div>
+<div class="list">
+<div class="r"><span class="tri">▸</span>dashboard</div>
+<div class="r" style="background:#f7f8ff;color:#2a3edb"><span class="tri">▾</span>family-l2</div>
+<div class="r ch"><i class="ic st"></i>family-l2-two-parents</div>
+<div class="r ch"><i class="ic st"></i>family-l2-two-parents-solo</div>
+<div class="r ch"><i class="ic ov"></i>family-l2-sheet-add-parent</div>
+<div class="r ch"><i class="ic ov"></i>family-l2-sheet-name</div>
+<div class="r ch sel"><i class="ic ov"></i>family-l2-sheet-leave</div>
+<div class="r ch"><i class="ic ov"></i>family-l2-sheet-leave-confirm</div>
+<div class="r"><span class="tri">▸</span>parent-l3</div>
+</div></div>
+
+<div class="main">
+<div class="strip">
+<div class="sth"><b>Variants of family-l2</b>· 8 variants · 2 state · 6 overlay<span class="r2">click a tile to switch · ←/→ steps through</span></div>
+<div class="tiles">
+<div class="grp"><div class="gl2">Base</div><div class="trow"><div class="vt"><i class="mp"><b class="h"></b><b class="c"></b><b class="c"></b></i>family-l2</div></div></div>
+<div class="grp"><div class="gl2"><i class="ic st" style="width:6px;height:9px"></i>State · 2</div><div class="trow">
+<div class="vt"><i class="mp"><b class="h"></b><b class="c"></b><b class="c"></b><b class="c"></b></i>two-parents</div>
+<div class="vt"><i class="mp"><b class="h"></b><b class="c"></b><b class="c"></b><b class="c"></b><b class="c"></b></i>two-parents-solo</div></div></div>
+<div class="grp"><div class="gl2"><i class="ic ov" style="width:6px;height:9px"></i>Overlay · 6</div><div class="trow">
+<div class="vt"><i class="mp"><b class="h"></b><b class="c"></b><b class="c"></b><u></u><s></s></i>sheet-add-parent</div>
+<div class="vt"><i class="mp"><b class="h"></b><b class="c"></b><b class="c"></b><u></u><s></s></i>sheet-name</div>
+<div class="vt on"><i class="mp"><b class="h"></b><b class="c"></b><b class="c"></b><u></u><s></s></i>sheet-leave</div>
+<div class="vt"><i class="mp"><b class="h"></b><b class="c"></b><b class="c"></b><u></u><s></s></i>sheet-leave-confirm</div>
+<div class="more">+ 2 more ▸</div></div></div>
+</div></div>
+
+<div class="fh"><b>family-l2-sheet-leave</b><span class="chip"><i class="ic ov" style="width:6px;height:9px;vertical-align:-1px;margin-right:3px"></i>overlay of family-l2</span><span class="chip g">⤴ Back to base</span><span style="margin-left:auto;font-size:12px;color:#555">Flow mode: arrived via tap on <b style="font-family:monospace">family-l2.btn-leave</b></span></div>
+
+<div class="canvas" style="position:relative">
+<i class="mp big"><b class="h">Familie</b><b class="c">Lena · Elternteil</b><b class="c">Tom · Kind</b><b class="c">Mia · Kind</b><u></u><s><em></em><strong>Familie verlassen?</strong><span>Du verlierst den Zugriff auf alle geteilten Termine.</span><i class="bt p">Verlassen</i><i class="bt">Abbrechen</i></s></i>
+<div class="note"><div class="card"><h3>How the context stays</h3>Tile stays outlined while you are in this variant. Header names the base and the kind. Flow mode arriving from another screen just selects the tile; tapping <b>Verlassen</b> moves the outline to <b>sheet-leave-confirm</b>.</div>
+<div class="card" style="margin-top:12px"><h3>Sequence?</h3>sheet-leave → sheet-leave-confirm is only a flow here, but it also sits in the Overlay group as a flat sibling.</div></div>
+</div>
+</div>
+
+<div class="side rt"><div class="sbh">Elements<span>▸</span></div>
+<div class="ins"><div class="card"><h3>Variant</h3>
+<div class="kv">Base<b>family-l2</b></div><div class="kv">Kind<b>overlay</b></div><div class="kv">Flows in / out<b>1 / 2</b></div><div class="kv">Siblings<b>7</b></div></div></div>
+<div class="el"><i>▸</i>&lt;div&gt; · sheet</div><div class="el"><i>▸</i>&lt;div&gt; · scrim</div><div class="el"><i>▸</i>&lt;div&gt; · btn-confirm</div></div>
+</div></div></body></html>

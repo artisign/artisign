@@ -438,7 +438,30 @@ body {
   border-bottom: 1px solid var(--color-border);
 }
 
+#screen-filter-row {
+  display: flex;
+  gap: var(--space-md);
+}
+
+/* CHR-731 — quieter than the header's filled .toggle-button: on = accent outline on the subtle accent fill (approved `variants-sidebar` c-tree-tags). */
+#screen-tags-toggle {
+  flex: none;
+  height: 32px;
+  padding: 0 var(--space-lg);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+#screen-tags-toggle[aria-pressed="true"] {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
 #screen-filter-input-wrap {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-md);
@@ -527,6 +550,144 @@ body {
   background: var(--color-accent-subtle);
   color: var(--color-accent);
   font-weight: 600;
+}
+
+/* CHR-731 — variant tree. A row's --depth (set inline by renderScreenList, only when the project has variants) indents 14px per level behind a 2px depth guide. */
+#screen-list li[data-depth] {
+  margin-left: calc(var(--depth) * 14px);
+}
+
+#screen-list li[data-depth]:not([data-depth="0"]) {
+  border-left: 2px solid var(--color-border);
+  border-radius: 0 6px 6px 0;
+}
+
+.screen-item.in-tree {
+  padding-left: 22px;
+}
+
+li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
+  font-size: 0.8rem;
+}
+
+.screen-item-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.screen-item-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screen-item-total {
+  margin-left: auto;
+  flex: none;
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
+}
+
+.screen-item-toggle {
+  position: absolute;
+  top: 5px;
+  left: 3px;
+  width: 18px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-faded);
+  font-size: 0.6rem;
+  cursor: pointer;
+}
+
+.kind-icon {
+  flex: none;
+  position: relative;
+  display: inline-block;
+  color: var(--color-text-muted);
+}
+
+.kind-state,
+.kind-overlay {
+  width: 9px;
+  height: 13px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+}
+
+.kind-state::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 2px;
+  height: 1.5px;
+  background: currentColor;
+  box-shadow: 0 3px 0 currentColor;
+}
+
+.kind-overlay {
+  color: var(--color-accent);
+}
+
+.kind-overlay::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  background: currentColor;
+}
+
+.kind-step {
+  width: 9px;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--color-warning);
+}
+
+#screen-list li.context .screen-item {
+  color: var(--color-text-faint);
+}
+
+#screen-list li.context .tag-row {
+  opacity: 0.55;
+}
+
+#screen-list li.screen-hidden-row {
+  padding: 2px 0 6px 22px;
+  font-size: 0.65rem;
+  color: var(--color-text-faint);
+}
+
+.screen-item mark {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-radius: 2px;
+}
+
+.tag-chip.match {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.tag-chip.tag-more {
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border-strong);
+  padding: 0 6px;
 }
 
 .tag-row {
@@ -2711,4 +2872,9 @@ body {
 .btn-confirm:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.screen-item-toggle:disabled {
+  cursor: default;
+  opacity: 0.4;
 }

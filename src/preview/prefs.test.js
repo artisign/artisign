@@ -4,6 +4,8 @@ import {
   writeBoolPref,
   readStringPref,
   writeStringPref,
+  readStringSetPref,
+  writeStringSetPref,
   pickInitialScreen,
   parseLastSelection,
   parseZoomPref,
@@ -279,5 +281,35 @@ describe("parseBoardZoomPref", () => {
 
   it("falls back for a non-numeric value", () => {
     expect(parseBoardZoomPref("banana", 50, 5, 200)).toBe(50);
+  });
+});
+
+describe("readStringSetPref / writeStringSetPref (CHR-731)", () => {
+  const memory = (init = {}) => {
+    const data = { ...init };
+    return {
+      getItem: (k) => data[k] ?? null,
+      setItem: (k, v) => void (data[k] = v),
+      removeItem: (k) => void delete data[k],
+    };
+  };
+
+  it("round-trips a set", () => {
+    const storage = memory();
+    writeStringSetPref(storage, "artisign.k", new Set(["a", "b"]));
+    expect([...readStringSetPref(storage, "artisign.k")]).toEqual(["a", "b"]);
+  });
+
+  it("falls back to an empty set on a missing key, bad JSON, a non-array, or no storage", () => {
+    expect(readStringSetPref(memory(), "artisign.k").size).toBe(0);
+    expect(readStringSetPref(memory({ "artisign.k": "{" }), "artisign.k").size).toBe(0);
+    expect(readStringSetPref(memory({ "artisign.k": '{"a":1}' }), "artisign.k").size).toBe(0);
+    expect(readStringSetPref(null, "artisign.k").size).toBe(0);
+  });
+
+  it("drops non-string entries", () => {
+    expect([...readStringSetPref(memory({ "artisign.k": '["a",1,null]' }), "artisign.k")]).toEqual([
+      "a",
+    ]);
   });
 });

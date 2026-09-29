@@ -20,7 +20,7 @@ import {
   fetchBoardState,
   setBoardState,
 } from "./api.js";
-import { renderScreenList, filterScreens } from "./screens.js";
+import { renderScreenList, filterScreens, buildScreenTree, ancestorNames } from "./screens.js";
 import { renderMockupList, filterMockups } from "./mockups.js";
 import { renderTagNotes } from "./notes-panel.js";
 import { renderMockupView } from "./mockup-view.js";
@@ -66,6 +66,8 @@ import {
   writeBoolPref,
   readStringPref,
   writeStringPref,
+  readStringSetPref,
+  writeStringSetPref,
   pickInitialScreen,
   parseLastSelection,
   parseZoomPref,
@@ -81,6 +83,7 @@ const mockupListEl = document.getElementById("mockup-list");
 const mockupViewEl = document.getElementById("mockup-view");
 const screenFilterInput = document.getElementById("screen-filter-input");
 const screenFilterHint = document.getElementById("screen-filter-hint");
+const screenTagsToggle = document.getElementById("screen-tags-toggle");
 const notesPanelEl = document.getElementById("notes-panel");
 const notesPanelHeader = document.getElementById("notes-panel-header");
 const notesPanelScreen = document.getElementById("notes-panel-screen");
@@ -333,11 +336,16 @@ board.mount();
  * client on this project including this one — see api.js's setBoardState
  * for why this never applies its own result directly.
  * @param {string} screen
+ * @param {string[]} [screensToPin] the screen plus its variants when pinning a sidebar group row
  */
-function toggleScreenPin(screen) {
+function toggleScreenPin(screen, screensToPin = [screen]) {
   if (!activeProjectRoot) return;
-  const op = pinnedScreens.includes(screen) ? "remove" : "add";
-  reportBoardStateFailure(setBoardState(activeProjectRoot, { pins: { op, screens: [screen] } }));
+  // CHR-731 — a sidebar group row passes its whole subtree, pinned or
+  // unpinned in ONE write; a partly pinned group pins the rest.
+  const op = screensToPin.every((name) => pinnedScreens.includes(name)) ? "remove" : "add";
+  reportBoardStateFailure(
+    setBoardState(activeProjectRoot, { pins: { op, screens: screensToPin } }),
+  );
 }
 
 boardClearPinsBtn.addEventListener("click", () => {
@@ -1221,11 +1229,67 @@ function selectMockupHuman(name) {
   return selectMockup(name);
 }
 
+// CHR-731 — sidebar tree view state, per browser (never sent to the daemon).
+// The expanded set is per project and loaded lazily the first time the
+// sidebar renders for a project root, so no project-switch hook is needed.
+const SIDEBAR_TAGS_KEY = "artisign.sidebarTags";
+let showSidebarTags = readBoolPref(prefsStorage, SIDEBAR_TAGS_KEY, true);
+let expandedScreens = new Set();
+let expandedScreensRoot = null;
+
+function sidebarExpandedKey(projectRoot) {
+  return `artisign.sidebarExpanded:${projectRoot}`;
+}
+
+function currentExpandedScreens() {
+  if (expandedScreensRoot !== activeProjectRoot) {
+    expandedScreensRoot = activeProjectRoot;
+    expandedScreens = activeProjectRoot
+      ? readStringSetPref(prefsStorage, sidebarExpandedKey(activeProjectRoot))
+      : new Set();
+  }
+  return expandedScreens;
+}
+
+function saveExpandedScreens() {
+  if (activeProjectRoot)
+    writeStringSetPref(prefsStorage, sidebarExpandedKey(activeProjectRoot), expandedScreens);
+}
+
+function toggleScreenExpanded(screen) {
+  const expanded = currentExpandedScreens();
+  if (!expanded.delete(screen)) expanded.add(screen);
+  saveExpandedScreens();
+  refreshSidebar();
+}
+
+/** Expands the ancestor path of `screen` so its row is visible — every selection route (list, flow, follow, board) ends in selectScreen. */
+function revealScreenInSidebar(screen) {
+  const expanded = currentExpandedScreens();
+  const missing = ancestorNames(buildScreenTree(screens), screen).filter(
+    (name) => !expanded.has(name),
+  );
+  if (missing.length === 0) return;
+  for (const name of missing) expanded.add(name);
+  saveExpandedScreens();
+}
+
+screenTagsToggle.setAttribute("aria-pressed", String(showSidebarTags));
+screenTagsToggle.addEventListener("click", () => {
+  showSidebarTags = !showSidebarTags;
+  screenTagsToggle.setAttribute("aria-pressed", String(showSidebarTags));
+  writeBoolPref(prefsStorage, SIDEBAR_TAGS_KEY, showSidebarTags);
+  refreshSidebar();
+});
+
 /** Re-renders the screen list and the mockup list (both filtered by the same sidebar search), plus everything in the sidebar derived from them/the current selection, plus the board toolbar's status text/Clear pins (CHR-624 — cheap and pure, so it's simplest to always keep in sync here rather than gate it on the Board tab actually showing). */
 function refreshSidebar() {
   renderScreenList(screenListEl, screens, currentScreen, selectScreenHuman, screenFilter, {
     pinned: new Set(pinnedScreens),
     onTogglePin: toggleScreenPin,
+    expanded: currentExpandedScreens(),
+    onToggleExpand: toggleScreenExpanded,
+    showTags: showSidebarTags,
   });
   const filteredMockups = filterMockups(mockups, screenFilter);
   renderMockupList(mockupListEl, filteredMockups, { activeName: currentMockup, onSelect: selectMockupHuman });
@@ -1302,6 +1366,7 @@ async function selectScreen(screen) {
   currentScreen = screen;
   currentMockup = null; // screens and mockups are never selected at the same time
   if (activeProjectRoot) writeStringPref(prefsStorage, lastScreenKey(activeProjectRoot), screen);
+  revealScreenInSidebar(screen);
   refreshSidebar();
   applyMainVisibility();
   await Promise.all([loadCurrentScreen(), loadComments(), loadInspectorEntries()]);

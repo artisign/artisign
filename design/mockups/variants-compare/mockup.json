@@ -1,0 +1,21 @@
+{
+  "variants": [
+    {
+      "id": "a-column-compare",
+      "title": "A · Column compare of a state family (base-anchored diff)",
+      "description": "Compare is a mode of the screen view (Single | Compare toggle in the header bar), so it inherits breadcrumb, sidebar and inspector. Picking works both ways: tick checkboxes on sidebar tree rows (they appear only in compare mode) or tick 'Compare' in the breadcrumb popover - both edit the same chip row above the canvas (2-4 members, max 4, base pinned as the reference column). Members render as equal-width columns like the mockup column view (label above, frame below), scaled to fit: 2-up ~100%, 3-up ~60%, 4-up ~45% with the zoom control (Fit / 100% / 150%) applying to all columns together, exactly like mockup zoom. Diff = amber dashed outline plus a small +/~ badge on every node that differs from the reference column; removed nodes show as an empty ghost outline in the column that lost them. The right panel lists the diff by node id and clicking a row highlights it in all columns. For overlays the sheet is diffed, the base behind it is not (see variant B). Easier: mirrors the mockup column view users already know; one reference makes the diff unambiguous. Harder: at 4-up small text needs zoom; only one reference column at a time."
+    },
+    {
+      "id": "b-overlay-focus-compare",
+      "title": "B · Overlay / step compare, sheet-focused 4-up with lens",
+      "description": "Same Compare mode, tuned for overlays and step sequences. Picking is a one-click 'Compare siblings' action on a node in the sidebar tree (or on the breadcrumb popover 'Inside sheet-leave' header) that pre-selects the node plus its children/steps; individual rows can then be added or removed with shift-click. Side panels collapse to a rail so 4 members get ~300px each (4-up at ~50% of the phone is readable enough here because the scrim base is identical). Because the base behind a sheet is the same in every column, it is rendered once, ghosted at 25% opacity, and the diff runs only on the sheet subtree: changed text gets an amber wash, changed/added/removed buttons get the amber dashed outline. Nodes that only exist in some members show as ghost outlines in the others so the sheets stay aligned. Zoom: hovering a column shows a lens (200%) following the cursor, plus the shared Fit/100%/150% control; keyboard Z toggles the lens. The right panel is replaced by a diff summary strip under the columns. Easier: sequences (leave -> confirm -> dissolve) read as one story; base noise removed. Harder: two different code paths (state vs overlay diff scope) and the ghosting rule needs a definition of 'the sheet subtree' for the tool."
+    }
+  ],
+  "title": "Side-by-side variant compare (CHR-734)",
+  "description": "Compare 2-4 members of a variant set as columns with a node-level diff highlight. A = state families, base-anchored, picking via sidebar checkboxes + breadcrumb popover. B = overlays/steps, sheet-only diff with ghosted base, 4-up, lens zoom.",
+  "tags": [
+    "CHR-734",
+    "chr-734",
+    "variants-exploration"
+  ]
+}

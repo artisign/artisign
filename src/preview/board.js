@@ -873,10 +873,13 @@ export function resolveFlowEdge(layout, flow) {
   const to = resolveEdgeEnd(layout, toScreen);
   if (!from || !to) return null;
   if (from.kind !== "tile" || to.kind !== "tile") {
-    const clusterOf = (screen) => layout.frames?.find((f) => f.members.includes(screen))?.root;
-    const fromCluster = clusterOf(fromScreen);
-    if (fromCluster !== undefined && fromCluster === clusterOf(toScreen)) return null;
+    // Nothing to draw when both ends dock on the same rect, or the edge stays
+    // inside one collapsed frame. Inside an expanded cluster, an edge from a
+    // tile to its own "+N more" tile is two different rects and is drawn.
     if (from.rect === to.rect) return null;
+    const frameOf = (screen) => layout.frames?.find((f) => f.members.includes(screen));
+    const fromFrame = frameOf(fromScreen);
+    if (fromFrame && !fromFrame.expanded && fromFrame === frameOf(toScreen)) return null;
   }
   return { from, to, sides: edgeSides(from.rect, to.rect) };
 }

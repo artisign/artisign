@@ -900,6 +900,15 @@ describe("edge endpoints on a cluster board", () => {
     expect(resolveFlowEdge(build([], ["plain"]), flow("plain.x", "dashboard"))).toBeNull(); // dashboard hidden by the filter
   });
 
+  it("an edge from a tile to a variant hidden in its own expanded cluster's '+N more' tile is drawn", () => {
+    const many = [v("m"), ...Array.from({ length: 11 }, (_, i) => v(`m-${i}`, "m", "overlay"))];
+    const model = buildBoardModel(many, many.map((s) => s.name), ["m"]);
+    const layout = computeClusterLayout(model.items, {}, {});
+    const edge = resolveFlowEdge(layout, flow("m.x", "m-10"));
+    expect(edge).not.toBeNull();
+    expect(edge.to).toMatchObject({ kind: "more", screen: "m-10" });
+  });
+
   it("an edge between two exact tiles inside an expanded cluster is drawn", () => {
     expect(resolveFlowEdge(build(["family"]), flow("family.x", "family-leave"))).not.toBeNull();
   });

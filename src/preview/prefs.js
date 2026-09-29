@@ -122,6 +122,37 @@ export function writeStringPref(storage, key, value) {
 }
 
 /**
+ * Reads a persisted set of strings (stored as a JSON array), falling back on
+ * an empty set for a missing key, unparsable JSON, or anything that isn't an
+ * array of strings — used for the sidebar tree's per-project expanded rows.
+ *
+ * @param {Storage | null | undefined} storage
+ * @param {string} key
+ * @returns {Set<string>}
+ */
+export function readStringSetPref(storage, key) {
+  const raw = readStringPref(storage, key, null);
+  if (raw === null) return new Set();
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? new Set(parsed.filter((v) => typeof v === "string")) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Writes a set of strings as a JSON array, best-effort like the other writers.
+ *
+ * @param {Storage | null | undefined} storage
+ * @param {string} key
+ * @param {Set<string>} value
+ */
+export function writeStringSetPref(storage, key, value) {
+  writeStringPref(storage, key, JSON.stringify([...value]));
+}
+
+/**
  * Picks which screen to open on boot/project-switch: the persisted screen
  * if it still exists among the project's current screens, otherwise the
  * graceful fallback — the first screen (or `null` if the project has none).

@@ -1,0 +1,99 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#1a1a1a;background:#fff;width:1440px}
+.app{width:1440px;height:900px;display:flex;flex-direction:column;overflow:hidden}
+.tb{height:48px;flex:none;display:flex;align-items:center;gap:16px;padding:0 16px;border-bottom:1px solid #e2e2e2;font-size:13.6px}
+.logo{font-weight:600;font-size:15px}.proj{border:1px solid #d6d6d6;border-radius:6px;padding:5px 12px;font-weight:600}
+.tab{padding:5px 10px;border-radius:6px;color:#555}.tab.on{background:#eef1ff;color:#2a3edb;font-weight:600}
+.btn{border:1px solid #d6d6d6;border-radius:6px;padding:6px 12px}.btn.on{background:#2a3edb;border-color:#2a3edb;color:#fff}.dot{width:8px;height:8px;border-radius:50%;background:#16a34a}
+.body{flex:1;display:flex;min-height:0}
+.side{width:280px;flex:none;background:#fff;display:flex;flex-direction:column;min-height:0}.side.l{border-right:1px solid #e2e2e2}.side.rt{border-left:1px solid #e2e2e2}
+.sbh{padding:10px 8px;border-bottom:1px solid #e2e2e2;display:flex;font-size:12.8px;font-weight:600;color:#333}.sbh span{margin-left:auto;color:#888}
+.fw{margin:12px 8px;display:flex;align-items:center;gap:8px;height:32px;border:1px solid #d6d6d6;border-radius:6px;background:#fafafa;padding:0 10px;font-size:12.8px;color:#999}
+.mg{width:11px;height:11px;border:1.5px solid #888;border-radius:50%}
+.list{padding:0 8px;overflow:hidden}
+.r{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:6px;font-size:13.6px;color:#333;margin-bottom:2px;white-space:nowrap}
+.r.sel{background:#eef1ff;color:#2a3edb;font-weight:600}.tri{width:10px;flex:none;font-size:9px;color:#999}
+.d1{margin-left:15px;padding-left:6px;border-left:2px solid #e2e2e2;font-size:12.8px}.d2{margin-left:29px;padding-left:6px;border-left:2px solid #e2e2e2;font-size:12.8px}
+.ic{display:inline-block;width:9px;height:13px;border:1.5px solid;border-radius:2px;position:relative;flex:none;color:#666}
+.ic.ov{color:#2a3edb}.ic.st::after{content:"";position:absolute;left:1px;right:1px;top:2px;height:1.5px;background:currentColor;box-shadow:0 3px 0 currentColor}.ic.ov::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:currentColor}
+.gl{width:9px;flex:none;text-align:center;font-size:12px;line-height:1;color:#d97706;font-weight:700}
+.px{color:#aaa}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;background:#e5e5e5;position:relative}
+.bc{flex:none;height:46px;background:#fff;border-bottom:1px solid #e2e2e2;display:flex;align-items:center;gap:6px;padding:0 16px;font-size:12.8px}
+.cr{display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:6px;color:#333;border:1px solid transparent}.cr.on{background:#eef1ff;color:#2a3edb;border-color:#2a3edb;font-weight:600}.cr.open{background:#f0f0f0;border-color:#d6d6d6}
+.cr small{font-size:9px;color:#888}.sep{color:#bbb;font-size:14px}
+.back{margin-left:auto;font-size:12px;color:#555;border:1px solid #d6d6d6;border-radius:6px;padding:4px 10px}
+.trail{flex:none;padding:8px 16px;font-size:12px;color:#555;display:flex;gap:8px;align-items:center}.trail b{font-family:monospace;color:#1a1a1a}
+.tag{font-size:10.5px;padding:2px 8px;border-radius:99px;background:#f0f0f0;color:#555}.tag.o{background:#eef1ff;color:#2a3edb}.tag.s{background:#fdf1e0;color:#b45309}
+.pop{position:absolute;left:130px;top:50px;width:262px;background:#fff;border:1px solid #d6d6d6;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px;z-index:5;font-size:12.5px}
+.pop h4{font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:#888;padding:6px 8px 4px}.pop .r{font-size:12.5px;margin:0}.pop .r span.z{margin-left:auto;color:#2a3edb;font-size:10.5px}.pop hr{border:0;border-top:1px solid #e2e2e2;margin:4px 0}
+.canvas{flex:1;display:flex;align-items:flex-start;gap:28px;padding:0 24px 0 274px;min-height:0;overflow:hidden}
+.mp{display:block;position:relative;width:36px;height:78px;border:1px solid #d6d6d6;border-radius:5px;background:#fff;overflow:hidden;font-size:0;font-style:normal}
+.mp b.h{display:block;height:8px;background:#f0f0f0}.mp b.c{display:block;height:12px;margin:4px 3px;background:#fafafa;border:1px solid #e2e2e2;border-radius:2px}
+.mp u{position:absolute;inset:0;background:rgba(0,0,0,.38)}.mp s{position:absolute;left:0;right:0;bottom:0;height:34%;background:#fff;border-radius:5px 5px 0 0;text-decoration:none}
+.mp.big{flex:none;width:266px;height:592px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.14);font-size:12px}
+.big b.h{height:46px;padding:15px 14px;font-size:13px;font-weight:600;color:#1a1a1a}.big b.c{height:56px;margin:10px 12px;border-radius:6px;padding:10px 12px;color:#777;line-height:1.5}
+.big s{height:230px;border-radius:16px 16px 0 0;padding:10px 18px;color:#333}.big s em{display:block;width:36px;height:4px;border-radius:2px;background:#d6d6d6;margin:0 auto 14px}.big s strong{display:block;font-size:14px;margin-bottom:6px}.big s span{display:block;color:#777;line-height:1.5;margin-bottom:14px}.big s i.bt{display:block;font-style:normal;text-align:center;border-radius:6px;padding:9px;margin-bottom:8px;border:1px solid #d6d6d6}.big s i.bt.p{background:#c0392b;border-color:#c0392b;color:#fff}
+.card{background:#fff;border:1px solid #e2e2e2;border-radius:10px;padding:12px}.card h3{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#888;margin-bottom:8px}
+.map{width:236px;flex:none;font-size:12px}.map .n{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:5px;color:#333}.map .n.on{background:#eef1ff;color:#2a3edb;font-weight:600}.map .n.dim{color:#999}
+.map .l1{margin-left:12px}.map .l2{margin-left:24px}.map .fl{margin-left:24px;font-size:10.5px;color:#d97706;padding:0 6px 2px}
+.ins{padding:12px}.ins .kv{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;color:#555}.ins .kv b{color:#1a1a1a;font-weight:600}
+.el{display:flex;gap:8px;padding:7px 12px;border-bottom:1px solid #e2e2e2;font-family:monospace;font-size:12px;color:#333}.el i{font-style:normal;color:#999;font-size:9px;width:10px}
+</style></head><body><div class="app">
+<div class="tb"><span class="logo">Artisign</span><span class="proj">Lückenzeit ▾</span><span class="tab on">Screens</span><span class="tab">Design System</span><span class="tab">Board</span><span style="flex:1"></span><span class="btn on">Flow mode</span><span class="btn">Comment mode</span><span class="dot"></span></div>
+<div class="body">
+<div class="side l"><div class="sbh">Screens<span>◂</span></div><div class="fw"><i class="mg"></i>Search screens, mockups and tags…</div>
+<div class="list">
+<div class="r"><span class="tri">▸</span>dashboard</div>
+<div class="r" style="background:#f7f8ff;color:#2a3edb"><span class="tri">▾</span>family-l2</div>
+<div class="r d1"><span class="tri">▸</span><i class="ic st"></i>family-l2-two-parents</div>
+<div class="r d1"><span class="tri"></span><i class="ic ov"></i>family-l2-sheet-add-parent</div>
+<div class="r d1"><span class="tri"></span><i class="ic ov"></i>family-l2-sheet-name</div>
+<div class="r d1" style="color:#2a3edb"><span class="tri">▾</span><i class="ic ov"></i>family-l2-sheet-leave</div>
+<div class="r d2 sel"><span class="tri"></span><span class="gl">↪</span><span><span class="px">…</span>leave-confirm</span></div>
+<div class="r d2"><span class="tri"></span><span class="gl">↪</span><span><span class="px">…</span>leave-dissolve</span></div>
+<div class="r d2"><span class="tri"></span><span class="gl">↪</span><span><span class="px">…</span>leave-no-transfer</span></div>
+<div class="r"><span class="tri">▸</span>parent-l3</div>
+</div></div>
+
+<div class="main">
+<div class="bc">
+<span class="cr"><span style="font-size:11px">⌂</span>family-l2 <small>▾</small></span><span class="sep">›</span>
+<span class="cr open"><i class="ic ov" style="width:7px;height:10px"></i>family-l2-sheet-leave <small>▾</small></span><span class="sep">›</span>
+<span class="cr on"><span class="gl">↪</span>…leave-confirm <small>▾</small></span>
+<span class="back">⤴ Back to family-l2</span></div>
+<div class="trail"><span class="tag">depth 3</span><span class="tag s">step</span><span style="margin-left:auto">Flow mode: tap on <b>sheet-leave.btn-verlassen</b> → <b>leave-confirm</b></span></div>
+
+<div class="pop"><h4>Inside sheet-leave · 3</h4>
+<div class="r sel"><span class="gl">↪</span>leave-confirm<span class="z">current</span></div>
+<div class="r"><span class="gl">↪</span>leave-dissolve</div>
+<div class="r"><span class="gl">↪</span>leave-no-transfer</div><hr>
+<h4>Siblings in family-l2 · 5</h4>
+<div class="r"><i class="ic ov"></i>sheet-add-parent</div>
+<div class="r"><i class="ic ov"></i>sheet-name</div>
+<div class="r"><i class="ic st"></i>two-parents<span class="z" style="color:#888">▸ 1</span></div><hr>
+<div class="r" style="color:#2a3edb">Open sheet-leave itself</div></div>
+
+<div class="canvas">
+<i class="mp big"><b class="h">Familie</b><b class="c">Lena · Elternteil</b><b class="c">Tom · Kind</b><b class="c">Mia · Kind</b><u></u><s><em></em><strong>Wirklich verlassen?</strong><span>Die Familie wird für dich gelöscht. Das kann nicht rückgängig gemacht werden.</span><i class="bt p">Ja, verlassen</i><i class="bt">Zurück</i></s></i>
+<div class="map"><div class="card"><h3>Variant tree · family-l2</h3>
+<div class="n dim">⌂ family-l2 <span style="margin-left:auto;font-size:10px">base</span></div>
+<div class="n dim l1"><i class="ic st"></i>two-parents</div>
+<div class="n dim l2"><i class="ic st"></i>…-solo</div>
+<div class="n dim l1"><i class="ic ov"></i>sheet-add-parent</div>
+<div class="n dim l1"><i class="ic ov"></i>sheet-name</div>
+<div class="n l1" style="color:#2a3edb"><i class="ic ov"></i>sheet-leave</div>
+<div class="n on l2"><span class="gl">↪</span>leave-confirm</div>
+<div class="fl">← tap “Ja, verlassen” here</div>
+<div class="n dim l2"><span class="gl">↪</span>leave-dissolve</div>
+<div class="n dim l2"><span class="gl">↪</span>leave-no-transfer</div>
+</div>
+<div class="card" style="margin-top:12px;font-size:12px;line-height:1.5;color:#333"><h3>Context guarantee</h3>Wherever flow mode lands, crumbs and map redraw. Every crumb and map node is clickable.</div></div>
+</div></div>
+
+<div class="side rt"><div class="sbh">Elements<span>▸</span></div>
+<div class="ins"><div class="card"><h3>Variant</h3>
+<div class="kv">Path<b>family-l2 › sheet-leave</b></div><div class="kv">Kind<b>step</b></div><div class="kv">Depth<b>3</b></div><div class="kv">Siblings<b>2</b></div><div class="kv">Flows in / out<b>1 / 1</b></div></div></div>
+<div class="el"><i>▸</i>&lt;div&gt; · sheet</div><div class="el"><i>▸</i>&lt;div&gt; · scrim</div><div class="el"><i>▸</i>&lt;div&gt; · btn-confirm</div></div>
+</div></div></body></html>

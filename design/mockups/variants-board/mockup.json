@@ -1,0 +1,30 @@
+{
+  "variants": [
+    {
+      "id": "b-stacks",
+      "title": "B · Card stacks (collapsed)",
+      "description": "Every main screen with variants is ONE board tile drawn as a card stack with a count and kind badges (state / overlay). Collapsed stacks still receive and emit the flow edges of all their variants: an edge that ends at a variant docks on the stack with an accent label naming it (-> sheet-edit, -> caregivers-l2-empty); an edge that starts in a variant shows the source name as a grey label; edges between a stack and its own variants collapse into an \"8 edges inside stack\" chip. 66 variant tiles disappear, so 197 tiles become 46 and Fit all is readable. Easier: overview and layout of the real main flow. Harder: a stack hides which exact variant a flow uses until you read the label; many labels on a busy stack (calendar-month has 37 variants) will crowd, and edge labels need aggregation (\"+5 more\") beyond ~3. Flow/Board stay intact: nothing is deleted, expanding is a per-stack view state (see b-stacks-expanded); pins apply to the whole stack."
+    },
+    {
+      "id": "b-stacks-expanded",
+      "title": "B · Stack expanded (fan-out)",
+      "description": "Clicking a stack opens it into a framed grid: base tile first, then state variants, then overlay variants, each a normal board tile (pin, open, comment, flow endpoint). Edges now attach to the exact tile (two-parents-solo -> parent-l3, sheet-invite -> caregivers-l2-empty), internal edges such as base -> sheet-leave become visible as thin lines. Other stacks keep their place; neighbours that would collide reflow below. Easier: inspect one screen family with its real edges, no mental un-grouping. Harder: a 37-variant stack (calendar-month) makes a very large frame, so expansion needs a cap or a scrollable frame; only one level, sequence order (leave -> leave-confirm) is only visible through edges, not layout. Flow/Board stay intact: collapse/expand is per-user view state and never changes screens or flows."
+    },
+    {
+      "id": "c-clusters",
+      "title": "C · Clusters (family-l2 expanded, depth 3)",
+      "description": "Each main screen plus its subtree is a framed cluster. Expanded, the subtree lays out left to right by depth (family-l2 > sheet-leave > leave-confirm / leave-dissolve / leave-no-transfer), grey solid connectors show variant-of, dashed arrows are real flow edges drawn between the exact tiles (leave-no-transfer -> dashboard-empty, two-parents-solo -> parent-l3). Other clusters stay collapsed to main tile + micro thumbnails; an edge into a collapsed cluster docks on its frame and carries the variant name. Easier: hierarchy and flow are both readable at once, sequences keep their shape at any depth. Harder: an open cluster is tall (10 nodes here, 40+ for calendar-month), tiles are shrunk to ~60% to fit, two edge languages (connector vs flow) must be learned, and long back-edges (leave-no-transfer -> dashboard-empty) sweep across the board. Flow/Board stay intact: every tile keeps its identity; collapse/expand is view state."
+    },
+    {
+      "id": "c-clusters-collapsed",
+      "title": "C · Clusters, all collapsed (Fit all shape)",
+      "description": "All clusters collapsed: each is a frame with header (name, subtree size, depth), the main tile and a row of micro thumbnails that hint at kind (grey = state, blue foot = overlay, dashed = deeper level). Edges keep their true direction and dock on the frame, labelled with the variant they really touch (-> dashboard-empty, -> sheet-edit, calendar-sheet-child-pick as source). Compared with stacks the frame carries more information (depth, kinds) but takes more space (204x240 vs a 180x172 stack) and shows many small shapes that can look noisy at zoom levels below 50%. Flow/Board stay intact: same view state as the expanded cluster, no data change."
+    }
+  ],
+  "title": "Screen variants — Board",
+  "description": "Board with flow edges when screens have variants. B = card stacks (collapsed + expanded fan-out), C = clusters (subtree frame expanded at depth 3 + all collapsed). Edges keep real endpoints in every state.",
+  "tags": [
+    "variants-exploration",
+    "chr-727"
+  ]
+}

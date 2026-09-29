@@ -1,0 +1,25 @@
+{
+  "variants": [
+    {
+      "id": "b-grouped",
+      "title": "B · Grouped variants (one level)",
+      "description": "A main screen is one row; its variants fold underneath as a flat group with a count badge split by kind (state = grey icon, overlay = blue icon). Filtering searches all 197 screens but pulls a matching variant's main screen in as a dimmed context row, so nothing is orphaned. A \"Group variants\" toggle falls back to today's flat list (each variant row then carries an \"overlay of family-l2\" sub-caption). Easier: overview (197 rows become 46), two badge kinds are readable at a glance. Harder: sequence steps (sheet-leave-confirm) appear as flat siblings of sheet-leave, the hierarchy between them is lost; a main with 37 variants (calendar-month) is a long flat group. Flow/Board: rows stay individually addressable and keep their own flow indicators; only the list presentation changes."
+    },
+    {
+      "id": "c-tree",
+      "title": "C · Nested tree (arbitrary depth)",
+      "description": "The screen list becomes a tree with disclosure triangles and depth guides. A variant may itself have variants, so all three relations fit: state (two-parents › two-parents-solo), overlay (family-l2 › sheet-leave) and sequence step (sheet-leave › leave-confirm / leave-dissolve / leave-no-transfer), the latter marked with an arrow glyph. Collapsed nodes show the total subtree count. Filtering keeps the full ancestor path of a match as dimmed context rows and auto-expands only that path; unrelated siblings stay folded (\"2 siblings hidden\"). Easier: the hierarchy of a flow (family-l2 › leave › confirm) is visible in the list itself, sequences no longer flatten. Harder: 280px is narrow, so names below depth 1 are shown as an ellipsis-prefixed suffix (full name on hover); reparenting and the risk of over-nesting need rules. Flow/Board: every node is a normal screen with its own flow indicators; the tree is only the list presentation of a stored variant-of pointer."
+    },
+    {
+      "id": "c-tree-tags",
+      "title": "C · Tree with tags (chosen direction)",
+      "description": "Concept C tree, unlimited depth, with tag chips on every row. A row shows its first two tags plus a \"+N\" chip; hovering the chip lists all tags, hovering a truncated name (\"...leave-no-transfer\") shows the full name plus its path. A \"Tags\" toggle next to the search hides all chips (per-browser preference) and returns the tree to compact single-line rows. Depth 4 (leave-no-transfer > ...-error) still reads at 280px because only the suffix is shown and indentation stays 14px per level. Filtering by a tag (chr-379) highlights matching rows and their matching chip, keeps ancestors as grey context rows and folds non-matching siblings into a \"N hidden\" line. Trade-off: chips double the row height (12 rows instead of ~20 visible), which the toggle is for; tags on state/step variants repeat their parent's tags, so an inherit-tags-from-parent option may be worth considering. Flow/Board are unaffected: this is list presentation only."
+    }
+  ],
+  "title": "Screen variants — sidebar list",
+  "description": "How related screens (state / overlay / step variants) are grouped in the left screen list. B = one-level group with kind badges, C = nested tree. Includes filter behaviour when a variant matches but its main screen does not.",
+  "tags": [
+    "variants-exploration",
+    "chr-727"
+  ]
+}

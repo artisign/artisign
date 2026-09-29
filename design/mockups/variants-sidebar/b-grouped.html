@@ -1,0 +1,108 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#1a1a1a;background:#fff;width:1440px}
+.app{width:1440px;height:900px;display:flex;flex-direction:column;overflow:hidden}
+.tb{height:48px;flex:none;display:flex;align-items:center;gap:16px;padding:0 16px;border-bottom:1px solid #e2e2e2;font-size:13.6px}
+.logo{font-weight:600;font-size:15px}.proj{border:1px solid #d6d6d6;border-radius:6px;padding:5px 12px;font-weight:600}
+.tab{padding:5px 10px;border-radius:6px;color:#555}.tab.on{background:#eef1ff;color:#2a3edb;font-weight:600}
+.btn{border:1px solid #d6d6d6;border-radius:6px;padding:6px 12px}.dot{width:8px;height:8px;border-radius:50%;background:#16a34a}
+.stage{flex:1;background:#e5e5e5;padding:20px 24px;display:flex;gap:24px;min-height:0}
+.pcol{width:280px;flex:none;display:flex;flex-direction:column;gap:8px;min-height:0}
+.cap{font-size:12px;font-weight:600;color:#333}.cap span{color:#777;font-weight:400}
+.sb{flex:1;background:#fff;border:1px solid #d6d6d6;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14);overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.sbh{padding:10px 8px;border-bottom:1px solid #e2e2e2;display:flex;font-size:12.8px;font-weight:600;color:#333}.sbh span{margin-left:auto;color:#888}
+.flt{padding:12px 8px;border-bottom:1px solid #e2e2e2}
+.fw{display:flex;align-items:center;gap:8px;height:32px;border:1px solid #d6d6d6;border-radius:6px;background:#fafafa;padding:0 10px;font-size:12.8px;color:#999}
+.fw.act{border-color:#2a3edb;background:#eef1ff;color:#2a3edb;font-weight:600}
+.mg{width:11px;height:11px;border:1.5px solid #888;border-radius:50%;flex:none}.act .mg{border-color:#2a3edb}
+.hint{margin-top:6px;font-size:10.9px;color:#999;display:flex;justify-content:space-between}.hint b{color:#555;font-weight:600}
+.tog{display:inline-flex;align-items:center;gap:4px;color:#555}.sw{width:20px;height:11px;border-radius:99px;background:#2a3edb;position:relative}.sw::after{content:"";position:absolute;right:1px;top:1px;width:9px;height:9px;border-radius:50%;background:#fff}.sw.off{background:#ccc}.sw.off::after{right:auto;left:1px}
+.list{padding:8px;overflow:hidden}
+.r{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:6px;font-size:13.6px;color:#333;margin-bottom:2px}
+.r.sel{background:#eef1ff;color:#2a3edb;font-weight:600}
+.tri{width:10px;flex:none;font-size:9px;color:#999}
+.cnt{margin-left:auto;display:flex;gap:4px}.k{display:inline-flex;align-items:center;gap:4px;font-size:10.9px;color:#555;background:#f0f0f0;border-radius:99px;padding:1px 7px}.k.o{color:#2a3edb;background:#eef1ff}
+.ic{display:inline-block;width:9px;height:13px;border:1.5px solid;border-radius:2px;position:relative;flex:none;color:#666}
+.ic.ov{color:#2a3edb}.ic.st::after{content:"";position:absolute;left:1px;right:1px;top:2px;height:1.5px;background:currentColor;box-shadow:0 3px 0 currentColor}.ic.ov::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:currentColor}
+.ch{margin-left:15px;padding-left:10px;border-left:2px solid #e2e2e2;border-radius:0 6px 6px 0;font-size:12.8px}
+.sub{display:block;font-size:10.4px;color:#999;font-weight:400}
+.ctx{color:#999}.cx{margin-left:auto;font-size:10.4px;color:#999}
+mark{background:#dfe4ff;color:#2a3edb;border-radius:2px;padding:0 1px}
+.tg{font-size:10.4px;padding:1px 7px;border-radius:99px;background:#e5e5e5;color:#666}
+.more{margin:2px 0 6px 15px;padding:4px 10px;border-left:2px solid #e2e2e2;font-size:11px;color:#2a3edb}
+.ft{margin-top:10px;padding:8px;font-size:10.9px;color:#999;border-top:1px dashed #e2e2e2}
+.leg{flex:1;background:#fff;border:1px solid #e2e2e2;border-radius:10px;padding:22px 24px;font-size:13px;line-height:1.55;color:#333;overflow:hidden}
+.leg h1{font-size:17px;margin-bottom:4px}.leg h2{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#888;margin:16px 0 6px}
+.leg p{margin-bottom:6px}.leg .lk{display:flex;align-items:center;gap:8px;margin:4px 0}
+.up{color:#0a7d3c}.dn{color:#b91c1c}
+</style></head><body><div class="app">
+<div class="tb"><span class="logo">Artisign</span><span class="proj">Lückenzeit ▾</span><span class="tab on">Screens</span><span class="tab">Design System</span><span class="tab">Board</span><span style="flex:1"></span><span class="btn">Flow mode</span><span class="btn">Comment mode</span><span class="dot"></span></div>
+<div class="stage">
+
+<div class="pcol"><div class="cap">1 · Browsing <span>— groups collapsed by default</span></div><div class="sb">
+<div class="sbh">Screens<span>◂</span></div>
+<div class="flt"><div class="fw"><i class="mg"></i>Search screens, mockups and tags…</div><div class="hint"><span><b>197</b> screens · <b>46</b> main screens</span><span class="tog">Group <i class="sw"></i></span></div></div>
+<div class="list">
+<div class="r">account-delete<span class="cnt"><span class="k o"><i class="ic ov"></i>1</span></span></div>
+<div class="r"><span class="tri">▸</span>calendar-month<span class="cnt"><span class="k"><i class="ic st"></i>7</span><span class="k o"><i class="ic ov"></i>30</span></span></div>
+<div class="r"><span class="tri">▸</span>caregiver-l3<span class="cnt"><span class="k"><i class="ic st"></i>2</span><span class="k o"><i class="ic ov"></i>5</span></span></div>
+<div class="r"><span class="tri">▸</span>caregivers-l2<span class="cnt"><span class="k"><i class="ic st"></i>1</span></span></div>
+<div class="r"><span class="tri">▸</span>child-l3<span class="cnt"><span class="k o"><i class="ic ov"></i>3</span></span></div>
+<div class="r"><span class="tri">▸</span>dashboard<span class="cnt"><span class="k"><i class="ic st"></i>9</span></span></div>
+<div class="r sel"><span class="tri" style="color:#2a3edb">▾</span>family-l2<span class="cnt"><span class="k"><i class="ic st"></i>2</span><span class="k o"><i class="ic ov"></i>6</span></span></div>
+<div class="r ch"><i class="ic st"></i>family-l2-two-parents</div>
+<div class="r ch"><i class="ic st"></i>family-l2-two-parents-solo</div>
+<div class="r ch"><i class="ic ov"></i>family-l2-sheet-add-parent</div>
+<div class="r ch"><i class="ic ov"></i>family-l2-sheet-name</div>
+<div class="r ch"><i class="ic ov"></i>family-l2-sheet-leave</div>
+<div class="r ch"><i class="ic ov"></i>family-l2-sheet-leave-confirm</div>
+<div class="more">+ 2 more overlays</div>
+<div class="r"><span class="tri">▸</span>parent-l3<span class="cnt"><span class="k"><i class="ic st"></i>3</span><span class="k o"><i class="ic ov"></i>5</span></span></div>
+<div class="r">onboarding-welcome</div>
+<div class="r">settings-l2<span class="cnt"><span class="k o"><i class="ic ov"></i>4</span></span></div>
+<div class="ft">46 main rows · 151 variants folded</div>
+</div></div></div>
+
+<div class="pcol"><div class="cap">2 · Filter “empty” <span>— match inside a variant</span></div><div class="sb">
+<div class="sbh">Screens<span>◂</span></div>
+<div class="flt"><div class="fw act"><i class="mg"></i>empty</div><div class="hint"><span><b>4</b> matches · 1 main, 3 in variants</span><span>of 197</span></div></div>
+<div class="list">
+<div class="r ctx"><span class="tri">▾</span>calendar-month<span class="cx">1 of 37</span></div>
+<div class="r ch"><i class="ic ov"></i>calendar-sheet-<mark>empty</mark>-day</div>
+<div class="r ctx"><span class="tri">▾</span>caregivers-l2<span class="cx">1 of 1</span></div>
+<div class="r ch"><i class="ic st"></i>caregivers-l2-<mark>empty</mark></div>
+<div class="r ctx"><span class="tri">▾</span>dashboard<span class="cx">1 of 9</span></div>
+<div class="r ch"><i class="ic st"></i>dashboard-<mark>empty</mark></div>
+<div class="r" style="margin-top:6px">children-l2-<mark>empty</mark><span class="cnt"><span class="tg">state</span></span></div>
+<div class="ft">Grey rows are context: the main screen does not match, but a variant does. They stay so a variant is never orphaned. Click a grey row to open the main screen; “1 of 9” reveals the hidden 8 variants.</div>
+</div></div></div>
+
+<div class="pcol"><div class="cap">3 · Toggle “Group” off <span>— today’s flat list</span></div><div class="sb">
+<div class="sbh">Screens<span>◂</span></div>
+<div class="flt"><div class="fw"><i class="mg"></i>Search screens, mockups and tags…</div><div class="hint"><span><b>197</b> screens</span><span class="tog">Group <i class="sw off"></i></span></div></div>
+<div class="list">
+<div class="r">family-l2</div>
+<div class="r">family-l2-sheet-add-parent</div>
+<div class="r" style="flex-direction:column;align-items:flex-start;gap:0">family-l2-sheet-leave<span class="sub"><i class="ic ov" style="width:6px;height:9px;margin-right:4px"></i>overlay of family-l2</span></div>
+<div class="r" style="flex-direction:column;align-items:flex-start;gap:0">family-l2-two-parents<span class="sub"><i class="ic st" style="width:6px;height:9px;margin-right:4px"></i>state of family-l2</span></div>
+<div class="r" style="flex-direction:column;align-items:flex-start;gap:0">parent-l3-sheet-edit<span class="sub"><i class="ic ov" style="width:6px;height:9px;margin-right:4px"></i>overlay of parent-l3</span></div>
+<div class="r">settings-l2</div>
+<div class="ft">Escape hatch for people who want the flat alphabetical list. The relation shows as a sub-caption instead of nesting; nothing else changes.</div>
+</div></div></div>
+
+<div class="leg"><h1>B · Grouped variants</h1><p style="color:#777">One level: main screen + flat variant group.</p>
+<h2>Kinds</h2>
+<div class="lk"><i class="ic st"></i><b>state</b> — same screen, different data (two-parents, -empty)</div>
+<div class="lk"><i class="ic ov" ></i><b>overlay</b> — sheet / snackbar over a base (sheet-leave)</div>
+<p style="color:#777">Sequences stay plain flows; sheet-leave-confirm is just another flat overlay of family-l2.</p>
+<h2>What changes</h2>
+<p><span class="up">Easier</span> — 197 rows collapse to 46. The count badge tells you at a glance which screens carry many variants (calendar-month 7 + 30).</p>
+<p><span class="up">Easier</span> — filter still hits variants; the dimmed context row keeps the relation visible.</p>
+<p><span class="dn">Harder</span> — no depth: leave → leave-confirm / -dissolve / -no-transfer flatten into one list of 8.</p>
+<p><span class="dn">Harder</span> — a 37-variant group is a long unfiltered list; needs the kind badge to sub-filter.</p>
+<h2>Flow &amp; Board stay intact</h2>
+<p>Every row remains a real screen: clickable, commentable, flow endpoint. The relation is a stored <code>variant-of</code> field, not a name prefix (calendar-sheet-* has none). Group toggle falls back to today’s list.</p>
+<h2>Numbers in the hint</h2>
+<p>“197 screens · 46 main screens” — the second figure is the grouped row count.</p>
+</div>
+</div></div></body></html>

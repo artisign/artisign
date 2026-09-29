@@ -1,0 +1,25 @@
+{
+  "variants": [
+    {
+      "id": "one-parent-edges",
+      "title": "1 · One parent, other entries are plain edges",
+      "description": "A variant has exactly one home (variant-of: \"family-l2\"). Everything else that opens it is an ordinary flow edge that crosses into the home cluster (onboarding-feed-first-start and -multi-children -> onboarding-sheet-child; calendar-sheet-care-one-child -> caregiver-sheet-new). Sidebar lists it once; breadcrumb shows the home path; the inspector lists \"Also reached from\" flow sources as links. Easier: simplest model and data (a single string), one tile, one comment thread. Harder: from the other cluster you only see an edge running off into another frame, the target's identity is only visible at the far end, and long crossing edges appear. Many apparent multi-parent cases disappear in the tree anyway: work-l3-sheet-edit is opened from work-l3 and its three state variants, which all sit in ONE cluster, so it has one parent. Stored data: variant-of: \"family-l2\". Flow/Board stay intact: edges are unchanged and keep their real endpoints."
+    },
+    {
+      "id": "one-parent-ghost",
+      "title": "2 · One parent + ghost reference tiles",
+      "description": "Still exactly one parent, but every other cluster that opens the variant shows a small dashed ghost tile (\"onboarding-sheet-child ^ lives in family-l2\") that the flow edge ends on; click jumps to the real tile, a dotted \"same screen\" link joins ghost and original. Sidebar shows a muted italic reference row under the other parent (dashed guide). Breadcrumb as in column 1 (home path only). Easier: each cluster reads locally, the flow inside onboarding-feed stays complete, still one tile/one thread of comments. Harder: ghosts add a third visual language (connector, edge, ghost) and clutter: a sheet opened from 30 screens creates many ghosts, so a per-cluster cap/\"+N refs\" is needed; ghosts have no thumbnail and are not commentable. Note: many multi-parent cases vanish anyway, e.g. work-l3-sheet-edit is opened from work-l3 and its 3 state variants, all one cluster, so no ghost. Stored data: variant-of: \"family-l2\" only; ghosts are derived from flow edges at render time, nothing extra is stored. Flow/Board stay intact: the edge still points to the real screen, the ghost is a rendering of its endpoint."
+    },
+    {
+      "id": "multi-parent",
+      "title": "3 · True multiple parents (DAG)",
+      "description": "The variant has several parents: variant-of: [\"family-l2\",\"onboarding-feed-first-start\"]. It appears as a full tile (with thumbnail and a \"2 parents\" badge) in both clusters, a dotted link marks the two tiles as the same screen; the sidebar lists it under both parents; the breadcrumb shows the path you arrived through (flow mode) with a switcher to the other parent path. Cost, honestly: duplicated tiles and thumbnails inflate the board (2 here, N for widely shared sheets); comments/pins/edges belong to the screen so both tiles show the same thing, and only the badge tells them apart; deleting or reparenting one parent must not delete the screen; kind (overlay vs step) may differ per parent so it should be stored per link; cluster layout, expand state and cycle checks must handle a node in two trees. Easier: the variant is found wherever a user looks for it, sidebar and breadcrumb are symmetric. work-l3-sheet-edit would NOT need this: its openers (work-l3 + 3 state variants) are one cluster. Flow/Board stay intact as long as tiles are treated as views of one screen id."
+    }
+  ],
+  "title": "Screen variants — variant reachable from several parents",
+  "description": "Three ways to handle a variant opened from several screens (real cases: onboarding-sheet-child from family-l2 + onboarding feed; caregiver-sheet-new from caregivers-l2 + calendar care sheets), each shown on board clusters, sidebar tree and breadcrumb. Many apparent multi-parent cases vanish in the tree (work-l3-sheet-edit is opened from work-l3 and its 3 state variants = one cluster).",
+  "tags": [
+    "variants-exploration",
+    "chr-727"
+  ]
+}

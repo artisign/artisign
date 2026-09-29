@@ -1,0 +1,25 @@
+{
+  "variants": [
+    {
+      "id": "b-variant-strip",
+      "title": "B · Variant strip above the canvas",
+      "description": "When a main screen (or any of its variants) is open, a filmstrip sits above the canvas: base first, then a State group and an Overlay group, each tile a mini thumbnail with the shared prefix stripped. Click a tile to switch the canvas; the selected variant is outlined, the canvas header shows \"overlay of family-l2\" and a \"Back to base\" button. Flow mode navigating into a variant (tap on family-l2.btn-leave -> sheet-leave) simply selects that tile, so context is never lost. Easier: one-click switching between 9 related screens, kinds are visible as groups, overlays read as sheet-over-base in the thumbnail. Harder: only one level; with 37 variants (calendar-month) the strip needs scrolling and group collapsing; the strip eats ~130px of canvas height. Flow/Board: tiles are real screens; the flow edge lands on the tile, nothing is hidden from the flow graph."
+    },
+    {
+      "id": "c-breadcrumb-tree",
+      "title": "C · Breadcrumb + tree map",
+      "description": "A breadcrumb bar replaces the strip: family-l2 > sheet-leave > sheet-leave-confirm, each crumb carries its kind icon and a disclosure arrow that opens a popover with the node's children and siblings (switching = one click, sequence branches leave-confirm / leave-dissolve / leave-no-transfer are one level below sheet-leave). A small tree map next to the phone shows the whole variant tree with the current node highlighted. Flow mode navigating into a deep variant only updates the crumbs, so \"variant of family-l2\" is always visible and clickable. Easier: any depth, sequences read as a path; the canvas keeps its full height. Harder: no simultaneous thumbnails of siblings (needs the popover or the tree map), more chrome to learn, long names in crumbs need truncation from the left. Flow/Board: crumbs are just a view of the stored variant-of chain; each node remains a flow endpoint."
+    },
+    {
+      "id": "side-by-side-compare",
+      "title": "Alt · Side-by-side compare (works with B and C)",
+      "description": "A compare mode on top of either navigation: pick 2-4 members of a variant set (base + state variants shown here) and the canvas lays them side by side at reduced scale with a highlight of the nodes that differ (amber dashed, computed from the HTML). Solves the actual question behind state variants - \"what changes between family-l2, two-parents and two-parents-solo?\" - which neither strip nor breadcrumb answers. Single mode remains the default; flow mode always navigates in single mode. Easier: reviewing a whole state family at once, spotting inconsistencies. Harder: overlays compare less well (sheet over dimmed base looks similar), and phones shrink to ~60% so small text needs zoom; diff needs a node-level HTML comparison (extra tooling work). Flow/Board: purely a viewing mode; nothing about identity or flow edges changes."
+    }
+  ],
+  "title": "Screen variants — canvas / screen view",
+  "description": "How you see and switch a main screen's variants on the canvas and how flow mode keeps the \"variant of ...\" context. B = variant strip, C = breadcrumb + tree map, plus an alternative side-by-side compare mode.",
+  "tags": [
+    "variants-exploration",
+    "chr-727"
+  ]
+}

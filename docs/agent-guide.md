@@ -298,6 +298,13 @@ main screen when it is a different destination.
 screens; `get_screen` at `view: "full"` adds `variants` (direct children) and
 `reached_from` (screens with a flow into this one).
 
+Deleting a screen that still has variants fails with `has_variants` (subtree
+size and example names; nothing changes). Delete the variants first, or pass
+`delete_entity {kind: "screen", name, cascade: true}` to remove the whole
+subtree at every depth in one commit: `deleted_screens` lists them, their
+outgoing flows are dropped, and a `dangling_flow` warning appears for each
+flow from a screen outside the subtree into it. `cascade` is screen-only.
+
 Write metadata when the decision is fresh, not as a cleanup pass.
 
 ## Anti-pattern checklist

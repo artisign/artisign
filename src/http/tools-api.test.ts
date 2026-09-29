@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { FsStore } from "../store/index.js";
 import { initProject } from "../init/init-project.js";
 import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
 import { startDaemon, type DaemonHandle } from "../daemon/start.js";
@@ -35,6 +36,16 @@ describe("internal tools API (/api/tools/*)", () => {
     });
     return { status: res.status, json: (await res.json()) as Record<string, unknown> };
   }
+
+  it("maps has_variants to 409", async () => {
+    const store = new FsStore(dir);
+    await store.writeScreen("root", `<div id="n1"></div>`);
+    await store.writeScreen("kid", `<div id="n1"></div>`);
+    await store.writeScreenMeta("kid", { notes: "", tags: [], variant_of: "root", variant_kind: "state" });
+    const { status, json } = await post("/api/tools/delete_entity", { kind: "screen", name: "root" });
+    expect(status).toBe(409);
+    expect(json).toMatchObject({ code: "has_variants" });
+  });
 
   it("runs a read tool and returns its response as JSON", async () => {
     const { status, json } = await post("/api/tools/get_project", {});

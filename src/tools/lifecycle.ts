@@ -618,7 +618,35 @@ async function deleteScreenEntity(store: Store, name: string, cascade: boolean, 
   const targetsSubtree = (r: { to: string }) => subtree.some((s) => r.to === s || r.to.startsWith(`${s}.`));
   const outgoing = allFlows.filter(inSubtree);
   const incoming = allFlows.filter((r) => !inSubtree(r) && targetsSubtree(r));
-  await store.writeFlows(allFlows.filter((r) => !inSubtree(r)));
+
+  // Screens first, flows.json last: if a delete fails midway, flows.json
+  // still lists the flows of the screens that survived, and what was
+  // actually deleted is still pruned and committed before the error goes on.
+  const deleted: string[] = [];
+  let failure: unknown;
+  try {
+    for (const screen of subtree) {
+      await store.deleteScreen(screen);
+      deleted.push(screen);
+    }
+  } catch (err) {
+    failure = err;
+  }
+  let commitResult: Awaited<ReturnType<Store["commit"]>> | undefined;
+  if (deleted.length > 0) {
+    try {
+      await store.writeFlows(allFlows.filter((r) => !deleted.some((s) => belongsToScreen(r, s))));
+      commitResult = await store.commit(
+        descendants.length > 0 ? `delete_entity: screen:${name} (+${descendants.length} variants)` : `delete_entity: screen:${name}`,
+      );
+    } catch (err) {
+      failure ??= err;
+    }
+    // CHR-624: a deleted screen leaves no stale pin on the Board — a no-op
+    // when ctx/viewState is absent (stdio has no board state to prune).
+    for (const screen of deleted) ctx?.viewState?.pruneScreen(screen);
+  }
+  if (failure !== undefined) throw failure;
 
   const warnings: Warning[] = incoming.map((r) => ({
     kind: "dangling_flow",
@@ -626,20 +654,11 @@ async function deleteScreenEntity(store: Store, name: string, cascade: boolean, 
     message: `flow from "${r.from}" still targets deleted screen "${r.to.split(".")[0]}"`,
   }));
 
-  for (const screen of subtree) await store.deleteScreen(screen);
-  const commitResult = await store.commit(
-    descendants.length > 0 ? `delete_entity: screen:${name} (+${descendants.length} variants)` : `delete_entity: screen:${name}`,
-  );
-
-  // CHR-624: a deleted screen leaves no stale pin on the Board — a no-op
-  // when ctx/viewState is absent (stdio has no board state to prune).
-  for (const screen of subtree) ctx?.viewState?.pruneScreen(screen);
-
   return {
     kind: "screen",
     name,
     path,
-    ...commitFields(commitResult),
+    ...commitFields(commitResult!),
     warnings,
     removed_flow_count: outgoing.length,
     ...(descendants.length > 0 ? { deleted_screens: subtree } : {}),
@@ -647,7 +666,7 @@ async function deleteScreenEntity(store: Store, name: string, cascade: boolean, 
 }
 
 export async function deleteEntity(store: Store, input: DeleteEntityInput, ctx?: ToolHandlerContext): Promise<Record<string, unknown>> {
-  if (input.cascade !== undefined && input.kind !== "screen") {
+  if (input.cascade === true && input.kind !== "screen") {
     throw new ToolError("validation_failed", "cascade only applies to kind \"screen\"");
   }
   if (input.kind === "component") return deleteComponent(store, input.name);

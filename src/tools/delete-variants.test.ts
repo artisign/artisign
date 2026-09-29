@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -131,7 +131,57 @@ describe("delete_entity — variant subtrees (ADR-006)", () => {
     expect((res.deleted_screens as string[]).sort()).toEqual(["a", "a1", "a1x"]);
   });
 
-  it("rejects cascade on other kinds", async () => {
+  it("rejects cascade: true on other kinds, but cascade: false is a no-op", async () => {
     await expect(deleteEntity(store, { kind: "component", name: "x", cascade: true })).rejects.toMatchObject({ code: "validation_failed" });
+    await expect(deleteEntity(store, { kind: "component", name: "x", cascade: false })).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("with autoCommit off, commit is null and deleted_screens is still reported", async () => {
+    const config = await store.readArtisignConfig();
+    config.settings.autoCommit = false;
+    await store.writeArtisignConfig(config);
+    const res = await deleteEntity(store, { kind: "screen", name: "a", cascade: true });
+    expect(res.commit).toBeNull();
+    expect(res.deleted_screens).toEqual(["a", "a1", "a1x"]);
+  });
+
+  it("names the deleted subtree screen a flow targeted, not the requested root", async () => {
+    await store.writeFlows([{ from: "other.n1", event: "tap", to: "a1x.n1", to_kind: "node" }]);
+    const res = await deleteEntity(store, { kind: "screen", name: "a", cascade: true });
+    expect((res.warnings as Warning[])[0]!.message).toBe('flow from "other.n1" still targets deleted screen "a1x"');
+  });
+
+  it("a delete failing on the 2nd of 3 screens propagates, prunes and commits what was deleted, and keeps the survivors' flows", async () => {
+    await store.writeFlows([
+      { from: "a.n1", event: "tap", to: "other", to_kind: "screen" },
+      { from: "a1.n1", event: "tap", to: "other", to_kind: "screen" },
+      { from: "a1x.n1", event: "tap", to: "other", to_kind: "screen" },
+    ]);
+    await store.commit("flows");
+    const board = createBoardStateStore();
+    board.set({ pins: { op: "add", screens: ["a", "a1", "a1x"] } });
+    const ctx: ToolHandlerContext = {
+      viewState: {
+        getBoardState: () => board.get(),
+        setBoardState: (patch) => board.set(patch).state,
+        pruneScreen: (n) => {
+          board.pruneScreen(n);
+        },
+      },
+    };
+    const real = store.deleteScreen.bind(store);
+    let calls = 0;
+    vi.spyOn(store, "deleteScreen").mockImplementation(async (n: string) => {
+      if (++calls === 2) throw new Error("disk on fire");
+      return real(n);
+    });
+
+    await expect(deleteEntity(store, { kind: "screen", name: "a", cascade: true }, ctx)).rejects.toThrow("disk on fire");
+
+    expect(await store.listScreens()).not.toContain("a");
+    expect(await store.listScreens()).toEqual(expect.arrayContaining(["a1", "a1x"]));
+    expect(board.get().pinned).toEqual(["a1", "a1x"]);
+    expect((await store.readFlows()).map((f) => f.from)).toEqual(["a1.n1", "a1x.n1"]);
+    expect(await git(dir, "log", "-1", "--format=%s")).toBe("delete_entity: screen:a (+2 variants)");
   });
 });

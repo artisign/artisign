@@ -239,6 +239,10 @@ Click routes are data, not annotations. Wire navigation with
 edit edges later with `set_flow`. A screen nobody can reach, or a CTA that goes
 nowhere, is an unfinished design.
 
+To present work on the Board, `set_board_state` filters and pins screens and
+takes `expanded` to open variant clusters (name the main screen or any of its
+variants).
+
 ## Comments
 
 The human reviews in the browser and comments on nodes. Each design session:
@@ -256,6 +260,8 @@ comments and flows anchor to them.
   choices already made, so the next agent does not relitigate them.
 - On **screens**: `notes`/`tags` for anything a screenshot cannot carry
   (states, edge cases, content rules).
+- On **screens**, also `variant_of` + `variant_kind` (see "Screen variants"
+  below).
 - On **mockups**: `tags`/`title`/`description` so an exploration is findable
   via `get_project {tags: [...]}` before it is promoted.
 - On a **tag** (`target: {kind: "tag", tag}`): `notes` — a spec spanning
@@ -268,6 +274,29 @@ comments and flows anchor to them.
 All of `notes`/`idea`/`decisions`/`usage`/a tag's own `notes` render as
 Markdown in the preview — plain prose is fine, but headings/lists/code fences
 show up formatted for the human reviewing.
+
+### Screen variants
+
+A variant is a normal screen that declares a parent in its sidecar:
+`set_meta {target: {kind: "screen", screen: "dashboard-empty"}, variant_of:
+"dashboard", variant_kind: "state"}`. `variant_kind` is required with
+`variant_of`; `variant_of: null` clears both. One parent, any depth, never
+derived from the name. Flows, refs and all write tools treat it like any other
+screen. A missing parent, a self-reference or a cycle is rejected.
+
+Make it a variant when the screen is the same page or task in another
+condition, so a reviewer would look for it next to its parent. Make it a new
+main screen when it is a different destination.
+
+- `state` — the same view in another data or status condition (empty, error,
+  loading, filled).
+- `overlay` — layered over the parent: sheet, modal, popover, menu.
+- `step` — a stage in a sequence that starts at the parent (wizard step,
+  onboarding page).
+
+`get_project` at `view: "tree"` carries `variant_of`/`variant_kind` on variant
+screens; `get_screen` at `view: "full"` adds `variants` (direct children) and
+`reached_from` (screens with a flow into this one).
 
 Write metadata when the decision is fresh, not as a cleanup pass.
 

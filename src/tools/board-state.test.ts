@@ -62,7 +62,7 @@ describe("set_board_state", () => {
 
     const write = await setBoardState(fx.store, { filter: "pay" }, ctx);
     expect(write.pinned).toEqual(["checkout"]);
-    expect(broadcasts.at(-1)).toEqual({ filter: "pay", pinned: ["checkout"] });
+    expect(broadcasts.at(-1)).toEqual({ filter: "pay", pinned: ["checkout"], expanded: [] });
   });
 
   it("op:set naming only unknown screens leaves the existing pins alone instead of clearing them", async () => {
@@ -192,5 +192,62 @@ describe("set_board_state", () => {
     // Matching itself still trims/lowercases, so the untrimmed stored value
     // still matches correctly.
     expect(res.shown_screens).toEqual(["checkout"]);
+  });
+  describe("expanded (CHR-729)", () => {
+    it("add / remove / set / clear round-trip and are echoed in the response", async () => {
+      const { ctx } = fakeViewState();
+      expect((await setBoardState(fx.store, { expanded: { op: "add", screens: ["home", "checkout"] } }, ctx)).expanded).toEqual(["home", "checkout"]);
+      expect((await setBoardState(fx.store, { expanded: { op: "remove", screens: ["home"] } }, ctx)).expanded).toEqual(["checkout"]);
+      expect((await setBoardState(fx.store, { expanded: { op: "set", screens: ["home"] } }, ctx)).expanded).toEqual(["home"]);
+      expect((await setBoardState(fx.store, { expanded: { op: "clear" } }, ctx)).expanded).toEqual([]);
+    });
+
+    it("dedupes", async () => {
+      const { ctx } = fakeViewState();
+      const res = await setBoardState(fx.store, { expanded: { op: "add", screens: ["home", "home"] } }, ctx);
+      expect(res.expanded).toEqual(["home"]);
+    });
+
+    it("an unknown name warns unknown_ref and is never stored; the known names still apply", async () => {
+      const { ctx } = fakeViewState();
+      const res = await setBoardState(fx.store, { expanded: { op: "add", screens: ["home", "ghost"] } }, ctx);
+      expect(res.expanded).toEqual(["home"]);
+      expect(res.warnings).toEqual([{ kind: "unknown_ref", message: 'screen "ghost" was not found' }]);
+    });
+
+    it("a set whose names are all unknown changes nothing", async () => {
+      const { ctx, broadcasts } = fakeViewState();
+      await setBoardState(fx.store, { expanded: { op: "add", screens: ["home"] } }, ctx);
+      broadcasts.length = 0;
+      const res = await setBoardState(fx.store, { expanded: { op: "set", screens: ["ghost"] } }, ctx);
+      expect(res.expanded).toEqual(["home"]);
+      expect(broadcasts).toEqual([]);
+    });
+
+    it("a pure read (every field omitted) reports expanded and does not broadcast", async () => {
+      const { ctx, broadcasts } = fakeViewState();
+      await setBoardState(fx.store, { expanded: { op: "add", screens: ["home"] } }, ctx);
+      broadcasts.length = 0;
+      const res = await setBoardState(fx.store, {}, ctx);
+      expect(res.expanded).toEqual(["home"]);
+      expect(broadcasts).toEqual([]);
+    });
+
+    it("a no-op expanded patch does not broadcast; a real change broadcasts exactly once", async () => {
+      const { ctx, broadcasts } = fakeViewState();
+      await setBoardState(fx.store, { expanded: { op: "add", screens: ["home"] } }, ctx);
+      expect(broadcasts).toEqual([{ filter: null, pinned: [], expanded: ["home"] }]);
+      broadcasts.length = 0;
+      await setBoardState(fx.store, { expanded: { op: "add", screens: ["home"] } }, ctx);
+      expect(broadcasts).toEqual([]);
+    });
+
+    it("a write drops an expanded entry whose screen vanished outside delete_entity", async () => {
+      const { ctx } = fakeViewState();
+      await setBoardState(fx.store, { expanded: { op: "set", screens: ["home", "checkout"] } }, ctx);
+      await fx.store.deleteScreen("home");
+      const res = await setBoardState(fx.store, { filter: "pay" }, ctx);
+      expect(res.expanded).toEqual(["checkout"]);
+    });
   });
 });

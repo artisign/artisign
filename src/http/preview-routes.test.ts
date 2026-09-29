@@ -69,6 +69,21 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
     expect(json).toEqual({ screens: [{ name: "home", tags: [], notes: "" }] });
   });
 
+  it("GET /api/screens carries variant fields on variants only, and treats a dangling parent as absent", async () => {
+    await store.writeScreen("home-empty", `<div id="n1"></div>`);
+    await store.writeScreen("orphan", `<div id="n1"></div>`);
+    await store.writeScreenMeta("home-empty", { notes: "", tags: [], variant_of: "home", variant_kind: "state" });
+    await store.writeScreenMeta("orphan", { notes: "", tags: [], variant_of: "gone", variant_kind: "overlay" });
+    const { json } = await getJson("/api/screens");
+    expect(json).toEqual({
+      screens: [
+        { name: "home", tags: [], notes: "" },
+        { name: "home-empty", tags: [], notes: "", variant_of: "home", variant_kind: "state" },
+        { name: "orphan", tags: [], notes: "" },
+      ],
+    });
+  });
+
   it("GET /api/flows returns an empty list when no screen has a flow edge", async () => {
     const { status, json } = await getJson("/api/flows");
     expect(status).toBe(200);

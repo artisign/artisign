@@ -6,7 +6,7 @@ import { CONFIG_FILENAME, CACHE_DIR } from "../init/artisign-config.js";
 import { atomicWrite, ensureCacheGitignore } from "./atomic-write.js";
 import { autoCommit, getHeadCommit } from "./git.js";
 import { watchProject } from "./watcher.js";
-import type { Store, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, TagMeta, DesignSystemMeta, DesignDecision, CommitResult, HeadCommitResult, MockupMeta, MockupVariantMeta } from "./types.js";
+import type { Store, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, VariantKind, TagMeta, DesignSystemMeta, DesignDecision, CommitResult, HeadCommitResult, MockupMeta, MockupVariantMeta } from "./types.js";
 
 function emptyScreenMeta(): ScreenMeta {
   return { notes: "", tags: [] };
@@ -90,9 +90,12 @@ function sanitizeStringRecord(value: unknown): Record<string, string> {
  */
 function sanitizeScreenMeta(value: unknown): ScreenMeta {
   const v = asRecord(value);
+  const isVariant =
+    typeof v.variant_of === "string" && v.variant_of.length > 0 && (v.variant_kind === "state" || v.variant_kind === "overlay" || v.variant_kind === "step");
   return {
     notes: typeof v.notes === "string" ? v.notes : "",
     tags: Array.isArray(v.tags) ? v.tags.filter((t): t is string => typeof t === "string") : [],
+    ...(isVariant ? { variant_of: v.variant_of as string, variant_kind: v.variant_kind as VariantKind } : {}),
   };
 }
 

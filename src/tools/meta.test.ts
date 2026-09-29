@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { setMeta } from "./meta.js";
 import { ToolError } from "./types.js";
@@ -291,5 +291,112 @@ describe("set_meta — a screen tag has to be a usable tag name (CHR-596)", () =
   it("still accepts the ordinary ones", async () => {
     await setMeta(fx.store, { target: { kind: "screen", screen: "home" }, tags: ["chr-244", "empty-state", "design-system"] });
     expect((await fx.store.readScreenMeta("home")).tags).toEqual(["chr-244", "empty-state", "design-system"]);
+  });
+});
+
+describe("set_meta — screen variants (ADR-006)", () => {
+  let fx: ProjectFixture;
+  const target = (screen: string) => ({ kind: "screen" as const, screen });
+
+  beforeEach(async () => {
+    fx = await setupProject();
+    for (const name of ["main", "child", "grandchild", "other"]) await fx.store.writeScreen(name, `<div id="n1"></div>`);
+  });
+  afterEach(() => fx.cleanup());
+
+  /** Asserts the call rejected with `code`, wrote no sidecar and made no commit. */
+  async function expectRejected(input: Parameters<typeof setMeta>[1], code: string, screens: string[]): Promise<void> {
+    const before = await Promise.all(screens.map((n) => fx.store.readScreenMeta(n)));
+    const commit = vi.spyOn(fx.store, "commit");
+    const write = vi.spyOn(fx.store, "writeScreenMeta");
+    await expect(setMeta(fx.store, input)).rejects.toMatchObject({ code });
+    expect(commit).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+    expect(await Promise.all(screens.map((n) => fx.store.readScreenMeta(n)))).toEqual(before);
+    vi.restoreAllMocks();
+  }
+
+  it("sets both fields and echoes them", async () => {
+    const res = await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
+    expect(res.meta).toEqual({ notes: "", tags: [], variant_of: "main", variant_kind: "state" });
+    expect(await fx.store.readScreenMeta("child")).toEqual({ notes: "", tags: [], variant_of: "main", variant_kind: "state" });
+  });
+
+  it("rejects a missing parent", async () => {
+    await expectRejected({ target: target("child"), variant_of: "nope", variant_kind: "state" }, "not_found", ["child"]);
+  });
+
+  it("rejects a kind-only change when the stored parent has since been deleted", async () => {
+    await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
+    await fx.store.deleteScreen("main");
+    await expectRejected({ target: target("child"), variant_kind: "overlay" }, "not_found", ["child"]);
+  });
+
+  it("a notes-only write on a variant whose parent was deleted still succeeds (no variant field in the call)", async () => {
+    await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
+    await fx.store.deleteScreen("main");
+    const res = await setMeta(fx.store, { target: target("child"), notes: "x" });
+    expect(res.meta).toMatchObject({ notes: "x" });
+  });
+
+  it("rejects a self-reference", async () => {
+    await expectRejected({ target: target("child"), variant_of: "child", variant_kind: "state" }, "validation_failed", ["child"]);
+  });
+
+  it("rejects a direct cycle", async () => {
+    await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
+    await expectRejected({ target: target("main"), variant_of: "child", variant_kind: "step" }, "validation_failed", ["main", "child"]);
+  });
+
+  it("rejects a deep cycle by re-parenting onto a grandchild", async () => {
+    await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
+    await setMeta(fx.store, { target: target("grandchild"), variant_of: "child", variant_kind: "overlay" });
+    await expectRejected({ target: target("main"), variant_of: "grandchild", variant_kind: "step" }, "validation_failed", ["main", "child", "grandchild"]);
+  });
+
+  it("rejects variant_of without a kind", async () => {
+    await expectRejected({ target: target("child"), variant_of: "main" }, "validation_failed", ["child"]);
+  });
+
+  it("rejects variant_kind on a screen with no parent", async () => {
+    await expectRejected({ target: target("child"), variant_kind: "state" }, "validation_failed", ["child"]);
+  });
+
+  it("rejects clearing the parent while passing a kind", async () => {
+    await expectRejected({ target: target("child"), variant_of: null, variant_kind: "state" }, "validation_failed", ["child"]);
+  });
+
+  it("rejects an invalid kind", async () => {
+    await expectRejected({ target: target("child"), variant_of: "main", variant_kind: "bogus" }, "validation_failed", ["child"]);
+  });
+
+  it("allows changing only the kind of an existing variant", async () => {
+    await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
+    const res = await setMeta(fx.store, { target: target("child"), variant_kind: "overlay" });
+    expect(res.meta).toEqual({ notes: "", tags: [], variant_of: "main", variant_kind: "overlay" });
+  });
+
+  it("allows re-parenting to a non-descendant", async () => {
+    await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
+    const res = await setMeta(fx.store, { target: target("child"), variant_of: "other" });
+    expect(res.meta).toMatchObject({ variant_of: "other", variant_kind: "state" });
+  });
+
+  it("clearing variant_of removes both fields from the sidecar and the response", async () => {
+    await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
+    const res = await setMeta(fx.store, { target: target("child"), variant_of: null });
+    expect(res.meta).toEqual({ notes: "", tags: [] });
+    expect(await fx.store.readScreenMeta("child")).toEqual({ notes: "", tags: [] });
+  });
+
+  it("setting notes/tags on a variant keeps both fields", async () => {
+    await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "step" });
+    await setMeta(fx.store, { target: target("child"), notes: "n" });
+    const res = await setMeta(fx.store, { target: target("child"), tags: ["t"] });
+    expect(res.meta).toEqual({ notes: "n", tags: ["t"], variant_of: "main", variant_kind: "step" });
+  });
+
+  it("rejects variant fields on a non-screen target", async () => {
+    await expect(setMeta(fx.store, { target: { kind: "tag", tag: "x" }, notes: "n", variant_of: "main" })).rejects.toMatchObject({ code: "validation_failed" });
   });
 });

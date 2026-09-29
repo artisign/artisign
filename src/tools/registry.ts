@@ -95,13 +95,13 @@ export const TOOLS: ToolDefinition[] = [
   // Reads ---------------------------------------------------------------
   tool(
     "get_project",
-    "Project root: screen list, design-system pointer, counts. Tiered, cold-start read. fields: [\"reuse\"] adds design-system reuse coverage (component/token, project-wide and per screen) plus unused components/tokens and the lowest-reuse screens.",
+    "Project root: screen list, design-system pointer, counts. Tiered, cold-start read. view \"tree\" marks a variant screen with variant_of/variant_kind. fields: [\"reuse\"] adds design-system reuse coverage (component/token, project-wide and per screen) plus unused components/tokens and the lowest-reuse screens.",
     { view: viewSchema.optional(), fields: z.array(z.string()).optional(), tags: z.array(z.string()).optional() },
     (store, input) => getProject(store, input),
   ),
   tool(
     "get_screen",
-    "One screen with comment/flow indicators. Tiered + field selection. fields: [\"rendered_html\"] at view \"full\" returns the resolved (component/token) render as a standalone HTML document — an MCP-only fallback for reading resolved output without Playwright; never included by default.",
+    "One screen with comment/flow indicators. Tiered + field selection. view \"full\" adds variants (direct child screens with their variant_kind) and reached_from (screens with a flow into this one), each only when non-empty. fields: [\"rendered_html\"] at view \"full\" returns the resolved (component/token) render as a standalone HTML document — an MCP-only fallback for reading resolved output without Playwright; never included by default.",
     {
       screen: z.string(),
       view: viewSchema.optional(),
@@ -272,7 +272,9 @@ export const TOOLS: ToolDefinition[] = [
       "design_system, usage for a component/pattern target, notes for a tag target ({kind:\"tag\", tag}) — a " +
       "spec that spans several screens, set once instead of duplicated into every tagged screen's own notes; no " +
       "screen has to carry the tag yet. tags and decisions replace the full list, not just add to it — read the " +
-      "current value first if you need to append.",
+      "current value first if you need to append. A screen target can also declare itself a variant of another " +
+      "screen: variant_of (parent screen name, null clears) plus variant_kind (state | overlay | step, required " +
+      "with variant_of). Rejected: missing parent, self, cycle.",
     {
       target: metaTargetSchema,
       notes: z.string().optional(),
@@ -282,6 +284,8 @@ export const TOOLS: ToolDefinition[] = [
       idea: z.string().optional(),
       decisions: z.array(setMetaDecisionSchema).optional(),
       usage: z.string().optional(),
+      variant_of: z.string().nullable().optional(),
+      variant_kind: z.enum(["state", "overlay", "step"]).optional(),
     },
     (store, input) => setMeta(store, input as never),
   ),
@@ -306,21 +310,24 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "set_board_state",
-    "Reads or mutates the Board's shared filter and pinned screens — held in daemon memory only, shared by " +
+    "Reads or mutates the Board's shared filter, pinned screens and expanded clusters — held in daemon memory only, shared by " +
       "every client (browser and agents) currently viewing this project; never persisted, never written to " +
       "the project folder. filter: omit to leave it unchanged, a string to set it (case-insensitive substring " +
       "match against a screen's name or any of its tags), null (or an empty/whitespace-only string — the same " +
       "state as null) to clear it. pins: {op:\"add\"|\"remove\"|\"set\", screens} to add/remove/replace the " +
-      "pinned set, or {op:\"clear\"} to unpin everything; omit to leave pins unchanged. A call with every " +
+      "pinned set, or {op:\"clear\"} to unpin everything; omit to leave pins unchanged. expanded: the same " +
+      "shape as pins, naming the variant clusters (ADR-006) shown expanded on the Board — name a main screen, " +
+      "or any variant to expand the cluster that contains it; omit to leave it unchanged. A call with every " +
       "field omitted is a pure read — no broadcast, no side effect. The response always reports the current " +
-      "filter/pinned plus shown_screens (filter matches ∪ pinned, restricted to screens that currently " +
-      "exist). An unknown screen name in an add/set never enters pinned — it's dropped with a warning, never " +
+      "filter/pinned/expanded plus shown_screens (filter matches ∪ pinned, restricted to screens that currently " +
+      "exist). An unknown screen name in an add/set never enters pinned or expanded — it's dropped with a warning, never " +
       "blocking; the known names in the same call still apply, and a set whose names are all unknown changes " +
       "nothing. Not available over the stdio MCP server " +
       "(invalid_state) — board state lives in the daemon, which stdio has no connection to.",
     {
       filter: z.string().nullable().optional(),
       pins: pinsPatchSchema.optional(),
+      expanded: pinsPatchSchema.optional(),
     },
     (store, input, ctx) => setBoardState(store, input as never, ctx),
   ),

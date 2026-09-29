@@ -94,6 +94,9 @@ function button(className, text, onClick) {
 export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect }) {
   let openCrumb = null;
   let last = { screens: [], flows: [], currentScreen: null };
+  // Where keyboard focus goes after the next render instead of the element
+  // that had it: the popover's first row on open, the crumb's toggle on close.
+  let focusNext = null;
 
   const rerender = () => update(last.screens, last.flows, last.currentScreen);
   const go = (name) => {
@@ -109,13 +112,38 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect }) {
   });
   document.addEventListener("keydown", (evt) => {
     if (evt.key === "Escape" && openCrumb) {
+      // Closing the popover is this Escape's whole job — app.js's
+      // inspect-mode Escape (registered later) must not also fire.
+      evt.stopImmediatePropagation();
+      focusNext = { cls: "crumb-toggle", screen: openCrumb };
       openCrumb = null;
       rerender();
     }
   });
 
+  /** A render replaces every control, so focus is remembered by role + screen and put back. */
+  function focusKey() {
+    const active = document.activeElement;
+    if (!active || ![barEl, mapEl, inspectorEl].some((c) => c.contains(active))) return null;
+    return { cls: active.classList[0], screen: active.dataset.screen ?? active.closest("[data-screen]")?.dataset.screen };
+  }
+
+  function restoreFocus(key) {
+    if (!key) return;
+    for (const container of [barEl, mapEl, inspectorEl]) {
+      for (const candidate of container.querySelectorAll(`.${key.cls}`)) {
+        const screen = candidate.dataset.screen ?? candidate.closest("[data-screen]")?.dataset.screen;
+        if (screen === key.screen) {
+          candidate.focus();
+          return;
+        }
+      }
+    }
+  }
+
   function popoverRow(name, current) {
     const row = button("variant-pop-row", "", () => go(name));
+    row.dataset.screen = name;
     const kind = last.tree.nodes.get(name)?.screen.variant_kind;
     const icon = createKindIcon(kind);
     if (icon) row.appendChild(icon);
@@ -173,6 +201,7 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect }) {
       const toggle = button("crumb-toggle", "▾", (evt) => {
         evt.stopPropagation();
         openCrumb = openCrumb === node.name ? null : node.name;
+        focusNext = openCrumb ? { cls: "variant-pop-row", screen: null } : { cls: "crumb-toggle", screen: node.name };
         rerender();
       });
       toggle.setAttribute("aria-expanded", String(openCrumb === node.name));
@@ -259,6 +288,15 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect }) {
   }
 
   function update(screens, flows, currentScreen) {
+    const key = focusNext ?? focusKey();
+    focusNext = null;
+    const shown = render(screens, flows, currentScreen);
+    if (key?.cls === "variant-pop-row" && key.screen === null) barEl.querySelector(".variant-pop-row")?.focus();
+    else restoreFocus(key);
+    return shown;
+  }
+
+  function render(screens, flows, currentScreen) {
     const tree = buildScreenTree(screens);
     last = { screens, flows, currentScreen, tree };
     const ctx = variantContext(tree, currentScreen);

@@ -326,6 +326,19 @@ describe("set_meta — screen variants (ADR-006)", () => {
     await expectRejected({ target: target("child"), variant_of: "nope", variant_kind: "state" }, "not_found", ["child"]);
   });
 
+  it("rejects a kind-only change when the stored parent has since been deleted", async () => {
+    await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
+    await fx.store.deleteScreen("main");
+    await expectRejected({ target: target("child"), variant_kind: "overlay" }, "not_found", ["child"]);
+  });
+
+  it("a notes-only write on a variant whose parent was deleted still succeeds (no variant field in the call)", async () => {
+    await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
+    await fx.store.deleteScreen("main");
+    const res = await setMeta(fx.store, { target: target("child"), notes: "x" });
+    expect(res.meta).toMatchObject({ notes: "x" });
+  });
+
   it("rejects a self-reference", async () => {
     await expectRejected({ target: target("child"), variant_of: "child", variant_kind: "state" }, "validation_failed", ["child"]);
   });
@@ -341,7 +354,7 @@ describe("set_meta — screen variants (ADR-006)", () => {
     await expectRejected({ target: target("main"), variant_of: "grandchild", variant_kind: "step" }, "validation_failed", ["main", "child", "grandchild"]);
   });
 
-  it("rejects variant_of without a kind, on the call and stored", async () => {
+  it("rejects variant_of without a kind", async () => {
     await expectRejected({ target: target("child"), variant_of: "main" }, "validation_failed", ["child"]);
   });
 

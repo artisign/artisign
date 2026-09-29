@@ -56,7 +56,9 @@ async function resolveVariantMeta(store: Store, screen: string, current: ScreenM
   if (kind === undefined) {
     throw new ToolError("validation_failed", "variant_of requires variant_kind (state, overlay or step)");
   }
-  if (input.variant_of !== undefined) {
+  // Any variant write re-validates the parent, including a kind-only change
+  // on a screen whose stored parent has since been deleted.
+  if (input.variant_of !== undefined || input.variant_kind !== undefined) {
     if (parent === screen) {
       throw new ToolError("validation_failed", `screen "${screen}" cannot be a variant of itself`);
     }

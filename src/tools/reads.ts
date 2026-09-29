@@ -348,20 +348,30 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
   if (tagNotes.length > 0) full.tag_notes = tagNotes;
   // Derived from the other screens' sidecars and the flow graph, both
   // omitted when empty like tag_notes so a plain screen's shape is unchanged.
-  const [allNames, allFlows] = await Promise.all([store.listScreens(), readAllFlows(store)]);
-  const allMetas = await Promise.all(allNames.map((name) => store.readScreenMeta(name)));
-  const variants = [...variantLinks(allNames, allMetas)]
-    .filter(([, link]) => link.of === input.screen)
-    .map(([name, link]) => ({ name, variant_kind: link.kind }))
-    .sort((a, b) => (a.name < b.name ? -1 : 1));
-  if (variants.length > 0) full.variants = variants;
-  const reachedFrom = new Set<string>();
-  for (const flow of allFlows) {
-    const source = flow.from.split(".")[0]!;
-    const target = (flow.to_kind ?? "screen") === "node" ? flow.to.split(".")[0] : flow.to;
-    if (target === input.screen && source !== input.screen) reachedFrom.add(source);
+  // Only computed when the response can carry them — it reads every sidecar
+  // and flows.json.
+  const wantVariants = !input.fields || input.fields.includes("variants");
+  const wantReachedFrom = !input.fields || input.fields.includes("reached_from");
+  if (wantVariants) {
+    const allNames = await store.listScreens();
+    const allMetas = await Promise.all(allNames.map((name) => store.readScreenMeta(name)));
+    const variants = [...variantLinks(allNames, allMetas)]
+      .filter(([, link]) => link.of === input.screen)
+      .map(([name, link]) => ({ name, variant_kind: link.kind }))
+      .sort((a, b) => (a.name < b.name ? -1 : 1));
+    if (variants.length > 0) full.variants = variants;
   }
-  if (reachedFrom.size > 0) full.reached_from = [...reachedFrom].sort();
+  if (wantReachedFrom) {
+    // Flow sources only (ADR-006 decision 3): the parent is listed when it
+    // has a flow edge into this screen, like any other source.
+    const reachedFrom = new Set<string>();
+    for (const flow of await readAllFlows(store)) {
+      const source = flow.from.split(".")[0]!;
+      const target = (flow.to_kind ?? "screen") === "node" ? flow.to.split(".")[0] : flow.to;
+      if (target === input.screen && source !== input.screen) reachedFrom.add(source);
+    }
+    if (reachedFrom.size > 0) full.reached_from = [...reachedFrom].sort();
+  }
   if (input.fields?.includes("comments")) {
     full.comments = commentsForScreen(commentRecords, input.screen, true);
   }

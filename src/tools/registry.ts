@@ -118,8 +118,8 @@ export const TOOLS: ToolDefinition[] = [
       "\"slots\": a list of its slot fills in document order, each with its slot name, tag, refs and the id it " +
       "renders with where this node is addressed (on the screen for a screen ref; in the standalone " +
       "definition render for a definition ref, where a screen namespaces it further). Slot content is never " +
-      "addressable by node ref (not in \"children\", not patchable by update_refs/patch_html) — change it by " +
-      "rewriting the screen or the instance's enclosing node.",
+      "addressable by get_node/update_refs (not in \"children\"); patch_html and inspect_node do accept " +
+      "\"<screen>.<id>\" for a fill node that carries an authored id.",
     { node: z.string(), view: viewSchema.optional(), fields: z.array(z.string()).optional() },
     (store, input) => getNode(store, input as never),
   ),
@@ -141,9 +141,10 @@ export const TOOLS: ToolDefinition[] = [
       "addressable by get_node/update_refs/patch_html, but only reliably resolves to the same element across " +
       "a later write when id_stability is \"explicit\" — a \"derived\" id is only guaranteed for this one call. " +
       "reply_comment stays screen-only. A predicate can also match inside a component instance's slot fills; " +
-      "that match carries node: null, addressable: false, and inside: \"<screen>.<node-id>\" pointing at the " +
-      "enclosing instance — fill content has no node ref of its own, so change it by rewriting the screen or the " +
-      "instance's enclosing node, never by addressing the match itself. The headline token-saver.",
+      "that match carries node: null, addressable: false, inside: \"<screen>.<node-id>\" pointing at the " +
+      "enclosing instance, and (screen matches only) its authored id when it has one — patch_html/inspect_node take \"<screen>.<id>\" " +
+      "for it; get_node/update_refs do not, and a fill without an id can only be reached by patch_html's " +
+      "css_selector. The headline token-saver.",
     {
       where: z.array(predicateSchema),
       screens: z.array(z.string()).optional(),
@@ -211,7 +212,10 @@ export const TOOLS: ToolDefinition[] = [
       "(see server instructions), including its data-slot rule — never style the slot element itself " +
       "when patching into a definition. node also accepts a component:<name>#<variant>.<node-id> / " +
       "pattern:<name>.<node-id> ref (css_selector targeting stays screen-only); touching a node with no " +
-      "explicit id in source returns a missing_id warning, not blocking. response_mode \"diff\"/\"full\" " +
+      "explicit id in source returns a missing_id warning, not blocking. Nodes inside a component instance's " +
+      "slot fill are patchable too, by \"<screen>.<id>\" (they need an authored id) or css_selector; the " +
+      "authored fill markup is edited, and a slot's top-level fill can be replaced by one element or deleted " +
+      "but has no siblings to insert. response_mode \"diff\"/\"full\" " +
       "are rejected against a definition ref — only \"summary\" is supported there. " +
       "Example: { target: { kind: \"node\", node: \"home.btn1\" }, " +
       "operation: \"set_attr\", attr: { name: \"data-variant\", value: \"hover\" } }.",
@@ -363,7 +367,8 @@ export const TOOLS: ToolDefinition[] = [
       "background_color, overflow) by rendering the screen headlessly. Prefer this over get_screenshot for " +
       "geometry/alignment/color questions (\"is this button 44px tall?\", \"do these two elements align?\") — " +
       "text is far cheaper than vision tokens. Use get_screenshot instead when the question is visual (layout " +
-      "looks right, imagery, overall composition). Requires Playwright, same as get_screenshot.",
+      "looks right, imagery, overall composition). Also measures a node inside a component instance's slot fill " +
+      "when it carries an authored id. Requires Playwright, same as get_screenshot.",
     { node: z.string() },
     (store, input) => inspectNode(store, input as never),
   ),

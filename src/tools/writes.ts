@@ -9,6 +9,7 @@ import {
   isRepeatedPatternCandidate,
   resolveTokenRef,
   tokenRefPaths,
+  type NodeSubtree,
   type ScreenDocument,
   type TokenRef,
 } from "../model/index.js";
@@ -18,7 +19,7 @@ import { buildStyleOccurrenceIndex } from "./style-index.js";
 import { parseNodeRef, formatNodeRef, requireScreenNodeRef } from "./node-ref.js";
 import { syncScreenFlows } from "./flows.js";
 import { diffScreenDocuments } from "./diff.js";
-import { findBySelector, spliceFragment, removeNode } from "./patch.js";
+import { findBySelector, findFillById, findFillsBySelector, patchFill, spliceFragment, removeNode } from "./patch.js";
 import { convertToComponentInstance, revertComponentInstanceToElement } from "./node-convert.js";
 import { isBlockingIssue, issueToWarning } from "./issue-filter.js";
 import { slotStylingWarnings } from "./definition-checks.js";
@@ -295,20 +296,38 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
   const doc: ScreenDocument = structuredClone(before);
   const registry = await loadRegistry(store);
 
-  const targetIds: string[] =
-    input.target.kind === "node" ? [targetNodeRef!.nodeId] : findBySelector(doc, input.target.css_selector).map((n) => n.id);
-
-  for (const id of targetIds) {
-    if (!doc.nodes[id]) throw new ToolError("not_found", `node "${formatNodeRef(screen, id)}" was not found`);
-  }
-  if (targetIds.length === 0) {
-    throw new ToolError("not_found", `no node matched selector "${input.target.kind === "selector" ? input.target.css_selector : ""}"`);
+  // A target is a flat-map node, or — when the id/selector only exists inside a
+  // component instance's slot fill — that fill's subtree (CHR-746).
+  type PatchTargetItem = { kind: "node"; id: string } | { kind: "fill"; sub: NodeSubtree };
+  const targets: PatchTargetItem[] = [];
+  if (input.target.kind === "node") {
+    const id = targetNodeRef!.nodeId;
+    const fill = doc.nodes[id] ? undefined : findFillById(doc, id);
+    if (!fill && !doc.nodes[id]) throw new ToolError("not_found", `node "${formatNodeRef(screen, id)}" was not found`);
+    targets.push(fill ? { kind: "fill", sub: fill.sub } : { kind: "node", id });
+  } else {
+    for (const n of findBySelector(doc, input.target.css_selector)) targets.push({ kind: "node", id: n.id });
+    for (const f of findFillsBySelector(doc, input.target.css_selector)) targets.push({ kind: "fill", sub: f.sub });
+    if (targets.length === 0) throw new ToolError("not_found", `no node matched selector "${input.target.css_selector}"`);
   }
 
   const affected = new Set<string>();
   const refWarnings: Warning[] = [];
 
-  for (const id of targetIds) {
+  for (const target of targets) {
+    if (target.kind === "fill") {
+      const result = patchFill(
+        doc,
+        target.sub,
+        { operation: input.operation, html_aug: input.html_aug, attr: input.attr },
+        registry,
+      );
+      if (!result) continue;
+      for (const fillId of result.affected) affected.add(formatNodeRef(screen, fillId));
+      for (const w of result.refWarnings) refWarnings.push(issueToWarning(w.issue, formatNodeRef(screen, w.owner)));
+      continue;
+    }
+    const id = target.id;
     // A selector can match both an ancestor and one of its own descendants;
     // deleting the ancestor already removed the descendant's entry.
     const node = doc.nodes[id];

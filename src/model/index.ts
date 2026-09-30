@@ -24,7 +24,7 @@ export type {
 export { NodeIdAllocator, isGeneratedId } from "./node-id.js";
 export { isMixedTokenValue, tokenRefPaths } from "./token-ref.js";
 export { loadRegistry, type DesignSystemRegistry } from "./registry.js";
-export { parseScreen, parseTokenValue, type ParseScreenOptions, type TokenValueParse } from "./parser.js";
+export { parseScreen, parseSubtreeFragment, parseTokenValue, type ParseScreenOptions, type TokenValueParse } from "./parser.js";
 export { serializeScreen, serializeNodeSubtree, serializeDetachedSubtree, serializeTokenRef } from "./serializer.js";
 export {
   computeDriftWarnings,

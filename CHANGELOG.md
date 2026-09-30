@@ -47,7 +47,8 @@ fails unless it cascades.
 - Side-by-side variant compare: `Single | Compare · N` in the screen view shows
   the family's main screen, locked as reference, beside 1-3 variants, with a
   diff overlay of added, changed and removed nodes. Nodes match on authored ids
-  only, and below 25 % shared authored ids a banner says so. Served by the new
+  only; below 25 % shared authored ids a column shows no diff, only a banner.
+  Served by the new
   `GET /api/compare` preview route, not a tool — the surface stays at 24.
   (CHR-738)
 - `artisign-ui`, the tool's own design project, is migrated onto the variant
@@ -63,7 +64,7 @@ fails unless it cascades.
 - `promote_mockup` turns a full-document mockup into a single-root screen:
   top-level `<style>` elements move into the root, several top-level nodes are
   wrapped in one `<div>` (which also carries `<body>` style and class), and
-  head-only tags and `<script>` are dropped. Each change is reported as a
+  head-only tags and `<script>` are dropped. The changes are reported in one
   `mockup_normalized` warning; a single-root mockup without `<style>` promotes
   byte-identically as before. (CHR-737)
 

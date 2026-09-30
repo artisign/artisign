@@ -155,7 +155,7 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
       if (name === reference) note = "reference";
       else if (member?.status === "low_overlap") {
         note = "diff unavailable";
-        column.bannerEl.textContent = `No shared node ids with the reference (${member.overlap.shared} of ${member.overlap.base}) — diff unavailable`;
+        column.bannerEl.textContent = `Too few shared node ids with the reference (${member.overlap.shared} of ${member.overlap.base}) — diff unavailable`;
         column.bannerEl.hidden = false;
       } else if (member) {
         const count = diffRows({ members: [member] }).length;

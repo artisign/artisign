@@ -278,7 +278,7 @@ describe("low_overlap", () => {
     loadFrame("a");
     const banner = els.columnsEl.querySelector('.compare-column[data-screen="a"] .compare-banner');
     expect(banner.hidden).toBe(false);
-    expect(banner.textContent).toBe("No shared node ids with the reference (2 of 18) — diff unavailable");
+    expect(banner.textContent).toBe("Too few shared node ids with the reference (2 of 18) — diff unavailable");
     expect(marks("a")).toHaveLength(0);
     expect(els.panelEl.querySelectorAll(".compare-diff-row")).toHaveLength(0);
     expect(els.barEl.querySelector('.compare-chip[data-screen="a"] .compare-chip-overlap').textContent).toBe("11%");

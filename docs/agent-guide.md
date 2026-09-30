@@ -234,7 +234,7 @@ These tools are built for small contexts — use the levers:
   screen-only — comments anchor to what the browser renders, not to a
   definition. A `find_nodes` match found inside a component instance's slot
   fill carries `node: null`, `addressable: false`, `inside` pointing at
-  the enclosing instance, and its authored `id` when it has one — use that as
+  the enclosing instance, and (screen matches only) its authored `id` when it has one — use that as
   `<screen>.<id>` for `patch_html` / `inspect_node`.
 - Cheapest write wins: `update_refs` (no HTML parse) < `patch_html` <
   `write_html`. Full rewrites are for new screens or structural overhauls —

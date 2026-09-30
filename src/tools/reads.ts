@@ -845,9 +845,9 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
       }
 
       // Slot-fill content (CHR-584): matched against the same predicates, but
-      // never addressable by node ref — a fill has none of its own
+      // never addressable by node ref (get_node/update_refs) — a fill has none of its own
       // (`slotOverrides` is deliberately kept out of `ScreenDocument.nodes`).
-      // `addressable: false` marks that, in the spirit of `id_stability`
+      // `addressable: false` marks that (it means "no node ref", not "unpatchable"), in the spirit of `id_stability`
       // above; `inside` points at the enclosing instance's own node ref
       // instead; patch_html/inspect_node additionally accept the fill's own
       // authored id (CHR-746), which is why it is reported.
@@ -858,9 +858,10 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
             node: null,
             inside: formatNodeRef(source.address, node.id),
             addressable: false,
-            // The authored id, when the fill has one — patch_html and
-            // inspect_node take "<screen>.<id>" for it (CHR-746).
-            ...(fillNode.id === undefined ? {} : { id: fillNode.id }),
+            // The authored id, when a screen fill has one — patch_html and
+            // inspect_node take "<screen>.<id>" for it (CHR-746). Not for
+            // definitions: patchDefinitionHtml does not address fills.
+            ...(fillNode.id === undefined || source.kind !== "screen" ? {} : { id: fillNode.id }),
             screen: source.kind === "screen" ? source.name : null,
             source: source.kind,
             ...(source.kind === "component" ? { component: source.name, variant: source.variant } : {}),

@@ -97,6 +97,20 @@ function subtreeIds(sub: NodeSubtree, out: Set<string>): Set<string> {
   return out;
 }
 
+/** Every id in use on the screen — flat-map nodes plus authored slot-fill ids — minus `exclude` (the ids of a subtree about to be replaced). */
+function takenIds(doc: ScreenDocument, exclude?: ReadonlySet<string>): Set<string> {
+  const taken = new Set(Object.keys(doc.nodes));
+  for (const f of collectFills(doc)) if (f.sub.id !== undefined) taken.add(f.sub.id);
+  if (exclude) for (const id of exclude) taken.delete(id);
+  return taken;
+}
+
+function assertIdsFree(ids: Iterable<string>, taken: ReadonlySet<string>): void {
+  for (const id of ids) {
+    if (taken.has(id)) throw new ToolError("validation_failed", `id "${id}" is already used in this screen`);
+  }
+}
+
 export type FillPatch = {
   operation: "replace" | "insert_before" | "insert_after" | "delete" | "set_attr"; 
   html_aug?: string;
@@ -151,11 +165,9 @@ export function patchFill(
       if (blocking.length > 0) throw new ToolError("validation_failed", blocking.map((e) => e.message).join("; "));
       if (subtrees.length === 0) throw new ToolError("validation_failed", "html_aug contains no element");
 
-      const taken = new Set(Object.keys(doc.nodes));
+      // A replace may keep the replaced subtree's own ids; an insert may not.
       const own = subtreeIds(sub, new Set());
-      for (const f of collectFills(doc)) if (f.sub.id !== undefined && !own.has(f.sub.id)) taken.add(f.sub.id);
-      const clash = explicitIds.filter((id) => taken.has(id) || (patch.operation !== "replace" && own.has(id)));
-      if (clash.length > 0) throw new ToolError("validation_failed", `id "${clash[0]}" is already used in this screen`);
+      assertIdsFree(explicitIds, takenIds(doc, patch.operation === "replace" ? own : undefined));
 
       if (container.kind === "slot") {
         // A top-level fill is bound to its slot by name: one element can take
@@ -201,7 +213,8 @@ export function spliceFragment(
   registry: DesignSystemRegistry,
 ): { ids: string[]; refWarnings: ValidationIssue[] } {
   const wrapped = `<div id="__artisign_patch_root__">${htmlAug}</div>`;
-  const { doc: fragDoc, errors } = parseScreen(wrapped, doc.id, registry, { reservedIds: Object.keys(doc.nodes) });
+  const taken = takenIds(doc);
+  const { doc: fragDoc, errors } = parseScreen(wrapped, doc.id, registry, { reservedIds: taken });
   const blocking = errors.filter(isBlockingIssue);
   if (blocking.length > 0) {
     throw new ToolError("validation_failed", blocking.map((e) => e.message).join("; "));
@@ -209,6 +222,10 @@ export function spliceFragment(
   const refWarnings = errors.filter((e) => !isBlockingIssue(e));
 
   const syntheticRootId = fragDoc.rootNodeId;
+  // Explicit fragment ids are taken as-is by the parser; a collision would
+  // overwrite a node or leave a duplicate id in the file. Generated ids were
+  // already steered clear of `taken`.
+  assertIdsFree(Object.keys(fragDoc.nodes).filter((id) => id !== syntheticRootId), taken);
   const newTopLevelIds = fragDoc.nodes[syntheticRootId]!.childIds;
 
   for (const [id, node] of Object.entries(fragDoc.nodes)) {

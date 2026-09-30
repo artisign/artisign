@@ -23,7 +23,7 @@ function isPlaywrightAvailable(): boolean {
 const SCREEN =
   `<main id="page">` +
   `<section id="install" class="$section">` +
-  `<div data-slot="content" id="content-wrap"><h2 id="install-title">Install</h2><p id="install-copy" class="lead">Run it</p></div>` +
+  `<div id="content-wrap" data-slot="content"><h2 id="install-title">Install</h2><p id="install-copy" class="lead">Run it</p></div>` +
   `</section>` +
   `<div id="shot" class="$screenshot-frame"><img id="shot-img" data-slot="image" src="assets/a.png" alt="old"></div>` +
   `</main>`;
@@ -120,6 +120,72 @@ describe("patch_html — nodes inside a slot fill (CHR-746)", () => {
     await expect(
       patchHtml(fx.store, { target: { kind: "node", node: "home.install-title" }, operation: "insert_after", html_aug: `<p id="page">z</p>` }),
     ).rejects.toMatchObject({ code: "validation_failed" });
+  });
+
+  it("rejects an explicit id that collides with a fill id or a node id on the node path, and fill-to-fill", async () => {
+    const before = await fx.store.readScreen("home");
+    await expect(
+      patchHtml(fx.store, { target: { kind: "node", node: "home.page" }, operation: "insert_after", html_aug: `<p id="install-title">x</p>` }),
+    ).rejects.toMatchObject({ code: "validation_failed" });
+    await expect(
+      patchHtml(fx.store, { target: { kind: "node", node: "home.shot" }, operation: "insert_after", html_aug: `<p id="install">x</p>` }),
+    ).rejects.toMatchObject({ code: "validation_failed" });
+    await expect(
+      patchHtml(fx.store, { target: { kind: "node", node: "home.install-title" }, operation: "insert_after", html_aug: `<p id="install-copy">x</p>` }),
+    ).rejects.toMatchObject({ code: "validation_failed" });
+    expect(await fx.store.readScreen("home")).toBe(before);
+    // a replace keeping its own id is fine
+    await patchHtml(fx.store, {
+      target: { kind: "node", node: "home.shot" },
+      operation: "replace",
+      html_aug: `<div id="shot" class="$screenshot-frame"><img id="shot-img" data-slot="image" src="assets/c.png" alt=""></div>`,
+    });
+    expect(await fx.store.readScreen("home")).toContain("c.png");
+  });
+
+  it("changes only the patched element in the file", async () => {
+    const before = await fx.store.readScreen("home");
+    await patchHtml(fx.store, {
+      target: { kind: "node", node: "home.install-copy" },
+      operation: "set_attr",
+      attr: { name: "data-x", value: "1" },
+    });
+    const after = await fx.store.readScreen("home");
+    expect(after).toBe(before.replace(`<p id="install-copy" class="lead">`, `<p id="install-copy" class="lead" data-x="1">`));
+    expect(after).not.toBe(before);
+  });
+
+  it("patches inside a nested component instance within a fill, and a positional fill", async () => {
+    await fx.store.writeComponent("badge", `<span style="padding: 2px"><b data-slot="label"></b></span>`);
+    await fx.store.writeComponent("row", `<div><div></div><div></div></div>`);
+    await fx.store.writeScreen(
+      "nest",
+      `<main id="m"><section id="s" class="$section"><div data-slot="content"><span id="bd" class="$badge"><b data-slot="label" id="lbl">Hi</b></span></div></section>` +
+        `<div id="r" class="$row"><i id="pos">a</i></div></main>`,
+    );
+    await patchHtml(fx.store, {
+      target: { kind: "node", node: "nest.lbl" },
+      operation: "replace",
+      html_aug: `<b id="lbl">Bye</b>`,
+    });
+    await patchHtml(fx.store, { target: { kind: "node", node: "nest.pos" }, operation: "set_attr", attr: { name: "title", value: "t" } });
+    const html = await fx.store.readScreen("nest");
+    expect(html).toContain("Bye");
+    expect(html).not.toContain("Hi");
+    expect(html).toContain(`title="t"`);
+    expect(html).toContain(`id="pos"`);
+  });
+
+  it("a selector matching a normal node and a fill node patches both", async () => {
+    await patchHtml(fx.store, {
+      target: { kind: "selector", screen: "home", css_selector: "div" },
+      operation: "set_attr",
+      attr: { name: "data-all", value: "1" },
+    });
+    const html = await fx.store.readScreen("home");
+    expect(html).toContain(`<div id="shot" class="$screenshot-frame" data-all="1">`);
+    expect(html).toContain(`id="content-wrap"`);
+    expect(html).toMatch(/<div[^>]*id="content-wrap"[^>]*data-all="1"/);
   });
 
   it("deleting a top-level fill removes it from the instance", async () => {

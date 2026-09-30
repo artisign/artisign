@@ -142,7 +142,7 @@ export const TOOLS: ToolDefinition[] = [
       "a later write when id_stability is \"explicit\" — a \"derived\" id is only guaranteed for this one call. " +
       "reply_comment stays screen-only. A predicate can also match inside a component instance's slot fills; " +
       "that match carries node: null, addressable: false, inside: \"<screen>.<node-id>\" pointing at the " +
-      "enclosing instance, and its authored id when it has one — patch_html/inspect_node take \"<screen>.<id>\" " +
+      "enclosing instance, and (screen matches only) its authored id when it has one — patch_html/inspect_node take \"<screen>.<id>\" " +
       "for it; get_node/update_refs do not, and a fill without an id can only be reached by patch_html's " +
       "css_selector. The headline token-saver.",
     {

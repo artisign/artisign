@@ -357,3 +357,25 @@ describe("zoom", () => {
     expect(compare.getZoom()).toBe(1);
   });
 });
+
+describe("a hidden compare view", () => {
+  it("holds renders back until show(), since a hidden iframe measures 0x0", async () => {
+    setup();
+    let visible = false;
+    deps.isVisible = () => visible;
+    compare = createCompareView(els, deps);
+    compare.enter("a");
+    await flush();
+    expect(deps.fetchRender).not.toHaveBeenCalled();
+    compare.screenChanged("a"); // an SSE reload while hidden waits too
+    await flush();
+    expect(deps.fetchRender).not.toHaveBeenCalled();
+    visible = true;
+    compare.show();
+    await flush();
+    expect(deps.fetchRender.mock.calls.map((c) => c[0]).sort()).toEqual(["a", "family"]);
+    compare.show(); // nothing left to run
+    await flush();
+    expect(deps.fetchRender).toHaveBeenCalledTimes(2);
+  });
+});

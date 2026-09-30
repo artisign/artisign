@@ -64,7 +64,9 @@ function button(className, text, onClick) {
  *   fetchCompare: (base: string, others: string[]) => Promise<{ ok: true, compare: object } | { ok: false, message: string }>,
  *   onAdd: () => void,
  *   onChange: () => void,
- * }} deps `onChange` fires after every state change the rest of the UI mirrors
+ *   isVisible?: () => boolean,
+ * }} deps `isVisible` (default: always) says whether the compare view is on screen; a hidden view
+ *   measures every iframe as 0x0, so renders wait until `show()` says it is visible again. `onChange` fires after every state change the rest of the UI mirrors
  *   (mode, selection) so the sidebar, breadcrumb and main visibility re-render.
  */
 export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl }, deps) {
@@ -113,6 +115,8 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
 
   function loadRender(column) {
     const request = ++column.request;
+    column.deferred = deps.isVisible ? !deps.isVisible() : false;
+    if (column.deferred) return;
     deps.fetchRender(column.name).then((result) => {
       if (request !== column.request || columns.get(column.name) !== column) return;
       column.ready = false;
@@ -250,7 +254,6 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
     add.disabled = selected.length >= COMPARE_MAX_MEMBERS;
     if (add.disabled) add.title = `At most ${COMPARE_MAX_MEMBERS} screens next to the reference`;
     barEl.appendChild(add);
-    barEl.appendChild(el("span", "compare-bar-spacer"));
 
     const diffLabel = el("label", "compare-diff");
     const diffBox = document.createElement("input");
@@ -285,7 +288,8 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
       const member = memberData(name);
       const row = el("div", "compare-summary-row");
       row.dataset.screen = name;
-      const value = !member ? "…" : member.status === "low_overlap" ? "unavailable" : `${diffRows({ members: [member] }).length} nodes`;
+      const count = member ? diffRows({ members: [member] }).length : 0;
+      const value = !member ? "…" : member.status === "low_overlap" ? "unavailable" : `${count} node${count === 1 ? "" : "s"}`;
       row.append(el("span", "compare-summary-name", name), el("b", "", value));
       summary.appendChild(row);
     }
@@ -449,6 +453,11 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
     loadCompare();
   }
 
+  /** The compare view became visible: run the renders that were held back while it was hidden. */
+  function show() {
+    for (const column of columns.values()) if (column.deferred) loadRender(column);
+  }
+
   /** Tokens, components or a reconnect can change any render: reload every column and the diff. */
   function reloadAll() {
     if (!on) return;
@@ -471,6 +480,7 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
     reconcile,
     screenChanged,
     reloadAll,
+    show,
     relayout: () => on && relayout(),
     setDiff,
     setZoom,

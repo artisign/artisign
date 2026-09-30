@@ -58,6 +58,14 @@ describe("compareScreens", () => {
     expect(m.removed).toEqual([]);
   });
 
+  it("ignores whitespace-only reformatting of text but still reports a real text change", async () => {
+    await write("a", `<main id="page"><p id="copy">Hello   there\n  world</p></main>`);
+    await write("b", `<main id="page"><p id="copy">\n    Hello there world\n  </p></main>`);
+    await write("c", `<main id="page"><p id="copy">Hello there World</p></main>`);
+    expect((await compareOne("a", "b")).changed).toEqual([]);
+    expect((await compareOne("a", "c")).changed).toEqual(["copy"]);
+  });
+
   it("folds anonymous elements: an inserted one changes its ancestor and shifts nothing", async () => {
     await write("a", `<main id="page"><div id="row"><span>x</span><b id="tail">t</b></div></main>`);
     await write("b", `<main id="page"><div id="row"><i>new</i><span>x</span><b id="tail">t</b></div></main>`);

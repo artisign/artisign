@@ -331,6 +331,7 @@ const compare = createCompareView(
     fetchRender: (screen) => fetchRender(screen, activeProjectRoot),
     fetchCompare: (base, others) => fetchCompare(base, others, activeProjectRoot),
     onAdd: () => variantUI.openPopover(currentScreen),
+    isVisible: () => currentView === "screens" && currentMockup === null,
     onChange: () => {
       refreshSidebar();
       applyMainVisibility();
@@ -715,7 +716,10 @@ async function switchToProject(root) {
   activeProjectRoot = root;
   resetProjectState();
   reconnectSse(root ?? undefined);
-  if (root) await bootScreens();
+  if (root) {
+    await bootScreens();
+    restoreCompare();
+  }
 }
 
 /** localStorage key for the last opened screen — scoped per project since the daemon serves several at once. */
@@ -824,7 +828,11 @@ async function bootScreens() {
   }
   if (screens.length === 0) return;
   await selectScreen(pickInitialScreen(screens, persisted?.kind === "screen" ? persisted.name : null));
-  if (compare.restoreWanted()) enterCompare(); // no-op when this screen's family has nothing to compare
+}
+
+/** Brings compare mode back after a boot or project switch — once the tab is settled, so a hidden tab holds the renders back. A no-op when the open screen's family has nothing to compare. */
+function restoreCompare() {
+  if (compare.restoreWanted()) enterCompare();
 }
 
 /** Re-fetches everything the current view depends on — used after an SSE reconnect, where the gap while disconnected is invisible to us. */
@@ -2004,7 +2012,10 @@ function applyMainVisibility() {
   panelBodyActivityEl.hidden = comparing || !activityTab;
   syncZoomButtons(showMockup ? mockupZoom : zoom);
   if (showMockup) updateMockupZoom();
-  if (comparing) compare.relayout();
+  if (comparing) {
+    compare.show(); // renders held back while another tab was showing
+    compare.relayout();
+  }
   else if (wasComparing && currentView === "screens" && !showMockup) updateCanvas(); // the canvas was measured while hidden
   wasComparing = comparing;
   return showMockup;
@@ -2061,6 +2072,7 @@ async function boot() {
     const allowedViews = [...viewTabs].map((tab) => tab.dataset.view);
     const persistedView = parseEnumPref(readStringPref(prefsStorage, "artisign.view", null), allowedViews, currentView);
     if (persistedView !== currentView) setView(persistedView);
+    restoreCompare();
   }
 }
 

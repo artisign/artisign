@@ -3341,6 +3341,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 #compare-view[hidden],
+#screens-stage[hidden],
 #compare-hint[hidden],
 #compare-panel[hidden],
 #compare-panel-title[hidden],
@@ -3366,10 +3367,6 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 .compare-title {
   font-size: 0.8rem;
   color: var(--color-text);
-}
-
-.compare-bar-spacer {
-  flex: 1;
 }
 
 .compare-chip {
@@ -3436,6 +3433,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .compare-diff {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 5px;

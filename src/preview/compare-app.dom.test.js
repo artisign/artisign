@@ -252,6 +252,21 @@ describe("staying current", () => {
   });
 });
 
+describe("compare restored behind another tab", () => {
+  it("renders the columns only once the Screens tab is showing", async () => {
+    memoryStorage.set("artisign.compare", "true");
+    memoryStorage.set("artisign.view", "board");
+    await boot("a");
+    expect($("#compare-view").hidden).toBe(true);
+    expect(calls.some((u) => u.startsWith("/api/render/family?"))).toBe(false); // the open screen itself still renders in #screen-frame
+    document.querySelector('.view-tab[data-view="screens"]').click();
+    await flush();
+    expect($("#compare-view").hidden).toBe(false);
+    expect(calls.some((u) => u.startsWith("/api/render/family?"))).toBe(true);
+    expect(calls.some((u) => u.startsWith("/api/render/a?"))).toBe(true);
+  });
+});
+
 describe("per-browser state", () => {
   it("restores compare mode, the selection and the zoom after a reload", async () => {
     await boot("a");

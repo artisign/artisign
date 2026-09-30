@@ -27,7 +27,8 @@ function ownSignature(node: InternalNode): Record<string, unknown> {
   return {
     kind: node.kind,
     tag: node.tag,
-    text: node.text,
+    // Rendering collapses whitespace, so a re-indented text is not a change.
+    text: node.text?.replace(/\s+/g, " ").trim(),
     attributes: node.attributes,
     refs: node.refs,
     inlineStyles: node.inlineStyles,

@@ -644,7 +644,16 @@ export function buildBoardModel(screens, visibleNames, expandedNames = [], { clu
       const byDepth = new Map();
       for (const m of members) byDepth.set(m.depth, [...(byDepth.get(m.depth) ?? []), m]);
       for (const [depth, list] of [...byDepth].sort((a, b) => a[0] - b[0])) {
-        cluster.levels.push({ depth, tiles: list.slice(0, MAX_TILES_PER_DEPTH), hidden: list.slice(MAX_TILES_PER_DEPTH) });
+        // Context ancestors are always tiles (they parent shown members) and
+        // don't count toward the cap; only shown members can fold into "+N more".
+        let shownSoFar = 0;
+        const tiles = [];
+        const hidden = [];
+        for (const m of list) {
+          if (m.context || shownSoFar++ < MAX_TILES_PER_DEPTH) tiles.push(m);
+          else hidden.push(m);
+        }
+        cluster.levels.push({ depth, tiles, hidden });
       }
       for (const level of cluster.levels) for (const m of level.tiles) tileNames.push(m.screen);
     } else {
@@ -778,10 +787,22 @@ function expandedBlock(cluster, sizes) {
         }
         cx += col.width + DEPTH_GAP;
       }
+      const foldedParents = new Set();
       for (const member of cluster.members) {
         const child = placed.get(member.screen);
         const parent = member.parent ? placed.get(member.parent) : null;
         if (child && parent) out.connectors.push({ from: parent.screen, to: child.screen });
+      }
+      // Children folded into a "+N more" tile keep their parent's connector,
+      // drawn once per parent to that tile.
+      for (const col of columns) {
+        const more = out.mores.find((m) => m.id === `${cluster.root}:${col.level.depth}`);
+        for (const member of col.level.hidden) {
+          const key = `${member.parent}>${more.id}`;
+          if (!member.parent || !placed.has(member.parent) || foldedParents.has(key)) continue;
+          foldedParents.add(key);
+          out.connectors.push({ from: member.parent, to: more.id, more: true });
+        }
       }
     },
   };
@@ -800,7 +821,7 @@ function expandedBlock(cluster, sizes) {
  * @param {{ columns?: number, gapX?: number, gapY?: number, padding?: number }} [options]
  * @returns {{
  *   tiles: ReturnType<typeof computeBoardLayout>["tiles"],
- *   frames: object[], mores: object[], connectors: { from: string, to: string }[],
+ *   frames: object[], mores: object[], connectors: { from: string, to: string, more?: boolean }[],
  *   contentWidth: number, contentHeight: number,
  * }}
  */

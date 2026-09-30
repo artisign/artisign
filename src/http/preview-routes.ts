@@ -8,6 +8,8 @@ import { buildRenderContext, renderScreenDocument, renderMockupDocument, resolve
 import { readMockupMetaOrDefault } from "../tools/mockups.js";
 import { variantLinks, variantFields } from "../tools/variants.js";
 import { readAllFlows, toPublicFlowRecord } from "../tools/flows.js";
+import { compareScreens } from "../tools/compare.js";
+import { ToolError } from "../tools/types.js";
 import {
   parseScreen,
   renderScreen,
@@ -20,6 +22,7 @@ import {
 } from "../model/index.js";
 import { sendJson } from "./json.js";
 
+const SCREEN_NAME_RE = /^[\w-]+$/;
 const FONT_FILENAME_RE = /^[\w.-]+\.woff2$/;
 
 type ComponentDefinitionJson = {
@@ -67,6 +70,38 @@ export async function handlePreviewRoutes(req: IncomingMessage, res: ServerRespo
     const links = variantLinks(names, metas);
     const screens = names.map((name, i) => ({ name, tags: metas[i]!.tags, notes: metas[i]!.notes, ...variantFields(links.get(name)) }));
     sendJson(res, 200, { screens });
+    return true;
+  }
+
+  if (url.pathname === "/api/compare") {
+    // Thin wrapper over compareScreens (CHR-738/ADR-006): any screens can be
+    // compared, the variant tree is not consulted.
+    const base = url.searchParams.get("base") ?? "";
+    const others = (url.searchParams.get("others") ?? "").split(",").filter((name) => name !== "");
+    const invalid = !base
+      ? "base query parameter is required"
+      : others.length < 1 || others.length > 3
+        ? "others must list 1 to 3 screens"
+        : new Set(others).size !== others.length
+          ? "others must not contain duplicates"
+          : others.includes(base)
+            ? "base must not be listed in others"
+            : [base, ...others].some((name) => !SCREEN_NAME_RE.test(name))
+              ? "screen names must match ^[\\w-]+$"
+              : undefined;
+    if (invalid) {
+      sendJson(res, 400, { code: "validation_failed", message: invalid });
+      return true;
+    }
+    try {
+      sendJson(res, 200, await compareScreens(store, base, others));
+    } catch (err) {
+      if (err instanceof ToolError && err.code === "not_found") {
+        sendJson(res, 404, { code: err.code, message: err.message });
+        return true;
+      }
+      throw err;
+    }
     return true;
   }
 

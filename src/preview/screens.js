@@ -210,6 +210,7 @@ export function createKindIcon(kind) {
  *   expanded?: Set<string>,
  *   onToggleExpand?: (screen: string) => void,
  *   showTags?: boolean,
+ *   compare?: { reference: string, family: string[], selected: string[], cap: number, onToggle: (screen: string) => void },
  * }} [opts]
  *   CHR-624 — omitting `onTogglePin` (the default) renders no pin button at
  *   all, so every OTHER caller of this widely-used function (and its
@@ -223,6 +224,11 @@ export function createKindIcon(kind) {
  *   (just `[screen]` on a leaf); a group row counts as pinned only once
  *   every member is. A project without any `variant_of` renders the flat
  *   list: no disclosure, no depth guides, no kind icons.
+ *
+ *   CHR-738 — while compare is on, `compare` puts a checkbox on every row of
+ *   the reference's family: the reference's is ticked and locked, the others
+ *   toggle their membership until `cap` members are ticked, then the unticked
+ *   ones are disabled. Rows outside the family get none.
  */
 export function renderScreenList(
   listEl,
@@ -230,7 +236,7 @@ export function renderScreenList(
   activeScreen,
   onSelect,
   filter = "",
-  { pinned, onTogglePin, expanded = new Set(), onToggleExpand, showTags = true } = {},
+  { pinned, onTogglePin, expanded = new Set(), onToggleExpand, showTags = true, compare } = {},
 ) {
   listEl.innerHTML = "";
   const tree = buildScreenTree(screens);
@@ -349,6 +355,22 @@ export function renderScreenList(
       // Before the select button in DOM order so Tab follows the visual
       // order (the toggle is positioned at the row's left edge).
       li.insertBefore(toggle, button);
+    }
+
+    if (compare?.family.includes(screen.name)) {
+      const isReference = screen.name === compare.reference;
+      const ticked = isReference || compare.selected.includes(screen.name);
+      // A sibling of the select button, like the pin button — no nested interactive elements.
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.className = "screen-item-compare";
+      box.checked = ticked;
+      box.disabled = isReference || (!ticked && compare.selected.length >= compare.cap);
+      box.setAttribute("aria-label", isReference ? `${screen.name} is the compare reference` : `Compare ${screen.name}`);
+      if (isReference) box.title = "The main screen is the locked reference";
+      box.addEventListener("change", () => compare.onToggle(screen.name));
+      li.classList.add("has-compare");
+      li.appendChild(box);
     }
 
     if (onTogglePin) {

@@ -84,6 +84,58 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
     });
   });
 
+  describe("GET /api/compare", () => {
+    beforeEach(async () => {
+      await store.writeScreen("dash", `<main id="page"><h1 id="greeting">Hi</h1><ul id="card-list"><li id="card-1">A</li></ul></main>`);
+      await store.writeScreen("dash-empty", `<main id="page"><h1 id="greeting">Hello</h1><div id="empty-state">none</div></main>`);
+      await store.writeScreen("other", `<main id="page"><h1 id="greeting">Hi</h1></main>`);
+    });
+
+    it("returns the contract shape; screens need not be variants of each other", async () => {
+      const { status, json } = await getJson("/api/compare?base=dash&others=dash-empty");
+      expect(status).toBe(200);
+      expect(json).toEqual({
+        base: "dash",
+        members: [
+          {
+            screen: "dash-empty",
+            status: "ok",
+            overlap: { shared: 2, base: 4, member: 3, ratio: 0.5 },
+            added: ["empty-state"],
+            removed: [{ id: "card-list", parent: "page" }],
+            changed: ["greeting"],
+            counts: { added: 1, removed: 2, changed: 1 },
+          },
+        ],
+      });
+    });
+
+    it("compares up to three members in the given order", async () => {
+      const { status, json } = await getJson("/api/compare?base=dash&others=other,dash-empty,home");
+      expect(status).toBe(200);
+      expect((json.members as { screen: string }[]).map((m) => m.screen)).toEqual(["other", "dash-empty", "home"]);
+    });
+
+    it.each([
+      ["missing base", "/api/compare?others=other"],
+      ["no others", "/api/compare?base=dash"],
+      ["empty others", "/api/compare?base=dash&others="],
+      ["more than three others", "/api/compare?base=dash&others=a,b,c,d"],
+      ["duplicates", "/api/compare?base=dash&others=other,other"],
+      ["base among others", "/api/compare?base=dash&others=other,dash"],
+      ["invalid screen name", "/api/compare?base=dash&others=../x"],
+    ])("400 validation_failed for %s", async (_label, path) => {
+      const { status, json } = await getJson(path);
+      expect(status).toBe(400);
+      expect(json.code).toBe("validation_failed");
+    });
+
+    it("404 not_found for an unknown screen", async () => {
+      expect((await getJson("/api/compare?base=dash&others=nope"))).toMatchObject({ status: 404, json: { code: "not_found" } });
+      expect((await getJson("/api/compare?base=nope&others=dash"))).toMatchObject({ status: 404, json: { code: "not_found" } });
+    });
+  });
+
   it("GET /api/flows returns an empty list when no screen has a flow edge", async () => {
     const { status, json } = await getJson("/api/flows");
     expect(status).toBe(200);

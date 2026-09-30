@@ -262,3 +262,45 @@ describe("renderScreenList — variant tree", () => {
     ).toBe("true");
   });
 });
+
+describe("renderScreenList compare checkboxes (CHR-738)", () => {
+  const screens = [
+    { name: "plain", tags: [] },
+    { name: "family", tags: [] },
+    { name: "a", tags: [], variant_of: "family", variant_kind: "state" },
+    { name: "a1", tags: [], variant_of: "a", variant_kind: "step" },
+    { name: "b", tags: [], variant_of: "family", variant_kind: "state" },
+  ];
+  const render = (compare) => {
+    const listEl = document.createElement("ul");
+    document.body.replaceChildren(listEl); // jsdom fires a checkbox's change only while it is connected
+    renderScreenList(listEl, screens, "a", () => {}, "", { expanded: new Set(["family", "a"]), compare });
+    return listEl;
+  };
+  const boxes = (listEl) => Object.fromEntries([...listEl.querySelectorAll("li")].map((li) => [li.dataset.screen, li.querySelector(".screen-item-compare")]));
+
+  it("renders none without the compare option", () => {
+    expect(render(undefined).querySelectorAll(".screen-item-compare")).toHaveLength(0);
+  });
+
+  it("puts one on each row of the family only: reference ticked and locked, members by selection", () => {
+    const found = boxes(render({ reference: "family", family: ["family", "a", "a1", "b"], selected: ["a1"], cap: 3, onToggle: () => {} }));
+    expect(found.plain).toBeNull();
+    expect([found.family.checked, found.family.disabled]).toEqual([true, true]);
+    expect([found.a.checked, found.a.disabled]).toEqual([false, false]);
+    expect([found.a1.checked, found.a1.disabled]).toEqual([true, false]);
+    expect([found.b.checked, found.b.disabled]).toEqual([false, false]);
+  });
+
+  it("toggles through onToggle and disables the unticked boxes once the cap is reached", () => {
+    const toggled = [];
+    const listEl = render({ reference: "family", family: ["family", "a", "a1", "b"], selected: ["a", "a1", "b"], cap: 3, onToggle: (n) => toggled.push(n) });
+    const found = boxes(listEl);
+    expect([found.a.disabled, found.a1.disabled, found.b.disabled]).toEqual([false, false, false]);
+    found.a1.click();
+    expect(toggled).toEqual(["a1"]);
+
+    const full = boxes(render({ reference: "family", family: ["family", "a", "a1", "b"], selected: ["a"], cap: 1, onToggle: () => {} }));
+    expect([full.a.disabled, full.a1.disabled, full.b.disabled]).toEqual([false, true, true]);
+  });
+});

@@ -4,6 +4,9 @@
     "chr-727",
     "chr-736",
     "chr-731",
-    "shell"
-  ]
+    "shell",
+    "chr-739"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "state"
 }

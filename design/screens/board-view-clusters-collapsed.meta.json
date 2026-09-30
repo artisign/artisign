@@ -1,0 +1,9 @@
+{
+  "notes": "Board with every variant cluster collapsed (the \"Fit all\" shape). Approved direction C (mockup `variants-board` / `c-clusters-collapsed`), implemented in CHR-733.\n\n- Each cluster is a frame: `$cluster-header` (name, subtree size, depth), the main tile and a row of `$micro-thumb` (grey = state, blue foot = overlay, dashed = deeper level), capped with a `+N` count.\n- Edges keep their true endpoints and dock on the frame; the label pill names the variant inside (`→ dashboard-empty`, `→ sheet-edit`; the calendar-sheet-child-pick pill is grey because it is the source).\n- Toolbar as in the expanded screen (`Clusters: On`, `Collapse all`).\n- Flow: tap on the family-l2 cluster header opens `board-view-clusters-expanded`.\n- Below ~50% zoom the micro thumbnails can look noisy; that trade-off was accepted with direction C.",
+  "tags": [
+    "chr-727",
+    "chr-736",
+    "chr-733",
+    "view"
+  ]
+}

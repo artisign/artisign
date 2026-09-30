@@ -94,5 +94,47 @@
     "event": "tap",
     "to": "app-shell",
     "to_kind": "screen"
+  },
+  {
+    "from": "sidebar-variant-tree.bar",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "inspector-variant-reached-from.bar",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "screen-view-variant-breadcrumb.bar",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-clusters-collapsed.bar",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-clusters-collapsed.frame-family-head",
+    "event": "tap",
+    "to": "board-view-clusters-expanded",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-clusters-expanded.bar",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-clusters-expanded.frame-family-head",
+    "event": "tap",
+    "to": "board-view-clusters-collapsed",
+    "to_kind": "screen"
   }
 ]

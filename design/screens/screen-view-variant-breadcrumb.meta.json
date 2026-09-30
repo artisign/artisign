@@ -1,0 +1,9 @@
+{
+  "notes": "Screen view of a variant: breadcrumb bar above the canvas, tree map right of the canvas, Variant card in the inspector. Approved direction C (mockup `variants-screen-view` / `c-breadcrumb-tree`), implemented in CHR-732.\n\nBehaviour:\n- Breadcrumb bar = crumb per ancestor (`$variant-crumb`: home glyph for the root, kind icon for variants, current crumb in accent) plus a kind chip and a 1-based depth chip, and a `Back to <root>` button on the right. Every crumb carries a disclosure arrow that opens a popover with the node's children and siblings; one click switches the screen (popover drawn open on the last crumb).\n- The tree map is a 260px column right of the canvas; the current node is highlighted, every node is clickable.\n- The `Variant` card (Path, Kind, Depth, Siblings, Flows in / out) lives in the inspector's Elements tab, not beside the phone. `Also reached from` is a second card there, see `inspector-variant-reached-from`.\n- No flow-trail line and no \"tap here\" annotation (dropped from the mockup). Flow mode landing on a variant only redraws crumbs and map.",
+  "tags": [
+    "chr-727",
+    "chr-736",
+    "chr-732",
+    "view"
+  ]
+}

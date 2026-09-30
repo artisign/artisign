@@ -6,6 +6,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+Screens can now be grouped into families: a state, an overlay or a step of a
+screen declares that screen as its parent, and the preview shows the family as
+a tree, a cluster on the Board and a side-by-side comparison. One behaviour
+change reaches agents: `delete_entity` on a screen that still has variants now
+fails unless it cascades.
+
+### Added
+
+- Screen variants: `set_meta` on a screen target takes `variant_of` (the parent
+  screen) and `variant_kind` (`state`, `overlay` or `step`), stored in
+  `screens/<name>.meta.json`. `variant_of: null` clears both; a missing parent,
+  a self-reference and a cycle are rejected. A dangling parent — deleted or
+  renamed by hand — reads as a main screen rather than an error. (CHR-728,
+  ADR-006)
+- `get_project` at `view: "tree"` carries `variant_of` and `variant_kind` on
+  variant screens, and `get_screen` at `view: "full"` returns `variants` (direct
+  children) and `reached_from` (screens with a flow into it). Both are omitted
+  when empty, and `summary` is unchanged. (CHR-728)
+- `set_board_state` takes `expanded`, the Board's open variant clusters, with
+  the same patch shape and unknown-name gate as `pins`. It rides the existing
+  `board_state` SSE event and `GET /api/board-state`, and is pruned when a
+  screen is deleted. (CHR-729)
+- `delete_entity` takes `cascade: true` for a screen: the whole variant subtree
+  at every depth goes in one commit, `deleted_screens` lists it, and a
+  `dangling_flow` warning names each flow from outside the subtree that still
+  targets it. `cascade` is screen-only. (CHR-730)
+- The preview's sidebar is a screen tree: variants nest under their parent with
+  a kind icon and tag chips, expand state is per browser, and pinning a group
+  row pins its subtree. (CHR-731)
+- The screen view shows a breadcrumb and a variant tree map for a variant or a
+  screen that has variants, and the inspector lists the flow sources a screen is
+  "Also reached from". (CHR-732)
+- Board clusters: a family is one frame around its main screen with variant
+  thumbnails, expandable into one column per depth (about 8 tiles, then "+N
+  more"). Which clusters are open is shared between tabs and agents through
+  `set_board_state`; a per-browser Clusters On/Off toggle restores flat tiles.
+  Context ancestors stay out of the tile cap and a parent with folded children
+  keeps its connector. (CHR-733, CHR-735)
+- Side-by-side variant compare: `Single | Compare · N` in the screen view shows
+  the family's main screen, locked as reference, beside 1-3 variants, with a
+  diff overlay of added, changed and removed nodes. Nodes match on authored ids
+  only; below 25 % shared authored ids a column shows no diff, only a banner.
+  Served by the new
+  `GET /api/compare` preview route, not a tool — the surface stays at 24.
+  (CHR-738)
+- `artisign-ui`, the tool's own design project, is migrated onto the variant
+  tree, with the concept and compare mockups that led there. (CHR-727, CHR-734,
+  CHR-736, CHR-739)
+
+### Changed
+
+- **Agents:** `delete_entity` on a screen with variants now fails with
+  `has_variants` (HTTP 409) — the message gives the subtree size and example
+  names, and nothing is deleted. Delete the variants first or pass
+  `cascade: true`. Screens without variants delete exactly as before. (CHR-730)
+- `promote_mockup` turns a full-document mockup into a single-root screen:
+  top-level `<style>` elements move into the root, several top-level nodes are
+  wrapped in one `<div>` (which also carries `<body>` style and class), and
+  head-only tags and `<script>` are dropped. The changes are reported in one
+  `mockup_normalized` warning; a single-root mockup without `<style>` promotes
+  byte-identically as before. (CHR-737)
+
+### Fixed
+
+- The serializer and renderer no longer entity-escape text inside `<style>`,
+  which broke selectors containing `>`, `&` or `<` after any write. (CHR-737)
+- The README no longer claims that `npx` rules out screenshots; it names
+  `ARTISIGN_PLAYWRIGHT_DIR` as the route. (CHR-669)
+
 ## [1.0.1] - 2026-09-21
 
 A packaging release with no behaviour change: npm version metadata is

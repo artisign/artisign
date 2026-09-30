@@ -229,6 +229,31 @@ Then iterate with the cheapest write that does the job:
 One write, one look. Chaining five writes before the first screenshot is how
 small errors compound into a broken screen you then debug expensively.
 
+### States, overlays and steps are variants
+
+The empty, error and loading states of `notes`, the "delete note" sheet, the
+second page of an onboarding — each is a normal screen, written like the one
+above. What makes it a *variant* is one `set_meta` call declaring its parent:
+
+```
+set_meta {target: {kind: "screen", screen: "notes-empty"},
+          variant_of: "notes", variant_kind: "state"}
+```
+
+`variant_kind` is `state` (same view, another condition), `overlay` (layered
+over the parent: sheet, modal, menu) or `step` (a stage in a sequence that
+starts at the parent). A different destination is a new main screen, not a
+variant. `variant_of: null` turns it back into one.
+
+What the human sees: the sidebar nests the variants under `notes` with a kind
+icon, the screen view shows a breadcrumb and a variant tree map, the Board
+folds the family into one cluster that expands on click, and `Compare` in the
+screen view lays `notes` and its variants side by side with a diff overlay.
+Compare matches nodes by authored `id`, so keep the ids of structural nodes
+(`card-list`, `empty-state`) identical across a family. Deleting `notes` later
+fails with `has_variants` until its variants are gone or `cascade: true` is
+passed.
+
 ---
 
 ## 6. Exploration and promotion — how new design enters the system
@@ -302,7 +327,7 @@ design later. Your handoff channel is `set_meta`:
 |---|---|---|
 | component / pattern | `usage` | When to use it, when not to, slot expectations ("Primary action, max one per screen") |
 | design system | `idea`, `decisions` | The design direction and settled choices, so they are not relitigated |
-| screen | `notes`, `tags` | What a screenshot cannot carry: states, empty/error cases, content rules |
+| screen | `notes`, `tags`, `variant_of`, `variant_kind` | What a screenshot cannot carry: states, empty/error cases, content rules; and which screen this one is a variant of |
 | mockup | `tags`, `title`, `description` | Makes an exploration findable via `get_project {tags: [...]}` before it is promoted |
 | tag | `notes` | A spec spanning several screens, set once (`target: {kind: "tag", tag}`) instead of duplicated into every tagged screen's own notes; surfaced back as `tag_notes` on `get_project`/`get_screen` |
 

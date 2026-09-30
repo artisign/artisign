@@ -119,8 +119,8 @@ function subtreeClassAttrValue(sub: NodeSubtree): string | undefined {
   return parts.length > 0 ? parts.join(" ") : undefined;
 }
 
-function serializeSubtree(sub: NodeSubtree, slotKey?: string, parentTag?: string): string {
-  if (sub.kind === "text") return escapeTextIn(parentTag, sub.text ?? "");
+function serializeSubtree(sub: NodeSubtree, slotKey?: string, parent?: NodeSubtree): string {
+  if (sub.kind === "text") return escapeTextIn(parent, sub.text ?? "");
 
   const isSvgDomain = sub.kind === "svg" || sub.kind === "svg_path";
   const attrs: [string, string][] = [];
@@ -150,14 +150,14 @@ function serializeSubtree(sub: NodeSubtree, slotKey?: string, parentTag?: string
       ? Object.entries(sub.slotOverrides ?? {})
           .map(([key, child]) => serializeSubtree(child, key))
           .join("")
-      : sub.children.map((child) => serializeSubtree(child, undefined, tag)).join("");
+      : sub.children.map((child) => serializeSubtree(child, undefined, sub)).join("");
   return `<${tag}${attrStr ? ` ${attrStr}` : ""}>${inner}</${tag}>`;
 }
 
 function serializeNode(nodeId: string, doc: ScreenDocument, flowsByTrigger: Map<string, Flow>): string {
   const node = doc.nodes[nodeId];
   if (!node) return "";
-  if (node.kind === "text") return escapeTextIn(doc.nodes[node.parentId ?? ""]?.tag, node.text ?? "");
+  if (node.kind === "text") return escapeTextIn(doc.nodes[node.parentId ?? ""], node.text ?? "");
 
   const tag = node.tag ?? "div";
   const attrStr = openTagAttrs(node, doc, flowsByTrigger);

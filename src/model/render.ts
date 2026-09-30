@@ -229,8 +229,8 @@ function fillInstanceId(sub: NodeSubtree, origin: Origin, fillIds: FillIds): str
  * the output as a literal class. The fill's authored ids are emitted too,
  * namespaced by where the fill was written (`origin`).
  */
-function renderSubtree(sub: NodeSubtree, ctx: RenderContext, origin: Origin, fillIds: FillIds, parentTag?: string): string {
-  if (sub.kind === "text") return escapeTextIn(parentTag, sub.text ?? "");
+function renderSubtree(sub: NodeSubtree, ctx: RenderContext, origin: Origin, fillIds: FillIds, parent?: NodeSubtree): string {
+  if (sub.kind === "text") return escapeTextIn(parent, sub.text ?? "");
 
   if (sub.kind === "component_instance") {
     return renderComponentInstance(sub, ctx, undefined, origin, fillInstanceId(sub, origin, fillIds));
@@ -244,14 +244,14 @@ function renderSubtree(sub: NodeSubtree, ctx: RenderContext, origin: Origin, fil
   ];
   const attrStr = attrsToString(attrs);
   if (VOID_ELEMENTS.has(tag)) return `<${tag}${attrStr ? ` ${attrStr}` : ""}>`;
-  const inner = sub.children.map((child) => renderSubtree(child, ctx, origin, fillIds, tag)).join("");
+  const inner = sub.children.map((child) => renderSubtree(child, ctx, origin, fillIds, sub)).join("");
   return `<${tag}${attrStr ? ` ${attrStr}` : ""}>${inner}</${tag}>`;
 }
 
 function renderNode(nodeId: string, doc: ScreenDocument, ctx: RenderContext, flowsByTrigger: Map<string, Flow>): string {
   const node = doc.nodes[nodeId];
   if (!node) return "";
-  if (node.kind === "text") return escapeTextIn(doc.nodes[node.parentId ?? ""]?.tag, node.text ?? "");
+  if (node.kind === "text") return escapeTextIn(doc.nodes[node.parentId ?? ""], node.text ?? "");
   if (node.kind === "component_instance") {
     return renderComponentInstance(node, ctx, flowsByTrigger.get(node.id), SCREEN_ORIGIN, node.id);
   }
@@ -540,7 +540,7 @@ function renderTemplateNode(
   const override = substitutions.get(nodeId);
   if (override !== undefined) return renderSubtree(override, ctx, fillOrigin, fillIds);
 
-  if (node.kind === "text") return escapeTextIn(templateDoc.nodes[node.parentId ?? ""]?.tag, node.text ?? "");
+  if (node.kind === "text") return escapeTextIn(templateDoc.nodes[node.parentId ?? ""], node.text ?? "");
 
   const isRoot = nodeId === templateDoc.rootNodeId;
   const renderedId = isRoot ? rootId : `${rootId}--${node.id}`;

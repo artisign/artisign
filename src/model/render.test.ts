@@ -796,6 +796,13 @@ describe("renderScreen — raw-text <style> content", () => {
     expect(html).toContain(`<style id="n2">${css}</style>`);
   });
 
+  it("still escapes <style> text inside <svg>, where entities are decoded", () => {
+    const { doc } = parseScreen(`<div id="n1"><svg id="n2"><style id="n3">&lt;/style&gt;&lt;script&gt;x&lt;/script&gt;</style></svg></div>`, "s", makeContext().registry);
+    const html = renderScreen(doc, makeContext());
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;/style&gt;");
+  });
+
   it("still escapes ordinary text", () => {
     const { doc } = parseScreen(`<div id="n1">a &lt; b &amp; c</div>`, "s", makeContext().registry);
     expect(renderScreen(doc, makeContext())).toBe(`<div id="n1">a &lt; b &amp; c</div>`);

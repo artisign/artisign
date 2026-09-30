@@ -616,4 +616,11 @@ describe("serializeScreen — raw-text <style> content", () => {
     const first = parseScreen(html, "s", registry);
     expect(serializeScreen(first.doc)).toBe(html);
   });
+
+  it("still escapes <style> text inside <svg>, where entities are decoded", () => {
+    const registry = { componentNames: new Set<string>(), tokenPaths: new Set<string>(), tokenFlatNames: new Set<string>() };
+    const html = `<div id="n1"><svg id="n2"><style id="n3">&lt;/style&gt;&lt;script&gt;x&lt;/script&gt;</style></svg></div>`;
+    const first = parseScreen(html, "s", registry);
+    expect(serializeScreen(first.doc)).toBe(html);
+  });
 });

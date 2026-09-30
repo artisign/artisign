@@ -1,0 +1,9 @@
+{
+  "notes": "Inspector Elements tab for a variant that is reachable from several screens. Approved model \"one parent, other entries are plain edges\" (mockup `variants-multi-parent` / `one-parent-edges`), implemented in CHR-732.\n\n- A variant has exactly one home (`variant_of`); every other screen that opens it is an ordinary flow edge.\n- Two cards at the top of the Elements tab: `Also reached from · N flow sources` (each source is a link) and the `Variant` card (Path, Kind, Depth, Siblings, Flows in / out). Both are `$variant-card` instances; the rows are plain text in the `body` slot.\n- The card list replaces the mockup's stand-alone card beside the phone; the sidebar lists the variant once under its home.\n- Link targets are intentionally not wired as flows: the sources named here are illustrative and not screens of this project.",
+  "tags": [
+    "chr-727",
+    "chr-736",
+    "chr-732",
+    "inspector"
+  ]
+}

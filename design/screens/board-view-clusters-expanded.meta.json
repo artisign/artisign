@@ -1,0 +1,9 @@
+{
+  "notes": "Board with variant clusters, family-l2 expanded to depth 3. Approved direction C (mockup `variants-board` / `c-clusters`), implemented in CHR-733.\n\n- Toolbar gains `Clusters: On/Off` and `Collapse all` next to `Edges` (`$board-toolbar` variant `clusters`).\n- Each main screen plus its subtree is one framed cluster (`$cluster-header`, `expanded` variant = accent frame with `▴ collapse`). Tiles inside an expanded cluster are ~0.6 scale (`$board-tile` variants `cluster`, `cluster-state`, `cluster-overlay`, `cluster-step`) and lay out left to right by depth.\n- After 8 tiles per level a dashed `+N more` tile stands in for the rest.\n- Grey solid connectors = variant-of; dashed `$color.edge` lines = real flow edges between the exact tiles. Label pills (`$edge-label`): target = accent, source = grey.\n- Collapsed clusters (dashboard, parent-l3, child-l3, calendar-month) are main tile plus `$micro-thumb` row; edges dock on the frame and carry the variant name.\n- Flow: tap on the family-l2 cluster header toggles to `board-view-clusters-collapsed`.\n- Edges have no arrowheads, like the rest of the board designs.",
+  "tags": [
+    "chr-727",
+    "chr-736",
+    "chr-733",
+    "view"
+  ]
+}

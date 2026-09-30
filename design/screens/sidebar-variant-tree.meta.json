@@ -1,0 +1,9 @@
+{
+  "notes": "Screens sidebar with the variant tree, shown filtered by tag `chr-379` because that state carries every rule at once. Approved direction C of the CHR-727 exploration (mockup `variants-sidebar` / `c-tree-tags`), implemented in CHR-731.\n\nRules:\n- Indent is 14px per depth level; children get a 2px left rail.\n- Every group row shows its subtree count at the right.\n- Variant rows show the name suffix (`…-suffix`) from depth 1 on; the full name plus path, depth and kind is a hover tooltip (not drawn).\n- Row = first two tags plus a dashed `+N` chip; hovering `+N` opens the full tag list (popover drawn on family-l2).\n- The `Tags` toggle next to the search hides all chips (per-browser preference); off = one-line rows.\n- Under a tag filter, matching rows carry the highlighted `match` chip, non-matching ancestors stay as grey context rows, and non-matching siblings collapse into a non-clickable `N hidden` line at the end of the children.\n- Kind glyphs come from `$kind-icon` (state, overlay, step). The `Tags on/off` states not drawn here differ only in chip visibility.\n\nNot drawn: Tags-off compact rows, the truncated-name tooltip. The right canvas is a placeholder frame.",
+  "tags": [
+    "chr-727",
+    "chr-736",
+    "chr-731",
+    "shell"
+  ]
+}

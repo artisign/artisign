@@ -112,7 +112,7 @@ export function createBoardView({
   let clustersOn = false;
   let currentProject = "";
   let model = buildBoardModel([], [], [], { clusters: false });
-  /** @type {{ tiles: object[], frames: object[], mores: object[], connectors: { from: string, to: string }[], contentWidth: number, contentHeight: number }} */
+  /** @type {{ tiles: object[], frames: object[], mores: object[], connectors: { from: string, to: string, more?: boolean }[], contentWidth: number, contentHeight: number }} */
   let layout = { tiles: [], frames: [], mores: [], connectors: [], contentWidth: 0, contentHeight: 0 };
   const framesEl = document.createElement("div");
   framesEl.className = "board-frames";
@@ -466,7 +466,7 @@ export function createBoardView({
     // Variant-of connectors are structure, not flow — drawn even with edges off.
     for (const connector of layout.connectors) {
       const parent = findTile(layout.tiles, connector.from);
-      const child = findTile(layout.tiles, connector.to);
+      const child = connector.more ? layout.mores.find((m) => m.id === connector.to) : findTile(layout.tiles, connector.to);
       if (!parent || !child) continue;
       const startX = parent.x + parent.width;
       const midX = (startX + child.x) / 2;

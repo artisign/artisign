@@ -839,6 +839,40 @@ describe("computeClusterLayout", () => {
     expect(layout.mores[0].y + layout.mores[0].height).toBeLessThanOrEqual(frame.y + frame.height);
   });
 
+  it("dimmed context ancestors do not count toward the per-level cap", () => {
+    // root -> c0 (context, hidden by filter) and c1 -> eight shown grandchildren
+    const screens = [v("r"), v("r-c0", "r", "overlay"), v("r-c1", "r", "overlay"), ...Array.from({ length: 8 }, (_, i) => v(`r-g${i}`, i % 2 ? "r-c1" : "r-c0", "step"))];
+    const shown = screens.map((s) => s.name).filter((n) => n !== "r-c0" && n !== "r-c1" && n !== "r");
+    const model = buildBoardModel(screens, [...shown, "r-c1"], ["r"]);
+    // depth 1: c0 (context) + c1 (shown) - depth 2: 8 shown
+    const level2 = model.clusters[0].levels.find((l) => l.depth === 2);
+    expect(level2.tiles).toHaveLength(8);
+    expect(level2.hidden).toEqual([]);
+    const level1 = model.clusters[0].levels.find((l) => l.depth === 1);
+    expect(level1.tiles.map((m) => m.screen).sort()).toEqual(["r-c0", "r-c1"]);
+  });
+
+  it("context ancestors stay tiles when the shown members of their level overflow the cap", () => {
+    const screens = [v("m"), v("m-ctx", "m", "overlay"), ...Array.from({ length: 9 }, (_, i) => v(`m-ctx-${i}`, "m-ctx", "step")), ...Array.from({ length: 8 }, (_, i) => v(`m-${i}`, "m", "overlay"))];
+    const shown = screens.map((s) => s.name).filter((n) => n !== "m-ctx");
+    const model = buildBoardModel(screens, shown, ["m"]);
+    const level1 = model.clusters[0].levels.find((l) => l.depth === 1);
+    expect(level1.tiles).toHaveLength(9); // 8 shown + the context ancestor
+    expect(level1.tiles.map((m) => m.screen)).toContain("m-ctx");
+    expect(level1.hidden).toEqual([]);
+    const level2 = model.clusters[0].levels.find((l) => l.depth === 2);
+    expect(level2.tiles).toHaveLength(8);
+    expect(level2.hidden.map((m) => m.screen)).toEqual(["m-ctx-8"]);
+  });
+
+  it("draws one connector from a parent to the '+N more' tile its folded children went into", () => {
+    const many = [v("m"), ...Array.from({ length: 11 }, (_, i) => v(`m-${i}`, "m", "overlay"))];
+    const model = buildBoardModel(many, many.map((s) => s.name), ["m"]);
+    const layout = computeClusterLayout(model.items, {}, {});
+    expect(layout.connectors.filter((c) => c.more)).toEqual([{ from: "m", to: layout.mores[0].id, more: true }]);
+    expect(layout.connectors).toHaveLength(8 + 1);
+  });
+
   it("shrinks tiles of a very full level so the cluster stays a sane height", () => {
     const many = [v("m"), ...Array.from({ length: 11 }, (_, i) => v(`m-${i}`, "m", "overlay"))];
     const cluster = buildBoardModel(many, many.map((s) => s.name), ["m"]).clusters[0];

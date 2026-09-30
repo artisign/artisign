@@ -3331,3 +3331,417 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 .board-edge-label.target text {
   fill: var(--color-accent);
 }
+
+/* CHR-738 — side-by-side variant compare (approved `variants-compare` a-column-compare). A mode of the screen view: #compare-view takes #screens-stage's place, the chip row sits above the columns, the compare panel replaces the Elements/Activity panel. */
+#compare-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#compare-view[hidden],
+#screens-stage[hidden],
+#compare-hint[hidden],
+#compare-panel[hidden],
+#compare-panel-title[hidden],
+.panel-tabs[hidden],
+.compare-banner[hidden],
+.compare-column-error[hidden] {
+  display: none;
+}
+
+#compare-bar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-xl);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.compare-title {
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
+.compare-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  max-width: 260px;
+  padding: 4px 9px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+  font: inherit;
+}
+
+.compare-chip-reference {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.compare-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-chip-note,
+.compare-chip-overlap {
+  flex: none;
+  font-size: 0.65rem;
+}
+
+.compare-chip-overlap {
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
+
+.compare-chip-lock {
+  font-size: 0.6rem;
+}
+
+.compare-chip-remove {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-faded);
+  font: inherit;
+  cursor: pointer;
+}
+
+.compare-chip-add {
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border-strong);
+  color: var(--color-text-faded);
+  cursor: pointer;
+}
+
+.compare-chip-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.compare-diff {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.compare-zoom,
+.compare-seg {
+  display: flex;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.compare-zoom-button,
+.compare-seg-button {
+  padding: 5px 11px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.compare-zoom-button[aria-pressed="true"],
+.compare-seg-button[aria-pressed="true"] {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.compare-seg-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#compare-canvas {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-xl) var(--space-2xl);
+  background: var(--color-canvas);
+}
+
+#compare-hint {
+  margin: 0 0 var(--space-lg);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+#compare-columns-wrap {
+  overflow: hidden;
+}
+
+#compare-columns {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 30px;
+  /* Sizes to its own unscaled content, like .mockup-columns, so mockup-zoom.js scales the real row. */
+  width: max-content;
+}
+
+.compare-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: min-content;
+}
+
+.compare-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 0;
+  min-width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.compare-label-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compare-label-note {
+  flex: none;
+  font-weight: 400;
+  font-size: 10.5px;
+  color: var(--color-text-tertiary);
+}
+
+.compare-banner {
+  margin: 0;
+  width: 0;
+  min-width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.compare-column-error {
+  margin: 0;
+  width: 0;
+  min-width: 100%;
+  font-size: 11px;
+  color: var(--color-error);
+}
+
+/* The overlay is a sibling of the iframe inside one positioned box: marks are placed in the frame's own unscaled coordinates, so the row's single transform scales both together. */
+.compare-frame {
+  position: relative;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-menu);
+  overflow: hidden;
+}
+
+.compare-frame-iframe {
+  display: block;
+  border: none;
+  width: 390px;
+  height: 200px;
+}
+
+.compare-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.compare-mark {
+  position: absolute;
+  box-sizing: border-box;
+  outline: 2px dashed var(--color-warning);
+  outline-offset: 1px;
+}
+
+.compare-mark-added,
+.compare-mark-changed {
+  background: rgba(217, 119, 6, 0.1);
+}
+
+.compare-mark-removed {
+  background: transparent;
+}
+
+.compare-mark.highlighted {
+  outline-style: solid;
+  outline-width: 3px;
+}
+
+.compare-mark-badge {
+  position: absolute;
+  top: -9px;
+  right: 6px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-warning);
+  color: #fff;
+  font-size: 9.5px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.compare-highlight {
+  position: absolute;
+  box-sizing: border-box;
+  outline: 3px solid var(--color-accent);
+  outline-offset: 1px;
+  background: rgba(42, 62, 219, 0.08);
+}
+
+/* The compare panel: summary card, then one row per diff node. */
+#compare-panel {
+  padding: var(--space-lg);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.compare-panel-empty,
+.compare-panel-error {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.compare-panel-error {
+  color: var(--color-error);
+}
+
+.compare-summary {
+  padding: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.compare-summary h3 {
+  margin: 0 0 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.compare-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: 4px 0;
+  color: var(--color-text-muted);
+}
+
+.compare-summary-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-summary-row b {
+  flex: none;
+  color: var(--color-text);
+}
+
+.compare-diff-list {
+  margin: var(--space-lg) calc(var(--space-lg) * -1) 0;
+}
+
+.compare-diff-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 5px var(--space-lg);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.compare-diff-row:hover,
+.compare-diff-row.selected {
+  background: var(--color-accent-subtle);
+}
+
+.compare-diff-sign {
+  width: 10px;
+  flex: none;
+  color: var(--color-warning);
+}
+
+.compare-diff-id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+}
+
+.compare-diff-member {
+  margin-left: auto;
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: normal;
+  color: var(--color-text-faint);
+}
+
+/* Compare checkboxes: sidebar rows (next to the pin) and breadcrumb popover rows. */
+.screen-item-compare {
+  position: absolute;
+  top: 11px;
+  right: 34px;
+  margin: 0;
+}
+
+li.has-compare > .screen-item {
+  padding-right: 54px;
+}
+
+.variant-pop-entry {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.variant-pop-entry > .variant-pop-row {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.variant-pop-check {
+  flex: none;
+  margin: 0 0 0 6px;
+}

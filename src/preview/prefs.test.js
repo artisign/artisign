@@ -11,6 +11,8 @@ import {
   parseZoomPref,
   parseEnumPref,
   parseBoardZoomPref,
+  readCompareSelection,
+  writeCompareSelection,
 } from "./prefs.js";
 
 function fakeStorage(initial = {}) {
@@ -311,5 +313,25 @@ describe("readStringSetPref / writeStringSetPref (CHR-731)", () => {
     expect([...readStringSetPref(memory({ "artisign.k": '["a",1,null]' }), "artisign.k")]).toEqual([
       "a",
     ]);
+  });
+});
+
+describe("compare selection pref (CHR-738)", () => {
+  it("round-trips the members per project and reference", () => {
+    const storage = fakeStorage();
+    writeCompareSelection(storage, "/p", "family", ["a", "b"]);
+    writeCompareSelection(storage, "/p", "other", ["x"]);
+    writeCompareSelection(storage, "/q", "family", ["z"]);
+    expect(readCompareSelection(storage, "/p", "family")).toEqual(["a", "b"]);
+    expect(readCompareSelection(storage, "/p", "other")).toEqual(["x"]);
+    expect(readCompareSelection(storage, "/q", "family")).toEqual(["z"]);
+  });
+
+  it("falls back to an empty selection for a missing key, bad JSON, wrong shapes or no storage", () => {
+    expect(readCompareSelection(fakeStorage(), "/p", "family")).toEqual([]);
+    expect(readCompareSelection(fakeStorage({ "artisign.compareSelection:/p": "{" }), "/p", "family")).toEqual([]);
+    expect(readCompareSelection(fakeStorage({ "artisign.compareSelection:/p": '{"family":"a"}' }), "/p", "family")).toEqual([]);
+    expect(readCompareSelection(fakeStorage({ "artisign.compareSelection:/p": '{"family":["a",1]}' }), "/p", "family")).toEqual(["a"]);
+    expect(readCompareSelection(null, "/p", "family")).toEqual([]);
   });
 });

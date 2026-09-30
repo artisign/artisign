@@ -195,3 +195,84 @@ describe("variant tree map", () => {
     expect(setup("plain").map.hidden).toBe(true);
   });
 });
+
+describe("compare mode controls (CHR-738)", () => {
+  function setupCompare(current, state) {
+    document.body.innerHTML = '<nav id="bar"></nav><aside id="map"></aside><section id="insp"></section>';
+    const calls = [];
+    const ui = createVariantUI({
+      barEl: document.getElementById("bar"),
+      mapEl: document.getElementById("map"),
+      inspectorEl: document.getElementById("insp"),
+      onSelect: () => {},
+      compare: {
+        state: () => ({ cap: 3, selected: [], on: false, ...state }),
+        onMode: (on) => calls.push(["mode", on]),
+        onPick: (name) => calls.push(["pick", name]),
+      },
+    });
+    ui.update(screens, flows, current);
+    return { ui, calls, bar: document.getElementById("bar") };
+  }
+  const seg = (bar) => [...bar.querySelectorAll(".compare-seg-button")];
+
+  it("adds a Single | Compare toggle to the bar, Single pressed while compare is off", () => {
+    const { bar, calls } = setupCompare("confirm", {});
+    expect(seg(bar).map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([
+      ["Single", "true"],
+      ["Compare", "false"],
+    ]);
+    seg(bar)[1].click();
+    seg(bar)[0].click(); // Single while already single: nothing
+    expect(calls).toEqual([["mode", true]]);
+  });
+
+  it("shows the column count on the pressed Compare button and Single leaves", () => {
+    const { bar, calls } = setupCompare("confirm", { on: true, selected: ["confirm", "dissolve"] });
+    expect(seg(bar).map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([
+      ["Single", "false"],
+      ["Compare · 3", "true"],
+    ]);
+    seg(bar)[0].click();
+    expect(calls).toEqual([["mode", false]]);
+  });
+
+  it("has no toggle without the compare option", () => {
+    const { bar } = setup("confirm");
+    expect(bar.querySelector(".compare-seg")).toBeNull();
+  });
+
+  it("puts a checkbox on every popover row while compare is on, and none while it is off", () => {
+    const off = setupCompare("confirm", {});
+    off.bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    expect(off.bar.querySelectorAll(".variant-pop-check")).toHaveLength(0);
+
+    const { bar, calls } = setupCompare("confirm", { on: true, selected: ["dissolve"] });
+    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    const boxes = [...bar.querySelectorAll(".variant-pop-check")];
+    expect(boxes.map((b) => [b.dataset.screen, b.checked])).toEqual([
+      ["confirm", false],
+      ["dissolve", true],
+      ["two-parents", false],
+      ["name-sheet", false],
+    ]);
+    boxes[0].click();
+    expect(calls).toEqual([["pick", "confirm"]]);
+    expect(bar.querySelector(".variant-pop")).not.toBeNull(); // ticking does not close the popover
+  });
+
+  it("disables unticked boxes once the cap is reached, keeping ticked ones usable", () => {
+    const { bar } = setupCompare("confirm", { on: true, selected: ["confirm", "dissolve", "two-parents"] });
+    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    const state = Object.fromEntries([...bar.querySelectorAll(".variant-pop-check")].map((b) => [b.dataset.screen, b.disabled]));
+    expect(state).toEqual({ confirm: false, dissolve: false, "two-parents": false, "name-sheet": true });
+  });
+
+  it("openPopover opens the popover of a crumb", () => {
+    const { ui, bar } = setupCompare("confirm", { on: true });
+    ui.openPopover("leave");
+    expect(bar.querySelector(".crumb-group[data-screen=leave] .variant-pop")).not.toBeNull();
+    ui.openPopover("nope");
+    expect(bar.querySelector(".crumb-group[data-screen=leave] .variant-pop")).not.toBeNull();
+  });
+});

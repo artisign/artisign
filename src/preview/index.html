@@ -183,6 +183,14 @@
             <aside id="variant-map" aria-label="Variant tree" hidden></aside>
             <p id="empty-state" hidden>No screens yet.</p>
             </div>
+            <!-- CHR-738: side-by-side variant compare — a mode of this view, filled and shown by compare.js in place of #screens-stage. The columns' iframes are sandboxed like #screen-frame (iframe-fit.js). -->
+            <div id="compare-view" hidden>
+              <div id="compare-bar"></div>
+              <div id="compare-canvas">
+                <p id="compare-hint" hidden></p>
+                <div id="compare-columns-wrap"><div id="compare-columns"></div></div>
+              </div>
+            </div>
           </div>
           <div id="mockup-view" class="main-view" hidden></div>
           <div id="design-system-view" class="main-view" hidden></div>
@@ -278,12 +286,14 @@
               <button type="button" id="panel-tab-elements" class="panel-tab" aria-pressed="true">Elements</button>
               <button type="button" id="panel-tab-activity" class="panel-tab" aria-pressed="false">Activity</button>
             </div>
+            <span id="compare-panel-title" class="side-panel-title" hidden>Compare</span>
             <span class="side-panel-rail-icon" aria-hidden="true">☰</span>
             <button type="button" id="inspector-collapse" class="side-panel-collapse" aria-expanded="true" aria-label="Collapse Elements panel">
               <span class="side-panel-collapse-chevron" aria-hidden="true">▸</span>
             </button>
           </div>
           <div class="side-panel-body">
+            <section id="compare-panel" hidden></section>
             <div id="panel-body-elements">
               <section id="variant-inspector" hidden></section>
               <ul id="inspector-list"></ul>

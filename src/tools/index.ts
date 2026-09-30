@@ -32,3 +32,4 @@ export {
   type PromoteMockupInput,
 } from "./mockups.js";
 export { setBoardState, type SetBoardStateInput } from "./board-state.js";
+export { compareScreens, type CompareResult, type CompareMember } from "./compare.js";

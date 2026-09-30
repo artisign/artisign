@@ -209,6 +209,24 @@ export async function fetchScreenNodes(screen, project) {
 }
 
 /**
+ * The node-level diff of each of `others` against the `base` screen
+ * (CHR-738, GET /api/compare) — bare node ids, `low_overlap` members carry
+ * no diff lists.
+ * @param {string} base the reference screen
+ * @param {string[]} others 1-3 screens compared against it
+ * @param {string} project see fetchScreens's own note — required here too.
+ * @returns {Promise<{ ok: true, compare: { base: string, members: { screen: string, status: "ok" | "low_overlap", overlap: { shared: number, base: number, member: number, ratio: number }, added: string[], removed: { id: string, parent: string | null }[], changed: string[], counts: { added: number, removed: number, changed: number } }[] } } | { ok: false, status: number, message: string }>}
+ */
+export async function fetchCompare(base, others, project) {
+  const res = await fetch(
+    `/api/compare?base=${encodeURIComponent(base)}&others=${encodeURIComponent(others.join(","))}&project=${encodeURIComponent(project)}`,
+  );
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, status: res.status, message: body.message ?? res.statusText };
+  return { ok: true, compare: body };
+}
+
+/**
  * Creates a human-authored comment: a new root comment anchored to a node
  * or the screen itself (`node_id: null`), or — when `parent_id` is given
  * instead of `screen`/`node_id` — a human reply on an existing thread

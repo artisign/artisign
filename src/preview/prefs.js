@@ -234,3 +234,50 @@ export function parseBoardZoomPref(raw, fallback, min, max) {
   const value = Number(raw);
   return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
 }
+
+/** localStorage key of a project's per-reference compare selections (CHR-738). */
+function compareSelectionKey(project) {
+  return `artisign.compareSelection:${project}`;
+}
+
+/** Reads the whole `{ reference: members[] }` map, tolerating anything else. */
+function readCompareSelections(storage, project) {
+  const raw = readStringPref(storage, compareSelectionKey(project), null);
+  try {
+    const parsed = raw === null ? null : JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * The compare members last ticked under `reference` in `project` (CHR-738,
+ * per browser). Anything that isn't an array of strings reads as empty.
+ *
+ * @param {Storage | null | undefined} storage
+ * @param {string} project
+ * @param {string} reference
+ * @returns {string[]}
+ */
+export function readCompareSelection(storage, project, reference) {
+  const names = readCompareSelections(storage, project)[reference];
+  return Array.isArray(names) ? names.filter((n) => typeof n === "string") : [];
+}
+
+/**
+ * Stores the compare members of `reference`, leaving every other reference's
+ * selection in the project untouched. Best-effort like the other writers.
+ *
+ * @param {Storage | null | undefined} storage
+ * @param {string} project
+ * @param {string} reference
+ * @param {string[]} names
+ */
+export function writeCompareSelection(storage, project, reference, names) {
+  writeStringPref(
+    storage,
+    compareSelectionKey(project),
+    JSON.stringify({ ...readCompareSelections(storage, project), [reference]: names }),
+  );
+}

@@ -5,6 +5,7 @@
 // The pure functions come first, the DOM wiring (createVariantUI) last.
 
 import { buildScreenTree, displayName, createKindIcon } from "./screens.js";
+import { canCompare } from "./compare-data.js";
 
 /** The screen part of a flow ref — "screen" or "screen.node-id". */
 export function screenOfRef(ref) {
@@ -86,12 +87,25 @@ function button(className, text, onClick) {
 }
 
 /**
- * @param {{ barEl: HTMLElement, mapEl: HTMLElement, inspectorEl: HTMLElement, onSelect: (screen: string) => void }} els
- * @returns {{ update: (screens: object[], flows: object[], currentScreen: string | null) => boolean }}
+ * @param {{
+ *   barEl: HTMLElement, mapEl: HTMLElement, inspectorEl: HTMLElement,
+ *   onSelect: (screen: string) => void,
+ *   compare?: {
+ *     state: () => { on: boolean, selected: string[], cap: number },
+ *     onMode: (on: boolean) => void,
+ *     onPick: (screen: string) => void,
+ *   },
+ * }} els CHR-738 — `compare` adds the Single | Compare toggle to the bar and a
+ *   checkbox per popover row while compare is on; without it the bar is as before.
+ * @returns {{
+ *   update: (screens: object[], flows: object[], currentScreen: string | null) => boolean,
+ *   openPopover: (screen: string) => void,
+ * }}
  *   `update` re-renders everything and returns whether the bar/map are showing,
- *   so the caller can re-fit the canvas when that changes.
+ *   so the caller can re-fit the canvas when that changes. `openPopover` opens
+ *   the variants popover of one crumb (the compare chip row's "+ add").
  */
-export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect }) {
+export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare }) {
   let openCrumb = null;
   let last = { screens: [], flows: [], currentScreen: null };
   // Where keyboard focus goes after the next render instead of the element
@@ -141,6 +155,25 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect }) {
     }
   }
 
+  /** The popover row plus, while compare is on, its checkbox as a sibling (a button can't hold one). */
+  function popoverEntry(name, current) {
+    const row = popoverRow(name, current);
+    const state = compare?.state();
+    if (!state?.on) return row;
+    const picked = state.selected.includes(name);
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.className = "variant-pop-check";
+    box.dataset.screen = name;
+    box.checked = picked;
+    box.disabled = !picked && state.selected.length >= state.cap;
+    box.setAttribute("aria-label", `Compare ${name}`);
+    box.addEventListener("change", () => compare.onPick(name));
+    const wrap = el("div", "variant-pop-entry");
+    wrap.append(box, row);
+    return wrap;
+  }
+
   function popoverRow(name, current) {
     const row = button("variant-pop-row", "", () => go(name));
     row.dataset.screen = name;
@@ -162,12 +195,12 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect }) {
     pop.setAttribute("aria-label", `Variants around ${node.name}`);
     if (node.children.length > 0) {
       pop.appendChild(el("h4", "", `Inside ${node.name} · ${node.children.length}`));
-      for (const child of node.children) pop.appendChild(popoverRow(child.name, current));
+      for (const child of node.children) pop.appendChild(popoverEntry(child.name, current));
     }
     const siblings = node.parent ? node.parent.children.filter((c) => c !== node) : [];
     if (siblings.length > 0) {
       pop.appendChild(el("h4", "", `Siblings in ${node.parent.name} · ${siblings.length}`));
-      for (const sibling of siblings) pop.appendChild(popoverRow(sibling.name, current));
+      for (const sibling of siblings) pop.appendChild(popoverEntry(sibling.name, current));
     }
     const itself = button("variant-pop-row variant-pop-itself", `Open ${node.name} itself`, () => go(node.name));
     if (node.name === current) itself.classList.add("current");
@@ -218,6 +251,27 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect }) {
     } else {
       barEl.appendChild(el("span", "variant-chip", `${ctx.node.total} variant${ctx.node.total === 1 ? "" : "s"}`));
     }
+    if (compare) barEl.appendChild(renderModeToggle(current));
+  }
+
+  /** CHR-738 — Single | Compare · N; Compare is disabled when the family has nothing to compare. */
+  function renderModeToggle(current) {
+    const state = compare.state();
+    const group = el("span", "compare-seg");
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", "Screen view mode");
+    const single = button("compare-seg-button", "Single", () => state.on && compare.onMode(false));
+    single.dataset.mode = "single";
+    single.setAttribute("aria-pressed", String(!state.on));
+    const both = button("compare-seg-button", state.on ? `Compare · ${1 + state.selected.length}` : "Compare", () => !state.on && compare.onMode(true));
+    both.dataset.mode = "compare";
+    both.setAttribute("aria-pressed", String(state.on));
+    if (!canCompare(last.tree, current)) {
+      both.disabled = true;
+      both.title = "no variants to compare";
+    }
+    group.append(single, both);
+    return group;
   }
 
   function renderMap(ctx, current) {
@@ -319,5 +373,13 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect }) {
     return true;
   }
 
-  return { update };
+  /** Opens `screen`'s popover (no-op for a screen that is not in the bar). */
+  function openPopover(screen) {
+    if (!last.tree?.nodes.has(screen)) return;
+    openCrumb = screen;
+    focusNext = { cls: "variant-pop-row", screen: null };
+    rerender();
+  }
+
+  return { update, openPopover };
 }

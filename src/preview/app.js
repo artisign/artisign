@@ -12,6 +12,7 @@ import {
   fetchFlows,
   fetchTags,
   fetchScreenNodes,
+  fetchCompare,
   postComment,
   fetchProjects,
   activateProject,
@@ -22,6 +23,8 @@ import {
 } from "./api.js";
 import { renderScreenList, filterScreens, buildScreenTree, ancestorNames } from "./screens.js";
 import { createVariantUI } from "./variants.js";
+import { createCompareView } from "./compare.js";
+import { modeToggleStates } from "./compare-data.js";
 import { renderMockupList, filterMockups } from "./mockups.js";
 import { renderTagNotes } from "./notes-panel.js";
 import { renderMockupView } from "./mockup-view.js";
@@ -100,6 +103,12 @@ const variantUI = createVariantUI({
   mapEl: document.getElementById("variant-map"),
   inspectorEl: document.getElementById("variant-inspector"),
   onSelect: (name) => selectScreenHuman(name),
+  // CHR-738 — the Single | Compare toggle and the popover checkboxes; `compare` (below) is only read once the UI renders.
+  compare: {
+    state: () => compare.state(),
+    onMode: (on) => (on ? enterCompare() : leaveCompare()),
+    onPick: (name) => compare.toggle(name),
+  },
 });
 function refreshVariantUI() {
   const shown = variantUI.update(screens, screenFlows, currentScreen);
@@ -109,6 +118,11 @@ function refreshVariantUI() {
     updateCanvas();
   }
 }
+const screensStageEl = document.getElementById("screens-stage");
+const compareViewEl = document.getElementById("compare-view");
+const comparePanelEl = document.getElementById("compare-panel");
+const comparePanelTitleEl = document.getElementById("compare-panel-title");
+const panelTabsEl = document.getElementById("panel-tabs");
 const screenHolderEl = document.getElementById("screen-holder");
 const statusBarOverlayEl = document.getElementById("status-bar-overlay");
 const emptyState = document.getElementById("empty-state");
@@ -167,6 +181,7 @@ const sidebarScreensCollapseBtn = document.getElementById("sidebar-screens-colla
 const sidebarContextEl = document.getElementById("sidebar-context");
 const sidebarContextCollapseBtn = document.getElementById("sidebar-context-collapse");
 const inspectModeToggle = document.getElementById("inspect-mode-toggle");
+const INSPECT_TOGGLE_TITLE = inspectModeToggle.title;
 const inspectorEl = document.getElementById("inspector");
 const inspectorCollapseBtn = document.getElementById("inspector-collapse");
 const inspectorListEl = document.getElementById("inspector-list");
@@ -299,6 +314,44 @@ const prefsStorage = (() => {
     return null;
   }
 })();
+
+// CHR-738 — side-by-side variant compare. Mode, selection and zoom are per-browser prefs (compare.js -> prefs.js).
+const compare = createCompareView(
+  {
+    barEl: document.getElementById("compare-bar"),
+    hintEl: document.getElementById("compare-hint"),
+    canvasEl: document.getElementById("compare-canvas"),
+    columnsEl: document.getElementById("compare-columns"),
+    panelEl: comparePanelEl,
+  },
+  {
+    storage: prefsStorage,
+    getProject: () => activeProjectRoot,
+    getScreens: () => screens,
+    fetchRender: (screen) => fetchRender(screen, activeProjectRoot),
+    fetchCompare: (base, others) => fetchCompare(base, others, activeProjectRoot),
+    onAdd: () => variantUI.openPopover(currentScreen),
+    isVisible: () => currentView === "screens" && currentMockup === null,
+    onChange: () => {
+      refreshSidebar();
+      applyMainVisibility();
+    },
+  },
+);
+
+/** Compare needs the open screen's variant family; comment, inspect and flow mode are all off while comparing (flow navigates in Single). */
+function enterCompare() {
+  if (!currentScreen) return;
+  if (activeMode !== "none") setMode(activeMode);
+  pauseFollow(); // a navigation that leaves the family would end the comparison
+  compare.enter(currentScreen);
+}
+
+/** Back to Single, on the screen that was open when compare started. */
+function leaveCompare() {
+  const back = compare.leave();
+  if (back && back !== currentScreen) selectScreenHuman(back);
+}
 
 // Board zoom's own value (CHR-623) — separate from `zoom`/`mockupZoom`
 // (the screen canvas / mockup row) since it's a different surface with its
@@ -597,6 +650,7 @@ async function refreshProjectsState() {
 function resetProjectState() {
   modeCleanup();
   modeCleanup = () => {};
+  compare.reset(); // the stored mode flag stays: bootScreens restores it for the next project
   warningBadgeCleanup();
   warningBadgeCleanup = () => {};
   warningCount = 0;
@@ -662,7 +716,10 @@ async function switchToProject(root) {
   activeProjectRoot = root;
   resetProjectState();
   reconnectSse(root ?? undefined);
-  if (root) await bootScreens();
+  if (root) {
+    await bootScreens();
+    restoreCompare();
+  }
 }
 
 /** localStorage key for the last opened screen — scoped per project since the daemon serves several at once. */
@@ -773,11 +830,17 @@ async function bootScreens() {
   await selectScreen(pickInitialScreen(screens, persisted?.kind === "screen" ? persisted.name : null));
 }
 
+/** Brings compare mode back after a boot or project switch — once the tab is settled, so a hidden tab holds the renders back. A no-op when the open screen's family has nothing to compare. */
+function restoreCompare() {
+  if (compare.restoreWanted()) enterCompare();
+}
+
 /** Re-fetches everything the current view depends on — used after an SSE reconnect, where the gap while disconnected is invisible to us. */
 async function resyncCurrentProject() {
   loadScreens();
   loadTags();
   loadBoardState(); // CHR-624 — the daemon's board state is empty after a restart; a reconnect must resync it same as everything else
+  compare.reloadAll();
   const mockupsOk = await loadMockups();
   if (currentScreen) {
     loadCurrentScreen();
@@ -811,6 +874,7 @@ async function handleChangeEvent(event) {
   if (event.kind === "screen") {
     const previousScreens = screens;
     await loadScreens();
+    compare.screenChanged(event.name);
     if (event.name === currentScreen) {
       await loadCurrentScreen();
       await loadInspectorEntries(); // the screen's own source changed — refs may have too
@@ -853,6 +917,7 @@ async function handleChangeEvent(event) {
     // the list (a same-screen rebuild, so createInspectorPanel.setEntries
     // carries expand/focus state over), and the iframe's own `load` handler
     // then refreshes those rows' bodies once the re-render lands.
+    compare.reloadAll();
     if (currentScreen) {
       await loadCurrentScreen();
       await loadInspectorEntries();
@@ -1366,6 +1431,7 @@ function refreshSidebar() {
     expanded: currentExpandedScreens(),
     onToggleExpand: toggleScreenExpanded,
     showTags: showSidebarTags,
+    compare: compare.isOn() ? { ...compare.state(), onToggle: compare.toggle } : undefined,
   });
   const filteredMockups = filterMockups(mockups, screenFilter);
   renderMockupList(mockupListEl, filteredMockups, { activeName: currentMockup, onSelect: selectMockupHuman });
@@ -1425,12 +1491,14 @@ notesPanelHeader.addEventListener("click", () => {
 async function loadScreens() {
   // A failed flows read only leaves the variant UI without "also reached from".
   [screens, screenFlows] = await Promise.all([fetchScreens(activeProjectRoot), fetchFlows(activeProjectRoot).catch(() => [])]);
+  compare.reconcile(); // a deleted member leaves the selection, a deleted reference ends compare
   refreshSidebar();
   emptyState.hidden = screens.length > 0;
   screenFrame.hidden = screens.length === 0;
 }
 
 async function selectScreen(screen) {
+  if (compare.isOn() && !compare.inFamily(screen)) compare.leave(); // compare belongs to one variant family (CHR-738)
   // Node ids are only unique within one screen (see the iframeRenderedScreen
   // comment above) — a comment target selected on the previous screen must
   // not survive onto this one, even if a same-named id happens to exist
@@ -1458,6 +1526,7 @@ async function selectScreen(screen) {
  * @param {string} name
  */
 async function selectMockup(name) {
+  compare.leave();
   setMode(activeMode); // passing the CURRENT mode always resolves to "none" — see setMode
   clearInspectFocus();
   clearActivityHighlights(); // CHR-631 — no screen highlight applies to the mockup view
@@ -1640,7 +1709,8 @@ function updateMockupZoom() {
 
 /** Re-fits whichever of the screen canvas / mockup row is actually showing — shared by every trigger whose available space can change without a view/selection switch of its own (pane resize, side-panel collapse). */
 function refitActivePane() {
-  if (isMockupZoomActive()) updateMockupZoom();
+  if (compare.isOn()) compare.relayout();
+  else if (isMockupZoomActive()) updateMockupZoom();
   else updateCanvas();
 }
 
@@ -1739,6 +1809,10 @@ screenFrame.addEventListener("load", () => {
 // Only "fit" needs to react to the pane resizing — a fixed zoom level keeps
 // its scale regardless of the available space.
 window.addEventListener("resize", () => {
+  if (compare.isOn()) {
+    if (compare.getZoom() === "fit") compare.relayout();
+    return;
+  }
   if (isMockupZoomActive() ? mockupZoom === "fit" : zoom === "fit") refitActivePane();
 });
 
@@ -1794,7 +1868,10 @@ function setMode(next) {
   board.setFlowMode(activeMode === "flow");
 }
 
-flowModeToggle.addEventListener("click", () => setMode("flow"));
+flowModeToggle.addEventListener("click", () => {
+  if (compare.isOn()) leaveCompare(); // flow mode navigates, and only Single navigates (CHR-738)
+  setMode("flow");
+});
 commentModeToggle.addEventListener("click", () => setMode("comment"));
 inspectModeToggle.addEventListener("click", () => setMode("inspect"));
 
@@ -1888,6 +1965,9 @@ async function loadBoard() {
   boardBuilt = true;
 }
 
+// Whether the previous applyMainVisibility() showed compare — leaving it re-fits the screen canvas, which was measured while hidden.
+let wasComparing = false;
+
 /**
  * Reconciles every hidden-toggle in #main and the toolbar for the current
  * view + mockup selection. The mockup view only ever shows within the
@@ -1899,25 +1979,45 @@ async function loadBoard() {
  */
 function applyMainVisibility() {
   const showMockup = currentView === "screens" && currentMockup !== null;
+  const comparing = compare.isOn() && currentView === "screens" && !showMockup;
   screensViewEl.hidden = currentView !== "screens" || showMockup;
+  screensStageEl.hidden = comparing;
+  compareViewEl.hidden = !comparing;
   mockupViewEl.hidden = !showMockup;
   designSystemViewEl.hidden = currentView !== "design-system";
   boardViewEl.hidden = currentView !== "board";
   // The zoom group stays visible over the mockup view too — it
   // scales the whole comparison row instead of the screen canvas. Only the
   // Status bar toggle, which has no mockup-view counterpart, hides with it.
-  canvasControlsEl.hidden = currentView !== "screens";
-  statusBarToggle.hidden = currentView !== "screens" || showMockup;
+  canvasControlsEl.hidden = currentView !== "screens" || comparing; // compare has its own zoom in its chip row
+  statusBarToggle.hidden = currentView !== "screens" || showMockup || comparing;
   warningBadge.hidden = currentView !== "screens" || showMockup || warningCount === 0;
   // The Elements panel only makes sense next to the single-screen canvas.
   inspectorEl.hidden = currentView !== "screens" || showMockup;
   // Comment/inspect mode have no board counterpart (see board-view.js), and
   // none of the three apply to the mockup view.
-  flowModeToggle.disabled = showMockup;
-  commentModeToggle.disabled = currentView === "board" || showMockup;
-  inspectModeToggle.disabled = currentView === "board" || showMockup;
+  const toggles = modeToggleStates({ view: currentView, showMockup, comparing });
+  flowModeToggle.disabled = toggles.flow.disabled;
+  commentModeToggle.disabled = toggles.comment.disabled;
+  inspectModeToggle.disabled = toggles.inspect.disabled;
+  flowModeToggle.title = toggles.flow.title;
+  commentModeToggle.title = toggles.comment.title;
+  inspectModeToggle.title = toggles.inspect.title ?? INSPECT_TOGGLE_TITLE;
+  // The compare panel replaces the Elements/Activity panel while comparing.
+  const activityTab = panelTabActivityEl.getAttribute("aria-pressed") === "true";
+  panelTabsEl.hidden = comparing;
+  comparePanelTitleEl.hidden = !comparing;
+  comparePanelEl.hidden = !comparing;
+  panelBodyElementsEl.hidden = comparing || activityTab;
+  panelBodyActivityEl.hidden = comparing || !activityTab;
   syncZoomButtons(showMockup ? mockupZoom : zoom);
   if (showMockup) updateMockupZoom();
+  if (comparing) {
+    compare.show(); // renders held back while another tab was showing
+    compare.relayout();
+  }
+  else if (wasComparing && currentView === "screens" && !showMockup) updateCanvas(); // the canvas was measured while hidden
+  wasComparing = comparing;
   return showMockup;
 }
 
@@ -1972,6 +2072,7 @@ async function boot() {
     const allowedViews = [...viewTabs].map((tab) => tab.dataset.view);
     const persistedView = parseEnumPref(readStringPref(prefsStorage, "artisign.view", null), allowedViews, currentView);
     if (persistedView !== currentView) setView(persistedView);
+    restoreCompare();
   }
 }
 

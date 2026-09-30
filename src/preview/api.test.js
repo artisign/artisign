@@ -16,6 +16,7 @@ import {
   fetchDesignSystem,
   fetchComments,
   fetchScreenNodes,
+  fetchCompare,
   postComment,
   fetchBoardState,
   setBoardState,
@@ -90,6 +91,18 @@ describe("api.js project scoping (CHR-651)", () => {
     globalThis.fetch = vi.fn(async () => okJson({ nodes: [] }));
     await fetchScreenNodes("home", PROJECT);
     expect(globalThis.fetch).toHaveBeenCalledWith(`/api/tools/get_screen?project=${P}`, expect.objectContaining({ method: "POST" }));
+  });
+
+  it("fetchCompare carries base, others and the project", async () => {
+    globalThis.fetch = vi.fn(async () => okJson({ base: "home", members: [] }));
+    const result = await fetchCompare("home", ["home-empty", "home-error"], PROJECT);
+    expect(globalThis.fetch).toHaveBeenCalledWith(`/api/compare?base=home&others=home-empty%2Chome-error&project=${P}`);
+    expect(result).toEqual({ ok: true, compare: { base: "home", members: [] } });
+  });
+
+  it("fetchCompare reports a rejected request", async () => {
+    globalThis.fetch = vi.fn(async () => ({ ok: false, status: 404, statusText: "Not Found", json: async () => ({ message: "no such screen" }) }));
+    expect(await fetchCompare("home", ["x"], PROJECT)).toEqual({ ok: false, status: 404, message: "no such screen" });
   });
 
   it("postComment", async () => {

@@ -54,3 +54,16 @@ export class NodeIdAllocator {
     return id;
   }
 }
+
+const GENERATED_ID_RE = /^n\d+(t\d*)?$/;
+
+/**
+ * True for an id the allocator generates: `n<digits>` for elements, and the
+ * `<parent>t[N]` text ids under such a parent. An authored id that happens to
+ * look like `n<digits>` counts as generated. A text id under an *authored*
+ * parent (`herot`) is indistinguishable from an authored id by its shape, so
+ * callers that hold the node should test `kind === "text"` as well.
+ */
+export function isGeneratedId(id: string): boolean {
+  return GENERATED_ID_RE.test(id);
+}

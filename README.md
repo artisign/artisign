@@ -122,8 +122,8 @@ Daemon-level state — that config plus the `daemon.lock` holding the running pi
 | Bucket | Tool | Does |
 |---|---|---|
 | Reads | `get_guide` | The design methodology guide (`docs/agent-guide.md`), on demand. |
-| Reads | `get_project` | Screen list, design-system pointer, counts. Tiered, cold-start read. |
-| Reads | `get_screen` | One screen with comment/flow indicators. Tiered + field selection. |
+| Reads | `get_project` | Screen list, design-system pointer, counts. Tiered, cold-start read; `tree` also carries each variant screen's `variant_of`/`variant_kind`. |
+| Reads | `get_screen` | One screen with comment/flow indicators. Tiered + field selection; `full` adds its direct `variants` and `reached_from`. |
 | Reads | `get_node` | Subtree of one node, addressed as `<screen>.<node-id>`. Tiered + field selection. |
 | Reads | `get_design_system` | Tokens, components (with variants and the default variant's slot names), and patterns. `tree` carries every token value, grouped by bucket. |
 | Reads | `find_nodes` | Where-query across screens (style ref, component ref, variant, comments, text, flow). |
@@ -134,14 +134,14 @@ Daemon-level state — that config plus the `daemon.lock` holding the running pi
 | Writes | `update_refs` | Change a node's token/component/variant bindings without a full HTML parse. |
 | Writes | `set_tokens` | Design-system token mutation — one call re-resolves every bound screen. |
 | Writes | `set_flow` | Mutate a flow edge in `flows.json` without touching any screen file. |
-| Writes | `set_meta` | Screen notes/tags, design-system idea/decisions, component/pattern usage, a tag's own notes — the handoff contract. |
+| Writes | `set_meta` | Screen notes/tags and `variant_of`/`variant_kind`, design-system idea/decisions, component/pattern usage, a tag's own notes — the handoff contract. |
 | Writes | `write_mockup` | Create or revise one variant of a mockup — raw HTML, outside the design system. |
-| Writes | `set_board_state` | Read or mutate the Board's shared filter and pinned screens — daemon memory only, not available over stdio. |
+| Writes | `set_board_state` | Read or mutate the Board's shared filter, pinned screens and expanded variant clusters — daemon memory only, not available over stdio. |
 | Lifecycle | `init_project` | Scaffold a project directory: empty, from HTML, or from a Stitch export URL. |
 | Lifecycle | `import_html` | Incremental HTML ingest into an existing project, with content-hash dedup. |
 | Lifecycle | `promote_to_system` | Lift an inline value or a repeated element into a token, component, or pattern. |
 | Lifecycle | `promote_mockup` | Copy a chosen mockup variant into a new, design-system-bound screen (the mockup stays). |
-| Lifecycle | `delete_entity` | Delete a screen, component, pattern, or mockup; refuses a component still referenced by a screen. |
+| Lifecycle | `delete_entity` | Delete a screen, component, pattern, or mockup; refuses a component still referenced by a screen, and a screen that still has variants (`has_variants`) unless `cascade: true` deletes the whole subtree. |
 | Comments | `reply_comment` | Answer a comment and optionally resolve it. |
 | Visual review | `get_screenshot` | Screenshots a rendered screen (or one node), or one mockup variant, as a PNG — the write → screenshot → adjust loop. |
 | Visual review | `inspect_node` | Computed box and styles of one node as text — cheaper than vision for geometry questions. |
@@ -164,6 +164,7 @@ It needs Playwright — see the optional dependency in [Install](#install) above
 │   ├── components/<name>.html    # component + variants
 │   └── patterns/<name>.html      # layout + interaction patterns
 ├── screens/<name>.html           # augmented HTML, one file per screen
+├── screens/<name>.meta.json      # notes, tags, and variant_of/variant_kind when the screen is a variant
 ├── mockups/<name>/mockup.json    # design explorations: variant titles/descriptions, outside the ref model
 ├── mockups/<name>/<variant>.html # raw HTML per variant, written verbatim
 ├── assets/                       # local images, referenced as assets/<path>
@@ -197,8 +198,10 @@ Everything is human-readable and diffable. With `autoCommit` on (the `init` defa
 Served at `http://127.0.0.1:<port>` once the daemon is running — plain ES modules, no build step:
 
 - **Project picker** — switch between open projects in the topbar; open an existing folder or create a new project through an in-app folder browser (no restart needed). With nothing open, an empty state offers both actions plus recent projects.
-- **Screens** — sidebar screen list, rendered source (preview = output, by construction)
-- **Board** — every screen laid out as a tile on one scrollable surface, with flow edges drawn between them (toggleable), a 5%–200% zoom slider (Fit all, 100%, or Ctrl/Cmd+wheel/pinch to zoom around the cursor), and the sidebar's shared filter plus any screen pinned onto the board regardless of the filter, so a flow is something you see rather than something you reconstruct
+- **Screens** — sidebar screen tree, rendered source (preview = output, by construction). Variants nest under their parent with a kind icon (state, overlay, step) and tag chips; expand state is kept per browser, and pinning a group row pins its whole subtree
+- **Variant context** — a screen that is a variant, or has variants, shows a breadcrumb above the canvas and a variant tree map beside it; the inspector lists the flow sources a screen is "Also reached from"
+- **Compare** — `Single | Compare · N` in the screen view puts the family's main screen (the locked reference) and 1–3 of its variants side by side in 2–4 columns, with a diff overlay marking nodes added, changed and removed against the reference. Nodes are matched by authored `id` only; below 25 % shared authored ids a banner says the screens are barely related
+- **Board** — every screen laid out as a tile on one scrollable surface, with flow edges drawn between them (toggleable), a 5%–200% zoom slider (Fit all, 100%, or Ctrl/Cmd+wheel/pinch to zoom around the cursor), and the sidebar's shared filter plus any screen pinned onto the board regardless of the filter, so a flow is something you see rather than something you reconstruct. A screen with variants is drawn as a cluster — a frame around the main screen with thumbnails of its variants — that expands into one column per depth (about 8 tiles per depth, then "+N more"); which clusters are open is shared between tabs and agents via `set_board_state`, and a per-browser Clusters On/Off toggle switches back to flat tiles
 - **Elements panel** — the selected screen's nodes listed by the id an agent addresses them with
 - **Notes panel** — the screen's own notes plus any tag notes that apply to it, both rendered as Markdown
 - **Flow mode** — click an element with `data-flow-target` to jump to the screen it points at

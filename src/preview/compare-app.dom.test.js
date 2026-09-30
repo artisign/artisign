@@ -38,6 +38,7 @@ function stubDaemon() {
     },
   );
   vi.stubGlobal("requestAnimationFrame", (cb) => cb());
+  vi.stubGlobal("CSS", { escape: (s) => s }); // jsdom has none; the Board tab (restored in one test) builds tiles with it
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   vi.stubGlobal("fetch", async (url, init) => {
     calls.push(String(url));
@@ -258,12 +259,12 @@ describe("compare restored behind another tab", () => {
     memoryStorage.set("artisign.view", "board");
     await boot("a");
     expect($("#compare-view").hidden).toBe(true);
-    expect(calls.some((u) => u.startsWith("/api/render/family?"))).toBe(false); // the open screen itself still renders in #screen-frame
+    const rendered = () => [...document.querySelectorAll("#compare-columns iframe")].filter((f) => f.srcdoc !== "").length;
+    expect(rendered()).toBe(0); // the Board tab renders its own tiles; only the compare columns are held back
     document.querySelector('.view-tab[data-view="screens"]').click();
     await flush();
     expect($("#compare-view").hidden).toBe(false);
-    expect(calls.some((u) => u.startsWith("/api/render/family?"))).toBe(true);
-    expect(calls.some((u) => u.startsWith("/api/render/a?"))).toBe(true);
+    expect(rendered()).toBe(2);
   });
 });
 

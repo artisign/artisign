@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `patch_html` and `inspect_node` now address nodes inside a component
+  instance's slot fill — by `<screen>.<id>` and, for `patch_html`, by
+  `css_selector`. Patches edit the authored fill markup in the screen file. A
+  slot's top-level fill can be replaced by one element or deleted, but not
+  given siblings; an explicit id already used anywhere in the screen is
+  rejected on every patch path. `find_nodes` reports a screen fill's `id` so a
+  match can be acted on. `get_node` and `update_refs` still take flat-map nodes
+  only. (CHR-746)
+- Compare: the low-overlap banner reads "Too few shared node ids with the
+  reference (x of y)" instead of claiming none are shared when up to a quarter
+  are. (CHR-744)
+
 ## [1.1.0] - 2026-09-30
 
 Screens can now be grouped into families: a state, an overlay or a step of a

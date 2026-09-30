@@ -4,6 +4,9 @@
     "chr-727",
     "chr-736",
     "chr-733",
-    "view"
-  ]
+    "view",
+    "chr-739"
+  ],
+  "variant_of": "board-view",
+  "variant_kind": "state"
 }

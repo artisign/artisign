@@ -1215,3 +1215,13 @@ describe("set_flow", () => {
     await expect(setFlow(fx.store, { node: "home.n999", flow: null })).rejects.toMatchObject({ code: "not_found" });
   });
 });
+
+describe("write_html — <style> inside the root", () => {
+  it("lands on disk with its CSS unescaped", async () => {
+    const fx = await setupProject();
+    const css = `.a > b { color: red } .c::after { content: "<&>" }`;
+    await writeHtml(fx.store, { screen: "s", mode: "create", title: "t", html_aug: `<div id="n1"><style id="n2">${css}</style></div>` });
+    expect(await fx.store.readScreen("s")).toContain(`<style id="n2">${css}</style>`);
+    await fx.cleanup();
+  });
+});

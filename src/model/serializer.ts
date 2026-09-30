@@ -1,6 +1,6 @@
 import type { Flow, Node, NodeSubtree, ScreenDocument, TokenRef, TokenRefAtom } from "./types.js";
 import { isMixedTokenValue } from "./token-ref.js";
-import { VOID_ELEMENTS, escapeAttr, escapeText } from "./html-syntax.js";
+import { VOID_ELEMENTS, escapeAttr, escapeTextIn } from "./html-syntax.js";
 
 function serializeTokenRefAtom(atom: TokenRefAtom): string {
   if (typeof atom === "string") return `$${atom}`;
@@ -119,8 +119,8 @@ function subtreeClassAttrValue(sub: NodeSubtree): string | undefined {
   return parts.length > 0 ? parts.join(" ") : undefined;
 }
 
-function serializeSubtree(sub: NodeSubtree, slotKey?: string): string {
-  if (sub.kind === "text") return escapeText(sub.text ?? "");
+function serializeSubtree(sub: NodeSubtree, slotKey?: string, parentTag?: string): string {
+  if (sub.kind === "text") return escapeTextIn(parentTag, sub.text ?? "");
 
   const isSvgDomain = sub.kind === "svg" || sub.kind === "svg_path";
   const attrs: [string, string][] = [];
@@ -150,14 +150,14 @@ function serializeSubtree(sub: NodeSubtree, slotKey?: string): string {
       ? Object.entries(sub.slotOverrides ?? {})
           .map(([key, child]) => serializeSubtree(child, key))
           .join("")
-      : sub.children.map((child) => serializeSubtree(child)).join("");
+      : sub.children.map((child) => serializeSubtree(child, undefined, tag)).join("");
   return `<${tag}${attrStr ? ` ${attrStr}` : ""}>${inner}</${tag}>`;
 }
 
 function serializeNode(nodeId: string, doc: ScreenDocument, flowsByTrigger: Map<string, Flow>): string {
   const node = doc.nodes[nodeId];
   if (!node) return "";
-  if (node.kind === "text") return escapeText(node.text ?? "");
+  if (node.kind === "text") return escapeTextIn(doc.nodes[node.parentId ?? ""]?.tag, node.text ?? "");
 
   const tag = node.tag ?? "div";
   const attrStr = openTagAttrs(node, doc, flowsByTrigger);

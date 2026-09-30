@@ -27,7 +27,10 @@ export type WarningKind =
   // *token*, this is about a whole *style block* matching another *element*
   // — different data, different remedy (`$<component>` vs. a promote call
   // vs. a token ref). Advisory only, never blocks a write.
-  | "repeated_pattern";
+  | "repeated_pattern"
+  // promote_mockup restructured or dropped mockup markup so it fits a
+  // screen's single-root rule; the screen no longer mirrors the mockup file.
+  | "mockup_normalized";
 
 export type Warning = {
   kind: WarningKind;

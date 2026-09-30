@@ -105,7 +105,17 @@ discipline while they stay mockups.
 Once a direction wins, `promote_mockup {mockup, variant, screen}` copies that
 one variant into a real screen via the normal `write_html` path — the mockup
 itself stays on disk as exploration history; delete it with `delete_entity`
-once you no longer need it. From that point on the screen is a screen:
+once you no longer need it. A screen has exactly one root element, so
+promotion normalizes the mockup first: a full `<html>` document contributes
+its `<head>` `<style>` elements and its `<body>` content; every top-level
+`<style>` (head and body) moves, in document order, into the start of the
+root, so the screen renders like the mockup; several top-level nodes are
+wrapped in one `<div>` (a `<body>` `style` or `class` is carried onto that
+`<div>`); `<script>`, `<meta>`, `<title>`, `<link>`, `<base>` and any other
+`<body>`/`<html>` attribute are dropped. Whenever promotion restructures or drops anything, the response
+carries a `mockup_normalized` warning — the screen then differs structurally
+from the mockup file. A single-root variant without `<style>` is written
+unchanged. From that point on the screen is a screen:
 refs/promote discipline applies exactly as in exploration mode above — a
 mockup variant is a draft too, not a deliverable, and promoting it doesn't
 grandfather its inline values in.

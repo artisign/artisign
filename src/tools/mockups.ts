@@ -2,9 +2,11 @@
 // one into a design-system-bound screen. Mockups are raw HTML, outside the
 // canonical ref model (ADR-003): no refs, no drift, no node ids to address.
 
+import { parse, serializeOuter, defaultTreeAdapter, html as p5html } from "parse5";
+import type { DefaultTreeAdapterTypes } from "parse5";
 import type { Store, MockupMeta } from "../store/index.js";
 import { writeHtml } from "./writes.js";
-import { ToolError, commitFields } from "./types.js";
+import { ToolError, commitFields, type Warning } from "./types.js";
 
 const NAME_RE = /^[\w-]+$/;
 
@@ -158,6 +160,69 @@ export async function getMockup(store: Store, input: GetMockupInput): Promise<Re
 // promote_mockup
 // ---------------------------------------------------------------------------
 
+type P5Node = DefaultTreeAdapterTypes.ChildNode;
+
+// Head-only elements and scripts have no place in a screen.
+const DROPPED_TAGS = new Set(["script", "meta", "title", "link", "base"]);
+
+/**
+ * A screen has exactly one root element, and mockups are raw HTML that is
+ * often a full document. Moves every top-level `<style>` (head and body) into
+ * the root as leading children, wraps several top-level nodes in a `<div>`,
+ * and drops what a screen can't carry. `<body>` `style`/`class` are carried
+ * onto the wrapping `<div>`; other `<body>`/`<html>` attributes are dropped.
+ * Single-root, style-free input is returned untouched.
+ */
+function normalizeMockupHtml(html: string): { html: string; warnings: Warning[] } {
+  const document = parse(html);
+  const htmlEl = document.childNodes.find(defaultTreeAdapter.isElementNode);
+  const headAndBody = (htmlEl?.childNodes ?? []).filter(defaultTreeAdapter.isElementNode);
+  const body = headAndBody.find((el) => el.tagName === "body");
+  const topLevel = headAndBody.flatMap((el) => el.childNodes);
+  const styles: P5Node[] = [];
+  const content: P5Node[] = [];
+  const dropped = new Set<string>();
+  for (const node of topLevel) {
+    if (defaultTreeAdapter.isElementNode(node)) {
+      if (node.tagName === "style") styles.push(node);
+      else if (DROPPED_TAGS.has(node.tagName)) dropped.add(node.tagName);
+      else content.push(node);
+    } else if (defaultTreeAdapter.isTextNode(node) && node.value.trim() !== "") {
+      content.push(node);
+    }
+  }
+
+  const bodyLook = (body?.attrs ?? []).filter((a) => a.name === "style" || a.name === "class");
+  for (const a of body?.attrs ?? []) if (!bodyLook.includes(a)) dropped.add(`body ${a.name}`);
+  for (const a of htmlEl?.attrs ?? []) dropped.add(`html ${a.name}`);
+
+  const singleRoot = bodyLook.length === 0 && content.length === 1 && content[0] !== undefined && defaultTreeAdapter.isElementNode(content[0]);
+  if (styles.length === 0 && dropped.size === 0 && bodyLook.length === 0 && singleRoot) return { html, warnings: [] };
+  if (styles.length === 0 && dropped.size === 0 && bodyLook.length === 0 && content.length === 0) return { html, warnings: [] };
+
+  let root: DefaultTreeAdapterTypes.Element;
+  if (singleRoot) {
+    root = content[0] as DefaultTreeAdapterTypes.Element;
+  } else {
+    root = defaultTreeAdapter.createElement("div", p5html.NS.HTML, bodyLook);
+    for (const node of content) defaultTreeAdapter.appendChild(root, node);
+  }
+  root.childNodes.unshift(...styles);
+  for (const style of styles) style.parentNode = root;
+
+  const warnings: Warning[] = [];
+  const changes = [
+    styles.length > 0 ? `${styles.length} <style> element(s) moved into the root` : undefined,
+    singleRoot ? undefined : "top-level nodes wrapped in one <div>",
+    dropped.size > 0 ? `dropped: ${[...dropped].map((t) => `<${t}>`).join(", ")}` : undefined,
+  ].filter((c) => c !== undefined);
+  warnings.push({
+    kind: "mockup_normalized",
+    message: `the screen differs structurally from the mockup file (${changes.join("; ")})`,
+  });
+  return { html: serializeOuter(root), warnings };
+}
+
 export type PromoteMockupInput = {
   mockup: string;
   variant: string;
@@ -172,15 +237,16 @@ export async function promoteMockup(store: Store, input: PromoteMockupInput): Pr
     throw new ToolError("not_found", `mockup "${input.mockup}" variant "${input.variant}" was not found`);
   }
 
-  const html = await store.readMockupVariant(input.mockup, input.variant);
+  const normalized = normalizeMockupHtml(await store.readMockupVariant(input.mockup, input.variant));
   const result = await writeHtml(store, {
     screen: input.screen,
     mode: "create",
     title: input.title ?? variant.title,
-    html_aug: html,
+    html_aug: normalized.html,
   });
+  const warnings = [...normalized.warnings, ...((result.warnings as Warning[] | undefined) ?? [])];
 
-  return { ...result, mockup: input.mockup, variant: input.variant };
+  return { ...result, warnings, mockup: input.mockup, variant: input.variant };
 }
 
 // ---------------------------------------------------------------------------

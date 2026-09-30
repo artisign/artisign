@@ -787,3 +787,24 @@ describe("renderScreen — component instances inside slot fills (CHR-581)", () 
     expect(html).toContain('<button id="n3">Go</button>');
   });
 });
+
+describe("renderScreen — raw-text <style> content", () => {
+  it("emits <style> text verbatim, not entity-escaped", () => {
+    const css = `.a > b { color: red } .c::after { content: "<&>" }`;
+    const { doc } = parseScreen(`<div id="n1"><style id="n2">${css}</style><p id="n3" class="a">hi</p></div>`, "s", makeContext().registry);
+    const html = renderScreen(doc, makeContext());
+    expect(html).toContain(`<style id="n2">${css}</style>`);
+  });
+
+  it("still escapes <style> text inside <svg>, where entities are decoded", () => {
+    const { doc } = parseScreen(`<div id="n1"><svg id="n2"><style id="n3">&lt;/style&gt;&lt;script&gt;x&lt;/script&gt;</style></svg></div>`, "s", makeContext().registry);
+    const html = renderScreen(doc, makeContext());
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;/style&gt;");
+  });
+
+  it("still escapes ordinary text", () => {
+    const { doc } = parseScreen(`<div id="n1">a &lt; b &amp; c</div>`, "s", makeContext().registry);
+    expect(renderScreen(doc, makeContext())).toBe(`<div id="n1">a &lt; b &amp; c</div>`);
+  });
+});

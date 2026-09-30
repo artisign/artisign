@@ -188,16 +188,95 @@ describe("promote_mockup", () => {
     await expect(promoteMockup(fx.store, { mockup: "m", variant: "nope", screen: "s1" })).rejects.toMatchObject({ code: "not_found" });
   });
 
-  it("a blocking parse error (two top-level elements) surfaces as malformed_html and writes nothing", async () => {
-    // <style> as a sibling of the root element makes two top-level elements —
-    // writeHtml's own blocking-error path, passed through unmodified.
+  it("promotes <style> + <div> by moving the style into the root, rendering like the mockup", async () => {
     await writeMockup(fx.store, {
       mockup: "m",
       variant: "a",
       mode: "create",
-      html: `<style>.x{color:red}</style><div id="n1"></div>`,
+      html: `<style>.x > b{color:red}</style>\n<div id="n1"><b class="x">hi</b></div>`,
     });
 
+    const res = await promoteMockup(fx.store, { mockup: "m", variant: "a", screen: "s1" });
+    expect(res.errors).toBeUndefined();
+    expect(res.warnings).toEqual([expect.objectContaining({ kind: "mockup_normalized" })]);
+    const html = await fx.store.readScreen("s1");
+    expect(html).toMatch(/^<div id="n1"[^>]*><style id="[^"]+">\.x > b\{color:red\}<\/style><b /);
+  });
+
+  it("promotes a full <html> document: head styles + body content, head metadata dropped", async () => {
+    await writeMockup(fx.store, {
+      mockup: "m",
+      variant: "a",
+      mode: "create",
+      html:
+        `<!DOCTYPE html><html><head><meta charset="utf-8"><title>T</title><style>.a{color:red}</style></head>` +
+        `<body><style>.b{color:blue}</style><section id="hero"><p class="a b">hi</p></section><script>alert(1)</script></body></html>`,
+    });
+
+    const res = await promoteMockup(fx.store, { mockup: "m", variant: "a", screen: "s1" });
+    expect(res.errors).toBeUndefined();
+    const html = await fx.store.readScreen("s1");
+    expect(html).toMatch(/^<section id="hero"[^>]*><style[^>]*>\.a\{color:red\}<\/style><style[^>]*>\.b\{color:blue\}<\/style><p /);
+    expect(html).not.toContain("alert");
+    expect(html).not.toContain("<meta");
+    expect(res.warnings).toContainEqual(expect.objectContaining({ kind: "mockup_normalized", message: expect.stringContaining("script") }));
+  });
+
+  it("wraps several top-level nodes in one <div> root", async () => {
+    await writeMockup(fx.store, { mockup: "m", variant: "a", mode: "create", html: `<style>.a{color:red}</style><h1 id="h">A</h1><p id="p">B</p>` });
+
+    const res = await promoteMockup(fx.store, { mockup: "m", variant: "a", screen: "s1" });
+    expect(res.errors).toBeUndefined();
+    const html = await fx.store.readScreen("s1");
+    expect(html).toMatch(/^<div id="[^"]+"[^>]*><style[^>]*>\.a\{color:red\}<\/style><h1 id="h">A<\/h1><p id="p">B<\/p><\/div>$/);
+    expect(res.warnings).toContainEqual(expect.objectContaining({ kind: "mockup_normalized" }));
+  });
+
+  it("wraps top-level text together with an element", async () => {
+    await writeMockup(fx.store, { mockup: "m", variant: "a", mode: "create", html: `hello <b id="b">x</b>` });
+    const res = await promoteMockup(fx.store, { mockup: "m", variant: "a", screen: "s1" });
+    expect(res.errors).toBeUndefined();
+    expect(await fx.store.readScreen("s1")).toMatch(/^<div [^>]*>hello <b id="b">x<\/b><\/div>$/);
+  });
+
+  it("a single-root variant without styles is written unchanged, with no normalization warning", async () => {
+    await writeMockup(fx.store, { mockup: "m", variant: "a", mode: "create", html: `<div id="n1"><p id="n2">x</p></div>` });
+    const res = await promoteMockup(fx.store, { mockup: "m", variant: "a", screen: "s1" });
+    expect(res.warnings).toEqual([]);
+    expect(await fx.store.readScreen("s1")).toBe(`<div id="n1" data-title="a"><p id="n2">x</p></div>`);
+  });
+
+  it("carries <body> style and class onto a wrapping <div> root and names other body/html attributes as dropped", async () => {
+    await writeMockup(fx.store, {
+      mockup: "m",
+      variant: "a",
+      mode: "create",
+      html:
+        `<html lang="de"><head><style>.a{color:red}</style></head>` +
+        `<body style="background: #eee" class="page" onload="go()"><section id="hero"><p class="a">hi</p></section></body></html>`,
+    });
+
+    const res = await promoteMockup(fx.store, { mockup: "m", variant: "a", screen: "s1" });
+    expect(res.errors).toBeUndefined();
+    const html = await fx.store.readScreen("s1");
+    expect(html).toMatch(/^<div [^>]*class="page"[^>]*><style[^>]*>\.a\{color:red\}<\/style><section id="hero"/);
+    expect(html).toContain("background: #eee");
+    expect(html).not.toContain("onload");
+    const message = (res.warnings as { message: string }[])[0]?.message;
+    expect(message).toContain("<body onload>");
+    expect(message).toContain("<html lang>");
+  });
+
+  it("a script-only variant is dropped down to an empty <div> root, with a warning", async () => {
+    await writeMockup(fx.store, { mockup: "m", variant: "a", mode: "create", html: `<script>x()</script>` });
+    const res = await promoteMockup(fx.store, { mockup: "m", variant: "a", screen: "s1" });
+    expect(res.errors).toBeUndefined();
+    expect(await fx.store.readScreen("s1")).not.toContain("script");
+    expect(res.warnings).toContainEqual(expect.objectContaining({ kind: "mockup_normalized" }));
+  });
+
+  it("an empty variant surfaces as malformed_html and writes nothing", async () => {
+    await writeMockup(fx.store, { mockup: "m", variant: "a", mode: "create", html: "  " });
     const res = await promoteMockup(fx.store, { mockup: "m", variant: "a", screen: "s1" });
     expect(res.errors).toMatchObject([{ code: "malformed_html" }]);
     expect(await fx.store.listScreens()).toEqual([]);

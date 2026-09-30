@@ -417,12 +417,15 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "promote_mockup",
-    "Copies a chosen mockup variant into a new design-system-bound screen: writeHtml(mode:\"create\") on " +
-      "the variant's raw HTML, returned unmodified (including any errors/warnings/root_node_id) plus the " +
-      "source mockup/variant. The mockup stays on disk as exploration history — delete it with delete_entity " +
-      "when done. Single-root variants only — prefer inline styles over a top-level <style> block, which the " +
-      "serializer entity-escapes rather than parses. Refs/drift discipline applies to the resulting screen " +
-      "from this point on, same as any other screen.",
+    "Copies a chosen mockup variant into a new design-system-bound screen via writeHtml(mode:\"create\"), " +
+      "returning its response (errors/warnings/root_node_id) plus the source mockup/variant. The mockup stays " +
+      "on disk as exploration history — delete it with delete_entity when done. A screen has one root, so " +
+      "promotion normalizes the mockup first: for a full <html> document only the <head> <style> elements and " +
+      "the <body> content are kept; every top-level <style> (head and body) moves, in document order, to the " +
+      "start of the root so the screen renders like the mockup; several top-level nodes are wrapped in one " +
+      "<div> (a <body> style/class is carried onto that <div>); <script>, <meta>, <title>, <link> and <base> and other <body>/<html> attributes are dropped. Any restructuring or drop is reported " +
+      "as a mockup_normalized warning; a single-root variant without styles is written unchanged. Refs/drift " +
+      "discipline applies to the resulting screen from this point on, same as any other screen.",
     { mockup: z.string(), variant: z.string(), screen: z.string(), title: z.string().optional() },
     (store, input) => promoteMockup(store, input as never),
   ),

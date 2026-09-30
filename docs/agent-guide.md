@@ -73,10 +73,13 @@ On a fresh project the order is: **tokens → base components → screens.**
   fill the slots, including with other component instances. Slot-fill content
   is readable — `get_node` (view `full`) lists it under `slots`, one entry per
   fill in document order with its slot name; `find_nodes` matches inside it
-  too — but it is **not**
-  addressable by node ref: it never appears in `children`, and no write tool
-  accepts a node ref that points into it. To change it, rewrite the screen or
-  the instance's enclosing node.
+  too. It never appears in `children`, and `get_node`/`update_refs` do not
+  take a ref into it. `patch_html` and `inspect_node` do: give the fill
+  element an explicit `id` and address it as `<screen>.<id>` (`patch_html`
+  also reaches fills by `css_selector`). The authored fill markup in the
+  screen file is what gets edited. A slot's top-level fill can be replaced by
+  a single element or deleted, but has no siblings to insert next to; inside
+  it, every operation works. A fill with no `id` has no ref — give it one.
 
 **Exploration mode:** for the *first* screen of a new direction you may sketch
 with inline values to find the design. That is a draft, not a deliverable.
@@ -230,8 +233,9 @@ These tools are built for small contexts — use the levers:
   returns a `missing_id` warning saying so. `reply_comment` stays
   screen-only — comments anchor to what the browser renders, not to a
   definition. A `find_nodes` match found inside a component instance's slot
-  fill carries `node: null`, `addressable: false`, and `inside` pointing at
-  the enclosing instance instead of its own node ref — fill content has none.
+  fill carries `node: null`, `addressable: false`, `inside` pointing at
+  the enclosing instance, and its authored `id` when it has one — use that as
+  `<screen>.<id>` for `patch_html` / `inspect_node`.
 - Cheapest write wins: `update_refs` (no HTML parse) < `patch_html` <
   `write_html`. Full rewrites are for new screens or structural overhauls —
   the same division applies to component/pattern definitions.

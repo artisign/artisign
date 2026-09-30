@@ -8,6 +8,7 @@
 import type { Store } from "../store/index.js";
 import { renderScreenForBrowser, renderDefinitionForBrowser } from "./render-context.js";
 import { parseNodeRef } from "./node-ref.js";
+import { findFillById } from "./patch.js";
 import { ToolError } from "./types.js";
 import { getBrowser } from "./browser.js";
 
@@ -87,8 +88,9 @@ export async function inspectNode(store: Store, input: InspectNodeInput): Promis
   const { doc, documentHtml, viewport } =
     ref.kind === "screen" ? await renderScreenForBrowser(store, ref.screen) : await renderDefinitionForBrowser(store, ref);
   // Validated against the parsed model before touching the browser at all —
-  // an unknown node never pays the render cost.
-  if (!doc.nodes[nodeId]) {
+  // an unknown node never pays the render cost. A slot-fill node is not in the
+  // flat map but renders under its authored id (CHR-746), so it is measurable.
+  if (!doc.nodes[nodeId] && !findFillById(doc, nodeId)) {
     throw new ToolError("not_found", `node "${input.node}" was not found`);
   }
 

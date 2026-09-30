@@ -693,6 +693,33 @@ function collectExplicitIds(nodes: P5ChildNode[], counts: Map<string, number>): 
   }
 }
 
+/**
+ * Parses `html` into detached subtrees — the shape a slot fill lives in, never
+ * entering a screen's flat node map (CHR-746). Element-kind decisions, refs
+ * and validation are `buildSubtree`'s, the same as when a screen is parsed;
+ * only explicit ids are kept. Top-level whitespace-only text is dropped.
+ */
+export function parseSubtreeFragment(
+  html: string,
+  registry: DesignSystemRegistry,
+): { subtrees: NodeSubtree[]; errors: ValidationIssue[]; explicitIds: string[] } {
+  const errors: ValidationIssue[] = [];
+  const parseErrorCodes: string[] = [];
+  const fragment = parseFragment(html, { onParseError: (err) => parseErrorCodes.push(err.code) });
+  if (parseErrorCodes.length > 0) {
+    errors.push({ code: "malformed_html", message: `HTML parse errors: ${parseErrorCodes.join(", ")}` });
+  }
+  const idCounts = new Map<string, number>();
+  collectExplicitIds(fragment.childNodes, idCounts);
+  for (const [explicitId, count] of idCounts) {
+    if (count > 1) errors.push({ code: "duplicate_node_id", message: `id "${explicitId}" is used ${count} times` });
+  }
+  const subtrees = fragment.childNodes
+    .filter((n) => !(n.nodeName === "#text" && (n as DefaultTreeAdapterTypes.TextNode).value.trim() === ""))
+    .map((n) => buildSubtree(n, false, registry, errors));
+  return { subtrees, errors, explicitIds: [...idCounts.keys()] };
+}
+
 export type ParseScreenOptions = {
   /**
    * Extra ids to seed the allocator with, beyond what's found in `html`

@@ -849,8 +849,8 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
       // (`slotOverrides` is deliberately kept out of `ScreenDocument.nodes`).
       // `addressable: false` marks that, in the spirit of `id_stability`
       // above; `inside` points at the enclosing instance's own node ref
-      // instead, since that's the closest addressable thing a caller could
-      // act on (rewrite the screen, or the instance's enclosing node).
+      // instead; patch_html/inspect_node additionally accept the fill's own
+      // authored id (CHR-746), which is why it is reported.
       for (const fillNode of collectFillDescendants(node)) {
         const fill = fillSubject(fillNode);
         if (input.where.every((p) => matchesPredicate(p, fill, commentedNodes, flowFroms))) {
@@ -858,6 +858,9 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
             node: null,
             inside: formatNodeRef(source.address, node.id),
             addressable: false,
+            // The authored id, when the fill has one — patch_html and
+            // inspect_node take "<screen>.<id>" for it (CHR-746).
+            ...(fillNode.id === undefined ? {} : { id: fillNode.id }),
             screen: source.kind === "screen" ? source.name : null,
             source: source.kind,
             ...(source.kind === "component" ? { component: source.name, variant: source.variant } : {}),

@@ -1110,6 +1110,7 @@ describe("find_nodes — matches inside slot fills (CHR-584)", () => {
         node: null,
         inside: "home.n2",
         addressable: false,
+        id: "p1",
         screen: "home",
         source: "screen",
         tag: "p",

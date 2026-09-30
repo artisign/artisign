@@ -123,14 +123,38 @@ describe("ProjectRegistry", () => {
     const handle = await registry.open(link);
     expect(handle.root).toBe(link);
 
+    // Removing the directory is itself what triggers the eviction: the
+    // project's watcher sees artisign.json vanish and the registry drops the
+    // project on its own, at a moment the test does not control (on a slow
+    // runner it can land before `rm` even resolves). So the test must not
+    // poll the registry and hope to catch it still listed — it hooks the
+    // "project-closed" broadcast instead, which evict() sends after its own
+    // lookup and before close() removes the map entry.
+    let listedAtProjectClosed: unknown;
+    const projectClosed = new Promise<void>((resolveClosed) => {
+      const originalBroadcast = registry.lifecycle.broadcast.bind(registry.lifecycle);
+      registry.lifecycle.broadcast = (event) => {
+        if (event.type === "project-closed") {
+          listedAtProjectClosed = registry.get(handle.root);
+          resolveClosed();
+        }
+        originalBroadcast(event);
+      };
+    });
+
     await rm(dir, { recursive: true, force: true });
+    await projectClosed;
 
     // realpath on a now-dangling symlink fails, so a lookup by handle.root
     // can no longer hit the map directly — it only succeeds via
-    // findEntry()'s scan fallback, matching on the handle's own root.
-    expect(registry.get(handle.root)).toBe(handle);
-    await expect(registry.close(handle.root)).resolves.toBeUndefined();
+    // findEntry()'s scan fallback, matching on the handle's own root. That
+    // held twice above: evict() had to find the entry that way to broadcast
+    // at all, and get() still returned the handle at that very moment.
+    expect(listedAtProjectClosed).toBe(handle);
+
+    await registry.settled();
     expect(registry.get(handle.root)).toBeUndefined();
+    await expect(registry.close(handle.root)).resolves.toBeUndefined();
   });
 
   it("opens two projects in parallel with independent indices", async () => {

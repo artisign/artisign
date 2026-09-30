@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-30
+
 Screens can now be grouped into families: a state, an overlay or a step of a
 screen declares that screen as its parent, and the preview shows the family as
 a tree, a cluster on the Board and a side-by-side comparison. One behaviour

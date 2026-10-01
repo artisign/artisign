@@ -10,19 +10,20 @@ import { sendJson, readJsonBody, PayloadTooLargeError } from "./json.js";
 type CreateCommentBody = { screen?: unknown; node_id?: unknown; text?: unknown; parent_id?: unknown; resolved?: unknown };
 
 /**
- * Maps the DOM id comment mode clicked to the node a comment can anchor to
- * (CHR-750): the id itself when it is a screen node or an authored slot-fill
- * id, otherwise the longest `--`-separated prefix that is one — component
- * internals render as `<instance>--<id>` (see render.ts) and have no node of
- * their own. Undefined when nothing matches.
+ * Maps the DOM id comment mode clicked to the screen node a comment anchors
+ * to (CHR-750) — comments only ever anchor to `doc.nodes`, the nodes
+ * `get_node`/`find_nodes` can reach. Tried on the id itself, then on each
+ * shorter `--`-separated prefix (component internals render as
+ * `<instance>--<id>`, see render.ts); an authored slot-fill id anchors to the
+ * instance it fills. Undefined when nothing matches.
  */
 function resolveAnchorId(doc: ScreenDocument, domId: string): string | undefined {
-  const isAnchor = (id: string): boolean => doc.nodes[id] !== undefined || findFillById(doc, id) !== undefined;
-  if (isAnchor(domId)) return domId;
   const parts = domId.split("--");
-  for (let i = parts.length - 1; i >= 1; i--) {
+  for (let i = parts.length; i >= 1; i--) {
     const candidate = parts.slice(0, i).join("--");
-    if (isAnchor(candidate)) return candidate;
+    if (doc.nodes[candidate] !== undefined) return candidate;
+    const fill = findFillById(doc, candidate);
+    if (fill !== undefined) return fill.owner.id;
   }
   return undefined;
 }

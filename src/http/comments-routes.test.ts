@@ -155,16 +155,16 @@ describe("/api/comments", () => {
       expect(json.node_id).toBe("pick.picker");
     });
 
-    it("accepts an authored slot-fill id (CHR-750)", async () => {
+    it("anchors an authored slot-fill id to the instance it fills, a node get_node can reach (CHR-750)", async () => {
       const { status, json } = await post("/api/comments", { screen: "pick", node_id: "chip-a", text: "x" });
       expect(status).toBe(201);
-      expect(json.node_id).toBe("pick.chip-a");
+      expect(json.node_id).toBe("pick.picker");
     });
 
-    it("anchors a node inside a slot-fill instance to that fill (CHR-750)", async () => {
+    it("anchors a node inside a slot-fill instance to the filled instance (CHR-750)", async () => {
       const { status, json } = await post("/api/comments", { screen: "pick", node_id: "chip-a--dot", text: "x" });
       expect(status).toBe(201);
-      expect(json.node_id).toBe("pick.chip-a");
+      expect(json.node_id).toBe("pick.picker");
     });
 
     it("still rejects an id whose no prefix is a known node (CHR-750)", async () => {

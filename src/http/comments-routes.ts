@@ -3,9 +3,30 @@ import type { Store } from "../store/index.js";
 import { createComment, readCommentRecordsWithStats } from "../tools/comments.js";
 import { ToolError } from "../tools/types.js";
 import { loadScreen } from "../tools/context.js";
+import { findFillById } from "../tools/patch.js";
+import type { ScreenDocument } from "../model/index.js";
 import { sendJson, readJsonBody, PayloadTooLargeError } from "./json.js";
 
 type CreateCommentBody = { screen?: unknown; node_id?: unknown; text?: unknown; parent_id?: unknown; resolved?: unknown };
+
+/**
+ * Maps the DOM id comment mode clicked to the screen node a comment anchors
+ * to (CHR-750) — comments only ever anchor to `doc.nodes`, the nodes
+ * `get_node`/`find_nodes` can reach. Tried on the id itself, then on each
+ * shorter `--`-separated prefix (component internals render as
+ * `<instance>--<id>`, see render.ts); an authored slot-fill id anchors to the
+ * instance it fills. Undefined when nothing matches.
+ */
+function resolveAnchorId(doc: ScreenDocument, domId: string): string | undefined {
+  const parts = domId.split("--");
+  for (let i = parts.length; i >= 1; i--) {
+    const candidate = parts.slice(0, i).join("--");
+    if (doc.nodes[candidate] !== undefined) return candidate;
+    const fill = findFillById(doc, candidate);
+    if (fill !== undefined) return fill.owner.id;
+  }
+  return undefined;
+}
 
 /**
  * `GET /api/comments?screen=<name>` and `POST /api/comments` — the
@@ -74,16 +95,21 @@ export async function handleCommentsRoutes(req: IncomingMessage, res: ServerResp
     // when that root was created), so only a new root comment needs its
     // target checked here — otherwise a typo'd screen/node id leaves an
     // orphaned record in the append-only log forever.
+    let nodeId = (body.node_id as string | null | undefined) ?? null;
     if (!hasParent) {
       const { doc } = await loadScreen(store, body.screen as string);
-      if (typeof body.node_id === "string" && !doc.nodes[body.node_id]) {
-        throw new ToolError("not_found", `node "${body.node_id}" was not found on screen "${body.screen as string}"`);
+      if (nodeId !== null) {
+        const anchorId = resolveAnchorId(doc, nodeId);
+        if (anchorId === undefined) {
+          throw new ToolError("not_found", `node "${nodeId}" was not found on screen "${body.screen as string}"`);
+        }
+        nodeId = anchorId;
       }
     }
 
     const comment = await createComment(store, {
       screen: typeof body.screen === "string" ? body.screen : "",
-      node_id: (body.node_id as string | null | undefined) ?? null,
+      node_id: nodeId,
       text: body.text,
       parent_id: (body.parent_id as string | undefined) ?? null,
       resolved: body.resolved as boolean | undefined,

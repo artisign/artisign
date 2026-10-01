@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-10-01
+
+### Fixed
+
+- Preview comment mode: commenting on an element inside a component instance
+  (rendered as `<instance>--<id>`) or inside a slot fill no longer fails with
+  `node … was not found on screen …`. The comment anchors to the screen node
+  that owns the clicked element — the instance — so `get_node` and
+  `find_nodes` can always reach it. (CHR-750)
+
 ## [1.1.1] - 2026-09-30
 
 ### Fixed

@@ -51,6 +51,14 @@ describe("/api/comments", () => {
     await initProject(dir);
     store = new FsStore(dir);
     await store.writeScreen("home", `<div id="n1"><button id="n2"></button></div>`);
+    // CHR-750: a component with an internal id renders it as `<instance>--<id>`,
+    // and an authored slot-fill id renders as-is without entering doc.nodes.
+    await store.writeComponent("chip", `<span><b id="dot"></b><span data-slot="label"></span></span>`);
+    await store.writeComponent("picker", `<div><div id="mode">All</div><div data-slot="chips"></div></div>`);
+    await store.writeScreen(
+      "pick",
+      `<main id="root"><div id="picker" class="$picker"><div data-slot="chips"><span id="chip-a" class="$chip"><span data-slot="label">A</span></span></div></div></main>`,
+    );
 
     // A private ARTISIGN_HOME so this file's global daemon lock never collides
     // with another test file's daemon running in parallel.
@@ -139,6 +147,29 @@ describe("/api/comments", () => {
       const { status, json } = await post("/api/comments", { screen: "home", node_id: "does-not-exist", text: "x" });
       expect(status).toBe(404);
       expect(json.code).toBe("not_found");
+    });
+
+    it("anchors a click on a component-internal node to its owning instance (CHR-750)", async () => {
+      const { status, json } = await post("/api/comments", { screen: "pick", node_id: "picker--mode", text: "drop this" });
+      expect(status).toBe(201);
+      expect(json.node_id).toBe("pick.picker");
+    });
+
+    it("accepts an authored slot-fill id (CHR-750)", async () => {
+      const { status, json } = await post("/api/comments", { screen: "pick", node_id: "chip-a", text: "x" });
+      expect(status).toBe(201);
+      expect(json.node_id).toBe("pick.chip-a");
+    });
+
+    it("anchors a node inside a slot-fill instance to that fill (CHR-750)", async () => {
+      const { status, json } = await post("/api/comments", { screen: "pick", node_id: "chip-a--dot", text: "x" });
+      expect(status).toBe(201);
+      expect(json.node_id).toBe("pick.chip-a");
+    });
+
+    it("still rejects an id whose no prefix is a known node (CHR-750)", async () => {
+      const { status } = await post("/api/comments", { screen: "pick", node_id: "ghost--mode", text: "x" });
+      expect(status).toBe(404);
     });
 
     it("rejects a cross-origin request", async () => {

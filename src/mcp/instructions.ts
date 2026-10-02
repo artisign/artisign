@@ -73,6 +73,8 @@ mockup via set_meta (target: {kind:"mockup", mockup}) to make it findable
 in get_project {tags: [...]}, same as a screen.
 
 RENDER ENVIRONMENT (guaranteed, no re-declare needed): border-box sizing,
-zero body margin — declared widths/heights render exactly as given. Fonts
+zero body margin — declared widths/heights render exactly as given. A screen
+renders at its root's declared width/height; undeclared = 390x844, a phone
+— a desktop product needs a desktop root width. Fonts
 named in tokens.json typography values are auto-loaded. Icons are Material
 Symbols ligatures: <span class="icon">close</span> — never a Unicode glyph.`;

@@ -105,7 +105,11 @@ export async function getScreenshot(store: Store, input: GetScreenshotInput): Pr
   }
 
   if (input.width !== undefined) {
-    throw new ToolError("validation_failed", "width is only valid together with mockup, not screen");
+    throw new ToolError(
+      "validation_failed",
+      "width is only valid together with mockup, not screen — a screen renders at its root element's declared " +
+        "width/height (e.g. style=\"width: 1440px\" on the root, or a $token), default 390x844 when undeclared",
+    );
   }
   return screenshotScreen(store, input.screen!, input.node, clampScale(input.scale));
 }

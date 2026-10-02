@@ -21,7 +21,7 @@ import { loadScreen } from "./context.js";
 import { readMockupMetaOrDefault } from "./mockups.js";
 import { loadAllDocuments, loadDefinitionSource, type SourceDoc } from "./definitions.js";
 import { computeReuseMetrics } from "./reuse.js";
-import { renderScreenDocument } from "./render-context.js";
+import { renderScreenDocument, describeViewport } from "./render-context.js";
 import { parseNodeRef, formatNodeRef } from "./node-ref.js";
 import { readAllFlows, readScreenFlows, toPublicFlowRecord } from "./flows.js";
 import { readCommentRecords, readCommentRecordsWithStats, groupThreads, threadStatus, toPublicComment, type CommentRecord } from "./comments.js";
@@ -233,6 +233,7 @@ export async function getProject(store: Store, input: GetProjectInput): Promise<
         open_comment_count: openCommentCountByScreen.get(name) ?? 0,
         tags: meta.tags,
         ...variantFields(links.get(name)),
+        viewport: describeViewport(doc.nodes[doc.rootNodeId]!, tokens),
       };
     }),
   );

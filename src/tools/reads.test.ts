@@ -28,7 +28,32 @@ describe("get_project", () => {
   it("tree includes a screen list with node counts and per-screen unresolved comment counts", async () => {
     await fx.store.writeScreen("home", `<div id="n1"><span id="n2"></span></div>`);
     const res = await getProject(fx.store, { view: "tree" });
-    expect(res.screens).toEqual([{ screen: "home", path: "screens/home.html", node_count: 2, open_comment_count: 0, tags: [] }]);
+    expect(res.screens).toEqual([
+      {
+        screen: "home",
+        path: "screens/home.html",
+        node_count: 2,
+        open_comment_count: 0,
+        tags: [],
+        viewport: { width: 390, height: 844, declared: false },
+      },
+    ]);
+  });
+
+  it("tree reports each screen's viewport from its root's declared width/height, token refs included", async () => {
+    const tokens = await fx.store.readTokens();
+    tokens.size = { desktop: "1280px" };
+    await fx.store.writeTokens(tokens);
+    await fx.store.writeScreen("dashboard", `<div id="n1" style="width: 1440px; height: 900px"></div>`);
+    await fx.store.writeScreen("settings", `<div id="n1" style="width: $size.desktop"></div>`);
+    await fx.store.writeScreen("phone", `<div id="n1" style="height: 700px"></div>`);
+    const res = await getProject(fx.store, { view: "tree" });
+    const viewports = Object.fromEntries((res.screens as { screen: string; viewport: unknown }[]).map((s) => [s.screen, s.viewport]));
+    expect(viewports).toEqual({
+      dashboard: { width: 1440, height: 900, declared: true },
+      settings: { width: 1280, height: 844, declared: true },
+      phone: { width: 390, height: 700, declared: false },
+    });
   });
 
   it("tree includes a mockups list with variant counts", async () => {
@@ -125,7 +150,14 @@ describe("get_project", () => {
 
     const filtered = await getProject(fx.store, { view: "tree", tags: ["checkout"] });
     expect(filtered.screens).toEqual([
-      { screen: "home", path: "screens/home.html", node_count: 1, open_comment_count: 0, tags: ["checkout"] },
+      {
+        screen: "home",
+        path: "screens/home.html",
+        node_count: 1,
+        open_comment_count: 0,
+        tags: ["checkout"],
+        viewport: { width: 390, height: 844, declared: false },
+      },
     ]);
     expect(filtered.screen_count).toBe(1);
   });

@@ -190,9 +190,13 @@ describe("MCP server — instructions budget", () => {
   // the budget from 870 to 910 — a documentation entity above the screen is
   // a new place metadata can live, and an agent that doesn't know it exists
   // duplicates the spec into every screen instead; measured at 907 when this
-  // line was added.
-  it("stays within the ~910 token cheat-sheet budget (chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(910);
+  // line was added. The RENDER ENVIRONMENT screen-size sentence (CHR-766)
+  // raised it from 910 to 950: an agent that never learns a screen's frame
+  // comes from its root width designs a desktop product as a 390px phone
+  // stack — a user-reported failure, and get_screenshot's width (mockups
+  // only) actively misleads toward it. Measured at 943 when this was added.
+  it("stays within the ~950 token cheat-sheet budget (chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(950);
   });
 });
 

@@ -97,6 +97,14 @@ A good starter set is small and role-named:
 `mode` is required: `"patch"` merges into the existing tokens, `"replace"`
 rewrites `tokens.json` wholesale.
 
+Settle the screen frame here too. A screen renders at its root's declared
+`width`/`height`; without one it falls back to 390×844, a phone. *Notely*
+is a phone app, so the default fits — a desktop product would add
+`"size": { "viewport_w": "1440px", "viewport_h": "900px" }` and put
+`width: $size.viewport_w; height: $size.viewport_h` on every screen root.
+`get_project` at `view: "tree"` shows each screen's `viewport`, with
+`declared: false` wherever the default is in effect.
+
 Guidelines that pay off later:
 
 - **Name by role, not appearance.** `color.primary`, not `color.green`. When

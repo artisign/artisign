@@ -172,6 +172,11 @@ export function resolveViewport(rootNode: InternalNode, tokens: TokensDocument):
   };
 }
 
+/** `resolveViewport` plus whether the root declares its width — `declared: false` means the default mobile width applies. Reported per screen by `get_project` so an agent sees an unintended 390px default without rendering. */
+export function describeViewport(rootNode: InternalNode, tokens: TokensDocument): Viewport & { declared: boolean } {
+  return { ...resolveViewport(rootNode, tokens), declared: resolveDimension("width", rootNode, tokens) !== undefined };
+}
+
 export type RenderedScreenForBrowser = RenderedScreenDocument & { rootNode: InternalNode; viewport: Viewport };
 
 /**

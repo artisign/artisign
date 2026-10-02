@@ -130,7 +130,26 @@ export function canFollowNavigate(state) {
  */
 export function resolveFollowNavigation(event, followState, lists) {
   if (!canFollowNavigate(followState)) return null;
+  // CHR-779 — ADR-005: a component/pattern target navigates too (to the Design System view); activityIsNavigable alone never says so.
+  const target = event.target;
+  if (event.tool !== "delete_entity" && (target?.kind === "component" || target?.kind === "pattern")) return target;
   return activityIsNavigable(event, lists);
+}
+
+/**
+ * CHR-779 — whether a live event should be HELD instead of dropped: follow
+ * is armed and the event targets a screen/mockup that isn't in the lists
+ * YET. `activity` and `change` travel on one stream but the activity event
+ * of a create (`write_html`, `promote_mockup`) can beat the `change` that
+ * adds the entity, so the lists are merely stale, not the target deleted.
+ * `delete_entity` never qualifies — its target is gone for good.
+ * @param {object} event
+ * @param {FollowState} followState
+ * @param {{ screenNames: string[], mockupNames: string[] }} lists
+ */
+export function followAwaitsTarget(event, followState, lists) {
+  if (!canFollowNavigate(followState) || event.tool === "delete_entity") return false;
+  return activityNavigationTarget(event) !== null && !activityTargetExists(event, lists);
 }
 
 /** The one short node id worth showing after the target label (e.g. "line-4") — omitted for `write_html` (its one node IS the screen root, not a specific element to point at) and whenever there isn't exactly one affected node. */

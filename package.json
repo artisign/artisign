@@ -1,6 +1,6 @@
 {
   "name": "artisign",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "mcpName": "dev.artisign/artisign",
   "description": "Artisign — local-first design system tool for AI agents, keeping screens consistent through shared tokens and components",
   "keywords": [

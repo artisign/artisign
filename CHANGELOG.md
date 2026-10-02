@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-10-02
+
 ### Added
 
 - `artisign` on its own (no command, or an option first — `artisign --port 4800
@@ -19,6 +21,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `xdg-open` on Linux), adds no dependency, and when the opener fails only the URL is
   printed. `serve`, `mcp`, `status`, `stop` and `init` never open a browser.
   (CHR-782)
+- Preview inspect mode labels the outlined component instance with its ref
+  (e.g. `$product-card · dark`) in a devtools-style tag on the outline. The
+  label keeps a constant size at any canvas zoom, is never truncated and stays
+  inside the canvas. (CHR-780)
+
+### Fixed
+
+- Follow the agent now switches to the target's own view: the Screens tab for a
+  screen or mockup target, the Design System for a component or pattern. It
+  also catches a target that the very write it follows has just created (the
+  `activity` event could arrive before the sidebar knew the new screen), and the
+  Design System cue lands after the view has re-rendered instead of before it.
+  (CHR-779)
 
 ## [1.1.3] - 2026-10-02
 

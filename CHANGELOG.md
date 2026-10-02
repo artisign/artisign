@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `get_project` at `view: "tree"`/`"full"`: every screen entry carries
   `viewport: { width, height, declared }` — the frame it renders at.
-  `declared: false` means the root declares no width and the 390×844 phone
+  `declared: false` means the root declares no px width and the 390×844 phone
   default applies. (CHR-766)
 
 ### Changed

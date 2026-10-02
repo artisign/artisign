@@ -29,9 +29,12 @@ Do not read full screens upfront. Load detail lazily with tiered reads.
 ## Screen size
 
 **A screen renders at its root element's declared `width`/`height`.** That
-size is the screen's frame everywhere — `get_screenshot`, `inspect_node`, the
-board. A root without a px width falls back to **390×844, a phone**. Nothing
-about Artisign is mobile-only; the default is just a default.
+size is the screen's frame in `get_screenshot` and `inspect_node`. A root
+without a px width (plain or via a `$token`) falls back to **390×844, a
+phone**. Nothing about Artisign is mobile-only; the default is just a
+default. Declare it on the screen's own root element — a width inside a
+component definition the root instantiates (`class="$app-shell"`) does not
+count.
 
 Decide the target platform before the first screen, and declare it on every
 root — as a token, so all screens share one frame:

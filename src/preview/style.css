@@ -1412,15 +1412,14 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   display: none;
 }
 
-/* CHR-780 — component tag on the outline's top-left edge, devtools style; flips inside when the outline touches the canvas top (data-flip, set by updateInspectOverlay). */
+/* CHR-780 — component tag on the outline's top-left edge, devtools style. #screen-holder is zoomed, so the label counter-scales (--zoom, set in canvas.js) to a constant on-screen size. data-flip (no room above) puts it inside the outline, --label-clamp keeps it below the holder's clipped top edge; data-align-right keeps it inside the holder's right edge. It overhangs the outline rather than truncating. */
 #inspect-overlay[data-label]::after {
   content: attr(data-label);
   position: absolute;
   left: -3px;
   bottom: calc(100% + 3px);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  transform: scale(calc(1 / var(--zoom, 1)));
+  transform-origin: bottom left;
   white-space: nowrap;
   background: var(--color-accent);
   color: var(--color-surface);
@@ -1433,9 +1432,22 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 #inspect-overlay[data-label][data-flip]::after {
   bottom: auto;
-  top: 0;
+  top: var(--label-clamp, 0px);
   left: 0;
+  transform-origin: top left;
   border-radius: 0 0 3px 0;
+}
+
+#inspect-overlay[data-label][data-align-right]::after {
+  left: auto;
+  right: -3px;
+  transform-origin: bottom right;
+}
+
+#inspect-overlay[data-label][data-flip][data-align-right]::after {
+  right: 0;
+  transform-origin: top right;
+  border-radius: 0 0 0 3px;
 }
 
 /* CHR-631 — follow mode's whole-screen write highlight, shown after

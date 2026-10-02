@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `artisign` on its own (no command, or an option first — `artisign --port 4800
+  ./proj`) now behaves exactly like `artisign start …` instead of exiting with
+  "Unknown command". An unknown word, including a bare path as the first
+  argument, still prints the usage and exits non-zero. (CHR-782)
+- `artisign start` opens the preview (`http://127.0.0.1:<port>/`) in the default
+  browser once the daemon is healthy, also when it was already running. Skipped
+  with `--no-open` or `ARTISIGN_NO_OPEN=1`, and when `CI` is set or stdout is not
+  a terminal. It uses the platform's own opener (`open`, `xdg-open`,
+  `cmd /c start`), adds no dependency, and when the opener fails only the URL is
+  printed. `serve`, `mcp`, `status`, `stop` and `init` never open a browser.
+  (CHR-782)
+
 ## [1.1.3] - 2026-10-02
 
 ### Added

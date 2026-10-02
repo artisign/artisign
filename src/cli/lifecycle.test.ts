@@ -127,6 +127,24 @@ describe("CLI lifecycle", () => {
     expect(status.stdout.trim()).toBe("not running");
   });
 
+  it("a bare artisign (option first) starts the daemon like start does", async () => {
+    // stdout is a pipe here, so the browser is not opened either way; --no-open makes that explicit.
+    const bare = await runCli(["--port", "0", "--no-open"]);
+    expect(bare.code).toBe(0);
+    expect(bare.stdout).toMatch(/artisign running on http:\/\/127\.0\.0\.1:\d+/);
+    const status = await runCli(["status"]);
+    expect(status.stdout).toMatch(/artisign running \(pid \d+, port \d+\)/);
+    await runCli(["stop"]);
+  }, 20_000);
+
+  it("a bare path is an unknown command, not a project to start", async () => {
+    const result = await runCli(["./some-project"]);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("Unknown command: ./some-project");
+    const status = await runCli(["status"]);
+    expect(status.stdout.trim()).toBe("not running");
+  });
+
   it("start is idempotent — a second start reports the already-running daemon", async () => {
     const first = await runCli(["start", "--port", "0"]);
     expect(first.code).toBe(0);

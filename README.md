@@ -19,7 +19,7 @@ One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
 Node.js ≥ 20.19, on **macOS or Linux**. **Windows is not supported** — the store's atomic writes (write temp file, then `rename`) and its path handling have never been verified there, so the tool is not shipped for it. `package.json` declares this via `os`, which makes `npm install` refuse the platform rather than fail somewhere later.
 
-**Two ways to run it.** `npx artisign` fetches the package on first use and needs no setup — the fastest way to try it. Installing it into a directory of your own is the other path, and the one the commands below are written for. Screenshots are not the difference between them: the two screenshot tools need Playwright, which a local install can sit next to and which the npx path reaches through `ARTISIGN_PLAYWRIGHT_DIR` — both routes are under **Optional: screenshots** below.
+**Two ways to run it.** `npx artisign` fetches the package on first use, starts the daemon and opens the preview in your browser — no setup, the fastest way to try it. Installing it into a directory of your own is the other path, and the one the commands below are written for. Screenshots are not the difference between them: the two screenshot tools need Playwright, which a local install can sit next to and which the npx path reaches through `ARTISIGN_PLAYWRIGHT_DIR` — both routes are under **Optional: screenshots** below.
 
 ```bash
 mkdir artisign && cd artisign
@@ -98,10 +98,11 @@ First run, in this order:
 
 ```bash
 npx artisign init ./my-project    # scaffold an empty project
-npx artisign start ./my-project   # start the daemon in the background and open the project
+npx artisign start ./my-project   # start the daemon in the background and open the preview in the browser
 npx artisign status               # pid, port, open projects
-# then open http://127.0.0.1:4711
 ```
+
+`npx artisign` on its own is `npx artisign start`, and takes the same arguments (`npx artisign --port 4800 ./my-project`). `start` opens `http://127.0.0.1:<port>/` in your default browser once the daemon is healthy — also when it was already running. Pass `--no-open` (or set `ARTISIGN_NO_OPEN=1`) to skip that; it is skipped anyway when `CI` is set or stdout is not a terminal, and when no browser can be opened the URL is printed and that is all. `serve`, `mcp`, `status`, `stop` and `init` never open a browser.
 
 The remaining commands, for reference — this block is a catalogue, not a sequence:
 

@@ -196,4 +196,56 @@ describe("design-system cue", () => {
     expect(card().classList.contains("activity-cue-write")).toBe(true);
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
+
+  it("an expired write cue is not applied by a later re-render", async () => {
+    await boot();
+    componentWrite("btn");
+    await flush();
+    await wait(1100);
+    Element.prototype.scrollIntoView.mockClear();
+    emit({ type: "change", kind: "tokens", name: "color" });
+    await flush();
+    expect($('.ds-component[data-component-name="btn"]').classList.contains("activity-cue-write")).toBe(false);
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it("paused follow plus a later Design System visit does not cue the old card", async () => {
+    await boot();
+    componentWrite("btn");
+    await flush();
+    tab("screens").click(); // human navigation pauses follow
+    await flush();
+    Element.prototype.scrollIntoView.mockClear();
+    tab("design-system").click();
+    await flush();
+    expect($('.ds-component[data-component-name="btn"]').classList.contains("activity-cue-write")).toBe(false);
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+  });
+});
+
+describe("follow bookkeeping", () => {
+  it("a non-navigating event between a held create and its change does not drop the hold", async () => {
+    await boot();
+    screenActivity("fresh", "write_html", "write");
+    activity("get_project", "read", null);
+    await flush();
+    screens = [s("a"), s("b"), s("fresh")];
+    emit({ type: "change", kind: "screen", name: "fresh" });
+    await flush();
+    expect(rowButton("fresh").getAttribute("aria-current")).toBe("true");
+  });
+
+  it("Resume jumps to a newer component write, not an older screen read", async () => {
+    await boot();
+    screenActivity("b");
+    await flush();
+    await wait(350);
+    componentWrite("btn");
+    await flush();
+    tab("screens").click(); // pauses
+    await flush();
+    $("#follow-toggle-resume").click();
+    await flush();
+    expect(pressed()).toBe("design-system");
+  });
 });

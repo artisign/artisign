@@ -1037,6 +1037,7 @@ function renderFollowUI() {
  */
 function pauseFollow() {
   followState = nextFollowState(followState, "pause");
+  pendingDesignSystemCue = null; // human navigation: a later render must not cue for the agent
   renderFollowUI();
 }
 
@@ -1063,7 +1064,8 @@ function jumpToLatestActivity() {
   // 3) — the last write in the feed can be a `delete_entity` (or any other
   // write) whose own target no longer exists; jumping to it would show an
   // error render instead of the agent's actual latest live target.
-  const latest = activityFeed.find((event) => event.ok && activityIsNavigable(event, lists));
+  // resolveFollowNavigation (CHR-779), same resolution as live follow — so a newer component/pattern write wins too.
+  const latest = activityFeed.find((event) => event.ok && resolveFollowNavigation(event, followState, lists));
   if (latest) navigateToActivity(latest);
 }
 
@@ -1115,11 +1117,12 @@ function handleActivityEvent(event) {
   // oversight (ADR-005: "never navigate or highlight — there is nothing
   // confirmed to point at").
   if (!event.ok) return;
-  holdFollowEvent(null); // a newer navigating event supersedes a held one
-  if (followAwaitsTarget(event, followState, currentActivityLists())) {
-    holdFollowEvent(event);
+  const lists = currentActivityLists();
+  if (followAwaitsTarget(event, followState, lists)) {
+    holdFollowEvent(event); // newest wins
     return;
   }
+  if (resolveFollowNavigation(event, followState, lists)) holdFollowEvent(null); // a newer navigating event supersedes a held one; a non-navigating one leaves it alone
   throttledActivityNavigate(event);
 }
 
@@ -1986,6 +1989,7 @@ function applyPendingDesignSystemCue() {
   const pending = pendingDesignSystemCue;
   if (!pending) return;
   if (pending.kind === "read" || Date.now() > pending.expires) pendingDesignSystemCue = null;
+  if (Date.now() > pending.expires) return; // expired: a later re-render must not pull the view back to an old card
   if (currentView !== "design-system") return;
   cueDesignSystemEntry(pending.target, pending.kind);
 }

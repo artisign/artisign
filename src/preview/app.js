@@ -35,6 +35,7 @@ import {
   pushActivityEntry,
   activityTargetExists,
   activityIsNavigable,
+  followAwaitsTarget,
   resolveFollowNavigation,
   highlightDurationMs,
   highlightNodes,
@@ -288,6 +289,15 @@ const ACTIVITY_NAVIGATE_THROTTLE_MS = 300;
 let lastActivityNavigateAt = 0;
 let throttledActivityEvent = null;
 let activityNavigateThrottleTimer = null;
+// CHR-779 — one navigating event whose screen/mockup target the lists don't
+// contain yet (its `activity` beat the `change` that adds it); newest wins,
+// dropped silently after WRITE_RERENDER_GRACE_MS. See flushHeldFollowEvent.
+let heldFollowEvent = null;
+let heldFollowTimer = null;
+// CHR-779 — a component/pattern cue waits for the design-system view's own
+// (re-)render; a write's cue stays armed until `expires` so the `change`
+// re-render that follows it re-applies the cue instead of wiping it.
+let pendingDesignSystemCue = null; // { target, kind, expires } | null
 let boardBuilt = false; // built lazily on first activation, then kept in sync via SSE — see loadBoard()
 let activeProjectRoot = null; // the project root currently displayed; null while the empty state shows
 let eventSource; // current /events connection — closed and reopened with a fresh ?project= on every switch
@@ -696,6 +706,8 @@ function resetProjectState() {
   mockupCueCleanup = () => {};
   designSystemCueCleanup();
   designSystemCueCleanup = () => {};
+  holdFollowEvent(null);
+  pendingDesignSystemCue = null;
   pendingActivityHighlight = null;
   clearTimeout(activityHighlightGraceTimer);
   // review fix 1 — a navigate already queued in the OLD project's throttle
@@ -874,6 +886,7 @@ async function handleChangeEvent(event) {
   if (event.kind === "screen") {
     const previousScreens = screens;
     await loadScreens();
+    flushHeldFollowEvent();
     compare.screenChanged(event.name);
     if (event.name === currentScreen) {
       await loadCurrentScreen();
@@ -927,6 +940,7 @@ async function handleChangeEvent(event) {
     if (currentView === "design-system") await loadDesignSystem();
   } else if (event.kind === "mockup") {
     if (!(await loadMockups())) return; // a fetch error must not be misread as "the mockup was deleted" — see fetchMockups
+    flushHeldFollowEvent();
     if (event.name !== currentMockup) return;
     // A delete fires multiple "mockup" events for the same name (server-side,
     // one per file removed), so the vanished branch may run more than once;
@@ -1101,6 +1115,26 @@ function handleActivityEvent(event) {
   // oversight (ADR-005: "never navigate or highlight — there is nothing
   // confirmed to point at").
   if (!event.ok) return;
+  holdFollowEvent(null); // a newer navigating event supersedes a held one
+  if (followAwaitsTarget(event, followState, currentActivityLists())) {
+    holdFollowEvent(event);
+    return;
+  }
+  throttledActivityNavigate(event);
+}
+
+/** Holds `event` (or clears the hold for null) until the lists catch up — the next change/list refresh calls flushHeldFollowEvent; after WRITE_RERENDER_GRACE_MS it is dropped. */
+function holdFollowEvent(event) {
+  clearTimeout(heldFollowTimer);
+  heldFollowEvent = event;
+  if (event) heldFollowTimer = setTimeout(() => (heldFollowEvent = null), WRITE_RERENDER_GRACE_MS);
+}
+
+/** Called after a screens/mockups list refresh: a held event whose target has arrived navigates now (through the same throttle as a live one). */
+function flushHeldFollowEvent() {
+  const event = heldFollowEvent;
+  if (!event || !activityIsNavigable(event, currentActivityLists())) return;
+  holdFollowEvent(null);
   throttledActivityNavigate(event);
 }
 
@@ -1161,14 +1195,17 @@ function throttledActivityNavigate(event) {
  */
 async function navigateToActivity(event) {
   const target = activityIsNavigable(event, currentActivityLists());
+  pendingDesignSystemCue = null;
   if (!target) {
     if (event.target?.kind === "component" || event.target?.kind === "pattern") {
+      // The cue is applied by loadDesignSystem once the card actually exists — see applyPendingDesignSystemCue
+      pendingDesignSystemCue = { target: event.target, kind: event.kind, expires: Date.now() + WRITE_RERENDER_GRACE_MS };
       setView("design-system");
-      await loadDesignSystem(); // setView's own fire-and-forget call already kicked this off too — cueDesignSystemEntry needs the render to actually have landed before it can find the card, so it awaits its own call rather than racing that one
-      cueDesignSystemEntry(event.target, event.kind);
     }
     return;
   }
+  // Follow's own view switch is programmatic — setView, unlike a tab click, does not pause follow (CHR-779).
+  if (currentView !== "screens") setView("screens");
   if (target.kind === "mockup") {
     selectMockup(target.name); // navigation-only, per the design spec — a mockup has no nodes to box
     cueMockupSidebarEntry(target.name, event.kind);
@@ -1935,9 +1972,22 @@ async function loadCurrentMockup() {
   updateMockupZoom(); // initial pass — columns start at their CSS default width, before any iframe has measured its variant
 }
 
+let designSystemRequestId = 0;
 async function loadDesignSystem() {
+  const requestId = ++designSystemRequestId;
   const data = await fetchDesignSystem(activeProjectRoot);
+  if (requestId !== designSystemRequestId) return; // a newer load is in flight and will render (and cue) instead
   renderDesignSystem(designSystemViewEl, data);
+  applyPendingDesignSystemCue();
+}
+
+/** Cues the pending component/pattern card once the view has re-rendered. A read cues once; a write stays armed until its grace expires, so the `change` re-render right behind it re-applies the cue. */
+function applyPendingDesignSystemCue() {
+  const pending = pendingDesignSystemCue;
+  if (!pending) return;
+  if (pending.kind === "read" || Date.now() > pending.expires) pendingDesignSystemCue = null;
+  if (currentView !== "design-system") return;
+  cueDesignSystemEntry(pending.target, pending.kind);
 }
 
 /** Builds the board from scratch — screens + flows. Only called once, lazily; SSE handlers keep it in sync afterward (see connectEvents below). */

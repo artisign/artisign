@@ -9,6 +9,7 @@ import {
   activityIsNavigable,
   canFollowNavigate,
   resolveFollowNavigation,
+  followAwaitsTarget,
   formatActivityTarget,
   formatActivityTime,
   nextFollowState,
@@ -291,5 +292,37 @@ describe("followToggleClickAction", () => {
   it("turns off from paused when the click missed the Resume affordance", () => {
     const paused = { enabled: true, paused: true };
     expect(followToggleClickAction(paused, false)).toBe("toggle-off");
+  });
+});
+
+describe("resolveFollowNavigation — component/pattern targets (CHR-779)", () => {
+  const lists = { screenNames: [], mockupNames: [] };
+  const following = { enabled: true, paused: false };
+  it("navigates to a component/pattern target while following", () => {
+    expect(resolveFollowNavigation({ tool: "write_html", target: { kind: "component", name: "btn" } }, following, lists)).toEqual({ kind: "component", name: "btn" });
+    expect(resolveFollowNavigation({ tool: "set_meta", target: { kind: "pattern", name: "hero" } }, following, lists)).toEqual({ kind: "pattern", name: "hero" });
+  });
+  it("never when paused/off or for delete_entity", () => {
+    const event = { tool: "write_html", target: { kind: "component", name: "btn" } };
+    expect(resolveFollowNavigation(event, { enabled: true, paused: true }, lists)).toBeNull();
+    expect(resolveFollowNavigation(event, FOLLOW_OFF, lists)).toBeNull();
+    expect(resolveFollowNavigation({ ...event, tool: "delete_entity" }, following, lists)).toBeNull();
+  });
+});
+
+describe("followAwaitsTarget (CHR-779)", () => {
+  const lists = { screenNames: ["a"], mockupNames: [] };
+  const following = { enabled: true, paused: false };
+  const screenEvent = (name, tool = "write_html") => ({ tool, target: { kind: "screen", name } });
+  it("holds a screen/mockup target the lists do not contain yet", () => {
+    expect(followAwaitsTarget(screenEvent("fresh"), following, lists)).toBe(true);
+    expect(followAwaitsTarget({ tool: "promote_mockup", target: { kind: "mockup", name: "m" } }, following, lists)).toBe(true);
+  });
+  it("does not hold an existing target, a component target, a broad read, a delete, or when not following", () => {
+    expect(followAwaitsTarget(screenEvent("a"), following, lists)).toBe(false);
+    expect(followAwaitsTarget({ tool: "write_html", target: { kind: "component", name: "x" } }, following, lists)).toBe(false);
+    expect(followAwaitsTarget({ tool: "get_project", target: null }, following, lists)).toBe(false);
+    expect(followAwaitsTarget(screenEvent("fresh", "delete_entity"), following, lists)).toBe(false);
+    expect(followAwaitsTarget(screenEvent("fresh"), { enabled: true, paused: true }, lists)).toBe(false);
   });
 });

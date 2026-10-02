@@ -6,7 +6,6 @@ const URL_ = "http://127.0.0.1:4711/";
 describe("openerCommand", () => {
   it("uses open on macOS", () => expect(openerCommand(URL_, "darwin")).toEqual({ command: "open", args: [URL_] }));
   it("uses xdg-open on Linux", () => expect(openerCommand(URL_, "linux")).toEqual({ command: "xdg-open", args: [URL_] }));
-  it('uses cmd /c start "" on Windows', () => expect(openerCommand(URL_, "win32")).toEqual({ command: "cmd", args: ["/c", "start", '""', URL_] }));
 });
 
 describe("openBrowser", () => {

@@ -21,7 +21,8 @@ export function parseStartArgs(argv: string[]): ParsedStartArgs {
         throw new Error("--port requires a non-negative integer value");
       }
       port = Number(value);
-    } else if (arg.startsWith("--")) {
+    } else if (arg.startsWith("-") && arg !== "-") {
+      // Any dash-prefixed token, short or long (`-p`, `-v`), is an option nobody handles — the CLI has no short flags.
       // Without this an unknown flag would be taken for a project directory,
       // and the daemon binds its port before it ever resolves projects — so
       // the failure would surface as a confusing path error on the wrong port.

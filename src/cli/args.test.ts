@@ -53,4 +53,9 @@ describe("parseStartArgs", () => {
   it("rejects an unknown option instead of taking it for a project directory", () => {
     expect(() => parseStartArgs(["--prot", "4799", "./proj"])).toThrow("Unknown option: --prot");
   });
+
+  it("rejects short options instead of taking them for project directories", () => {
+    expect(() => parseStartArgs(["-v"])).toThrow("Unknown option: -v");
+    expect(() => parseStartArgs(["-p", "4800"])).toThrow("Unknown option: -p");
+  });
 });

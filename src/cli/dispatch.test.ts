@@ -56,6 +56,20 @@ describe("dispatch: bare artisign", () => {
     expect(deps.runStart).not.toHaveBeenCalled();
   });
 
+  it("rejects a short option it does not know instead of starting a daemon", async () => {
+    for (const argv of [["-v"], ["-p", "4800"]]) {
+      const { deps } = fakeDeps();
+      await expect(dispatch(argv, ENTRY, deps)).rejects.toThrow(`Unknown option: ${argv[0]}`);
+      expect(deps.runStart).not.toHaveBeenCalled();
+    }
+  });
+
+  it("start -p is rejected the same way", async () => {
+    const { deps } = fakeDeps();
+    await expect(dispatch(["start", "-p", "4800"], ENTRY, deps)).rejects.toThrow("Unknown option: -p");
+    expect(deps.runStart).not.toHaveBeenCalled();
+  });
+
   it("-h and --help print usage and start nothing", async () => {
     for (const flag of ["-h", "--help"]) {
       const { deps, out } = fakeDeps();

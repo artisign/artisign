@@ -15,8 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `artisign start` opens the preview (`http://127.0.0.1:<port>/`) in the default
   browser once the daemon is healthy, also when it was already running. Skipped
   with `--no-open` or `ARTISIGN_NO_OPEN=1`, and when `CI` is set or stdout is not
-  a terminal. It uses the platform's own opener (`open`, `xdg-open`,
-  `cmd /c start`), adds no dependency, and when the opener fails only the URL is
+  a terminal. It uses the platform's own opener (`open` on macOS,
+  `xdg-open` on Linux), adds no dependency, and when the opener fails only the URL is
   printed. `serve`, `mcp`, `status`, `stop` and `init` never open a browser.
   (CHR-782)
 

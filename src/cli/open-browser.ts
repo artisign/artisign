@@ -6,7 +6,6 @@ type SpawnFn = (command: string, args: string[], options: SpawnOptions) => { on(
 /** The platform's own "open this URL" command — built-ins only, no dependency. */
 export function openerCommand(url: string, platform: NodeJS.Platform = process.platform): { command: string; args: string[] } {
   if (platform === "darwin") return { command: "open", args: [url] };
-  if (platform === "win32") return { command: "cmd", args: ["/c", "start", '""', url] };
   return { command: "xdg-open", args: [url] };
 }
 
@@ -17,7 +16,7 @@ export function openerCommand(url: string, platform: NodeJS.Platform = process.p
  */
 export function openBrowser(url: string, platform: NodeJS.Platform = process.platform, spawn: SpawnFn = nodeSpawn as SpawnFn): void {
   const { command, args } = openerCommand(url, platform);
-  const child = spawn(command, args, { detached: true, stdio: "ignore", windowsVerbatimArguments: platform === "win32" });
+  const child = spawn(command, args, { detached: true, stdio: "ignore" });
   child.on("error", () => {});
   child.unref();
 }

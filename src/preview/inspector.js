@@ -375,12 +375,22 @@ export function createInspectorPanel({ listEl, emptyEl, errorEl }, { getRendered
     return rows.get(focusedId).lastClickedDomId ?? focusedId;
   }
 
+  /** CHR-780 — the focused entry's "$ref · variant" label for the canvas outline, from the same entry the row badge reads; null for a plain element or when the outline sits on a descendant of the instance rather than the instance itself. */
+  function getFocusedLabel() {
+    if (!focusedId || !rows.has(focusedId)) return null;
+    const entry = entries.find((e) => e.id === focusedId);
+    if (!entry?.componentRef) return null;
+    const outlinedId = rows.get(focusedId).lastClickedDomId ?? focusedId;
+    if (outlinedId !== focusedId) return null;
+    return entry.variant ? `$${entry.componentRef} · ${entry.variant}` : `$${entry.componentRef}`;
+  }
+
   /** Every known model node id on the current screen — for resolving a canvas click's DOM id (see resolveModelId). */
   function getModelIds() {
     return modelIds;
   }
 
-  return { setEntries, setError, refreshExpanded, focusEntry, clearFocus, getFocusedDomId, getModelIds };
+  return { setEntries, setError, refreshExpanded, focusEntry, clearFocus, getFocusedDomId, getFocusedLabel, getModelIds };
 }
 
 /**
@@ -450,8 +460,9 @@ export function applyInspectMode(doc, enabled, { getModelIds, onSelect, onDesele
  * @param {HTMLElement} overlayEl
  * @param {Document | null} renderedDoc
  * @param {string | null} domId
+ * @param {string | null} [label] component tag drawn on the outline's top-left edge (CHR-780); style.css flips it inside the outline when `data-flip` is set, i.e. when there's no room above
  */
-export function updateInspectOverlay(overlayEl, renderedDoc, domId) {
+export function updateInspectOverlay(overlayEl, renderedDoc, domId, label = null) {
   const el = domId && renderedDoc ? renderedDoc.getElementById(domId) : null;
   if (!el) {
     overlayEl.hidden = true;
@@ -462,5 +473,22 @@ export function updateInspectOverlay(overlayEl, renderedDoc, domId) {
   overlayEl.style.top = `${Math.round(rect.top)}px`;
   overlayEl.style.width = `${Math.round(rect.width)}px`;
   overlayEl.style.height = `${Math.round(rect.height)}px`;
+  // The overlay sits inside the zoomed #screen-holder; the label counter-scales (style.css) to a constant on-screen size, so its room/width needs are in unscaled iframe px = on-screen px / zoom.
+  const zoom = parseFloat(overlayEl.parentElement?.style.getPropertyValue("--zoom") ?? "") || 1;
+  if (label) overlayEl.dataset.label = label;
+  else delete overlayEl.dataset.label;
+  if (rect.top < INSPECT_LABEL_ROOM_PX / zoom) overlayEl.dataset.flip = "";
+  else delete overlayEl.dataset.flip;
+  // A label scrolled partly above the viewport would be clipped at the holder's top: nudge it into view.
+  overlayEl.style.setProperty("--label-clamp", `${Math.max(0, -Math.round(rect.top))}px`);
+  // Overhangs the outline like devtools; right-aligns instead when it would cross the holder's right edge.
+  const labelWidth = label ? (label.length * INSPECT_LABEL_CHAR_PX + INSPECT_LABEL_PAD_PX) / zoom : 0;
+  if (label && rect.left + labelWidth > (overlayEl.parentElement?.clientWidth ?? Infinity)) overlayEl.dataset.alignRight = "";
+  else delete overlayEl.dataset.alignRight;
   overlayEl.hidden = false;
 }
+
+// On-screen px (style.css `#inspect-overlay[data-label]::after`): height the label needs above the outline before it flips inside, and a rough width estimate (0.65rem semibold ≈ 6.5px/char + padding) for the right-edge check.
+const INSPECT_LABEL_ROOM_PX = 22;
+const INSPECT_LABEL_CHAR_PX = 6.5;
+const INSPECT_LABEL_PAD_PX = 16;

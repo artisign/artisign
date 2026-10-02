@@ -1642,7 +1642,7 @@ function clearInspectFocus() {
 /** Keeps the canvas overlay in agreement with whatever the panel currently has focused (or hides it when nothing is) — called after anything that can change either side: a click, a list rebuild, or an iframe reload. */
 function syncInspectOverlay() {
   const domId = inspectorPanel.getFocusedDomId();
-  updateInspectOverlay(inspectOverlayEl, domId ? getRenderedDocForScreen(currentScreen) : null, domId);
+  updateInspectOverlay(inspectOverlayEl, domId ? getRenderedDocForScreen(currentScreen) : null, domId, inspectorPanel.getFocusedLabel());
 }
 
 /** @type {(rootId: string, text: string, onError: (message: string) => void) => void} */

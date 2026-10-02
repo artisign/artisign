@@ -64,6 +64,7 @@ export function applyCanvas({ canvasEl, holderEl, iframeEl, zoom }) {
   holderEl.style.width = `${width}px`;
   holderEl.style.height = `${height}px`;
   holderEl.style.transform = `scale(${scale})`;
+  holderEl.style.setProperty("--zoom", String(scale)); // overlay labels counter-scale with it (CHR-780)
   holderEl.style.left = `${Math.max(0, (availW - width * scale) / 2)}px`;
   holderEl.style.top = `${Math.max(0, (availH - height * scale) / 2)}px`;
 

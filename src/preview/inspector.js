@@ -375,12 +375,22 @@ export function createInspectorPanel({ listEl, emptyEl, errorEl }, { getRendered
     return rows.get(focusedId).lastClickedDomId ?? focusedId;
   }
 
+  /** CHR-780 — the focused entry's "$ref · variant" label for the canvas outline, from the same entry the row badge reads; null for a plain element or when the outline sits on a descendant of the instance rather than the instance itself. */
+  function getFocusedLabel() {
+    if (!focusedId || !rows.has(focusedId)) return null;
+    const entry = entries.find((e) => e.id === focusedId);
+    if (!entry?.componentRef) return null;
+    const outlinedId = rows.get(focusedId).lastClickedDomId ?? focusedId;
+    if (outlinedId !== focusedId) return null;
+    return entry.variant ? `$${entry.componentRef} · ${entry.variant}` : `$${entry.componentRef}`;
+  }
+
   /** Every known model node id on the current screen — for resolving a canvas click's DOM id (see resolveModelId). */
   function getModelIds() {
     return modelIds;
   }
 
-  return { setEntries, setError, refreshExpanded, focusEntry, clearFocus, getFocusedDomId, getModelIds };
+  return { setEntries, setError, refreshExpanded, focusEntry, clearFocus, getFocusedDomId, getFocusedLabel, getModelIds };
 }
 
 /**
@@ -450,8 +460,9 @@ export function applyInspectMode(doc, enabled, { getModelIds, onSelect, onDesele
  * @param {HTMLElement} overlayEl
  * @param {Document | null} renderedDoc
  * @param {string | null} domId
+ * @param {string | null} [label] component tag drawn on the outline's top-left edge (CHR-780); style.css flips it inside the outline when `data-flip` is set, i.e. when there's no room above
  */
-export function updateInspectOverlay(overlayEl, renderedDoc, domId) {
+export function updateInspectOverlay(overlayEl, renderedDoc, domId, label = null) {
   const el = domId && renderedDoc ? renderedDoc.getElementById(domId) : null;
   if (!el) {
     overlayEl.hidden = true;
@@ -462,5 +473,12 @@ export function updateInspectOverlay(overlayEl, renderedDoc, domId) {
   overlayEl.style.top = `${Math.round(rect.top)}px`;
   overlayEl.style.width = `${Math.round(rect.width)}px`;
   overlayEl.style.height = `${Math.round(rect.height)}px`;
+  if (label) overlayEl.dataset.label = label;
+  else delete overlayEl.dataset.label;
+  if (rect.top < INSPECT_LABEL_ROOM_PX) overlayEl.dataset.flip = "";
+  else delete overlayEl.dataset.flip;
   overlayEl.hidden = false;
 }
+
+// Height the label needs above the outline before it flips inside (style.css `#inspect-overlay[data-label]::after`).
+const INSPECT_LABEL_ROOM_PX = 22;

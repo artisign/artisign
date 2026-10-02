@@ -1412,6 +1412,32 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   display: none;
 }
 
+/* CHR-780 — component tag on the outline's top-left edge, devtools style; flips inside when the outline touches the canvas top (data-flip, set by updateInspectOverlay). */
+#inspect-overlay[data-label]::after {
+  content: attr(data-label);
+  position: absolute;
+  left: -3px;
+  bottom: calc(100% + 3px);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--color-accent);
+  color: var(--color-surface);
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: 3px 3px 0 0;
+}
+
+#inspect-overlay[data-label][data-flip]::after {
+  bottom: auto;
+  top: 0;
+  left: 0;
+  border-radius: 0 0 3px 0;
+}
+
 /* CHR-631 — follow mode's whole-screen write highlight, shown after
    write_html on the currently displayed screen ($activity-highlight's
    `write-screen` variant). Sized with `inset: 0`, not a copied bounding

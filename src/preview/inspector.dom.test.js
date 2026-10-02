@@ -6,8 +6,8 @@
 // jsdom doesn't compute — that part stays covered only by manual browser
 // verification. Here getRenderedDoc always returns null, exercising the
 // "waiting" fallback path instead of asserting on layout jsdom can't produce.
-import { describe, it, expect } from "vitest";
-import { createInspectorPanel } from "./inspector.js";
+import { describe, it, expect, beforeAll } from "vitest";
+import { createInspectorPanel, updateInspectOverlay } from "./inspector.js";
 
 function makePanel(getRenderedDoc = () => null) {
   const listEl = document.createElement("ul");
@@ -81,5 +81,60 @@ describe("createInspectorPanel", () => {
     expect(errorEl.hidden).toBe(false);
     expect(errorEl.textContent).toBe("boom");
     expect(emptyEl.hidden).toBe(true);
+  });
+});
+
+describe("inspect outline label (CHR-780)", () => {
+  beforeAll(() => {
+    Element.prototype.scrollIntoView ??= () => {}; // jsdom has none; focusEntry scrolls its row
+  });
+  const withInstance = [
+    ...entries,
+    { id: "card-1", tag: "div", componentRef: "product-card", variant: null, tokenRefs: [] },
+  ];
+
+  it("labels a component instance with its ref, and with ref · variant when it has one", () => {
+    const { panel } = makePanel();
+    panel.setEntries(withInstance, "home");
+    panel.focusEntry("card-1");
+    expect(panel.getFocusedLabel()).toBe("$product-card");
+    panel.focusEntry("btn-1");
+    expect(panel.getFocusedLabel()).toBe("$btn-primary · hover");
+  });
+
+  it("gives a plain element, a descendant outline and no focus no label", () => {
+    const { panel } = makePanel();
+    panel.setEntries(withInstance, "home");
+    expect(panel.getFocusedLabel()).toBeNull();
+    panel.focusEntry("root");
+    expect(panel.getFocusedLabel()).toBeNull();
+    panel.focusEntry("card-1", "card-1-title"); // outline is on a descendant, not the instance
+    expect(panel.getFocusedLabel()).toBeNull();
+  });
+});
+
+describe("updateInspectOverlay label", () => {
+  const doc = () => {
+    const d = document.implementation.createHTMLDocument("x");
+    d.body.innerHTML = '<div id="card-1"></div>';
+    return d;
+  };
+
+  it("sets and clears data-label as focus moves, and flips when there is no room above", () => {
+    const overlay = document.createElement("div");
+    updateInspectOverlay(overlay, doc(), "card-1", "$product-card · dark");
+    expect(overlay.dataset.label).toBe("$product-card · dark");
+    expect(overlay.hidden).toBe(false);
+    expect("flip" in overlay.dataset).toBe(true); // jsdom rect.top is 0 — no room above
+    updateInspectOverlay(overlay, doc(), "card-1", null);
+    expect("label" in overlay.dataset).toBe(false);
+  });
+
+  it("does not flip when the element sits low enough", () => {
+    const overlay = document.createElement("div");
+    const d = doc();
+    d.getElementById("card-1").getBoundingClientRect = () => ({ left: 0, top: 80, width: 10, height: 10 });
+    updateInspectOverlay(overlay, d, "card-1", "$x");
+    expect("flip" in overlay.dataset).toBe(false);
   });
 });

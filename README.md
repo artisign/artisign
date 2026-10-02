@@ -122,7 +122,7 @@ Daemon-level state — that config plus the `daemon.lock` holding the running pi
 | Bucket | Tool | Does |
 |---|---|---|
 | Reads | `get_guide` | The design methodology guide (`docs/agent-guide.md`), on demand. |
-| Reads | `get_project` | Screen list, design-system pointer, counts. Tiered, cold-start read; `tree` also carries each variant screen's `variant_of`/`variant_kind`. |
+| Reads | `get_project` | Screen list, design-system pointer, counts. Tiered, cold-start read; `tree` also carries each screen's `viewport` (`{ width, height, declared }` — the frame it renders at, 390×844 when the root declares no px width) and each variant screen's `variant_of`/`variant_kind`. |
 | Reads | `get_screen` | One screen with comment/flow indicators. Tiered + field selection; `full` adds its direct `variants` and `reached_from`. |
 | Reads | `get_node` | Subtree of one node, addressed as `<screen>.<node-id>`. Tiered + field selection. |
 | Reads | `get_design_system` | Tokens, components (with variants and the default variant's slot names), and patterns. `tree` carries every token value, grouped by bucket. |

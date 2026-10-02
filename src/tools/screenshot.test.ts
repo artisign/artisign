@@ -180,9 +180,11 @@ describe("getScreenshot — node/screen validation (no browser needed)", () => {
   });
 
   it("rejects width given together with screen", async () => {
-    await expect(getScreenshot(fx.store, { screen: "home", width: 500 })).rejects.toMatchObject({
-      code: "validation_failed",
-    });
+    const err = await getScreenshot(fx.store, { screen: "home", width: 500 }).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: "validation_failed" });
+    // The message must point at the fix — the root's declared width — not just say "no".
+    expect((err as Error).message).toMatch(/root/);
+    expect((err as Error).message).toMatch(/390x844/);
   });
 
   it("rejects a non-finite width for a mockup before the browser is touched", async () => {

@@ -95,7 +95,7 @@ export const TOOLS: ToolDefinition[] = [
   // Reads ---------------------------------------------------------------
   tool(
     "get_project",
-    "Project root: screen list, design-system pointer, counts. Tiered, cold-start read. view \"tree\" marks a variant screen with variant_of/variant_kind. fields: [\"reuse\"] adds design-system reuse coverage (component/token, project-wide and per screen) plus unused components/tokens and the lowest-reuse screens.",
+    "Project root: screen list, design-system pointer, counts. Tiered, cold-start read. view \"tree\" marks a variant screen with variant_of/variant_kind and gives each screen its viewport {width, height, declared} — declared: false means the root declares no px width and the 390x844 phone default applies. fields: [\"reuse\"] adds design-system reuse coverage (component/token, project-wide and per screen) plus unused components/tokens and the lowest-reuse screens.",
     { view: viewSchema.optional(), fields: z.array(z.string()).optional(), tags: z.array(z.string()).optional() },
     (store, input) => getProject(store, input),
   ),
@@ -345,7 +345,9 @@ export const TOOLS: ToolDefinition[] = [
       "(\"<screen>.<node-id>\", must belong to screen and not valid with mockup) to clip to just that element " +
       "plus 8px padding — far fewer vision tokens than a full screen when iterating on one component. A " +
       "component:<name>#<variant>.<node-id> / pattern:<name>.<node-id> ref renders that definition standalone " +
-      "and stands alone — it takes neither screen nor mockup. For a mockup, " +
+      "and stands alone — it takes neither screen nor mockup. A screen renders at its root element's declared " +
+      "width/height (e.g. style=\"width: 1440px; height: 900px\" on the root, or $tokens), 390x844 when undeclared — " +
+      "change the root to change the frame; width is not accepted with screen. For a mockup, " +
       "width sets the viewport (default 390, height fixed 844) and the capture is always full-page, uncropped, " +
       "since a variant can run taller than the fold. Requires Playwright " +
       "(npm install playwright && npx playwright install chromium); scale defaults to 1x, higher scales cost more " +

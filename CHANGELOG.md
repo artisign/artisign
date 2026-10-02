@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `get_project` at `view: "tree"`/`"full"`: every screen entry carries
+  `viewport: { width, height, declared }` — the frame it renders at.
+  `declared: false` means the root declares no px width and the 390×844 phone
+  default applies. (CHR-766)
+
+### Changed
+
+- Screen size is now documented where agents look: the MCP instructions, the
+  `get_screenshot` description and the agent guide (new "Screen size"
+  section) explain that a screen renders at its root's declared
+  `width`/`height`, default 390×844. `get_screenshot {screen, width}` still
+  fails, but the error now names that fix. Agents redesigning a desktop app
+  no longer read the phone default as "Artisign is mobile-only". (CHR-766)
+
 ## [1.1.2] - 2026-10-01
 
 ### Fixed

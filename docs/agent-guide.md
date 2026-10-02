@@ -26,6 +26,41 @@ discipline in copying values.
 
 Do not read full screens upfront. Load detail lazily with tiered reads.
 
+## Screen size
+
+**A screen renders at its root element's declared `width`/`height`.** That
+size is the screen's frame in `get_screenshot` and `inspect_node`. A root
+without a px width (plain or via a `$token`) falls back to **390×844, a
+phone**. Nothing about Artisign is mobile-only; the default is just a
+default. Declare it on the screen's own root element — a width inside a
+component definition the root instantiates (`class="$app-shell"`) does not
+count.
+
+Decide the target platform before the first screen, and declare it on every
+root — as a token, so all screens share one frame:
+
+- **Redesigning an existing product:** match its real platform. A desktop web
+  app gets a desktop frame and its desktop layout (sidebars, multi-column
+  grids) — never a single-column phone stack because nothing said otherwise.
+- **New product:** ask, or take it from the brief.
+
+```html
+<!-- tokens: size.viewport_w = "1440px", size.viewport_h = "900px" -->
+<div id="dashboard-root"
+     style="width: $size.viewport_w; height: $size.viewport_h; background: $color.bg">
+  …
+</div>
+```
+
+Declare the height too: a screen's `get_screenshot` captures exactly that
+frame, not the full page — without a height it is cut at 844px.
+
+`get_screenshot` has no `width` for screens (that parameter is for mockups
+only) — change the root's width instead. `get_project` at `view: "tree"`
+reports each screen's `viewport` as `{ width, height, declared }`;
+`declared: false` means the 390px default is in effect, which is almost
+always a mistake on a desktop product.
+
 ## Empty project: system first, exploration allowed
 
 On a fresh project the order is: **tokens → base components → screens.**

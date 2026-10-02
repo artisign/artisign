@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-10-02
+
 ### Added
 
 - `get_project` at `view: "tree"`/`"full"`: every screen entry carries

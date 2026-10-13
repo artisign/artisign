@@ -162,7 +162,6 @@ async function captureNode(
   nodeId: string,
   nodeRef: string,
   viewport: { width: number; height: number },
-  scale: number,
 ): Promise<ScreenshotResult> {
   const box = (await page.evaluate(nodeBoxScript(nodeId))) as ClipRect | null;
   if (!box) {
@@ -180,11 +179,19 @@ async function captureNode(
       height: Math.max(viewport.height, neededHeight),
     });
   }
-  const buffer = await page.screenshot({ clip });
+  return pngResult(await page.screenshot({ clip }), browser);
+}
+
+/**
+ * width/height come straight from the PNG header (IHDR, bytes 16-23):
+ * engines round a fractional clip differently (Chromium rounds, Firefox
+ * truncates), so the image itself is the only exact source.
+ */
+function pngResult(buffer: Buffer, browser: Browser): ScreenshotResult {
   return {
     __image: { data: buffer.toString("base64"), mimeType: "image/png" },
-    width: Math.round(clip.width * scale),
-    height: Math.round(clip.height * scale),
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
     browser: browser.name,
   };
 }
@@ -214,14 +221,8 @@ async function screenshotScreen(
   const { documentHtml, viewport } = await renderScreenForBrowser(store, screen);
 
   return withPage(documentHtml, viewport, scale, kind, async (page, browser) => {
-    if (nodeId) return captureNode(page, browser, nodeId, nodeRef!, viewport, scale);
-    const buffer = await page.screenshot();
-    return {
-      __image: { data: buffer.toString("base64"), mimeType: "image/png" },
-      width: Math.round(viewport.width * scale),
-      height: Math.round(viewport.height * scale),
-      browser: browser.name,
-    };
+    if (nodeId) return captureNode(page, browser, nodeId, nodeRef!, viewport);
+    return pngResult(await page.screenshot(), browser);
   });
 }
 
@@ -240,7 +241,7 @@ async function screenshotDefinition(
 ): Promise<ScreenshotResult> {
   const { documentHtml, viewport } = await renderDefinitionForBrowser(store, ref);
   const nodeRef = formatNodeRef(ref.address, ref.nodeId);
-  return withPage(documentHtml, viewport, scale, kind, (page, browser) => captureNode(page, browser, ref.nodeId, nodeRef, viewport, scale));
+  return withPage(documentHtml, viewport, scale, kind, (page, browser) => captureNode(page, browser, ref.nodeId, nodeRef, viewport));
 }
 
 const DEFAULT_MOCKUP_WIDTH = 390;
@@ -274,18 +275,8 @@ async function screenshotMockup(
 
   const viewport = { width, height: MOCKUP_VIEWPORT_HEIGHT };
   return withPage(documentHtml, viewport, scale, kind, async (page, browser) => {
-    const buffer = await page.screenshot({ fullPage: true });
     // Full-page content can be taller (or, for a desktop-width variant,
-    // wider) than the viewport — report the document's actual size so
-    // width/height describe the PNG that was actually returned.
-    const content = (await page.evaluate(
-      "({ width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight })",
-    )) as { width: number; height: number };
-    return {
-      __image: { data: buffer.toString("base64"), mimeType: "image/png" },
-      width: Math.round(Math.max(content.width || 0, viewport.width) * scale),
-      height: Math.round(Math.max(content.height || 0, viewport.height) * scale),
-      browser: browser.name,
-    };
+    // wider) than the viewport; pngResult reports the size actually captured.
+    return pngResult(await page.screenshot({ fullPage: true }), browser);
   });
 }

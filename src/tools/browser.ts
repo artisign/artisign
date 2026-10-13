@@ -35,6 +35,8 @@ export type Browser = {
   name: string;
   newContext(options: { viewport: Viewport; deviceScaleFactor: number }): Promise<BrowserContext>;
   close(): Promise<void>;
+  /** Resolves once the browser process is gone — closed, crashed or killed — so it is never reused. */
+  disconnected: Promise<void>;
 };
 
 export const BROWSER_KINDS = ["chrome", "edge", "brave", "chromium", "firefox"] as const;
@@ -210,6 +212,8 @@ const FIREFOX_PREFS = [
   // Light content regardless of the OS theme (0 = dark, 1 = light), matching the Chromium path.
   'user_pref("layout.css.prefers-color-scheme.content-override", 1);',
   'user_pref("ui.systemUsesDarkTheme", 0);',
+  // Overlay scrollbars take no layout space — the counterpart of Chromium's --hide-scrollbars.
+  'user_pref("ui.useOverlayScrollbars", 1);',
 ].join("\n");
 
 /**
@@ -317,6 +321,22 @@ function killAndWait(child: ChildProcess): Promise<void> {
   });
 }
 
+/** Resolves when `child` has exited. */
+function exited(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise((resolve) => child.once("exit", () => resolve()));
+}
+
+/** Runs a post-spawn launch step; if it fails, the already running browser is killed instead of leaking. */
+async function killOnFailure<T>(child: ChildProcess, step: () => Promise<T>): Promise<T> {
+  try {
+    return await step();
+  } catch (err) {
+    await killAndWait(child);
+    throw err;
+  }
+}
+
 /**
  * Profile directories are named `<pid>-<uuid>`. A process that died without
  * its exit handler finishing (SIGKILL, crash) leaves its directory behind;
@@ -370,6 +390,11 @@ class Connection {
   }
 
   send(message: Record<string, unknown>): Promise<unknown> {
+    // WebSocket.send on a closed socket is a silent no-op: fail now instead
+    // of waiting out the command timeout.
+    if (this.ws.readyState !== WebSocket.OPEN) {
+      return Promise.reject(new Error("browser connection closed"));
+    }
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -450,7 +475,7 @@ async function launchCdp(installed: InstalledBrowser, profile: string): Promise<
     CDP_LISTENING_PATTERN,
     profile,
   );
-  const conn = await Connection.open(wsUrl);
+  const conn = await killOnFailure(child, () => Connection.open(wsUrl));
   const cdp = (
     method: string,
     params: Record<string, unknown> = {},
@@ -460,11 +485,14 @@ async function launchCdp(installed: InstalledBrowser, profile: string): Promise<
       Record<string, unknown>
     >;
 
-  const version = (await cdp("Browser.getVersion")) as { product?: string };
+  const version = (await killOnFailure(child, () => cdp("Browser.getVersion"))) as {
+    product?: string;
+  };
   const versionNumber = version.product?.split("/")[1] ?? "";
 
   return {
     name: `${LABELS[installed.kind]} ${versionNumber}`.trim(),
+    disconnected: exited(child),
     async newContext({ viewport, deviceScaleFactor }) {
       const { browserContextId } = (await cdp("Target.createBrowserContext", {
         disposeOnDetach: true,
@@ -479,14 +507,13 @@ async function launchCdp(installed: InstalledBrowser, profile: string): Promise<
             targetId,
             flatten: true,
           })) as { sessionId: string };
-          let current = viewport;
           const setMetrics = (size: Viewport): Promise<unknown> =>
             cdp(
               "Emulation.setDeviceMetricsOverride",
               { width: size.width, height: size.height, deviceScaleFactor, mobile: false },
               sessionId,
             );
-          await setMetrics(current);
+          await setMetrics(viewport);
           // Render light regardless of the OS theme, as the preview baseline
           // does — a dark OS otherwise paints the blank canvas dark.
           await cdp(
@@ -536,7 +563,6 @@ async function launchCdp(installed: InstalledBrowser, profile: string): Promise<
               return Buffer.from(data, "base64");
             },
             async setViewportSize(size) {
-              current = size;
               await setMetrics(size);
             },
           };
@@ -592,19 +618,20 @@ async function launchBidi(installed: InstalledBrowser, profile: string): Promise
     BIDI_LISTENING_PATTERN,
     profile,
   );
-  const conn = await Connection.open(`${wsUrl}/session`);
+  const conn = await killOnFailure(child, () => Connection.open(`${wsUrl}/session`));
   const bidi = (
     method: string,
     params: Record<string, unknown> = {},
   ): Promise<Record<string, unknown>> =>
     conn.send({ method, params }) as Promise<Record<string, unknown>>;
 
-  const session = (await bidi("session.new", { capabilities: {} })) as {
+  const session = (await killOnFailure(child, () => bidi("session.new", { capabilities: {} }))) as {
     capabilities?: { browserVersion?: string };
   };
 
   return {
     name: `${LABELS[installed.kind]} ${session.capabilities?.browserVersion ?? ""}`.trim(),
+    disconnected: exited(child),
     async newContext({ viewport, deviceScaleFactor }) {
       const { userContext } = (await bidi("browser.createUserContext")) as { userContext: string };
       return {
@@ -721,8 +748,19 @@ export async function getBrowser(kind?: BrowserKind): Promise<Browser> {
   const installed = select(kind);
   let pending = browsers.get(installed.executable);
   if (!pending) {
-    pending = launcher(installed);
-    browsers.set(installed.executable, pending);
+    const launched = launcher(installed);
+    pending = launched;
+    browsers.set(installed.executable, launched);
+    // A browser that crashes or is killed later must not stay cached — the
+    // next call launches a fresh one instead of talking to a dead socket.
+    launched.then(
+      (browser) =>
+        browser.disconnected.then(() => {
+          if (browsers.get(installed.executable) === launched)
+            browsers.delete(installed.executable);
+        }),
+      () => {},
+    );
   }
   try {
     return await pending;

@@ -10,11 +10,13 @@ import { renderScreenForBrowser, renderDefinitionForBrowser } from "./render-con
 import { parseNodeRef } from "./node-ref.js";
 import { findFillById } from "./patch.js";
 import { ToolError } from "./types.js";
-import { getBrowser } from "./browser.js";
+import { getBrowser, type BrowserKind } from "./browser.js";
 
 export type InspectNodeInput = {
   /** Node ref, `"<screen>.<node-id>"` — same addressing as every other tool. */
   node: string;
+  /** Which installed browser measures the node (cross-browser check); default is the first one discovered. */
+  browser?: BrowserKind;
 };
 
 export type NodeBox = { x: number; y: number; width: number; height: number };
@@ -37,6 +39,8 @@ export type NodeComputedStyles = {
 export type InspectNodeResult = {
   box: NodeBox;
   styles: NodeComputedStyles;
+  /** Browser name and version that measured the node — engines differ slightly in layout. */
+  browser: string;
 };
 
 /**
@@ -94,12 +98,11 @@ export async function inspectNode(store: Store, input: InspectNodeInput): Promis
     throw new ToolError("not_found", `node "${input.node}" was not found`);
   }
 
-  const browser = await getBrowser();
+  const browser = await getBrowser(input.browser);
   const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
   try {
     const page = await context.newPage();
     await page.setContent(documentHtml);
-    await page.evaluate("document.fonts.ready");
 
     const result = (await page.evaluate(buildInspectScript(nodeId))) as PageInspectResult;
     if (!result) {
@@ -117,6 +120,7 @@ export async function inspectNode(store: Store, input: InspectNodeInput): Promis
         height: round(result.box.height),
       },
       styles,
+      browser: browser.name,
     };
   } finally {
     await context.close();

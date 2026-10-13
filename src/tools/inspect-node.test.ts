@@ -2,23 +2,15 @@ import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { mkdtemp, rm, cp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createRequire } from "node:module";
 import { setupProject, estimateTokens, type ProjectFixture } from "./test-fixtures.js";
 import { inspectNode } from "./inspect-node.js";
-import { PLAYWRIGHT_MISSING_MESSAGE } from "./browser.js";
-import { __setPlaywrightImportForTests, __resetBrowserForTests } from "./browser.js";
+import { NO_BROWSER_MESSAGE, BROWSER_ENV, discoverBrowsers, selectBrowser } from "./browser.js";
+import { __setBrowserForTests, __resetBrowserForTests } from "./browser.js";
 import { FsStore } from "../store/index.js";
 import { ToolError } from "./types.js";
 
-const require = createRequire(import.meta.url);
-
-function isPlaywrightAvailable(): boolean {
-  try {
-    require.resolve("playwright");
-    return true;
-  } catch {
-    return false;
-  }
+function isBrowserAvailable(): boolean {
+  return Boolean(process.env[BROWSER_ENV]) || discoverBrowsers().length > 0;
 }
 
 describe("inspectNode — validation (no browser needed)", () => {
@@ -59,7 +51,7 @@ describe("inspectNode — validation (no browser needed)", () => {
   });
 });
 
-describe("inspectNode — missing Playwright", () => {
+describe("inspectNode — no usable browser", () => {
   let fx: ProjectFixture;
 
   beforeEach(async () => {
@@ -68,20 +60,20 @@ describe("inspectNode — missing Playwright", () => {
   });
   afterEach(() => {
     fx.cleanup();
-    __setPlaywrightImportForTests(undefined);
+    __setBrowserForTests(undefined);
   });
 
-  it("throws a ToolError naming the install command when playwright can't be imported", async () => {
-    __setPlaywrightImportForTests(() => Promise.reject(new Error("Cannot find module 'playwright'")));
+  it("throws a ToolError naming the remedy when no browser is installed", async () => {
+    __setBrowserForTests({ select: (kind) => selectBrowser(kind, { platform: "linux", env: { PATH: "/usr/bin" }, exists: () => false }) });
 
     await expect(inspectNode(fx.store, { node: "home.n1" })).rejects.toMatchObject({
       code: "io_error",
-      message: PLAYWRIGHT_MISSING_MESSAGE,
+      message: NO_BROWSER_MESSAGE,
     });
   });
 });
 
-describe.skipIf(!isPlaywrightAvailable())("inspectNode — e2e (real Chromium)", () => {
+describe.skipIf(!isBrowserAvailable())("inspectNode — e2e (installed browser)", () => {
   let dir: string;
   let store: FsStore;
 
@@ -95,8 +87,8 @@ describe.skipIf(!isPlaywrightAvailable())("inspectNode — e2e (real Chromium)",
     await rm(dir, { recursive: true, force: true });
   });
 
-  afterAll(() => {
-    __setPlaywrightImportForTests(undefined);
+  afterAll(async () => {
+    await __resetBrowserForTests();
   });
 
   it(
@@ -158,50 +150,6 @@ describe.skipIf(!isPlaywrightAvailable())("inspectNode — e2e (real Chromium)",
     async () => {
       const result = await inspectNode(store, { node: "welcome.n4" });
       expect(estimateTokens(result)).toBeLessThanOrEqual(400);
-    },
-    30_000,
-  );
-});
-
-// Same fd-3/4 fallback story as get_screenshot — inspect_node
-// shares the launch path via browser.ts, so a single smoke test here is
-// enough; the exhaustive fallback coverage lives in screenshot.test.ts.
-// Runs on CI too: the manual spawn passes `--no-sandbox` (see
-// MANUAL_LAUNCH_ARGS in browser.ts), so a sandboxed Linux runner — the kind of
-// host the fallback exists for — is exactly where this has to keep passing.
-describe.skipIf(!isPlaywrightAvailable())("inspectNode — fallback launch (real Chromium)", () => {
-  let dir: string;
-  let store: FsStore;
-
-  beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "artisign-inspect-node-fallback-e2e-"));
-    await cp(join(process.cwd(), "src", "tools", "__fixtures__", "notes-app"), dir, { recursive: true });
-    store = new FsStore(dir);
-    await __resetBrowserForTests();
-  });
-
-  afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
-    __setPlaywrightImportForTests(undefined);
-    await __resetBrowserForTests();
-  });
-
-  it(
-    "falls back to a manually spawned, CDP-connected Chromium when the primary launch rejects",
-    async () => {
-      const real = require("playwright");
-      __setPlaywrightImportForTests(() =>
-        Promise.resolve({
-          chromium: {
-            launch: () => Promise.reject(new Error("spawn EBADF")),
-            executablePath: () => real.chromium.executablePath(),
-            connectOverCDP: (wsEndpoint: string) => real.chromium.connectOverCDP(wsEndpoint),
-          },
-        }),
-      );
-
-      const result = await inspectNode(store, { node: "welcome.n4" });
-      expect(result.box.width).toBeGreaterThan(0);
     },
     30_000,
   );

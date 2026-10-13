@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { mkdtemp, rm, cp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createRequire } from "node:module";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import {
   getScreenshot,
@@ -10,24 +9,17 @@ import {
   computeNodeClip,
   clampWidth,
   NODE_SCREENSHOT_PADDING_PX,
-  __setPlaywrightImportForTests,
+  __setBrowserForTests,
   __resetBrowserForTests,
 } from "./screenshot.js";
-import { PLAYWRIGHT_MISSING_MESSAGE, PLAYWRIGHT_DIR_ENV, resolvePlaywrightSpecifier } from "./browser.js";
-import { mkdir, writeFile } from "node:fs/promises";
+import { NO_BROWSER_MESSAGE, discoverBrowsers, selectBrowser, BROWSER_ENV } from "./browser.js";
 import { parseScreen, loadRegistry } from "../model/index.js";
 import { FsStore } from "../store/index.js";
 import { ToolError } from "./types.js";
 
-const require = createRequire(import.meta.url);
-
-function isPlaywrightAvailable(): boolean {
-  try {
-    require.resolve("playwright");
-    return true;
-  } catch {
-    return false;
-  }
+/** The real-browser suites run wherever a supported browser is installed (CI: Chrome and Firefox). */
+function isBrowserAvailable(): boolean {
+  return Boolean(process.env[BROWSER_ENV]) || discoverBrowsers().length > 0;
 }
 
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -224,57 +216,58 @@ describe("getScreenshot — node/screen validation (no browser needed)", () => {
   });
 });
 
-describe("getScreenshot — missing Playwright", () => {
+describe("getScreenshot — no usable browser", () => {
   let fx: ProjectFixture;
 
   beforeEach(async () => {
     fx = await setupProject();
     await fx.store.writeScreen("home", `<div id="n1"></div>`);
   });
-  afterEach(() => {
+  afterEach(async () => {
     fx.cleanup();
-    __setPlaywrightImportForTests(undefined);
-  });
-
-  it("throws a ToolError naming a working install route when playwright can't be imported", async () => {
-    __setPlaywrightImportForTests(() => Promise.reject(new Error("Cannot find module 'playwright'")));
-
-    await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toMatchObject({
-      code: "io_error",
-      message: PLAYWRIGHT_MISSING_MESSAGE,
-    });
-    await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toBeInstanceOf(ToolError);
-    // The command has to be the one that works in a checkout: a plain
-    // `npm install playwright` is a no-op against an optional peer on some npm
-    // versions and edits package.json on the others (CHR-576).
-    expect(PLAYWRIGHT_MISSING_MESSAGE).toContain("npm install --no-save playwright && npx playwright install chromium");
-    expect(PLAYWRIGHT_MISSING_MESSAGE).toContain(PLAYWRIGHT_DIR_ENV);
-  });
-
-  // A half-reaped symlink or a partial copy still *imports* — as a module
-  // without `chromium`, or one whose `chromium` has no `launch`. Before the
-  // usability check that surfaced as a raw TypeError from inside the launch
-  // path; it has to be the same clean, actionable ToolError as the absent case.
-  it.each([
-    ["an empty module", {}],
-    ["a module whose chromium has no launch", { chromium: { executablePath: () => "/x", connectOverCDP: () => Promise.reject(new Error("x")) } }],
-    ["a module whose chromium has no executablePath", { chromium: { launch: () => Promise.reject(new Error("x")), connectOverCDP: () => Promise.reject(new Error("x")) } }],
-  ])("throws a clean ToolError, not a TypeError, for %s", async (_label, partial) => {
-    __setPlaywrightImportForTests(() => Promise.resolve(partial as never));
-
-    const err = await getScreenshot(fx.store, { screen: "home" }).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(ToolError);
-    expect(err).toMatchObject({ code: "io_error", message: expect.stringMatching(/Playwright is installed but unusable/) });
-    expect((err as Error).message).toContain("restart the Artisign daemon");
-    expect((err as Error).message).not.toMatch(/Cannot read properties/);
+    __setBrowserForTests(undefined);
     await __resetBrowserForTests();
   });
 
-  it("does not cache the failure: a later call re-imports and succeeds once playwright is there", async () => {
+  it("throws a ToolError naming the remedy when no browser is installed", async () => {
+    __setBrowserForTests({ select: (kind) => selectBrowser(kind, { platform: "linux", env: { PATH: "/usr/bin" }, exists: () => false }) });
+
+    await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toMatchObject({
+      code: "io_error",
+      message: NO_BROWSER_MESSAGE,
+    });
+    await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toBeInstanceOf(ToolError);
+    expect(NO_BROWSER_MESSAGE).toContain(BROWSER_ENV);
+  });
+
+  it("names the installed alternatives when the requested browser is missing", async () => {
+    __setBrowserForTests({
+      select: (kind) =>
+        selectBrowser(kind, { platform: "linux", env: { PATH: "/usr/bin" }, exists: (path) => path === "/usr/bin/google-chrome" }),
+    });
+
+    await expect(getScreenshot(fx.store, { screen: "home", browser: "firefox" })).rejects.toMatchObject({
+      code: "not_found",
+      message: expect.stringContaining("available: chrome"),
+    });
+  });
+
+  it("wraps a failed launch in a single ToolError naming the browser and the executable", async () => {
+    __setBrowserForTests({ select: () => ({ kind: "chrome", executable: "/nonexistent/artisign-test/chrome" }) });
+
+    const err = await getScreenshot(fx.store, { screen: "home" }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ToolError);
+    expect(err).toMatchObject({ code: "io_error", message: expect.stringContaining("Could not start Chrome (/nonexistent/artisign-test/chrome)") });
+  });
+
+  it("does not cache a failed launch: the next call launches again", async () => {
     let calls = 0;
-    __setPlaywrightImportForTests(() => {
-      calls += 1;
-      return Promise.reject(new Error("Cannot find module 'playwright'"));
+    __setBrowserForTests({
+      select: () => ({ kind: "chrome", executable: "/fake/chrome" }),
+      launch: () => {
+        calls += 1;
+        return Promise.reject(new ToolError("io_error", "launch failed"));
+      },
     });
     await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toMatchObject({ code: "io_error" });
     await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toMatchObject({ code: "io_error" });
@@ -282,122 +275,7 @@ describe("getScreenshot — missing Playwright", () => {
   });
 });
 
-describe("resolvePlaywrightSpecifier — ARTISIGN_PLAYWRIGHT_DIR", () => {
-  it("resolves the bare specifier when the variable is unset or blank", () => {
-    expect(resolvePlaywrightSpecifier({})).toBe("playwright");
-    expect(resolvePlaywrightSpecifier({ [PLAYWRIGHT_DIR_ENV]: "   " })).toBe("playwright");
-  });
-
-  it("resolves playwright from the named directory's own node_modules, as a file URL", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "artisign-pw-dir-"));
-    try {
-      const pkgDir = join(dir, "node_modules", "playwright");
-      await mkdir(pkgDir, { recursive: true });
-      await writeFile(join(pkgDir, "package.json"), JSON.stringify({ name: "playwright", main: "index.js" }));
-      await writeFile(join(pkgDir, "index.js"), "module.exports = {};");
-
-      const spec = resolvePlaywrightSpecifier({ [PLAYWRIGHT_DIR_ENV]: dir });
-      expect(spec.startsWith("file://")).toBe(true);
-      expect(spec).toContain("/node_modules/playwright/index.js");
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
-
-  it("names the directory and the fix when it holds no playwright", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "artisign-pw-empty-"));
-    try {
-      expect(() => resolvePlaywrightSpecifier({ [PLAYWRIGHT_DIR_ENV]: dir })).toThrowError(
-        expect.objectContaining({ code: "io_error", message: expect.stringContaining(dir) }),
-      );
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
-});
-
-describe("getScreenshot — primary and fallback launch both fail", () => {
-  let fx: ProjectFixture;
-
-  beforeEach(async () => {
-    fx = await setupProject();
-    await fx.store.writeScreen("home", `<div id="n1"></div>`);
-  });
-  afterEach(async () => {
-    fx.cleanup();
-    __setPlaywrightImportForTests(undefined);
-    await __resetBrowserForTests();
-  });
-
-  it("wraps both error messages in a single ToolError instead of propagating either raw", async () => {
-    __setPlaywrightImportForTests(() =>
-      Promise.resolve({
-        chromium: {
-          launch: () => Promise.reject(new Error("spawn EBADF")),
-          executablePath: () => {
-            throw new Error("no bundled chromium found");
-          },
-          connectOverCDP: () => Promise.reject(new Error("unreachable")),
-        },
-      }),
-    );
-
-    await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toMatchObject({
-      code: "io_error",
-      message: expect.stringMatching(/spawn EBADF/),
-    });
-    await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toMatchObject({
-      message: expect.stringMatching(/no bundled chromium found/),
-    });
-    await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toBeInstanceOf(ToolError);
-  });
-});
-
-describe("getScreenshot — playwright installed but its browser was never downloaded", () => {
-  let fx: ProjectFixture;
-
-  beforeEach(async () => {
-    fx = await setupProject();
-    await fx.store.writeScreen("home", `<div id="n1"></div>`);
-  });
-  afterEach(async () => {
-    fx.cleanup();
-    __setPlaywrightImportForTests(undefined);
-    await __resetBrowserForTests();
-  });
-
-  // A separate failure from "playwright isn't installed" and from
-  // the fd-3/4 EBADF case the manual fallback exists for. Spawning a
-  // non-existent executable would only bury the actual remedy under a second
-  // error, so this case never reaches the fallback.
-  it("names the browser download command and doesn't attempt the manual fallback", async () => {
-    let executablePathCalls = 0;
-    __setPlaywrightImportForTests(() =>
-      Promise.resolve({
-        chromium: {
-          launch: () =>
-            Promise.reject(
-              new Error("browserType.launch: Executable doesn't exist at /cache/ms-playwright/chromium-1091/chrome-mac/Chromium"),
-            ),
-          executablePath: () => {
-            executablePathCalls += 1;
-            return "/cache/ms-playwright/chromium-1091/chrome-mac/Chromium";
-          },
-          connectOverCDP: () => Promise.reject(new Error("unreachable")),
-        },
-      }),
-    );
-
-    await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toMatchObject({
-      code: "io_error",
-      message: "Playwright is installed but its browser is missing. Run: npx playwright install chromium",
-    });
-    await expect(getScreenshot(fx.store, { screen: "home" })).rejects.toBeInstanceOf(ToolError);
-    expect(executablePathCalls).toBe(0);
-  });
-});
-
-describe.skipIf(!isPlaywrightAvailable())("getScreenshot — e2e (real Chromium)", () => {
+describe.skipIf(!isBrowserAvailable())("getScreenshot — e2e (installed browser)", () => {
   let dir: string;
   let store: FsStore;
 
@@ -411,9 +289,32 @@ describe.skipIf(!isPlaywrightAvailable())("getScreenshot — e2e (real Chromium)
     await rm(dir, { recursive: true, force: true });
   });
 
-  afterAll(() => {
-    __setPlaywrightImportForTests(undefined);
+  afterAll(async () => {
+    await __resetBrowserForTests();
   });
+
+  it(
+    "names the browser that rendered it and returns a PNG of exactly the reported size",
+    async () => {
+      for (const input of [
+        { screen: "welcome" },
+        { screen: "welcome", scale: 2 },
+        { screen: "welcome", node: "welcome.n4" },
+        { mockup: "welcome-hero", variant: "bold" },
+        { mockup: "welcome-hero", variant: "bold", width: 1200 },
+      ]) {
+        const result = await getScreenshot(store, input);
+        expect(result.browser).toMatch(/^(Chrome|Edge|Brave|Chromium|Firefox) \d/);
+        const buffer = Buffer.from(result.__image.data, "base64");
+        // IHDR: width and height as big-endian uint32 at bytes 16 and 20.
+        expect({ width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) }).toEqual({
+          width: result.width,
+          height: result.height,
+        });
+      }
+    },
+    60_000,
+  );
 
   it(
     "screenshots the full screen as a PNG matching the fallback viewport",
@@ -497,57 +398,6 @@ describe.skipIf(!isPlaywrightAvailable())("getScreenshot — e2e (real Chromium)
       // 100x50 node + 8px padding on every side.
       expect(result.width).toBe(116);
       expect(result.height).toBe(66);
-    },
-    30_000,
-  );
-});
-
-// Some MCP hosts spawn this server with only fds 0/1/2 available,
-// which makes the primary `pw.chromium.launch()` (5-fd pipe transport) fail
-// with `spawn EBADF` — not reproducible from a plain Node child process, so
-// this forces the primary launch to fail and asserts the fallback (manual
-// spawn + connectOverCDP, clean 3-fd stdio) still produces a screenshot.
-// Runs on CI too: the manual spawn passes `--no-sandbox` (see
-// MANUAL_LAUNCH_ARGS in browser.ts), so a sandboxed Linux runner — the kind of
-// host the fallback exists for — is exactly where this has to keep passing.
-describe.skipIf(!isPlaywrightAvailable())("getScreenshot — fallback launch (real Chromium)", () => {
-  let dir: string;
-  let store: FsStore;
-
-  beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "artisign-screenshot-fallback-e2e-"));
-    await cp(join(process.cwd(), "src", "tools", "__fixtures__", "notes-app"), dir, { recursive: true });
-    store = new FsStore(dir);
-    await __resetBrowserForTests();
-  });
-
-  afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
-    __setPlaywrightImportForTests(undefined);
-    await __resetBrowserForTests();
-  });
-
-  it(
-    "falls back to a manually spawned, CDP-connected Chromium when the primary launch rejects",
-    async () => {
-      const real = require("playwright");
-      __setPlaywrightImportForTests(() =>
-        Promise.resolve({
-          chromium: {
-            launch: () => Promise.reject(new Error("spawn EBADF")),
-            executablePath: () => real.chromium.executablePath(),
-            connectOverCDP: (wsEndpoint: string) => real.chromium.connectOverCDP(wsEndpoint),
-          },
-        }),
-      );
-
-      const result = await getScreenshot(store, { screen: "welcome" });
-
-      expect(result.__image.mimeType).toBe("image/png");
-      const buffer = Buffer.from(result.__image.data, "base64");
-      expect(buffer.subarray(0, 8)).toEqual(PNG_MAGIC);
-      expect(result.width).toBe(390);
-      expect(result.height).toBe(844);
     },
     30_000,
   );

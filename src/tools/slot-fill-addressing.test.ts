@@ -1,19 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
-import { createRequire } from "node:module";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { patchHtml } from "./writes.js";
 import { inspectNode } from "./inspect-node.js";
 import { getNode } from "./reads.js";
-import { __setPlaywrightImportForTests } from "./browser.js";
+import { __resetBrowserForTests, BROWSER_ENV, discoverBrowsers } from "./browser.js";
 
-const require = createRequire(import.meta.url);
-function isPlaywrightAvailable(): boolean {
-  try {
-    require.resolve("playwright");
-    return true;
-  } catch {
-    return false;
-  }
+function isBrowserAvailable(): boolean {
+  return Boolean(process.env[BROWSER_ENV]) || discoverBrowsers().length > 0;
 }
 
 // CHR-746 — nodes inside a component instance's slot fill must be reachable by
@@ -205,14 +198,14 @@ describe("patch_html — nodes inside a slot fill (CHR-746)", () => {
   });
 });
 
-describe.skipIf(!isPlaywrightAvailable())("inspect_node — nodes inside a slot fill (CHR-746)", () => {
+describe.skipIf(!isBrowserAvailable())("inspect_node — nodes inside a slot fill (CHR-746)", () => {
   let fx: ProjectFixture;
   beforeEach(async () => {
     fx = await setupProject();
     await setup(fx);
   });
   afterEach(() => fx.cleanup());
-  afterAll(() => __setPlaywrightImportForTests(undefined));
+  afterAll(() => __resetBrowserForTests());
 
   it("returns a box for a nested fill node and for a slot-filling <img>", async () => {
     const copy = await inspectNode(fx.store, { node: "home.install-copy" });

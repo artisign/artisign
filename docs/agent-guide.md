@@ -184,16 +184,19 @@ After **every** `write_html` / `patch_html`:
 
 Never chain multiple writes without looking. One write, one look.
 
-Both tools need Playwright, which is optional and not bundled. It has to resolve
-from where Artisign itself is installed — Playwright added to a different
-project tree is not seen — unless `ARTISIGN_PLAYWRIGHT_DIR` names a directory
-that holds it. With a local install of Artisign, run in that directory:
+Both tools render in a browser that is already installed on the machine —
+Chrome, Edge, Brave, Chromium or Firefox, found automatically; nothing to
+install. Every result names the browser and version that rendered it
+(`browser`). Engines differ slightly in text rasterization and rounding, so
+before you call a screen done, check it once in a second installed browser:
+pass `browser: "firefox"` (or `"chrome"`, `"edge"`, …) to `get_screenshot` or
+`inspect_node`. Keep the everyday loop on the default browser, so consecutive
+screenshots stay comparable.
 
-`npm install --no-save playwright && npx playwright install chromium`
-
-Everything else in this guide works without it, so treat a
-`Playwright is not installed` (or `installed but unusable`) error as a setup
-gap to report — the message carries the fix — not as a bug in your design work.
+If no supported browser is found, both tools fail with a message that names the
+fix (install one, or set `ARTISIGN_BROWSER` to a browser executable). Everything
+else in this guide works without a browser, so treat that error as a setup gap
+to report — not as a bug in your design work.
 
 ### Reviewing a component before a screen uses it
 

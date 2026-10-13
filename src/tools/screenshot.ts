@@ -6,9 +6,9 @@ import type { Store } from "../store/index.js";
 import { renderScreenForBrowser, renderMockupDocument, renderDefinitionForBrowser } from "./render-context.js";
 import { parseNodeRef, formatNodeRef, type DefinitionNodeRef } from "./node-ref.js";
 import { ToolError } from "./types.js";
-import { getBrowser } from "./browser.js";
+import { getBrowser, type Browser, type BrowserKind, type Page } from "./browser.js";
 
-export { __setPlaywrightImportForTests, __resetBrowserForTests } from "./browser.js";
+export { __setBrowserForTests, __resetBrowserForTests } from "./browser.js";
 export { resolveViewport, type Viewport } from "./render-context.js";
 
 export type GetScreenshotInput = {
@@ -29,6 +29,8 @@ export type GetScreenshotInput = {
   variant?: string;
   /** Mockup viewport width in px, default 390. Not valid with `screen`. */
   width?: number;
+  /** Which installed browser renders the capture (cross-browser check); default is the first one discovered. */
+  browser?: BrowserKind;
 };
 
 export type ScreenshotResult = {
@@ -36,6 +38,8 @@ export type ScreenshotResult = {
   __image: { data: string; mimeType: "image/png" };
   width: number;
   height: number;
+  /** Browser name and version that rendered the image — engines differ slightly in pixels. */
+  browser: string;
 };
 
 function clampScale(scale: number | undefined): number {
@@ -87,7 +91,7 @@ export async function getScreenshot(store: Store, input: GetScreenshotInput): Pr
     if (hasScreen) throw new ToolError("validation_failed", `node "${input.node}" addresses a component/pattern definition, not screen "${input.screen}"`);
     if (hasMockup) throw new ToolError("validation_failed", "node addressing a component/pattern definition is not valid together with mockup");
     if (input.width !== undefined) throw new ToolError("validation_failed", "width is only valid together with mockup, not a definition node");
-    return screenshotDefinition(store, ref, clampScale(input.scale));
+    return screenshotDefinition(store, ref, clampScale(input.scale), input.browser);
   }
 
   if (hasScreen === hasMockup) {
@@ -101,7 +105,7 @@ export async function getScreenshot(store: Store, input: GetScreenshotInput): Pr
     if (input.node !== undefined) {
       throw new ToolError("validation_failed", "node is only valid together with screen, not mockup");
     }
-    return screenshotMockup(store, input.mockup, input.variant, clampWidth(input.width), clampScale(input.scale));
+    return screenshotMockup(store, input.mockup, input.variant, clampWidth(input.width), clampScale(input.scale), input.browser);
   }
 
   if (input.width !== undefined) {
@@ -111,10 +115,94 @@ export async function getScreenshot(store: Store, input: GetScreenshotInput): Pr
         "width/height (e.g. style=\"width: 1440px\" on the root, or a $token), default 390x844 when undeclared",
     );
   }
-  return screenshotScreen(store, input.screen!, input.node, clampScale(input.scale));
+  return screenshotScreen(store, input.screen!, input.node, clampScale(input.scale), input.browser);
 }
 
-async function screenshotScreen(store: Store, screen: string, nodeRef: string | undefined, scale: number): Promise<ScreenshotResult> {
+/**
+ * Opens `documentHtml` in a fresh context of the selected browser, hands the
+ * loaded page to `capture`, and always closes the context again.
+ */
+async function withPage<T>(
+  documentHtml: string,
+  viewport: { width: number; height: number },
+  scale: number,
+  kind: BrowserKind | undefined,
+  capture: (page: Page, browser: Browser) => Promise<T>,
+): Promise<T> {
+  const browser = await getBrowser(kind);
+  const context = await browser.newContext({ viewport, deviceScaleFactor: scale });
+  try {
+    const page = await context.newPage();
+    await page.setContent(documentHtml);
+    return await capture(page, browser);
+  } finally {
+    await context.close();
+  }
+}
+
+/** A string expression (evaluated in the page, not this Node process) so this file doesn't need the DOM lib. */
+function nodeBoxScript(nodeId: string): string {
+  return `(() => {
+    const el = document.getElementById(${JSON.stringify(nodeId)});
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.x, y: r.y, width: r.width, height: r.height };
+  })()`;
+}
+
+/**
+ * Clips to `nodeId`'s bounding box plus `NODE_SCREENSHOT_PADDING_PX`. The
+ * padded box can extend below/right of the initial viewport (a node past
+ * the fold) — the viewport grows to cover it instead of the clip being
+ * clamped and the image silently truncated.
+ */
+async function captureNode(
+  page: Page,
+  browser: Browser,
+  nodeId: string,
+  nodeRef: string,
+  viewport: { width: number; height: number },
+): Promise<ScreenshotResult> {
+  const box = (await page.evaluate(nodeBoxScript(nodeId))) as ClipRect | null;
+  if (!box) {
+    throw new ToolError("not_found", `node "${nodeRef}" was not found`);
+  }
+  const clip = computeNodeClip(box, NODE_SCREENSHOT_PADDING_PX);
+  if (clip.width <= 0 || clip.height <= 0) {
+    throw new ToolError("invalid_state", `node "${nodeRef}" has no visible area to screenshot`);
+  }
+  const neededWidth = Math.ceil(clip.x + clip.width);
+  const neededHeight = Math.ceil(clip.y + clip.height);
+  if (neededWidth > viewport.width || neededHeight > viewport.height) {
+    await page.setViewportSize({
+      width: Math.max(viewport.width, neededWidth),
+      height: Math.max(viewport.height, neededHeight),
+    });
+  }
+  return pngResult(await page.screenshot({ clip }), browser);
+}
+
+/**
+ * width/height come straight from the PNG header (IHDR, bytes 16-23):
+ * engines round a fractional clip differently (Chromium rounds, Firefox
+ * truncates), so the image itself is the only exact source.
+ */
+function pngResult(buffer: Buffer, browser: Browser): ScreenshotResult {
+  return {
+    __image: { data: buffer.toString("base64"), mimeType: "image/png" },
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+    browser: browser.name,
+  };
+}
+
+async function screenshotScreen(
+  store: Store,
+  screen: string,
+  nodeRef: string | undefined,
+  scale: number,
+  kind: BrowserKind | undefined,
+): Promise<ScreenshotResult> {
   let nodeId: string | undefined;
   if (nodeRef) {
     const ref = parseNodeRef(nodeRef);
@@ -132,53 +220,10 @@ async function screenshotScreen(store: Store, screen: string, nodeRef: string | 
 
   const { documentHtml, viewport } = await renderScreenForBrowser(store, screen);
 
-  const browser = await getBrowser();
-  const context = await browser.newContext({ viewport, deviceScaleFactor: scale });
-  try {
-    const page = await context.newPage();
-    await page.setContent(documentHtml);
-    // A string expression (evaluated in the page, not this Node process) so
-    // this file doesn't need the DOM lib just to reference `document`.
-    await page.evaluate("document.fonts.ready");
-
-    if (nodeId) {
-      const locator = page.locator(`[id="${nodeId}"]`).first();
-      const box = (await locator.count()) > 0 ? await locator.boundingBox() : null;
-      if (!box) {
-        throw new ToolError("not_found", `node "${nodeRef}" was not found`);
-      }
-      const clip = computeNodeClip(box, NODE_SCREENSHOT_PADDING_PX);
-      if (clip.width <= 0 || clip.height <= 0) {
-        throw new ToolError("invalid_state", `node "${nodeRef}" has no visible area to screenshot`);
-      }
-      // The node's padded box can extend below/right of the initial
-      // viewport (e.g. a node past the fold) — grow the viewport to cover
-      // it instead of clamping the clip and silently truncating the image.
-      const neededWidth = Math.ceil(clip.x + clip.width);
-      const neededHeight = Math.ceil(clip.y + clip.height);
-      if (neededWidth > viewport.width || neededHeight > viewport.height) {
-        await page.setViewportSize({
-          width: Math.max(viewport.width, neededWidth),
-          height: Math.max(viewport.height, neededHeight),
-        });
-      }
-      const buffer = await page.screenshot({ clip });
-      return {
-        __image: { data: buffer.toString("base64"), mimeType: "image/png" },
-        width: Math.round(clip.width * scale),
-        height: Math.round(clip.height * scale),
-      };
-    }
-
-    const buffer = await page.screenshot();
-    return {
-      __image: { data: buffer.toString("base64"), mimeType: "image/png" },
-      width: Math.round(viewport.width * scale),
-      height: Math.round(viewport.height * scale),
-    };
-  } finally {
-    await context.close();
-  }
+  return withPage(documentHtml, viewport, scale, kind, async (page, browser) => {
+    if (nodeId) return captureNode(page, browser, nodeId, nodeRef!, viewport);
+    return pngResult(await page.screenshot(), browser);
+  });
 }
 
 /**
@@ -186,47 +231,17 @@ async function screenshotScreen(store: Store, screen: string, nodeRef: string | 
  * (ADR-004 §1). Always clips to `ref.nodeId` — there is no "whole document"
  * case the way a bare screen screenshot has, since a definition ref always
  * names a specific node; clipping to the definition's own root node captures
- * the whole rendered variant/pattern. Mirrors `screenshotScreen`'s
- * node-clip branch (viewport growth included) since it's the same
- * clip-and-capture logic against a standalone rendered document either way.
+ * the whole rendered variant/pattern.
  */
-async function screenshotDefinition(store: Store, ref: DefinitionNodeRef, scale: number): Promise<ScreenshotResult> {
+async function screenshotDefinition(
+  store: Store,
+  ref: DefinitionNodeRef,
+  scale: number,
+  kind: BrowserKind | undefined,
+): Promise<ScreenshotResult> {
   const { documentHtml, viewport } = await renderDefinitionForBrowser(store, ref);
   const nodeRef = formatNodeRef(ref.address, ref.nodeId);
-
-  const browser = await getBrowser();
-  const context = await browser.newContext({ viewport, deviceScaleFactor: scale });
-  try {
-    const page = await context.newPage();
-    await page.setContent(documentHtml);
-    await page.evaluate("document.fonts.ready");
-
-    const locator = page.locator(`[id="${ref.nodeId}"]`).first();
-    const box = (await locator.count()) > 0 ? await locator.boundingBox() : null;
-    if (!box) {
-      throw new ToolError("not_found", `node "${nodeRef}" was not found`);
-    }
-    const clip = computeNodeClip(box, NODE_SCREENSHOT_PADDING_PX);
-    if (clip.width <= 0 || clip.height <= 0) {
-      throw new ToolError("invalid_state", `node "${nodeRef}" has no visible area to screenshot`);
-    }
-    const neededWidth = Math.ceil(clip.x + clip.width);
-    const neededHeight = Math.ceil(clip.y + clip.height);
-    if (neededWidth > viewport.width || neededHeight > viewport.height) {
-      await page.setViewportSize({
-        width: Math.max(viewport.width, neededWidth),
-        height: Math.max(viewport.height, neededHeight),
-      });
-    }
-    const buffer = await page.screenshot({ clip });
-    return {
-      __image: { data: buffer.toString("base64"), mimeType: "image/png" },
-      width: Math.round(clip.width * scale),
-      height: Math.round(clip.height * scale),
-    };
-  } finally {
-    await context.close();
-  }
+  return withPage(documentHtml, viewport, scale, kind, (page, browser) => captureNode(page, browser, ref.nodeId, nodeRef, viewport));
 }
 
 const DEFAULT_MOCKUP_WIDTH = 390;
@@ -236,11 +251,18 @@ const MOCKUP_VIEWPORT_HEIGHT = 844;
  * A mockup variant has no ref model to derive a declared width/height from
  * (ADR-003) — the viewport is always `width`x844 (width defaulting to 390,
  * same as a screen's fallback viewport), and the screenshot is always
- * `fullPage: true` so content taller than that viewport is still captured
- * in full rather than clipped, matching the mockup's whole point (comparing
- * variants side by side without truncation).
+ * full-page so content taller than that viewport is still captured in full
+ * rather than clipped, matching the mockup's whole point (comparing variants
+ * side by side without truncation).
  */
-async function screenshotMockup(store: Store, mockup: string, variant: string, width: number, scale: number): Promise<ScreenshotResult> {
+async function screenshotMockup(
+  store: Store,
+  mockup: string,
+  variant: string,
+  width: number,
+  scale: number,
+  kind: BrowserKind | undefined,
+): Promise<ScreenshotResult> {
   let documentHtml: string;
   try {
     ({ documentHtml } = await renderMockupDocument(store, mockup, variant, { fontMode: "inline" }));
@@ -252,24 +274,9 @@ async function screenshotMockup(store: Store, mockup: string, variant: string, w
   }
 
   const viewport = { width, height: MOCKUP_VIEWPORT_HEIGHT };
-  const browser = await getBrowser();
-  const context = await browser.newContext({ viewport, deviceScaleFactor: scale });
-  try {
-    const page = await context.newPage();
-    await page.setContent(documentHtml);
-    await page.evaluate("document.fonts.ready");
-
-    const buffer = await page.screenshot({ fullPage: true });
-    // fullPage content can be taller than the viewport — report the actual
-    // captured height, not the viewport's, so width/height describe the PNG
-    // that was actually returned.
-    const contentHeight = Number(await page.evaluate("document.documentElement.scrollHeight"));
-    return {
-      __image: { data: buffer.toString("base64"), mimeType: "image/png" },
-      width: Math.round(viewport.width * scale),
-      height: Math.round((Number.isFinite(contentHeight) ? Math.max(contentHeight, viewport.height) : viewport.height) * scale),
-    };
-  } finally {
-    await context.close();
-  }
+  return withPage(documentHtml, viewport, scale, kind, async (page, browser) => {
+    // Full-page content can be taller (or, for a desktop-width variant,
+    // wider) than the viewport; pngResult reports the size actually captured.
+    return pngResult(await page.screenshot({ fullPage: true }), browser);
+  });
 }

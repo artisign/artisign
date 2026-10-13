@@ -1,135 +1,287 @@
-// Shared Playwright lifecycle for tools that need a headless render:
-// `get_screenshot` and `inspect_node`. Extracted
-// out of screenshot.ts so the browser-launch/fallback logic has exactly one
-// implementation.
+// Built-in browser driver for the tools that need a real render:
+// `get_screenshot` and `inspect_node` (CHR-807 / ADR-007). No Playwright, no
+// library and no browser download: it drives a browser that is already
+// installed on the machine — Chromium-family browsers over the Chrome
+// DevTools Protocol, Firefox over WebDriver BiDi — through Node's built-in
+// WebSocket. Artisign still has exactly one document renderer
+// (`renderScreenDocument`); the browser only lays out and captures it.
 
-import { spawn } from "node:child_process";
-import { createRequire } from "node:module";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync, rmSync } from "node:fs";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { basename, delimiter, join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { ToolError } from "./types.js";
 
-export type PWBoundingBox = { x: number; y: number; width: number; height: number };
-export type PWLocator = {
-  first(): PWLocator;
-  count(): Promise<number>;
-  boundingBox(): Promise<PWBoundingBox | null>;
-};
-export type PWPage = {
+export type BoundingBox = { x: number; y: number; width: number; height: number };
+export type Viewport = { width: number; height: number };
+
+export type Page = {
+  /** Replaces the page's document with `html` and resolves once it has loaded and its fonts are ready. */
   setContent(html: string): Promise<void>;
+  /** Evaluates a JS expression in the page (awaiting a returned promise) and returns its JSON-serializable value. */
   evaluate(expression: string): Promise<unknown>;
-  screenshot(options?: { clip?: PWBoundingBox; fullPage?: boolean }): Promise<Buffer>;
-  locator(selector: string): PWLocator;
-  setViewportSize(size: { width: number; height: number }): Promise<void>;
+  /** A PNG of the viewport, of `clip` (document coordinates, CSS px), or of the whole document. */
+  screenshot(options?: { clip?: BoundingBox; fullPage?: boolean }): Promise<Buffer>;
+  setViewportSize(size: Viewport): Promise<void>;
 };
-export type PWContext = {
-  newPage(): Promise<PWPage>;
+export type BrowserContext = {
+  newPage(): Promise<Page>;
   close(): Promise<void>;
 };
 export type Browser = {
-  newContext(options: { viewport: { width: number; height: number }; deviceScaleFactor: number }): Promise<PWContext>;
+  /** Browser name and version, e.g. "Chrome 141.0.7390.54" — reported with every capture. */
+  name: string;
+  newContext(options: { viewport: Viewport; deviceScaleFactor: number }): Promise<BrowserContext>;
   close(): Promise<void>;
+  /** Resolves once the browser process is gone — closed, crashed or killed — so it is never reused. */
+  disconnected: Promise<void>;
 };
-type PlaywrightModule = {
-  chromium: {
-    launch(): Promise<Browser>;
-    // Only needed by the fd-3/4-avoiding fallback below.
-    executablePath(): string;
-    connectOverCDP(wsEndpoint: string): Promise<Browser>;
-  };
+
+export const BROWSER_KINDS = ["chrome", "edge", "brave", "chromium", "firefox"] as const;
+export type BrowserKind = (typeof BROWSER_KINDS)[number];
+
+/** Environment variable naming a browser executable that is used instead of the discovered one. */
+export const BROWSER_ENV = "ARTISIGN_BROWSER";
+
+const LABELS: Record<BrowserKind, string> = {
+  chrome: "Chrome",
+  edge: "Edge",
+  brave: "Brave",
+  chromium: "Chromium",
+  firefox: "Firefox",
 };
-type ImportPlaywright = () => Promise<PlaywrightModule>;
-
-// A non-literal specifier keeps TS from trying (and failing) to resolve
-// playwright's own module/type declarations at compile time — the whole
-// point of the lazy import.
-const PLAYWRIGHT_MODULE = "playwright";
-
-/** Environment variable naming a directory whose `node_modules/playwright` is used instead of the one next to Artisign. */
-export const PLAYWRIGHT_DIR_ENV = "ARTISIGN_PLAYWRIGHT_DIR";
 
 /**
- * Where `playwright` gets imported from. By default the specifier `"playwright"`,
- * resolved by Node from the tree Artisign itself lives in — which is why an
- * install into the *design project* is never seen, and why nothing at all
- * works while Artisign runs from npx's cache (CHR-576). With
- * `ARTISIGN_PLAYWRIGHT_DIR` set, the module is resolved from that directory's
- * own `node_modules` instead, so Playwright can live anywhere — a dedicated
- * `~/.artisign-playwright`, say — without touching the repo's lockfile and
- * regardless of how Artisign was installed.
- *
- * Resolving with `createRequire` from the directory (rather than importing a
- * hand-built path) honours the package's own `exports`/`main` and gives a
- * clean, nameable failure when the directory has no Playwright in it.
+ * Where each browser lives, in discovery order: Chromium-family first (closest
+ * to what most people review the preview in), Firefox last — on many Linux
+ * desktops the only browser there is. macOS: app bundles in /Applications or
+ * ~/Applications. Linux: executables on PATH.
  */
-export function resolvePlaywrightSpecifier(env: NodeJS.ProcessEnv = process.env): string {
-  const dir = env[PLAYWRIGHT_DIR_ENV]?.trim();
-  if (!dir) return PLAYWRIGHT_MODULE;
-  try {
-    return pathToFileURL(createRequire(join(dir, "package.json")).resolve(PLAYWRIGHT_MODULE)).href;
-  } catch {
+const MAC_APPS: Record<BrowserKind, string> = {
+  chrome: "Google Chrome.app/Contents/MacOS/Google Chrome",
+  edge: "Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  brave: "Brave Browser.app/Contents/MacOS/Brave Browser",
+  chromium: "Chromium.app/Contents/MacOS/Chromium",
+  firefox: "Firefox.app/Contents/MacOS/firefox",
+};
+const LINUX_BINARIES: Record<BrowserKind, string[]> = {
+  chrome: ["google-chrome", "google-chrome-stable"],
+  edge: ["microsoft-edge", "microsoft-edge-stable"],
+  brave: ["brave-browser", "brave"],
+  chromium: ["chromium", "chromium-browser"],
+  firefox: ["firefox", "firefox-esr"],
+};
+
+export type InstalledBrowser = { kind: BrowserKind; executable: string };
+
+export type DiscoveryOptions = {
+  platform?: NodeJS.Platform;
+  env?: NodeJS.ProcessEnv;
+  home?: string;
+  exists?: (path: string) => boolean;
+};
+
+/** The kind an arbitrary executable path most likely is — decides CDP vs. BiDi for `ARTISIGN_BROWSER`. */
+export function kindFromExecutable(executable: string): BrowserKind {
+  const name = basename(executable).toLowerCase();
+  if (name.includes("firefox")) return "firefox";
+  if (name.includes("edge")) return "edge";
+  if (name.includes("brave")) return "brave";
+  if (name.includes("chromium")) return "chromium";
+  return "chrome";
+}
+
+/** Every supported browser found on this machine, in discovery order. Pure apart from `exists`. */
+export function discoverBrowsers(options: DiscoveryOptions = {}): InstalledBrowser[] {
+  const platform = options.platform ?? process.platform;
+  const env = options.env ?? process.env;
+  const home = options.home ?? homedir();
+  const exists = options.exists ?? existsSync;
+
+  const found: InstalledBrowser[] = [];
+  for (const kind of BROWSER_KINDS) {
+    const candidates =
+      platform === "darwin"
+        ? [join("/Applications", MAC_APPS[kind]), join(home, "Applications", MAC_APPS[kind])]
+        : (env.PATH ?? "")
+            .split(delimiter)
+            .filter(Boolean)
+            .flatMap((dir) => LINUX_BINARIES[kind].map((bin) => join(dir, bin)));
+    const executable = candidates.find(exists);
+    if (executable) found.push({ kind, executable });
+  }
+  return found;
+}
+
+export const NO_BROWSER_MESSAGE =
+  "No supported browser found. Screenshots use a browser that is already installed on this machine — install " +
+  `Chrome, Edge, Brave, Chromium or Firefox, or set ${BROWSER_ENV}=<path to a browser executable>.`;
+
+/**
+ * Picks the browser for one call: the requested `kind`, else the
+ * `ARTISIGN_BROWSER` override, else the first one discovered. An explicit
+ * `kind` that matches the override's kind uses the override's executable.
+ */
+export function selectBrowser(
+  kind: BrowserKind | undefined,
+  options: DiscoveryOptions = {},
+): InstalledBrowser {
+  const env = options.env ?? process.env;
+  const exists = options.exists ?? existsSync;
+  const override = env[BROWSER_ENV]?.trim();
+  if (override) {
+    if (!exists(override)) {
+      throw new ToolError(
+        "io_error",
+        `${BROWSER_ENV}=${override} does not exist. Point it at a browser executable, or unset it.`,
+      );
+    }
+    const overrideKind = kindFromExecutable(override);
+    if (kind === undefined || kind === overrideKind)
+      return { kind: overrideKind, executable: override };
+  }
+  const installed = discoverBrowsers(options);
+  if (kind === undefined) {
+    if (installed.length === 0) throw new ToolError("io_error", NO_BROWSER_MESSAGE);
+    return installed[0]!;
+  }
+  const match = installed.find((b) => b.kind === kind);
+  if (!match) {
+    const available = installed.map((b) => b.kind).join(", ") || "none";
     throw new ToolError(
-      "io_error",
-      `${PLAYWRIGHT_DIR_ENV}=${dir} does not contain an installed Playwright (no node_modules/playwright there). ` +
-        `Run in that directory: npm install playwright && npx playwright install chromium — or unset ${PLAYWRIGHT_DIR_ENV}.`,
+      "not_found",
+      `browser "${kind}" is not installed on this machine (available: ${available}). Omit browser to use the default.`,
     );
   }
+  return match;
 }
 
-const defaultImportPlaywright: ImportPlaywright = () => import(resolvePlaywrightSpecifier()) as Promise<PlaywrightModule>;
+// ---------------------------------------------------------------------------
+// Process launch
 
-let importPlaywright: ImportPlaywright = defaultImportPlaywright;
+/** Every browser process and temp profile still alive — killed/removed synchronously on process exit. */
+const liveChildren = new Set<ChildProcess>();
+const liveProfiles = new Set<string>();
 
-export function __setPlaywrightImportForTests(fn: ImportPlaywright | undefined): void {
-  importPlaywright = fn ?? defaultImportPlaywright;
+const LAUNCH_TIMEOUT_MS = 20_000;
+const COMMAND_TIMEOUT_MS = 30_000;
+const CDP_LISTENING_PATTERN = /DevTools listening on (ws:\/\/\S+)/;
+const BIDI_LISTENING_PATTERN = /WebDriver BiDi listening on (ws:\/\/\S+)/;
+
+/**
+ * Temp profiles live in a non-hidden directory under the home directory, not
+ * in /tmp or ~/.artisign: a Snap- or Flatpak-packaged Firefox cannot see
+ * either, and its launch then hangs instead of failing.
+ */
+function profileRoot(): string {
+  return join(homedir(), "artisign-browser-profiles");
 }
 
-const DEVTOOLS_LISTENING_PATTERN = /DevTools listening on (ws:\/\/\S+)/;
-const MANUAL_LAUNCH_TIMEOUT_MS = 15_000;
+/**
+ * Flags for Chromium-family browsers. `--no-sandbox` is deliberate (CHR-562):
+ * Chromium's own sandbox needs user namespaces, which sandboxed Linux hosts
+ * (CI runners, container-based MCP hosts) do not grant. What the browser
+ * renders is the user's own local project, never arbitrary sites.
+ * `--disable-dev-shm-usage` keeps the renderer alive where /dev/shm is tiny.
+ */
+function chromiumArgs(profile: string): string[] {
+  return [
+    "--headless=new",
+    "--remote-debugging-port=0",
+    `--user-data-dir=${profile}`,
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--hide-scrollbars",
+    "--mute-audio",
+    "about:blank",
+  ];
+}
+
+/** Prefs that keep a fresh Firefox profile from opening first-run or update pages. */
+const FIREFOX_PREFS = [
+  'user_pref("browser.shell.checkDefaultBrowser", false);',
+  'user_pref("browser.startup.homepage_override.mstone", "ignore");',
+  'user_pref("browser.aboutwelcome.enabled", false);',
+  'user_pref("datareporting.policy.dataSubmissionEnabled", false);',
+  'user_pref("toolkit.telemetry.reportingpolicy.firstRun", false);',
+  'user_pref("app.update.disabledForTesting", true);',
+  // Light content regardless of the OS theme (0 = dark, 1 = light), matching the Chromium path.
+  'user_pref("layout.css.prefers-color-scheme.content-override", 1);',
+  'user_pref("ui.systemUsesDarkTheme", 0);',
+  // Overlay scrollbars take no layout space — the counterpart of Chromium's --hide-scrollbars.
+  'user_pref("ui.useOverlayScrollbars", 1);',
+].join("\n");
 
 /**
- * Flags for the manual spawn below. `--no-sandbox` is deliberate (CHR-562):
- * Chromium's own sandbox needs user namespaces, which a sandboxed Linux host
- * (CI runners, container-based MCP hosts) does not grant — the process then
- * dies before printing its DevTools endpoint, and those hosts are precisely
- * the ones this fallback exists for. It drops no boundary the primary path
- * keeps: `pw.chromium.launch()` passes `--no-sandbox` itself unless
- * `chromiumSandbox: true` is requested, and this server never requests it.
- * What the browser renders is the user's own project — local, agent-authored
- * HTML in a `setContent` page — not arbitrary sites, which is why Playwright
- * defaults that way too. `--disable-dev-shm-usage` mirrors the other
- * Playwright default that matters on such hosts, where `/dev/shm` is too
- * small for Chromium's shared memory and the renderer crashes mid-page.
+ * A detached watchdog per browser: once the owning Artisign process is gone
+ * — however it went, SIGTERM from an MCP host, SIGKILL or a crash, none of
+ * which run an "exit" handler — it kills the browser and removes its
+ * profile. Without it a stdio server killed by its host leaves a headless
+ * browser running for good. It exits once the browser is closed normally,
+ * or once it has cleaned up after the owner.
  */
-const MANUAL_LAUNCH_ARGS = ["--headless=new", "--remote-debugging-port=0", "--no-sandbox", "--disable-dev-shm-usage"];
+const WATCHDOG_SCRIPT = `
+const [owner, browser, profile] = process.argv.slice(1);
+const alive = (pid) => { try { process.kill(Number(pid), 0); return true; } catch (e) { return e.code === "EPERM"; } };
+const timer = setInterval(() => {
+  if (alive(owner)) {
+    // Closed normally: the owner removes the profile itself.
+    if (!alive(browser)) clearInterval(timer);
+    return;
+  }
+  clearInterval(timer);
+  try { process.kill(Number(browser)); } catch {}
+  setTimeout(() => require("node:fs").rmSync(profile, { recursive: true, force: true }), 2000);
+}, 1000);`;
+
+function startWatchdog(browserPid: number, profile: string): void {
+  const watchdog = spawn(
+    process.execPath,
+    ["-e", WATCHDOG_SCRIPT, String(process.pid), String(browserPid), profile],
+    {
+      detached: true,
+      stdio: "ignore",
+    },
+  );
+  watchdog.on("error", () => {}); // best effort — the exit handler and the stale-profile sweep still apply
+  watchdog.unref();
+}
 
 /**
- * Fallback launch path: `pw.chromium.launch()` always asks Node to open a
- * 5-fd stdio array for the browser process (fds 3/4 carry Playwright's own
- * pipe transport to Chromium's `--remote-debugging-pipe`). Some MCP hosts
- * spawn this server through a sandbox wrapper that restricts/closes extra
- * fds, which makes that launch fail with `spawn EBADF` — not reproducible
- * locally, but real in dogfooding. Spawning Chromium ourselves
- * with an explicit, clean 3-fd stdio array and talking to it over a
- * websocket (parsed from stderr) instead structurally avoids fds 3/4.
+ * Spawns the browser with a clean 3-fd stdio array (some MCP hosts close
+ * fds 3/4, CHR-562) and resolves with the WebSocket URL it prints on stderr.
+ * stderr keeps being drained afterwards, so a chatty browser never blocks on
+ * a full pipe.
  */
-async function launchBrowserManually(pw: PlaywrightModule): Promise<Browser> {
-  const child = spawn(pw.chromium.executablePath(), MANUAL_LAUNCH_ARGS, {
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-
-  const wsEndpoint = await new Promise<string>((resolve, reject) => {
+function spawnBrowser(
+  executable: string,
+  args: string[],
+  pattern: RegExp,
+  profile: string,
+): Promise<{ child: ChildProcess; wsUrl: string }> {
+  const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"] });
+  liveChildren.add(child);
+  child.on("exit", () => liveChildren.delete(child));
+  if (child.pid !== undefined) startWatchdog(child.pid, profile);
+  child.stdout?.resume();
+  return new Promise((resolve, reject) => {
     let output = "";
     const timer = setTimeout(() => {
       cleanup();
-      reject(new Error("timed out waiting for Chromium to print its DevTools websocket endpoint"));
-    }, MANUAL_LAUNCH_TIMEOUT_MS);
+      child.kill();
+      reject(new Error("timed out waiting for the browser to print its WebSocket endpoint"));
+    }, LAUNCH_TIMEOUT_MS);
     const onData = (chunk: Buffer): void => {
       output += chunk.toString();
-      const match = DEVTOOLS_LISTENING_PATTERN.exec(output);
+      const match = pattern.exec(output);
       if (match) {
         cleanup();
-        resolve(match[1]!);
+        child.stderr?.resume();
+        resolve({ child, wsUrl: match[1]! });
       }
     };
     const onError = (err: Error): void => {
@@ -138,7 +290,11 @@ async function launchBrowserManually(pw: PlaywrightModule): Promise<Browser> {
     };
     const onExit = (code: number | null): void => {
       cleanup();
-      reject(new Error(`Chromium exited with code ${code} before printing its DevTools websocket endpoint`));
+      reject(
+        new Error(
+          `exited with code ${code} before printing its WebSocket endpoint${output ? `: ${output.trim().slice(-300)}` : ""}`,
+        ),
+      );
     };
     const cleanup = (): void => {
       clearTimeout(timer);
@@ -150,132 +306,495 @@ async function launchBrowserManually(pw: PlaywrightModule): Promise<Browser> {
     child.on("error", onError);
     child.on("exit", onExit);
   });
+}
 
-  let browser: Browser;
-  try {
-    browser = await pw.chromium.connectOverCDP(wsEndpoint);
-  } catch (err) {
+/** Kills `child` and resolves once it has exited (or after 5s), so its profile directory is no longer written to. */
+function killAndWait(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, 5_000);
+    child.once("exit", () => {
+      clearTimeout(timer);
+      resolve();
+    });
     child.kill();
+  });
+}
+
+/** Resolves when `child` has exited. */
+function exited(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise((resolve) => child.once("exit", () => resolve()));
+}
+
+/** Runs a post-spawn launch step; if it fails, the already running browser is killed instead of leaking. */
+async function killOnFailure<T>(child: ChildProcess, step: () => Promise<T>): Promise<T> {
+  try {
+    return await step();
+  } catch (err) {
+    await killAndWait(child);
     throw err;
   }
+}
+
+/**
+ * Profile directories are named `<pid>-<uuid>`. A process that died without
+ * its exit handler finishing (SIGKILL, crash) leaves its directory behind;
+ * the next launch removes every directory whose owning process is gone.
+ */
+async function sweepStaleProfiles(root: string): Promise<void> {
+  let entries: string[];
+  try {
+    entries = await readdir(root);
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const pid = Number(entry.split("-")[0]);
+    if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) continue;
+    try {
+      process.kill(pid, 0);
+      continue; // still alive — not ours to remove
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ESRCH") continue;
+    }
+    await rm(join(root, entry), { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+// ---------------------------------------------------------------------------
+// JSON-over-WebSocket transport, shared by both protocols
+
+type Pending = {
+  resolve: (value: unknown) => void;
+  reject: (err: Error) => void;
+  timer: NodeJS.Timeout;
+};
+
+class Connection {
+  private nextId = 1;
+  private readonly pending = new Map<number, Pending>();
+  private constructor(private readonly ws: WebSocket) {
+    ws.addEventListener("message", (event) => this.onMessage(String(event.data)));
+    ws.addEventListener("close", () => this.failAll(new Error("browser connection closed")));
+  }
+
+  static open(url: string): Promise<Connection> {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(url);
+      ws.addEventListener("open", () => resolve(new Connection(ws)), { once: true });
+      ws.addEventListener("error", () => reject(new Error(`could not connect to ${url}`)), {
+        once: true,
+      });
+    });
+  }
+
+  send(message: Record<string, unknown>): Promise<unknown> {
+    // WebSocket.send on a closed socket is a silent no-op: fail now instead
+    // of waiting out the command timeout.
+    if (this.ws.readyState !== WebSocket.OPEN) {
+      return Promise.reject(new Error("browser connection closed"));
+    }
+    const id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(
+          new Error(
+            `browser did not answer ${String(message.method)} within ${COMMAND_TIMEOUT_MS / 1000}s`,
+          ),
+        );
+      }, COMMAND_TIMEOUT_MS);
+      this.pending.set(id, { resolve, reject, timer });
+      this.ws.send(JSON.stringify({ id, ...message }));
+    });
+  }
+
+  close(): void {
+    this.ws.close();
+  }
+
+  private onMessage(data: string): void {
+    const msg = JSON.parse(data) as {
+      id?: number;
+      result?: unknown;
+      error?: unknown;
+      message?: unknown;
+    };
+    if (msg.id === undefined) return; // an event — nothing here subscribes to any
+    const entry = this.pending.get(msg.id);
+    if (!entry) return;
+    this.pending.delete(msg.id);
+    clearTimeout(entry.timer);
+    if (msg.error !== undefined) {
+      // CDP: { error: { message } }; BiDi: { error: "<code>", message }.
+      const detail =
+        typeof msg.error === "object" && msg.error !== null
+          ? (msg.error as { message?: string }).message
+          : `${String(msg.error)}: ${String(msg.message ?? "")}`;
+      entry.reject(new Error(detail ?? "browser command failed"));
+    } else {
+      entry.resolve(msg.result);
+    }
+  }
+
+  private failAll(err: Error): void {
+    for (const entry of this.pending.values()) {
+      clearTimeout(entry.timer);
+      entry.reject(err);
+    }
+    this.pending.clear();
+  }
+}
+
+/**
+ * Replaces the document in place and waits for `load` (images) and
+ * `document.fonts.ready` — the same readiness `page.setContent` +
+ * `document.fonts.ready` gave before. One script for both protocols.
+ */
+function setContentScript(html: string): string {
+  return `(async () => {
+    document.open();
+    document.write(${JSON.stringify(html)});
+    document.close();
+    if (document.readyState !== "complete") await new Promise((r) => window.addEventListener("load", r, { once: true }));
+    await document.fonts.ready;
+  })()`;
+}
+
+const DOCUMENT_SIZE_SCRIPT =
+  "({ width: Math.max(document.documentElement.scrollWidth, window.innerWidth), height: Math.max(document.documentElement.scrollHeight, window.innerHeight) })";
+
+// ---------------------------------------------------------------------------
+// Chromium family — Chrome DevTools Protocol
+
+async function launchCdp(installed: InstalledBrowser, profile: string): Promise<Browser> {
+  const { child, wsUrl } = await spawnBrowser(
+    installed.executable,
+    chromiumArgs(profile),
+    CDP_LISTENING_PATTERN,
+    profile,
+  );
+  const conn = await killOnFailure(child, () => Connection.open(wsUrl));
+  const cdp = (
+    method: string,
+    params: Record<string, unknown> = {},
+    sessionId?: string,
+  ): Promise<Record<string, unknown>> =>
+    conn.send({ method, params, ...(sessionId ? { sessionId } : {}) }) as Promise<
+      Record<string, unknown>
+    >;
+
+  const version = (await killOnFailure(child, () => cdp("Browser.getVersion"))) as {
+    product?: string;
+  };
+  const versionNumber = version.product?.split("/")[1] ?? "";
+
   return {
-    newContext: (options) => browser.newContext(options),
-    // connectOverCDP() only disconnects on close() — we own this process
-    // (we spawned it), so close it ourselves too.
+    name: `${LABELS[installed.kind]} ${versionNumber}`.trim(),
+    disconnected: exited(child),
+    async newContext({ viewport, deviceScaleFactor }) {
+      const { browserContextId } = (await cdp("Target.createBrowserContext", {
+        disposeOnDetach: true,
+      })) as { browserContextId: string };
+      return {
+        async newPage() {
+          const { targetId } = (await cdp("Target.createTarget", {
+            url: "about:blank",
+            browserContextId,
+          })) as { targetId: string };
+          const { sessionId } = (await cdp("Target.attachToTarget", {
+            targetId,
+            flatten: true,
+          })) as { sessionId: string };
+          const setMetrics = (size: Viewport): Promise<unknown> =>
+            cdp(
+              "Emulation.setDeviceMetricsOverride",
+              { width: size.width, height: size.height, deviceScaleFactor, mobile: false },
+              sessionId,
+            );
+          await setMetrics(viewport);
+          // Render light regardless of the OS theme, as the preview baseline
+          // does — a dark OS otherwise paints the blank canvas dark.
+          await cdp(
+            "Emulation.setEmulatedMedia",
+            { features: [{ name: "prefers-color-scheme", value: "light" }] },
+            sessionId,
+          );
+
+          const evaluate = async (expression: string): Promise<unknown> => {
+            const res = (await cdp(
+              "Runtime.evaluate",
+              { expression, awaitPromise: true, returnByValue: true },
+              sessionId,
+            )) as {
+              result?: { value?: unknown };
+              exceptionDetails?: { text?: string; exception?: { description?: string } };
+            };
+            if (res.exceptionDetails) {
+              throw new Error(
+                res.exceptionDetails.exception?.description ??
+                  res.exceptionDetails.text ??
+                  "evaluation failed",
+              );
+            }
+            return res.result?.value;
+          };
+
+          return {
+            setContent: async (html) => {
+              await evaluate(setContentScript(html));
+            },
+            evaluate,
+            async screenshot(options = {}) {
+              let clip = options.clip;
+              if (options.fullPage) {
+                const size = (await evaluate(DOCUMENT_SIZE_SCRIPT)) as Viewport;
+                clip = { x: 0, y: 0, width: size.width, height: size.height };
+              }
+              const params: Record<string, unknown> = { format: "png" };
+              // `scale` is on top of the device scale factor, so 1 keeps the
+              // output at clip x deviceScaleFactor — same as the viewport case.
+              if (clip)
+                Object.assign(params, { clip: { ...clip, scale: 1 }, captureBeyondViewport: true });
+              const { data } = (await cdp("Page.captureScreenshot", params, sessionId)) as {
+                data: string;
+              };
+              return Buffer.from(data, "base64");
+            },
+            async setViewportSize(size) {
+              await setMetrics(size);
+            },
+          };
+        },
+        async close() {
+          await cdp("Target.disposeBrowserContext", { browserContextId }).catch(() => {});
+        },
+      };
+    },
+    async close() {
+      await cdp("Browser.close").catch(() => {});
+      conn.close();
+      await killAndWait(child);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Firefox — WebDriver BiDi
+
+type RemoteValue = { type: string; value?: unknown };
+
+/** Turns a BiDi RemoteValue back into a plain JS value (only the shapes the tools' scripts return). */
+export function fromRemoteValue(rv: RemoteValue): unknown {
+  switch (rv.type) {
+    case "undefined":
+    case "null":
+      return rv.type === "null" ? null : undefined;
+    case "string":
+    case "boolean":
+      return rv.value;
+    case "number":
+      return typeof rv.value === "number" ? rv.value : Number(rv.value);
+    case "array":
+      return ((rv.value as RemoteValue[]) ?? []).map(fromRemoteValue);
+    case "object":
+      return Object.fromEntries(
+        ((rv.value as [string | RemoteValue, RemoteValue][]) ?? []).map(([k, v]) => [
+          String(typeof k === "string" ? k : fromRemoteValue(k)),
+          fromRemoteValue(v),
+        ]),
+      );
+    default:
+      return rv.value;
+  }
+}
+
+async function launchBidi(installed: InstalledBrowser, profile: string): Promise<Browser> {
+  await writeFile(join(profile, "user.js"), FIREFOX_PREFS);
+  const { child, wsUrl } = await spawnBrowser(
+    installed.executable,
+    ["--headless", "--remote-debugging-port=0", "--no-remote", "--profile", profile, "about:blank"],
+    BIDI_LISTENING_PATTERN,
+    profile,
+  );
+  const conn = await killOnFailure(child, () => Connection.open(`${wsUrl}/session`));
+  const bidi = (
+    method: string,
+    params: Record<string, unknown> = {},
+  ): Promise<Record<string, unknown>> =>
+    conn.send({ method, params }) as Promise<Record<string, unknown>>;
+
+  const session = (await killOnFailure(child, () => bidi("session.new", { capabilities: {} }))) as {
+    capabilities?: { browserVersion?: string };
+  };
+
+  return {
+    name: `${LABELS[installed.kind]} ${session.capabilities?.browserVersion ?? ""}`.trim(),
+    disconnected: exited(child),
+    async newContext({ viewport, deviceScaleFactor }) {
+      const { userContext } = (await bidi("browser.createUserContext")) as { userContext: string };
+      return {
+        async newPage() {
+          const { context } = (await bidi("browsingContext.create", {
+            type: "tab",
+            userContext,
+          })) as { context: string };
+          const setViewport = (size: Viewport): Promise<unknown> =>
+            bidi("browsingContext.setViewport", {
+              context,
+              viewport: size,
+              devicePixelRatio: deviceScaleFactor,
+            });
+          await setViewport(viewport);
+
+          const evaluate = async (expression: string): Promise<unknown> => {
+            const res = (await bidi("script.evaluate", {
+              expression,
+              target: { context },
+              awaitPromise: true,
+              resultOwnership: "none",
+            })) as {
+              type: "success" | "exception";
+              result?: RemoteValue;
+              exceptionDetails?: { text?: string };
+            };
+            if (res.type === "exception")
+              throw new Error(res.exceptionDetails?.text ?? "evaluation failed");
+            return res.result ? fromRemoteValue(res.result) : undefined;
+          };
+
+          return {
+            setContent: async (html) => {
+              await evaluate(setContentScript(html));
+            },
+            evaluate,
+            async screenshot(options = {}) {
+              const params: Record<string, unknown> = {
+                context,
+                origin: options.fullPage || options.clip ? "document" : "viewport",
+              };
+              if (options.clip) params.clip = { type: "box", ...options.clip };
+              const { data } = (await bidi("browsingContext.captureScreenshot", params)) as {
+                data: string;
+              };
+              return Buffer.from(data, "base64");
+            },
+            async setViewportSize(size) {
+              await setViewport(size);
+            },
+          };
+        },
+        async close() {
+          await bidi("browser.removeUserContext", { userContext }).catch(() => {});
+        },
+      };
+    },
+    async close() {
+      await bidi("browser.close").catch(() => {});
+      conn.close();
+      await killAndWait(child);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Lifecycle
+
+async function launch(installed: InstalledBrowser): Promise<Browser> {
+  await sweepStaleProfiles(profileRoot());
+  const profile = join(profileRoot(), `${process.pid}-${randomUUID()}`);
+  await mkdir(profile, { recursive: true });
+  liveProfiles.add(profile);
+  const removeProfile = async (): Promise<void> => {
+    liveProfiles.delete(profile);
+    await rm(profile, { recursive: true, force: true }).catch(() => {});
+  };
+  let browser: Browser;
+  try {
+    browser =
+      installed.kind === "firefox"
+        ? await launchBidi(installed, profile)
+        : await launchCdp(installed, profile);
+  } catch (err) {
+    await removeProfile();
+    const message = err instanceof Error ? err.message : String(err);
+    throw new ToolError(
+      "io_error",
+      `Could not start ${LABELS[installed.kind]} (${installed.executable}): ${message}. ` +
+        `Pass another installed browser via the browser input, or set ${BROWSER_ENV}=<path to a browser executable>.`,
+    );
+  }
+  return {
+    ...browser,
     close: async () => {
       try {
         await browser.close();
       } finally {
-        child.kill();
+        await removeProfile();
       }
     },
   };
 }
 
-/**
- * The install command that actually works in a checkout of this repo, and in
- * a project that installed `artisign` locally. Playwright is an *optional
- * peer* dependency, so it has to be asked for by name; `--no-save` keeps
- * `package.json` and the lockfile out of it, which is the point of the
- * optional-peer decision. Named once here so the three failure messages
- * below cannot drift apart.
- */
-export const PLAYWRIGHT_INSTALL_HINT =
-  "in the directory Artisign is installed in, run: npm install --no-save playwright && npx playwright install chromium " +
-  `— or install it in any directory and point ${PLAYWRIGHT_DIR_ENV} at that directory (see README, 'Optional: screenshots')`;
+type Launcher = (installed: InstalledBrowser) => Promise<Browser>;
+let launcher: Launcher = launch;
+let select: (kind: BrowserKind | undefined) => InstalledBrowser = (kind) => selectBrowser(kind);
 
-export const PLAYWRIGHT_MISSING_MESSAGE = `Playwright is not installed. To install it, ${PLAYWRIGHT_INSTALL_HINT}.`;
+/** One running browser per executable, launched on first use and reused for every later call. */
+const browsers = new Map<string, Promise<Browser>>();
 
-/**
- * Resolvability is not usability: a half-reaped symlink or a partial copy
- * still imports — as a module with no `chromium`, or a `chromium` with no
- * `launch` — and without this check that surfaces as a raw TypeError
- * (`Cannot read properties of undefined (reading 'launch')`) from deep inside
- * the launch path, which is the outcome the missing-module message exists to
- * prevent (CHR-576). Everything the launch path touches is checked here.
- */
-function describeUnusablePlaywright(pw: unknown): string | undefined {
-  const mod = pw as Partial<PlaywrightModule> | null | undefined;
-  const chromium = mod?.chromium as Partial<PlaywrightModule["chromium"]> | undefined;
-  if (!chromium || typeof chromium !== "object") return "the module exports no `chromium`";
-  for (const fn of ["launch", "executablePath", "connectOverCDP"] as const) {
-    if (typeof chromium[fn] !== "function") return `\`chromium.${fn}\` is not a function`;
-  }
-  return undefined;
-}
-
-async function launchBrowser(): Promise<Browser> {
-  let pw: PlaywrightModule;
-  try {
-    pw = await importPlaywright();
-  } catch (err) {
-    // A bad ARTISIGN_PLAYWRIGHT_DIR already carries its own remedy.
-    if (err instanceof ToolError) throw err;
-    // Node does not cache a failed module resolution, and a failed launch is
-    // not cached below either, so a Playwright installed *after* this error
-    // is picked up on the next call — no daemon restart needed for this case.
-    throw new ToolError("io_error", PLAYWRIGHT_MISSING_MESSAGE);
-  }
-
-  const unusable = describeUnusablePlaywright(pw);
-  if (unusable !== undefined) {
-    // Unlike the missing case, a successful-but-broken import *is* cached by
-    // Node for the life of the process, so a repair only takes effect after a
-    // restart. Say so, or the trap is a correct fix that changes nothing.
-    throw new ToolError(
-      "io_error",
-      `Playwright is installed but unusable (${unusable}) — a partial or broken install, or a symlink whose target went away. ` +
-        `Reinstall it: ${PLAYWRIGHT_INSTALL_HINT}. Then restart the Artisign daemon: it holds on to the broken module until it is restarted.`,
+export async function getBrowser(kind?: BrowserKind): Promise<Browser> {
+  const installed = select(kind);
+  let pending = browsers.get(installed.executable);
+  if (!pending) {
+    const launched = launcher(installed);
+    pending = launched;
+    browsers.set(installed.executable, launched);
+    // A browser that crashes or is killed later must not stay cached — the
+    // next call launches a fresh one instead of talking to a dead socket.
+    launched.then(
+      (browser) =>
+        browser.disconnected.then(() => {
+          if (browsers.get(installed.executable) === launched)
+            browsers.delete(installed.executable);
+        }),
+      () => {},
     );
   }
-
   try {
-    return await pw.chromium.launch();
-  } catch (primaryErr) {
-    // A missing browser download is its own failure, separate from
-    // the fd-3/4 EBADF case the manual fallback exists for. Spawning the
-    // executable ourselves would fail for the very same reason and bury the
-    // remedy under a second error message, so answer it directly.
-    const primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
-    if (primaryMsg.includes("Executable doesn't exist")) {
-      throw new ToolError("io_error", "Playwright is installed but its browser is missing. Run: npx playwright install chromium");
-    }
-    try {
-      return await launchBrowserManually(pw);
-    } catch (fallbackErr) {
-      const fallbackMessage = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
-      throw new ToolError(
-        "io_error",
-        `Chromium launch failed (${primaryMsg}); fallback launch also failed (${fallbackMessage}). ` +
-          `If Playwright or its browser is incomplete, reinstall: ${PLAYWRIGHT_INSTALL_HINT}.`,
-      );
-    }
-  }
-}
-
-let browserPromise: Promise<Browser> | null = null;
-
-export async function getBrowser(): Promise<Browser> {
-  if (!browserPromise) browserPromise = launchBrowser();
-  try {
-    return await browserPromise;
+    return await pending;
   } catch (err) {
-    // Don't cache a rejected launch — let the next call retry from scratch.
-    browserPromise = null;
+    // Don't cache a failed launch — the next call retries from scratch.
+    browsers.delete(installed.executable);
     throw err;
   }
 }
 
-/** Test-only: drop (and close) the cached browser so the next call re-launches, picking up a fresh `__setPlaywrightImportForTests` mock. */
+/** Test-only: replace browser selection and/or launch. `undefined` restores the real one. */
+export function __setBrowserForTests(
+  options:
+    { select?: (kind: BrowserKind | undefined) => InstalledBrowser; launch?: Launcher } | undefined,
+): void {
+  select = options?.select ?? ((kind) => selectBrowser(kind));
+  launcher = options?.launch ?? launch;
+}
+
+/** Test-only: close every cached browser so the next call launches afresh. */
 export async function __resetBrowserForTests(): Promise<void> {
-  const prior = browserPromise;
-  browserPromise = null;
-  if (!prior) return;
-  await prior.then((browser) => browser.close()).catch(() => {});
+  const prior = [...browsers.values()];
+  browsers.clear();
+  await Promise.all(prior.map((p) => p.then((b) => b.close()).catch(() => {})));
 }
 
 process.on("exit", () => {
-  // Best-effort only: an "exit" handler can't await. On a forced
-  // `process.exit()` this may not finish, but it beats leaking silently.
-  void browserPromise?.then((browser) => browser.close()).catch(() => {});
+  // An "exit" handler can't await a polite Browser.close — kill and clean up synchronously instead.
+  for (const child of liveChildren) child.kill();
+  for (const profile of liveProfiles) {
+    try {
+      rmSync(profile, { recursive: true, force: true });
+    } catch {
+      // Best effort: a locked file only leaves a stray profile directory behind.
+    }
+  }
 });

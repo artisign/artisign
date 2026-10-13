@@ -29,24 +29,15 @@ For working on Artisign itself (the maintainer, or a fork):
 
 ```bash
 npm ci
-npm install --no-save playwright && npx playwright install chromium   # optional, for the browser-backed tests
 npm test
 ```
 
-Playwright is an optional peer dependency of the package, and that shapes the
-second line. A plain `npm install playwright` is the wrong command here: with
-some npm versions it reports `up to date` and installs nothing, because an
-absent optional peer already counts as satisfied; with the others it installs
-but writes `playwright` into `package.json` and the lockfile, which is exactly
-what the optional-peer decision exists to avoid. `--no-save` installs without
-touching either file — `git status` stays clean.
-
-If that still leaves nothing in `node_modules/playwright`, install Playwright
-into a directory of its own and point the tools at it with
-`ARTISIGN_PLAYWRIGHT_DIR=<that directory>` — the same mechanism the README
-describes for users, and it works for the test suite too (CI does the
-`--no-save` route). Without Playwright the browser-backed suites skip
-themselves; every other test runs.
+The browser-backed suites (`get_screenshot`, `inspect_node`) drive whatever
+supported browser is installed — Chrome, Edge, Brave, Chromium or Firefox —
+and skip themselves when there is none; every other test runs. To test one
+protocol in particular, pin the browser: `ARTISIGN_BROWSER=/path/to/firefox
+npm test` exercises the WebDriver BiDi adapter, a Chromium-family path the
+CDP one. CI runs both (see `.github/workflows/ci.yml`).
 
 ## Releasing
 

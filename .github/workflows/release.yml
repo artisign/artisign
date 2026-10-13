@@ -72,12 +72,12 @@ jobs:
 
       - run: npm ci
 
-      # Same reason as in ci.yml: without Playwright the browser-backed suites
+      # Same reason as in ci.yml: without a browser the browser-backed suites
       # skip, and the publish gate would be green without ever launching one.
-      - name: Install Playwright
+      - name: Pin the browser under test
         run: |
-          npm install --no-save playwright
-          npx playwright install --with-deps chromium
+          browser="$(command -v google-chrome)" || { echo "::error::google-chrome is not installed on this runner"; exit 1; }
+          echo "ARTISIGN_BROWSER=$browser" >> "$GITHUB_ENV"
 
       - run: npm run type-check
       - run: npm run lint

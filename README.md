@@ -17,9 +17,9 @@ One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
 ## Install
 
-Node.js ≥ 20.19, on **macOS or Linux**. **Windows is not supported** — the store's atomic writes (write temp file, then `rename`) and its path handling have never been verified there, so the tool is not shipped for it. `package.json` declares this via `os`, which makes `npm install` refuse the platform rather than fail somewhere later.
+Node.js ≥ 22.4, on **macOS or Linux**. **Windows is not supported** — the store's atomic writes (write temp file, then `rename`) and its path handling have never been verified there, so the tool is not shipped for it. `package.json` declares this via `os`, which makes `npm install` refuse the platform rather than fail somewhere later.
 
-**Two ways to run it.** `npx artisign` fetches the package on first use, starts the daemon and opens the preview in your browser — no setup, the fastest way to try it. Installing it into a directory of your own is the other path, and the one the commands below are written for. Screenshots are not the difference between them: the two screenshot tools need Playwright, which a local install can sit next to and which the npx path reaches through `ARTISIGN_PLAYWRIGHT_DIR` — both routes are under **Optional: screenshots** below.
+**Two ways to run it.** `npx artisign` fetches the package on first use, starts the daemon and opens the preview in your browser — no setup, the fastest way to try it. Installing it into a directory of your own is the other path, and the one the commands below are written for. Screenshots work the same on both: they use a browser that is already installed — see **Screenshots** below.
 
 ```bash
 mkdir artisign && cd artisign
@@ -37,29 +37,14 @@ npm install artisign
 claude mcp add --transport http artisign "http://127.0.0.1:4711/mcp?project=/absolute/path/to/my-project"
 ```
 
-The first two lines repeat the install above on purpose: the point of this block is that nothing has to be assembled from elsewhere. On the npx path, drop them and start with `npx artisign start ./my-project` instead — the screenshot tools then need `ARTISIGN_PLAYWRIGHT_DIR`, as described below.
+The first two lines repeat the install above on purpose: the point of this block is that nothing has to be assembled from elsewhere. On the npx path, drop them and start with `npx artisign start ./my-project` instead.
 
-**Optional: screenshots.** `get_screenshot` and `inspect_node` need a real browser, which is intentionally not bundled (`npx artisign` stays light without it). Playwright is an **optional peer dependency** — npm neither installs it nor its ~150 MB of browser binaries unless you ask for them by name. Two ways to do that:
+**Screenshots.** `get_screenshot` and `inspect_node` render in a real browser — one that is already on your machine. Artisign finds Chrome, Edge, Brave, Chromium or Firefox by itself (in that order) and drives it headless through the browser's own remote protocol: the Chrome DevTools Protocol for the Chromium family, WebDriver BiDi for Firefox. Nothing to install, no Playwright, no browser download.
 
-1. **Next to Artisign.** In the directory you installed `artisign` into:
-
-   ```bash
-   npm install --no-save playwright && npx playwright install chromium
-   ```
-
-   `--no-save` matters: it installs the package without writing it into `package.json` or the lockfile, which is the whole point of Playwright being optional. Without the flag npm edits both files; with some npm versions a plain `npm install playwright` even reports `up to date` and installs nothing, because an optional peer counts as satisfied when absent.
-
-2. **Anywhere, named by `ARTISIGN_PLAYWRIGHT_DIR`.** Install Playwright once into a directory of its own and point Artisign at it:
-
-   ```bash
-   mkdir -p ~/.artisign-playwright && cd ~/.artisign-playwright
-   npm init -y >/dev/null && npm install playwright && npx playwright install chromium
-   export ARTISIGN_PLAYWRIGHT_DIR=~/.artisign-playwright   # in the shell that starts the daemon
-   ```
-
-   This is the route that also works when `artisign` runs from npx's cache, and the one to use when the first route leaves the repo dirty. The variable has to be set for the process that runs the daemon — for a stdio MCP server, that is the `env` block of the host's config.
-
-`artisign` imports Playwright dynamically, so without the variable Node resolves it from the tree `artisign` itself lives in: installing Playwright into your design project has no effect. If Playwright isn't installed, or is installed but broken (a partial copy, a symlink whose target is gone), both tools fail with the fix in the error message rather than crashing the server; every other tool works without it. A Playwright installed *after* the daemon started is picked up on the next call; a *repaired* one needs a daemon restart, and the error says so.
+- **Pick a browser explicitly** with `ARTISIGN_BROWSER=/path/to/browser` in the environment of the process that runs the daemon (for a stdio MCP server, the `env` block of the host's config). The name decides the protocol: a path containing `firefox` is driven over BiDi, anything else over CDP.
+- **Cross-browser check.** Both tools take an optional `browser` input (`"chrome"`, `"edge"`, `"brave"`, `"chromium"`, `"firefox"`), and every result names the browser and version that rendered it — so an agent can check the same screen in a second installed browser before calling it done.
+- **Each launch uses a fresh, throwaway profile** in `~/artisign-browser-profiles/`, removed when the browser closes. It lives under your home directory, not `/tmp`, because a Snap- or Flatpak-packaged Firefox cannot see `/tmp`.
+- **No browser installed** (a bare server or container): both tools fail with the fix in the error message; every other tool works without one. Installing `chromium` or `firefox-esr` from the distribution's packages is enough.
 
 **Register the MCP server.**
 
@@ -151,7 +136,7 @@ Daemon-level state — that config plus the `daemon.lock` holding the running pi
 
 `get_screenshot` renders a screen (or, given `node`, crops to one element) exactly the way the browser preview does — same parse, same `renderScreen` — and returns a PNG, so an agent can see what a write actually produced instead of only inspecting markup. Typical use: `write_html`/`patch_html`, then `get_screenshot` to review, then adjust.
 
-It needs Playwright — see the optional dependency in [Install](#install) above.
+It renders in a browser already installed on the machine, and the result names which one — see **Screenshots** under [Install](#install) above. Pass `browser` to check the same screen in another installed browser.
 
 `scale` (default `1`) is the screenshot's device scale factor — `1x` is enough for most visual review; go higher only when pixel-level detail matters, since a larger image costs more tokens once it reaches a model.
 

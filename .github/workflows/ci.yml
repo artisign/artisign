@@ -11,10 +11,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The floor `engines` promises and the version releases are built on.
-        # Without the floor, nothing checks that the package actually runs on
-        # the oldest Node it claims to support.
-        node-version: ["20.19.0", "22"]
+        # The floor `engines` promises and the current LTS. Without the floor,
+        # nothing checks that the package actually runs on the oldest Node it
+        # claims to support. Each driver protocol gets its own browser run:
+        # Chrome exercises the CDP adapter, Firefox the WebDriver BiDi one —
+        # both come preinstalled on the Ubuntu runner (ADR-007).
+        include:
+          - { node-version: "22.4.0", browser: google-chrome }
+          - { node-version: "24", browser: google-chrome }
+          - { node-version: "24", browser: firefox }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,14 +37,15 @@ jobs:
 
       - run: npm ci
 
-      # Playwright is an optional peer dependency, so the screenshot and
-      # inspect-node suites skip themselves when it is absent — a green run
-      # that never touched the browser path. Installing it here is what makes
-      # `npm test` an actual gate for `get_screenshot` and `inspect_node`.
-      - name: Install Playwright
+      # The screenshot and inspect-node suites skip themselves when no browser
+      # is found — a green run that never touched the browser path. Pinning
+      # the browser here makes `npm test` an actual gate for both protocols,
+      # and fails loudly if the runner image ever drops it.
+      - name: Pin the browser under test
         run: |
-          npm install --no-save playwright
-          npx playwright install --with-deps chromium
+          browser="$(command -v ${{ matrix.browser }})" || { echo "::error::${{ matrix.browser }} is not installed on this runner"; exit 1; }
+          echo "ARTISIGN_BROWSER=$browser" >> "$GITHUB_ENV"
+          "$browser" --version
 
       - run: npm run type-check
       - run: npm run lint

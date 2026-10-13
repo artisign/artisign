@@ -14,6 +14,7 @@ import { initProjectTool, importHtml, promoteToSystem, deleteEntity } from "./li
 import { replyComment } from "./comments.js";
 import { getScreenshot } from "./screenshot.js";
 import { inspectNode } from "./inspect-node.js";
+import { BROWSER_KINDS } from "./browser.js";
 import { setMeta } from "./meta.js";
 import { getGuide } from "./guide.js";
 import { writeMockup, getMockup, promoteMockup } from "./mockups.js";
@@ -101,7 +102,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "get_screen",
-    "One screen with comment/flow indicators. Tiered + field selection. view \"full\" adds variants (direct child screens with their variant_kind) and reached_from (screens with a flow into this one), each only when non-empty. fields: [\"rendered_html\"] at view \"full\" returns the resolved (component/token) render as a standalone HTML document — an MCP-only fallback for reading resolved output without Playwright; never included by default.",
+    "One screen with comment/flow indicators. Tiered + field selection. view \"full\" adds variants (direct child screens with their variant_kind) and reached_from (screens with a flow into this one), each only when non-empty. fields: [\"rendered_html\"] at view \"full\" returns the resolved (component/token) render as a standalone HTML document — an MCP-only fallback for reading resolved output without a browser render; never included by default.",
     {
       screen: z.string(),
       view: viewSchema.optional(),
@@ -349,8 +350,10 @@ export const TOOLS: ToolDefinition[] = [
       "width/height (e.g. style=\"width: 1440px; height: 900px\" on the root, or $tokens), 390x844 when undeclared — " +
       "change the root to change the frame; width is not accepted with screen. For a mockup, " +
       "width sets the viewport (default 390, height fixed 844) and the capture is always full-page, uncropped, " +
-      "since a variant can run taller than the fold. Requires Playwright " +
-      "(npm install playwright && npx playwright install chromium); scale defaults to 1x, higher scales cost more " +
+      "since a variant can run taller than the fold. Renders in a browser already installed on this machine " +
+      "(Chrome, Edge, Brave, Chromium or Firefox — nothing to install); the result names it. Pass browser " +
+      "(\"chrome\" | \"edge\" | \"brave\" | \"chromium\" | \"firefox\") to check the same design in another " +
+      "installed browser before calling it done. scale defaults to 1x, higher scales cost more " +
       "tokens once the image reaches a model.",
     {
       screen: z.string().optional(),
@@ -359,6 +362,7 @@ export const TOOLS: ToolDefinition[] = [
       mockup: z.string().optional(),
       variant: z.string().optional(),
       width: z.number().optional(),
+      browser: z.enum(BROWSER_KINDS).optional(),
     },
     (store, input) => getScreenshot(store, input as never),
   ),
@@ -370,8 +374,9 @@ export const TOOLS: ToolDefinition[] = [
       "geometry/alignment/color questions (\"is this button 44px tall?\", \"do these two elements align?\") — " +
       "text is far cheaper than vision tokens. Use get_screenshot instead when the question is visual (layout " +
       "looks right, imagery, overall composition). Also measures a node inside a component instance's slot fill " +
-      "when it carries an authored id. Requires Playwright, same as get_screenshot.",
-    { node: z.string() },
+      "when it carries an authored id. Renders in an installed browser, same as get_screenshot, and takes the same " +
+      "optional browser input for a cross-browser check.",
+    { node: z.string(), browser: z.enum(BROWSER_KINDS).optional() },
     (store, input) => inspectNode(store, input as never),
   ),
 

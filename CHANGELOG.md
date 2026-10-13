@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING:** `get_screenshot` and `inspect_node` no longer need Playwright or
+  a Chromium download. Artisign drives a browser that is already installed —
+  Chrome, Edge, Brave, Chromium (Chrome DevTools Protocol) or Firefox
+  (WebDriver BiDi) — headless, with a throwaway profile, through Node's built-in
+  WebSocket; no library is added. `ARTISIGN_BROWSER=<path>` picks a specific
+  executable. The optional `playwright` peer dependency and
+  `ARTISIGN_PLAYWRIGHT_DIR` are gone. (CHR-807, ADR-007)
+- **BREAKING:** Node.js ≥ 22.4 is required (was ≥ 20.19, which is end of life);
+  it provides the stable global `WebSocket` the driver uses. (CHR-807)
+- A mockup screenshot now reports the width of the PNG it returns — a variant
+  wider than its viewport was captured in full but reported at the viewport
+  width. (CHR-807)
+
+### Added
+
+- `get_screenshot` and `inspect_node` take an optional `browser` input
+  (`"chrome"`, `"edge"`, `"brave"`, `"chromium"`, `"firefox"`) for a
+  cross-browser check, and every result names the browser and version that
+  rendered it (`browser`). (CHR-807)
+
 ## [1.1.4] - 2026-10-02
 
 ### Added

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createRequire } from "node:module";
-import { PLAYWRIGHT_MISSING_MESSAGE } from "../tools/browser.js";
+import { NO_BROWSER_MESSAGE, selectBrowser } from "../tools/browser.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,7 +9,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { setupProject, type ProjectFixture } from "../tools/test-fixtures.js";
 import { createMcpServer } from "./server.js";
 import { TOOLS } from "../tools/index.js";
-import { __setPlaywrightImportForTests, __resetBrowserForTests } from "../tools/browser.js";
+import { __setBrowserForTests, __resetBrowserForTests } from "../tools/browser.js";
 import { INSTRUCTIONS } from "./instructions.js";
 
 /**
@@ -151,22 +151,20 @@ describe("MCP server — protocol-level", () => {
   // The remedy is only worth anything if it survives the trip to the
   // agent. The tool-level tests cover the ToolError itself; this one covers
   // what a connected client actually reads out of the response.
-  it("hands the agent the playwright install remedy as the tool error message", async () => {
+  it("hands the agent the no-browser remedy as the tool error message", async () => {
     await fx.store.writeScreen("home", `<div id="n1"></div>`);
-    // `browserPromise` is module-level: a browser cached by any earlier test
-    // would short-circuit the launch and silently bypass this mock.
     await __resetBrowserForTests();
-    __setPlaywrightImportForTests(() => Promise.reject(new Error("Cannot find module 'playwright'")));
+    __setBrowserForTests({ select: (kind) => selectBrowser(kind, { platform: "linux", env: { PATH: "/usr/bin" }, exists: () => false }) });
     try {
       const result = await client.callTool({ name: "get_screenshot", arguments: { screen: "home" } });
       expect(result.isError).toBe(true);
       const content = result.content as Array<{ type: string; text: string }>;
       expect(JSON.parse(content[0]!.text)).toEqual({
         code: "io_error",
-        message: PLAYWRIGHT_MISSING_MESSAGE,
+        message: NO_BROWSER_MESSAGE,
       });
     } finally {
-      __setPlaywrightImportForTests(undefined);
+      __setBrowserForTests(undefined);
       await __resetBrowserForTests();
     }
   });

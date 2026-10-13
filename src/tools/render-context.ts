@@ -183,7 +183,7 @@ export type RenderedScreenForBrowser = RenderedScreenDocument & { rootNode: Inte
  * Shared preamble for the headless-render tools (`get_screenshot`,
  * `inspect_node`): render the screen, translate `store.readScreen`'s ENOENT
  * into a `not_found` ToolError, and resolve the root's viewport. What each
- * tool does with a live Playwright page after this point differs enough
+ * tool does with a live browser page after this point differs enough
  * (full vs. node-clipped screenshot vs. a single `page.evaluate` geometry
  * read) that it isn't folded in here too.
  */

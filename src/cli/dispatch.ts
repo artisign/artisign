@@ -7,6 +7,7 @@ import { runStop } from "./stop.js";
 import { runStatus } from "./status.js";
 import { parseStartArgs } from "./args.js";
 import { runSetup, type SetupOptions } from "./setup.js";
+import { runUpdate, runRepin } from "./update.js";
 import { readVersion } from "../version.js";
 
 export const USAGE = [
@@ -28,6 +29,7 @@ export const USAGE = [
   "  serve [--port N] [dir...]               run in the foreground",
   "  init [dir]                              scaffold a new project",
   "  setup [--yes] [--remove]                connect your AI tools to Artisign (or disconnect them)",
+  "  update                                  install the latest version and re-pin your AI tool entries",
   "  mcp                                     stdio connection for AI tools; starts Artisign if needed",
   "  help [command]                          show this help, or the help of one command",
   "",
@@ -97,6 +99,16 @@ export const COMMAND_HELP: Record<string, string> = {
     "Example:",
     "  artisign setup",
   ].join("\n"),
+  update: [
+    "Usage: artisign update",
+    "",
+    "Install the latest artisign globally (`npm install -g artisign@latest`), then re-pin the `artisign` entries",
+    "in your AI tools to it and restart a running Artisign. Does nothing when you are already on the latest version.",
+    "Also available as `artisign --update`. Installed with pnpm, bun or yarn, it prints the matching command instead.",
+    "",
+    "Example:",
+    "  artisign update",
+  ].join("\n"),
   status: [
     "Usage: artisign status",
     "",
@@ -122,6 +134,8 @@ export type CliDeps = {
   runServe: typeof runServe;
   runMcp: (cliEntry: string) => Promise<void>;
   runSetup: (opts: SetupOptions) => Promise<number>;
+  runUpdate: () => Promise<number>;
+  runRepin: (cliEntry: string) => Promise<void>;
   runDaemonForeground: typeof runDaemonForeground;
   runStart: (opts: StartOptions) => Promise<void>;
   runStop: () => Promise<void>;
@@ -135,6 +149,8 @@ export const defaultCliDeps: CliDeps = {
   runServe,
   runMcp,
   runSetup,
+  runUpdate,
+  runRepin,
   runDaemonForeground,
   runStart,
   runStop,
@@ -156,7 +172,8 @@ function parseStart(argv: string[]): { port?: number; projects: string[]; noOpen
  * first argument is not, and is an unknown command like any other word.
  */
 export async function dispatch(argv: string[], cliEntry: string, deps: CliDeps = defaultCliDeps): Promise<number> {
-  const [command, ...rest] = argv;
+  const [first, ...rest] = argv;
+  const command = first === "--update" ? "update" : first;
 
   if (command === "--version" || command === "-v") {
     deps.log(readVersion());
@@ -245,6 +262,17 @@ async function run(
       }
       return deps.runSetup({ yes: rest.includes("--yes"), remove: rest.includes("--remove"), cliEntry });
     }
+    case "update":
+      if (rest.length > 0) {
+        deps.error(`Unknown option: ${rest[0]}`);
+        deps.error(HINT);
+        return 1;
+      }
+      return deps.runUpdate();
+    // Internal: run by the freshly installed version at the end of `update`.
+    case "__repin":
+      await deps.runRepin(cliEntry);
+      return 0;
     case "start": {
       const { port, projects, noOpen } = parseStart(rest);
       await deps.runStart({ port, projects, cliEntry, noOpen });

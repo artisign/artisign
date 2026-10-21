@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { initProject } from "../init/init-project.js";
 import { runServe } from "./serve.js";
 import { runMcp } from "./mcp.js";
@@ -8,21 +9,102 @@ import { runStatus } from "./status.js";
 import { parseStartArgs } from "./args.js";
 
 export const USAGE = [
-  "Usage: artisign [start] [--port N] [--no-open] [dir...]",
-  "       artisign <init|stop|status|serve|mcp> [options] [dir]",
+  "Artisign: a local design tool your AI tool drives and you review in the browser.",
   "",
-  "  (no command)                same as start",
-  "  init [dir]                  scaffold a new project",
-  "  start [--port N] [--no-open] [dir...]",
-  "                              start the daemon in the background and open the preview in the",
-  "                              browser (--no-open or ARTISIGN_NO_OPEN=1 to skip)",
-  "  status                      pid, port, open projects",
-  "  stop                        stop the daemon",
-  "  serve [--port N] [dir...]   run the daemon in the foreground",
-  "  mcp [dir]                   stdio MCP server for Claude Desktop / Claude Code",
+  "Get started:",
+  "  1. Install once:   npm install -g artisign",
+  "  2. Run `artisign`  (starts Artisign and, on first run, connects your AI tool)",
+  "  3. Ask your AI tool to create or open a project",
   "",
+  "Update: `artisign update`",
+  "",
+  "Usage: artisign [command] [options]",
+  "",
+  "Commands:",
+  "  start [--port N] [--no-open] [dir...]   start in the background and open the preview (the default)",
+  "  status                                  pid, port, open projects",
+  "  stop                                    stop the background process",
+  "  serve [--port N] [dir...]               run in the foreground",
+  "  init [dir]                              scaffold a new project",
+  "  mcp [dir]                               stdio MCP server for Claude Desktop / Claude Code",
+  "  help [command]                          show this help, or the help of one command",
+  "",
+  "Options:",
+  "  -h, --help      show help (also: artisign <command> --help)",
+  "  -v, --version   print the version",
+  "",
+  "A project is a folder holding your screens, design system and comments as plain files.",
   "Without --port the port comes from the config in ARTISIGN_HOME, else 4711.",
 ].join("\n");
+
+/** Per-command help, keyed by command name. A command that has no entry here falls back to the top-level help. */
+export const COMMAND_HELP: Record<string, string> = {
+  start: [
+    "Usage: artisign start [--port N] [--no-open] [dir...]",
+    "",
+    "Start Artisign in the background and open the preview in the browser. This is what a bare",
+    "`artisign` does. Each dir is a project to open; without one, the current folder is opened.",
+    "",
+    "Options:",
+    "  --port N     listen on this port (default: the port from the config, else 4711)",
+    "  --no-open    do not open the browser (or set ARTISIGN_NO_OPEN=1)",
+    "",
+    "Example:",
+    "  artisign start --no-open ./my-project",
+  ].join("\n"),
+  serve: [
+    "Usage: artisign serve [--port N] [dir...]",
+    "",
+    "Run Artisign in the foreground, logging to the terminal. Stop it with Ctrl+C.",
+    "",
+    "Options:",
+    "  --port N     listen on this port (default: the port from the config, else 4711)",
+    "",
+    "Example:",
+    "  artisign serve --port 4800 ./my-project",
+  ].join("\n"),
+  init: [
+    "Usage: artisign init [dir]",
+    "",
+    "Scaffold an empty project (artisign.json, design system, screens) in dir, default the current folder.",
+    "",
+    "Example:",
+    "  artisign init ./my-project",
+  ].join("\n"),
+  mcp: [
+    "Usage: artisign mcp [dir]",
+    "",
+    "Run a stdio MCP server for Claude Desktop or Claude Code, serving the project in dir (default the",
+    "current folder). It starts the background process if it is not running.",
+    "",
+    "Example:",
+    "  claude mcp add artisign -- artisign mcp ./my-project",
+  ].join("\n"),
+  status: [
+    "Usage: artisign status",
+    "",
+    "Print the pid, the port and the open projects of the running background process.",
+    "",
+    "Example:",
+    "  artisign status",
+  ].join("\n"),
+  stop: [
+    "Usage: artisign stop",
+    "",
+    "Stop the background process started by `artisign start`.",
+    "",
+    "Example:",
+    "  artisign stop",
+  ].join("\n"),
+};
+
+/** The package version, read from package.json at runtime (two levels up from both src/cli and dist/cli). */
+export function readVersion(): string {
+  const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
+  return pkg.version;
+}
+
+const HINT = "Run `artisign help` for usage.";
 
 export type CliDeps = {
   initProject: (dir: string) => Promise<unknown>;
@@ -63,14 +145,60 @@ function parseStart(argv: string[]): { port?: number; projects: string[]; noOpen
 export async function dispatch(argv: string[], cliEntry: string, deps: CliDeps = defaultCliDeps): Promise<number> {
   const [command, ...rest] = argv;
 
+  if (command === "--version" || command === "-v") {
+    deps.log(readVersion());
+    return 0;
+  }
+
+  if (command === "help") {
+    const topic = rest[0];
+    if (topic === undefined) {
+      deps.log(USAGE);
+      return 0;
+    }
+    return printCommandHelp(topic, deps);
+  }
+
   // Anywhere in the line, not just as the command — `serve --help` is at
   // least as likely a way to discover the flags as `artisign --help`, and
   // the option guard in parseStartArgs would otherwise reject it.
   if (argv.includes("--help") || argv.includes("-h")) {
+    if (command !== undefined && Object.hasOwn(COMMAND_HELP, command)) return printCommandHelp(command, deps);
     deps.log(USAGE);
     return 0;
   }
 
+  try {
+    return await run(command, rest, argv, cliEntry, deps);
+  } catch (err) {
+    // A mistyped option is a usage mistake, not a crash: one line and a pointer, not a stack or the full usage.
+    if (err instanceof Error && err.message.startsWith("Unknown option:")) {
+      deps.error(err.message);
+      deps.error(HINT);
+      return 1;
+    }
+    throw err;
+  }
+}
+
+function printCommandHelp(command: string, deps: CliDeps): number {
+  const text = Object.hasOwn(COMMAND_HELP, command) ? COMMAND_HELP[command] : undefined;
+  if (text === undefined) {
+    deps.error(`Unknown command: ${command}`);
+    deps.error(HINT);
+    return 1;
+  }
+  deps.log(text);
+  return 0;
+}
+
+async function run(
+  command: string | undefined,
+  rest: string[],
+  argv: string[],
+  cliEntry: string,
+  deps: CliDeps,
+): Promise<number> {
   if (command === undefined || command.startsWith("-")) {
     const { port, projects, noOpen } = parseStart(argv);
     await deps.runStart({ port, projects, cliEntry, noOpen });
@@ -109,7 +237,7 @@ export async function dispatch(argv: string[], cliEntry: string, deps: CliDeps =
     }
     default:
       deps.error(`Unknown command: ${command}`);
-      deps.error(USAGE);
+      deps.error(HINT);
       return 1;
   }
 }

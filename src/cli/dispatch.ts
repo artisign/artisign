@@ -89,7 +89,7 @@ export const COMMAND_HELP: Record<string, string> = {
   setup: [
     "Usage: artisign setup [--yes] [--remove]",
     "",
-    "Connect Claude Code and Claude Desktop to Artisign. For each one found, asks, then writes a user-level",
+    "Connect your AI tools to Artisign (Claude Code, Claude Desktop, Cursor, Codex CLI, VS Code, opencode). For each one found, asks, then writes a user-level",
     "entry named `artisign` that runs `npx -y artisign@<version> mcp`, pinned to the version running setup.",
     "Run it again after an update to re-pin. Other entries and settings are left untouched.",
     "",

@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-21
+
 One install path and a per-call project: Artisign is installed once with `npm install -g artisign`, connects to your
 AI tools itself, and every tool call names its project.
 

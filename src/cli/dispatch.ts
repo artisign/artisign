@@ -75,7 +75,7 @@ export const COMMAND_HELP: Record<string, string> = {
     "Usage: artisign mcp [dir]",
     "",
     "Run a stdio MCP server for Claude Desktop or Claude Code, serving the project in dir (default the",
-    "current folder). It starts the background process if it is not running.",
+    "current folder). It runs in-process and does not start the background process.",
     "",
     "Example:",
     "  claude mcp add artisign -- artisign mcp ./my-project",
@@ -163,7 +163,7 @@ export async function dispatch(argv: string[], cliEntry: string, deps: CliDeps =
   // least as likely a way to discover the flags as `artisign --help`, and
   // the option guard in parseStartArgs would otherwise reject it.
   if (argv.includes("--help") || argv.includes("-h")) {
-    if (command !== undefined && Object.hasOwn(COMMAND_HELP, command)) return printCommandHelp(command, deps);
+    if (command !== undefined && !command.startsWith("-")) return printCommandHelp(command, deps);
     deps.log(USAGE);
     return 0;
   }

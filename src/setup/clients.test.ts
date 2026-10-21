@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { defaultClientEnv, cursor, codex, type Client, type ClientEnv } from "./clients.js";
+import { defaultClientEnv, cursor, codex, vscode, type Client, type ClientEnv } from "./clients.js";
 import { connectClients, disconnectClients } from "./connect.js";
 
 let root: string;
@@ -107,5 +107,27 @@ describe("Codex CLI", () => {
     expect(written.match(/\[mcp_servers\.artisign\]/g)).toHaveLength(1);
     await disconnectClients(env(), [codex]);
     expect(await readFile(file(), "utf8")).toBe(other);
+  });
+});
+
+describe("VS Code", () => {
+  const file = (): string => join(home, "Library", "Application Support", "Code", "User", "mcp.json");
+
+  it("is detected by its user directory", async () => {
+    expect((await vscode.detect(env())).found).toBe(false);
+    await mkdir(dirname(file()), { recursive: true });
+    expect((await vscode.detect(env())).found).toBe(true);
+  });
+
+  it("writes a stdio entry under `servers` and keeps the rest", async () => {
+    await expectContract(vscode, file(), "servers");
+    await connectClients({ version: "5.0.0", env: env(), clients: [vscode] });
+    const entry = ((await readJson(file())).servers as Record<string, { type: string; command: string }>).artisign;
+    expect(entry?.type).toBe("stdio");
+    expect(entry?.command).toBe(join(bin, "npx"));
+  });
+
+  it("uses ~/.config/Code/User on Linux", async () => {
+    await expectContract(vscode, join(home, ".config", "Code", "User", "mcp.json"), "servers", "linux");
   });
 });

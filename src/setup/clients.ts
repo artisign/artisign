@@ -288,4 +288,30 @@ export const codex: Client = {
   },
 };
 
-export const CLIENTS: Client[] = [claudeCode, claudeDesktop, cursor, codex];
+/** VS Code's user-profile data directory. The docs name `mcp.json` in the user profile but not its path; these are VS Code's standard locations. */
+function vscodeUserDir(env: ClientEnv): string | undefined {
+  if (env.platform === "darwin") return join(env.home, "Library", "Application Support", "Code", "User");
+  if (env.platform === "linux") return join(env.home, ".config", "Code", "User");
+  return undefined;
+}
+
+/** VS Code: user-profile `mcp.json`, top-level `servers`, `{type: "stdio", command, args, env}`. A GUI app, so absolute npx. */
+export const vscode: Client = {
+  name: "VS Code",
+  async detect(env) {
+    const dir = vscodeUserDir(env);
+    const found = dir !== undefined && (await exists(dir));
+    return { found, hasEntry: found && (await hasServerEntry(join(dir, "mcp.json"), "servers")) };
+  },
+  async write(env, version) {
+    const dir = vscodeUserDir(env);
+    if (dir === undefined) throw new Error("VS Code's user directory is unknown on this platform");
+    await editServers(join(dir, "mcp.json"), { type: "stdio", ...(await absoluteNpxEntry(env, version)) }, "servers");
+  },
+  async remove(env) {
+    const dir = vscodeUserDir(env);
+    if (dir !== undefined && (await exists(join(dir, "mcp.json")))) await editServers(join(dir, "mcp.json"), undefined, "servers");
+  },
+};
+
+export const CLIENTS: Client[] = [claudeCode, claudeDesktop, cursor, codex, vscode];

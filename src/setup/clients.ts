@@ -232,4 +232,60 @@ export const cursor: Client = {
   },
 };
 
-export const CLIENTS: Client[] = [claudeCode, claudeDesktop, cursor];
+// Codex CLI keeps its servers in TOML tables. Rather than a TOML library, the `artisign` tables are cut out and
+// re-appended as text: a header line `[mcp_servers.artisign]` (or a sub-table such as `.env`) runs to the next header.
+const CODEX_TABLE = /^\s*\[\s*mcp_servers\s*\.\s*("artisign"|artisign)\s*(\.[^\]]*)?\]/;
+const TOML_HEADER = /^\s*\[/;
+
+function withoutCodexEntry(toml: string): string {
+  const kept: string[] = [];
+  let skipping = false;
+  for (const line of toml.split("\n")) {
+    if (TOML_HEADER.test(line)) skipping = CODEX_TABLE.test(line);
+    if (!skipping) kept.push(line);
+  }
+  return kept.join("\n").replace(/\n+$/, "");
+}
+
+async function editCodexConfig(path: string, version: string | undefined): Promise<void> {
+  let text = "";
+  let mode: number | undefined;
+  try {
+    text = await readFile(path, "utf8");
+    mode = (await stat(path)).mode & 0o777;
+  } catch {
+    // A missing file is created.
+  }
+  const rest = withoutCodexEntry(text);
+  const entry =
+    version === undefined
+      ? ""
+      : `[mcp_servers.artisign]\ncommand = "npx"\nargs = ${JSON.stringify(npxArgs(version))}\n`;
+  const out = [rest, entry].filter((part) => part !== "").join("\n\n");
+  await atomicWrite(path, out === "" ? "" : `${out.replace(/\n*$/, "")}\n`, mode);
+}
+
+/** Codex CLI: `~/.codex/config.toml`, table `[mcp_servers.artisign]` (https://developers.openai.com/codex/mcp). A terminal tool, so plain `npx`. */
+export const codex: Client = {
+  name: "Codex CLI",
+  async detect(env) {
+    const path = join(env.home, ".codex", "config.toml");
+    const found = (await exists(join(env.home, ".codex"))) || (await findOnPath("codex", env.pathEnv)) !== undefined;
+    let hasEntry = false;
+    try {
+      hasEntry = (await readFile(path, "utf8")).split("\n").some((line) => CODEX_TABLE.test(line));
+    } catch {
+      // No file, no entry.
+    }
+    return { found, hasEntry };
+  },
+  async write(env, version) {
+    await editCodexConfig(join(env.home, ".codex", "config.toml"), version);
+  },
+  async remove(env) {
+    const path = join(env.home, ".codex", "config.toml");
+    if (await exists(path)) await editCodexConfig(path, undefined);
+  },
+};
+
+export const CLIENTS: Client[] = [claudeCode, claudeDesktop, cursor, codex];

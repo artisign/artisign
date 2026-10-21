@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { defaultClientEnv, cursor, type Client, type ClientEnv } from "./clients.js";
+import { defaultClientEnv, cursor, codex, type Client, type ClientEnv } from "./clients.js";
 import { connectClients, disconnectClients } from "./connect.js";
 
 let root: string;
@@ -73,3 +73,39 @@ describe("Cursor", () => {
   });
 });
 
+
+describe("Codex CLI", () => {
+  const file = (): string => join(home, ".codex", "config.toml");
+
+  it("is detected by ~/.codex or a codex binary on PATH", async () => {
+    expect(await codex.detect(env())).toEqual({ found: false, hasEntry: false });
+    await writeFile(join(bin, "codex"), "#!/bin/sh\n");
+    await chmod(join(bin, "codex"), 0o755);
+    expect((await codex.detect(env())).found).toBe(true);
+    await rm(join(bin, "codex"));
+    await mkdir(join(home, ".codex"));
+    expect((await codex.detect(env())).found).toBe(true);
+  });
+
+  it("creates the file with the table and plain npx", async () => {
+    await mkdir(join(home, ".codex"));
+    await connectClients({ version: "5.0.0", env: env(), clients: [codex] });
+    expect(await readFile(file(), "utf8")).toBe('[mcp_servers.artisign]\ncommand = "npx"\nargs = ["-y","artisign@5.0.0","mcp"]\n');
+    expect((await codex.detect(env())).hasEntry).toBe(true);
+  });
+
+  it("replaces our tables (sub-tables too), keeps everything else and removes only ours", async () => {
+    const other = '# my settings\nmodel = "gpt-x"\n\n[mcp_servers.keep]\ncommand = "k"\nargs = ["a"]\n\n[profiles.fast]\nmodel = "m"\n';
+    const ours = '\n[mcp_servers.artisign]\ncommand = "old"\n\n[mcp_servers.artisign.env]\nX = "1"\n';
+    await writeAt(file(), other + ours);
+    await connectClients({ version: "6.0.0", env: env(), clients: [codex] });
+    const written = await readFile(file(), "utf8");
+    expect(written.startsWith(other.trimEnd())).toBe(true);
+    expect(written).toContain("artisign@6.0.0");
+    expect(written).not.toContain('"old"');
+    expect(written).not.toContain("X = ");
+    expect(written.match(/\[mcp_servers\.artisign\]/g)).toHaveLength(1);
+    await disconnectClients(env(), [codex]);
+    expect(await readFile(file(), "utf8")).toBe(other);
+  });
+});

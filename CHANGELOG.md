@@ -35,21 +35,25 @@ AI tools itself, and every tool call names its project.
   (`~/.codex/config.toml`), VS Code (user-profile `mcp.json`) and opencode (`~/.config/opencode/opencode.json`) with one
   user-level `artisign` entry each, running `npx -y artisign@<version> mcp` pinned to the version that ran setup. It asks
   per detected tool (`--yes` skips the questions and is the only way to run without a terminal), replaces an existing
-  entry, leaves every other entry and setting untouched, and restarts a running Artisign of another version.
+  entry, leaves every other entry and setting untouched, and restarts a running Artisign of an older version.
   `artisign setup --remove` removes exactly the `artisign` entries. Claude Code is driven through its own `claude mcp`
-  CLI; Claude Desktop gets absolute paths to `npx` and `node`, since a GUI app does not inherit the shell's PATH.
-  (CHR-833, CHR-836, CHR-837, CHR-838, CHR-839)
+  CLI and Codex CLI through `codex mcp add/remove` when it is on PATH (`CODEX_HOME` is honoured). GUI clients (Claude
+  Desktop, Cursor, VS Code) get an absolute path to the `npx` found on PATH, since a GUI app does not inherit the
+  shell's PATH. A config file with comments or trailing commas is not rewritten — setup prints the entry to add by
+  hand — and a symlinked config is written through. (CHR-833, CHR-836, CHR-837, CHR-838, CHR-839)
 - `artisign` (and `artisign start`) offers once, in a terminal and outside CI, to connect the AI tools it finds when none
   of them has an `artisign` entry yet. Answering no is remembered (`setupDeclined` in `~/.artisign/config.json`);
   `artisign setup` works any time. (CHR-835)
 - `artisign update` (also `artisign --update`) installs the latest version with `npm install -g artisign@latest`, then
   the newly installed version re-pins every existing `artisign` entry in your AI tools and restarts a running Artisign
-  of an older version with its open projects. It does nothing when you are already on the latest version, never uses
-  sudo, and on a pnpm, bun or yarn install prints the matching command instead; through npx it points to the global
-  install. (CHR-881)
+  of an older version, on its port and with its open projects (a newer one is left alone). It does nothing when you are
+  already on the latest version and never uses sudo: when npm is denied permission it prints the fix (a Node you own, or
+  `npm config set prefix ~/.npm-global`). On a pnpm, bun or yarn install it prints the matching command instead; through
+  npx it points to the global install. (CHR-881)
 - `artisign` / `artisign start` checks the npm registry for a newer release at most once every 24 hours and prints
   `New version x.y.z — run artisign update` on stderr when there is one. The check never delays or fails a start, is
-  skipped when `CI` is set or stdout is not a terminal, and is turned off with `ARTISIGN_NO_UPDATE_CHECK=1`. (CHR-882)
+  skipped when `CI` is set or stdout is not a terminal, and is turned off with `ARTISIGN_NO_UPDATE_CHECK=1`. A newer
+  cached version is printed straight from the cache. (CHR-882)
 - `list_projects` lists every project the daemon has opened or created, as `{ name, root, open }`; `init_project` now
   returns `project`, the name to pass in later calls (the root when the name is taken). (CHR-829)
 - The project dialogs in the preview can create a new folder, and the empty state offers a ready-made prompt for your AI

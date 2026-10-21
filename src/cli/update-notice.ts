@@ -55,13 +55,6 @@ async function readCache(): Promise<Cache | undefined> {
   }
 }
 
-let inFlight: AbortController | undefined;
-
-/** Cancels a registry request still in flight, so a finished command exits at once instead of waiting for it. */
-export function abortUpdateCheck(): void {
-  inFlight?.abort();
-}
-
 const defaultDeps: UpdateNoticeDeps = {
   env: process.env,
   isTTY: process.stdout.isTTY === true,
@@ -86,10 +79,13 @@ export async function checkForUpdate(deps: UpdateNoticeDeps = defaultDeps): Prom
     const cache = await readCache();
     const printedFromCache = cache !== undefined && isNewer(cache.latest, current);
     if (printedFromCache) notice(cache.latest);
-    if (cache && deps.now() - cache.checkedAt < DAY_MS) return;
+    // A checkedAt in the future (clock was ahead when it was written) counts as stale, not as fresh forever.
+    const age = cache ? deps.now() - cache.checkedAt : -1;
+    if (age >= 0 && age < DAY_MS) return;
 
-    inFlight = new AbortController();
-    const res = await deps.fetch(DIST_TAGS_URL, { signal: AbortSignal.any([inFlight.signal, AbortSignal.timeout(TIMEOUT_MS)]) });
+    // Not aborted when the command finishes: a running daemon makes `start` return within a millisecond,
+    // which would cancel every check. At most once a day the exit waits for this request (≤ TIMEOUT_MS).
+    const res = await deps.fetch(DIST_TAGS_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!res.ok) return;
     const { latest } = (await res.json()) as { latest?: unknown };
     if (typeof latest !== "string" || parseVersion(latest) === undefined) return;

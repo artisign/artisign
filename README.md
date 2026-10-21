@@ -28,7 +28,7 @@ artisign
 
 **Requirements.** Node.js ≥ 22.4 on **macOS or Linux** — Windows is not supported (the store's atomic writes and path handling have never been verified there, so `package.json` makes `npm install` refuse the platform). For screenshots, a browser that is already installed: Chrome, Edge, Brave, Chromium or Firefox — see **Screenshots** below.
 
-**Updating.** Run `artisign update` (also `artisign --update`). It installs the latest version with `npm install -g artisign@latest`, re-pins the `artisign` entries in your AI tools to it and restarts a running Artisign of an older version with its open projects. Nothing is updated automatically: `artisign` checks the npm registry for a newer release at most once a day and prints one line (`New version x.y.z — run artisign update`) when there is one. Set `ARTISIGN_NO_UPDATE_CHECK=1` to turn that off.
+**Updating.** Run `artisign update` (also `artisign --update`). It installs the latest version with `npm install -g artisign@latest`, re-pins the `artisign` entries in your AI tools to it and restarts a running Artisign of an older version with its open projects. It does nothing when you are already on the latest version, and never uses `sudo`. Nothing is updated automatically: `artisign` checks the npm registry for a newer release at most once a day and prints one line (`New version x.y.z — run artisign update`) when there is one. Set `ARTISIGN_NO_UPDATE_CHECK=1` to turn that off.
 
 **Troubleshooting.**
 
@@ -42,7 +42,7 @@ artisign
 - **Each launch uses a fresh, throwaway profile** in `~/artisign-browser-profiles/`, removed when the browser closes. It lives under your home directory, not `/tmp`, because a Snap- or Flatpak-packaged Firefox cannot see `/tmp`.
 - **No browser installed** (a bare server or container): both tools fail with the fix in the error message; every other tool works without one. Installing `chromium` or `firefox-esr` from the distribution's packages is enough.
 
-**Privacy.** Artisign collects nothing — no telemetry, no account, no server beyond the local one it runs. Three things reach the network, none of them about you: the once-a-day update check asks `registry.npmjs.org` for the latest version (and sends nothing else); `import_html` fetches whatever URL you hand it; and the first render of a project fetches the font families named in your tokens — plus the Material Symbols Rounded icon font, always — from Google Fonts, then caches them locally (see [Fonts & icons](#fonts--icons)).
+**Privacy.** Artisign collects nothing — no telemetry, no account, no server beyond the local one it runs. These requests reach the network, none of them about you, and that is the complete list: the update check (at most once a day) asks `registry.npmjs.org` for the latest version and sends nothing else; `artisign update` runs `npm`, and the `npx` in your AI tool's entry fetches the pinned version from npm, both talking to the npm registry; `import_html` fetches whatever URL you hand it; and the first render of a project fetches the font families named in your tokens — plus the Material Symbols Rounded icon font, always (a copy shipped with the package is the fallback when that fails) — from Google Fonts, then caches them locally (see [Fonts & icons](#fonts--icons)). Everything else stays on `127.0.0.1`.
 
 ## Quickstart
 
@@ -68,7 +68,7 @@ Artisign is **multi-project**: one process on `127.0.0.1:4711` holds several pro
 
 ## Advanced
 
-**Connecting an AI tool.** `artisign setup` connects Claude Code, Claude Desktop, Cursor, Codex CLI, VS Code and opencode. For each one it finds, it asks, then writes a user-level entry named `artisign` that runs `npx -y artisign@<version> mcp`, pinned to the version that ran setup; other entries and settings are left untouched. `--yes` connects every tool found without asking (the only way to run without a terminal); `artisign setup --remove` removes exactly the `artisign` entries. Run it again after an update to re-pin (`artisign update` does so for you).
+**Connecting an AI tool.** `artisign setup` connects Claude Code, Claude Desktop, Cursor, Codex CLI, VS Code and opencode. For each one it finds, it asks, then writes a user-level entry named `artisign` that runs `npx -y artisign@<version> mcp`, pinned to the version that ran setup; other entries and settings are left untouched. Claude Code is driven through its own `claude mcp` CLI and Codex CLI through `codex mcp add/remove` (it honours `CODEX_HOME`) when those are on your `PATH`; GUI clients (Claude Desktop, Cursor, VS Code) get the `npx` found on your `PATH`, as an absolute path, because they do not inherit your shell's. A config file that holds comments or trailing commas is never rewritten — setup prints the entry to add by hand instead — and a symlinked config is written through. `--yes` connects every tool found without asking (the only way to run without a terminal); `artisign setup --remove` removes exactly the `artisign` entries. Run it again after an update to re-pin (`artisign update` does so for you).
 
 **Manual entry.** If you don't run setup, add the same stdio server to your AI tool by hand — command `npx`, args `["-y", "artisign@<version>", "mcp"]` (use the version you installed; `artisign --version`):
 

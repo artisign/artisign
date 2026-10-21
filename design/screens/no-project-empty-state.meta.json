@@ -1,8 +1,9 @@
 {
-  "notes": "What the daemon shows before any project is open. The topbar collapses to the title and a dashed project picker; both actions lead into the project dialogs.",
+  "notes": "What the daemon shows before any project is open. The topbar collapses to the title and a dashed project picker; both buttons lead into the project dialogs.\n\nCHR-831: the card now names both paths. Copy: \"Artisign is running, but no project is open yet. Open or create one here, or ask your AI tool to do it.\" Below the buttons, `empty-ai` (surface-subtle box, mono prompt) reads \"OR ASK YOUR AI TOOL\" / \"Create an Artisign project in ~/work/acme\" / \"To pick up an existing one, ask: “Open my project acme”.\" The prompt is an example, not a button; it is the main path once the AI tool is connected via `artisign` setup.",
   "tags": [
     "empty-state",
     "dialog",
-    "chr-739"
+    "chr-739",
+    "chr-831"
   ]
 }

@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-831 error state: name already exists. `$new-folder-row` variant `error` (red input border, Create at 0.4 opacity, message below). Message: \"A folder named “scratch” already exists here.\" The row stays open and focused; editing the name clears the message.",
+  "tags": [
+    "dialog",
+    "chr-831"
+  ],
+  "variant_of": "init-project-dialog-new-folder",
+  "variant_kind": "state"
+}

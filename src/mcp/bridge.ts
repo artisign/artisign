@@ -16,20 +16,41 @@ type JsonRpcId = string | number | null;
 
 const REQUEST_HEADERS = { "content-type": "application/json", accept: "application/json, text/event-stream" };
 
-/** The `data:` payloads of the complete events in `buffer`, plus the unfinished tail. */
-function takeSseEvents(buffer: string): { messages: string[]; rest: string } {
-  const parts = buffer.split(/\r?\n\r?\n/);
-  const rest = parts.pop() ?? "";
-  const messages: string[] = [];
-  for (const part of parts) {
-    const data = part
-      .split(/\r?\n/)
-      .filter((line) => line.startsWith("data:"))
-      .map((line) => line.slice(5).replace(/^ /, ""))
-      .join("\n");
-    if (data !== "") messages.push(data);
-  }
-  return { messages, rest };
+const SEPARATOR = /\r?\n\r?\n/;
+
+/** The `data:` payload of one SSE event, or undefined when it has none. */
+function eventData(event: string): string | undefined {
+  const data = event
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).replace(/^ /, ""))
+    .join("\n");
+  return data === "" ? undefined : data;
+}
+
+/**
+ * Incremental SSE splitter. A separator is searched for only in the new text plus the last 3 characters before it (the
+ * most a separator can straddle), so a multi-megabyte event arriving in many chunks is scanned once, not once per chunk.
+ */
+function createSseSplitter(onData: (data: string) => void): (text: string) => void {
+  let parts: string[] = [];
+  let tail = "";
+  return function push(text: string): void {
+    const match = SEPARATOR.exec(tail + text);
+    if (!match) {
+      parts.push(text);
+      tail = (tail + text).slice(-3);
+      return;
+    }
+    const full = parts.join("") + text;
+    const end = full.length - text.length + (match.index - tail.length);
+    const rest = text.slice(match.index + match[0].length - tail.length);
+    parts = [];
+    tail = "";
+    const data = eventData(full.slice(0, end));
+    if (data !== undefined) onData(data);
+    if (rest !== "") push(rest);
+  };
 }
 
 /**
@@ -40,6 +61,7 @@ function takeSseEvents(buffer: string): { messages: string[]; rest: string } {
  */
 export function createBridge(deps: BridgeDeps): { handleMessage: (line: string) => Promise<void> } {
   let daemon: Promise<BridgeDaemon> | undefined;
+  const warnedVersions = new Set<string>();
 
   const connect = (): Promise<BridgeDaemon> => {
     daemon ??= deps.ensureDaemon().then(
@@ -59,7 +81,8 @@ export function createBridge(deps: BridgeDeps): { handleMessage: (line: string) 
     try {
       const res = await deps.fetch(`http://127.0.0.1:${d.port}/health`);
       const body = (await res.json()) as { version?: string };
-      if (body.version === deps.version) return;
+      if (body.version === deps.version || warnedVersions.has(String(body.version))) return;
+      warnedVersions.add(String(body.version));
       deps.warn(
         `artisign: the running daemon is ${body.version === undefined ? "an older version" : `v${body.version}`}, ` +
           `this bridge is v${deps.version}. Run \`artisign update\`; if you are already on the latest version, ` +
@@ -83,13 +106,8 @@ export function createBridge(deps: BridgeDeps): { handleMessage: (line: string) 
       return;
     }
     const decoder = new TextDecoder();
-    let buffer = "";
-    for await (const chunk of res.body) {
-      buffer += decoder.decode(chunk, { stream: true });
-      const { messages, rest } = takeSseEvents(buffer);
-      buffer = rest;
-      for (const message of messages) deps.write(JSON.stringify(JSON.parse(message)));
-    }
+    const push = createSseSplitter((data) => deps.write(JSON.stringify(JSON.parse(data))));
+    for await (const chunk of res.body) push(decoder.decode(chunk, { stream: true }));
   };
 
   const fail = (id: JsonRpcId | undefined, message: string): void => {

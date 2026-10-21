@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile, stat, symlink } from "node:fs/promises";
+import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { initProject } from "../init/init-project.js";
 import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
 import { ProjectRegistry } from "./project-registry.js";
-import { readGlobalConfig } from "./global-config.js";
+import { readGlobalConfig, writeGlobalConfig } from "./global-config.js";
 import { FsStore } from "../store/index.js";
 import { ensureFontsCached, isMaterialSymbolsAvailable, __setFetchForTests, __resetFontMemoForTests } from "../model/fonts.js";
 
@@ -268,6 +269,96 @@ describe("ProjectRegistry", () => {
     expect(recentProjects).toHaveLength(10);
     expect(recentProjects[0]).toBe(extraDirs[extraDirs.length - 1]);
     expect(recentProjects).not.toContain(dirA);
+  });
+
+  it("persists every opened project in knownProjects, uncapped, without duplicates", async () => {
+    const dirs12 = await Promise.all(Array.from({ length: 12 }, () => makeProject()));
+    for (const dir of dirs12) await registry.open(dir);
+    await registry.open(dirs12[0]!);
+
+    const known = (await readGlobalConfig()).knownProjects ?? [];
+    expect(known).toEqual(dirs12.map((d) => realpathSync(d)));
+    expect((await readGlobalConfig()).recentProjects).toHaveLength(10);
+  });
+
+  it("listKnown() reports name, root and open state", async () => {
+    const dirA = await makeProject();
+    const dirB = await makeProject();
+    await registry.open(dirA);
+    await registry.open(dirB);
+    await registry.close(dirB);
+
+    const nameOf = async (dir: string): Promise<string> => (await new FsStore(dir).readArtisignConfig()).name;
+    expect(await registry.listKnown()).toEqual([
+      { name: await nameOf(dirA), root: realpathSync(dirA), open: true },
+      { name: await nameOf(dirB), root: realpathSync(dirB), open: false },
+    ]);
+  });
+
+  it("listKnown() leaves out a project whose artisign.json is gone, but keeps it in the config", async () => {
+    const dirA = await makeProject();
+    const dirB = await makeProject();
+    await registry.open(dirA);
+    await registry.open(dirB);
+    await registry.close(dirB);
+    const dirBKey = realpathSync(dirB);
+    await rm(join(dirB, "artisign.json"));
+
+    expect((await registry.listKnown()).map((p) => p.root)).toEqual([realpathSync(dirA)]);
+    expect((await readGlobalConfig()).knownProjects).toContain(dirBKey);
+
+    await initProject(dirB);
+    expect((await registry.listKnown()).map((p) => p.root)).toEqual([realpathSync(dirA), dirBKey]);
+  });
+
+  it("listKnown() includes recentProjects from a config that predates knownProjects", async () => {
+    const dirA = await makeProject();
+    const dirB = await makeProject();
+    await writeGlobalConfig({ recentProjects: [dirA, dirB] });
+
+    expect((await registry.listKnown()).map((p) => [p.root, p.open])).toEqual([
+      [dirA, false],
+      [dirB, false],
+    ]);
+  });
+
+  it("the first open after the upgrade keeps all legacy recent projects (cap does not drop the oldest)", async () => {
+    const legacy = await Promise.all(Array.from({ length: 10 }, () => makeProject()));
+    await writeGlobalConfig({ recentProjects: legacy });
+    const fresh = await makeProject();
+
+    await registry.open(fresh);
+
+    const roots = (await registry.listKnown()).map((p) => realpathSync(p.root)).sort();
+    expect(roots).toEqual([...legacy, fresh].map((d) => realpathSync(d)).sort());
+  });
+
+  it("lists one folder once even when it is stored under two spellings", async () => {
+    const dir = await makeProject();
+    const linkContainer = await mkdtemp(join(tmpdir(), "artisign-registry-link-"));
+    dirs.push(linkContainer);
+    const link = join(linkContainer, "via-symlink");
+    await symlink(dir, link);
+    await writeGlobalConfig({ knownProjects: [link, dir] });
+
+    expect(await registry.listKnown()).toHaveLength(1);
+
+  });
+
+  it("stores a project under its canonical root, whatever spelling opened it", async () => {
+    const dir = await makeProject();
+    const linkContainer = await mkdtemp(join(tmpdir(), "artisign-registry-link-"));
+    dirs.push(linkContainer);
+    const link = join(linkContainer, "via-symlink");
+    await symlink(dir, link);
+
+    await registry.open(link);
+
+    expect((await readGlobalConfig()).knownProjects).toEqual([realpathSync(dir)]);
+  });
+
+  it("listKnown() is empty on a fresh home", async () => {
+    expect(await registry.listKnown()).toEqual([]);
   });
 
   it("concurrent opens of two different roots both land in recentProjects (no lost update)", async () => {

@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { access, readdir, stat } from "node:fs/promises";
+import { access, mkdir, readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { CONFIG_FILENAME } from "../init/artisign-config.js";
-import { sendJson } from "./json.js";
+import { sendJson, readJsonBody, PayloadTooLargeError } from "./json.js";
 
 async function pathExists(path: string): Promise<boolean> {
   return access(path)
@@ -26,6 +26,7 @@ type DirEntry = { name: string; path: string; isArtisignProject: boolean };
  */
 export async function handleFsApi(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
+  if (url.pathname === "/api/fs/dirs" && req.method === "POST") return createDir(req, res);
   if (url.pathname !== "/api/fs/dirs" || req.method !== "GET") return false;
 
   const pathParam = url.searchParams.get("path");
@@ -75,4 +76,67 @@ export async function handleFsApi(req: IncomingMessage, res: ServerResponse): Pr
   const parent = dirname(path);
   sendJson(res, 200, { path, parent: parent === path ? null : parent, entries, home: homedir() });
   return true;
+}
+
+/**
+ * `POST /api/fs/dirs` `{ parent, name }` — creates exactly one directory
+ * inside `parent` (the folder browser's "+ New folder"). `name` is a single
+ * path segment: separators, a leading `.` (incl. `.`/`..`) and empty names are rejected so the
+ * request can never escape `parent` or create nested folders. Failures keep
+ * distinct codes the UI maps to its copy: `validation_failed` 400,
+ * `not_found` 404 (parent missing), `already_exists` 409,
+ * `permission_denied` 403. Success is 201 with the new `{ name, path }`.
+ */
+async function createDir(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  let body: Record<string, unknown>;
+  try {
+    body = (await readJsonBody(req)) as Record<string, unknown>;
+  } catch (err) {
+    if (err instanceof PayloadTooLargeError) {
+      sendJson(res, 413, { code: "validation_failed", message: err.message });
+    } else {
+      sendJson(res, 400, { code: "validation_failed", message: "request body is not valid JSON" });
+    }
+    return true;
+  }
+
+  const { parent, name } = body ?? {};
+  if (typeof parent !== "string" || !isAbsolute(parent)) {
+    sendJson(res, 400, { code: "validation_failed", message: "parent must be an absolute path" });
+    return true;
+  }
+  const folderName = typeof name === "string" ? name.trim() : "";
+  if (!isValidFolderName(folderName)) {
+    sendJson(res, 400, {
+      code: "validation_failed",
+      message: "folder names can't start with \".\", contain / or \\, or be empty",
+    });
+    return true;
+  }
+
+  const path = join(resolve(parent), folderName);
+  try {
+    await mkdir(path);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EEXIST") {
+      sendJson(res, 409, { code: "already_exists", message: `a folder named "${folderName}" already exists here` });
+    } else if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
+      sendJson(res, 403, { code: "permission_denied", message: `permission denied: ${resolve(parent)}` });
+    } else if (code === "ENAMETOOLONG") {
+      sendJson(res, 400, { code: "validation_failed", message: "folder name is too long" });
+    } else if (code === "ENOENT" || code === "ENOTDIR" || code === "ELOOP") {
+      sendJson(res, 404, { code: "not_found", message: `directory not found: ${resolve(parent)}` });
+    } else {
+      throw err;
+    }
+    return true;
+  }
+  sendJson(res, 201, { name: folderName, path });
+  return true;
+}
+
+/** A single visible path segment: the listing hides dotdirs, so a leading `.` (which also covers `.` and `..`) is refused. */
+function isValidFolderName(name: string): boolean {
+  return name !== "" && !name.startsWith(".") && !/[/\\\0]/.test(name);
 }

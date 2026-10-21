@@ -136,7 +136,7 @@ export type CliDeps = {
   runMcp: (cliEntry: string) => Promise<void>;
   runSetup: (opts: SetupOptions) => Promise<number>;
   runUpdate: () => Promise<number>;
-  runRepin: (cliEntry: string) => Promise<void>;
+  runRepin: (cliEntry: string) => Promise<number>;
   /** First-run offer to connect an AI tool; asks at most once, only on `start` / bare `artisign`. */
   offerSetup: (cliEntry: string) => Promise<void>;
   runDaemonForeground: typeof runDaemonForeground;
@@ -276,8 +276,7 @@ async function run(
       return deps.runUpdate();
     // Internal: run by the freshly installed version at the end of `update`.
     case "__repin":
-      await deps.runRepin(cliEntry);
-      return 0;
+      return deps.runRepin(cliEntry);
     case "start": {
       const { port, projects, noOpen } = parseStart(rest);
       await deps.offerSetup(cliEntry);

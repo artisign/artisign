@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access, constants, readFile, stat } from "node:fs/promises";
+import { access, constants, readFile, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { atomicWrite } from "../store/atomic-write.js";
@@ -22,7 +22,7 @@ export function defaultClientEnv(): ClientEnv {
     platform: process.platform,
     pathEnv: process.env.PATH ?? "",
     execPath: process.execPath,
-    run: (command, args) => new Promise((resolve) => execFile(command, args, (err) => resolve(err === null))),
+    run: (command, args) => new Promise((resolve) => execFile(command, args, { timeout: 30_000 }, (err) => resolve(err === null))),
   };
 }
 
@@ -64,8 +64,10 @@ async function readConfig(path: string): Promise<{ config: JsonObject; mode?: nu
   let raw: string;
   try {
     raw = await readFile(path, "utf8");
-  } catch {
-    return { config: {} };
+  } catch (err) {
+    // Only a file that is not there is an empty config. An unreadable one (EACCES, EIO) must not be replaced by `{}`.
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return { config: {} };
+    throw new Error(`could not read ${path}: ${(err as Error).message} (nothing was changed)`);
   }
   let parsed: unknown;
   try {
@@ -93,7 +95,9 @@ async function hasServerEntry(path: string): Promise<boolean> {
 }
 
 /** Sets or deletes `mcpServers.artisign` in a JSON file, leaving every other key as it was. */
-async function editServers(path: string, entry: JsonObject | undefined): Promise<void> {
+async function editServers(configPath: string, entry: JsonObject | undefined): Promise<void> {
+  // A config symlinked from a dotfiles repo stays a symlink: the atomic rename happens next to the real file.
+  const path = await realpath(configPath).catch(() => configPath);
   const { config, mode } = await readConfig(path);
   const servers = { ...serversOf(config) };
   if (entry === undefined) delete servers[NAME];
@@ -128,7 +132,7 @@ export const claudeCode: Client = {
   async remove(env) {
     const claude = await findOnPath("claude", env.pathEnv);
     if (claude === undefined) await editServers(join(env.home, ".claude.json"), undefined);
-    else await env.run(claude, ["mcp", "remove", NAME, "--scope", "user"]);
+    else if (!(await env.run(claude, ["mcp", "remove", NAME, "--scope", "user"]))) throw new Error("`claude mcp remove` failed");
   },
 };
 
@@ -140,7 +144,12 @@ function desktopDirs(env: ClientEnv): string[] {
 }
 
 async function desktopConfigPath(env: ClientEnv): Promise<string | undefined> {
-  for (const dir of desktopDirs(env)) if (await exists(dir)) return join(dir, "claude_desktop_config.json");
+  for (const dir of desktopDirs(env)) {
+    const file = join(dir, "claude_desktop_config.json");
+    // The lowercase Linux directory is also a common XDG name for other things: only a config file in it says "Desktop".
+    const isLowercase = dir.endsWith("/claude");
+    if (isLowercase ? await exists(file) : await exists(dir)) return file;
+  }
   return undefined;
 }
 
@@ -160,6 +169,9 @@ export const claudeDesktop: Client = {
     const path = await desktopConfigPath(env);
     if (path === undefined) throw new Error("Claude Desktop's config directory is gone");
     const npx = (await findOnPath("npx", env.pathEnv)) ?? join(dirname(env.execPath), "npx");
+    if (!(await exists(npx, constants.X_OK))) {
+      throw new Error("npx was not found on PATH or next to node; install npm and run setup again (nothing was changed)");
+    }
     const bin = dirname(npx);
     await editServers(path, {
       command: npx,

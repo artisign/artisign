@@ -51,17 +51,17 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
   }
 
   /**
-   * The folder /api/projects/init scaffolds into: the folder "+ New folder"
-   * just made and selected, else a folder named after the project inside the
-   * current one. `name` alone never creates a subfolder server-side.
+   * The folder /api/projects/init scaffolds into: a folder named after the
+   * project, inside the folder "+ New folder" just made and selected, else
+   * inside the current one. `name` alone never creates a subfolder server-side.
    * @returns {string | null}
    */
   function initTargetDir() {
-    if (createdFolderPath) return createdFolderPath;
     const name = nameInput.value.trim();
     if (!name) return null;
-    // currentPath is "/" at the filesystem root — joining naively would give "//name".
-    return `${currentPath === "/" ? "" : currentPath}/${name}`;
+    const parent = createdFolderPath ?? currentPath;
+    // The parent is "/" at the filesystem root — joining naively would give "//name".
+    return `${parent === "/" ? "" : parent}/${name}`;
   }
 
   function renderQuickChips() {
@@ -225,9 +225,6 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
         return;
       }
       await loadPath(currentPath, { created: result.path });
-      // Init mode: the new folder is the target; its name is the natural project name.
-      if (nameInput && !nameInput.value.trim()) nameInput.value = result.name;
-      updateHint();
       dirListEl.querySelector(".dir-row-created")?.focus();
     }
 

@@ -268,7 +268,7 @@ describe("folder browser: + New folder", () => {
     expect(posts).toHaveLength(1);
   });
 
-  it("init mode: after creating a folder, confirm scaffolds into that folder, not its parent", async () => {
+  it("init mode: the created folder is the parent of the new project — confirm scaffolds into <folder>/<name>", async () => {
     const onInit = vi.fn(async () => ({ ok: true }));
     initSectionEl.remove();
     initSectionEl = section(true);
@@ -276,14 +276,17 @@ describe("folder browser: + New folder", () => {
     dialogs = createProjectDialogs({ scrimEl, openSectionEl, initSectionEl }, { onOpen: async () => ({ ok: true }), onInit });
     dialogs.showInitDialog();
     await settle();
-    await typeAndCreate(initSectionEl, "acme");
+    await typeAndCreate(initSectionEl, "clients");
+    const name = initSectionEl.querySelector(".field-name-input");
+    expect(name.value).toBe("");
+    name.value = "acme";
+    name.dispatchEvent(new Event("input"));
 
-    expect(initSectionEl.querySelector(".selection-path").textContent).toBe("~/Workspace/acme");
-    expect(initSectionEl.querySelector(".field-name-input").value).toBe("acme");
+    expect(initSectionEl.querySelector(".selection-path").textContent).toBe("~/Workspace/clients/acme");
     initSectionEl.querySelector(".btn-confirm").click();
     await settle();
 
-    expect(onInit).toHaveBeenCalledWith(`${PARENT}/acme`, "acme");
+    expect(onInit).toHaveBeenCalledWith(`${PARENT}/clients/acme`, "acme");
   });
 
   it("init mode: without a created folder the hint and the confirm target are <current>/<name>", async () => {

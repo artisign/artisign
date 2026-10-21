@@ -27,6 +27,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   setting untouched, and restarts a running Artisign of another version. `artisign setup --remove` removes exactly the
   `artisign` entries. Claude Code is driven through its own `claude mcp` CLI; Claude Desktop gets absolute paths to `npx`
   and `node`, since a GUI app does not inherit the shell's PATH. (CHR-833)
+- `artisign` / `artisign start` checks the npm registry for a newer release at most once every 24 hours and prints
+  `New version x.y.z — run artisign update` on stderr when there is one. The check never delays or fails a start,
+  is skipped when `CI` is set or stdout is not a terminal, and is turned off with `ARTISIGN_NO_UPDATE_CHECK=1`.
+  (CHR-882)
 
 ### Changed
 

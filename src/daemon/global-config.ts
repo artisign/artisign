@@ -14,6 +14,8 @@ export type ArtisignGlobalConfig = {
   recentProjects?: string[];
   /** The user answered "no" to the first-run offer to connect an AI tool; never ask again (CHR-835). */
   setupDeclined?: boolean;
+  /** Every project root the daemon ever opened or created — uncapped, unlike `recentProjects`. */
+  knownProjects?: string[];
 };
 
 /** `$ARTISIGN_HOME`, or `~/.artisign` — where daemon-level state (config, lock) lives. */

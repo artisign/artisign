@@ -197,7 +197,7 @@ export async function dispatch(argv: string[], cliEntry: string, deps: CliDeps =
   // least as likely a way to discover the flags as `artisign --help`, and
   // the option guard in parseStartArgs would otherwise reject it.
   if (argv.includes("--help") || argv.includes("-h")) {
-    if (command !== undefined && Object.hasOwn(COMMAND_HELP, command)) return printCommandHelp(command, deps);
+    if (command !== undefined && !command.startsWith("-")) return printCommandHelp(command, deps);
     deps.log(USAGE);
     return 0;
   }

@@ -15,7 +15,8 @@ type JsonRpcResponse = {
 
 async function mcpCall(port: number, project: string, body: unknown): Promise<{ status: number; json: JsonRpcResponse }> {
   const url = new URL(`http://127.0.0.1:${port}/mcp`);
-  url.searchParams.set("project", project);
+  const call = body as { params: { arguments: Record<string, unknown> } };
+  call.params.arguments = { project, ...call.params.arguments };
   const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
@@ -120,6 +121,35 @@ describe("CHR-630 activity SSE events", () => {
     await daemon.stop();
     await artisignHome.cleanup();
     await rm(dir, { recursive: true, force: true });
+  });
+
+  it("routes an activity event to the named project's hub, not the browser's active project", async () => {
+    const other = await mkdtemp(join(tmpdir(), "artisign-activity-other-"));
+    try {
+      await initProject(other);
+      await daemon.registry.open(other);
+      expect(daemon.registry.activeProject).toBe(dir); // `dir` stays the browser's project
+
+      const activeSse = await fetch(`http://127.0.0.1:${daemon.port}/events?project=${encodeURIComponent(dir)}`);
+      const otherSse = await fetch(`http://127.0.0.1:${daemon.port}/events?project=${encodeURIComponent(other)}`);
+      const activeReader = activeSse.body!.getReader();
+      const otherReader = otherSse.body!.getReader();
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        await mcpCall(daemon.port, other, toolCallBody("get_project", {}));
+
+        const evt = await waitForSseEvent(otherReader, (e) => e.type === "activity", 2000, { buffer: "" });
+        expect(evt).toMatchObject({ type: "activity", tool: "get_project", ok: true });
+        const onActive = await drainAvailable(activeReader, 500);
+        expect(onActive.some((e) => e.type === "activity")).toBe(false);
+      } finally {
+        await activeReader.cancel().catch(() => {});
+        await otherReader.cancel().catch(() => {});
+      }
+    } finally {
+      await rm(other, { recursive: true, force: true });
+    }
   });
 
   it("emits an activity event for a read tool call over /mcp", async () => {

@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-831 error state in the Open project dialog. Identical row and messages to the New project dialog; only \"exists\" is drawn here. \"invalid\" and \"permission\" use the same `$new-folder-row` `error` variant with the strings in the init-project-dialog-new-folder-* screens.",
+  "tags": [
+    "dialog",
+    "chr-831"
+  ],
+  "variant_of": "open-project-dialog-new-folder",
+  "variant_kind": "state"
+}

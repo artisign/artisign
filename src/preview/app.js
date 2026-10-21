@@ -1758,14 +1758,15 @@ function refitActivePane() {
  * Wires a collapsible side panel: applies the persisted collapse state up
  * front, then toggles + persists + re-fits the canvas on every click. The
  * DOM (`panelEl.dataset.collapsed`) is the single source of truth — no
- * parallel module-level boolean to keep in sync.
+ * parallel module-level boolean to keep in sync. `defaultCollapsed` applies
+ * only while nothing is stored (CHR-888: Context and Elements start collapsed).
  */
-function setupSidePanel(panelEl, collapseBtn, prefKey) {
+function setupSidePanel(panelEl, collapseBtn, prefKey, defaultCollapsed = false) {
   function apply(collapsed) {
     panelEl.dataset.collapsed = String(collapsed);
     collapseBtn.setAttribute("aria-expanded", String(!collapsed));
   }
-  apply(readBoolPref(prefsStorage, prefKey, false));
+  apply(readBoolPref(prefsStorage, prefKey, defaultCollapsed));
   collapseBtn.addEventListener("click", () => {
     const collapsed = panelEl.dataset.collapsed !== "true";
     apply(collapsed);
@@ -1779,8 +1780,8 @@ function setupSidePanel(panelEl, collapseBtn, prefKey) {
 }
 
 setupSidePanel(sidebarScreensEl, sidebarScreensCollapseBtn, "artisign.sidebar-screens.collapsed");
-setupSidePanel(sidebarContextEl, sidebarContextCollapseBtn, "artisign.sidebar-context.collapsed");
-setupSidePanel(inspectorEl, inspectorCollapseBtn, "artisign.inspector.collapsed");
+setupSidePanel(sidebarContextEl, sidebarContextCollapseBtn, "artisign.sidebar-context.collapsed", true);
+setupSidePanel(inspectorEl, inspectorCollapseBtn, "artisign.inspector.collapsed", true);
 
 zoom = parseZoomPref(readStringPref(prefsStorage, "artisign.zoom", null), zoom);
 mockupZoom = parseZoomPref(readStringPref(prefsStorage, "artisign.mockupZoom", null), mockupZoom);

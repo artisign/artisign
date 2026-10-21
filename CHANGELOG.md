@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `artisign setup` also connects Cursor (`~/.cursor/mcp.json`). (CHR-836)
+
 - `artisign` (and `artisign start`) offers once, in a terminal and outside CI, to connect the AI tools it finds when
   none of them has an `artisign` entry yet. Answering no is remembered (`setupDeclined` in
   `~/.artisign/config.json`); `artisign setup` works any time. (CHR-835)

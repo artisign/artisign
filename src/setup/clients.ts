@@ -22,7 +22,8 @@ export function defaultClientEnv(): ClientEnv {
     platform: process.platform,
     pathEnv: process.env.PATH ?? "",
     execPath: process.execPath,
-    run: (command, args) => new Promise((resolve) => execFile(command, args, (err) => resolve(err === null))),
+    run: (command, args) =>
+      new Promise((resolve) => execFile(command, args, (err) => resolve(err === null))),
   };
 }
 
@@ -71,7 +72,9 @@ async function readConfig(path: string): Promise<{ config: JsonObject; mode?: nu
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(`${path} is not valid JSON; fix or remove it and run setup again (nothing was changed)`);
+    throw new Error(
+      `${path} is not valid JSON; fix or remove it and run setup again (nothing was changed)`,
+    );
   }
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new Error(`${path} does not hold a JSON object (nothing was changed)`);
@@ -79,26 +82,35 @@ async function readConfig(path: string): Promise<{ config: JsonObject; mode?: nu
   return { config: parsed as JsonObject, mode: (await stat(path)).mode & 0o777 };
 }
 
-function serversOf(config: JsonObject): JsonObject {
-  const servers = config.mcpServers;
-  return typeof servers === "object" && servers !== null && !Array.isArray(servers) ? (servers as JsonObject) : {};
+/** The top-level key a client keeps its servers under (`mcpServers` for most, `servers` for VS Code, `mcp` for opencode). */
+type ServersKey = string;
+
+function serversOf(config: JsonObject, key: ServersKey): JsonObject {
+  const servers = config[key];
+  return typeof servers === "object" && servers !== null && !Array.isArray(servers)
+    ? (servers as JsonObject)
+    : {};
 }
 
-async function hasServerEntry(path: string): Promise<boolean> {
+async function hasServerEntry(path: string, key: ServersKey = "mcpServers"): Promise<boolean> {
   try {
-    return NAME in serversOf((await readConfig(path)).config);
+    return NAME in serversOf((await readConfig(path)).config, key);
   } catch {
     return false;
   }
 }
 
-/** Sets or deletes `mcpServers.artisign` in a JSON file, leaving every other key as it was. */
-async function editServers(path: string, entry: JsonObject | undefined): Promise<void> {
+/** Sets or deletes the `artisign` entry under `key` in a JSON file, leaving every other key as it was. */
+async function editServers(
+  path: string,
+  entry: JsonObject | undefined,
+  key: ServersKey = "mcpServers",
+): Promise<void> {
   const { config, mode } = await readConfig(path);
-  const servers = { ...serversOf(config) };
+  const servers = { ...serversOf(config, key) };
   if (entry === undefined) delete servers[NAME];
   else servers[NAME] = entry;
-  await atomicWrite(path, `${JSON.stringify({ ...config, mcpServers: servers }, null, 2)}\n`, mode);
+  await atomicWrite(path, `${JSON.stringify({ ...config, [key]: servers }, null, 2)}\n`, mode);
 }
 
 const npxArgs = (version: string): string[] => ["-y", `${NAME}@${version}`, "mcp"];
@@ -117,12 +129,28 @@ export const claudeCode: Client = {
   async write(env, version) {
     const claude = await findOnPath("claude", env.pathEnv);
     if (claude === undefined) {
-      await editServers(join(env.home, ".claude.json"), { type: "stdio", command: "npx", args: npxArgs(version), env: {} });
+      await editServers(join(env.home, ".claude.json"), {
+        type: "stdio",
+        command: "npx",
+        args: npxArgs(version),
+        env: {},
+      });
       return;
     }
     // `add` refuses an existing name; replacing means remove first (its failure just means there was nothing to remove).
     await env.run(claude, ["mcp", "remove", NAME, "--scope", "user"]);
-    const added = await env.run(claude, ["mcp", "add", "--scope", "user", "--transport", "stdio", NAME, "--", "npx", ...npxArgs(version)]);
+    const added = await env.run(claude, [
+      "mcp",
+      "add",
+      "--scope",
+      "user",
+      "--transport",
+      "stdio",
+      NAME,
+      "--",
+      "npx",
+      ...npxArgs(version),
+    ]);
     if (!added) throw new Error("`claude mcp add` failed");
   },
   async remove(env) {
@@ -134,38 +162,52 @@ export const claudeCode: Client = {
 
 /** Directories Claude Desktop keeps `claude_desktop_config.json` in. Anthropic documents macOS only; the Linux ones are community builds. */
 function desktopDirs(env: ClientEnv): string[] {
-  if (env.platform === "darwin") return [join(env.home, "Library", "Application Support", "Claude")];
-  if (env.platform === "linux") return [join(env.home, ".config", "Claude"), join(env.home, ".config", "claude")];
+  if (env.platform === "darwin")
+    return [join(env.home, "Library", "Application Support", "Claude")];
+  if (env.platform === "linux")
+    return [join(env.home, ".config", "Claude"), join(env.home, ".config", "claude")];
   return [];
 }
 
 async function desktopConfigPath(env: ClientEnv): Promise<string | undefined> {
-  for (const dir of desktopDirs(env)) if (await exists(dir)) return join(dir, "claude_desktop_config.json");
+  for (const dir of desktopDirs(env))
+    if (await exists(dir)) return join(dir, "claude_desktop_config.json");
   return undefined;
 }
 
 /**
- * Claude Desktop is a GUI app without the shell's PATH, so the entry uses an absolute npx and a PATH that starts with its
- * directory (npx's `#!/usr/bin/env node` then finds the same node). The npx is the one on the user's PATH, unresolved —
- * `/opt/homebrew/bin/npx` survives a `brew upgrade node`, the versioned Cellar path it links to does not. Only without
- * npx on PATH does it fall back to the directory of the node running setup.
+ * `{command, args, env}` for a GUI client, which does not inherit the shell's PATH: an absolute npx and a PATH that starts
+ * with its directory (npx's `#!/usr/bin/env node` then finds the same node). The npx is the one on the user's PATH,
+ * unresolved — `/opt/homebrew/bin/npx` survives a `brew upgrade node`, the versioned Cellar path it links to does not.
+ * Only without npx on PATH does it fall back to the directory of the node running setup.
  */
+async function absoluteNpxEntry(
+  env: ClientEnv,
+  version: string,
+): Promise<{ command: string; args: string[]; env: { PATH: string } }> {
+  const npx = (await findOnPath("npx", env.pathEnv)) ?? join(dirname(env.execPath), "npx");
+  const bin = dirname(npx);
+  return {
+    command: npx,
+    args: npxArgs(version),
+    env: { PATH: [bin, "/usr/local/bin", "/usr/bin", "/bin"].join(delimiter) },
+  };
+}
+
+/** Claude Desktop: `claude_desktop_config.json`, key `mcpServers`, absolute npx (see `absoluteNpxEntry`). */
 export const claudeDesktop: Client = {
   name: "Claude Desktop",
   async detect(env) {
     const path = await desktopConfigPath(env);
-    return { found: path !== undefined, hasEntry: path !== undefined && (await hasServerEntry(path)) };
+    return {
+      found: path !== undefined,
+      hasEntry: path !== undefined && (await hasServerEntry(path)),
+    };
   },
   async write(env, version) {
     const path = await desktopConfigPath(env);
     if (path === undefined) throw new Error("Claude Desktop's config directory is gone");
-    const npx = (await findOnPath("npx", env.pathEnv)) ?? join(dirname(env.execPath), "npx");
-    const bin = dirname(npx);
-    await editServers(path, {
-      command: npx,
-      args: npxArgs(version),
-      env: { PATH: [bin, "/usr/local/bin", "/usr/bin", "/bin"].join(delimiter) },
-    });
+    await editServers(path, await absoluteNpxEntry(env, version));
   },
   async remove(env) {
     const path = await desktopConfigPath(env);
@@ -173,4 +215,21 @@ export const claudeDesktop: Client = {
   },
 };
 
-export const CLIENTS: Client[] = [claudeCode, claudeDesktop];
+/** Cursor: `~/.cursor/mcp.json`, key `mcpServers` (https://cursor.com/docs/context/mcp). A GUI app, so absolute npx. */
+export const cursor: Client = {
+  name: "Cursor",
+  async detect(env) {
+    const dir = join(env.home, ".cursor");
+    const found = await exists(dir);
+    return { found, hasEntry: found && (await hasServerEntry(join(dir, "mcp.json"))) };
+  },
+  async write(env, version) {
+    await editServers(join(env.home, ".cursor", "mcp.json"), await absoluteNpxEntry(env, version));
+  },
+  async remove(env) {
+    const path = join(env.home, ".cursor", "mcp.json");
+    if (await exists(path)) await editServers(path, undefined);
+  },
+};
+
+export const CLIENTS: Client[] = [claudeCode, claudeDesktop, cursor];

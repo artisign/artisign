@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-831. Same inline new-folder row as the New project dialog, in the Open project dialog. Open stays disabled while the row is being edited.",
+  "tags": [
+    "dialog",
+    "chr-831"
+  ],
+  "variant_of": "open-project-dialog",
+  "variant_kind": "state"
+}

@@ -61,6 +61,9 @@ surface it as tag_notes. All notes/idea/decisions/usage bodies render as
 Markdown in the preview. Find screens or mockups by tag via get_project
 {tags: [...]}.
 
+PROJECTS: list_projects -> {name, root, open} per known project. init_project
+returns "project" (the name for later calls); ask the user where it goes.
+
 LIFECYCLE: write_html kind:"component"|"pattern" writes a definition
 (default variant + <template data-variant> siblings). delete_entity
 {kind, name} deletes a screen/component/pattern/mockup; refused if

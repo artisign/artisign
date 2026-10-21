@@ -214,7 +214,7 @@ export function createServer(registry: ProjectRegistry): HttpServer {
     const isToolsApi = url.pathname.startsWith("/api/tools/");
     const isCommentsApi = url.pathname === "/api/comments";
     const isProjectsApi = url.pathname === "/api/projects" || url.pathname.startsWith("/api/projects/");
-    const isFsApi = req.method === "GET" && url.pathname === "/api/fs/dirs";
+    const isFsApi = (req.method === "GET" || req.method === "POST") && url.pathname === "/api/fs/dirs";
     const isSse = req.method === "GET" && url.pathname === "/events";
     const isApiPath = url.pathname.startsWith("/api/");
     const isPreviewApi = req.method === "GET" && isApiPath && !isToolsApi && !isCommentsApi && !isProjectsApi && !isFsApi;

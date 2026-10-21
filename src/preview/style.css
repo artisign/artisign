@@ -1393,10 +1393,106 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   display: none;
 }
 
-#empty-state {
-  margin: auto;
-  color: var(--color-text-faded);
-  font-size: 0.9rem;
+/* CHR-890 — the how-to-start guide inside the empty #screen-holder frame. Sized for the 390x844 default frame at scale 1 (the holder's zoom scales it; ~2x the app's type so it lands near 11px at the 50% default). */
+#empty-guide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+  padding: 40px 32px;
+  color: var(--color-text);
+}
+
+#empty-guide[hidden] {
+  display: none;
+}
+
+#empty-guide p,
+#empty-guide h2,
+#empty-guide ol {
+  margin: 0;
+}
+
+#empty-guide-label {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-label);
+  margin-bottom: 10px;
+}
+
+#empty-guide-title {
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+#empty-guide-steps {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+#empty-guide-steps li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.empty-guide-num {
+  flex: none;
+  width: 33px;
+  height: 33px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: 600;
+  font-size: 18.7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-guide-text {
+  font-size: 22px;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+  padding-top: 4px;
+}
+
+#empty-guide-prompt-box {
+  margin-top: 14px;
+  display: flex;
+  gap: 12.6px;
+  align-items: flex-start;
+  padding: 12.6px 14.4px;
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+#empty-guide-prompt {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 18px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+#empty-guide-copy {
+  flex: none;
+  padding: 4.32px 8.64px;
+  font-size: 14.4px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 /* Inspect mode selection overlay — see index.html's comment on #inspect-overlay. */

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { initProject } from "../init/init-project.js";
@@ -122,5 +122,92 @@ describe("GET /api/fs/dirs", () => {
     });
 
     expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /api/fs/dirs", () => {
+  let root: string;
+  let artisignHome: ArtisignHomeFixture;
+  let daemon: DaemonHandle;
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), "artisign-fs-mkdir-"));
+    artisignHome = await setupArtisignHome();
+    daemon = await startDaemon({ port: 0 });
+  });
+
+  afterEach(async () => {
+    await daemon.stop();
+    await artisignHome.cleanup();
+    await chmod(root, 0o755);
+    await rm(root, { recursive: true, force: true });
+  });
+
+  async function postDir(
+    body: unknown,
+    headers: Record<string, string> = {},
+  ): Promise<{ status: number; json: Record<string, unknown> }> {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/fs/dirs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+    return { status: res.status, json: (await res.json()) as Record<string, unknown> };
+  }
+
+  it("creates one directory inside parent and answers 201 with its path", async () => {
+    const { status, json } = await postDir({ parent: root, name: "clients" });
+
+    expect(status).toBe(201);
+    expect(json).toEqual({ name: "clients", path: join(root, "clients") });
+    expect((await stat(join(root, "clients"))).isDirectory()).toBe(true);
+  });
+
+  it("409s already_exists for an existing name and leaves it alone", async () => {
+    await mkdir(join(root, "clients"));
+    await writeFile(join(root, "clients", "keep.txt"), "x");
+
+    const { status, json } = await postDir({ parent: root, name: "clients" });
+
+    expect(status).toBe(409);
+    expect(json.code).toBe("already_exists");
+    expect((await stat(join(root, "clients", "keep.txt"))).isFile()).toBe(true);
+  });
+
+  it.each(["", "   ", ".", "..", "a/b", "a\\b", "../escape", "/abs"])("400s validation_failed for the name %j", async (name) => {
+    const { status, json } = await postDir({ parent: root, name });
+
+    expect(status).toBe(400);
+    expect(json.code).toBe("validation_failed");
+  });
+
+  it("400s for a missing or non-string name and a relative parent", async () => {
+    expect((await postDir({ parent: root })).status).toBe(400);
+    expect((await postDir({ parent: root, name: 7 })).status).toBe(400);
+    expect((await postDir({ parent: "relative/dir", name: "x" })).status).toBe(400);
+    expect((await postDir({ name: "x" })).status).toBe(400);
+  });
+
+  it("404s not_found when the parent does not exist and creates no intermediate folders", async () => {
+    const { status, json } = await postDir({ parent: join(root, "nope"), name: "clients" });
+
+    expect(status).toBe(404);
+    expect(json.code).toBe("not_found");
+  });
+
+  it.skipIf(process.getuid?.() === 0)("403s permission_denied (not a 500) for a read-only parent", async () => {
+    await chmod(root, 0o555);
+
+    const { status, json } = await postDir({ parent: root, name: "clients" });
+
+    expect(status).toBe(403);
+    expect(json.code).toBe("permission_denied");
+  });
+
+  it("rejects a cross-origin request and creates nothing", async () => {
+    const { status } = await postDir({ parent: root, name: "clients" }, { origin: "https://evil.example" });
+
+    expect(status).toBe(403);
+    await expect(stat(join(root, "clients"))).rejects.toThrow();
   });
 });

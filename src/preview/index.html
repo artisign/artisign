@@ -311,10 +311,15 @@
         <section id="empty-card">
           <span id="empty-icon" aria-hidden="true">🗂️</span>
           <h1 id="empty-title">No project open</h1>
-          <p id="empty-copy">The daemon is running, but no design project is open yet. Open an existing project folder or initialize a new one.</p>
+          <p id="empty-copy">Artisign is running, but no project is open yet. Open or create one here, or ask your AI tool to do it.</p>
           <div id="empty-actions">
             <button type="button" id="empty-btn-open" class="btn-confirm">Open project…</button>
             <button type="button" id="empty-btn-init" class="btn-cancel">New project…</button>
+          </div>
+          <div id="empty-ai">
+            <p id="empty-ai-label">Or ask your AI tool</p>
+            <p id="empty-ai-prompt">Create an Artisign project in ~/work/acme</p>
+            <p id="empty-ai-more">To pick up an existing one, ask: “Open my project acme”.</p>
           </div>
           <div id="empty-recent">
             <p id="empty-recent-label">Recent</p>
@@ -331,7 +336,10 @@
           <button type="button" class="quick-chip" data-quick="workspace">Workspace</button>
           <button type="button" class="quick-chip" data-quick="desktop">Desktop</button>
         </div>
-        <nav class="breadcrumbs"></nav>
+        <div class="browse-bar">
+          <nav class="breadcrumbs"></nav>
+          <button type="button" class="btn-new-folder">+ New folder</button>
+        </div>
         <div class="dir-list"></div>
         <p class="selection-hint">Selected: <span class="selection-path">—</span> — folders already containing a project are badged.</p>
         <p class="dialog-error" hidden></p>
@@ -348,10 +356,13 @@
           <button type="button" class="quick-chip" data-quick="workspace">Workspace</button>
           <button type="button" class="quick-chip" data-quick="desktop">Desktop</button>
         </div>
-        <nav class="breadcrumbs"></nav>
+        <div class="browse-bar">
+          <nav class="breadcrumbs"></nav>
+          <button type="button" class="btn-new-folder">+ New folder</button>
+        </div>
         <div class="dir-list"></div>
         <div class="field-name">
-          <label for="init-name-input">New folder / project name</label>
+          <label for="init-name-input">Project name</label>
           <input type="text" id="init-name-input" class="field-name-input" placeholder="my-new-project" autocomplete="off" />
         </div>
         <p class="selection-hint">Will create: <span class="selection-path">—</span></p>

@@ -5,7 +5,7 @@
 // is owned by app.js, same split as comments.js's reply affordance — this
 // module is DOM wiring + directory-tree state only.
 
-import { fetchFsDirs } from "./api.js";
+import { fetchFsDirs, createFsDir } from "./api.js";
 
 /**
  * Wires one dialog section (open or init) to the shared `/api/fs/dirs`
@@ -23,11 +23,14 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
   const confirmButton = sectionEl.querySelector(".btn-confirm");
   const cancelButton = sectionEl.querySelector(".btn-cancel");
   const nameInput = sectionEl.querySelector(".field-name-input");
+  const newFolderButton = sectionEl.querySelector(".btn-new-folder");
 
   let currentPath = null;
   let homePath = null;
   let workspacePath = null; // ~/Workspace — null until checked, false once checked-and-absent
   let selectedProjectPath = null; // "open" mode only: a badged row the user picked
+  let createdFolderPath = null; // the folder "+ New folder" just made: badged "new" and highlighted until the user navigates away
+  let newFolderRowEl = null; // the inline create row while it is open
 
   /** @param {string} path */
   function displayPath(path) {
@@ -124,6 +127,14 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       // "open" mode: a project folder is the thing you pick, not a folder
       // you drill into. "init" mode: a project folder can't be a target
       // (per spec) — so it's inert, neither selectable nor navigable.
+      if (entry.path === createdFolderPath) {
+        row.classList.add("dir-row-selected");
+        const badge = document.createElement("span");
+        badge.className = "dir-row-badge dir-row-badge-new";
+        badge.textContent = "new";
+        row.appendChild(badge);
+      }
+
       if (mode === "open" && entry.isArtisignProject) {
         row.classList.add("dir-row-selectable");
         if (selectedProjectPath === entry.path) row.classList.add("dir-row-selected");
@@ -141,8 +152,84 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
     }
   }
 
-  /** @param {string} [path] */
-  async function loadPath(path) {
+  function basename(path) {
+    return path === "/" ? "/" : path.slice(path.lastIndexOf("/") + 1);
+  }
+
+  /** @param {string} name @param {{ code?: string, message: string }} failure */
+  function newFolderErrorText(name, failure) {
+    if (failure.code === "already_exists") return `A folder named \u201C${name}\u201D already exists here.`;
+    if (failure.code === "validation_failed") {
+      return "Folder names can\u2019t contain / or \\ and can\u2019t be empty, \u201C.\u201D or \u201C..\u201D.";
+    }
+    if (failure.code === "permission_denied") {
+      return `Can\u2019t create a folder in ${basename(currentPath)}: permission denied.`;
+    }
+    return failure.message;
+  }
+
+  function closeNewFolderRow() {
+    newFolderRowEl?.remove();
+    newFolderRowEl = null;
+    newFolderButton.setAttribute("aria-pressed", "false");
+  }
+
+  /** Inline row at the top of the list; creates exactly one level inside `currentPath`. */
+  function openNewFolderRow() {
+    if (newFolderRowEl) {
+      newFolderRowEl.querySelector(".new-folder-input").focus();
+      return;
+    }
+    const row = document.createElement("div");
+    row.className = "new-folder-row";
+    row.innerHTML = `
+      <div class="new-folder-line">
+        <span class="new-folder-icon">\u25B8</span>
+        <input type="text" class="new-folder-input" placeholder="Folder name" autocomplete="off" aria-label="New folder name" />
+        <button type="button" class="new-folder-create">Create</button>
+        <button type="button" class="new-folder-cancel">Cancel</button>
+      </div>
+      <div class="new-folder-message" hidden></div>`;
+    const input = row.querySelector(".new-folder-input");
+    const messageEl = row.querySelector(".new-folder-message");
+
+    async function create() {
+      const name = input.value.trim();
+      const result = await createFsDir(currentPath, name);
+      if (!result.ok) {
+        messageEl.textContent = newFolderErrorText(name, result);
+        messageEl.hidden = false;
+        row.classList.add("new-folder-row-error");
+        return;
+      }
+      await loadPath(currentPath, { created: result.path });
+    }
+
+    input.addEventListener("input", () => {
+      messageEl.hidden = true;
+      row.classList.remove("new-folder-row-error");
+    });
+    input.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter") {
+        evt.preventDefault();
+        create();
+      } else if (evt.key === "Escape") {
+        // Only the row closes — the dialog-level Escape must not also fire.
+        evt.stopPropagation();
+        closeNewFolderRow();
+      }
+    });
+    row.querySelector(".new-folder-create").addEventListener("click", create);
+    row.querySelector(".new-folder-cancel").addEventListener("click", closeNewFolderRow);
+
+    dirListEl.prepend(row);
+    newFolderRowEl = row;
+    newFolderButton.setAttribute("aria-pressed", "true");
+    input.focus();
+  }
+
+  /** @param {string} [path] @param {{ created?: string }} [options] */
+  async function loadPath(path, { created = null } = {}) {
     errorEl.hidden = true;
     const result = await fetchFsDirs(path);
     if (!result.ok) {
@@ -153,6 +240,9 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
     currentPath = result.path;
     homePath = result.home;
     selectedProjectPath = null;
+    createdFolderPath = created;
+    newFolderRowEl = null;
+    newFolderButton.setAttribute("aria-pressed", "false");
 
     if (workspacePath === null) {
       const candidate = `${homePath}/Workspace`;
@@ -173,6 +263,9 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
     });
   }
 
+  newFolderButton.addEventListener("click", () => {
+    if (currentPath) openNewFolderRow();
+  });
   nameInput?.addEventListener("input", updateHint);
   cancelButton.addEventListener("click", () => onCancel());
 
@@ -192,6 +285,7 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
   function reset() {
     errorEl.hidden = true;
     selectedProjectPath = null;
+    createdFolderPath = null;
     if (nameInput) nameInput.value = "";
     updateHint();
     loadPath(homePath ?? undefined);

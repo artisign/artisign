@@ -1,4 +1,3 @@
-import { readVersion } from "../version.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { createServer as createNetServer, type AddressInfo } from "node:net";
@@ -8,6 +7,7 @@ import { initProject } from "../init/init-project.js";
 import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
 import { startDaemon, DaemonAlreadyRunningError, type DaemonHandle } from "./start.js";
 import { writeLock } from "./lock.js";
+import { readVersion } from "../version.js";
 
 describe("startDaemon", () => {
   let dir: string;

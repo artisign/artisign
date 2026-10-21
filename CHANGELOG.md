@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `artisign update` (also `artisign --update`) installs the latest version with `npm install -g artisign@latest`, then
+  the newly installed version re-pins every existing `artisign` entry in your AI tools and restarts a running Artisign
+  of an older version with its open projects. It does nothing when you are already on the latest version, never uses
+  sudo, and on a pnpm, bun or yarn install prints the matching command instead; through npx it points to the global
+  install. (CHR-881)
+
 - `artisign setup` connects Claude Code and Claude Desktop with one user-level `artisign` entry each, running
   `npx -y artisign@<version> mcp` pinned to the version that ran setup. It asks per detected tool (`--yes` skips the
   questions and is the only way to run without a terminal), replaces an existing entry, leaves every other entry and

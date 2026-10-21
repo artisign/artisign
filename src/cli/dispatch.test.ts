@@ -10,6 +10,8 @@ function fakeDeps() {
     runServe: vi.fn(async () => {}),
     runMcp: vi.fn(async () => {}),
     runSetup: vi.fn(async () => 0),
+    runUpdate: vi.fn(async () => 0),
+    runRepin: vi.fn(async () => 0),
     runDaemonForeground: vi.fn(async () => {}),
     runStart: vi.fn(async () => {}),
     runStop: vi.fn(async () => {}),
@@ -152,7 +154,7 @@ describe("dispatch: help and version", () => {
   });
 
   it("<command> --help and help <command> print that command's usage, options and an example", async () => {
-    for (const command of ["start", "serve", "init", "mcp", "setup", "status", "stop"]) {
+    for (const command of ["start", "serve", "init", "mcp", "setup", "update", "status", "stop"]) {
       for (const argv of [[command, "--help"], [command, "-h"], ["help", command]]) {
         const { deps, out } = fakeDeps();
         expect(await dispatch(argv, ENTRY, deps)).toBe(0);
@@ -221,5 +223,30 @@ describe("dispatch: setup", () => {
     expect(await dispatch(["setup", "--force"], ENTRY, deps)).toBe(1);
     expect(err).toEqual(["Unknown option: --force", "Run `artisign help` for usage."]);
     expect(deps.runSetup).not.toHaveBeenCalled();
+  });
+});
+
+describe("dispatch: update", () => {
+  it("update and --update are the same command and pass the exit code through", async () => {
+    for (const argv of [["update"], ["--update"]]) {
+      const { deps } = fakeDeps();
+      vi.mocked(deps.runUpdate).mockResolvedValueOnce(1);
+      expect(await dispatch(argv, ENTRY, deps)).toBe(1);
+      expect(deps.runUpdate).toHaveBeenCalledTimes(1);
+      expect(deps.runStart).not.toHaveBeenCalled();
+    }
+  });
+
+  it("--update --help prints the update help", async () => {
+    const { deps, out } = fakeDeps();
+    await dispatch(["--update", "--help"], ENTRY, deps);
+    expect(out).toEqual([COMMAND_HELP.update]);
+  });
+
+  it("update takes no arguments", async () => {
+    const { deps, err } = fakeDeps();
+    expect(await dispatch(["update", "x"], ENTRY, deps)).toBe(1);
+    expect(err[0]).toBe("Unknown option: x");
+    expect(deps.runUpdate).not.toHaveBeenCalled();
   });
 });

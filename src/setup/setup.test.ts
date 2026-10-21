@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { defaultClientEnv, CLIENTS, type ClientEnv } from "./clients.js";
+import { defaultClientEnv, CLIENTS, claudeDesktop, type ClientEnv } from "./clients.js";
 import { connectClients } from "./connect.js";
 import { runSetup, restartStaleDaemon, type SetupDeps } from "../cli/setup.js";
 
@@ -10,6 +10,7 @@ let root: string;
 let home: string;
 let bin: string;
 let claudeLog: string;
+let nodeDir: string;
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), "artisign-setup-"));
@@ -18,6 +19,10 @@ beforeEach(async () => {
   claudeLog = join(root, "claude.log");
   await mkdir(home, { recursive: true });
   await mkdir(bin, { recursive: true });
+  nodeDir = join(root, "nodebin");
+  await mkdir(nodeDir, { recursive: true });
+  await writeFile(join(nodeDir, "npx"), "#!/bin/sh\n");
+  await chmod(join(nodeDir, "npx"), 0o755);
 });
 afterEach(async () => {
   await rm(root, { recursive: true, force: true });
@@ -43,7 +48,7 @@ function env(): ClientEnv {
     home,
     platform: "darwin",
     pathEnv: bin,
-    execPath: "/opt/node/bin/node",
+    execPath: join(nodeDir, "node"),
   };
 }
 
@@ -56,7 +61,7 @@ function deps(over: Partial<SetupDeps> = {}) {
     version: "9.9.9",
     isTTY: true,
     ask: vi.fn(async () => ""),
-    restartDaemon: vi.fn(async () => false),
+    restartDaemon: vi.fn(async () => "unchanged" as const),
     log: (l) => out.push(l),
     error: (l) => err.push(l),
     ...over,
@@ -85,9 +90,9 @@ describe("setup: fresh install", () => {
       mcpServers: {
         other: { command: "x" },
         artisign: {
-          command: "/opt/node/bin/npx",
+          command: join(nodeDir, "npx"),
           args: ["-y", "artisign@9.9.9", "mcp"],
-          env: { PATH: "/opt/node/bin:/usr/local/bin:/usr/bin:/bin" },
+          env: { PATH: `${nodeDir}:/usr/local/bin:/usr/bin:/bin` },
         },
       },
     });
@@ -129,36 +134,115 @@ describe("setup: the npx Claude Desktop runs", () => {
     await installDesktop();
     const { d } = deps();
     await runSetup({ cliEntry: "e", yes: true }, d);
-    expect((await entryOf()).command).toBe("/opt/node/bin/npx");
+    expect((await entryOf()).command).toBe(join(nodeDir, "npx"));
   });
 });
 
 describe("setup: restarting a stale daemon", () => {
-  const make = (info: { version?: string; projects: string[] } | undefined) => {
+  const make = (info: { version?: string; port?: number; projects: string[] } | undefined, stuck = false) => {
     const calls: string[] = [];
     return {
       calls,
       deps: {
         daemon: async () => (info ? { port: 1, ...info } : undefined),
         stop: async () => void calls.push("stop"),
-        start: async (o: { projects: string[]; noOpen: boolean }) =>
-          void calls.push(`start ${o.projects.join(",")} noOpen=${o.noOpen}`),
+        stillRunning: async () => stuck,
+        start: async (o: { port: number; projects: string[]; noOpen: boolean }) =>
+          void calls.push(`start :${o.port} ${o.projects.join(",")} noOpen=${o.noOpen}`),
       },
     };
   };
 
-  it("stops it and starts it again with the projects it had open", async () => {
-    const { calls, deps: d } = make({ version: "1.0.0", projects: ["/a", "/b"] });
-    expect(await restartStaleDaemon("e", "2.0.0", d)).toBe(true);
-    expect(calls).toEqual(["stop", "start /a,/b noOpen=true"]);
+  it("stops an older daemon and starts it again on its port with the projects it had open", async () => {
+    const { calls, deps: d } = make({ version: "1.0.0", port: 4800, projects: ["/a", "/b"] });
+    expect(await restartStaleDaemon("e", "2.0.0", d)).toBe("restarted");
+    expect(calls).toEqual(["stop", "start :4800 /a,/b noOpen=true"]);
   });
 
-  it("leaves a current daemon and a missing daemon alone", async () => {
-    for (const info of [{ version: "2.0.0", projects: ["/a"] }, undefined]) {
+  it("restarts a daemon that reports no version (it predates the field)", async () => {
+    const { calls, deps: d } = make({ projects: [] });
+    expect(await restartStaleDaemon("e", "2.0.0", d)).toBe("restarted");
+    expect(calls[0]).toBe("stop");
+  });
+
+  it("leaves a current, a newer and a missing daemon alone (no downgrade)", async () => {
+    for (const info of [{ version: "2.0.0", projects: ["/a"] }, { version: "2.1.0", projects: [] }, { version: "10.0.0", projects: [] }, undefined]) {
       const { calls, deps: d } = make(info);
-      expect(await restartStaleDaemon("e", "2.0.0", d)).toBe(false);
+      expect(await restartStaleDaemon("e", "2.0.0", d)).toBe("unchanged");
       expect(calls).toEqual([]);
     }
+  });
+
+  it("reports failure, and does not start a second daemon, when the old one would not stop", async () => {
+    const { calls, deps: d } = make({ version: "1.0.0", projects: [] }, true);
+    expect(await restartStaleDaemon("e", "2.0.0", d)).toBe("failed");
+    expect(calls).toEqual(["stop"]);
+  });
+
+  it("runSetup says so and exits 1 when the restart failed", async () => {
+    await installDesktop();
+    const { d, out, err } = deps({ restartDaemon: vi.fn(async () => "failed" as const) });
+    expect(await runSetup({ cliEntry: "e", yes: true }, d)).toBe(1);
+    expect(err.join("\n")).toContain("could not be stopped");
+    expect(out.join("\n")).not.toContain("Restarted");
+  });
+});
+
+describe("setup: config files that must not be clobbered", () => {
+  it("an unreadable ~/.claude.json is not replaced by a fresh one", async () => {
+    const file = join(home, ".claude.json");
+    await writeFile(file, JSON.stringify({ precious: true }));
+    await chmod(file, 0o000);
+    try {
+      const { d, err } = deps();
+      expect(await runSetup({ cliEntry: "e", yes: true }, d)).toBe(1);
+      expect(err.join("\n")).toContain("nothing was changed");
+    } finally {
+      await chmod(file, 0o600);
+    }
+    expect(await readFile(file, "utf8")).toBe(JSON.stringify({ precious: true }));
+  });
+
+  it("a symlinked config stays a symlink and the real file is updated", async () => {
+    const real = join(root, "dotfiles", "claude_desktop_config.json");
+    await mkdir(join(root, "dotfiles"), { recursive: true });
+    await writeFile(real, JSON.stringify({ keep: 1 }));
+    await mkdir(desktopDir(), { recursive: true });
+    await symlink(real, desktopFile());
+    const { d } = deps();
+    await runSetup({ cliEntry: "e", yes: true }, d);
+    expect((await lstat(desktopFile())).isSymbolicLink()).toBe(true);
+    const written = JSON.parse(await readFile(real, "utf8")) as Record<string, unknown>;
+    expect(written.keep).toBe(1);
+    expect(written.mcpServers).toHaveProperty("artisign");
+  });
+
+  it("--remove fails loudly when `claude mcp remove` fails", async () => {
+    const path = join(bin, "claude");
+    await writeFile(path, "#!/bin/sh\nexit 1\n");
+    await chmod(path, 0o755);
+    await writeFile(join(home, ".claude.json"), JSON.stringify({ mcpServers: { artisign: {} } }));
+    const { d, err } = deps();
+    expect(await runSetup({ cliEntry: "e", remove: true }, d)).toBe(1);
+    expect(err.join("\n")).toContain("claude mcp remove");
+  });
+
+  it("refuses to write a Desktop entry when no npx can be found", async () => {
+    await installDesktop({ keep: 1 });
+    const { d, err } = deps({ env: { ...env(), execPath: join(root, "nowhere", "node") } });
+    expect(await runSetup({ cliEntry: "e", yes: true }, d)).toBe(1);
+    expect(err.join("\n")).toContain("npx was not found");
+    expect(await readDesktop()).toEqual({ keep: 1 });
+  });
+
+  it("on Linux, ~/.config/claude counts as Claude Desktop only with a config file inside", async () => {
+    await mkdir(join(home, ".config", "claude"), { recursive: true });
+    // A case-insensitive filesystem (macOS) cannot tell the two directories apart; there the case is moot.
+    if (await stat(join(home, ".config", "Claude")).then(() => true, () => false)) return;
+    const linux = { ...env(), platform: "linux" as const };
+    expect((await claudeDesktop.detect(linux)).found).toBe(false);
+    await writeFile(join(home, ".config", "claude", "claude_desktop_config.json"), "{}");
+    expect((await claudeDesktop.detect(linux)).found).toBe(true);
   });
 });
 
@@ -197,7 +281,7 @@ describe("setup: upgrade and remove", () => {
     await installDesktop();
     const old = deps({ version: "1.0.0" });
     await runSetup({ cliEntry: "e", yes: true }, old.d);
-    const next = deps({ version: "2.0.0", restartDaemon: vi.fn(async () => true) });
+    const next = deps({ version: "2.0.0", restartDaemon: vi.fn(async () => "restarted" as const) });
     await runSetup({ cliEntry: "e", yes: true }, next.d);
     const servers = (await readDesktop()).mcpServers as Record<string, { args: string[] }>;
     expect(servers.artisign?.args).toEqual(["-y", "artisign@2.0.0", "mcp"]);

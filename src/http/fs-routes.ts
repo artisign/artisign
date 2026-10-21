@@ -81,7 +81,7 @@ export async function handleFsApi(req: IncomingMessage, res: ServerResponse): Pr
 /**
  * `POST /api/fs/dirs` `{ parent, name }` — creates exactly one directory
  * inside `parent` (the folder browser's "+ New folder"). `name` is a single
- * path segment: separators, `.`, `..` and empty names are rejected so the
+ * path segment: separators, a leading `.` (incl. `.`/`..`) and empty names are rejected so the
  * request can never escape `parent` or create nested folders. Failures keep
  * distinct codes the UI maps to its copy: `validation_failed` 400,
  * `not_found` 404 (parent missing), `already_exists` 409,
@@ -105,35 +105,38 @@ async function createDir(req: IncomingMessage, res: ServerResponse): Promise<boo
     sendJson(res, 400, { code: "validation_failed", message: "parent must be an absolute path" });
     return true;
   }
-  if (typeof name !== "string" || !isValidFolderName(name)) {
+  const folderName = typeof name === "string" ? name.trim() : "";
+  if (!isValidFolderName(folderName)) {
     sendJson(res, 400, {
       code: "validation_failed",
-      message: "folder names can't contain / or \\ and can't be empty, \".\" or \"..\"",
+      message: "folder names can't start with \".\", contain / or \\, or be empty",
     });
     return true;
   }
 
-  const path = join(resolve(parent), name);
+  const path = join(resolve(parent), folderName);
   try {
     await mkdir(path);
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "EEXIST") {
-      sendJson(res, 409, { code: "already_exists", message: `a folder named "${name}" already exists here` });
+      sendJson(res, 409, { code: "already_exists", message: `a folder named "${folderName}" already exists here` });
     } else if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
       sendJson(res, 403, { code: "permission_denied", message: `permission denied: ${resolve(parent)}` });
-    } else if (code === "ENOENT" || code === "ENOTDIR") {
+    } else if (code === "ENAMETOOLONG") {
+      sendJson(res, 400, { code: "validation_failed", message: "folder name is too long" });
+    } else if (code === "ENOENT" || code === "ENOTDIR" || code === "ELOOP") {
       sendJson(res, 404, { code: "not_found", message: `directory not found: ${resolve(parent)}` });
     } else {
       throw err;
     }
     return true;
   }
-  sendJson(res, 201, { name, path });
+  sendJson(res, 201, { name: folderName, path });
   return true;
 }
 
+/** A single visible path segment: the listing hides dotdirs, so a leading `.` (which also covers `.` and `..`) is refused. */
 function isValidFolderName(name: string): boolean {
-  const trimmed = name.trim();
-  return trimmed !== "" && trimmed !== "." && trimmed !== ".." && !/[/\\\0]/.test(name);
+  return name !== "" && !name.startsWith(".") && !/[/\\\0]/.test(name);
 }

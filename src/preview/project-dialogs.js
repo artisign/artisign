@@ -44,13 +44,24 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       selectionPathEl.textContent = selectedProjectPath ? displayPath(selectedProjectPath) : "—";
       confirmButton.disabled = !selectedProjectPath;
     } else {
-      const name = nameInput.value.trim();
-      // currentPath is "/" at the filesystem root —
-      // joining naively would render the hint as "//my-project".
-      const prefix = currentPath === "/" ? "" : currentPath;
-      selectionPathEl.textContent = name ? displayPath(`${prefix}/${name}`) : "—";
-      confirmButton.disabled = !name;
+      const target = initTargetDir();
+      selectionPathEl.textContent = target ? displayPath(target) : "—";
+      confirmButton.disabled = !nameInput.value.trim();
     }
+  }
+
+  /**
+   * The folder /api/projects/init scaffolds into: the folder "+ New folder"
+   * just made and selected, else a folder named after the project inside the
+   * current one. `name` alone never creates a subfolder server-side.
+   * @returns {string | null}
+   */
+  function initTargetDir() {
+    if (createdFolderPath) return createdFolderPath;
+    const name = nameInput.value.trim();
+    if (!name) return null;
+    // currentPath is "/" at the filesystem root — joining naively would give "//name".
+    return `${currentPath === "/" ? "" : currentPath}/${name}`;
   }
 
   function renderQuickChips() {
@@ -128,7 +139,8 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       // you drill into. "init" mode: a project folder can't be a target
       // (per spec) — so it's inert, neither selectable nor navigable.
       if (entry.path === createdFolderPath) {
-        row.classList.add("dir-row-selected");
+        row.classList.add("dir-row-selected", "dir-row-created");
+        row.tabIndex = -1;
         const badge = document.createElement("span");
         badge.className = "dir-row-badge dir-row-badge-new";
         badge.textContent = "new";
@@ -160,7 +172,7 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
   function newFolderErrorText(name, failure) {
     if (failure.code === "already_exists") return `A folder named \u201C${name}\u201D already exists here.`;
     if (failure.code === "validation_failed") {
-      return "Folder names can\u2019t contain / or \\ and can\u2019t be empty, \u201C.\u201D or \u201C..\u201D.";
+      return "Folder names can\u2019t start with \u201C.\u201D, contain / or \\, or be empty.";
     }
     if (failure.code === "permission_denied") {
       return `Can\u2019t create a folder in ${basename(currentPath)}: permission denied.`;
@@ -192,35 +204,55 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       <div class="new-folder-message" hidden></div>`;
     const input = row.querySelector(".new-folder-input");
     const messageEl = row.querySelector(".new-folder-message");
+    const createButton = row.querySelector(".new-folder-create");
 
+    let creating = false;
     async function create() {
+      if (creating) return;
+      creating = true;
+      input.disabled = true;
+      createButton.disabled = true;
       const name = input.value.trim();
       const result = await createFsDir(currentPath, name);
       if (!result.ok) {
+        creating = false;
+        input.disabled = false;
+        createButton.disabled = false;
         messageEl.textContent = newFolderErrorText(name, result);
         messageEl.hidden = false;
         row.classList.add("new-folder-row-error");
+        input.focus();
         return;
       }
       await loadPath(currentPath, { created: result.path });
+      // Init mode: the new folder is the target; its name is the natural project name.
+      if (nameInput && !nameInput.value.trim()) nameInput.value = result.name;
+      updateHint();
+      dirListEl.querySelector(".dir-row-created")?.focus();
+    }
+
+    function dismiss() {
+      closeNewFolderRow();
+      newFolderButton.focus();
     }
 
     input.addEventListener("input", () => {
       messageEl.hidden = true;
       row.classList.remove("new-folder-row-error");
     });
-    input.addEventListener("keydown", (evt) => {
-      if (evt.key === "Enter") {
+    // On the row, not the input: Esc with focus on Create/Cancel must close
+    // only the row too — the dialog-level Escape must not also fire.
+    row.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter" && evt.target === input) {
         evt.preventDefault();
         create();
       } else if (evt.key === "Escape") {
-        // Only the row closes — the dialog-level Escape must not also fire.
         evt.stopPropagation();
-        closeNewFolderRow();
+        dismiss();
       }
     });
-    row.querySelector(".new-folder-create").addEventListener("click", create);
-    row.querySelector(".new-folder-cancel").addEventListener("click", closeNewFolderRow);
+    createButton.addEventListener("click", create);
+    row.querySelector(".new-folder-cancel").addEventListener("click", dismiss);
 
     dirListEl.prepend(row);
     newFolderRowEl = row;
@@ -270,7 +302,7 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
   cancelButton.addEventListener("click", () => onCancel());
 
   confirmButton.addEventListener("click", async () => {
-    const target = mode === "open" ? { dir: selectedProjectPath } : { dir: currentPath, name: nameInput.value.trim() };
+    const target = mode === "open" ? { dir: selectedProjectPath } : { dir: initTargetDir(), name: nameInput.value.trim() };
     confirmButton.disabled = true;
     const result = await onConfirm(target);
     confirmButton.disabled = false;

@@ -229,6 +229,81 @@ describe("folder browser: + New folder", () => {
     expect(scrimEl.hidden).toBe(true);
   });
 
+  it("Escape with focus on the row's Create or Cancel button closes only the row and refocuses + New folder", () => {
+    initSectionEl.querySelector(".btn-new-folder").click();
+    initSectionEl.querySelector(".new-folder-cancel").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+    expect(initSectionEl.querySelector(".new-folder-row")).toBeNull();
+    expect(scrimEl.hidden).toBe(false);
+    expect(document.activeElement).toBe(initSectionEl.querySelector(".btn-new-folder"));
+  });
+
+  it("focuses the new row after a successful create", async () => {
+    await typeAndCreate(initSectionEl, "clients");
+
+    expect(document.activeElement).toBe(initSectionEl.querySelector(".dir-row-created"));
+  });
+
+  it("ignores a second Create while the request is in flight", async () => {
+    let release;
+    const gate = new Promise((r) => (release = r));
+    const base = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (url, init) => {
+      if (init?.method === "POST") await gate;
+      return base(url, init);
+    });
+    initSectionEl.querySelector(".btn-new-folder").click();
+    const input = initSectionEl.querySelector(".new-folder-input");
+    input.value = "clients";
+    const create = initSectionEl.querySelector(".new-folder-create");
+    create.click();
+    create.click();
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(create.disabled).toBe(true);
+    expect(input.disabled).toBe(true);
+    release();
+    await settle();
+    await settle();
+
+    expect(posts).toHaveLength(1);
+  });
+
+  it("init mode: after creating a folder, confirm scaffolds into that folder, not its parent", async () => {
+    const onInit = vi.fn(async () => ({ ok: true }));
+    initSectionEl.remove();
+    initSectionEl = section(true);
+    document.body.append(initSectionEl);
+    dialogs = createProjectDialogs({ scrimEl, openSectionEl, initSectionEl }, { onOpen: async () => ({ ok: true }), onInit });
+    dialogs.showInitDialog();
+    await settle();
+    await typeAndCreate(initSectionEl, "acme");
+
+    expect(initSectionEl.querySelector(".selection-path").textContent).toBe("~/Workspace/acme");
+    expect(initSectionEl.querySelector(".field-name-input").value).toBe("acme");
+    initSectionEl.querySelector(".btn-confirm").click();
+    await settle();
+
+    expect(onInit).toHaveBeenCalledWith(`${PARENT}/acme`, "acme");
+  });
+
+  it("init mode: without a created folder the hint and the confirm target are <current>/<name>", async () => {
+    const onInit = vi.fn(async () => ({ ok: true }));
+    initSectionEl.remove();
+    initSectionEl = section(true);
+    document.body.append(initSectionEl);
+    dialogs = createProjectDialogs({ scrimEl, openSectionEl, initSectionEl }, { onOpen: async () => ({ ok: true }), onInit });
+    dialogs.showInitDialog();
+    await settle();
+    const name = initSectionEl.querySelector(".field-name-input");
+    name.value = "proj";
+    name.dispatchEvent(new Event("input"));
+
+    expect(initSectionEl.querySelector(".selection-path").textContent).toBe("~/Workspace/proj");
+    initSectionEl.querySelector(".btn-confirm").click();
+    await settle();
+    expect(onInit).toHaveBeenCalledWith(`${PARENT}/proj`, "proj");
+  });
+
   it("Cancel closes the row without a request", () => {
     initSectionEl.querySelector(".btn-new-folder").click();
     initSectionEl.querySelector(".new-folder-cancel").click();
@@ -239,7 +314,7 @@ describe("folder browser: + New folder", () => {
 
   it.each([
     ["already_exists", 409, "A folder named \u201Cscratch\u201D already exists here."],
-    ["validation_failed", 400, "Folder names can\u2019t contain / or \\ and can\u2019t be empty, \u201C.\u201D or \u201C..\u201D."],
+    ["validation_failed", 400, "Folder names can\u2019t start with \u201C.\u201D, contain / or \\, or be empty."],
     ["permission_denied", 403, "Can\u2019t create a folder in Workspace: permission denied."],
   ])("shows the designed copy for %s and keeps the row open", async (code, status, copy) => {
     postReply = { ok: false, status, statusText: "x", json: async () => ({ code, message: "raw server text" }) };

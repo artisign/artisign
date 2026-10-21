@@ -174,7 +174,7 @@ describe("POST /api/fs/dirs", () => {
     expect((await stat(join(root, "clients", "keep.txt"))).isFile()).toBe(true);
   });
 
-  it.each(["", "   ", ".", "..", "a/b", "a\\b", "../escape", "/abs"])("400s validation_failed for the name %j", async (name) => {
+  it.each(["", "   ", ".", "..", ".archive", "a/b", "a\\b", "../escape", "/abs"])("400s validation_failed for the name %j", async (name) => {
     const { status, json } = await postDir({ parent: root, name });
 
     expect(status).toBe(400);
@@ -193,6 +193,42 @@ describe("POST /api/fs/dirs", () => {
 
     expect(status).toBe(404);
     expect(json.code).toBe("not_found");
+    await expect(stat(join(root, "nope"))).rejects.toThrow();
+  });
+
+  it("409s already_exists when a FILE already has the name", async () => {
+    await writeFile(join(root, "clients"), "x");
+
+    const { status, json } = await postDir({ parent: root, name: "clients" });
+
+    expect(status).toBe(409);
+    expect(json.code).toBe("already_exists");
+  });
+
+  it("creates the trimmed name", async () => {
+    const { status, json } = await postDir({ parent: root, name: "  clients  " });
+
+    expect(status).toBe(201);
+    expect(json).toEqual({ name: "clients", path: join(root, "clients") });
+    expect((await stat(join(root, "clients"))).isDirectory()).toBe(true);
+  });
+
+  it("400s validation_failed for a name over the filesystem limit", async () => {
+    const { status, json } = await postDir({ parent: root, name: "x".repeat(300) });
+
+    expect(status).toBe(400);
+    expect(json.code).toBe("validation_failed");
+  });
+
+  it("403s a POST without a JSON content-type", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/fs/dirs`, {
+      method: "POST",
+      headers: { "content-type": "text/plain" },
+      body: JSON.stringify({ parent: root, name: "clients" }),
+    });
+
+    expect(res.status).toBe(403);
+    await expect(stat(join(root, "clients"))).rejects.toThrow();
   });
 
   it.skipIf(process.getuid?.() === 0)("403s permission_denied (not a 500) for a read-only parent", async () => {

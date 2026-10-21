@@ -3,7 +3,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { connectClients } from "../setup/connect.js";
 import { isNewer, readVersion } from "../version.js";
-import { restartStaleDaemon } from "./setup.js";
+import { restartDaemon } from "./setup.js";
 
 type Run = { code: number; stdout: string; stderr: string };
 
@@ -128,7 +128,7 @@ export async function runUpdate(deps: UpdateDeps = defaultDeps()): Promise<numbe
 
 type RepinDeps = {
   connect: typeof connectClients;
-  restart: typeof restartStaleDaemon;
+  restart: typeof restartDaemon;
   version: string;
   log: (line: string) => void;
   error: (line: string) => void;
@@ -139,7 +139,7 @@ export async function runRepin(
   cliEntry: string,
   deps: RepinDeps = {
     connect: connectClients,
-    restart: restartStaleDaemon,
+    restart: restartDaemon,
     version: readVersion(),
     log: console.log,
     error: console.error,
@@ -153,7 +153,8 @@ export async function runRepin(
       failed = true;
     }
   }
-  const restart = await deps.restart(cliEntry, deps.version);
+  // Unconditional: the install replaced the code on disk, whatever the running daemon reports about itself.
+  const restart = await deps.restart(cliEntry);
   if (restart === "restarted") deps.log("Restarted the running Artisign.");
   if (restart === "failed") {
     deps.error("The running Artisign could not be stopped. Run `artisign stop`, then `artisign`.");

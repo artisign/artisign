@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `artisign update` now always restarts the running Artisign (same port, same open projects) after installing, and
+  `/health` reports the version the process started with. Before, `/health` read `package.json` on every request, so an
+  update that had just replaced it made the old daemon claim the new version and the restart was skipped. (CHR-886)
+
 ## [2.1.0] - 2026-10-21
 
 One install path and a per-call project: Artisign is installed once with `npm install -g artisign`, connects to your

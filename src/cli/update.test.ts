@@ -153,6 +153,12 @@ describe("repin", () => {
     expect(d.restart).toHaveBeenCalled();
   });
 
+  it("restarts the daemon without asking its version", async () => {
+    const d = make([], "restarted");
+    await runRepin("e", d);
+    expect(d.restart).toHaveBeenCalledWith("e");
+  });
+
   it("returns non-zero when the old daemon would not stop", async () => {
     expect(await runRepin("e", make([], "failed"))).toBe(1);
   });

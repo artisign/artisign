@@ -141,6 +141,33 @@
             <nav id="variant-bar" aria-label="Variant path" hidden></nav>
             <div id="screens-stage">
             <div id="canvas">
+              <!-- CHR-890: how-to-start guide, shown on the bare canvas (the frame is hidden) while the project has no screens. Native size, outside the zoomed #screen-holder. -->
+              <div id="empty-guide" hidden>
+                <div id="empty-guide-head">
+                  <p id="empty-guide-label">Get started</p>
+                  <h2 id="empty-guide-title">Design your first screen</h2>
+                </div>
+                <ol id="empty-guide-steps">
+                  <li>
+                    <span class="empty-guide-num">1</span>
+                    <div class="empty-guide-body">
+                      <div class="empty-guide-text">Ask your AI tool to design a screen in this project.</div>
+                      <div id="empty-guide-prompt-box">
+                        <span id="empty-guide-prompt"></span>
+                        <button type="button" id="empty-guide-copy">Copy</button>
+                      </div>
+                    </div>
+                  </li>
+                  <li>
+                    <span class="empty-guide-num">2</span>
+                    <div class="empty-guide-body"><div class="empty-guide-text">Watch it appear here while the agent works.</div></div>
+                  </li>
+                  <li>
+                    <span class="empty-guide-num">3</span>
+                    <div class="empty-guide-body"><div class="empty-guide-text">Review it. Use Comment mode to leave feedback the agent reads.</div></div>
+                  </li>
+                </ol>
+              </div>
               <div id="screen-holder">
                 <!--
                   sandbox="allow-same-origin" only, NEVER "allow-scripts": this
@@ -181,7 +208,6 @@
               </div>
             </div>
             <aside id="variant-map" aria-label="Variant tree" hidden></aside>
-            <p id="empty-state" hidden>No screens yet.</p>
             </div>
             <!-- CHR-738: side-by-side variant compare — a mode of this view, filled and shown by compare.js in place of #screens-stage. The columns' iframes are sandboxed like #screen-frame (iframe-fit.js). -->
             <div id="compare-view" hidden>

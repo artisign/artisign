@@ -1216,7 +1216,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   flex-direction: column;
 }
 
-/* CHR-732 — the breadcrumb bar sits above the canvas; the stage keeps the old canvas row (canvas + empty-state, now also the variant tree map). */
+/* CHR-732 — the breadcrumb bar sits above the canvas; the stage keeps the old canvas row (canvas + the variant tree map; the empty-project guide sits centred on #canvas, CHR-890). */
 #screens-stage {
   flex: 1;
   min-height: 0;
@@ -1393,10 +1393,114 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   display: none;
 }
 
-#empty-state {
-  margin: auto;
-  color: var(--color-text-faded);
-  font-size: 0.9rem;
+/* CHR-890 — the how-to-start guide sits on the bare canvas while the project has no screens: native size, centred, outside the zoomed #screen-holder (which is hidden then). */
+#empty-guide {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+#empty-guide[hidden] {
+  display: none;
+}
+
+#empty-guide p,
+#empty-guide h2,
+#empty-guide ol {
+  margin: 0;
+}
+
+#empty-guide-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+#empty-guide-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-label);
+}
+
+#empty-guide-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+#empty-guide-steps {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+#empty-guide-steps li {
+  display: flex;
+  gap: var(--space-lg);
+  align-items: flex-start;
+}
+
+.empty-guide-num {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: 600;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-guide-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.empty-guide-text {
+  font-size: 0.85rem;
+  line-height: 22px;
+  color: var(--color-text-secondary);
+}
+
+#empty-guide-prompt-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+  padding: var(--space-lg) var(--space-xl);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+}
+
+#empty-guide-prompt {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+#empty-guide-copy {
+  flex: none;
+  padding: var(--space-xs) var(--space-lg);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 /* Inspect mode selection overlay — see index.html's comment on #inspect-overlay. */

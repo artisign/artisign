@@ -126,7 +126,9 @@ const comparePanelTitleEl = document.getElementById("compare-panel-title");
 const panelTabsEl = document.getElementById("panel-tabs");
 const screenHolderEl = document.getElementById("screen-holder");
 const statusBarOverlayEl = document.getElementById("status-bar-overlay");
-const emptyState = document.getElementById("empty-state");
+const emptyGuideEl = document.getElementById("empty-guide");
+const emptyGuidePromptEl = document.getElementById("empty-guide-prompt");
+const emptyGuideCopyBtn = document.getElementById("empty-guide-copy");
 const screensViewEl = document.getElementById("screens-view");
 const designSystemViewEl = document.getElementById("design-system-view");
 const boardViewEl = document.getElementById("board-view");
@@ -648,12 +650,14 @@ const projectDialogs = createProjectDialogs(
 /** Applies a fresh `/api/projects` response: updates the picker/empty-state and, if the active project changed, switches to it. */
 async function applyProjectsResult(state) {
   projectUI.render(state);
+  syncGuidePrompt();
   if (state.active !== activeProjectRoot) await switchToProject(state.active);
 }
 
 async function refreshProjectsState() {
   const state = await fetchProjects();
   projectUI.render(state);
+  syncGuidePrompt();
   return state;
 }
 
@@ -850,7 +854,7 @@ function restoreCompare() {
 
 /** Re-fetches everything the current view depends on — used after an SSE reconnect, where the gap while disconnected is invisible to us. */
 async function resyncCurrentProject() {
-  loadScreens();
+  loadScreensSelectingFirst(); // the first screen may have arrived while disconnected
   loadTags();
   loadBoardState(); // CHR-624 — the daemon's board state is empty after a restart; a reconnect must resync it same as everything else
   compare.reloadAll();
@@ -883,10 +887,16 @@ function arraysEqual(a, b) {
   return a.length === b.length && a.every((item, i) => item === b[i]);
 }
 
+/** CHR-890 — the first screen of an empty project arrives live: render it instead of leaving the frame blank. */
+async function loadScreensSelectingFirst() {
+  await loadScreens();
+  if (currentScreen === null && currentMockup === null && screens.length > 0) await selectScreen(pickInitialScreen(screens, null));
+}
+
 async function handleChangeEvent(event) {
   if (event.kind === "screen") {
     const previousScreens = screens;
-    await loadScreens();
+    await loadScreensSelectingFirst();
     flushHeldFollowEvent();
     compare.screenChanged(event.name);
     if (event.name === currentScreen) {
@@ -1534,9 +1544,39 @@ async function loadScreens() {
   [screens, screenFlows] = await Promise.all([fetchScreens(activeProjectRoot), fetchFlows(activeProjectRoot).catch(() => [])]);
   compare.reconcile(); // a deleted member leaves the selection, a deleted reference ends compare
   refreshSidebar();
-  emptyState.hidden = screens.length > 0;
-  screenFrame.hidden = screens.length === 0;
+  const empty = screens.length === 0;
+  emptyGuideEl.hidden = !empty;
+  screenHolderEl.hidden = empty; // no white frame while the guide shows on the bare canvas
+  screenFrame.hidden = empty;
+  if (empty) {
+    // The last screen is gone: drop its document, so the stale one neither lingers nor sizes the next frame.
+    if (iframeRenderedScreen !== null) {
+      screenFrame.srcdoc = "";
+      iframeRenderedScreen = null;
+    }
+    currentScreen = null; // a later first screen must be picked up as a fresh selection (handleChangeEvent)
+    syncGuidePrompt();
+  }
 }
+
+/** CHR-890 — names the active project (as the picker shows it) in the guide's prompt. */
+function syncGuidePrompt() {
+  emptyGuidePromptEl.textContent = `Design a login screen in my Artisign project ${projectPickerName.textContent}`;
+}
+
+let guideCopyTimer;
+emptyGuideCopyBtn.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(emptyGuidePromptEl.textContent);
+  } catch {
+    return; // clipboard denied — the prompt stays selectable text
+  }
+  emptyGuideCopyBtn.textContent = "Copied";
+  clearTimeout(guideCopyTimer);
+  guideCopyTimer = setTimeout(() => {
+    emptyGuideCopyBtn.textContent = "Copy";
+  }, 1500);
+});
 
 async function selectScreen(screen) {
   if (compare.isOn() && !compare.inFamily(screen)) compare.leave(); // compare belongs to one variant family (CHR-738)

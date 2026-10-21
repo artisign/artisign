@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { connectClients } from "../setup/connect.js";
 import { isNewer, readVersion } from "../version.js";
@@ -14,6 +14,7 @@ export type UpdateDeps = {
   entryPath: string;
   /** Runs npm; `stream` forwards its output to stderr while it runs. */
   npm: (args: string[], stream: boolean) => Promise<Run>;
+  exists: (path: string) => boolean;
   /** Runs `artisign __repin` from the newly installed entry — the old code must not write the entries. */
   repin: (newEntry: string) => Promise<number>;
   log: (line: string) => void;
@@ -50,6 +51,7 @@ function defaultDeps(): UpdateDeps {
       }
     })(),
     npm: (args, stream) => run("npm", args, stream),
+    exists: existsSync,
     repin: async (newEntry) => (await run(process.execPath, [newEntry, "__repin"], true)).code,
     log: (line) => console.log(line),
     error: (line) => console.error(line),
@@ -103,40 +105,58 @@ export async function runUpdate(deps: UpdateDeps = defaultDeps()): Promise<numbe
   deps.log(`Updating artisign ${deps.currentVersion} -> ${latest} ...`);
   const install = await deps.npm(["install", "-g", "artisign@latest"], true);
   if (install.code !== 0) {
-    deps.error(
-      `npm could not install artisign@latest${/EACCES/.test(install.stderr) ? " (permission denied)" : ""}. Nothing was changed.`,
-    );
-    deps.error(FIX);
+    if (/\b(EACCES|EPERM)\b/.test(install.stderr)) {
+      deps.error("npm could not install artisign@latest (permission denied). Nothing was changed.");
+      deps.error(FIX);
+    } else {
+      // npm's own error was already streamed to stderr; only the outcome is added.
+      deps.error("Update failed, nothing was changed.");
+    }
     return 1;
   }
 
+  // `npm root -g` can point elsewhere than the npm that owns this install (Volta, a second prefix); then the
+  // running binary's own entry, which a normal global install overwrites in place, is the new version.
   const root = await deps.npm(["root", "-g"], false);
-  if (root.code !== 0 || root.stdout.trim() === "") {
-    deps.error(
-      "Installed, but could not locate the new version to re-pin your AI tool entries. Run `artisign setup`.",
-    );
-    return 1;
-  }
-  const code = await deps.repin(join(root.stdout.trim(), "artisign", "dist", "cli", "index.js"));
+  const fromNpm = join(root.stdout.trim(), "artisign", "dist", "cli", "index.js");
+  const newEntry =
+    root.code === 0 && root.stdout.trim() !== "" && deps.exists(fromNpm) ? fromNpm : deps.entryPath;
+  const code = await deps.repin(newEntry);
   if (code !== 0) deps.error("Installed, but re-pinning the entries failed. Run `artisign setup`.");
   return code;
 }
 
+type RepinDeps = {
+  connect: typeof connectClients;
+  restart: typeof restartStaleDaemon;
+  version: string;
+  log: (line: string) => void;
+  error: (line: string) => void;
+};
+
 /** `artisign __repin`, run by the NEW version after an update: re-pins existing entries, restarts an older daemon. */
-export async function runRepin(cliEntry: string): Promise<number> {
-  const version = readVersion();
+export async function runRepin(
+  cliEntry: string,
+  deps: RepinDeps = {
+    connect: connectClients,
+    restart: restartStaleDaemon,
+    version: readVersion(),
+    log: console.log,
+    error: console.error,
+  },
+): Promise<number> {
   let failed = false;
-  for (const r of await connectClients({ version, onlyExisting: true })) {
-    if (r.status === "done") console.log(`Re-pinned ${r.name} to artisign@${version}.`);
+  for (const r of await deps.connect({ version: deps.version, onlyExisting: true })) {
+    if (r.status === "done") deps.log(`Re-pinned ${r.name} to artisign@${deps.version}.`);
     else if (r.status === "failed") {
-      console.error(`${r.name}: ${r.error}`);
+      deps.error(`${r.name}: ${r.error}`);
       failed = true;
     }
   }
-  const restart = await restartStaleDaemon(cliEntry, version);
-  if (restart === "restarted") console.log("Restarted the running Artisign.");
+  const restart = await deps.restart(cliEntry, deps.version);
+  if (restart === "restarted") deps.log("Restarted the running Artisign.");
   if (restart === "failed") {
-    console.error("The running Artisign could not be stopped. Run `artisign stop`, then `artisign`.");
+    deps.error("The running Artisign could not be stopped. Run `artisign stop`, then `artisign`.");
     return 1;
   }
   return failed ? 1 : 0;

@@ -187,6 +187,25 @@ export async function fetchFsDirs(path) {
 }
 
 /**
+ * Creates one folder inside `parent` (`POST /api/fs/dirs`). `code` carries the
+ * route's error code so the folder browser can phrase it (already_exists,
+ * validation_failed, permission_denied, not_found).
+ * @param {string} parent absolute path of the folder currently shown
+ * @param {string} name a single path segment
+ * @returns {Promise<{ ok: true, name: string, path: string } | { ok: false, code: string | undefined, message: string }>}
+ */
+export async function createFsDir(parent, name) {
+  const res = await fetch("/api/fs/dirs", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ parent, name }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, code: body.code, message: body.message ?? res.statusText };
+  return { ok: true, ...body };
+}
+
+/**
  * The Elements panel's node list for a screen, in document order: each
  * model node's id/tag plus its refs (component/variant/token), the same
  * shape `get_node`'s summary view returns per node — see reads.ts.

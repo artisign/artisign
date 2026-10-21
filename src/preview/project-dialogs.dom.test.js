@@ -16,6 +16,7 @@ function section(withNameInput) {
     <button class="quick-chip" data-quick="home"></button>
     <button class="quick-chip" data-quick="workspace"></button>
     <div class="breadcrumbs"></div>
+    <button class="btn-new-folder"></button>
     <div class="dir-list"></div>
     <span class="selection-path"></span>
     <p class="dialog-error"></p>
@@ -122,5 +123,213 @@ describe("folder browser breadcrumbs", () => {
     nameInput.dispatchEvent(new Event("input"));
 
     expect(initSectionEl.querySelector(".selection-path").textContent).toBe("/my-project");
+  });
+});
+
+describe("folder browser: + New folder", () => {
+  const PARENT = "/Users/example/Workspace";
+  let folders;
+  let scrimEl;
+  let openSectionEl;
+  let initSectionEl;
+  let dialogs;
+  let posts;
+  let postReply;
+
+  beforeEach(async () => {
+    folders = [{ name: "notes-app", isArtisignProject: true }, { name: "scratch", isArtisignProject: false }];
+    posts = [];
+    postReply = null;
+    globalThis.fetch = vi.fn(async (url, init) => {
+      if (init?.method === "POST") {
+        const body = JSON.parse(init.body);
+        posts.push(body);
+        if (postReply) return postReply;
+        folders.push({ name: body.name, isArtisignProject: false });
+        folders.sort((a, b) => a.name.localeCompare(b.name));
+        return { ok: true, status: 201, json: async () => ({ name: body.name, path: `${body.parent}/${body.name}` }) };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          path: PARENT,
+          parent: "/Users/example",
+          home: HOME,
+          entries: folders.map((f) => ({ ...f, path: `${PARENT}/${f.name}` })),
+        }),
+      };
+    });
+    scrimEl = document.createElement("div");
+    openSectionEl = section(false);
+    initSectionEl = section(true);
+    dialogs = createProjectDialogs(
+      { scrimEl, openSectionEl, initSectionEl },
+      { onOpen: async () => ({ ok: true }), onInit: async () => ({ ok: true }) },
+    );
+    document.body.append(openSectionEl, initSectionEl);
+    dialogs.showInitDialog();
+    await settle();
+  });
+
+  afterEach(() => {
+    openSectionEl.remove();
+    initSectionEl.remove();
+    delete globalThis.fetch;
+  });
+
+  async function typeAndCreate(sectionEl, name, via = "button") {
+    sectionEl.querySelector(".btn-new-folder").click();
+    const input = sectionEl.querySelector(".new-folder-input");
+    input.value = name;
+    input.dispatchEvent(new Event("input"));
+    if (via === "enter") input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    else sectionEl.querySelector(".new-folder-create").click();
+    await settle();
+    await settle();
+  }
+
+  const rowNames = (sectionEl) => [...sectionEl.querySelectorAll(".dir-row-name")].map((n) => n.textContent);
+
+  it("creates inside the shown folder and inserts the new folder alphabetically, badged and selected", async () => {
+    await typeAndCreate(initSectionEl, "clients");
+
+    expect(posts).toEqual([{ parent: PARENT, name: "clients" }]);
+    expect(rowNames(initSectionEl)).toEqual(["clients", "notes-app", "scratch"]);
+    const row = initSectionEl.querySelector(".dir-row-selected");
+    expect(row.querySelector(".dir-row-name").textContent).toBe("clients");
+    expect(row.querySelector(".dir-row-badge-new").textContent).toBe("new");
+    expect(initSectionEl.querySelector(".new-folder-row")).toBeNull();
+  });
+
+  it("creates on Enter", async () => {
+    await typeAndCreate(initSectionEl, "clients", "enter");
+
+    expect(posts).toHaveLength(1);
+    expect(rowNames(initSectionEl)).toContain("clients");
+  });
+
+  it("in open mode the new folder is highlighted but Open stays disabled", async () => {
+    dialogs.showOpenDialog();
+    await settle();
+    await typeAndCreate(openSectionEl, "clients");
+
+    expect(openSectionEl.querySelector(".dir-row-selected .dir-row-name").textContent).toBe("clients");
+    expect(openSectionEl.querySelector(".btn-confirm").disabled).toBe(true);
+  });
+
+  it("Escape closes only the row, not the dialog", async () => {
+    initSectionEl.querySelector(".btn-new-folder").click();
+    const input = initSectionEl.querySelector(".new-folder-input");
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(initSectionEl.querySelector(".new-folder-row")).toBeNull();
+    expect(scrimEl.hidden).toBe(false);
+
+    // A second Escape, now outside the row, closes the dialog.
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(scrimEl.hidden).toBe(true);
+  });
+
+  it("Escape with focus on the row's Create or Cancel button closes only the row and refocuses + New folder", () => {
+    initSectionEl.querySelector(".btn-new-folder").click();
+    initSectionEl.querySelector(".new-folder-cancel").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+    expect(initSectionEl.querySelector(".new-folder-row")).toBeNull();
+    expect(scrimEl.hidden).toBe(false);
+    expect(document.activeElement).toBe(initSectionEl.querySelector(".btn-new-folder"));
+  });
+
+  it("focuses the new row after a successful create", async () => {
+    await typeAndCreate(initSectionEl, "clients");
+
+    expect(document.activeElement).toBe(initSectionEl.querySelector(".dir-row-created"));
+  });
+
+  it("ignores a second Create while the request is in flight", async () => {
+    let release;
+    const gate = new Promise((r) => (release = r));
+    const base = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (url, init) => {
+      if (init?.method === "POST") await gate;
+      return base(url, init);
+    });
+    initSectionEl.querySelector(".btn-new-folder").click();
+    const input = initSectionEl.querySelector(".new-folder-input");
+    input.value = "clients";
+    const create = initSectionEl.querySelector(".new-folder-create");
+    create.click();
+    create.click();
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    expect(create.disabled).toBe(true);
+    expect(input.disabled).toBe(true);
+    release();
+    await settle();
+    await settle();
+
+    expect(posts).toHaveLength(1);
+  });
+
+  it("init mode: the created folder is the parent of the new project — confirm scaffolds into <folder>/<name>", async () => {
+    const onInit = vi.fn(async () => ({ ok: true }));
+    initSectionEl.remove();
+    initSectionEl = section(true);
+    document.body.append(initSectionEl);
+    dialogs = createProjectDialogs({ scrimEl, openSectionEl, initSectionEl }, { onOpen: async () => ({ ok: true }), onInit });
+    dialogs.showInitDialog();
+    await settle();
+    await typeAndCreate(initSectionEl, "clients");
+    const name = initSectionEl.querySelector(".field-name-input");
+    expect(name.value).toBe("");
+    name.value = "acme";
+    name.dispatchEvent(new Event("input"));
+
+    expect(initSectionEl.querySelector(".selection-path").textContent).toBe("~/Workspace/clients/acme");
+    initSectionEl.querySelector(".btn-confirm").click();
+    await settle();
+
+    expect(onInit).toHaveBeenCalledWith(`${PARENT}/clients/acme`, "acme");
+  });
+
+  it("init mode: without a created folder the hint and the confirm target are <current>/<name>", async () => {
+    const onInit = vi.fn(async () => ({ ok: true }));
+    initSectionEl.remove();
+    initSectionEl = section(true);
+    document.body.append(initSectionEl);
+    dialogs = createProjectDialogs({ scrimEl, openSectionEl, initSectionEl }, { onOpen: async () => ({ ok: true }), onInit });
+    dialogs.showInitDialog();
+    await settle();
+    const name = initSectionEl.querySelector(".field-name-input");
+    name.value = "proj";
+    name.dispatchEvent(new Event("input"));
+
+    expect(initSectionEl.querySelector(".selection-path").textContent).toBe("~/Workspace/proj");
+    initSectionEl.querySelector(".btn-confirm").click();
+    await settle();
+    expect(onInit).toHaveBeenCalledWith(`${PARENT}/proj`, "proj");
+  });
+
+  it("Cancel closes the row without a request", () => {
+    initSectionEl.querySelector(".btn-new-folder").click();
+    initSectionEl.querySelector(".new-folder-cancel").click();
+
+    expect(initSectionEl.querySelector(".new-folder-row")).toBeNull();
+    expect(posts).toEqual([]);
+  });
+
+  it.each([
+    ["already_exists", 409, "A folder named \u201Cscratch\u201D already exists here."],
+    ["validation_failed", 400, "Folder names can\u2019t start with \u201C.\u201D, contain / or \\, or be empty."],
+    ["permission_denied", 403, "Can\u2019t create a folder in Workspace: permission denied."],
+  ])("shows the designed copy for %s and keeps the row open", async (code, status, copy) => {
+    postReply = { ok: false, status, statusText: "x", json: async () => ({ code, message: "raw server text" }) };
+    await typeAndCreate(initSectionEl, "scratch");
+
+    const message = initSectionEl.querySelector(".new-folder-message");
+    expect(message.hidden).toBe(false);
+    expect(message.textContent).toBe(copy);
+    expect(initSectionEl.querySelector(".new-folder-row-error")).not.toBeNull();
+
+    const input = initSectionEl.querySelector(".new-folder-input");
+    input.dispatchEvent(new Event("input"));
+    expect(message.hidden).toBe(true);
   });
 });

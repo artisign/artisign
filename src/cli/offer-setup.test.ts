@@ -18,7 +18,7 @@ const desktopDir = (): string => join(home, "Library", "Application Support", "C
 function make(over: Partial<OfferSetupDeps> = {}) {
   let declined = false;
   const deps: OfferSetupDeps = {
-    env: { ...defaultClientEnv(), home, platform: "darwin", pathEnv: "" },
+    env: { ...defaultClientEnv(), home, platform: "darwin", pathEnv: "", vars: {} },
     clients: CLIENTS,
     isTTY: true,
     processEnv: {},

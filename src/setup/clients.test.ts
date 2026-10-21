@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { defaultClientEnv, cursor, codex, vscode, opencode, type Client, type ClientEnv } from "./clients.js";
+import { defaultClientEnv, cursor, codex, vscode, opencode, claudeCode, claudeDesktop, type Client, type ClientEnv } from "./clients.js";
 import { connectClients, disconnectClients } from "./connect.js";
 
 let root: string;
@@ -22,11 +22,12 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-const env = (platform: NodeJS.Platform = "darwin"): ClientEnv => ({
+const env = (platform: NodeJS.Platform = "darwin", vars: NodeJS.ProcessEnv = {}): ClientEnv => ({
   ...defaultClientEnv(),
   home,
   platform,
   pathEnv: bin,
+  vars,
 });
 
 async function writeAt(path: string, content: string): Promise<void> {
@@ -68,6 +69,7 @@ describe("Cursor", () => {
     await connectClients({ version: "5.0.0", env: env(), clients: [cursor] });
     const entry = ((await readJson(join(home, ".cursor", "mcp.json"))).mcpServers as Record<string, { command: string; args: string[]; env: { PATH: string } }>).artisign;
     expect(entry?.command).toBe(join(bin, "npx"));
+    expect((entry as unknown as { type: string }).type).toBe("stdio");
     expect(entry?.args).toEqual(["-y", "artisign@5.0.0", "mcp"]);
     expect(entry?.env.PATH.startsWith(`${bin}:`)).toBe(true);
   });
@@ -90,7 +92,7 @@ describe("Codex CLI", () => {
   it("creates the file with the table and plain npx", async () => {
     await mkdir(join(home, ".codex"));
     await connectClients({ version: "5.0.0", env: env(), clients: [codex] });
-    expect(await readFile(file(), "utf8")).toBe('[mcp_servers.artisign]\ncommand = "npx"\nargs = ["-y","artisign@5.0.0","mcp"]\n');
+    expect(await readFile(file(), "utf8")).toBe('[mcp_servers.artisign]\ncommand = "npx"\nargs = ["-y","artisign@5.0.0","mcp"]\nstartup_timeout_sec = 60\n');
     expect((await codex.detect(env())).hasEntry).toBe(true);
   });
 
@@ -145,7 +147,7 @@ describe("opencode", () => {
     await expectContract(opencode, join(dir(), "opencode.json"), "mcp");
     await connectClients({ version: "5.0.0", env: env(), clients: [opencode] });
     const entry = ((await readJson(join(dir(), "opencode.json"))).mcp as Record<string, unknown>).artisign;
-    expect(entry).toEqual({ type: "local", command: ["npx", "-y", "artisign@5.0.0", "mcp"], enabled: true });
+    expect(entry).toEqual({ type: "local", command: ["npx", "-y", "artisign@5.0.0", "mcp"], enabled: true, timeout: 60000 });
   });
 
   it("edits opencode.jsonc when that is the only config file", async () => {
@@ -167,6 +169,125 @@ describe("Codex CLI: a config that cannot be read", () => {
       await chmod(file, 0o600);
     }
     expect(await readFile(file, "utf8")).toBe('model = "precious"\n');
+  });
+});
+
+describe("Codex CLI: shapes the text edit must not duplicate", () => {
+  const file = (): string => join(home, ".codex", "config.toml");
+
+  it.each([
+    ["an inline table", '[mcp_servers]\nartisign = { command = "old" }\n'],
+    ["a dotted key", 'mcp_servers.artisign.command = "old"\n'],
+    ["a quoted dotted key", "mcp_servers.'artisign'.command = \"old\"\n"],
+    ["an inline mcp_servers", 'mcp_servers = { artisign = { command = "old" } }\n'],
+  ])("refuses %s, changes nothing and shows the snippet", async (_name, input) => {
+    await writeAt(file(), input);
+    const [result] = await connectClients({ version: "5.0.0", env: env(), clients: [codex] });
+    expect(result?.status).toBe("failed");
+    expect(result?.error).toContain("Nothing was changed");
+    expect(result?.error).toContain("artisign@5.0.0");
+    expect(await readFile(file(), "utf8")).toBe(input);
+  });
+
+  it("recognises a literal-quoted table header as its own entry", async () => {
+    await writeAt(file(), "[mcp_servers.'artisign']\ncommand = \"old\"\n");
+    await connectClients({ version: "5.0.0", env: env(), clients: [codex] });
+    const text = await readFile(file(), "utf8");
+    expect(text).not.toContain("old");
+    expect(text.match(/\[mcp_servers\./g)).toHaveLength(1);
+  });
+
+  it("keeps the comments and blank lines that belong to the next table", async () => {
+    const input = '[mcp_servers.artisign]\ncommand = "old"\n\n# the other server\n[mcp_servers.keep]\ncommand = "k"\n';
+    await writeAt(file(), input);
+    await disconnectClients(env(), [codex]);
+    expect(await readFile(file(), "utf8")).toBe("\n# the other server\n[mcp_servers.keep]\ncommand = \"k\"\n");
+    await writeAt(file(), input);
+    await connectClients({ version: "5.0.0", env: env(), clients: [codex] });
+    const text = await readFile(file(), "utf8");
+    expect(text).toContain("# the other server\n[mcp_servers.keep]");
+  });
+
+  it("honours CODEX_HOME", async () => {
+    const custom = join(root, "codex-home");
+    await mkdir(custom);
+    const e = env("darwin", { CODEX_HOME: custom });
+    expect((await codex.detect(e)).found).toBe(true);
+    await connectClients({ version: "5.0.0", env: e, clients: [codex] });
+    expect(await readFile(join(custom, "config.toml"), "utf8")).toContain("artisign@5.0.0");
+  });
+
+  it("drives the codex CLI when it is on PATH, then adds the startup timeout", async () => {
+    const log = join(root, "codex.log");
+    await writeFile(
+      join(bin, "codex"),
+      `#!/bin/sh\necho "$@" >> '${log}'\nif [ "$2" = add ]; then mkdir -p '${home}/.codex'; printf '[mcp_servers.artisign]\\ncommand = "npx"\\n' > '${home}/.codex/config.toml'; fi\n`,
+    );
+    await chmod(join(bin, "codex"), 0o755);
+    const [result] = await connectClients({ version: "5.0.0", env: env(), clients: [codex] });
+    expect(result?.status).toBe("done");
+    expect((await readFile(log, "utf8")).trim().split("\n")).toEqual(["mcp remove artisign", "mcp add artisign -- npx -y artisign@5.0.0 mcp"]);
+    expect(await readFile(join(home, ".codex", "config.toml"), "utf8")).toContain("startup_timeout_sec = 60");
+  });
+
+  it("reports a failing codex CLI", async () => {
+    await writeFile(join(bin, "codex"), "#!/bin/sh\nexit 1\n");
+    await chmod(join(bin, "codex"), 0o755);
+    const [result] = await connectClients({ version: "5.0.0", env: env(), clients: [codex] });
+    expect(result?.status).toBe("failed");
+  });
+});
+
+describe("config files with comments or trailing commas", () => {
+  it.each([
+    ["Cursor", cursor, join(".cursor", "mcp.json"), "mcpServers"],
+    ["VS Code", vscode, join("Library", "Application Support", "Code", "User", "mcp.json"), "servers"],
+    ["opencode", opencode, join(".config", "opencode", "opencode.json"), "mcp"],
+  ])("%s: nothing is changed and the snippet to add by hand is shown", async (_n, client, rel, key) => {
+    const input = '{\n  // my servers\n  "other": 1,\n}\n';
+    await writeAt(join(home, rel), input);
+    const [result] = await connectClients({ version: "5.0.0", env: env(), clients: [client] });
+    expect(result?.status).toBe("failed");
+    expect(result?.error).toContain("comments or trailing commas");
+    expect(result?.error).toContain(`"${key}"`);
+    expect(result?.error).toContain("artisign@5.0.0");
+    expect(await readFile(join(home, rel), "utf8")).toBe(input);
+  });
+
+  it("one client failing does not stop the others", async () => {
+    await writeAt(join(home, ".cursor", "mcp.json"), "{ // c\n}");
+    await mkdir(join(home, ".config", "opencode"), { recursive: true });
+    const results = await connectClients({ version: "5.0.0", env: env(), clients: [cursor, opencode] });
+    expect(results.map((r) => r.status)).toEqual(["failed", "done"]);
+  });
+});
+
+describe("symlinked config files", () => {
+  it.each([
+    ["Cursor", cursor, join(".cursor", "mcp.json")],
+    ["VS Code", vscode, join("Library", "Application Support", "Code", "User", "mcp.json")],
+    ["opencode", opencode, join(".config", "opencode", "opencode.json")],
+    ["Claude Desktop", claudeDesktop, join("Library", "Application Support", "Claude", "claude_desktop_config.json")],
+    ["Claude Code (file fallback)", claudeCode, ".claude.json"],
+    ["Codex CLI", codex, join(".codex", "config.toml")],
+  ])("%s: the link survives and the real file is updated", async (_n, client, rel) => {
+    const real = join(root, "dotfiles", rel.replaceAll("/", "_"));
+    await mkdir(dirname(real), { recursive: true });
+    await writeFile(real, rel.endsWith(".toml") ? "# mine\n" : "{}");
+    await mkdir(dirname(join(home, rel)), { recursive: true });
+    await symlink(real, join(home, rel));
+    const [result] = await connectClients({ version: "5.0.0", env: env(), clients: [client] });
+    expect(result?.status).toBe("done");
+    expect((await lstat(join(home, rel))).isSymbolicLink()).toBe(true);
+    expect(await readFile(real, "utf8")).toContain("artisign@5.0.0");
+  });
+});
+
+describe("opencode detection", () => {
+  it("finds the opencode binary on PATH even without a config directory", async () => {
+    await writeFile(join(bin, "opencode"), "#!/bin/sh\n");
+    await chmod(join(bin, "opencode"), 0o755);
+    expect((await opencode.detect(env())).found).toBe(true);
   });
 });
 

@@ -9,11 +9,12 @@ import { CACHE_DIR } from "../init/artisign-config.js";
  * atomic, so readers never observe a partial write. The temp name includes a
  * random suffix so concurrent writes to the same path (e.g. two debounced
  * index rebuilds firing close together) never collide on the same temp file.
+ * `mode` sets the new file's permissions (a replaced file otherwise falls back to the default, not the old mode).
  */
-export async function atomicWrite(path: string, content: string): Promise<void> {
+export async function atomicWrite(path: string, content: string, mode?: number): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const tempPath = `${path}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
-  await writeFile(tempPath, content);
+  await writeFile(tempPath, content, { mode });
   await rename(tempPath, path);
 }
 

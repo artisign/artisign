@@ -6,6 +6,7 @@ import { runStart, type StartOptions } from "./start.js";
 import { runStop } from "./stop.js";
 import { runStatus } from "./status.js";
 import { parseStartArgs } from "./args.js";
+import { runSetup, type SetupOptions } from "./setup.js";
 import { readVersion } from "../version.js";
 
 export const USAGE = [
@@ -26,6 +27,7 @@ export const USAGE = [
   "  stop                                    stop the background process",
   "  serve [--port N] [dir...]               run in the foreground",
   "  init [dir]                              scaffold a new project",
+  "  setup [--yes] [--remove]                connect your AI tools to Artisign (or disconnect them)",
   "  mcp                                     stdio connection for AI tools; starts Artisign if needed",
   "  help [command]                          show this help, or the help of one command",
   "",
@@ -81,6 +83,20 @@ export const COMMAND_HELP: Record<string, string> = {
     "Example:",
     "  npx -y artisign@<version> mcp   (the entry `artisign setup` writes into your AI tool's config)",
   ].join("\n"),
+  setup: [
+    "Usage: artisign setup [--yes] [--remove]",
+    "",
+    "Connect Claude Code and Claude Desktop to Artisign. For each one found, asks, then writes a user-level",
+    "entry named `artisign` that runs `npx -y artisign@<version> mcp`, pinned to the version running setup.",
+    "Run it again after an update to re-pin. Other entries and settings are left untouched.",
+    "",
+    "Options:",
+    "  --yes      connect every tool found without asking (needed without a terminal)",
+    "  --remove   remove the `artisign` entries instead",
+    "",
+    "Example:",
+    "  artisign setup",
+  ].join("\n"),
   status: [
     "Usage: artisign status",
     "",
@@ -105,6 +121,7 @@ export type CliDeps = {
   initProject: (dir: string) => Promise<unknown>;
   runServe: typeof runServe;
   runMcp: (cliEntry: string) => Promise<void>;
+  runSetup: (opts: SetupOptions) => Promise<number>;
   runDaemonForeground: typeof runDaemonForeground;
   runStart: (opts: StartOptions) => Promise<void>;
   runStop: () => Promise<void>;
@@ -117,6 +134,7 @@ export const defaultCliDeps: CliDeps = {
   initProject,
   runServe,
   runMcp,
+  runSetup,
   runDaemonForeground,
   runStart,
   runStop,
@@ -218,6 +236,15 @@ async function run(
       }
       await deps.runMcp(cliEntry);
       return 0;
+    case "setup": {
+      const unexpected = rest.find((arg) => arg !== "--yes" && arg !== "--remove");
+      if (unexpected !== undefined) {
+        deps.error(`Unknown option: ${unexpected}`);
+        deps.error(HINT);
+        return 1;
+      }
+      return deps.runSetup({ yes: rest.includes("--yes"), remove: rest.includes("--remove"), cliEntry });
+    }
     case "start": {
       const { port, projects, noOpen } = parseStart(rest);
       await deps.runStart({ port, projects, cliEntry, noOpen });

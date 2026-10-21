@@ -17,6 +17,10 @@ discipline in copying values.
 
 ## Session start
 
+0. Not sure which project to work in? `list_projects` returns every known
+   project as `{name, root, open}`. To start a new one, ask the user where it
+   should live before `init_project` — it returns `project`, the name to use
+   in later calls.
 1. `get_project` (default `summary` view) — screens, counts, design-system pointer.
 2. `get_design_system` at `view: "tree"` — know every token, component, and
    pattern **before** designing anything. You cannot reuse what you have not

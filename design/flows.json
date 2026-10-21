@@ -42,18 +42,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "no-project-empty-state.empty-btn-open",
-    "event": "tap",
-    "to": "open-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "no-project-empty-state.empty-btn-init",
-    "event": "tap",
-    "to": "init-project-dialog",
-    "to_kind": "screen"
-  },
-  {
     "from": "board-view.si-open",
     "event": "tap",
     "to": "open-project-dialog",
@@ -135,6 +123,30 @@
     "from": "board-view-clusters-expanded.frame-family-head",
     "event": "tap",
     "to": "board-view-clusters-collapsed",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state.empty-btn-open",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state.empty-btn-init",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog.init-dialog-newfolder",
+    "event": "tap",
+    "to": "init-project-dialog-new-folder",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog.open-dialog-newfolder",
+    "event": "tap",
+    "to": "open-project-dialog-new-folder",
     "to_kind": "screen"
   }
 ]

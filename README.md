@@ -103,7 +103,7 @@ The daemon is **multi-project**: it runs permanently on `127.0.0.1:4711` and can
 
 Daemon-level state — that config plus the `daemon.lock` holding the running pid and port — lives in `~/.artisign`. Set `ARTISIGN_HOME` to move it somewhere else; that, together with `--port`, is what lets a second daemon run fully isolated from the first, which is worth doing before you try anything destructive against projects you care about.
 
-## The 24 tools
+## The 25 tools
 
 | Bucket | Tool | Does |
 |---|---|---|
@@ -123,7 +123,8 @@ Daemon-level state — that config plus the `daemon.lock` holding the running pi
 | Writes | `set_meta` | Screen notes/tags and `variant_of`/`variant_kind`, design-system idea/decisions, component/pattern usage, a tag's own notes — the handoff contract. |
 | Writes | `write_mockup` | Create or revise one variant of a mockup — raw HTML, outside the design system. |
 | Writes | `set_board_state` | Read or mutate the Board's shared filter, pinned screens and expanded variant clusters — daemon memory only, not available over stdio. |
-| Lifecycle | `init_project` | Scaffold a project directory: empty, from HTML, or from a Stitch export URL. |
+| Lifecycle | `list_projects` | Every project the daemon has opened or created, as `{ name, root, open }`; works with no project open. |
+| Lifecycle | `init_project` | Scaffold a project directory: empty, from HTML, or from a Stitch export URL. Returns `project`, the name to pass in later calls. |
 | Lifecycle | `import_html` | Incremental HTML ingest into an existing project, with content-hash dedup. |
 | Lifecycle | `promote_to_system` | Lift an inline value or a repeated element into a token, component, or pattern. |
 | Lifecycle | `promote_mockup` | Copy a chosen mockup variant into a new, design-system-bound screen (the mockup stays). |
@@ -232,7 +233,7 @@ src/daemon/          daemon lifecycle — project registry, global config/lock (
 src/init/            project scaffolding (init) and artisign.json
 src/store/           Store interface, FsStore, watcher, atomic writes, git auto-commit
 src/model/           HTML parser, canonical ref model, index
-src/tools/           the 24 tools (reads, writes, lifecycle, comments, visual review)
+src/tools/           the 25 tools (reads, writes, lifecycle, comments, visual review)
 src/mcp/             MCP server — stdio + streamable HTTP
 src/http/            internal JSON API + SSE, consumed by the preview
 src/preview/         browser preview — plain ES modules, no build step

@@ -90,6 +90,7 @@ function buildViewState(handle: ProjectHandle, source: "agent" | "human"): ViewS
 function buildToolContext(handle: ProjectHandle | undefined, registry: ProjectRegistry, source: "agent" | "human"): ToolHandlerContext {
   return {
     openProject: (dir: string) => registry.open(dir),
+    listProjects: () => registry.listKnown(),
     viewState: handle ? buildViewState(handle, source) : undefined,
     source,
   };

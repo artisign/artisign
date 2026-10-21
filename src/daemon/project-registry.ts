@@ -68,7 +68,7 @@ export class ProjectRegistry {
       // of it — two callers opening the same folder through different
       // spellings (a symlink and its target) must not push two different
       // strings to the front of recentProjects for one folder.
-      await this.rememberRecent(existing.entry.handle.root);
+      await this.rememberProject(existing.entry.handle.root);
       return existing.entry.handle;
     }
 
@@ -160,12 +160,12 @@ export class ProjectRegistry {
     // it just became what the preview UI shows, same as any later activate.
     if (this.active === undefined) this.activeProject = root;
 
-    await this.rememberRecent(root);
+    await this.rememberProject(root);
 
     return handle;
   }
 
-  private rememberRecent(root: string): Promise<void> {
+  private rememberProject(root: string): Promise<void> {
     const next = this.recentChain.then(async () => {
       try {
         const config = await readGlobalConfig();
@@ -176,16 +176,19 @@ export class ProjectRegistry {
         // An idempotent re-open of an already-open root recomputes the same
         // front-of-list result every time; skip the atomic write for it
         // rather than costing an I/O round trip on every repeated open().
+        const known = config.knownProjects ?? [];
+        const knownProjects = known.includes(root) ? known : [...known, root];
         const unchanged =
           config.recentProjects !== undefined &&
           config.recentProjects.length === recentProjects.length &&
-          config.recentProjects.every((p, i) => p === recentProjects[i]);
+          config.recentProjects.every((p, i) => p === recentProjects[i]) &&
+          knownProjects === known;
         if (unchanged) return;
-        await writeGlobalConfig({ ...config, recentProjects });
+        await writeGlobalConfig({ ...config, recentProjects, knownProjects });
       } catch (err) {
         // Best-effort metadata — never breaks the chain for the next open(),
         // and never fails open() itself over a recentProjects write.
-        console.error(`failed to update recentProjects for ${root}:`, err instanceof Error ? err.message : err);
+        console.error(`failed to update recentProjects/knownProjects for ${root}:`, err instanceof Error ? err.message : err);
       }
     });
     this.recentChain = next;
@@ -217,6 +220,28 @@ export class ProjectRegistry {
       if (entry.handle.root === resolved) return { key: k, entry };
     }
     return undefined;
+  }
+
+  /**
+   * Every project the daemon ever opened or created (`knownProjects` in the
+   * global config), open or not. A root whose `artisign.json` is gone or
+   * unreadable is left out but stays in the config, so a remounted folder
+   * reappears. An open project reports its live cached name.
+   */
+  async listKnown(): Promise<{ name: string; root: string; open: boolean }[]> {
+    const roots = (await readGlobalConfig()).knownProjects ?? [];
+    const entries = await Promise.all(
+      roots.map(async (root) => {
+        const open = this.findEntry(root);
+        if (open) return { name: open.entry.handle.name, root, open: true };
+        try {
+          return { name: (await new FsStore(root).readArtisignConfig()).name, root, open: false };
+        } catch {
+          return undefined;
+        }
+      }),
+    );
+    return entries.filter((e) => e !== undefined);
   }
 
   list(): ProjectHandle[] {

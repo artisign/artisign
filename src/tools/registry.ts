@@ -10,7 +10,7 @@ import {
   listComments,
 } from "./reads.js";
 import { writeHtml, patchHtml, updateRefs, setTokens, setFlow } from "./writes.js";
-import { initProjectTool, importHtml, promoteToSystem, deleteEntity } from "./lifecycle.js";
+import { initProjectTool, listProjects, importHtml, promoteToSystem, deleteEntity } from "./lifecycle.js";
 import { replyComment } from "./comments.js";
 import { getScreenshot } from "./screenshot.js";
 import { inspectNode } from "./inspect-node.js";
@@ -167,6 +167,15 @@ export const TOOLS: ToolDefinition[] = [
       limit: z.number().int().positive().optional(),
     },
     (store, input) => listComments(store, input),
+  ),
+  tool(
+    "list_projects",
+    "Lists every project this daemon knows (opened or created before), each as {name, root, open}. Works with no " +
+      "project open. A project whose artisign.json is gone is left out. Pass a project's name to later calls " +
+      "that take a project.",
+    {},
+    (_store, _input, ctx) => listProjects(ctx),
+    { requiresProject: false },
   ),
   tool(
     "get_guide",
@@ -383,7 +392,7 @@ export const TOOLS: ToolDefinition[] = [
   // Lifecycle ---------------------------------------------------------------
   tool(
     "init_project",
-    "Scaffold a project directory: empty, from HTML, or from a Stitch export URL.",
+    "Scaffold a project directory: empty, from HTML, or from a Stitch export URL. Returns `project`, the name to pass in later calls. If the user has not named a location, ask them for it — do not pick a directory yourself.",
     {
       dir: z.string(),
       name: z.string().optional(),

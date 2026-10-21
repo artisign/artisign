@@ -154,7 +154,16 @@ export async function initProjectTool(input: InitProjectInput, ctx?: ToolHandler
   // scaffolding-only is the correct, unchanged behavior there.
   await ctx?.openProject?.(store.projectDir);
 
-  return { root: store.projectDir, files_created: filesCreated, screens, ...commitFields(commitResult) };
+  const { name: project } = await store.readArtisignConfig();
+
+  return { root: store.projectDir, project, files_created: filesCreated, screens, ...commitFields(commitResult) };
+}
+
+export async function listProjects(ctx?: ToolHandlerContext): Promise<{ projects: { name: string; root: string; open: boolean }[] }> {
+  if (!ctx?.listProjects) {
+    throw new ToolError("invalid_state", "list_projects is only available on the daemon (it needs the project registry)");
+  }
+  return { projects: await ctx.listProjects() };
 }
 
 // ---------------------------------------------------------------------------

@@ -270,6 +270,49 @@ describe("ProjectRegistry", () => {
     expect(recentProjects).not.toContain(dirA);
   });
 
+  it("persists every opened project in knownProjects, uncapped, without duplicates", async () => {
+    const dirs12 = await Promise.all(Array.from({ length: 12 }, () => makeProject()));
+    for (const dir of dirs12) await registry.open(dir);
+    await registry.open(dirs12[0]!);
+
+    const known = (await readGlobalConfig()).knownProjects ?? [];
+    expect(known).toEqual(dirs12);
+    expect((await readGlobalConfig()).recentProjects).toHaveLength(10);
+  });
+
+  it("listKnown() reports name, root and open state", async () => {
+    const dirA = await makeProject();
+    const dirB = await makeProject();
+    await registry.open(dirA);
+    await registry.open(dirB);
+    await registry.close(dirB);
+
+    const nameOf = async (dir: string): Promise<string> => (await new FsStore(dir).readArtisignConfig()).name;
+    expect(await registry.listKnown()).toEqual([
+      { name: await nameOf(dirA), root: dirA, open: true },
+      { name: await nameOf(dirB), root: dirB, open: false },
+    ]);
+  });
+
+  it("listKnown() leaves out a project whose artisign.json is gone, but keeps it in the config", async () => {
+    const dirA = await makeProject();
+    const dirB = await makeProject();
+    await registry.open(dirA);
+    await registry.open(dirB);
+    await registry.close(dirB);
+    await rm(join(dirB, "artisign.json"));
+
+    expect((await registry.listKnown()).map((p) => p.root)).toEqual([dirA]);
+    expect((await readGlobalConfig()).knownProjects).toContain(dirB);
+
+    await initProject(dirB);
+    expect((await registry.listKnown()).map((p) => p.root)).toEqual([dirA, dirB]);
+  });
+
+  it("listKnown() is empty on a fresh home", async () => {
+    expect(await registry.listKnown()).toEqual([]);
+  });
+
   it("concurrent opens of two different roots both land in recentProjects (no lost update)", async () => {
     const dirA = await makeProject();
     const dirB = await makeProject();

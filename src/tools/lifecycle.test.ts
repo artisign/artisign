@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
-import { initProjectTool, importHtml, promoteToSystem, deleteEntity } from "./lifecycle.js";
+import { initProjectTool, listProjects, importHtml, promoteToSystem, deleteEntity } from "./lifecycle.js";
 import { updateRefs, writeHtml } from "./writes.js";
 import { getDesignSystem, listComments } from "./reads.js";
 import { buildRenderContext } from "./render-context.js";
@@ -28,6 +28,11 @@ describe("init_project", () => {
     const res = await initProjectTool({ dir, seed: { kind: "empty" } });
     expect(res.screens).toEqual([]);
     expect(res.files_created).toContain("artisign.json");
+  });
+
+  it("returns the project name to pass in later calls", async () => {
+    const res = await initProjectTool({ dir, name: "My Project", seed: { kind: "empty" } });
+    expect(res.project).toBe("My Project");
   });
 
   it("seeds a screen from html_aug", async () => {
@@ -783,5 +788,16 @@ describe("delete_entity", () => {
   it("deleting a screen with no ctx (or an unpinned screen) is a no-op on board state — never throws", async () => {
     await fx.store.writeScreen("home", `<div id="n1"></div>`);
     await expect(deleteEntity(fx.store, { kind: "screen", name: "home" })).resolves.toMatchObject({ kind: "screen" });
+  });
+});
+
+describe("list_projects", () => {
+  it("returns the registry's known projects under `projects`", async () => {
+    const projects = [{ name: "a", root: "/tmp/a", open: true }];
+    await expect(listProjects({ listProjects: async () => projects })).resolves.toEqual({ projects });
+  });
+
+  it("reports invalid_state without a registry (stdio)", async () => {
+    await expect(listProjects()).rejects.toMatchObject({ code: "invalid_state" });
   });
 });

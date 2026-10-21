@@ -340,14 +340,22 @@ describe("setup: nothing to do", () => {
     expect(d.ask).not.toHaveBeenCalled();
   });
 
-  it("detects the Linux Desktop directory that exists, in either capitalisation", async () => {
+  it("on Linux, a lowercase ~/.config/claude with a config file is detected and written", async () => {
+    const file = join(home, ".config", "claude", "claude_desktop_config.json");
     await mkdir(join(home, ".config", "claude"), { recursive: true });
+    await writeFile(file, "{}");
     const { d } = deps({ env: { ...env(), platform: "linux" } });
     await runSetup({ cliEntry: "e", yes: true }, d);
-    expect(
-      JSON.parse(
-        await readFile(join(home, ".config", "claude", "claude_desktop_config.json"), "utf8"),
-      ),
-    ).toHaveProperty("mcpServers.artisign");
+    expect(JSON.parse(await readFile(file, "utf8"))).toHaveProperty("mcpServers.artisign");
+  });
+
+  it("on Linux, a lowercase ~/.config/claude without a config file is not Claude Desktop", async () => {
+    await mkdir(join(home, ".config", "claude"), { recursive: true });
+    // A case-insensitive filesystem (macOS) cannot tell the two directories apart; there the case is moot.
+    if (await stat(join(home, ".config", "Claude")).then(() => true, () => false)) return;
+    const { d, out } = deps({ env: { ...env(), platform: "linux" } });
+    await runSetup({ cliEntry: "e", yes: true }, d);
+    expect(out.join("\n")).toContain("No supported AI tool found");
+    await expect(stat(join(home, ".config", "claude", "claude_desktop_config.json"))).rejects.toThrow();
   });
 });

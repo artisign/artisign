@@ -43,7 +43,7 @@ export const COMMAND_HELP: Record<string, string> = {
     "Usage: artisign start [--port N] [--no-open] [dir...]",
     "",
     "Start Artisign in the background and open the preview in the browser. This is what a bare",
-    "`artisign` does. Each dir is a project to open; without one, the current folder is opened.",
+    "`artisign` does. Each dir is a project to open; without one, the preview opens with the project list.",
     "",
     "Options:",
     "  --port N     listen on this port (default: the port from the config, else 4711)",

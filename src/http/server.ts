@@ -126,7 +126,7 @@ function createMcpProjectResolver(registry: ProjectRegistry): ProjectResolver {
     } else {
       const matches = (await registry.listKnown()).filter((p) => p.name === requested);
       if (matches.length === 0) {
-        throw new ToolError("not_found", `unknown project "${requested}" — call list_projects`);
+        throw new ToolError("not_found", `unknown project "${requested}" — call list_projects, or pass an absolute path`);
       }
       if (matches.length > 1) {
         throw new ToolError(

@@ -126,6 +126,31 @@ describe("project-scoped /mcp and UI routes", () => {
     expect(body.message).toContain(badPath);
   });
 
+  it("tools/list: project-bound tools require `project`; list_projects, init_project and get_guide do not", async () => {
+    daemon = await startDaemon({ port: 0, projects: [dirA] });
+
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+    const dataLine = (await res.text()).split("\n").find((l) => l.startsWith("data: "))!;
+    const { result } = JSON.parse(dataLine.slice("data: ".length)) as {
+      result: { tools: Array<{ name: string; inputSchema: { properties?: Record<string, unknown>; required?: string[] } }> };
+    };
+
+    const unbound = new Set(["list_projects", "init_project", "get_guide"]);
+    expect(result.tools.length).toBeGreaterThan(unbound.size);
+    for (const tool of result.tools) {
+      if (unbound.has(tool.name)) {
+        expect(tool.inputSchema.properties ?? {}).not.toHaveProperty("project");
+      } else {
+        expect(tool.inputSchema.properties, tool.name).toHaveProperty("project");
+        expect(tool.inputSchema.required, tool.name).toContain("project");
+      }
+    }
+  });
+
   it("a project name resolves a known project, open or not", async () => {
     daemon = await startDaemon({ port: 0, projects: [dirA] });
     await new FsStore(dirB).writeArtisignConfig({ ...(await new FsStore(dirB).readArtisignConfig()), name: "beta" });
@@ -145,6 +170,16 @@ describe("project-scoped /mcp and UI routes", () => {
 
     expect(JSON.stringify(json)).toContain("list_projects");
     expect(JSON.stringify(json)).not.toContain("home");
+  });
+
+  it("a relative path is not a path: it fails as an unknown name and says to pass an absolute path", async () => {
+    daemon = await startDaemon({ port: 0, projects: [dirA] });
+
+    const { json } = await mcpCall(daemon.port, "artisign/design", toolCallBody("get_project"));
+
+    const body = JSON.parse(json.result!.content[0]!.text) as { code: string; message: string };
+    expect(body.code).toBe("not_found");
+    expect(body.message).toContain("absolute path");
   });
 
   it("an unknown project name points to list_projects", async () => {

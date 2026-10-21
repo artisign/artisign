@@ -123,6 +123,35 @@ describe("CHR-630 activity SSE events", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  it("routes an activity event to the named project's hub, not the browser's active project", async () => {
+    const other = await mkdtemp(join(tmpdir(), "artisign-activity-other-"));
+    try {
+      await initProject(other);
+      await daemon.registry.open(other);
+      expect(daemon.registry.activeProject).toBe(dir); // `dir` stays the browser's project
+
+      const activeSse = await fetch(`http://127.0.0.1:${daemon.port}/events?project=${encodeURIComponent(dir)}`);
+      const otherSse = await fetch(`http://127.0.0.1:${daemon.port}/events?project=${encodeURIComponent(other)}`);
+      const activeReader = activeSse.body!.getReader();
+      const otherReader = otherSse.body!.getReader();
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
+        await mcpCall(daemon.port, other, toolCallBody("get_project", {}));
+
+        const evt = await waitForSseEvent(otherReader, (e) => e.type === "activity", 2000, { buffer: "" });
+        expect(evt).toMatchObject({ type: "activity", tool: "get_project", ok: true });
+        const onActive = await drainAvailable(activeReader, 500);
+        expect(onActive.some((e) => e.type === "activity")).toBe(false);
+      } finally {
+        await activeReader.cancel().catch(() => {});
+        await otherReader.cancel().catch(() => {});
+      }
+    } finally {
+      await rm(other, { recursive: true, force: true });
+    }
+  });
+
   it("emits an activity event for a read tool call over /mcp", async () => {
     const res = await fetch(`http://127.0.0.1:${daemon.port}/events?project=${encodeURIComponent(dir)}`);
     const reader = res.body!.getReader();

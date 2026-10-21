@@ -1,0 +1,26 @@
+{
+  "variants": [
+    {
+      "id": "a-steps-in-frame",
+      "title": "A · Numbered steps inside the frame",
+      "description": "Guide inside the frame, vertically centred, 32px side padding. Copy: label \"GET STARTED\"; title \"Design your first screen\"; 1 \"Ask your AI tool to design a screen in this project.\" + prompt block (mono) \"Design a login screen in my Artisign project delete-me\" + Copy button; 2 \"Watch it appear here while the agent works.\"; 3 \"Review it. Use Comment mode to leave feedback the agent reads.\" Sizes at frame scale 1: title 34px/600, steps 22px, prompt 18px mono, number badge 33px. At 50% that is ~17/11/9px on screen. Easier: complete story in one glance, mirrors the numbered mental model. Harder: busiest in a small frame; prompt wraps to four lines in the narrow column."
+    },
+    {
+      "id": "b-compact-in-frame",
+      "title": "B · Compact prompt + one line inside the frame",
+      "description": "Minimal guide inside the frame: one action, one line. Copy: title \"Ask your AI tool to design a screen\"; prompt block \"Design a login screen in my Artisign project delete-me\" + Copy; line \"It appears here live while the agent works.\" Comment mode is not mentioned (discoverable from the topbar, taught once a screen exists). Sizes at frame scale 1: title 32px/600, prompt 19px mono, line 21px/#555. Easier: least text, lowest visual weight, the prompt is the hero. Harder: drops step 3 (review/comment), so the feedback loop is not introduced."
+    },
+    {
+      "id": "c-card-over-frame",
+      "title": "C · Native-size card over a ghost frame",
+      "description": "Card centred over the canvas at native size (360px wide, independent of zoom), the empty frame behind it as a dashed ghost (no shadow) so the user sees where the screen will land. Copy: title \"Design your first screen\"; 1 \"Ask your AI tool to design a screen in this project.\" + prompt block + Copy; 2 \"It appears here live while the agent works.\"; 3 \"Review it. Use Comment mode to leave feedback the agent reads.\" Sizes: card padding 24px, title 1.05rem/600, steps 0.85rem, prompt 12.5px mono, radius.md, shadow.menu. Card and ghost disappear when the first screen arrives. Easier: always legible at any zoom, uses the app's real type scale (matches no-project-empty-state). Harder: card is not inside the frame as briefed, covers most of the ghost frame, and an overlay-like card on a canvas can read as a dismissible dialog (add no close button; it is state, not a dialog)."
+    }
+  ],
+  "title": "Empty-project canvas: how-to-start guide (CHR-889)",
+  "description": "Screens view of a freshly created project (delete-me), no screens yet. Shared across all variants: topbar unchanged (50% zoom active, the default); Screens panel stays expanded but empty (search field + \"0 screens · 0 mockups\", no \"No screens yet.\" text); Context (left) and Elements (right) are 36px icon rails (CHR-888, same rail as sidebars-collapsed); the grey \"No screens yet.\" column is gone; canvas = $color.canvas with the empty 390x844 frame at 50% (195x422). Tokens (literal values here since mockups are outside the ref model): surface #fff, surface-subtle #fafafa, border #e2e2e2/#d6d6d6, accent #2a3edb on accent-subtle #eef1ff for step numbers, text #333 / text-muted #555 / text-label #8a8a8a, mono prompt block reuses empty-ai from no-project-empty-state, radius sm 6 / md 10, shadow.menu. Behaviour (all variants): the guide is shown only while the project has zero screens and disappears the moment the first screen arrives live (the frame then renders that screen); the prompt uses the active project name (\"delete-me\" here); Copy copies the prompt text (label flips to \"Copied\" for ~1.5s); the prompt is also selectable text. Zoom tradeoff: text inside the frame scales with zoom. A and B author type at ~2x (22px body, 18px mono) so it lands at ~11px / 9px on screen at the 50% default, but then reads huge at 100%/200% and the frame at 200% would overflow nothing but look loud. C avoids this: the card is native size, independent of zoom, but it is not \"in the frame\" and covers it. Not promoted; Christian picks.",
+  "tags": [
+    "CHR-889",
+    "chr-889",
+    "empty-state"
+  ]
+}

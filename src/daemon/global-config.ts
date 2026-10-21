@@ -12,6 +12,8 @@ import { atomicWrite } from "../store/atomic-write.js";
 export type ArtisignGlobalConfig = {
   port?: number;
   recentProjects?: string[];
+  /** The user answered "no" to the first-run offer to connect an AI tool; never ask again (CHR-835). */
+  setupDeclined?: boolean;
 };
 
 /** `$ARTISIGN_HOME`, or `~/.artisign` — where daemon-level state (config, lock) lives. */

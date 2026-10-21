@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING:** `/mcp` no longer reads `?project=`, and never falls back to the
+  project shown in the browser. Every tool except `list_projects`,
+  `init_project` and `get_guide` takes a required `project` input — a known
+  project's name (see `list_projects`) or an absolute path (opened on first
+  use). A missing or unknown name fails with a pointer to `list_projects`; a
+  name shared by several projects fails with the candidates' roots. A request
+  that still carries `?project=` gets a JSON-RPC error telling the client to
+  reconfigure (`artisign setup`). The preview's own `/api/*` routes are
+  unchanged. (CHR-832)
+
+### Added
+
+- `list_projects` lists every project the daemon has opened or created, as
+  `{ name, root, open }`; `init_project` now returns `project`, the name to
+  pass in later calls. (CHR-829)
+
 ## [2.0.0] - 2026-10-13
 
 ### Changed

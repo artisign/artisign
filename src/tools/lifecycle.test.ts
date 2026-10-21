@@ -35,6 +35,18 @@ describe("init_project", () => {
     expect(res.project).toBe("My Project");
   });
 
+  it("returns the root as `project` when the name is already taken by another known project", async () => {
+    const taken = [
+      { name: "design", root: "/elsewhere/design", open: true },
+      { name: "design", root: dir, open: true },
+    ];
+    const res = await initProjectTool({ dir, name: "design", seed: { kind: "empty" } }, { listProjects: async () => taken });
+    expect(res.project).toBe(dir);
+
+    const unique = await initProjectTool({ dir, name: "design", seed: { kind: "empty" } }, { listProjects: async () => [taken[1]!] });
+    expect(unique.project).toBe("design");
+  });
+
   it("seeds a screen from html_aug", async () => {
     const res = await initProjectTool({
       dir,

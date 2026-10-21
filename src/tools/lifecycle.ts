@@ -154,7 +154,11 @@ export async function initProjectTool(input: InitProjectInput, ctx?: ToolHandler
   // scaffolding-only is the correct, unchanged behavior there.
   await ctx?.openProject?.(store.projectDir);
 
-  const { name: project } = await store.readArtisignConfig();
+  const { name } = await store.readArtisignConfig();
+  // The name is only a usable handle while it is unique among known projects (two `design`
+  // folders share one); otherwise hand back the root, which always disambiguates.
+  const known = (await ctx?.listProjects?.()) ?? [];
+  const project = known.filter((p) => p.name === name).length > 1 ? store.projectDir : name;
 
   return { root: store.projectDir, project, files_created: filesCreated, screens, ...commitFields(commitResult) };
 }

@@ -176,12 +176,17 @@ export class ProjectRegistry {
         // An idempotent re-open of an already-open root recomputes the same
         // front-of-list result every time; skip the atomic write for it
         // rather than costing an I/O round trip on every repeated open().
-        const known = config.knownProjects ?? [];
-        const knownProjects = known.includes(root) ? known : [...known, root];
+        // First write after the upgrade seeds from the legacy recent list, which
+        // is capped and would otherwise lose its oldest entries from both lists.
+        // Stored as the canonical key so one folder never appears under two spellings.
+        const known = config.knownProjects ?? config.recentProjects ?? [];
+        const key = projectKey(root);
+        const knownProjects = known.includes(key) ? known : [...known, key];
         const unchanged =
           config.recentProjects !== undefined &&
           config.recentProjects.length === recentProjects.length &&
           config.recentProjects.every((p, i) => p === recentProjects[i]) &&
+          config.knownProjects !== undefined &&
           knownProjects === known;
         if (unchanged) return;
         await writeGlobalConfig({ ...config, recentProjects, knownProjects });
@@ -232,7 +237,12 @@ export class ProjectRegistry {
     const config = await readGlobalConfig();
     // `recentProjects` predates `knownProjects`; folding it in keeps the
     // list populated for configs written before the upgrade.
-    const roots = [...new Set([...(config.knownProjects ?? []), ...(config.recentProjects ?? [])])];
+    // Deduped by canonical key: entries stored before keys were canonical may name one folder twice.
+    const byKey = new Map<string, string>();
+    for (const root of [...(config.knownProjects ?? []), ...(config.recentProjects ?? [])]) {
+      if (!byKey.has(projectKey(root))) byKey.set(projectKey(root), root);
+    }
+    const roots = [...byKey.values()];
     const entries = await Promise.all(
       roots.map(async (root) => {
         const open = this.findEntry(root);

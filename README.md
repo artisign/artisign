@@ -89,6 +89,8 @@ npx artisign status               # pid, port, open projects
 
 `npx artisign` on its own is `npx artisign start`, and takes the same arguments (`npx artisign --port 4800 ./my-project`). `start` opens `http://127.0.0.1:<port>/` in your default browser once the daemon is healthy — also when it was already running. Pass `--no-open` (or set `ARTISIGN_NO_OPEN=1`) to skip that; it is skipped anyway when `CI` is set or stdout is not a terminal, and when no browser can be opened the URL is printed and that is all. `serve`, `mcp`, `status`, `stop` and `init` never open a browser.
 
+`start` also checks the npm registry for a newer `artisign` at most once a day and prints one line when there is one (`New version x.y.z — run artisign update`); that single request to `registry.npmjs.org` is the only thing sent, and nothing is updated automatically. Set `ARTISIGN_NO_UPDATE_CHECK=1` to turn it off; it is skipped anyway when `CI` is set or stdout is not a terminal.
+
 The remaining commands, for reference — this block is a catalogue, not a sequence:
 
 ```bash

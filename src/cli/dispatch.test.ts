@@ -11,7 +11,7 @@ function fakeDeps() {
     runMcp: vi.fn(async () => {}),
     runSetup: vi.fn(async () => 0),
     runUpdate: vi.fn(async () => 0),
-    runRepin: vi.fn(async () => {}),
+    runRepin: vi.fn(async () => 0),
     runDaemonForeground: vi.fn(async () => {}),
     runStart: vi.fn(async () => {}),
     runStop: vi.fn(async () => {}),

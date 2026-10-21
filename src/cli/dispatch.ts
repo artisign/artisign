@@ -135,7 +135,7 @@ export type CliDeps = {
   runMcp: (cliEntry: string) => Promise<void>;
   runSetup: (opts: SetupOptions) => Promise<number>;
   runUpdate: () => Promise<number>;
-  runRepin: (cliEntry: string) => Promise<void>;
+  runRepin: (cliEntry: string) => Promise<number>;
   runDaemonForeground: typeof runDaemonForeground;
   runStart: (opts: StartOptions) => Promise<void>;
   runStop: () => Promise<void>;
@@ -271,8 +271,7 @@ async function run(
       return deps.runUpdate();
     // Internal: run by the freshly installed version at the end of `update`.
     case "__repin":
-      await deps.runRepin(cliEntry);
-      return 0;
+      return deps.runRepin(cliEntry);
     case "start": {
       const { port, projects, noOpen } = parseStart(rest);
       await deps.runStart({ port, projects, cliEntry, noOpen });

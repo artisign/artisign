@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { runUpdate, type UpdateDeps } from "./update.js";
+import { runUpdate, runRepin, type UpdateDeps } from "./update.js";
 
 function setup(
   over: Partial<UpdateDeps> & {
@@ -21,6 +21,7 @@ function setup(
         return { code: over.installCode ?? 0, stdout: "", stderr: over.installStderr ?? "" };
       return { code: 0, stdout: "/usr/local/lib/node_modules\n", stderr: "" };
     }),
+    exists: () => true,
     repin: vi.fn(async () => 0),
     log: (l) => out.push(l),
     error: (l) => err.push(l),
@@ -49,6 +50,21 @@ describe("update", () => {
     expect(await runUpdate(deps)).toBe(0);
     expect(npmCalls).toEqual(["view artisign version", "install -g artisign@latest", "root -g"]);
     expect(deps.npm).toHaveBeenCalledWith(["install", "-g", "artisign@latest"], true);
+    expect(deps.repin).toHaveBeenCalledWith(
+      "/usr/local/lib/node_modules/artisign/dist/cli/index.js",
+    );
+  });
+
+  it("an npm failure other than permissions prints no prefix advice", async () => {
+    const { deps, err } = setup({ installCode: 1, installStderr: "npm error code ETARGET" });
+    expect(await runUpdate(deps)).toBe(1);
+    expect(err).toEqual(["Update failed, nothing was changed."]);
+    expect(deps.repin).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the running binary's entry when npm's global root does not hold the new version", async () => {
+    const { deps } = setup({ exists: () => false });
+    expect(await runUpdate(deps)).toBe(0);
     expect(deps.repin).toHaveBeenCalledWith(
       "/usr/local/lib/node_modules/artisign/dist/cli/index.js",
     );
@@ -103,5 +119,41 @@ describe("update", () => {
     expect(await runUpdate(deps)).toBe(1);
     expect(err.join("\n")).toContain("npm install -g artisign");
     expect(deps.npm).not.toHaveBeenCalled();
+  });
+});
+
+describe("repin", () => {
+  const make = (
+    results: { name: string; status: "done" | "skipped" | "failed"; error?: string }[],
+    restart: "unchanged" | "restarted" | "failed",
+  ) => ({
+    connect: vi.fn(async () => results),
+    restart: vi.fn(async () => restart),
+    version: "3.0.0",
+    log: vi.fn(),
+    error: vi.fn(),
+  });
+
+  it("returns 0 when every write succeeded", async () => {
+    const d = make([{ name: "Cursor", status: "done" }], "unchanged");
+    expect(await runRepin("e", d)).toBe(0);
+    expect(d.connect).toHaveBeenCalledWith({ version: "3.0.0", onlyExisting: true });
+  });
+
+  it("returns non-zero when any client write failed, and still restarts the daemon", async () => {
+    const d = make(
+      [
+        { name: "Cursor", status: "failed", error: "boom" },
+        { name: "Codex CLI", status: "done" },
+      ],
+      "restarted",
+    );
+    expect(await runRepin("e", d)).toBe(1);
+    expect(d.error).toHaveBeenCalledWith("Cursor: boom");
+    expect(d.restart).toHaveBeenCalled();
+  });
+
+  it("returns non-zero when the old daemon would not stop", async () => {
+    expect(await runRepin("e", make([], "failed"))).toBe(1);
   });
 });

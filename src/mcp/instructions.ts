@@ -6,6 +6,10 @@
  */
 export const INSTRUCTIONS = `Artisign — augmentation grammar for screen HTML (html_aug).
 
+PROJECT: start with list_projects. Every tool but init_project/get_guide takes
+a required "project" (its name, or an absolute path). init_project returns it;
+ask the user where a new project goes.
+
 WORKFLOW: tokens -> components -> screens; inline values only while exploring
 screen one of a direction, promoted before screen two; second occurrence of a
 value/pattern gets promoted, named by role. One write, one look

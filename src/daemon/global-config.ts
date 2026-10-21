@@ -12,6 +12,8 @@ import { atomicWrite } from "../store/atomic-write.js";
 export type ArtisignGlobalConfig = {
   port?: number;
   recentProjects?: string[];
+  /** Every project root the daemon ever opened or created — uncapped, unlike `recentProjects`. */
+  knownProjects?: string[];
 };
 
 /** `$ARTISIGN_HOME`, or `~/.artisign` — where daemon-level state (config, lock) lives. */

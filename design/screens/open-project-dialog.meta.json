@@ -1,8 +1,9 @@
 {
-  "notes": "Opening an existing project. Browsing happens in-app rather than through the native folder picker, because a browser never reveals an absolute path to the page and the daemon could not act on the selection. Folders that already hold a project are badged.",
+  "notes": "Opening an existing project. Browsing happens in-app rather than through the native folder picker, because a browser never reveals an absolute path to the page and the daemon could not act on the selection. Folders that already hold a project are badged.\n\nCHR-831: the path row carries a \"+ New folder\" button (`$new-folder-btn`) right of the breadcrumbs. Click opens an inline row at the top of the list; see `open-project-dialog-new-folder` and its `-exists` / `-created` states.",
   "tags": [
     "dialog",
-    "chr-739"
+    "chr-739",
+    "chr-831"
   ],
   "variant_of": "no-project-empty-state",
   "variant_kind": "overlay"

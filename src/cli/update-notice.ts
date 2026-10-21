@@ -55,6 +55,13 @@ async function readCache(): Promise<Cache | undefined> {
   }
 }
 
+let inFlight: AbortController | undefined;
+
+/** Cancels a registry request still in flight, so a finished command exits at once instead of waiting for it. */
+export function abortUpdateCheck(): void {
+  inFlight?.abort();
+}
+
 const defaultDeps: UpdateNoticeDeps = {
   env: process.env,
   isTTY: process.stdout.isTTY === true,
@@ -81,7 +88,8 @@ export async function checkForUpdate(deps: UpdateNoticeDeps = defaultDeps): Prom
     if (printedFromCache) notice(cache.latest);
     if (cache && deps.now() - cache.checkedAt < DAY_MS) return;
 
-    const res = await deps.fetch(DIST_TAGS_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) });
+    inFlight = new AbortController();
+    const res = await deps.fetch(DIST_TAGS_URL, { signal: AbortSignal.any([inFlight.signal, AbortSignal.timeout(TIMEOUT_MS)]) });
     if (!res.ok) return;
     const { latest } = (await res.json()) as { latest?: unknown };
     if (typeof latest !== "string" || parseVersion(latest) === undefined) return;

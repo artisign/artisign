@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
-import { checkForUpdate, isNewer, type UpdateNoticeDeps } from "./update-notice.js";
+import { abortUpdateCheck, checkForUpdate, isNewer, type UpdateNoticeDeps } from "./update-notice.js";
 
 const NOW = 1_800_000_000_000;
 const HOUR = 60 * 60 * 1000;
@@ -71,6 +71,31 @@ describe("update notice", () => {
     expect(fetchStub).toHaveBeenCalledTimes(1);
     expect(lines).toEqual(["New version 2.2.0 — run artisign update"]);
     expect(JSON.parse(await readFile(cacheFile(), "utf-8")).latest).toBe("2.3.0");
+  });
+
+  it("prints nothing when the running version is already at or above the cached latest (after an update)", async () => {
+    await writeFile(cacheFile(), JSON.stringify({ checkedAt: NOW - HOUR, latest: "2.0.0" }));
+    await checkForUpdate({ ...deps, currentVersion: () => "2.1.0" });
+    expect(lines).toEqual([]);
+  });
+
+  it("abortUpdateCheck() ends a request that is still pending, silently", async () => {
+    let signal: AbortSignal | undefined;
+    fetchStub.mockImplementation(
+      (_url: string, init: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          signal = init.signal;
+          init.signal.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+    );
+    const pending = checkForUpdate(deps);
+    await vi.waitFor(() => expect(signal).toBeDefined());
+
+    abortUpdateCheck();
+
+    await expect(pending).resolves.toBeUndefined();
+    expect(signal!.aborted).toBe(true);
+    expect(lines).toEqual([]);
   });
 
   it("is silent when offline, on a bad status or on bad JSON", async () => {

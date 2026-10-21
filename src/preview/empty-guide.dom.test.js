@@ -87,6 +87,17 @@ describe("empty-project guide", () => {
     expect($("#screen-frame").hidden).toBe(true);
   });
 
+  it("a first screen written while disconnected is selected on reconnect", async () => {
+    await import("./app.js");
+    await flush();
+    sources.at(-1).onopen(); // first connect
+    screens = [{ name: "one", tags: [], notes: "" }];
+    sources.at(-1).onopen(); // reconnect after a drop → resync
+    await flush();
+    expect($("#empty-guide").hidden).toBe(true);
+    expect($("#screen-list li[data-screen=\"one\"] button.screen-item").getAttribute("aria-current")).toBe("true");
+  });
+
   it("is not shown for a project that has screens", async () => {
     screens = [{ name: "one", tags: [], notes: "" }];
     await import("./app.js");

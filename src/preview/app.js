@@ -854,7 +854,7 @@ function restoreCompare() {
 
 /** Re-fetches everything the current view depends on — used after an SSE reconnect, where the gap while disconnected is invisible to us. */
 async function resyncCurrentProject() {
-  loadScreens();
+  loadScreensSelectingFirst(); // the first screen may have arrived while disconnected
   loadTags();
   loadBoardState(); // CHR-624 — the daemon's board state is empty after a restart; a reconnect must resync it same as everything else
   compare.reloadAll();
@@ -887,12 +887,16 @@ function arraysEqual(a, b) {
   return a.length === b.length && a.every((item, i) => item === b[i]);
 }
 
+/** CHR-890 — the first screen of an empty project arrives live: render it instead of leaving the frame blank. */
+async function loadScreensSelectingFirst() {
+  await loadScreens();
+  if (currentScreen === null && currentMockup === null && screens.length > 0) await selectScreen(pickInitialScreen(screens, null));
+}
+
 async function handleChangeEvent(event) {
   if (event.kind === "screen") {
     const previousScreens = screens;
-    await loadScreens();
-    // CHR-890 — the first screen of an empty project arrives live: render it instead of leaving the frame blank.
-    if (currentScreen === null && currentMockup === null && screens.length > 0) await selectScreen(pickInitialScreen(screens, null));
+    await loadScreensSelectingFirst();
     flushHeldFollowEvent();
     compare.screenChanged(event.name);
     if (event.name === currentScreen) {

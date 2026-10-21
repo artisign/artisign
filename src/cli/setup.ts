@@ -1,6 +1,6 @@
 import { createInterface } from "node:readline/promises";
 import { CLIENTS, defaultClientEnv, type Client, type ClientEnv } from "../setup/clients.js";
-import { connectClients, detectClients, disconnectClients, runningDaemonVersion } from "../setup/connect.js";
+import { connectClients, detectClients, disconnectClients, runningDaemonInfo } from "../setup/connect.js";
 import { readVersion } from "../version.js";
 import { runStart } from "./start.js";
 import { runStop } from "./stop.js";
@@ -25,12 +25,22 @@ export type SetupDeps = {
   error: (line: string) => void;
 };
 
-/** Restarts a running daemon whose version differs from `version`, so it serves what the entries now pin. */
-export async function restartStaleDaemon(cliEntry: string, version: string): Promise<boolean> {
-  const daemon = await runningDaemonVersion();
+type RestartDeps = {
+  daemon: typeof runningDaemonInfo;
+  stop: () => Promise<void>;
+  start: (opts: { projects: string[]; cliEntry: string; noOpen: boolean }) => Promise<void>;
+};
+
+/** Restarts a running daemon whose version differs from `version`, reopening the projects it had open. */
+export async function restartStaleDaemon(
+  cliEntry: string,
+  version: string,
+  deps: RestartDeps = { daemon: runningDaemonInfo, stop: runStop, start: runStart },
+): Promise<boolean> {
+  const daemon = await deps.daemon();
   if (!daemon || daemon.version === version) return false;
-  await runStop();
-  await runStart({ projects: [], cliEntry, noOpen: true });
+  await deps.stop();
+  await deps.start({ projects: daemon.projects, cliEntry, noOpen: true });
   return true;
 }
 

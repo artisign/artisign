@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defaultClientEnv, CLIENTS, type ClientEnv } from "./clients.js";
 import { connectClients } from "./connect.js";
-import { runSetup, type SetupDeps } from "../cli/setup.js";
+import { runSetup, restartStaleDaemon, type SetupDeps } from "../cli/setup.js";
 
 let root: string;
 let home: string;
@@ -106,6 +106,59 @@ describe("setup: fresh install", () => {
     const { d } = deps();
     await runSetup({ cliEntry: "e", yes: true }, d);
     expect(Object.keys((await readDesktop()).mcpServers as object)).toEqual(["artisign"]);
+  });
+});
+
+describe("setup: the npx Claude Desktop runs", () => {
+  const entryOf = async (): Promise<{ command: string; env: { PATH: string } }> =>
+    ((await readDesktop()).mcpServers as Record<string, { command: string; env: { PATH: string } }>)
+      .artisign as never;
+
+  it("is the unresolved npx found on PATH, with its directory first in PATH", async () => {
+    await installDesktop();
+    await writeFile(join(bin, "npx"), "#!/bin/sh\n");
+    await chmod(join(bin, "npx"), 0o755);
+    const { d } = deps();
+    await runSetup({ cliEntry: "e", yes: true }, d);
+    const entry = await entryOf();
+    expect(entry.command).toBe(join(bin, "npx"));
+    expect(entry.env.PATH.startsWith(`${bin}:`)).toBe(true);
+  });
+
+  it("falls back to the directory of the running node when npx is not on PATH", async () => {
+    await installDesktop();
+    const { d } = deps();
+    await runSetup({ cliEntry: "e", yes: true }, d);
+    expect((await entryOf()).command).toBe("/opt/node/bin/npx");
+  });
+});
+
+describe("setup: restarting a stale daemon", () => {
+  const make = (info: { version?: string; projects: string[] } | undefined) => {
+    const calls: string[] = [];
+    return {
+      calls,
+      deps: {
+        daemon: async () => (info ? { port: 1, ...info } : undefined),
+        stop: async () => void calls.push("stop"),
+        start: async (o: { projects: string[]; noOpen: boolean }) =>
+          void calls.push(`start ${o.projects.join(",")} noOpen=${o.noOpen}`),
+      },
+    };
+  };
+
+  it("stops it and starts it again with the projects it had open", async () => {
+    const { calls, deps: d } = make({ version: "1.0.0", projects: ["/a", "/b"] });
+    expect(await restartStaleDaemon("e", "2.0.0", d)).toBe(true);
+    expect(calls).toEqual(["stop", "start /a,/b noOpen=true"]);
+  });
+
+  it("leaves a current daemon and a missing daemon alone", async () => {
+    for (const info of [{ version: "2.0.0", projects: ["/a"] }, undefined]) {
+      const { calls, deps: d } = make(info);
+      expect(await restartStaleDaemon("e", "2.0.0", d)).toBe(false);
+      expect(calls).toEqual([]);
+    }
   });
 });
 

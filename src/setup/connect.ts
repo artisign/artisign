@@ -60,13 +60,21 @@ export async function disconnectClients(env: ClientEnv = defaultClientEnv(), cli
   return results;
 }
 
-/** The version a running daemon reports on `/health`, or undefined when none runs (or it predates the field). */
-export async function runningDaemonVersion(): Promise<{ port: number; version?: string } | undefined> {
+/** What a running daemon reports: its `/health` version (absent before CHR-830) and the project roots it has open. */
+export async function runningDaemonInfo(): Promise<{ port: number; version?: string; projects: string[] } | undefined> {
   const lock = await findRunningDaemon();
   if (!lock) return undefined;
+  const base = `http://127.0.0.1:${lock.port}`;
   try {
-    const body = (await (await fetch(`http://127.0.0.1:${lock.port}/health`)).json()) as { version?: string };
-    return { port: lock.port, version: body.version };
+    const health = (await (await fetch(`${base}/health`)).json()) as { version?: string };
+    let projects: string[] = [];
+    try {
+      const res = await fetch(`${base}/api/projects`);
+      if (res.ok) projects = ((await res.json()) as { open: { root: string }[] }).open.map((p) => p.root);
+    } catch {
+      // The restart then opens no project, as a plain `start` would.
+    }
+    return { port: lock.port, version: health.version, projects };
   } catch {
     return undefined;
   }

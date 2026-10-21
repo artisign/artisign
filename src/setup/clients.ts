@@ -144,7 +144,12 @@ async function desktopConfigPath(env: ClientEnv): Promise<string | undefined> {
   return undefined;
 }
 
-/** Claude Desktop is a GUI app without the shell's PATH: the entry uses the absolute npx next to the node running setup. */
+/**
+ * Claude Desktop is a GUI app without the shell's PATH, so the entry uses an absolute npx and a PATH that starts with its
+ * directory (npx's `#!/usr/bin/env node` then finds the same node). The npx is the one on the user's PATH, unresolved —
+ * `/opt/homebrew/bin/npx` survives a `brew upgrade node`, the versioned Cellar path it links to does not. Only without
+ * npx on PATH does it fall back to the directory of the node running setup.
+ */
 export const claudeDesktop: Client = {
   name: "Claude Desktop",
   async detect(env) {
@@ -154,9 +159,10 @@ export const claudeDesktop: Client = {
   async write(env, version) {
     const path = await desktopConfigPath(env);
     if (path === undefined) throw new Error("Claude Desktop's config directory is gone");
-    const bin = dirname(env.execPath);
+    const npx = (await findOnPath("npx", env.pathEnv)) ?? join(dirname(env.execPath), "npx");
+    const bin = dirname(npx);
     await editServers(path, {
-      command: join(bin, "npx"),
+      command: npx,
       args: npxArgs(version),
       env: { PATH: [bin, "/usr/local/bin", "/usr/bin", "/bin"].join(delimiter) },
     });

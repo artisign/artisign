@@ -1393,15 +1393,15 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   display: none;
 }
 
-/* CHR-890 — the how-to-start guide inside the empty #screen-holder frame. Sized for the 390x844 default frame at scale 1 (the holder's zoom scales it; ~2x the app's type so it lands near 11px at the 50% default). */
+/* CHR-890 — the how-to-start guide fills the empty #screen-holder frame: header pinned top, steps anchored bottom. Sized for the 390x844 default frame at scale 1 (the holder's zoom scales it). */
 #empty-guide {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 28px;
-  padding: 40px 32px;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 48px 32px 44px;
   color: var(--color-text);
 }
 
@@ -1416,17 +1416,17 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 #empty-guide-label {
-  font-size: 15px;
+  font-size: 18px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--color-text-label);
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 #empty-guide-title {
-  font-size: 34px;
+  font-size: 40px;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 #empty-guide-steps {
@@ -1434,59 +1434,61 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 30px;
 }
 
 #empty-guide-steps li {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   align-items: flex-start;
 }
 
 .empty-guide-num {
   flex: none;
-  width: 33px;
-  height: 33px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-pill);
   background: var(--color-accent-subtle);
   color: var(--color-accent);
   font-weight: 600;
-  font-size: 18.7px;
+  font-size: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .empty-guide-text {
-  font-size: 22px;
-  line-height: 1.4;
+  flex: 1;
+  font-size: 24px;
+  line-height: 1.35;
   color: var(--color-text-secondary);
-  padding-top: 4px;
+  padding-top: var(--space-xs);
 }
 
 #empty-guide-prompt-box {
-  margin-top: 14px;
+  margin-top: 18px;
   display: flex;
-  gap: 12.6px;
-  align-items: flex-start;
-  padding: 12.6px 14.4px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 16px 18px;
   background: var(--color-surface-subtle);
   border: 1px solid var(--color-border);
   border-radius: 6px;
 }
 
 #empty-guide-prompt {
-  flex: 1;
+  align-self: stretch;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1.45;
   color: var(--color-text-secondary);
 }
 
 #empty-guide-copy {
   flex: none;
-  padding: 4.32px 8.64px;
-  font-size: 14.4px;
+  padding: 7px 16px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--color-text-secondary);
   background: var(--color-surface);

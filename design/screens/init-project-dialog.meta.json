@@ -1,8 +1,9 @@
 {
-  "notes": "Creating a new project: the same folder browser plus a name field. Confirm stays disabled until both a parent folder and a name are chosen.",
+  "notes": "Creating a new project: the same folder browser plus a name field. Confirm stays disabled until both a parent folder and a name are chosen.\n\nCHR-831: the name field is labelled \"Project name\" (was \"New folder / project name\") so it is not confused with the new \"+ New folder\" button in the path row, which creates intermediate folders such as ~/work/clients. States: `init-project-dialog-new-folder` (typing) and its `-exists`, `-invalid`, `-permission`, `-created` variants.",
   "tags": [
     "dialog",
-    "chr-739"
+    "chr-739",
+    "chr-831"
   ],
   "variant_of": "no-project-empty-state",
   "variant_kind": "overlay"

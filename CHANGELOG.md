@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `artisign` / `artisign start` checks the npm registry for a newer release at most once every 24 hours and prints
+  `New version x.y.z — run artisign update` on stderr when there is one. The check never delays or fails a start,
+  is skipped when `CI` is set or stdout is not a terminal, and is turned off with `ARTISIGN_NO_UPDATE_CHECK=1`.
+  (CHR-882)
+
 ### Changed
 
 - **BREAKING:** `artisign mcp <dir>` is gone. `artisign mcp` is now a stdio bridge to the running daemon: it forwards

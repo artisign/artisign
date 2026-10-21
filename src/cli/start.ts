@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { findRunningDaemon, readLock, type DaemonLock } from "../daemon/lock.js";
 import { waitFor } from "./wait-for.js";
 import { openBrowser } from "./open-browser.js";
+import { checkForUpdate } from "./update-notice.js";
 
 export type StartOptions = {
   port?: number;
@@ -22,6 +23,8 @@ export type StartDeps = {
   isTTY: boolean;
   log: (line: string) => void;
   error: (line: string) => void;
+  /** Daily update notice (CHR-882) — fire and forget; absent in tests. */
+  updateCheck?: () => Promise<void>;
 };
 
 /**
@@ -53,6 +56,7 @@ const defaultDeps: StartDeps = {
   isTTY: process.stdout.isTTY === true,
   log: (line) => console.log(line),
   error: (line) => console.error(line),
+  updateCheck: () => checkForUpdate(),
 };
 
 export async function pollForHealthyDaemon(timeoutMs: number): Promise<DaemonLock | undefined> {
@@ -70,6 +74,7 @@ export async function pollForHealthyDaemon(timeoutMs: number): Promise<DaemonLoc
 }
 
 export async function runStart(opts: StartOptions, deps: StartDeps = defaultDeps): Promise<void> {
+  void deps.updateCheck?.();
   const open = (port: number): void => {
     if (!shouldOpenBrowser({ noOpen: opts.noOpen, env: deps.env, isTTY: deps.isTTY })) return;
     // The URL is already printed: a browser that cannot be opened is not an error.

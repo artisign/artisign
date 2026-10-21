@@ -272,7 +272,7 @@ describe("setup: Claude Code without the CLI", () => {
     const { d, err } = deps();
     expect(await runSetup({ cliEntry: "e", yes: true }, d)).toBe(1);
     expect(await readFile(file, "utf8")).toBe("{ nope");
-    expect(err.join("\n")).toContain("not valid JSON");
+    expect(err.join("\n")).toContain("comments or trailing commas");
   });
 });
 

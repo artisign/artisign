@@ -1,7 +1,8 @@
 import { createInterface } from "node:readline/promises";
 import { CLIENTS, defaultClientEnv, type Client, type ClientEnv } from "../setup/clients.js";
 import { connectClients, detectClients, disconnectClients, runningDaemonInfo } from "../setup/connect.js";
-import { readVersion } from "../version.js";
+import { findRunningDaemon } from "../daemon/lock.js";
+import { isNewer, readVersion } from "../version.js";
 import { runStart } from "./start.js";
 import { runStop } from "./stop.js";
 
@@ -20,7 +21,7 @@ export type SetupDeps = {
   version: string;
   isTTY: boolean;
   ask: (question: string) => Promise<string>;
-  restartDaemon: (cliEntry: string, version: string) => Promise<boolean>;
+  restartDaemon: (cliEntry: string, version: string) => Promise<RestartResult>;
   log: (line: string) => void;
   error: (line: string) => void;
 };
@@ -28,20 +29,27 @@ export type SetupDeps = {
 type RestartDeps = {
   daemon: typeof runningDaemonInfo;
   stop: () => Promise<void>;
-  start: (opts: { projects: string[]; cliEntry: string; noOpen: boolean }) => Promise<void>;
+  stillRunning: () => Promise<boolean>;
+  start: (opts: { port: number; projects: string[]; cliEntry: string; noOpen: boolean }) => Promise<void>;
 };
 
-/** Restarts a running daemon whose version differs from `version`, reopening the projects it had open. */
+export type RestartResult = "unchanged" | "restarted" | "failed";
+
+/**
+ * Restarts a running daemon that is older than `version` (or reports none), on its own port and with the projects it
+ * had open. A daemon that is as new or newer is left alone: an old `npx artisign@1.x setup` must not downgrade it.
+ */
 export async function restartStaleDaemon(
   cliEntry: string,
   version: string,
-  deps: RestartDeps = { daemon: runningDaemonInfo, stop: runStop, start: runStart },
-): Promise<boolean> {
+  deps: RestartDeps = { daemon: runningDaemonInfo, stop: runStop, stillRunning: async () => (await findRunningDaemon()) !== undefined, start: runStart },
+): Promise<RestartResult> {
   const daemon = await deps.daemon();
-  if (!daemon || daemon.version === version) return false;
+  if (!daemon || (daemon.version !== undefined && !isNewer(version, daemon.version))) return "unchanged";
   await deps.stop();
-  await deps.start({ projects: daemon.projects, cliEntry, noOpen: true });
-  return true;
+  if (await deps.stillRunning()) return "failed";
+  await deps.start({ port: daemon.port, projects: daemon.projects, cliEntry, noOpen: true });
+  return "restarted";
 }
 
 async function ask(question: string): Promise<string> {
@@ -84,7 +92,10 @@ export async function runSetup(opts: SetupOptions, deps: SetupDeps = defaultDeps
   if (opts.remove) {
     const results = await disconnectClients(deps.env, deps.clients);
     if (results.length === 0) log("No artisign entry found in a supported AI tool; nothing to remove.");
-    for (const r of results) log(r.status === "done" ? `Removed the artisign entry from ${r.name}.` : `${r.name}: ${r.error}`);
+    for (const r of results) {
+      if (r.status === "done") log(`Removed the artisign entry from ${r.name}.`);
+      else error(`${r.name}: ${r.error}`);
+    }
     return results.some((r) => r.status === "failed") ? 1 : 0;
   }
 
@@ -115,10 +126,16 @@ export async function runSetup(opts: SetupOptions, deps: SetupDeps = defaultDeps
     else error(`${r.name}: ${r.error}`);
   }
 
-  if (results.some((r) => r.status === "done") && (await deps.restartDaemon(opts.cliEntry, deps.version))) {
-    log("Restarted the running Artisign so it matches this version.");
+  let restartFailed = false;
+  if (results.some((r) => r.status === "done")) {
+    const restart = await deps.restartDaemon(opts.cliEntry, deps.version);
+    if (restart === "restarted") log("Restarted the running Artisign so it matches this version.");
+    if (restart === "failed") {
+      error("The running Artisign is older than this version and could not be stopped. Run `artisign stop`, then `artisign`.");
+      restartFailed = true;
+    }
   }
-  if (results.some((r) => r.status === "failed")) return 1;
+  if (restartFailed || results.some((r) => r.status === "failed")) return 1;
   if (results.some((r) => r.status === "done")) for (const line of NEXT_STEPS) log(line);
   return 0;
 }

@@ -12,6 +12,7 @@ function fakeDeps() {
     runSetup: vi.fn(async () => 0),
     runUpdate: vi.fn(async () => 0),
     runRepin: vi.fn(async () => 0),
+    offerSetup: vi.fn(async () => {}),
     runDaemonForeground: vi.fn(async () => {}),
     runStart: vi.fn(async () => {}),
     runStop: vi.fn(async () => {}),
@@ -248,5 +249,25 @@ describe("dispatch: update", () => {
     expect(await dispatch(["update", "x"], ENTRY, deps)).toBe(1);
     expect(err[0]).toBe("Unknown option: x");
     expect(deps.runUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("dispatch: the first-run offer", () => {
+  it("bare artisign and start offer setup once, before starting", async () => {
+    for (const argv of [[], ["start"], ["--no-open"]]) {
+      const { deps } = fakeDeps();
+      const order: string[] = [];
+      vi.mocked(deps.offerSetup).mockImplementation(async () => void order.push("offer"));
+      vi.mocked(deps.runStart).mockImplementation(async () => void order.push("start"));
+      await dispatch(argv, ENTRY, deps);
+      expect(order).toEqual(["offer", "start"]);
+      expect(deps.offerSetup).toHaveBeenCalledWith(ENTRY);
+    }
+  });
+
+  it("no other command offers it", async () => {
+    const { deps } = fakeDeps();
+    for (const argv of [["status"], ["stop"], ["serve"], ["init", "p"], ["mcp"], ["setup"], ["help"]]) await dispatch(argv, ENTRY, deps);
+    expect(deps.offerSetup).not.toHaveBeenCalled();
   });
 });

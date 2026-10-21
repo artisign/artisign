@@ -8,6 +8,7 @@ import { runStatus } from "./status.js";
 import { parseStartArgs } from "./args.js";
 import { runSetup, type SetupOptions } from "./setup.js";
 import { runUpdate, runRepin } from "./update.js";
+import { offerSetup } from "./offer-setup.js";
 import { readVersion } from "../version.js";
 
 export const USAGE = [
@@ -136,6 +137,8 @@ export type CliDeps = {
   runSetup: (opts: SetupOptions) => Promise<number>;
   runUpdate: () => Promise<number>;
   runRepin: (cliEntry: string) => Promise<number>;
+  /** First-run offer to connect an AI tool; asks at most once, only on `start` / bare `artisign`. */
+  offerSetup: (cliEntry: string) => Promise<void>;
   runDaemonForeground: typeof runDaemonForeground;
   runStart: (opts: StartOptions) => Promise<void>;
   runStop: () => Promise<void>;
@@ -151,6 +154,7 @@ export const defaultCliDeps: CliDeps = {
   runSetup,
   runUpdate,
   runRepin,
+  offerSetup,
   runDaemonForeground,
   runStart,
   runStop,
@@ -231,6 +235,7 @@ async function run(
 ): Promise<number> {
   if (command === undefined || command.startsWith("-")) {
     const { port, projects, noOpen } = parseStart(argv);
+    await deps.offerSetup(cliEntry);
     await deps.runStart({ port, projects, cliEntry, noOpen });
     return 0;
   }
@@ -274,6 +279,7 @@ async function run(
       return deps.runRepin(cliEntry);
     case "start": {
       const { port, projects, noOpen } = parseStart(rest);
+      await deps.offerSetup(cliEntry);
       await deps.runStart({ port, projects, cliEntry, noOpen });
       return 0;
     }

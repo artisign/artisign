@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `artisign` (and `artisign start`) offers once, in a terminal and outside CI, to connect the AI tools it finds when
+  none of them has an `artisign` entry yet. Answering no is remembered (`setupDeclined` in
+  `~/.artisign/config.json`); `artisign setup` works any time. (CHR-835)
+
 - `artisign update` (also `artisign --update`) installs the latest version with `npm install -g artisign@latest`, then
   the newly installed version re-pins every existing `artisign` entry in your AI tools and restarts a running Artisign
   of an older version with its open projects. It does nothing when you are already on the latest version, never uses

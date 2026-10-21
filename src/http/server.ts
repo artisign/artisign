@@ -13,6 +13,7 @@ import { isAllowedOrigin, hasJsonContentType } from "./origin-guard.js";
 import { sendJson } from "./json.js";
 import type { ProjectRegistry, ProjectHandle } from "../daemon/project-registry.js";
 import { ToolError, type ViewState, type BoardStatePatch, type ToolHandlerContext } from "../tools/index.js";
+import { readVersion } from "../version.js";
 
 // This module lives at src/http/server.ts (dev) or dist/http/server.js (build);
 // both are two directories below the package root, next to src/preview.
@@ -204,7 +205,7 @@ export function createServer(registry: ProjectRegistry): HttpServer {
   const server = createHttpServer((req, res) => {
     if (req.method === "GET" && req.url === "/health") {
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ status: "ok" }));
+      res.end(JSON.stringify({ status: "ok", version: readVersion() }));
       return;
     }
 

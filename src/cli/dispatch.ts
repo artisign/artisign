@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { initProject } from "../init/init-project.js";
 import { runServe } from "./serve.js";
 import { runMcp } from "./mcp.js";
@@ -7,6 +6,7 @@ import { runStart, type StartOptions } from "./start.js";
 import { runStop } from "./stop.js";
 import { runStatus } from "./status.js";
 import { parseStartArgs } from "./args.js";
+import { readVersion } from "../version.js";
 
 export const USAGE = [
   "Artisign: a local design tool your AI tool drives and you review in the browser.",
@@ -26,7 +26,7 @@ export const USAGE = [
   "  stop                                    stop the background process",
   "  serve [--port N] [dir...]               run in the foreground",
   "  init [dir]                              scaffold a new project",
-  "  mcp [dir]                               stdio MCP server for Claude Desktop / Claude Code",
+  "  mcp                                     stdio connection for AI tools; starts Artisign if needed",
   "  help [command]                          show this help, or the help of one command",
   "",
   "Options:",
@@ -72,13 +72,14 @@ export const COMMAND_HELP: Record<string, string> = {
     "  artisign init ./my-project",
   ].join("\n"),
   mcp: [
-    "Usage: artisign mcp [dir]",
+    "Usage: artisign mcp",
     "",
-    "Run a stdio MCP server for Claude Desktop or Claude Code, serving the project in dir (default the",
-    "current folder). It runs in-process and does not start the background process.",
+    "Stdio connection for AI tools such as Claude Desktop and Claude Code. It forwards every MCP message to",
+    "the running Artisign and starts it if it is not running. Your AI tool launches this; you rarely run it.",
+    "It takes no project directory: the project is named per tool call.",
     "",
     "Example:",
-    "  claude mcp add artisign -- artisign mcp ./my-project",
+    "  npx -y artisign@<version> mcp   (the entry `artisign setup` writes into your AI tool's config)",
   ].join("\n"),
   status: [
     "Usage: artisign status",
@@ -98,18 +99,12 @@ export const COMMAND_HELP: Record<string, string> = {
   ].join("\n"),
 };
 
-/** The package version, read from package.json at runtime (two levels up from both src/cli and dist/cli). */
-export function readVersion(): string {
-  const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
-  return pkg.version;
-}
-
 const HINT = "Run `artisign help` for usage.";
 
 export type CliDeps = {
   initProject: (dir: string) => Promise<unknown>;
   runServe: typeof runServe;
-  runMcp: (dir: string) => Promise<void>;
+  runMcp: (cliEntry: string) => Promise<void>;
   runDaemonForeground: typeof runDaemonForeground;
   runStart: (opts: StartOptions) => Promise<void>;
   runStop: () => Promise<void>;
@@ -216,7 +211,12 @@ async function run(
       return 0;
     }
     case "mcp":
-      await deps.runMcp(rest[0] ?? ".");
+      if (rest.length > 0) {
+        deps.error("`artisign mcp` no longer takes a project directory: the project is named per tool call.");
+        deps.error("Run `artisign setup` to connect your AI tool.");
+        return 1;
+      }
+      await deps.runMcp(cliEntry);
       return 0;
     case "start": {
       const { port, projects, noOpen } = parseStart(rest);

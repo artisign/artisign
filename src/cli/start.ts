@@ -55,7 +55,7 @@ const defaultDeps: StartDeps = {
   error: (line) => console.error(line),
 };
 
-async function pollForHealthyDaemon(timeoutMs: number): Promise<DaemonLock | undefined> {
+export async function pollForHealthyDaemon(timeoutMs: number): Promise<DaemonLock | undefined> {
   return waitFor(timeoutMs, async () => {
     const lock = await readLock();
     if (!lock) return undefined;

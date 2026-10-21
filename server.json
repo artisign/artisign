@@ -14,6 +14,7 @@
       "registryType": "npm",
       "identifier": "artisign",
       "version": "2.0.0",
+      "packageArguments": [{ "type": "positional", "value": "mcp" }],
       "transport": { "type": "stdio" }
     }
   ]

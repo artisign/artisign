@@ -7,6 +7,7 @@ import { initProject } from "../init/init-project.js";
 import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
 import { startDaemon, DaemonAlreadyRunningError, type DaemonHandle } from "./start.js";
 import { writeLock } from "./lock.js";
+import { readVersion } from "../version.js";
 
 describe("startDaemon", () => {
   let dir: string;
@@ -37,7 +38,7 @@ describe("startDaemon", () => {
 
     const res = await fetch(`http://127.0.0.1:${daemon.port}/health`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: "ok" });
+    expect(await res.json()).toEqual({ status: "ok", version: readVersion() });
   });
 
   it("serves the placeholder preview page on other routes", async () => {

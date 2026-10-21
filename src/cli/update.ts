@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { join } from "node:path";
 import { connectClients } from "../setup/connect.js";
-import { readVersion } from "../version.js";
+import { isNewer, readVersion } from "../version.js";
 import { restartStaleDaemon } from "./setup.js";
 
 type Run = { code: number; stdout: string; stderr: string };
@@ -54,17 +54,6 @@ function defaultDeps(): UpdateDeps {
     log: (line) => console.log(line),
     error: (line) => console.error(line),
   };
-}
-
-/** True when `latest` is a higher x.y.z than `current` (pre-release tags are ignored). */
-function isNewer(latest: string, current: string): boolean {
-  const parts = (v: string): number[] => v.split("-")[0]!.split(".").map(Number);
-  const [a, b] = [parts(latest), parts(current)];
-  for (let i = 0; i < 3; i++) {
-    const [x, y] = [a[i] ?? 0, b[i] ?? 0];
-    if (x !== y) return x > y;
-  }
-  return false;
 }
 
 const FIX =
@@ -134,11 +123,21 @@ export async function runUpdate(deps: UpdateDeps = defaultDeps()): Promise<numbe
 }
 
 /** `artisign __repin`, run by the NEW version after an update: re-pins existing entries, restarts an older daemon. */
-export async function runRepin(cliEntry: string): Promise<void> {
+export async function runRepin(cliEntry: string): Promise<number> {
   const version = readVersion();
+  let failed = false;
   for (const r of await connectClients({ version, onlyExisting: true })) {
     if (r.status === "done") console.log(`Re-pinned ${r.name} to artisign@${version}.`);
-    else if (r.status === "failed") console.error(`${r.name}: ${r.error}`);
+    else if (r.status === "failed") {
+      console.error(`${r.name}: ${r.error}`);
+      failed = true;
+    }
   }
-  if (await restartStaleDaemon(cliEntry, version)) console.log("Restarted the running Artisign.");
+  const restart = await restartStaleDaemon(cliEntry, version);
+  if (restart === "restarted") console.log("Restarted the running Artisign.");
+  if (restart === "failed") {
+    console.error("The running Artisign could not be stopped. Run `artisign stop`, then `artisign`.");
+    return 1;
+  }
+  return failed ? 1 : 0;
 }

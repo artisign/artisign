@@ -154,3 +154,19 @@ describe("opencode", () => {
     expect(JSON.stringify(await readJson(join(dir(), "opencode.jsonc")))).toContain("artisign@5.0.0");
   });
 });
+
+describe("Codex CLI: a config that cannot be read", () => {
+  it("is left alone instead of being replaced", async () => {
+    const file = join(home, ".codex", "config.toml");
+    await writeAt(file, 'model = "precious"\n');
+    await chmod(file, 0o000);
+    try {
+      const [result] = await connectClients({ version: "5.0.0", env: env(), clients: [codex] });
+      expect(result?.status).toBe("failed");
+    } finally {
+      await chmod(file, 0o600);
+    }
+    expect(await readFile(file, "utf8")).toBe('model = "precious"\n');
+  });
+});
+

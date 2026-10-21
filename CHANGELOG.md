@@ -6,56 +6,58 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Added
-
-- `artisign setup` also connects Cursor (`~/.cursor/mcp.json`), Codex CLI (`~/.codex/config.toml`), VS Code (user-profile `mcp.json`) and
-  opencode (`~/.config/opencode/opencode.json`). (CHR-836, CHR-837, CHR-838, CHR-839)
-
-- `artisign` (and `artisign start`) offers once, in a terminal and outside CI, to connect the AI tools it finds when
-  none of them has an `artisign` entry yet. Answering no is remembered (`setupDeclined` in
-  `~/.artisign/config.json`); `artisign setup` works any time. (CHR-835)
-
-- `artisign update` (also `artisign --update`) installs the latest version with `npm install -g artisign@latest`, then
-  the newly installed version re-pins every existing `artisign` entry in your AI tools and restarts a running Artisign
-  of an older version with its open projects. It does nothing when you are already on the latest version, never uses
-  sudo, and on a pnpm, bun or yarn install prints the matching command instead; through npx it points to the global
-  install. (CHR-881)
-
-- `artisign setup` connects Claude Code and Claude Desktop with one user-level `artisign` entry each, running
-  `npx -y artisign@<version> mcp` pinned to the version that ran setup. It asks per detected tool (`--yes` skips the
-  questions and is the only way to run without a terminal), replaces an existing entry, leaves every other entry and
-  setting untouched, and restarts a running Artisign of another version. `artisign setup --remove` removes exactly the
-  `artisign` entries. Claude Code is driven through its own `claude mcp` CLI; Claude Desktop gets absolute paths to `npx`
-  and `node`, since a GUI app does not inherit the shell's PATH. (CHR-833)
-- `artisign` / `artisign start` checks the npm registry for a newer release at most once every 24 hours and prints
-  `New version x.y.z — run artisign update` on stderr when there is one. The check never delays or fails a start,
-  is skipped when `CI` is set or stdout is not a terminal, and is turned off with `ARTISIGN_NO_UPDATE_CHECK=1`.
-  (CHR-882)
+One install path and a per-call project: Artisign is installed once with `npm install -g artisign`, connects to your
+AI tools itself, and every tool call names its project.
 
 ### Changed
 
+- **BREAKING:** `/mcp` no longer reads `?project=`, and never falls back to the project shown in the browser. Every tool
+  except `list_projects`, `init_project` and `get_guide` takes a required `project` input — a known project's name (see
+  `list_projects`) or an absolute path (opened on first use). A missing or unknown name fails with a pointer to
+  `list_projects`; a name shared by several projects fails with the candidates' roots. A request that still carries
+  `?project=` gets a JSON-RPC error telling the client to reconfigure (`artisign setup`). The preview's own `/api/*`
+  routes are unchanged. (CHR-832)
 - **BREAKING:** `artisign mcp <dir>` is gone. `artisign mcp` is now a stdio bridge to the running daemon: it forwards
   every MCP message to the daemon's `/mcp` and starts the daemon if none is running, so Claude Desktop (stdio only) gets
   the same backend as the HTTP route, including `set_board_state` and activity events. The standalone stdio server with
   its own store is removed; a daemon that stops or restarts mid-session no longer ends the session. Passing a directory
   now fails with a pointer to `artisign setup`. (CHR-830)
+- The install path is `npm install -g artisign`, then `artisign`; the README and the tutorial start from it. A local
+  install and `npx` as the install path are gone from the quickstart. (CHR-841)
 - `/health` reports the daemon's `version`; the bridge warns on stderr when it differs from its own. (CHR-830)
 - The MCP registry entry in `server.json` launches `artisign mcp` instead of the bare package. (CHR-830)
-- **BREAKING:** `/mcp` no longer reads `?project=`, and never falls back to the
-  project shown in the browser. Every tool except `list_projects`,
-  `init_project` and `get_guide` takes a required `project` input — a known
-  project's name (see `list_projects`) or an absolute path (opened on first
-  use). A missing or unknown name fails with a pointer to `list_projects`; a
-  name shared by several projects fails with the candidates' roots. A request
-  that still carries `?project=` gets a JSON-RPC error telling the client to
-  reconfigure (`artisign setup`). The preview's own `/api/*` routes are
-  unchanged. (CHR-832)
 
 ### Added
 
-- `list_projects` lists every project the daemon has opened or created, as
-  `{ name, root, open }`; `init_project` now returns `project`, the name to
-  pass in later calls. (CHR-829)
+- `artisign help [command]`, `artisign <command> --help`, and `--version` / `-v`; an unknown command is a one-line
+  error. (CHR-828)
+- `artisign setup` connects Claude Code, Claude Desktop, Cursor (`~/.cursor/mcp.json`), Codex CLI
+  (`~/.codex/config.toml`), VS Code (user-profile `mcp.json`) and opencode (`~/.config/opencode/opencode.json`) with one
+  user-level `artisign` entry each, running `npx -y artisign@<version> mcp` pinned to the version that ran setup. It asks
+  per detected tool (`--yes` skips the questions and is the only way to run without a terminal), replaces an existing
+  entry, leaves every other entry and setting untouched, and restarts a running Artisign of an older version.
+  `artisign setup --remove` removes exactly the `artisign` entries. Claude Code is driven through its own `claude mcp`
+  CLI and Codex CLI through `codex mcp add/remove` when it is on PATH (`CODEX_HOME` is honoured). GUI clients (Claude
+  Desktop, Cursor, VS Code) get an absolute path to the `npx` found on PATH, since a GUI app does not inherit the
+  shell's PATH. A config file with comments or trailing commas is not rewritten — setup prints the entry to add by
+  hand — and a symlinked config is written through. (CHR-833, CHR-836, CHR-837, CHR-838, CHR-839)
+- `artisign` (and `artisign start`) offers once, in a terminal and outside CI, to connect the AI tools it finds when none
+  of them has an `artisign` entry yet. Answering no is remembered (`setupDeclined` in `~/.artisign/config.json`);
+  `artisign setup` works any time. (CHR-835)
+- `artisign update` (also `artisign --update`) installs the latest version with `npm install -g artisign@latest`, then
+  the newly installed version re-pins every existing `artisign` entry in your AI tools and restarts a running Artisign
+  of an older version, on its port and with its open projects (a newer one is left alone). It does nothing when you are
+  already on the latest version and never uses sudo: when npm is denied permission it prints the fix (a Node you own, or
+  `npm config set prefix ~/.npm-global`). On a pnpm, bun or yarn install it prints the matching command instead; through
+  npx it points to the global install. (CHR-881)
+- `artisign` / `artisign start` checks the npm registry for a newer release at most once every 24 hours and prints
+  `New version x.y.z — run artisign update` on stderr when there is one. The check never delays or fails a start, is
+  skipped when `CI` is set or stdout is not a terminal, and is turned off with `ARTISIGN_NO_UPDATE_CHECK=1`. A newer
+  cached version is printed straight from the cache. (CHR-882)
+- `list_projects` lists every project the daemon has opened or created, as `{ name, root, open }`; `init_project` now
+  returns `project`, the name to pass in later calls (the root when the name is taken). (CHR-829)
+- The project dialogs in the preview can create a new folder, and the empty state offers a ready-made prompt for your AI
+  tool ("Create an Artisign project in ~/work/acme"). (CHR-834)
 
 ## [2.0.0] - 2026-10-13
 

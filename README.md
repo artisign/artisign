@@ -6,7 +6,7 @@ Local-first UX design tool for AI agents. Agents design through MCP, the human r
 
 One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
-**Status:** Stable (`2.0.0`) — CLI, store, parser/model, the 24-tool MCP surface, browser preview with live reload/flows/comments, screen variants with side-by-side compare, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. Artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
+**Status:** Stable (`2.0.0`) — CLI, store, parser/model, the 25-tool MCP surface, browser preview with live reload/flows/comments, screen variants with side-by-side compare, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. Artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
 
 ## Why
 
@@ -17,93 +17,91 @@ One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
 ## Install
 
-Node.js ≥ 22.4, on **macOS or Linux**. **Windows is not supported** — the store's atomic writes (write temp file, then `rename`) and its path handling have never been verified there, so the tool is not shipped for it. `package.json` declares this via `os`, which makes `npm install` refuse the platform rather than fail somewhere later.
-
-**Two ways to run it.** `npx artisign` fetches the package on first use, starts the daemon and opens the preview in your browser — no setup, the fastest way to try it. Installing it into a directory of your own is the other path, and the one the commands below are written for. Screenshots work the same on both: they use a browser that is already installed — see **Screenshots** below.
+**Requirements.** Node.js ≥ 22.4 on **macOS or Linux** — Windows is not supported (the store's atomic writes and path handling have never been verified there, so `package.json` makes `npm install` refuse the platform). For screenshots, a browser that is already installed: Chrome, Edge, Brave, Chromium or Firefox — see **Screenshots** below.
 
 ```bash
-mkdir artisign && cd artisign
-npm install artisign
+npm install -g artisign
+artisign
 ```
 
-The commands below are written as `npx artisign`. With a local install, run `./node_modules/.bin/artisign` instead — or `npm install -g artisign` and just `artisign`.
+1. `npm install -g artisign` — once.
+2. `artisign` — starts Artisign's background process (the *daemon*), opens the preview in your browser and, on first run, offers to connect your AI tool. After connecting, quit and reopen the AI tool so it picks up the new entry.
+3. Ask your AI tool to create or open a project: *"Create an Artisign project in ~/work/acme"*. The project folder (and any missing parent folders) is created for you; the AI tool passes an absolute path, since Artisign does not expand `~` itself. Writes are committed to git automatically (`autoCommit`, on by default) — Artisign runs `git init` in the project on the first write, needs `git` installed for that, and skips the commit rather than fail when it is missing or the folder sits inside another repo.
 
-**Canonical quickstart.** The local install, from an empty directory to a connected agent. Start the daemon before registering the MCP server — the HTTP registration below runs against an already-running daemon:
+**Check it works.** Ask your AI tool *"List my Artisign projects"* — it calls `list_projects` and the project you just created appears, and in the preview's project picker too.
 
-```bash
-mkdir artisign && cd artisign
-npm install artisign
-./node_modules/.bin/artisign start ./my-project
-claude mcp add --transport http artisign "http://127.0.0.1:4711/mcp?project=/absolute/path/to/my-project"
-```
+**Two copies, one version.** The global install is the `artisign` command you type. Your AI tool's entry runs the same version, pinned, through `npx` (downloaded once on its first launch) as a small stdio bridge; `artisign update` keeps the two in step. Whichever starts first — you with `artisign`, or the bridge when your AI tool connects — starts the daemon; both use the same `~/.artisign` and port, so there is only ever one. The daemon inherits the environment of the process that started it: to make a variable such as `ARTISIGN_BROWSER` stick, run `artisign` from your shell before your AI tool does (`artisign stop` first if it is already running); putting it in the entry's `env` also works, but `artisign setup` rewrites entries, so add it again after an update.
 
-The first two lines repeat the install above on purpose: the point of this block is that nothing has to be assembled from elsewhere. On the npx path, drop them and start with `npx artisign start ./my-project` instead.
+**Updating.** Run `artisign update` (also `artisign --update`). It installs the latest version with `npm install -g artisign@latest`, re-pins the `artisign` entries in your AI tools to it and restarts a running Artisign of an older version with its open projects. Then quit and reopen your AI tool, so it launches the re-pinned entry. It does nothing when you are already on the latest version, and never uses `sudo`. Nothing is updated automatically: `artisign` checks the npm registry for a newer release at most once a day and prints one line (`New version x.y.z — run artisign update`) when there is one. Set `ARTISIGN_NO_UPDATE_CHECK=1` to turn that off.
+
+**Troubleshooting.**
+
+- **`EACCES` on `npm install -g`** — npm cannot write to its global folder. Never fix this with `sudo`. Use a Node you own (for example through [nvm](https://github.com/nvm-sh/nvm)), or point npm at a folder in your home: `npm config set prefix ~/.npm-global`, then add `~/.npm-global/bin` to your `PATH`.
+- **nvm** — a global install belongs to one Node version. After switching versions, run `npm install -g artisign` and `artisign setup` again.
+- **pnpm, bun or yarn** — install with `pnpm add -g artisign`, `bun add -g artisign` or `yarn global add artisign`; update with the same command and `@latest` (`artisign update` only *prints* that command for these installs, it does not run it). Then run `artisign setup` to connect your AI tool and re-pin its entries.
 
 **Screenshots.** `get_screenshot` and `inspect_node` render in a real browser — one that is already on your machine. Artisign finds Chrome, Edge, Brave, Chromium or Firefox by itself (in that order) and drives it headless through the browser's own remote protocol: the Chrome DevTools Protocol for the Chromium family, WebDriver BiDi for Firefox. Nothing to install, no Playwright, no browser download.
 
-- **Pick a browser explicitly** with `ARTISIGN_BROWSER=/path/to/browser` in the environment of the process that runs the daemon (for a stdio MCP server, the `env` block of the host's config). The name decides the protocol: a path containing `firefox` is driven over BiDi, anything else over CDP.
+- **Pick a browser explicitly** with `ARTISIGN_BROWSER=/path/to/browser` in the environment of the process that runs the daemon. The name decides the protocol: a path containing `firefox` is driven over BiDi, anything else over CDP.
 - **Cross-browser check.** Both tools take an optional `browser` input (`"chrome"`, `"edge"`, `"brave"`, `"chromium"`, `"firefox"`), and every result names the browser and version that rendered it — so an agent can check the same screen in a second installed browser before calling it done.
 - **Each launch uses a fresh, throwaway profile** in `~/artisign-browser-profiles/`, removed when the browser closes. It lives under your home directory, not `/tmp`, because a Snap- or Flatpak-packaged Firefox cannot see `/tmp`.
 - **No browser installed** (a bare server or container): both tools fail with the fix in the error message; every other tool works without one. Installing `chromium` or `firefox-esr` from the distribution's packages is enough.
 
-**Register the MCP server.**
+**Privacy.** Artisign collects nothing — no telemetry, no account, no server beyond the local one it runs. These requests reach the network, none of them about you, and that is the complete list: the update check (at most once a day) asks `registry.npmjs.org` for the latest version and sends nothing else; `artisign update` runs `npm`, and the `npx` in your AI tool's entry fetches the pinned version from npm, both talking to the npm registry; `import_html` fetches whatever URL you hand it; and the first render of a project fetches the font families named in your tokens — plus the Material Symbols Rounded icon font, always (a copy shipped with the package is the fallback when that fails) — from Google Fonts, then caches them locally (see [Fonts & icons](#fonts--icons)). Everything else stays on `127.0.0.1`.
 
-Claude Desktop — stdio, add to `claude_desktop_config.json`:
+## Quickstart
+
+`artisign` on its own is `artisign start`. It starts the background process, opens `http://127.0.0.1:<port>/` in your browser once it is healthy — also when it was already running — and, the first time, offers (once, in a terminal and outside CI) to connect the AI tools it finds. Answering no is remembered; `artisign setup` works any time. Pass `--no-open` (or set `ARTISIGN_NO_OPEN=1`) to skip the browser; it is skipped anyway when `CI` is set or stdout is not a terminal, and when no browser can be opened the URL is printed and that is all. `serve`, `mcp`, `status`, `stop` and `init` never open a browser.
+
+Then ask your AI tool for a project. Or do it yourself:
+
+```bash
+artisign init ./my-project    # scaffold an empty project
+artisign start ./my-project   # start (or reuse) the background process with it open
+artisign status               # pid, port, open projects
+```
+
+The remaining commands, for reference — this block is a catalogue, not a sequence:
+
+```bash
+artisign serve ./my-project   # foreground (development); opens the project on start
+artisign stop                 # stop the background process
+artisign help [command]       # also: artisign <command> --help
+```
+
+Artisign is **multi-project**: one process on `127.0.0.1:4711` holds several projects open at once. Open or create projects from the browser UI (project picker in the topbar), or let agents address any project by name or path in the `project` input of each tool call — `list_projects` shows the names. No restart when you switch.
+
+## Advanced
+
+**Connecting an AI tool.** `artisign setup` connects Claude Code, Claude Desktop, Cursor, Codex CLI, VS Code and opencode. For each one it finds, it asks, then writes a user-level entry named `artisign` that runs `npx -y artisign@<version> mcp`, pinned to the version that ran setup; other entries and settings are left untouched. Claude Code is driven through its own `claude mcp` CLI and Codex CLI through `codex mcp add/remove` (it honours `CODEX_HOME`) when those are on your `PATH`; GUI clients (Claude Desktop, Cursor, VS Code) get the `npx` found on your `PATH`, as an absolute path, because they do not inherit your shell's. A config file that holds comments or trailing commas is never rewritten — setup prints the entry to add by hand instead — and a symlinked config is written through. `--yes` connects every tool found without asking (the only way to run without a terminal); `artisign setup --remove` removes exactly the `artisign` entries. Run it again after an update to re-pin (`artisign update` does so for you). Quit and reopen the AI tool after setup, so it picks up the entry.
+
+**Manual entry.** If you don't run setup, add the same stdio server to your AI tool by hand, pinned to the version you installed (`artisign --version`). A terminal client (Claude Code, Codex CLI, opencode) can use plain `npx`:
+
+```bash
+claude mcp add --scope user --transport stdio artisign -- npx -y artisign@<version> mcp
+```
+
+A GUI client (Claude Desktop, Cursor, VS Code) does not inherit your shell's `PATH`, so give it the absolute path of your `npx` (`which npx`) and a `PATH` that starts with its directory — this is what setup writes. For Claude Desktop, in `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
 
 ```json
 {
   "mcpServers": {
     "artisign": {
-      "command": "npx",
-      "args": ["artisign", "mcp"]
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "artisign@<version>", "mcp"],
+      "env": { "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" }
     }
   }
 }
 ```
 
-Claude Code — stdio:
+Replace `/opt/homebrew/bin` with the directory `which npx` shows. Quit and reopen the client afterwards.
 
-```bash
-claude mcp add artisign -- npx artisign mcp
-```
+`artisign mcp` is a stdio bridge: it forwards every MCP message to the running background process and starts it if it is not running, so it is the same backend whichever client connects. It takes no project directory — the project is named in each tool call.
 
-Recommended — against the running daemon (`npx artisign start`), streamable HTTP instead of spawning a second process. Bake the project into the URL, one stable entry per coding project:
+**State and ports.** The port comes from `~/.artisign/config.json` or `--port N` on `start` and `serve` (a `settings.port` in a project's `artisign.json` is deprecated and ignored). Daemon-level state — that config plus the `daemon.lock` holding the running pid and port — lives in `~/.artisign`. Set `ARTISIGN_HOME` to move it somewhere else; that, together with `--port`, is what lets a second daemon run fully isolated from the first, which is worth doing before you try anything destructive against projects you care about.
 
-```bash
-claude mcp add --transport http artisign "http://127.0.0.1:4711/mcp?project=/absolute/path/to/my-project"
-```
-
-The `?project=` parameter scopes every tool call to that project (auto-opening it on first use), so several coding projects can share one daemon without ever restarting it. Without the parameter, calls go to the project currently active in the browser UI. `init_project` works even while no project is open.
-
-**Privacy.** Artisign collects nothing — no telemetry, no account, no server beyond the local one it runs, no update check. Two things reach the network, neither of them about you: `import_html` fetches whatever URL you hand it, and the first render of a project fetches the font families named in your tokens — plus the Material Symbols Rounded icon font, always — from Google Fonts, then caches them locally (see [Fonts & icons](#fonts--icons)).
-
-## Quickstart
-
-First run, in this order:
-
-```bash
-npx artisign init ./my-project    # scaffold an empty project
-npx artisign start ./my-project   # start the daemon in the background and open the preview in the browser
-npx artisign status               # pid, port, open projects
-```
-
-`npx artisign` on its own is `npx artisign start`, and takes the same arguments (`npx artisign --port 4800 ./my-project`). `start` opens `http://127.0.0.1:<port>/` in your default browser once the daemon is healthy — also when it was already running. Pass `--no-open` (or set `ARTISIGN_NO_OPEN=1`) to skip that; it is skipped anyway when `CI` is set or stdout is not a terminal, and when no browser can be opened the URL is printed and that is all. `serve`, `mcp`, `status`, `stop` and `init` never open a browser.
-
-`start` also checks the npm registry for a newer `artisign` at most once a day and prints one line when there is one (`New version x.y.z — run artisign update`); that single request to `registry.npmjs.org` is the only thing sent, and nothing is updated automatically. Set `ARTISIGN_NO_UPDATE_CHECK=1` to turn it off; it is skipped anyway when `CI` is set or stdout is not a terminal.
-
-The remaining commands, for reference — this block is a catalogue, not a sequence:
-
-```bash
-npx artisign serve ./my-project   # foreground daemon (development); opens the project on start
-npx artisign mcp                  # stdio bridge to the daemon for Claude Desktop / Claude Code
-npx artisign stop                 # stop the daemon
-```
-
-`artisign --help` lists the flags each command accepts.
-
-The daemon is **multi-project**: it runs permanently on `127.0.0.1:4711` and can hold several projects open at once. Open or create projects from the browser UI (project picker in the topbar), or let agents address any project by name or path in the `project` input of each tool call — no restart when you switch projects. The port comes from `~/.artisign/config.json` or `--port N` on `start` and `serve` (a `settings.port` in a project's `artisign.json` is deprecated and ignored).
-
-Daemon-level state — that config plus the `daemon.lock` holding the running pid and port — lives in `~/.artisign`. Set `ARTISIGN_HOME` to move it somewhere else; that, together with `--port`, is what lets a second daemon run fully isolated from the first, which is worth doing before you try anything destructive against projects you care about.
+**Just trying it.** `npx artisign` runs it once without installing.
 
 ## The 25 tools
 
@@ -188,7 +186,7 @@ Everything is human-readable and diffable. With `autoCommit` on (the `init` defa
 
 Served at `http://127.0.0.1:<port>` once the daemon is running — plain ES modules, no build step:
 
-- **Project picker** — switch between open projects in the topbar; open an existing folder or create a new project through an in-app folder browser (no restart needed). With nothing open, an empty state offers both actions plus recent projects.
+- **Project picker** — switch between open projects in the topbar; open an existing folder or create a new project through an in-app folder browser, which can also make a new folder (no restart needed). With nothing open, an empty state offers both actions, recent projects, and a ready-made prompt for your AI tool ("Create an Artisign project in ~/work/acme").
 - **Screens** — sidebar screen tree, rendered source (preview = output, by construction). Variants nest under their parent with a kind icon (state, overlay, step) and tag chips; expand state is kept per browser, and pinning a group row pins its whole subtree
 - **Variant context** — a screen that is a variant, or has variants, shows a breadcrumb above the canvas and a variant tree map beside it; the inspector lists the flow sources a screen is "Also reached from"
 - **Compare** — `Single | Compare · N` in the screen view puts the family's main screen (the locked reference) and 1–3 of its variants side by side in 2–4 columns, with a diff overlay marking nodes added, changed and removed against the reference. Nodes are matched by authored `id` only; below 25 % shared authored ids that column shows no diff, only a banner saying the diff is unavailable
@@ -204,7 +202,7 @@ Served at `http://127.0.0.1:<port>` once the daemon is running — plain ES modu
 
 ## Deterministic render baseline
 
-Every rendered surface — screens pane, Design System variants, and (later) `get_screenshot` — wraps the rendered fragment in the same small baseline document, so what an agent designs is what renders everywhere, pixel for pixel. The guarantee: `box-sizing: border-box` on every element, zero `body` margin, antialiased text. A screen root declared `width: 390px` with padding measures exactly 390px — no implicit UA margin or box-model surprise to account for.
+Every rendered surface — screens pane, Design System variants, and `get_screenshot` — wraps the rendered fragment in the same small baseline document, so what an agent designs is what renders everywhere, pixel for pixel. The guarantee: `box-sizing: border-box` on every element, zero `body` margin, antialiased text. A screen root declared `width: 390px` with padding measures exactly 390px — no implicit UA margin or box-model surprise to account for.
 
 ## Fonts & icons
 
@@ -232,13 +230,13 @@ The reference stays portable in the source file. At render time it resolves two 
 ## Repo structure
 
 ```
-src/cli/            CLI entry point — init, start, stop, status, serve, mcp
+src/cli/            CLI entry point — init, start, stop, status, serve, mcp, setup, update, help
 src/daemon/          daemon lifecycle — project registry, global config/lock (~/.artisign)
 src/init/            project scaffolding (init) and artisign.json
 src/store/           Store interface, FsStore, watcher, atomic writes, git auto-commit
 src/model/           HTML parser, canonical ref model, index
 src/tools/           the 25 tools (reads, writes, lifecycle, comments, visual review)
-src/mcp/             MCP server — stdio + streamable HTTP
+src/mcp/             MCP server (streamable HTTP) and the stdio bridge to it
 src/http/            internal JSON API + SSE, consumed by the preview
 src/preview/         browser preview — plain ES modules, no build step
 design/              the tool's own UI, designed with the tool (see below)
@@ -260,7 +258,7 @@ counterpart at all stay literal rather than implying a binding that does not exi
 the same way as any other project:
 
 ```bash
-npx artisign serve design
+artisign serve design
 ```
 
 That makes it the largest worked example in the repo, and the honest answer to whether the

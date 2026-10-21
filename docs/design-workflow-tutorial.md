@@ -21,6 +21,20 @@ a note list, a note editor, and settings.
 
 ---
 
+## Setup
+
+```bash
+npm install -g artisign
+artisign
+```
+
+Then ask your AI tool to create or open a project — *"Create an Artisign project
+in ~/work/acme"*. The first `artisign` run offers to connect your AI tool; update
+later with `artisign update`. Install details, troubleshooting and manual MCP
+setup are in the [README](../README.md#install).
+
+---
+
 ## 1. Why design-system-first
 
 Artisign stores screens as augmented HTML in plain files. Nothing stops you

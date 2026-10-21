@@ -178,6 +178,13 @@ describe("dispatch: help and version", () => {
     expect(err).toEqual(["Unknown command: bogus", "Run `artisign help` for usage."]);
   });
 
+  it("--help after an unknown command is the same one-line error, exit 1", async () => {
+    const { deps, out, err } = fakeDeps();
+    expect(await dispatch(["bogus", "--help"], ENTRY, deps)).toBe(1);
+    expect(out).toEqual([]);
+    expect(err).toEqual(["Unknown command: bogus", "Run `artisign help` for usage."]);
+  });
+
   it("--version and -v print the version from package.json and exit 0", async () => {
     const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
     for (const flag of ["--version", "-v"]) {

@@ -49,7 +49,9 @@ The rest of this tutorial is that principle applied in order.
 
 ## 2. Phase 0 — Know before you design
 
-Every session, before any write:
+Every session, before any write. Start with `list_projects` — every tool below
+takes the `project` it returns (a name, or an absolute path); a brand-new
+project starts with `init_project`, whose `dir` you ask the user for:
 
 ```text
 get_project                 → screens, counts, design-system pointer (summary)

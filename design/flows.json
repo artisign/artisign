@@ -148,5 +148,11 @@
     "event": "tap",
     "to": "open-project-dialog-new-folder",
     "to_kind": "screen"
+  },
+  {
+    "from": "shell-empty-project.screens-collapse",
+    "event": "tap",
+    "to": "sidebars-collapsed",
+    "to_kind": "screen"
   }
 ]

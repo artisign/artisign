@@ -42,10 +42,24 @@ export type RestartResult = "unchanged" | "restarted" | "failed";
 export async function restartStaleDaemon(
   cliEntry: string,
   version: string,
-  deps: RestartDeps = { daemon: runningDaemonInfo, stop: runStop, stillRunning: async () => (await findRunningDaemon()) !== undefined, start: runStart },
+  deps: RestartDeps = defaultRestartDeps,
 ): Promise<RestartResult> {
   const daemon = await deps.daemon();
   if (!daemon || (daemon.version !== undefined && !isNewer(version, daemon.version))) return "unchanged";
+  return restartDaemon(cliEntry, deps);
+}
+
+const defaultRestartDeps: RestartDeps = {
+  daemon: runningDaemonInfo,
+  stop: runStop,
+  stillRunning: async () => (await findRunningDaemon()) !== undefined,
+  start: runStart,
+};
+
+/** Restarts the running daemon whatever it reports, keeping its port and open projects. A daemon that is not running stays stopped. */
+export async function restartDaemon(cliEntry: string, deps: RestartDeps = defaultRestartDeps): Promise<RestartResult> {
+  const daemon = await deps.daemon();
+  if (!daemon) return "unchanged";
   await deps.stop();
   if (await deps.stillRunning()) return "failed";
   await deps.start({ port: daemon.port, projects: daemon.projects, cliEntry, noOpen: true });

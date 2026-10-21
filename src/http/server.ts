@@ -188,6 +188,12 @@ export type HttpServer = {
 };
 
 /**
+ * The version this process started with. Read once: `npm install -g` overwrites package.json while an old daemon keeps
+ * running its old code, and `/health` must not claim the new version for it (`update` and `setup` compare against it).
+ */
+const STARTED_VERSION = readVersion();
+
+/**
  * Routes every request. `/health`, `/api/projects*`, `/api/fs/dirs`, and the
  * static preview files (including `/`) work with zero projects open — the
  * daemon itself, the project registry, and the empty-state UI don't depend
@@ -205,7 +211,7 @@ export function createServer(registry: ProjectRegistry): HttpServer {
   const server = createHttpServer((req, res) => {
     if (req.method === "GET" && req.url === "/health") {
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ status: "ok", version: readVersion() }));
+      res.end(JSON.stringify({ status: "ok", version: STARTED_VERSION }));
       return;
     }
 

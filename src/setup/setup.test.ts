@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defaultClientEnv, CLIENTS, claudeDesktop, type ClientEnv } from "./clients.js";
 import { connectClients } from "./connect.js";
-import { runSetup, restartStaleDaemon, type SetupDeps } from "../cli/setup.js";
+import { runSetup, restartStaleDaemon, restartDaemon, type SetupDeps } from "../cli/setup.js";
 
 let root: string;
 let home: string;
@@ -171,6 +171,18 @@ describe("setup: restarting a stale daemon", () => {
       expect(await restartStaleDaemon("e", "2.0.0", d)).toBe("unchanged");
       expect(calls).toEqual([]);
     }
+  });
+
+  it("restartDaemon restarts a daemon that claims to be current, on its port with its projects", async () => {
+    const { calls, deps: d } = make({ version: "2.0.0", port: 4801, projects: ["/a"] });
+    expect(await restartDaemon("e", d)).toBe("restarted");
+    expect(calls).toEqual(["stop", "start :4801 /a noOpen=true"]);
+  });
+
+  it("restartDaemon leaves a daemon that is not running stopped", async () => {
+    const { calls, deps: d } = make(undefined);
+    expect(await restartDaemon("e", d)).toBe("unchanged");
+    expect(calls).toEqual([]);
   });
 
   it("reports failure, and does not start a second daemon, when the old one would not stop", async () => {

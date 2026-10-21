@@ -8,7 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- `artisign setup` also connects Cursor (`~/.cursor/mcp.json`) Codex CLI (`~/.codex/config.toml`), and VS Code (user-profile `mcp.json`). (CHR-836, CHR-837, CHR-838)
+- `artisign setup` also connects Cursor (`~/.cursor/mcp.json`) Codex CLI (`~/.codex/config.toml`), VS Code (user-profile `mcp.json`) and
+  opencode (`~/.config/opencode/opencode.json`). (CHR-836, CHR-837, CHR-838, CHR-839)
 
 - `artisign` (and `artisign start`) offers once, in a terminal and outside CI, to connect the AI tools it finds when
   none of them has an `artisign` entry yet. Answering no is remembered (`setupDeclined` in

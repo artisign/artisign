@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { defaultClientEnv, cursor, codex, vscode, type Client, type ClientEnv } from "./clients.js";
+import { defaultClientEnv, cursor, codex, vscode, opencode, type Client, type ClientEnv } from "./clients.js";
 import { connectClients, disconnectClients } from "./connect.js";
 
 let root: string;
@@ -129,5 +129,28 @@ describe("VS Code", () => {
 
   it("uses ~/.config/Code/User on Linux", async () => {
     await expectContract(vscode, join(home, ".config", "Code", "User", "mcp.json"), "servers", "linux");
+  });
+});
+
+describe("opencode", () => {
+  const dir = (): string => join(home, ".config", "opencode");
+
+  it("is detected by its config directory or a binary on PATH", async () => {
+    expect((await opencode.detect(env())).found).toBe(false);
+    await mkdir(dir(), { recursive: true });
+    expect((await opencode.detect(env())).found).toBe(true);
+  });
+
+  it("writes a local entry with the command as an array and keeps the rest", async () => {
+    await expectContract(opencode, join(dir(), "opencode.json"), "mcp");
+    await connectClients({ version: "5.0.0", env: env(), clients: [opencode] });
+    const entry = ((await readJson(join(dir(), "opencode.json"))).mcp as Record<string, unknown>).artisign;
+    expect(entry).toEqual({ type: "local", command: ["npx", "-y", "artisign@5.0.0", "mcp"], enabled: true });
+  });
+
+  it("edits opencode.jsonc when that is the only config file", async () => {
+    await writeAt(join(dir(), "opencode.jsonc"), "{}");
+    await connectClients({ version: "5.0.0", env: env(), clients: [opencode] });
+    expect(JSON.stringify(await readJson(join(dir(), "opencode.jsonc")))).toContain("artisign@5.0.0");
   });
 });

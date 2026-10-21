@@ -314,4 +314,27 @@ export const vscode: Client = {
   },
 };
 
-export const CLIENTS: Client[] = [claudeCode, claudeDesktop, cursor, codex, vscode];
+/** opencode keeps its global config in `opencode.json`, or `opencode.jsonc` when only that exists. */
+async function opencodeConfigPath(env: ClientEnv): Promise<string> {
+  const dir = join(env.home, ".config", "opencode");
+  const jsonc = join(dir, "opencode.jsonc");
+  return !(await exists(join(dir, "opencode.json"))) && (await exists(jsonc)) ? jsonc : join(dir, "opencode.json");
+}
+
+/** opencode: `~/.config/opencode/opencode.json`, key `mcp`, `{type: "local", command: [...], enabled}`; a terminal tool, so plain `npx`. */
+export const opencode: Client = {
+  name: "opencode",
+  async detect(env) {
+    const found = (await exists(join(env.home, ".config", "opencode"))) || (await findOnPath("opencode", env.pathEnv)) !== undefined;
+    return { found, hasEntry: found && (await hasServerEntry(await opencodeConfigPath(env), "mcp")) };
+  },
+  async write(env, version) {
+    await editServers(await opencodeConfigPath(env), { type: "local", command: ["npx", ...npxArgs(version)], enabled: true }, "mcp");
+  },
+  async remove(env) {
+    const path = await opencodeConfigPath(env);
+    if (await exists(path)) await editServers(path, undefined, "mcp");
+  },
+};
+
+export const CLIENTS: Client[] = [claudeCode, claudeDesktop, cursor, codex, vscode, opencode];

@@ -392,7 +392,7 @@ export const TOOLS: ToolDefinition[] = [
   // Lifecycle ---------------------------------------------------------------
   tool(
     "init_project",
-    "Scaffold a project directory: empty, from HTML, or from a Stitch export URL. Returns `project`, the name to pass in later calls. If the user has not named a location, ask them for it — do not pick a directory yourself.",
+    "Scaffold a project directory: empty, from HTML, or from a Stitch export URL. Returns `project`, the name to pass in later calls (the root when the name is taken). If the user has not named a location, ask them for it — do not pick a directory yourself.",
     {
       dir: z.string(),
       name: z.string().optional(),

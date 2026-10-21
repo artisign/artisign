@@ -354,6 +354,7 @@ function enterCompare() {
   if (!currentScreen) return;
   if (activeMode !== "none") setMode(activeMode);
   pauseFollow(); // a navigation that leaves the family would end the comparison
+  expandInspectorPanel(); // the compare panel replaces Elements in the inspector (CHR-888)
   compare.enter(currentScreen);
 }
 
@@ -1758,16 +1759,18 @@ function refitActivePane() {
  * Wires a collapsible side panel: applies the persisted collapse state up
  * front, then toggles + persists + re-fits the canvas on every click. The
  * DOM (`panelEl.dataset.collapsed`) is the single source of truth — no
- * parallel module-level boolean to keep in sync.
+ * parallel module-level boolean to keep in sync. `defaultCollapsed` applies
+ * only while nothing is stored (CHR-888: Context and Elements start collapsed).
+ * Returns `expand`, for a mode whose output lives in this panel — it opens
+ * the panel the same way a click on the chevron would.
  */
-function setupSidePanel(panelEl, collapseBtn, prefKey) {
+function setupSidePanel(panelEl, collapseBtn, prefKey, defaultCollapsed = false) {
   function apply(collapsed) {
     panelEl.dataset.collapsed = String(collapsed);
     collapseBtn.setAttribute("aria-expanded", String(!collapsed));
   }
-  apply(readBoolPref(prefsStorage, prefKey, false));
-  collapseBtn.addEventListener("click", () => {
-    const collapsed = panelEl.dataset.collapsed !== "true";
+  apply(readBoolPref(prefsStorage, prefKey, defaultCollapsed));
+  function set(collapsed) {
     apply(collapsed);
     writeBoolPref(prefsStorage, prefKey, collapsed);
     // The Screens/Context panels stay visible over the mockup view too
@@ -1775,12 +1778,16 @@ function setupSidePanel(panelEl, collapseBtn, prefKey) {
     // changes #mockup-view's available width just as much as the canvas's,
     // so this must re-fit whichever is active.
     refitActivePane();
-  });
+  }
+  collapseBtn.addEventListener("click", () => set(panelEl.dataset.collapsed !== "true"));
+  return function expand() {
+    if (panelEl.dataset.collapsed === "true") set(false);
+  };
 }
 
 setupSidePanel(sidebarScreensEl, sidebarScreensCollapseBtn, "artisign.sidebar-screens.collapsed");
-setupSidePanel(sidebarContextEl, sidebarContextCollapseBtn, "artisign.sidebar-context.collapsed");
-setupSidePanel(inspectorEl, inspectorCollapseBtn, "artisign.inspector.collapsed");
+const expandContextPanel = setupSidePanel(sidebarContextEl, sidebarContextCollapseBtn, "artisign.sidebar-context.collapsed", true);
+const expandInspectorPanel = setupSidePanel(inspectorEl, inspectorCollapseBtn, "artisign.inspector.collapsed", true);
 
 zoom = parseZoomPref(readStringPref(prefsStorage, "artisign.zoom", null), zoom);
 mockupZoom = parseZoomPref(readStringPref(prefsStorage, "artisign.mockupZoom", null), mockupZoom);
@@ -1900,6 +1907,9 @@ function setMode(next) {
   if (activeMode === "inspect" && resulting !== "inspect") clearInspectFocus();
   // ADR-005 pause rule 1 — an open comment or inspect mode pauses follow.
   if (resulting === "comment" || resulting === "inspect") pauseFollow();
+  // CHR-888 — both panels start collapsed; a mode whose output lands in one opens it.
+  if (resulting === "comment") expandContextPanel();
+  if (resulting === "inspect") expandInspectorPanel();
   activeMode = resulting;
   flowModeToggle.setAttribute("aria-pressed", String(activeMode === "flow"));
   commentModeToggle.setAttribute("aria-pressed", String(activeMode === "comment"));

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// CHR-890 — the how-to-start guide inside the empty #screen-holder frame:
+// CHR-890 — the how-to-start guide on the bare canvas (no frame):
 // shown while the project has no screens, names the active project, and
 // switches with the screen list live.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -67,7 +67,9 @@ describe("empty-project guide", () => {
     expect($("#empty-state")).toBeNull();
     expect($("#empty-guide").hidden).toBe(false);
     expect($("#screen-frame").hidden).toBe(true);
-    expect($("#screen-holder").contains($("#empty-guide"))).toBe(true);
+    expect($("#canvas").contains($("#empty-guide"))).toBe(true);
+    expect($("#screen-holder").contains($("#empty-guide"))).toBe(false); // not zoomed with the frame
+    expect($("#screen-holder").hidden).toBe(true);
     expect($("#empty-guide-prompt").textContent).toBe("Design a login screen in my Artisign project delete-me");
   });
 
@@ -79,6 +81,7 @@ describe("empty-project guide", () => {
     await flush();
     expect($("#empty-guide").hidden).toBe(true);
     expect($("#screen-frame").hidden).toBe(false);
+    expect($("#screen-holder").hidden).toBe(false);
     expect($("#screen-list li[data-screen=\"one\"] button.screen-item").getAttribute("aria-current")).toBe("true"); // the new screen is selected and rendered
     screens = [];
     emit({ type: "change", kind: "screen", name: "one" });

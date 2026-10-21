@@ -1546,16 +1546,16 @@ async function loadScreens() {
   refreshSidebar();
   const empty = screens.length === 0;
   emptyGuideEl.hidden = !empty;
+  screenHolderEl.hidden = empty; // no white frame while the guide shows on the bare canvas
   screenFrame.hidden = empty;
   if (empty) {
-    // The last screen is gone: drop its document so the frame falls back to the default size the guide is laid out for.
+    // The last screen is gone: drop its document, so the stale one neither lingers nor sizes the next frame.
     if (iframeRenderedScreen !== null) {
       screenFrame.srcdoc = "";
       iframeRenderedScreen = null;
     }
     currentScreen = null; // a later first screen must be picked up as a fresh selection (handleChangeEvent)
     syncGuidePrompt();
-    updateCanvas();
   }
 }
 

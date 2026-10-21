@@ -1393,16 +1393,16 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   display: none;
 }
 
-/* CHR-890 — the how-to-start guide fills the empty #screen-holder frame: header pinned top, steps anchored bottom. Sized for the 390x844 default frame at scale 1 (the holder's zoom scales it). */
+/* CHR-890 — the how-to-start guide sits on the bare canvas while the project has no screens: native size, centred, outside the zoomed #screen-holder (which is hidden then). */
 #empty-guide {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 480px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 32px;
-  padding: 48px 32px 44px;
-  color: var(--color-text);
+  gap: var(--space-2xl);
 }
 
 #empty-guide[hidden] {
@@ -1415,18 +1415,22 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   margin: 0;
 }
 
+#empty-guide-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
 #empty-guide-label {
-  font-size: 18px;
+  font-size: 0.7rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--color-text-label);
-  margin-bottom: 14px;
 }
 
 #empty-guide-title {
-  font-size: 40px;
+  font-size: 1.1rem;
   font-weight: 600;
-  line-height: 1.15;
 }
 
 #empty-guide-steps {
@@ -1434,61 +1438,63 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: var(--space-xl);
 }
 
 #empty-guide-steps li {
   display: flex;
-  gap: 16px;
+  gap: var(--space-lg);
   align-items: flex-start;
 }
 
 .empty-guide-num {
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 22px;
+  height: 22px;
   border-radius: var(--radius-pill);
   background: var(--color-accent-subtle);
   color: var(--color-accent);
   font-weight: 600;
-  font-size: 22px;
+  font-size: 0.78rem;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.empty-guide-text {
+.empty-guide-body {
   flex: 1;
-  font-size: 24px;
-  line-height: 1.35;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.empty-guide-text {
+  font-size: 0.85rem;
+  line-height: 22px;
   color: var(--color-text-secondary);
-  padding-top: var(--space-xs);
 }
 
 #empty-guide-prompt-box {
-  margin-top: 18px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 14px;
-  padding: 16px 18px;
-  background: var(--color-surface-subtle);
-  border: 1px solid var(--color-border);
+  align-items: center;
+  gap: var(--space-xl);
+  padding: var(--space-lg) var(--space-xl);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
 }
 
 #empty-guide-prompt {
-  align-self: stretch;
+  flex: 1;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 20px;
-  line-height: 1.45;
+  font-size: 0.8rem;
   color: var(--color-text-secondary);
 }
 
 #empty-guide-copy {
   flex: none;
-  padding: 7px 16px;
-  font-size: 18px;
+  padding: var(--space-xs) var(--space-lg);
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--color-text-secondary);
   background: var(--color-surface);

@@ -1216,7 +1216,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   flex-direction: column;
 }
 
-/* CHR-732 — the breadcrumb bar sits above the canvas; the stage keeps the old canvas row (canvas + the variant tree map; the empty-project guide lives inside #screen-holder, CHR-890). */
+/* CHR-732 — the breadcrumb bar sits above the canvas; the stage keeps the old canvas row (canvas + the variant tree map; the empty-project guide sits centred on #canvas, CHR-890). */
 #screens-stage {
   flex: 1;
   min-height: 0;

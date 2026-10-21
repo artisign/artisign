@@ -224,12 +224,15 @@ export class ProjectRegistry {
 
   /**
    * Every project the daemon ever opened or created (`knownProjects` in the
-   * global config), open or not. A root whose `artisign.json` is gone or
+   * global config plus the older `recentProjects`), open or not. A root whose `artisign.json` is gone or
    * unreadable is left out but stays in the config, so a remounted folder
    * reappears. An open project reports its live cached name.
    */
   async listKnown(): Promise<{ name: string; root: string; open: boolean }[]> {
-    const roots = (await readGlobalConfig()).knownProjects ?? [];
+    const config = await readGlobalConfig();
+    // `recentProjects` predates `knownProjects`; folding it in keeps the
+    // list populated for configs written before the upgrade.
+    const roots = [...new Set([...(config.knownProjects ?? []), ...(config.recentProjects ?? [])])];
     const entries = await Promise.all(
       roots.map(async (root) => {
         const open = this.findEntry(root);

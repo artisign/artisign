@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { initProject } from "../init/init-project.js";
 import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
 import { ProjectRegistry } from "./project-registry.js";
-import { readGlobalConfig } from "./global-config.js";
+import { readGlobalConfig, writeGlobalConfig } from "./global-config.js";
 import { FsStore } from "../store/index.js";
 import { ensureFontsCached, isMaterialSymbolsAvailable, __setFetchForTests, __resetFontMemoForTests } from "../model/fonts.js";
 
@@ -307,6 +307,17 @@ describe("ProjectRegistry", () => {
 
     await initProject(dirB);
     expect((await registry.listKnown()).map((p) => p.root)).toEqual([dirA, dirB]);
+  });
+
+  it("listKnown() includes recentProjects from a config that predates knownProjects", async () => {
+    const dirA = await makeProject();
+    const dirB = await makeProject();
+    await writeGlobalConfig({ recentProjects: [dirA, dirB] });
+
+    expect((await registry.listKnown()).map((p) => [p.root, p.open])).toEqual([
+      [dirA, false],
+      [dirB, false],
+    ]);
   });
 
   it("listKnown() is empty on a fresh home", async () => {

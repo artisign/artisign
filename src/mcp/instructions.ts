@@ -6,6 +6,10 @@
  */
 export const INSTRUCTIONS = `Artisign — augmentation grammar for screen HTML (html_aug).
 
+PROJECT: start with list_projects. Every tool but init_project/get_guide takes
+a required "project" (its name, or an absolute path). init_project returns it;
+ask the user where a new project goes.
+
 WORKFLOW: tokens -> components -> screens; inline values only while exploring
 screen one of a direction, promoted before screen two; second occurrence of a
 value/pattern gets promoted, named by role. One write, one look
@@ -56,9 +60,6 @@ once instead of duplicated into each one's own notes; get_project/get_screen
 surface it as tag_notes. All notes/idea/decisions/usage bodies render as
 Markdown in the preview. Find screens or mockups by tag via get_project
 {tags: [...]}.
-
-PROJECTS: list_projects -> {name, root, open} per known project. init_project
-returns "project" (the name for later calls); ask the user where it goes.
 
 LIFECYCLE: write_html kind:"component"|"pattern" writes a definition
 (default variant + <template data-variant> siblings). delete_entity

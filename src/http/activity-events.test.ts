@@ -15,7 +15,8 @@ type JsonRpcResponse = {
 
 async function mcpCall(port: number, project: string, body: unknown): Promise<{ status: number; json: JsonRpcResponse }> {
   const url = new URL(`http://127.0.0.1:${port}/mcp`);
-  url.searchParams.set("project", project);
+  const call = body as { params: { arguments: Record<string, unknown> } };
+  call.params.arguments = { project, ...call.params.arguments };
   const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },

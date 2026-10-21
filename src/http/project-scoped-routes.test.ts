@@ -15,7 +15,9 @@ type JsonRpcResponse = {
 
 async function mcpCall(port: number, project: string | undefined, body: unknown): Promise<{ status: number; json: JsonRpcResponse }> {
   const url = new URL(`http://127.0.0.1:${port}/mcp`);
-  if (project !== undefined) url.searchParams.set("project", project);
+  // The project is named per tool call (CHR-832); `?project=` is rejected.
+  const call = body as { params: { arguments: Record<string, unknown> } };
+  if (project !== undefined) call.params.arguments = { project, ...call.params.arguments };
   const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
@@ -94,7 +96,7 @@ describe("project-scoped /mcp and UI routes", () => {
     await rm(dirB, { recursive: true, force: true });
   });
 
-  it("/mcp?project=A and /mcp?project=B run in parallel with independent results", async () => {
+  it("/mcp calls naming project A and project B run in parallel with independent results", async () => {
     daemon = await startDaemon({ port: 0, projects: [dirA, dirB] });
 
     const [resA, resB] = await Promise.all([
@@ -112,26 +114,92 @@ describe("project-scoped /mcp and UI routes", () => {
     expect(screensB).toEqual(["dashboard"]);
   });
 
-  it("/mcp?project=<invalid path> returns a JSON-RPC error naming the path, not a bare 500", async () => {
+  it("a project path that is not a project returns a tool error naming the path, not a bare 500", async () => {
     daemon = await startDaemon({ port: 0, projects: [dirA] });
     const badPath = join(tmpdir(), "artisign-scope-not-a-project");
 
     const { status, json } = await mcpCall(daemon.port, badPath, toolCallBody("get_project"));
 
     expect(status).not.toBe(500);
-    expect(json.jsonrpc).toBe("2.0");
-    expect(json.error).toBeDefined();
-    expect(json.error!.message).toContain(badPath);
+    const body = JSON.parse(json.result!.content[0]!.text) as { code: string; message: string };
+    expect(body.code).toBe("not_found");
+    expect(body.message).toContain(badPath);
   });
 
-  it("/mcp without ?project= falls back to the active project", async () => {
+  it("a project name resolves a known project, open or not", async () => {
+    daemon = await startDaemon({ port: 0, projects: [dirA] });
+    await new FsStore(dirB).writeArtisignConfig({ ...(await new FsStore(dirB).readArtisignConfig()), name: "beta" });
+    await daemon.registry.open(dirB);
+    await daemon.registry.close(dirB);
+
+    const { json } = await mcpCall(daemon.port, "beta", toolCallBody("get_project", { view: "tree" }));
+
+    const body = JSON.parse(json.result!.content[0]!.text) as { screens: Array<{ screen: string }> };
+    expect(body.screens.map((s) => s.screen)).toEqual(["dashboard"]);
+  });
+
+  it("a missing project never falls back to the active project and points to list_projects", async () => {
     daemon = await startDaemon({ port: 0, projects: [dirA] });
 
-    const { status, json } = await mcpCall(daemon.port, undefined, toolCallBody("get_project", { view: "tree" }));
+    const { json } = await mcpCall(daemon.port, undefined, toolCallBody("get_project", { view: "tree" }));
 
-    expect(status).toBe(200);
+    expect(JSON.stringify(json)).toContain("list_projects");
+    expect(JSON.stringify(json)).not.toContain("home");
+  });
+
+  it("an unknown project name points to list_projects", async () => {
+    daemon = await startDaemon({ port: 0, projects: [dirA] });
+
+    const { json } = await mcpCall(daemon.port, "nope", toolCallBody("get_project"));
+
+    const body = JSON.parse(json.result!.content[0]!.text) as { code: string; message: string };
+    expect(body.code).toBe("not_found");
+    expect(body.message).toContain("list_projects");
+  });
+
+  it("an ambiguous project name lists the candidates' roots; passing a root disambiguates", async () => {
+    for (const dir of [dirA, dirB]) {
+      const store = new FsStore(dir);
+      await store.writeArtisignConfig({ ...(await store.readArtisignConfig()), name: "twin" });
+    }
+    daemon = await startDaemon({ port: 0, projects: [dirA, dirB] });
+
+    const { json } = await mcpCall(daemon.port, "twin", toolCallBody("get_project"));
+    const body = JSON.parse(json.result!.content[0]!.text) as { code: string; message: string };
+    expect(body.code).toBe("validation_failed");
+    expect(body.message).toContain(dirA);
+    expect(body.message).toContain(dirB);
+
+    const byRoot = await mcpCall(daemon.port, dirB, toolCallBody("get_project", { view: "tree" }));
+    const ok = JSON.parse(byRoot.json.result!.content[0]!.text) as { screens: Array<{ screen: string }> };
+    expect(ok.screens.map((s) => s.screen)).toEqual(["dashboard"]);
+  });
+
+  it("a path to a folder that is not open yet opens it", async () => {
+    daemon = await startDaemon({ port: 0, projects: [dirA] });
+
+    const { json } = await mcpCall(daemon.port, dirB, toolCallBody("get_project", { view: "tree" }));
+
     const body = JSON.parse(json.result!.content[0]!.text) as { screens: Array<{ screen: string }> };
-    expect(body.screens.map((s) => s.screen)).toEqual(["home"]);
+    expect(body.screens.map((s) => s.screen)).toEqual(["dashboard"]);
+    expect(daemon.registry.get(dirB)).toBeDefined();
+  });
+
+  it("/mcp rejects the removed ?project= parameter with a JSON-RPC error that names the fix", async () => {
+    daemon = await startDaemon({ port: 0, projects: [dirA] });
+
+    for (const value of [dirA, "", "   "]) {
+      const res = await fetch(`http://127.0.0.1:${daemon.port}/mcp?project=${encodeURIComponent(value)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+        body: JSON.stringify(toolCallBody("list_projects")),
+      });
+      const json = (await res.json()) as JsonRpcResponse;
+      expect(res.status).toBe(400);
+      expect(json.jsonrpc).toBe("2.0");
+      expect(json.error!.message).toContain("removed");
+      expect(json.error!.message).toContain("artisign setup");
+    }
   });
 
   it("?project= on a UI route (/api/screens) returns the right project's screens", async () => {
@@ -188,7 +256,7 @@ describe("project-scoped /mcp and UI routes", () => {
   it("any other tool via /mcp with zero projects open reports a clean error, not a bare 500", async () => {
     daemon = await startDaemon({ port: 0 });
 
-    const { status, json } = await mcpCall(daemon.port, undefined, toolCallBody("get_project", {}));
+    const { status, json } = await mcpCall(daemon.port, "nothing", toolCallBody("get_project", {}));
 
     expect(status).not.toBe(500);
     // The MCP SDK reports a tool-level failure as a successful envelope
@@ -196,8 +264,8 @@ describe("project-scoped /mcp and UI routes", () => {
     // a JSON-RPC-level error — mirroring how every other ToolError already
     // surfaces through mcp/server.ts.
     const body = JSON.parse(json.result!.content[0]!.text) as { code: string; message: string };
-    expect(body.code).toBe("invalid_state");
-    expect(body.message).toContain("init_project");
+    expect(body.code).toBe("not_found");
+    expect(body.message).toContain("list_projects");
   });
 
   it("POST /api/tools/init_project with zero projects open succeeds and registers the project", async () => {
@@ -230,19 +298,6 @@ describe("project-scoped /mcp and UI routes", () => {
     expect(res.status).not.toBe(500);
     const body = (await res.json()) as { code: string };
     expect(body.code).toBe("invalid_state");
-  });
-
-  it("?project= that is empty or whitespace is treated as absent on /mcp", async () => {
-    daemon = await startDaemon({ port: 0, projects: [dirA] });
-
-    const emptyRes = await mcpCall(daemon.port, "", toolCallBody("get_project", { view: "tree" }));
-    const whitespaceRes = await mcpCall(daemon.port, "   ", toolCallBody("get_project", { view: "tree" }));
-
-    for (const res of [emptyRes, whitespaceRes]) {
-      expect(res.status).toBe(200);
-      const body = JSON.parse(res.json.result!.content[0]!.text) as { screens: Array<{ screen: string }> };
-      expect(body.screens.map((s) => s.screen)).toEqual(["home"]);
-    }
   });
 
   it("?project= that is empty or whitespace is treated as absent on a UI route", async () => {

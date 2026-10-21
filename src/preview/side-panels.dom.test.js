@@ -76,4 +76,17 @@ describe("side panel defaults", () => {
     expect(state("inspector")).toBe("false");
     expect(memoryStorage.get("artisign.inspector.collapsed")).toBe("false");
   });
+
+  it("comment mode opens Context, inspect mode opens Elements", async () => {
+    await boot();
+    const comment = document.getElementById("comment-mode-toggle");
+    const inspect = document.getElementById("inspect-mode-toggle");
+    comment.disabled = false;
+    inspect.disabled = false;
+    comment.click();
+    expect([state("sidebar-context"), state("inspector")]).toEqual(["false", "true"]);
+    inspect.click();
+    expect(state("inspector")).toBe("false");
+    expect(memoryStorage.get("artisign.inspector.collapsed")).toBe("false");
+  });
 });

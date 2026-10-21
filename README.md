@@ -55,7 +55,7 @@ Claude Desktop — stdio, add to `claude_desktop_config.json`:
   "mcpServers": {
     "artisign": {
       "command": "npx",
-      "args": ["artisign", "mcp", "/absolute/path/to/my-project"]
+      "args": ["artisign", "mcp"]
     }
   }
 }
@@ -64,7 +64,7 @@ Claude Desktop — stdio, add to `claude_desktop_config.json`:
 Claude Code — stdio:
 
 ```bash
-claude mcp add artisign -- npx artisign mcp /absolute/path/to/my-project
+claude mcp add artisign -- npx artisign mcp
 ```
 
 Recommended — against the running daemon (`npx artisign start`), streamable HTTP instead of spawning a second process. Bake the project into the URL, one stable entry per coding project:
@@ -93,7 +93,7 @@ The remaining commands, for reference — this block is a catalogue, not a seque
 
 ```bash
 npx artisign serve ./my-project   # foreground daemon (development); opens the project on start
-npx artisign mcp ./my-project     # stdio MCP server for Claude Desktop / Claude Code
+npx artisign mcp                  # stdio bridge to the daemon for Claude Desktop / Claude Code
 npx artisign stop                 # stop the daemon
 ```
 
@@ -122,7 +122,7 @@ Daemon-level state — that config plus the `daemon.lock` holding the running pi
 | Writes | `set_flow` | Mutate a flow edge in `flows.json` without touching any screen file. |
 | Writes | `set_meta` | Screen notes/tags and `variant_of`/`variant_kind`, design-system idea/decisions, component/pattern usage, a tag's own notes — the handoff contract. |
 | Writes | `write_mockup` | Create or revise one variant of a mockup — raw HTML, outside the design system. |
-| Writes | `set_board_state` | Read or mutate the Board's shared filter, pinned screens and expanded variant clusters — daemon memory only, not available over stdio. |
+| Writes | `set_board_state` | Read or mutate the Board's shared filter, pinned screens and expanded variant clusters — daemon memory only. |
 | Lifecycle | `init_project` | Scaffold a project directory: empty, from HTML, or from a Stitch export URL. |
 | Lifecycle | `import_html` | Incremental HTML ingest into an existing project, with content-hash dedup. |
 | Lifecycle | `promote_to_system` | Lift an inline value or a repeated element into a token, component, or pattern. |

@@ -1,3 +1,4 @@
+import { readVersion } from "../version.js";
 import { createServer as createHttpServer, type Server, type ServerResponse, type IncomingMessage } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -174,7 +175,7 @@ export function createServer(registry: ProjectRegistry): HttpServer {
   const server = createHttpServer((req, res) => {
     if (req.method === "GET" && req.url === "/health") {
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ status: "ok" }));
+      res.end(JSON.stringify({ status: "ok", version: readVersion() }));
       return;
     }
 

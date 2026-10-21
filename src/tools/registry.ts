@@ -327,8 +327,7 @@ export const TOOLS: ToolDefinition[] = [
       "filter/pinned/expanded plus shown_screens (filter matches ∪ pinned, restricted to screens that currently " +
       "exist). An unknown screen name in an add/set never enters pinned or expanded — it's dropped with a warning, never " +
       "blocking; the known names in the same call still apply, and a set whose names are all unknown changes " +
-      "nothing. Not available over the stdio MCP server " +
-      "(invalid_state) — board state lives in the daemon, which stdio has no connection to.",
+      "nothing. Board state lives in the daemon; without one the tool fails with invalid_state.",
     {
       filter: z.string().nullable().optional(),
       pins: pinsPatchSchema.optional(),

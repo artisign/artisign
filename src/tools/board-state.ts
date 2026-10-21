@@ -74,7 +74,7 @@ export async function setBoardState(store: Store, input: SetBoardStateInput, ctx
     // more closely than it matches init_project's optional-chaining
     // degrade: those tools still do their one real job without ctx, this
     // one has no job left to do without it.
-    throw new ToolError("invalid_state", "set_board_state needs the daemon's board state — not available over the stdio MCP server");
+    throw new ToolError("invalid_state", "set_board_state needs the daemon's board state — not available without a running daemon");
   }
 
   const screenNames = await store.listScreens();

@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING:** `artisign mcp <dir>` is gone. `artisign mcp` is now a stdio bridge to the running daemon: it forwards
+  every MCP message to the daemon's `/mcp` and starts the daemon if none is running, so Claude Desktop (stdio only) gets
+  the same backend as the HTTP route, including `set_board_state` and activity events. The standalone stdio server with
+  its own store is removed; a daemon that stops or restarts mid-session no longer ends the session. Passing a directory
+  now fails with a pointer to `artisign setup`. (CHR-830)
+- `/health` reports the daemon's `version`; the bridge warns on stderr when it differs from its own. (CHR-830)
+- The MCP registry entry in `server.json` launches `artisign mcp` instead of the bare package. (CHR-830)
+
 ## [2.0.0] - 2026-10-13
 
 ### Changed

@@ -1,3 +1,4 @@
+import { readVersion } from "../version.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { createServer as createNetServer, type AddressInfo } from "node:net";
@@ -37,7 +38,7 @@ describe("startDaemon", () => {
 
     const res = await fetch(`http://127.0.0.1:${daemon.port}/health`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: "ok" });
+    expect(await res.json()).toEqual({ status: "ok", version: readVersion() });
   });
 
   it("serves the placeholder preview page on other routes", async () => {

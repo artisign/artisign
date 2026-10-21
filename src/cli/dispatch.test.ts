@@ -117,11 +117,11 @@ describe("dispatch: the other commands never start the browser path", () => {
   it("init, mcp, status and stop are routed to their own commands", async () => {
     const { deps } = fakeDeps();
     await dispatch(["init", "p"], ENTRY, deps);
-    await dispatch(["mcp", "p"], ENTRY, deps);
+    await dispatch(["mcp"], ENTRY, deps);
     await dispatch(["status"], ENTRY, deps);
     await dispatch(["stop"], ENTRY, deps);
     expect(deps.initProject).toHaveBeenCalledWith("p");
-    expect(deps.runMcp).toHaveBeenCalledWith("p");
+    expect(deps.runMcp).toHaveBeenCalledWith(ENTRY);
     expect(deps.runStatus).toHaveBeenCalled();
     expect(deps.runStop).toHaveBeenCalled();
     expect(deps.runStart).not.toHaveBeenCalled();
@@ -185,5 +185,15 @@ describe("dispatch: help and version", () => {
       expect(out).toEqual([pkg.version]);
       expect(deps.runStart).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe("dispatch: mcp", () => {
+  it("mcp <dir> fails with the per-call explanation and a pointer to setup, and runs nothing", async () => {
+    const { deps, err } = fakeDeps();
+    expect(await dispatch(["mcp", "./proj"], ENTRY, deps)).toBe(1);
+    expect(err.join("\n")).toContain("named per tool call");
+    expect(err.join("\n")).toContain("artisign setup");
+    expect(deps.runMcp).not.toHaveBeenCalled();
   });
 });

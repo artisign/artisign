@@ -194,9 +194,11 @@ describe("MCP server — instructions budget", () => {
   // stack — a user-reported failure, and get_screenshot's width (mockups
   // only) actively misleads toward it. Measured at 943 when this was added.
   // The PROJECTS lines (CHR-829) raised it from 950 to 985: with one global
-  // MCP entry an agent must know how to find and name a project.
-  it("stays within the ~985 token cheat-sheet budget (chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(985);
+  // MCP entry an agent must know how to find and name a project. CHR-832
+  // moved that block to the top and made `project` a required input of every
+  // call (no implicit fallback any more): 985 to 995, measured at 992.
+  it("stays within the ~995 token cheat-sheet budget (chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(995);
   });
 });
 

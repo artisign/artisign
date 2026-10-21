@@ -1,8 +1,8 @@
 import { createServer as createHttpServer, type Server, type ServerResponse, type IncomingMessage } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { dirname, extname, resolve, sep } from "node:path";
-import { createMcpHttpHandler } from "../mcp/index.js";
+import { dirname, extname, isAbsolute, resolve, sep } from "node:path";
+import { createMcpHttpHandler, type ProjectResolver } from "../mcp/index.js";
 import { handleToolsApi } from "./tools-api.js";
 import { handlePreviewRoutes } from "./preview-routes.js";
 import { handleCommentsRoutes } from "./comments-routes.js";
@@ -12,7 +12,7 @@ import { handleSseConnection } from "./sse.js";
 import { isAllowedOrigin, hasJsonContentType } from "./origin-guard.js";
 import { sendJson } from "./json.js";
 import type { ProjectRegistry, ProjectHandle } from "../daemon/project-registry.js";
-import type { ViewState, BoardStatePatch, ToolHandlerContext } from "../tools/index.js";
+import { ToolError, type ViewState, type BoardStatePatch, type ToolHandlerContext } from "../tools/index.js";
 
 // This module lives at src/http/server.ts (dev) or dist/http/server.js (build);
 // both are two directories below the package root, next to src/preview.
@@ -59,7 +59,7 @@ function rejectForbidden(res: ServerResponse): void {
   res.end(JSON.stringify({ code: "validation_failed", message: "forbidden: cross-origin request" }));
 }
 
-/** A bare 500 mid-MCP-request looks like a server bug to a JSON-RPC client; this is a well-formed (if id-less, since the request body was never parsed) JSON-RPC error instead — used only for project resolution failures that happen before a transport is even created. -32602 is JSON-RPC 2.0's standard "Invalid params" code, an apt fit for an unresolvable `?project=` path. */
+/** A bare 500 mid-MCP-request looks like a server bug to a JSON-RPC client; this is a well-formed (if id-less, since the request body was never parsed) JSON-RPC error instead — used only for project resolution failures that happen before a transport is even created. -32602 is JSON-RPC 2.0's standard "Invalid params" code, an apt fit for a request carrying the removed `?project=` parameter. */
 function sendMcpError(res: ServerResponse, message: string): void {
   res.writeHead(400, { "content-type": "application/json" });
   res.end(JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32602, message } }));
@@ -105,35 +105,64 @@ function normalizeProjectParam(url: URL): string | undefined {
 }
 
 /**
- * Resolves `?project=<path>` against the registry, auto-opening it if it
- * isn't already open — MCP clients (agents) are trusted callers, unlike the
- * browser UI (see `resolveUiProject` below), so an unopened-but-valid path
- * just works. Falls back to the active project when the param is absent.
+ * Resolves a tool call's `project` input against the registry: an absolute
+ * path opens that folder if it isn't open yet (MCP clients are trusted
+ * callers, unlike the browser UI — see `resolveUiProject` below); anything
+ * else is a known project's name. There is deliberately no fallback to the
+ * active project — that slot belongs to the preview UI.
+ */
+function createMcpProjectResolver(registry: ProjectRegistry): ProjectResolver {
+  return async (project) => {
+    const requested = project?.trim();
+    if (!requested) throw new ToolError("validation_failed", "project is required — call list_projects");
+
+    let handle: ProjectHandle | undefined;
+    if (isAbsolute(requested)) {
+      try {
+        handle = registry.get(requested) ?? (await registry.open(requested));
+      } catch (err) {
+        throw new ToolError("not_found", err instanceof Error ? err.message : String(err));
+      }
+    } else {
+      const matches = (await registry.listKnown()).filter((p) => p.name === requested);
+      if (matches.length === 0) {
+        throw new ToolError("not_found", `unknown project "${requested}" — call list_projects, or pass an absolute path`);
+      }
+      if (matches.length > 1) {
+        throw new ToolError(
+          "validation_failed",
+          `project name "${requested}" is ambiguous — pass the root instead: ${matches.map((p) => p.root).join(", ")}`,
+        );
+      }
+      const root = matches[0]!.root;
+      try {
+        handle = registry.get(root) ?? (await registry.open(root));
+      } catch (err) {
+        throw new ToolError("not_found", err instanceof Error ? err.message : String(err));
+      }
+    }
+    return { store: handle.store, ctx: buildToolContext(handle, registry, "agent"), activity: handle.sseHub };
+  };
+}
+
+/**
+ * `/mcp` is not bound to a project: each tool call names its own (see
+ * `createMcpProjectResolver`). The old `?project=` query parameter is gone —
+ * a request still carrying it gets a JSON-RPC error saying how to
+ * reconfigure, rather than being silently served against the wrong project.
  *
- * When no project resolves either way — no `?project=` and nothing active —
- * this still builds the MCP server, in "bootstrap mode" (`store: undefined`,
- * review fix 1): `init_project` is the one tool that doesn't need a project
- * (it builds its own `Store` from `input.dir`), and a daemon with zero
- * projects open has no other way for an agent to create the first one.
- * Every other tool reports a clean error in that mode instead of the whole
- * route 503ing before an MCP client can even call `tools/list`.
+ * Zero projects open is fine: `list_projects` and `init_project` need none.
  */
 async function handleMcpRoute(req: IncomingMessage, res: ServerResponse, registry: ProjectRegistry, url: URL): Promise<void> {
-  const projectParam = normalizeProjectParam(url);
-  let handle: ProjectHandle | undefined;
-
-  if (projectParam !== undefined) {
-    try {
-      handle = registry.get(projectParam) ?? (await registry.open(projectParam));
-    } catch (err) {
-      sendMcpError(res, err instanceof Error ? err.message : String(err));
-      return;
-    }
-  } else if (registry.activeProject !== undefined) {
-    handle = registry.get(registry.activeProject);
+  if (url.searchParams.has("project")) {
+    sendMcpError(
+      res,
+      "the ?project= parameter was removed from /mcp: every tool call now names its project in a `project` input (see list_projects). Reconfigure your MCP entry without it — run `artisign setup`.",
+    );
+    return;
   }
 
-  const mcpHandler = createMcpHttpHandler(handle?.store, buildToolContext(handle, registry, "agent"), handle?.sseHub);
+  const mcpHandler = createMcpHttpHandler(undefined, buildToolContext(undefined, registry, "agent"), undefined, createMcpProjectResolver(registry));
   await mcpHandler(req, res);
 }
 

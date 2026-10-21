@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `artisign setup` connects Claude Code and Claude Desktop with one user-level `artisign` entry each, running
+  `npx -y artisign@<version> mcp` pinned to the version that ran setup. It asks per detected tool (`--yes` skips the
+  questions and is the only way to run without a terminal), replaces an existing entry, leaves every other entry and
+  setting untouched, and restarts a running Artisign of another version. `artisign setup --remove` removes exactly the
+  `artisign` entries. Claude Code is driven through its own `claude mcp` CLI; Claude Desktop gets absolute paths to `npx`
+  and `node`, since a GUI app does not inherit the shell's PATH. (CHR-833)
+
 ### Changed
 
 - **BREAKING:** `artisign mcp <dir>` is gone. `artisign mcp` is now a stdio bridge to the running daemon: it forwards

@@ -9,6 +9,7 @@ function fakeDeps() {
     initProject: vi.fn(async () => undefined),
     runServe: vi.fn(async () => {}),
     runMcp: vi.fn(async () => {}),
+    runSetup: vi.fn(async () => 0),
     runDaemonForeground: vi.fn(async () => {}),
     runStart: vi.fn(async () => {}),
     runStop: vi.fn(async () => {}),
@@ -151,7 +152,7 @@ describe("dispatch: help and version", () => {
   });
 
   it("<command> --help and help <command> print that command's usage, options and an example", async () => {
-    for (const command of ["start", "serve", "init", "mcp", "status", "stop"]) {
+    for (const command of ["start", "serve", "init", "mcp", "setup", "status", "stop"]) {
       for (const argv of [[command, "--help"], [command, "-h"], ["help", command]]) {
         const { deps, out } = fakeDeps();
         expect(await dispatch(argv, ENTRY, deps)).toBe(0);
@@ -195,5 +196,23 @@ describe("dispatch: mcp", () => {
     expect(err.join("\n")).toContain("named per tool call");
     expect(err.join("\n")).toContain("artisign setup");
     expect(deps.runMcp).not.toHaveBeenCalled();
+  });
+});
+
+describe("dispatch: setup", () => {
+  it("passes --yes and --remove through, with the CLI entry, and returns its exit code", async () => {
+    const { deps } = fakeDeps();
+    vi.mocked(deps.runSetup).mockResolvedValueOnce(1);
+    expect(await dispatch(["setup", "--yes", "--remove"], ENTRY, deps)).toBe(1);
+    expect(deps.runSetup).toHaveBeenCalledWith({ yes: true, remove: true, cliEntry: ENTRY });
+    await dispatch(["setup"], ENTRY, deps);
+    expect(deps.runSetup).toHaveBeenLastCalledWith({ yes: false, remove: false, cliEntry: ENTRY });
+  });
+
+  it("rejects anything else with the one-line error", async () => {
+    const { deps, err } = fakeDeps();
+    expect(await dispatch(["setup", "--force"], ENTRY, deps)).toBe(1);
+    expect(err).toEqual(["Unknown option: --force", "Run `artisign help` for usage."]);
+    expect(deps.runSetup).not.toHaveBeenCalled();
   });
 });

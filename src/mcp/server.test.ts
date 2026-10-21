@@ -46,10 +46,10 @@ describe("MCP server — protocol-level", () => {
     expect(client.getServerVersion()).toMatchObject({ name: "artisign", version });
   });
 
-  it("lists all 24 tools", async () => {
+  it("lists all 25 tools", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(TOOLS.map((t) => t.name).sort());
-    expect(tools).toHaveLength(24);
+    expect(tools).toHaveLength(25);
   });
 
   it("successfully calls every one of the 21 tools that don't need a browser or daemon board-state context (get_screenshot/inspect_node/set_board_state excluded)", async () => {
@@ -193,8 +193,12 @@ describe("MCP server — instructions budget", () => {
   // comes from its root width designs a desktop product as a 390px phone
   // stack — a user-reported failure, and get_screenshot's width (mockups
   // only) actively misleads toward it. Measured at 943 when this was added.
-  it("stays within the ~950 token cheat-sheet budget (chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(950);
+  // The PROJECTS lines (CHR-829) raised it from 950 to 985: with one global
+  // MCP entry an agent must know how to find and name a project. CHR-832
+  // moved that block to the top and made `project` a required input of every
+  // call (no implicit fallback any more): 985 to 995, measured at 992.
+  it("stays within the ~995 token cheat-sheet budget (chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(995);
   });
 });
 

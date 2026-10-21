@@ -169,3 +169,60 @@ describe("bridge version check", () => {
     expect(warnings).toEqual([]);
   });
 });
+
+describe("bridge SSE parsing", () => {
+  it("relays a 5 MB event split over many chunks, quickly and intact", async () => {
+    const big = "x".repeat(5 * 1024 * 1024);
+    const body = `event: message\ndata: ${JSON.stringify({ jsonrpc: "2.0", id: 1, result: { big } })}\n\n`;
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        const bytes = enc.encode(body);
+        for (let i = 0; i < bytes.length; i += 16 * 1024) c.enqueue(bytes.slice(i, i + 16 * 1024));
+        c.close();
+      },
+    });
+    const { bridge, out } = setup((url) =>
+      url.endsWith("/health") ? health("2.0.0") : new Response(stream, { headers: { "content-type": "text/event-stream" } }),
+    );
+    const started = Date.now();
+    await bridge.handleMessage(JSON.stringify(call));
+    expect(Date.now() - started).toBeLessThan(3000);
+    expect(out).toHaveLength(1);
+    expect(JSON.parse(out[0] as string).result.big).toHaveLength(big.length);
+  });
+
+  it("finds a separator that straddles two chunks, and several events in one chunk", async () => {
+    const text = 'data: {"id":1}\n\ndata: {"id":2}\r\n\r\ndata: {"id":3}\n\n';
+    for (const cut of [15, 16, 17, 30, 31]) {
+      const stream = new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(enc.encode(text.slice(0, cut)));
+          c.enqueue(enc.encode(text.slice(cut)));
+          c.close();
+        },
+      });
+      const { bridge, out } = setup((url) =>
+        url.endsWith("/health") ? health("2.0.0") : new Response(stream, { headers: { "content-type": "text/event-stream" } }),
+      );
+      await bridge.handleMessage(JSON.stringify(call));
+      expect(out.map((l) => JSON.parse(l).id)).toEqual([1, 2, 3]);
+    }
+  });
+});
+
+describe("bridge version warning", () => {
+  it("is not repeated when the daemon is reconnected with the same version", async () => {
+    let fail = true;
+    const { bridge, warnings } = setup((url) => {
+      if (url.endsWith("/health")) return health("1.9.0");
+      if (fail) {
+        fail = false;
+        throw new TypeError("fetch failed");
+      }
+      return sse({ jsonrpc: "2.0", id: 1, result: {} });
+    });
+    await bridge.handleMessage(JSON.stringify(call));
+    expect(warnings.filter((w) => w.includes("1.9.0"))).toHaveLength(1);
+  });
+});
+

@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-831 success state: after Create the row closes, the new folder is inserted alphabetically with a \"new\" badge and selected (accent row), so the user continues straight to the project name. Hint shows the resulting path: \"Will create: ~/Workspace/clients/acme\". The user's use case: ~/Workspace/clients did not exist, now it does and the project goes into it. Create & open is enabled once a name is typed.",
+  "tags": [
+    "dialog",
+    "chr-831"
+  ],
+  "variant_of": "init-project-dialog-new-folder",
+  "variant_kind": "state"
+}

@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Store } from "../store/index.js";
 import type { ToolHandlerContext } from "../tools/index.js";
-import { createMcpServer } from "./server.js";
+import { createMcpServer, type ProjectResolver } from "./server.js";
 import type { ActivitySink } from "./activity.js";
 
 /**
@@ -20,9 +20,10 @@ export function createMcpHttpHandler(
   store: Store | undefined,
   ctx?: ToolHandlerContext,
   activity?: ActivitySink,
+  resolveProject?: ProjectResolver,
 ): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
-    const server = createMcpServer(store, ctx, activity);
+    const server = createMcpServer(store, ctx, activity, resolveProject);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on("close", () => {
       void transport.close();

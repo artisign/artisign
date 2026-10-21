@@ -17,23 +17,28 @@ One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
 ## Install
 
+**Requirements.** Node.js ≥ 22.4 on **macOS or Linux** — Windows is not supported (the store's atomic writes and path handling have never been verified there, so `package.json` makes `npm install` refuse the platform). For screenshots, a browser that is already installed: Chrome, Edge, Brave, Chromium or Firefox — see **Screenshots** below.
+
 ```bash
 npm install -g artisign
 artisign
 ```
 
 1. `npm install -g artisign` — once.
-2. `artisign` — starts Artisign, opens the preview in your browser and, on first run, offers to connect your AI tool.
-3. Ask your AI tool to create or open a project: *"Create an Artisign project in ~/work/acme"*.
+2. `artisign` — starts Artisign's background process (the *daemon*), opens the preview in your browser and, on first run, offers to connect your AI tool. After connecting, quit and reopen the AI tool so it picks up the new entry.
+3. Ask your AI tool to create or open a project: *"Create an Artisign project in ~/work/acme"*. The project folder (and any missing parent folders) is created for you; the AI tool passes an absolute path, since Artisign does not expand `~` itself. Writes are committed to git automatically (`autoCommit`, on by default) — Artisign runs `git init` in the project on the first write, needs `git` installed for that, and skips the commit rather than fail when it is missing or the folder sits inside another repo.
 
-**Requirements.** Node.js ≥ 22.4 on **macOS or Linux** — Windows is not supported (the store's atomic writes and path handling have never been verified there, so `package.json` makes `npm install` refuse the platform). For screenshots, a browser that is already installed: Chrome, Edge, Brave, Chromium or Firefox — see **Screenshots** below.
+**Check it works.** Ask your AI tool *"List my Artisign projects"* — it calls `list_projects` and the project you just created appears, and in the preview's project picker too.
 
-**Updating.** Run `artisign update` (also `artisign --update`). It installs the latest version with `npm install -g artisign@latest`, re-pins the `artisign` entries in your AI tools to it and restarts a running Artisign of an older version with its open projects. It does nothing when you are already on the latest version, and never uses `sudo`. Nothing is updated automatically: `artisign` checks the npm registry for a newer release at most once a day and prints one line (`New version x.y.z — run artisign update`) when there is one. Set `ARTISIGN_NO_UPDATE_CHECK=1` to turn that off.
+**Two copies, one version.** The global install is the `artisign` command you type. Your AI tool's entry runs the same version, pinned, through `npx` (downloaded once on its first launch) as a small stdio bridge; `artisign update` keeps the two in step. Whichever starts first — you with `artisign`, or the bridge when your AI tool connects — starts the daemon; both use the same `~/.artisign` and port, so there is only ever one. The daemon inherits the environment of the process that started it: to make a variable such as `ARTISIGN_BROWSER` stick, run `artisign` from your shell before your AI tool does (`artisign stop` first if it is already running); putting it in the entry's `env` also works, but `artisign setup` rewrites entries, so add it again after an update.
+
+**Updating.** Run `artisign update` (also `artisign --update`). It installs the latest version with `npm install -g artisign@latest`, re-pins the `artisign` entries in your AI tools to it and restarts a running Artisign of an older version with its open projects. Then quit and reopen your AI tool, so it launches the re-pinned entry. It does nothing when you are already on the latest version, and never uses `sudo`. Nothing is updated automatically: `artisign` checks the npm registry for a newer release at most once a day and prints one line (`New version x.y.z — run artisign update`) when there is one. Set `ARTISIGN_NO_UPDATE_CHECK=1` to turn that off.
 
 **Troubleshooting.**
 
 - **`EACCES` on `npm install -g`** — npm cannot write to its global folder. Never fix this with `sudo`. Use a Node you own (for example through [nvm](https://github.com/nvm-sh/nvm)), or point npm at a folder in your home: `npm config set prefix ~/.npm-global`, then add `~/.npm-global/bin` to your `PATH`.
-- **pnpm, bun or yarn** — install with `pnpm add -g artisign`, `bun add -g artisign` or `yarn global add artisign`; update with the same command and `@latest` (`artisign update` prints it for you). Then run `artisign setup` to connect your AI tool and re-pin its entries.
+- **nvm** — a global install belongs to one Node version. After switching versions, run `npm install -g artisign` and `artisign setup` again.
+- **pnpm, bun or yarn** — install with `pnpm add -g artisign`, `bun add -g artisign` or `yarn global add artisign`; update with the same command and `@latest` (`artisign update` only *prints* that command for these installs, it does not run it). Then run `artisign setup` to connect your AI tool and re-pin its entries.
 
 **Screenshots.** `get_screenshot` and `inspect_node` render in a real browser — one that is already on your machine. Artisign finds Chrome, Edge, Brave, Chromium or Firefox by itself (in that order) and drives it headless through the browser's own remote protocol: the Chrome DevTools Protocol for the Chromium family, WebDriver BiDi for Firefox. Nothing to install, no Playwright, no browser download.
 
@@ -68,23 +73,29 @@ Artisign is **multi-project**: one process on `127.0.0.1:4711` holds several pro
 
 ## Advanced
 
-**Connecting an AI tool.** `artisign setup` connects Claude Code, Claude Desktop, Cursor, Codex CLI, VS Code and opencode. For each one it finds, it asks, then writes a user-level entry named `artisign` that runs `npx -y artisign@<version> mcp`, pinned to the version that ran setup; other entries and settings are left untouched. Claude Code is driven through its own `claude mcp` CLI and Codex CLI through `codex mcp add/remove` (it honours `CODEX_HOME`) when those are on your `PATH`; GUI clients (Claude Desktop, Cursor, VS Code) get the `npx` found on your `PATH`, as an absolute path, because they do not inherit your shell's. A config file that holds comments or trailing commas is never rewritten — setup prints the entry to add by hand instead — and a symlinked config is written through. `--yes` connects every tool found without asking (the only way to run without a terminal); `artisign setup --remove` removes exactly the `artisign` entries. Run it again after an update to re-pin (`artisign update` does so for you).
+**Connecting an AI tool.** `artisign setup` connects Claude Code, Claude Desktop, Cursor, Codex CLI, VS Code and opencode. For each one it finds, it asks, then writes a user-level entry named `artisign` that runs `npx -y artisign@<version> mcp`, pinned to the version that ran setup; other entries and settings are left untouched. Claude Code is driven through its own `claude mcp` CLI and Codex CLI through `codex mcp add/remove` (it honours `CODEX_HOME`) when those are on your `PATH`; GUI clients (Claude Desktop, Cursor, VS Code) get the `npx` found on your `PATH`, as an absolute path, because they do not inherit your shell's. A config file that holds comments or trailing commas is never rewritten — setup prints the entry to add by hand instead — and a symlinked config is written through. `--yes` connects every tool found without asking (the only way to run without a terminal); `artisign setup --remove` removes exactly the `artisign` entries. Run it again after an update to re-pin (`artisign update` does so for you). Quit and reopen the AI tool after setup, so it picks up the entry.
 
-**Manual entry.** If you don't run setup, add the same stdio server to your AI tool by hand — command `npx`, args `["-y", "artisign@<version>", "mcp"]` (use the version you installed; `artisign --version`):
-
-```json
-{
-  "mcpServers": {
-    "artisign": { "command": "npx", "args": ["-y", "artisign@<version>", "mcp"] }
-  }
-}
-```
-
-For Claude Code, one line:
+**Manual entry.** If you don't run setup, add the same stdio server to your AI tool by hand, pinned to the version you installed (`artisign --version`). A terminal client (Claude Code, Codex CLI, opencode) can use plain `npx`:
 
 ```bash
 claude mcp add --scope user --transport stdio artisign -- npx -y artisign@<version> mcp
 ```
+
+A GUI client (Claude Desktop, Cursor, VS Code) does not inherit your shell's `PATH`, so give it the absolute path of your `npx` (`which npx`) and a `PATH` that starts with its directory — this is what setup writes. For Claude Desktop, in `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+
+```json
+{
+  "mcpServers": {
+    "artisign": {
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "artisign@<version>", "mcp"],
+      "env": { "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" }
+    }
+  }
+}
+```
+
+Replace `/opt/homebrew/bin` with the directory `which npx` shows. Quit and reopen the client afterwards.
 
 `artisign mcp` is a stdio bridge: it forwards every MCP message to the running background process and starts it if it is not running, so it is the same backend whichever client connects. It takes no project directory — the project is named in each tool call.
 
@@ -191,7 +202,7 @@ Served at `http://127.0.0.1:<port>` once the daemon is running — plain ES modu
 
 ## Deterministic render baseline
 
-Every rendered surface — screens pane, Design System variants, and (later) `get_screenshot` — wraps the rendered fragment in the same small baseline document, so what an agent designs is what renders everywhere, pixel for pixel. The guarantee: `box-sizing: border-box` on every element, zero `body` margin, antialiased text. A screen root declared `width: 390px` with padding measures exactly 390px — no implicit UA margin or box-model surprise to account for.
+Every rendered surface — screens pane, Design System variants, and `get_screenshot` — wraps the rendered fragment in the same small baseline document, so what an agent designs is what renders everywhere, pixel for pixel. The guarantee: `box-sizing: border-box` on every element, zero `body` margin, antialiased text. A screen root declared `width: 390px` with padding measures exactly 390px — no implicit UA margin or box-model surprise to account for.
 
 ## Fonts & icons
 
@@ -219,7 +230,7 @@ The reference stays portable in the source file. At render time it resolves two 
 ## Repo structure
 
 ```
-src/cli/            CLI entry point — init, start, stop, status, serve, mcp
+src/cli/            CLI entry point — init, start, stop, status, serve, mcp, setup, update, help
 src/daemon/          daemon lifecycle — project registry, global config/lock (~/.artisign)
 src/init/            project scaffolding (init) and artisign.json
 src/store/           Store interface, FsStore, watcher, atomic writes, git auto-commit

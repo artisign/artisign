@@ -40,6 +40,7 @@ const READ_TOOLS = new Set([
   "get_design_system",
   "find_nodes",
   "list_comments",
+  "list_projects",
   "get_guide",
   "get_mockup",
   "get_screenshot",

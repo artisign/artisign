@@ -87,6 +87,7 @@ export type ViewState = {
  */
 export type ToolHandlerContext = {
   openProject?: (dir: string) => Promise<unknown>;
+  listProjects?: () => Promise<{ name: string; root: string; open: boolean }[]>;
   viewState?: ViewState;
   source?: "agent" | "human";
 };

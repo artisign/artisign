@@ -1,8 +1,10 @@
 {
-  "notes": "The frame every view renders into: a 48px topbar, the Screens and Context side panels at 280px each, the canvas, and the Elements panel on the right. Every other screen is this shell with one region in a different state, so changes here propagate by construction.",
+  "notes": "CHR-905 / CHR-909 direction C, light shell (approved by Christian 2026-10-23; folded in from the former chrome-c-shell). Root binds `--chrome-*` from `chrome-light.*`; all chrome uses `chrome-*` components and `$size/$spacing/$radius/$typography` tokens. Panels: Screens 264px (variant tree with tag chips), Context 252px (Notes + Comments), canvas with variant breadcrumb, Elements 280px; topbar 44px.\n\nVariants of this screen: app-shell-dark = chrome-c-shell-dark, project menu = chrome-c-shell-menu, zoom menu = chrome-c-shell-zoom-menu, offline chip = chrome-c-shell-offline, shortcuts = chrome-c-shell-shortcuts, dialogs = chrome-c-dialog (+ -dark), compare = chrome-c-compare, mockup columns = chrome-c-mockup-columns.\n\nFlows: Screens panel header -> sidebars-collapsed, Design System tab -> design-system-view, Board tab -> board-view, project picker -> open-project-dialog, Comments header -> comments-panel, open Elements row -> inspector-selected.\n\nIcon-only modes: on-state = accent-subtle fill + accent icon; every icon toggle needs a tooltip with label + shortcut, centered under its button (shown once, on Flow mode). Intended drift warnings: the phone frame is a stand-in for the USER screen (never themed); repeated_pattern advisories come from the light/dark/overlay copies. Mapping: decision chr905-preview-var-mapping; shortcuts: chr905-shortcuts.",
   "tags": [
     "shell",
     "screens",
-    "chr-739"
+    "chr-739",
+    "CHR-905",
+    "CHR-909"
   ]
 }

@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-905 direction C: zoom dropdown open (trigger in `open` state) with the browser-safe shortcut hints (Shift+1 Fit, Shift+5 50%, Shift+0 100%, Shift+2 200%, + / - step). Full table: decision chr905-shortcuts.",
+  "tags": [
+    "CHR-905",
+    "CHR-909"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "overlay"
+}

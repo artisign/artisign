@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-905 direction C: dark counterpart of chrome-c-dialog.",
+  "tags": [
+    "CHR-905",
+    "CHR-909"
+  ],
+  "variant_of": "chrome-c-dialog",
+  "variant_kind": "state"
+}

@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-905 direction C: Live-reload chip in its disconnected state: red dot + \"Offline\" with tooltip \"Live reload disconnected, retrying\". Connected state is green + \"Live\" (app-shell). Informational, never clickable.",
+  "tags": [
+    "CHR-905",
+    "CHR-909"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "state"
+}

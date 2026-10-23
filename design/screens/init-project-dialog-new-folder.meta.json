@@ -2,7 +2,9 @@
   "notes": "CHR-831. \"+ New folder\" pressed (button in `active` variant): `$new-folder-row` appears pinned at the top of the folder list with a focused input (accent border), Create (Enter) and Cancel (Esc). The folder is created inside the folder currently browsed (here ~/Workspace) — one level, the user can repeat it to nest. Name input is empty-validated: Create stays enabled only for a non-empty name. Project-name field and confirm button below are untouched until a folder is selected.",
   "tags": [
     "dialog",
-    "chr-831"
+    "chr-831",
+    "CHR-905",
+    "CHR-909"
   ],
   "variant_of": "init-project-dialog",
   "variant_kind": "state"

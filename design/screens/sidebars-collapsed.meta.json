@@ -3,7 +3,9 @@
   "tags": [
     "shell",
     "empty-state",
-    "chr-739"
+    "chr-739",
+    "CHR-905",
+    "CHR-909"
   ],
   "variant_of": "app-shell",
   "variant_kind": "state"

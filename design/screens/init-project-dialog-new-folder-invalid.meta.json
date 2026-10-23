@@ -2,7 +2,9 @@
   "notes": "CHR-831 error state: invalid name (path separators, empty, \".\" or \"..\"). Message: \"Folder names can’t contain / or \\ and can’t be empty, “.” or “..”.\" Same row, same behavior as the exists state.",
   "tags": [
     "dialog",
-    "chr-831"
+    "chr-831",
+    "CHR-905",
+    "CHR-909"
   ],
   "variant_of": "init-project-dialog-new-folder",
   "variant_kind": "state"

@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-905 direction C, light: project menu open (its own overlay screen so it no longer hides the sidebar header). Built from the `chrome-menu` pattern + `chrome-menu-item` (checked-hover, default, action). Trigger shows `chrome-dropdown` open. Same intended drift as app-shell (user-screen stand-in).",
+  "tags": [
+    "CHR-905",
+    "CHR-909"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "overlay"
+}

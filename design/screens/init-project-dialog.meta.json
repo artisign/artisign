@@ -3,7 +3,9 @@
   "tags": [
     "dialog",
     "chr-739",
-    "chr-831"
+    "chr-831",
+    "CHR-905",
+    "CHR-909"
   ],
   "variant_of": "no-project-empty-state",
   "variant_kind": "overlay"

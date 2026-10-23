@@ -32,6 +32,12 @@ npm ci
 npm test
 ```
 
+To use the checkout instead of a globally installed `artisign`, run
+`./artisign-dev.sh start [dir...]`: it builds, stops whichever Artisign is
+running (both share `~/.artisign/` and port 4711), and starts this build in the
+background. `./artisign-dev.sh stop` and `./artisign-dev.sh status` do what they
+say.
+
 The browser-backed suites (`get_screenshot`, `inspect_node`) drive whatever
 supported browser is installed — Chrome, Edge, Brave, Chromium or Firefox —
 and skip themselves when there is none; every other test runs. To test one

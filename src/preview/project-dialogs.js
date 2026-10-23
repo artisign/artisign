@@ -307,6 +307,7 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
   });
   nameInput?.addEventListener("input", updateHint);
   cancelButton.addEventListener("click", () => onCancel());
+  sectionEl.querySelector(".dialog-close")?.addEventListener("click", () => onCancel());
 
   confirmButton.addEventListener("click", async () => {
     const target = mode === "open" ? { dir: selectedProjectPath } : { dir: initTargetDir(), name: nameInput.value.trim() };

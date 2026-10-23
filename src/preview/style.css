@@ -3155,6 +3155,13 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   display: none;
 }
 
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
 .dialog-title {
   margin: 0;
   font-size: var(--ui-title);

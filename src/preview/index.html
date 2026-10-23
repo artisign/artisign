@@ -376,7 +376,10 @@
     </div>
     <div id="dialog-scrim" class="chrome-scrim" hidden>
       <section id="open-project-dialog" class="project-dialog chrome-dialog" hidden>
-        <h1 class="dialog-title">Open project</h1>
+        <div class="dialog-head">
+          <h1 class="dialog-title">Open project</h1>
+          <button type="button" class="dialog-close chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </div>
         <div class="quick-access">
           <button type="button" class="quick-chip" data-quick="home"><span class="icon" aria-hidden="true">home</span>Home</button>
           <button type="button" class="quick-chip" data-quick="workspace"><span class="icon" aria-hidden="true">folder_special</span>Workspace</button>
@@ -395,7 +398,10 @@
         </div>
       </section>
       <section id="init-project-dialog" class="project-dialog chrome-dialog" hidden>
-        <h1 class="dialog-title">New project</h1>
+        <div class="dialog-head">
+          <h1 class="dialog-title">New project</h1>
+          <button type="button" class="dialog-close chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </div>
         <p class="dialog-sub">Choose where the new project folder is created.</p>
         <div class="quick-access">
           <button type="button" class="quick-chip" data-quick="home"><span class="icon" aria-hidden="true">home</span>Home</button>

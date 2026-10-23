@@ -22,6 +22,7 @@ function section(withNameInput) {
     <p class="dialog-error"></p>
     <button class="btn-confirm"></button>
     <button class="btn-cancel"></button>
+    <button class="dialog-close"></button>
     ${withNameInput ? '<input class="field-name-input" />' : ""}
   `;
   return el;
@@ -387,5 +388,23 @@ describe("folder browser controls are buttons without glyph icons (CHR-911)", ()
     expect(row.querySelector(".new-folder-input").classList.contains("chrome-field")).toBe(true);
     expect(row.querySelector(".new-folder-create").classList.contains("chrome-btn")).toBe(true);
     expect(row.querySelector(".new-folder-cancel").tagName).toBe("BUTTON");
+  });
+});
+
+describe("dialog close button (CHR-911)", () => {
+  it("closes the dialog like Cancel, with no other side effect", async () => {
+    globalThis.fetch = stubFs();
+    const scrimEl = document.createElement("div");
+    const openSectionEl = section(false);
+    const onOpen = vi.fn(async () => ({ ok: true }));
+    const dialogs = createProjectDialogs({ scrimEl, openSectionEl, initSectionEl: section(true) }, { onOpen, onInit: async () => ({ ok: true }) });
+    dialogs.showOpenDialog();
+    await settle();
+    expect(scrimEl.hidden).toBe(false);
+    openSectionEl.querySelector(".dialog-close").click();
+    expect(scrimEl.hidden).toBe(true);
+    expect(openSectionEl.hidden).toBe(true);
+    expect(onOpen).not.toHaveBeenCalled();
+    delete globalThis.fetch;
   });
 });

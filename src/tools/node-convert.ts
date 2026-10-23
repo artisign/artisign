@@ -1,4 +1,4 @@
-import { NodeIdAllocator, flowFromAttributes, type Node as InternalNode, type NodeSubtree, type ScreenDocument } from "../model/index.js";
+import { NodeIdAllocator, flowFromAttributes, flowToAttributes, type Flow, type Node as InternalNode, type NodeSubtree, type ScreenDocument } from "../model/index.js";
 import { takenIds } from "./patch.js";
 
 /**
@@ -71,15 +71,14 @@ export function collectDescendantIds(doc: ScreenDocument, nodeId: string, out: s
  * and the fill keeps the node's id (generated or authored — ids are serialized
  * and stay stable), which is what addresses the edge (`<screen>.<id>`).
  */
-function carryFlowsIntoFills(doc: ScreenDocument, nodeId: string, sub: NodeSubtree): void {
-  const flow = doc.flows.find((f) => f.triggerNodeId === nodeId);
+function carryFlowsIntoFills(doc: ScreenDocument, flows: Map<string, Flow>, nodeId: string, sub: NodeSubtree): void {
+  const flow = flows.get(nodeId);
   if (flow) {
-    sub.attributes = { ...sub.attributes, "data-flow-target": flow.targetId };
-    if (flow.triggerEvent !== "tap") sub.attributes["data-flow-trigger"] = flow.triggerEvent;
+    sub.attributes = { ...sub.attributes, ...flowToAttributes(flow) };
     sub.id = nodeId;
   }
   const node = doc.nodes[nodeId]!;
-  for (const [i, childId] of node.childIds.entries()) carryFlowsIntoFills(doc, childId, sub.children[i]!);
+  for (const [i, childId] of node.childIds.entries()) carryFlowsIntoFills(doc, flows, childId, sub.children[i]!);
 }
 
 /**
@@ -96,13 +95,17 @@ export function convertToComponentInstance(doc: ScreenDocument, node: InternalNo
   const descendantIds: string[] = [];
   collectDescendantIds(doc, node.id, descendantIds);
   const subtree = nodeToSubtree(doc, node.id);
-  for (const [i, child] of node.childIds.entries()) carryFlowsIntoFills(doc, child, subtree.children[i]!);
+  const flowsByTrigger = new Map(doc.flows.map((f) => [f.triggerNodeId, f]));
+  for (const [i, child] of node.childIds.entries()) carryFlowsIntoFills(doc, flowsByTrigger, child, subtree.children[i]!);
 
   node.kind = "component_instance";
   node.refs.component = componentName;
   node.slotOverrides = Object.fromEntries(subtree.children.map((child, i) => [`slot-${i}`, child]));
   node.childIds = [];
   for (const id of descendantIds) delete doc.nodes[id];
+  // Their flows now live on the fills' attributes (carried above), not in doc.flows.
+  const gone = new Set(descendantIds);
+  doc.flows = doc.flows.filter((f) => !gone.has(f.triggerNodeId));
 }
 
 function materializeSubtree(
@@ -133,11 +136,10 @@ function materializeSubtree(
   // attributes into doc.flows (the serializer emits it from there).
   const attributes = { ...subtree.attributes };
   const { flow } = flowFromAttributes(id, attributes);
-  if (flow) {
-    doc.flows.push(flow);
-    delete attributes["data-flow-target"];
-    delete attributes["data-flow-trigger"];
-  }
+  if (flow) doc.flows.push(flow);
+  // Always stripped: a trigger without a target must not stay behind as a reserved attribute.
+  delete attributes["data-flow-target"];
+  delete attributes["data-flow-trigger"];
   // A component_instance's content stays embedded in slotOverrides, never
   // flat-mapped via childIds — materializing its (empty) `children` instead
   // would silently drop it, the same bug this subtree machinery had before.

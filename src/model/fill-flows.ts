@@ -42,6 +42,14 @@ export function forEachFill(doc: ScreenDocument, visit: (sub: NodeSubtree, owner
   for (const { sub, owner } of collectFills(doc)) visit(sub, owner.id);
 }
 
+/** The raw `data-flow-*` attributes that encode `flow` (the inverse of `flowFromAttributes`); `tap` is the default and stays implicit. */
+export function flowToAttributes(flow: Flow): Record<string, string> {
+  return {
+    "data-flow-target": flow.targetId,
+    ...(flow.triggerEvent === "tap" ? {} : { "data-flow-trigger": flow.triggerEvent }),
+  };
+}
+
 /**
  * The flow a fill's raw `data-flow-target` / `data-flow-trigger` attributes
  * describe, built the same way the parser builds a top-level one: an invalid

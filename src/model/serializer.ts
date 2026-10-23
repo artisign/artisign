@@ -1,4 +1,5 @@
 import type { Flow, Node, NodeSubtree, ScreenDocument, TokenRef, TokenRefAtom } from "./types.js";
+import { flowToAttributes } from "./fill-flows.js";
 import { isMixedTokenValue } from "./token-ref.js";
 import { VOID_ELEMENTS, escapeAttr, escapeTextIn } from "./html-syntax.js";
 
@@ -84,8 +85,7 @@ function openTagAttrs(node: Node, doc: ScreenDocument, flowsByTrigger: Map<strin
 
   const flow = flowsByTrigger.get(node.id);
   if (flow) {
-    attrs.push(["data-flow-target", flow.targetId]);
-    if (flow.triggerEvent !== "tap") attrs.push(["data-flow-trigger", flow.triggerEvent]);
+    attrs.push(...Object.entries(flowToAttributes(flow)));
   }
 
   if (isSvgDomain) {

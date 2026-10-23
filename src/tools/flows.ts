@@ -70,7 +70,11 @@ export async function readScreenFlows(store: Store, screenId: string): Promise<F
  */
 function documentOrderIndex(doc: ScreenDocument): Map<string, number> {
   const fillsByOwner = new Map<string, NodeSubtree[]>();
-  for (const { sub, owner } of collectFills(doc)) fillsByOwner.set(owner.id, [...(fillsByOwner.get(owner.id) ?? []), sub]);
+  for (const { sub, owner } of collectFills(doc)) {
+    const fills = fillsByOwner.get(owner.id) ?? [];
+    fills.push(sub);
+    fillsByOwner.set(owner.id, fills);
+  }
   const index = new Map<string, number>();
   const visit = (id: string): void => {
     const node = doc.nodes[id];

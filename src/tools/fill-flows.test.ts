@@ -160,6 +160,16 @@ describe("flow edges on slot-fill content (CHR-778)", () => {
     expect(html).toMatch(/<a[^>]*data-flow-target="checkout"/);
   });
 
+  it("revert strips a trigger-only fill's data-flow-trigger, so a later set_flow serializes it once", async () => {
+    await fx.store.writeComponent("card", `<div id="c"><span data-slot="slot-0">d</span></div>`);
+    await write(`<div id="root"><div id="box" class="$card"><a id="t" data-flow-trigger="hover">x</a></div></div>`);
+    await updateRefs(fx.store, { node: "cart.box", refs: { component_ref: null } });
+    await setFlow(fx.store, { node: "cart.t", flow: { from: "cart.t", event: "hover", to: "home", to_kind: "screen" } });
+    const html = await fx.store.readScreen("cart");
+    expect(html.match(/data-flow-trigger/g)).toHaveLength(1);
+    expect(html.match(/data-flow-target/g)).toHaveLength(1);
+  });
+
   describe("folding a subtree into slot fills keeps its flows", () => {
     it("revert never mints an id that a folded fill already uses (no duplicate id, no wrong edge)", async () => {
       await fx.store.writeComponent("card", `<div id="c"><span data-slot="slot-0">d</span></div>`);

@@ -22,6 +22,7 @@ import { readVariantLinks } from "./variants.js";
 import { nodeToSubtree, convertToComponentInstance, subtreesStructurallyEqual } from "./node-convert.js";
 import { deleteMockupEntity } from "./mockups.js";
 import { slotStylingWarnings } from "./definition-checks.js";
+import { checkNewTokenMembers, checkNewComponentName } from "./name-collision.js";
 import { assertValidEntityName, assertValidVariantName } from "./name-validation.js";
 import { ToolError, commitFields, type Warning, type ToolHandlerContext } from "./types.js";
 
@@ -263,13 +264,14 @@ async function promoteToken(store: Store, doc: ScreenDocument, node: InternalNod
   // concern here at all (this path only ever adds a token, never removes
   // one), so a single post-write scan is strictly sufficient.
   const tokens = await store.readTokens();
+  const collisionWarnings = await checkNewTokenMembers(store, [member]);
   tokens[bucket] ??= {};
   tokens[bucket]![member] = value;
   await store.writeTokens(tokens);
 
   const registry = await loadRegistry(store);
   const { docs: sources, warnings: loadWarnings } = await loadAllDocuments(store, registry);
-  const warnings: Warning[] = [...loadWarnings];
+  const warnings: Warning[] = [...loadWarnings, ...collisionWarnings];
 
   const rewrittenNodes: string[] = [];
   const affectedScreens = new Set<string>();
@@ -435,7 +437,11 @@ async function promoteComponentOrPattern(
   const path =
     kind === "component" ? `design-system/components/${name}.html` : `design-system/patterns/${name}.html`;
 
-  const definitionWarnings: Warning[] = [];
+  // Promoted instances are class-form `$name`, so a bare token member of the same name would leave them unbound at birth.
+  const definitionWarnings: Warning[] =
+    kind === "component" && !(await store.listComponents()).includes(name)
+      ? await checkNewComponentName(store, name, { breaksNewInstances: true })
+      : [];
 
   if (kind === "component") {
     await store.writeComponent(name, fileContent);

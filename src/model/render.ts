@@ -160,6 +160,13 @@ function buildAttrs(source: AttrSource, tokens: TokensDocument, flow: Flow | und
     if (source.refs.tokens.stroke) attrs.push(["stroke", resolveTokenRef(source.refs.tokens.stroke, tokens, unresolved)]);
   }
 
+  // A `$name` left in the plain classes is a class ref the parser could not bind (ambiguous between a component and a token).
+  // A component instance keeps a `$` token there on purpose (data-component wins over class="$x") — that is not unresolved.
+  if (source.kind !== "component_instance") {
+    for (const part of source.attributes.class?.split(/\s+/) ?? []) {
+      if (part.startsWith("$")) unresolved.push(part.slice(1));
+    }
+  }
   if (unresolved.length > 0) attrs.push(["data-unresolved-token", unresolved.join(",")]);
   if (iconFontAvailable === false && hasIconClass(cls)) attrs.push(["data-unresolved-icon-font", "Material Symbols Rounded"]);
 

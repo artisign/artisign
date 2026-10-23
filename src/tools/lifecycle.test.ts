@@ -660,6 +660,18 @@ describe("delete_entity", () => {
     await deleteEntity(fx.store, { kind: "pattern", name: "card-grid" });
 
     expect(writeSpy).not.toHaveBeenCalled();
+    writeSpy.mockRestore();
+  });
+
+  it("deleting a component named like an Object.prototype key does not touch meta.json (CHR-773)", async () => {
+    await fx.store.writeComponent("constructor", `<button id="btn">Go</button>`);
+    const writeSpy = vi.spyOn(fx.store, "writeDesignSystemMeta");
+
+    await deleteEntity(fx.store, { kind: "component", name: "constructor" });
+
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(await fx.store.listComponents()).toEqual([]);
+    writeSpy.mockRestore();
   });
 
   it("deletes a component even when its own file has a duplicate variant name", async () => {

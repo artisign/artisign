@@ -54,7 +54,11 @@ export function applyTheme(root, pref, mql) {
  * @param {() => string} getPref
  */
 export function watchSystemTheme(root, mql, getPref) {
-  mql.addEventListener("change", () => {
+  const onChange = () => {
     if (getPref() === "system") applyTheme(root, "system", mql);
-  });
+  };
+  // Safari < 14 only has the deprecated addListener; never throw at app load.
+  if (typeof mql.addEventListener === "function") mql.addEventListener("change", onChange);
+  else if (typeof mql.addListener === "function") mql.addListener(onChange);
 }
+

@@ -1,5 +1,6 @@
 import { createServer as createHttpServer, type Server, type ServerResponse, type IncomingMessage } from "node:http";
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, extname, isAbsolute, resolve, sep } from "node:path";
 import { createMcpHttpHandler, type ProjectResolver } from "../mcp/index.js";
@@ -14,6 +15,7 @@ import { sendJson } from "./json.js";
 import type { ProjectRegistry, ProjectHandle } from "../daemon/project-registry.js";
 import { ToolError, type ViewState, type BoardStatePatch, type ToolHandlerContext } from "../tools/index.js";
 import { readVersion } from "../version.js";
+import { BUNDLED_MATERIAL_SYMBOLS_URL } from "../model/fonts.js";
 
 // This module lives at src/http/server.ts (dev) or dist/http/server.js (build);
 // both are two directories below the package root, next to src/preview.
@@ -25,16 +27,40 @@ const STATIC_CONTENT_TYPES: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
 };
 
-// The preview chrome's icon font (CHR-910): the bundled Material Symbols file the render path already ships (`assets/` sits next to `dist/` and `src/`, so this resolves from both). One allowlisted URL — nothing else under `assets/` is reachable.
+// The preview chrome's icon font (CHR-910): the bundled Material Symbols file the render path already ships. One allowlisted URL — nothing else under `assets/` is reachable.
 const PREVIEW_ICON_FONT_PATH = "/fonts/material-symbols-rounded.woff2";
-const PREVIEW_ICON_FONT_FILE = new URL("../../assets/fonts/material-symbols-rounded.woff2", import.meta.url);
 
-/** Serves the icon font for the preview chrome, with no project open and cacheable for good (the file only changes with a release). */
-function serveIconFont(res: ServerResponse): void {
-  readFile(PREVIEW_ICON_FONT_FILE)
-    .then((body) => {
-      res.writeHead(200, { "content-type": "font/woff2", "cache-control": "public, max-age=31536000, immutable" });
-      res.end(body);
+let iconFont: Promise<{ body: Buffer; etag: string }> | undefined;
+
+/** Read once, lazily — the file only changes with a release, and a restart picks that up. */
+function loadIconFont(): Promise<{ body: Buffer; etag: string }> {
+  iconFont ??= readFile(BUNDLED_MATERIAL_SYMBOLS_URL).then((body) => ({
+    body,
+    etag: `"${createHash("sha1").update(body).digest("hex")}"`,
+  }));
+  iconFont.catch(() => {
+    iconFont = undefined; // do not cache a failed read
+  });
+  return iconFont;
+}
+
+/** Serves the icon font for the preview chrome with no project open. The URL never changes, so it revalidates (`no-cache` + ETag, 304) instead of being cached as immutable — a release with a new font must not be shadowed by an old cached one. GET/HEAD only. */
+function serveIconFont(req: IncomingMessage, res: ServerResponse): void {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    res.writeHead(405, { "content-type": "text/plain", allow: "GET, HEAD" });
+    res.end("Method not allowed");
+    return;
+  }
+  loadIconFont()
+    .then(({ body, etag }) => {
+      const headers = { etag, "cache-control": "no-cache" };
+      if (req.headers["if-none-match"] === etag) {
+        res.writeHead(304, headers);
+        res.end();
+        return;
+      }
+      res.writeHead(200, { ...headers, "content-type": "font/woff2", "content-length": body.length });
+      res.end(req.method === "HEAD" ? undefined : body);
     })
     .catch(() => {
       res.writeHead(404, { "content-type": "text/plain" });
@@ -311,7 +337,7 @@ export function createServer(registry: ProjectRegistry): HttpServer {
     }
 
     if (url.pathname === PREVIEW_ICON_FONT_PATH) {
-      serveIconFont(res);
+      serveIconFont(req, res);
       return;
     }
 

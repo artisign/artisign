@@ -87,4 +87,49 @@ describe("initTooltips", () => {
     btn.click();
     expect(tip().textContent).toContain("Theme: Dark");
   });
+
+  it("stays dismissed after Escape until the pointer leaves the trigger", () => {
+    const inner = document.getElementById("inner");
+    btn.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(tip().hidden).toBe(true);
+    inner.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    expect(tip().hidden).toBe(true);
+    btn.dispatchEvent(new MouseEvent("mouseout", { bubbles: true, relatedTarget: document.body }));
+    btn.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    expect(tip().hidden).toBe(false);
+  });
+
+  it("keeps a hover-opened tooltip when focus leaves another element", () => {
+    const plain = document.getElementById("plain");
+    plain.focus();
+    btn.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    plain.blur();
+    expect(tip().hidden).toBe(false);
+    btn.dataset.tooltip = "Changed";
+    btn.click();
+    expect(tip().textContent).toContain("Changed");
+  });
+
+  it("hides on scroll, on resize and when the trigger is removed", () => {
+    btn.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    document.dispatchEvent(new Event("scroll"));
+    expect(tip().hidden).toBe(true);
+    btn.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    window.dispatchEvent(new Event("resize"));
+    expect(tip().hidden).toBe(true);
+    btn.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    btn.remove();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+    expect(tip().hidden).toBe(true);
+  });
+
+  it("is idempotent: a second init leaves one tooltip element and no stacked listeners", () => {
+    const second = initTooltips(document);
+    expect(document.querySelectorAll("#chrome-tooltip")).toHaveLength(1);
+    btn.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    expect(tip().hidden).toBe(false);
+    second();
+    expect(document.querySelectorAll("#chrome-tooltip")).toHaveLength(0);
+  });
 });

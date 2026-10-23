@@ -12,15 +12,26 @@ describe("buildStyleOccurrenceIndex", () => {
   afterEach(() => fx.cleanup());
 
   it("byScreen groups a fingerprint by every screen carrying a matching ad-hoc node", async () => {
-    await fx.store.writeScreen("home", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div>`);
-    await fx.store.writeScreen("checkout", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div>`);
-    await fx.store.writeScreen("cart", `<div id="n1" style="color: #fff"></div>`); // different fingerprint
+    await fx.store.writeScreen("home", `<div id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div></div>`);
+    await fx.store.writeScreen("checkout", `<div id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div></div>`);
+    await fx.store.writeScreen("cart", `<div id="root"><div id="n1" style="color: #fff"></div></div>`); // different fingerprint
 
     const registry = await loadRegistry(fx.store);
     const index = await buildStyleOccurrenceIndex(fx.store, registry);
 
     const screens = index.byScreen.get("background:rgba(0,0,0,.4);color:#fff;position:fixed");
     expect(screens && [...screens].sort()).toEqual(["checkout", "home"]);
+  });
+
+  it("a screen root is never an occurrence, a non-root node with the same style still is (CHR-774)", async () => {
+    const style = "background: rgba(0,0,0,.4); color: #fff; position: fixed";
+    await fx.store.writeScreen("home", `<div id="root" style="${style}"></div>`);
+    await fx.store.writeScreen("checkout", `<div id="root"><div id="n1" style="${style}"></div></div>`);
+
+    const registry = await loadRegistry(fx.store);
+    const index = await buildStyleOccurrenceIndex(fx.store, registry);
+
+    expect(index.byScreen.get("background:rgba(0,0,0,.4);color:#fff;position:fixed")).toEqual(new Set(["checkout"]));
   });
 
   it("never feeds byScreen from a component or pattern definition — screens only", async () => {

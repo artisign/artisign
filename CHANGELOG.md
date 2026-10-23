@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- A component name and a bare token member name share one namespace for `class="$name"`: `set_tokens`, `write_html` and
+  `promote_to_system` now refuse (`conflict`) when introducing the second meaning would unbind existing nodes and otherwise warn
+  `ambiguous_ref`; an already ambiguous ref renders with the red outline instead of silently as a plain element. (CHR-772)
+
 ## [2.1.1] - 2026-10-21
 
 ### Fixed

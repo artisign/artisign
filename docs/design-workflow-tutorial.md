@@ -195,10 +195,12 @@ Two rules of thumb:
   own sizing (`width`, `height`, `display`) — see `docs/agent-guide.md` for
   the worked example.
 
-`get_screenshot` renders screens, not component definitions — so you review a
-component through its first instance: place it on the screen that needs it,
-screenshot that screen (or clip to the instance node) and look. Red outlines
-mean an unresolved ref — a typo'd token name, usually. Fix before moving on.
+Review a component twice. On its own: pass `get_screenshot` a definition node
+ref as `node` — `component:<name>#<variant>.<node-id>`, with no `screen` — and
+it renders that definition standalone, one variant at a time. In context: place
+it on the screen that needs it, screenshot that screen (or clip to the instance
+node) and look. Red outlines mean an unresolved ref — a typo'd token name,
+usually. Fix before moving on.
 
 ---
 

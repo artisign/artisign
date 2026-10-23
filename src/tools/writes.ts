@@ -523,6 +523,8 @@ export async function updateRefs(store: Store, input: UpdateRefsInput): Promise<
   }
 
   await store.writeScreen(screen, serializeScreen(doc));
+  // component_ref can fold a subtree (and its flow triggers) into slot fills.
+  await syncScreenFlows(store, doc);
   const commitResult = await store.commit(`update_refs: ${input.node}`);
 
   return { node: input.node, ...commitFields(commitResult), applied_refs: applied, warnings };

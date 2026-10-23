@@ -47,6 +47,35 @@ describe("static preview assets (/, *.js, *.css)", () => {
     expect(res.headers.get("content-type")).toContain("text/css");
   });
 
+  it("GET /fonts/material-symbols-rounded.woff2 serves the bundled icon font", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/fonts/material-symbols-rounded.woff2`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("font/woff2");
+    const body = Buffer.from(await res.arrayBuffer());
+    expect(body.subarray(0, 4).toString("ascii")).toBe("wOF2");
+    expect(res.headers.get("cache-control")).toBe("no-cache");
+    expect(res.headers.get("etag")).toBeTruthy();
+  });
+
+  it("answers a matching If-None-Match with 304 and no body", async () => {
+    const url = `http://127.0.0.1:${daemon.port}/fonts/material-symbols-rounded.woff2`;
+    const etag = (await fetch(url)).headers.get("etag") ?? "";
+    const res = await fetch(url, { headers: { "if-none-match": etag } });
+    expect(res.status).toBe(304);
+    expect((await res.arrayBuffer()).byteLength).toBe(0);
+  });
+
+  it("allows HEAD and rejects other methods with 405", async () => {
+    const url = `http://127.0.0.1:${daemon.port}/fonts/material-symbols-rounded.woff2`;
+    expect((await fetch(url, { method: "HEAD" })).status).toBe(200);
+    expect((await fetch(url, { method: "POST" })).status).toBe(405);
+  });
+
+  it("404s for any other font path", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/fonts/other.woff2`);
+    expect(res.status).toBe(404);
+  });
+
   it("404s for an unknown static path", async () => {
     const res = await fetch(`http://127.0.0.1:${daemon.port}/does-not-exist.js`);
     expect(res.status).toBe(404);
@@ -67,5 +96,26 @@ describe("static preview assets (/, *.js, *.css)", () => {
     const html = await res.text();
     const match = /<iframe id="screen-frame"[^>]*sandbox="([^"]*)"/.exec(html);
     expect(match?.[1]).toBe("allow-same-origin");
+  });
+});
+
+describe("preview icon font with no project open", () => {
+  let artisignHome: ArtisignHomeFixture;
+  let daemon: DaemonHandle;
+
+  beforeEach(async () => {
+    artisignHome = await setupArtisignHome();
+    daemon = await startDaemon({ port: 0 });
+  });
+
+  afterEach(async () => {
+    await daemon.stop();
+    await artisignHome.cleanup();
+  });
+
+  it("serves the font without a project", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/fonts/material-symbols-rounded.woff2`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("font/woff2");
   });
 });

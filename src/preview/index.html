@@ -5,6 +5,17 @@
     <title>Artisign</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/style.css" />
+    <!-- CHR-910: resolve the chrome theme before first paint so a dark hard reload never flashes light. Mirrors theme.js (same key, same values, "system" = OS preference); app.js re-applies it with the full module afterwards. -->
+    <script>
+      (function () {
+        var pref = null;
+        try {
+          pref = localStorage.getItem("artisign.theme");
+        } catch (e) {}
+        var dark = pref === "dark" || (pref !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+      })();
+    </script>
   </head>
   <body>
     <div id="app">
@@ -71,6 +82,15 @@
           <button type="button" id="status-bar-toggle" class="toggle-button" aria-pressed="false">Status bar</button>
         </div>
         <button type="button" id="warning-badge" title="Render diagnostics — click to step through" hidden></button>
+        <button
+          type="button"
+          id="theme-toggle"
+          class="chrome-icon-btn"
+          aria-label="Theme: System"
+          data-tooltip="Theme: System"
+        >
+          <span class="icon" aria-hidden="true">contrast</span>
+        </button>
         <span id="connection-status" title="Live reload connection">●</span>
       </header>
       <div id="body">

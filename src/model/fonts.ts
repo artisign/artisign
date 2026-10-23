@@ -33,7 +33,7 @@ const MATERIAL_SYMBOLS_FAMILY = "Material Symbols Rounded";
 // path resolves whether this module runs from `src/model/` (dev, via tsx)
 // or `dist/model/` (built) — `import.meta.url`, not `cwd()`, since a global
 // install's cwd is whatever the caller happens to be in.
-const BUNDLED_MATERIAL_SYMBOLS_URL = new URL("../../assets/fonts/material-symbols-rounded.woff2", import.meta.url);
+export const BUNDLED_MATERIAL_SYMBOLS_URL = new URL("../../assets/fonts/material-symbols-rounded.woff2", import.meta.url);
 const BUNDLED_MATERIAL_SYMBOLS_FILE = "material-symbols-rounded-bundled.woff2";
 
 const GENERIC_FAMILIES = new Set([

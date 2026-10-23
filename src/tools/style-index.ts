@@ -55,6 +55,10 @@ function collectFillOccurrences(subtree: NodeSubtree, screen: ScreenId, byScreen
 }
 
 /**
+ * The screen root is never an occurrence (`isRepeatedPatternCandidate`
+ * excludes it — it carries the frame size and can't be promoted), so a
+ * non-root node is never flagged merely for matching some screen's root.
+ *
  * `byScreen` is built from `source.kind === "screen"` sources only —
  * patterns/components must never feed it (the AC is screen-occurrence
  * only; a repeated *definition* is a design-system authoring choice, not

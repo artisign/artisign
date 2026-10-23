@@ -52,8 +52,8 @@ async function readBody(req: IncomingMessage, res: ServerResponse): Promise<Reco
 
 /**
  * `/api/projects*` — the preview's project switcher: list open/recent
- * projects, open one, scaffold+open a new one, or switch which one is
- * active. Unlike every other route, these operate on the `ProjectRegistry`
+ * projects, open one, or scaffold+open a new one (which also becomes the
+ * default project of a freshly opened tab). Unlike every other route, these operate on the `ProjectRegistry`
  * itself rather than one project's `Store`, so they're routed before (and
  * independently of) the per-request project resolution in `server.ts`.
  * Returns `false` when `req` doesn't match `/api/projects*`, so the caller
@@ -135,24 +135,6 @@ export async function handleProjectsApi(req: IncomingMessage, res: ServerRespons
     // initProjectTool awaited openProject last, so the root is registered —
     // the setter cannot throw here (a failure would reach failSafe anyway).
     registry.activeProject = result.root as string;
-    sendJson(res, 200, await buildProjectsResponse(registry));
-    return true;
-  }
-
-  if (url.pathname === "/api/projects/activate" && req.method === "POST") {
-    const body = await readBody(req, res);
-    if (body === undefined) return true;
-    if (typeof body.root !== "string" || body.root.length === 0) {
-      sendJson(res, 400, { code: "validation_failed", message: "root is required" });
-      return true;
-    }
-
-    try {
-      registry.activeProject = body.root;
-    } catch (err) {
-      sendJson(res, 400, { code: "validation_failed", message: err instanceof Error ? err.message : String(err) });
-      return true;
-    }
     sendJson(res, 200, await buildProjectsResponse(registry));
     return true;
   }

@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-905 direction C: mockup column view. Mockups appear as a section in the Screens panel; the main area shows the selected mockup's variants as labelled columns with a shared zoom dropdown. Mockup frames are raw user HTML stand-ins.",
+  "tags": [
+    "CHR-905",
+    "CHR-909"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "state"
+}

@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-905 direction C, dark theme of app-shell: identical markup, root binds `--chrome-*` from `chrome-dark.*` instead of `chrome-light.*`. The phone frame stays light (user screen, never themed). See app-shell notes and decisions chr905-chrome-themes-parallel-token-groups / chr905-preview-var-mapping.",
+  "tags": [
+    "CHR-905",
+    "CHR-909"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "state"
+}

@@ -2,7 +2,9 @@
   "notes": "CHR-831 error state: the daemon could not create the folder (EACCES/EPERM). Message: \"Can’t create a folder in Workspace: permission denied.\" (folder name = the currently browsed folder). Shown after Create, so the Create button is dimmed until the name changes.",
   "tags": [
     "dialog",
-    "chr-831"
+    "chr-831",
+    "CHR-905",
+    "CHR-909"
   ],
   "variant_of": "init-project-dialog-new-folder",
   "variant_kind": "state"

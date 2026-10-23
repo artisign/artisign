@@ -2,7 +2,9 @@
   "notes": "CHR-831 success state: new folder inserted with a \"new\" badge and selected. A fresh folder holds no project, so Open is disabled and the hint says so: \"Selected: ~/Workspace/clients — no project here yet. Browse into a folder that holds one, or create a project from the empty state.\" (Design assumption, see open question: Open on a non-project folder is not possible.)",
   "tags": [
     "dialog",
-    "chr-831"
+    "chr-831",
+    "CHR-905",
+    "CHR-909"
   ],
   "variant_of": "open-project-dialog-new-folder",
   "variant_kind": "state"

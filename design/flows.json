@@ -1,44 +1,14 @@
 [
   {
-    "from": "app-shell.screens-collapse",
+    "from": "board-view-clusters-collapsed.bar",
     "event": "tap",
-    "to": "sidebars-collapsed",
+    "to": "app-shell",
     "to_kind": "screen"
   },
   {
-    "from": "app-shell.si-collapsed",
+    "from": "board-view-clusters-collapsed.frame-family-head",
     "event": "tap",
-    "to": "sidebars-collapsed",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.si-inspector",
-    "event": "tap",
-    "to": "inspector-selected",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.si-comments",
-    "event": "tap",
-    "to": "comments-panel",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.si-ds",
-    "event": "tap",
-    "to": "design-system-view",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.si-board",
-    "event": "tap",
-    "to": "board-view",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.si-open",
-    "event": "tap",
-    "to": "open-project-dialog",
+    "to": "board-view-clusters-expanded",
     "to_kind": "screen"
   },
   {
@@ -84,9 +54,81 @@
     "to_kind": "screen"
   },
   {
-    "from": "sidebar-variant-tree.bar",
+    "from": "no-project-empty-state.empty-btn-open",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state.empty-btn-init",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-empty-project.screens-collapse",
+    "event": "tap",
+    "to": "sidebars-collapsed",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-dark.si-open",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-dark.si-init",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-dark.si-empty",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-dark.bc-init",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-dark.bc-empty",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-dark.bc-open",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-dark.bc-1",
     "event": "tap",
     "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state-dark.empty-btn-open",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state-dark.empty-btn-init",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-empty-project-dark.screens-collapse",
+    "event": "tap",
+    "to": "sidebars-collapsed",
     "to_kind": "screen"
   },
   {
@@ -96,21 +138,21 @@
     "to_kind": "screen"
   },
   {
-    "from": "screen-view-variant-breadcrumb.bar",
+    "from": "sidebar-variant-tree.bar",
     "event": "tap",
     "to": "app-shell",
     "to_kind": "screen"
   },
   {
-    "from": "board-view-clusters-collapsed.bar",
+    "from": "board-view-clusters-expanded-dark.bar",
     "event": "tap",
     "to": "app-shell",
     "to_kind": "screen"
   },
   {
-    "from": "board-view-clusters-collapsed.frame-family-head",
+    "from": "board-view-clusters-expanded-dark.frame-family-head",
     "event": "tap",
-    "to": "board-view-clusters-expanded",
+    "to": "board-view-clusters-collapsed",
     "to_kind": "screen"
   },
   {
@@ -126,18 +168,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "no-project-empty-state.empty-btn-open",
-    "event": "tap",
-    "to": "open-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "no-project-empty-state.empty-btn-init",
-    "event": "tap",
-    "to": "init-project-dialog",
-    "to_kind": "screen"
-  },
-  {
     "from": "init-project-dialog.init-dialog-newfolder",
     "event": "tap",
     "to": "init-project-dialog-new-folder",
@@ -150,9 +180,51 @@
     "to_kind": "screen"
   },
   {
-    "from": "shell-empty-project.screens-collapse",
+    "from": "screen-view-variant-breadcrumb-dark.bar",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "screen-view-variant-breadcrumb.bar",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.project-picker",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-ds",
+    "event": "tap",
+    "to": "design-system-view",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-board",
+    "event": "tap",
+    "to": "board-view",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.left-header",
     "event": "tap",
     "to": "sidebars-collapsed",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.comments-header",
+    "event": "tap",
+    "to": "comments-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.el-checkout",
+    "event": "tap",
+    "to": "inspector-selected",
     "to_kind": "screen"
   }
 ]

@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-905 direction C: Compare mode of the screens view (CHR-734 exploration, new as a real screen). Single | Compare toggle and member chips above the canvas; members as columns with a node-level diff in amber (theme-independent, drawn on user screens); the right panel becomes the Compare panel listing the diff by node id. Frames are user-screen stand-ins (literal light values, intended drift warnings).",
+  "tags": [
+    "CHR-905",
+    "CHR-909"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "state"
+}

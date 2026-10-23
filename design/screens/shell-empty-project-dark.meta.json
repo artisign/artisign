@@ -1,0 +1,12 @@
+{
+  "notes": "",
+  "tags": [
+    "CHR-905",
+    "shell",
+    "empty-state",
+    "chr-889",
+    "CHR-909"
+  ],
+  "variant_of": "shell-empty-project",
+  "variant_kind": "state"
+}

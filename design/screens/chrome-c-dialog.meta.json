@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-905 direction C, light: New project dialog over the dimmed shell (`--chrome-scrim`). radius.md 10px, padding spacing.3xl 20px, `chrome-btn` secondary-compact chips / ghost / secondary / primary, `chrome-list-row`, `chrome-field` focus. Dark counterpart: chrome-c-dialog-dark.",
+  "tags": [
+    "CHR-905",
+    "CHR-909"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "overlay"
+}

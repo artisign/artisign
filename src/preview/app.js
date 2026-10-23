@@ -15,7 +15,6 @@ import {
   fetchCompare,
   postComment,
   fetchProjects,
-  activateProject,
   openProject,
   initProject,
   fetchBoardState,
@@ -613,10 +612,10 @@ const projectUI = createProjectUI(
     emptyBtnInitEl: emptyBtnInit,
   },
   {
+    // Tab-local (CHR-775): the daemon's activeProject is only the default for a fresh tab.
     onSwitch: async (root) => {
-      const result = await activateProject(root);
-      if (result.ok) await applyProjectsResult(result.projects);
-      else console.error(result.message);
+      await switchToProject(root);
+      renderProjects(projectsState);
     },
     onOpenRecent: async (dir) => {
       const result = await openProject(dir);
@@ -647,17 +646,24 @@ const projectDialogs = createProjectDialogs(
   },
 );
 
-/** Applies a fresh `/api/projects` response: updates the picker/empty-state and, if the active project changed, switches to it. */
-async function applyProjectsResult(state) {
-  projectUI.render(state);
+let projectsState = { active: null, open: [], recent: [] }; // last /api/projects response; its `active` is the daemon's default, not this tab's
+
+/** Renders the picker/empty-state for this tab: the highlighted project is the tab's own, never the daemon-global default. */
+function renderProjects(state, active = activeProjectRoot) {
+  projectsState = state;
+  projectUI.render({ ...state, active });
   syncGuidePrompt();
-  if (state.active !== activeProjectRoot) await switchToProject(state.active);
+}
+
+/** Applies the `/api/projects` response of an open/init this tab triggered: the opening tab switches to the new project. */
+async function applyProjectsResult(state) {
+  renderProjects(state, state.active);
+  await switchToProject(state.active);
 }
 
 async function refreshProjectsState() {
   const state = await fetchProjects();
-  projectUI.render(state);
-  syncGuidePrompt();
+  renderProjects(state);
   return state;
 }
 
@@ -987,8 +993,13 @@ async function handleChangeEvent(event) {
 
 /** @param {{ type: "project-switched" | "project-opened" | "project-closed", root: string }} event */
 async function handleLifecycleEvent(event) {
-  const state = await refreshProjectsState();
-  if (event.type === "project-switched" || event.type === "project-closed") await switchToProject(state.active);
+  const state = await fetchProjects();
+  // Only this tab's own project closing moves it (or an empty tab picking up a first project);
+  // project-switched is ignored — the daemon-global default must not drag other tabs along (CHR-775).
+  if (activeProjectRoot === null || (event.type === "project-closed" && event.root === activeProjectRoot)) {
+    await switchToProject(state.active);
+  }
+  renderProjects(state);
 }
 
 /**
@@ -2168,8 +2179,9 @@ for (const tab of viewTabs) {
  * the single /events connection everything else reacts to.
  */
 async function boot() {
-  const state = await refreshProjectsState();
+  const state = await fetchProjects();
   activeProjectRoot = state.active;
+  renderProjects(state);
   reconnectSse(activeProjectRoot ?? undefined);
   if (activeProjectRoot) {
     await bootScreens();

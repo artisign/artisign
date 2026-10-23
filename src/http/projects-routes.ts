@@ -139,23 +139,5 @@ export async function handleProjectsApi(req: IncomingMessage, res: ServerRespons
     return true;
   }
 
-  if (url.pathname === "/api/projects/activate" && req.method === "POST") {
-    const body = await readBody(req, res);
-    if (body === undefined) return true;
-    if (typeof body.root !== "string" || body.root.length === 0) {
-      sendJson(res, 400, { code: "validation_failed", message: "root is required" });
-      return true;
-    }
-
-    try {
-      registry.activeProject = body.root;
-    } catch (err) {
-      sendJson(res, 400, { code: "validation_failed", message: err instanceof Error ? err.message : String(err) });
-      return true;
-    }
-    sendJson(res, 200, await buildProjectsResponse(registry));
-    return true;
-  }
-
   return false;
 }

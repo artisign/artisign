@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `patch_html` no longer duplicates or orphans `flows.json` edges: replacing or deleting a node with `data-flow-target` (or an
+  ancestor of one) now leaves exactly one edge per trigger, in document order, and `update_refs` keeps `flows.json` in sync. (CHR-813)
+
 ## [2.1.1] - 2026-10-21
 
 ### Fixed

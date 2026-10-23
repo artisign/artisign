@@ -238,7 +238,9 @@ describe("menu and empty-state rows are buttons without glyph icons (CHR-911)", 
     await boot();
     const rows = [...document.querySelectorAll("#project-menu .menu-item")];
     expect(rows).toHaveLength(3);
-    for (const row of rows) expect(row.tagName).toBe("BUTTON");
+    // The current project is plain content; every actionable row is a button.
+    expect(rows.map((r) => r.tagName)).toEqual(["DIV", "BUTTON", "BUTTON"]);
+    expect(menuRow("alpha").classList.contains("menu-item-active")).toBe(true);
     expect(menuRow("alpha").querySelector(".menu-item-check").textContent).toBe("check");
     expect(menuRow("alpha").getAttribute("aria-current")).toBe("true");
     expect($("#project-menu").textContent).not.toMatch(GLYPH_ICON);
@@ -251,5 +253,14 @@ describe("menu and empty-state rows are buttons without glyph icons (CHR-911)", 
     expect(row.tagName).toBe("BUTTON");
     expect(row.querySelector(".empty-recent-name").textContent).toBe("acme");
     expect($("#no-project-state").textContent).not.toMatch(GLYPH_ICON);
+  });
+
+  it("tells recents that share a base name apart by their shortened path, with the full path as title", async () => {
+    projects = { active: "/p", open: [{ root: "/p", name: "alpha" }], recent: ["/work/acme/design", "/work/other/design"] };
+    await boot();
+    const rows = [...document.querySelectorAll("#menu-recent-list .menu-item")];
+    expect(rows.map((r) => r.querySelector(".menu-item-name").textContent)).toEqual(["design", "design"]);
+    expect(rows.map((r) => r.querySelector(".menu-item-path").textContent)).toEqual(["\u2026/acme/design", "\u2026/other/design"]);
+    expect(rows.map((r) => r.title)).toEqual(["/work/acme/design", "/work/other/design"]);
   });
 });

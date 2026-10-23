@@ -267,6 +267,7 @@
 
 .chrome-menu-item.is-current {
   background: var(--chrome-active);
+  cursor: default;
 }
 
 /* Fixed-width column so labels align whether or not a row carries a check. */
@@ -284,6 +285,12 @@
 }
 
 /* Right-aligned hint column (the shortcut slot, filled by CHR-916). */
+/* Uppercase section label variant (the variant popover's "INSIDE X" / "SIBLINGS IN X"). */
+.chrome-menu-label--caps {
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .chrome-menu-hint {
   flex: none;
   margin-left: auto;
@@ -315,7 +322,7 @@
   color: var(--chrome-text-secondary);
 }
 
-.chrome-btn:hover {
+.chrome-btn:hover:not(:disabled) {
   background: var(--chrome-hover);
 }
 
@@ -326,8 +333,8 @@
   font-weight: 500;
 }
 
-.chrome-btn--primary:hover {
-  background: var(--chrome-text);
+.chrome-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--chrome-primary) 85%, var(--chrome-primary-text));
 }
 
 .chrome-btn--ghost {
@@ -346,14 +353,6 @@
 .chrome-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-
-.chrome-btn:disabled:hover {
-  background: var(--chrome-raised);
-}
-
-.chrome-btn--primary:disabled:hover {
-  background: var(--chrome-primary);
 }
 
 .chrome-field {
@@ -3263,7 +3262,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   font-size: var(--ui-sm);
 }
 
-.new-folder-input.is-error {
+.new-folder-row-error .new-folder-input {
   border-color: var(--chrome-error);
 }
 
@@ -3275,7 +3274,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   font-weight: 500;
 }
 
-.new-folder-create:hover {
+.new-folder-create:hover:not(:disabled) {
   background: var(--chrome-accent);
   filter: brightness(1.08);
 }
@@ -3590,13 +3589,6 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   width: 262px;
   font-size: var(--ui-base);
   font-weight: 400;
-}
-
-.variant-pop h4 {
-  padding: var(--space-sm) var(--space-md) 3px;
-  font-size: var(--ui-2xs);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .variant-pop-row {

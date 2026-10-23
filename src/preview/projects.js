@@ -12,6 +12,17 @@ function baseName(path) {
 }
 
 /**
+ * Abbreviated project root for a menu row's hint: the last two segments behind an ellipsis, so two projects sharing a base name stay distinguishable ("/Users/me/work/acme/design" -> ".../acme/design"). The full path is the row's title.
+ *
+ * @param {string} path
+ * @returns {string}
+ */
+export function shortPath(path) {
+  const segments = path.split("/").filter(Boolean);
+  return segments.length > 2 ? `\u2026/${segments.slice(-2).join("/")}` : path;
+}
+
+/**
  * @param {{
  *   triggerEl: HTMLElement, nameEl: HTMLElement, menuEl: HTMLElement,
  *   openLabelEl: HTMLElement, openListEl: HTMLElement, dividerEl: HTMLElement,
@@ -62,11 +73,12 @@ export function createProjectUI(elements, callbacks) {
     triggerEl.setAttribute("aria-expanded", String(menuOpen));
   }
 
-  function renderMenuRow(name, path, isActive, onClick, title = path) {
-    const row = document.createElement("button");
-    row.type = "button";
+  function renderMenuRow(name, path, isActive, onClick) {
+    // The current project is not actionable, so it is plain content, not a focusable button that does nothing.
+    const row = document.createElement(isActive ? "div" : "button");
+    if (!isActive) row.type = "button";
     row.className = "menu-item chrome-menu-item";
-    if (title) row.title = title;
+    row.title = path;
     if (isActive) {
       row.classList.add("menu-item-active", "is-current");
       row.setAttribute("aria-current", "true");
@@ -82,12 +94,10 @@ export function createProjectUI(elements, callbacks) {
     nameEl2.className = "menu-item-name";
     nameEl2.textContent = name;
     row.appendChild(nameEl2);
-    if (path) {
-      const pathEl = document.createElement("span");
-      pathEl.className = "menu-item-path chrome-menu-hint";
-      pathEl.textContent = path;
-      row.appendChild(pathEl);
-    }
+    const pathEl = document.createElement("span");
+    pathEl.className = "menu-item-path chrome-menu-hint";
+    pathEl.textContent = shortPath(path);
+    row.appendChild(pathEl);
 
     if (onClick) row.addEventListener("click", onClick);
     return row;
@@ -106,7 +116,7 @@ export function createProjectUI(elements, callbacks) {
     const recentOnly = state.recent.filter((path) => !state.open.some((p) => p.root === path));
     recentListEl.innerHTML = "";
     for (const path of recentOnly) {
-      recentListEl.appendChild(renderMenuRow(baseName(path), null, false, () => onOpenRecent(path), path));
+      recentListEl.appendChild(renderMenuRow(baseName(path), path, false, () => onOpenRecent(path)));
     }
     recentLabelEl.hidden = recentOnly.length === 0;
     dividerEl.hidden = state.open.length === 0 || recentOnly.length === 0;

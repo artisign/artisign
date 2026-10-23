@@ -245,6 +245,19 @@ describe("folder browser: + New folder", () => {
     expect(document.activeElement).toBe(initSectionEl.querySelector(".dir-row-created"));
   });
 
+  it("keeps Enter and Space on the just-created row from navigating into it", async () => {
+    await typeAndCreate(initSectionEl, "clients");
+    const row = initSectionEl.querySelector(".dir-row-created");
+    for (const [type, key] of [["keydown", "Enter"], ["keyup", " "], ["keydown", " "]]) {
+      const evt = new KeyboardEvent(type, { key, bubbles: true, cancelable: true });
+      row.dispatchEvent(evt);
+      expect(evt.defaultPrevented).toBe(true);
+    }
+    const other = new KeyboardEvent("keydown", { key: "a", bubbles: true, cancelable: true });
+    row.dispatchEvent(other);
+    expect(other.defaultPrevented).toBe(false);
+  });
+
   it("ignores a second Create while the request is in flight", async () => {
     let release;
     const gate = new Promise((r) => (release = r));

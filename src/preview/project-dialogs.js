@@ -147,6 +147,12 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       // (per spec) — so it's inert, neither selectable nor navigable.
       if (entry.path === createdFolderPath) {
         row.classList.add("dir-row-selected", "dir-row-created");
+        // The created row stays selected until the user clicks away; Enter/Space on it (it holds focus after creating) must not navigate into it.
+        const swallowActivation = (evt) => {
+          if (evt.key === "Enter" || evt.key === " ") evt.preventDefault();
+        };
+        row.addEventListener("keydown", swallowActivation);
+        row.addEventListener("keyup", swallowActivation);
         const badge = document.createElement("span");
         badge.className = "dir-row-badge dir-row-badge-new";
         badge.textContent = "new";
@@ -229,7 +235,6 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
         messageEl.textContent = newFolderErrorText(name, result);
         messageEl.hidden = false;
         row.classList.add("new-folder-row-error");
-        input.classList.add("is-error");
         input.focus();
         return;
       }
@@ -245,7 +250,6 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
     input.addEventListener("input", () => {
       messageEl.hidden = true;
       row.classList.remove("new-folder-row-error");
-      input.classList.remove("is-error");
     });
     // On the row, not the input: Esc with focus on Create/Cancel must close
     // only the row too — the dialog-level Escape must not also fire.

@@ -273,7 +273,7 @@ npm run lint         # eslint
 npm test             # vitest run
 npm run build        # compile src/ to dist/
 npm run dev -- serve ./my-project   # run the CLI from source via tsx
-./artisign-dev.sh start [dir...]     # build, stop any running Artisign, start this checkout in the background
+./artisign-dev.sh start [dir...]     # build, stop the running Artisign, start this checkout in the background
 ./artisign-dev.sh stop               # stop it (also: status)
 ```
 

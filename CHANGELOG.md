@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `delete_entity` now also removes the deleted component's or pattern's usage text from `design-system/meta.json`, in the same
+  commit, so a later component of the same name no longer inherits it. (CHR-773)
+
 ## [2.1.1] - 2026-10-21
 
 ### Fixed

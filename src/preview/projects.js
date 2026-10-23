@@ -62,29 +62,32 @@ export function createProjectUI(elements, callbacks) {
     triggerEl.setAttribute("aria-expanded", String(menuOpen));
   }
 
-  function renderMenuRow(name, path, isActive, onClick) {
-    const row = document.createElement("div");
-    row.className = "menu-item";
-    if (isActive) row.classList.add("menu-item-active");
+  function renderMenuRow(name, path, isActive, onClick, title = path) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "menu-item chrome-menu-item";
+    if (title) row.title = title;
+    if (isActive) {
+      row.classList.add("menu-item-active", "is-current");
+      row.setAttribute("aria-current", "true");
+    }
 
     const check = document.createElement("span");
-    check.className = "menu-item-check";
-    check.textContent = isActive ? "✓" : ""; // ✓
+    check.className = "menu-item-check chrome-menu-check icon";
+    check.setAttribute("aria-hidden", "true");
+    check.textContent = isActive ? "check" : "";
     row.appendChild(check);
 
-    const body = document.createElement("span");
-    body.className = "menu-item-body";
     const nameEl2 = document.createElement("span");
     nameEl2.className = "menu-item-name";
     nameEl2.textContent = name;
-    body.appendChild(nameEl2);
+    row.appendChild(nameEl2);
     if (path) {
       const pathEl = document.createElement("span");
-      pathEl.className = "menu-item-path";
+      pathEl.className = "menu-item-path chrome-menu-hint";
       pathEl.textContent = path;
-      body.appendChild(pathEl);
+      row.appendChild(pathEl);
     }
-    row.appendChild(body);
 
     if (onClick) row.addEventListener("click", onClick);
     return row;
@@ -103,7 +106,7 @@ export function createProjectUI(elements, callbacks) {
     const recentOnly = state.recent.filter((path) => !state.open.some((p) => p.root === path));
     recentListEl.innerHTML = "";
     for (const path of recentOnly) {
-      recentListEl.appendChild(renderMenuRow(path, null, false, () => onOpenRecent(path)));
+      recentListEl.appendChild(renderMenuRow(baseName(path), null, false, () => onOpenRecent(path), path));
     }
     recentLabelEl.hidden = recentOnly.length === 0;
     dividerEl.hidden = state.open.length === 0 || recentOnly.length === 0;
@@ -120,14 +123,20 @@ export function createProjectUI(elements, callbacks) {
 
     emptyRecentListEl.innerHTML = "";
     for (const path of state.recent) {
-      const row = document.createElement("div");
+      const row = document.createElement("button");
+      row.type = "button";
       row.className = "empty-recent-row";
+      const chevron = document.createElement("span");
+      chevron.className = "empty-recent-icon icon";
+      chevron.setAttribute("aria-hidden", "true");
+      chevron.textContent = "chevron_right";
       const name = document.createElement("span");
       name.className = "empty-recent-name";
       name.textContent = baseName(path);
       const pathEl = document.createElement("span");
       pathEl.className = "empty-recent-path";
       pathEl.textContent = path;
+      row.appendChild(chevron);
       row.appendChild(name);
       row.appendChild(pathEl);
       row.addEventListener("click", () => onOpenRecent(path));

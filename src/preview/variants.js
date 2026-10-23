@@ -175,35 +175,35 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare }
   }
 
   function popoverRow(name, current) {
-    const row = button("variant-pop-row", "", () => go(name));
+    const row = button("variant-pop-row chrome-menu-item", "", () => go(name));
     row.dataset.screen = name;
     const kind = last.tree.nodes.get(name)?.screen.variant_kind;
     const icon = createKindIcon(kind);
     if (icon) row.appendChild(icon);
     row.appendChild(el("span", "variant-pop-name", name));
     if (name === current) {
-      row.classList.add("current");
-      row.appendChild(el("span", "variant-pop-current", "current"));
+      row.classList.add("current", "is-current");
+      row.appendChild(el("span", "variant-pop-current chrome-menu-hint", "current"));
     }
     row.title = name;
     return row;
   }
 
   function renderPopover(node, current) {
-    const pop = el("div", "variant-pop");
+    const pop = el("div", "variant-pop chrome-menu");
     pop.setAttribute("role", "dialog");
     pop.setAttribute("aria-label", `Variants around ${node.name}`);
     if (node.children.length > 0) {
-      pop.appendChild(el("h4", "", `Inside ${node.name} · ${node.children.length}`));
+      pop.appendChild(el("h4", "chrome-menu-label", `Inside ${node.name} · ${node.children.length}`));
       for (const child of node.children) pop.appendChild(popoverEntry(child.name, current));
     }
     const siblings = node.parent ? node.parent.children.filter((c) => c !== node) : [];
     if (siblings.length > 0) {
-      pop.appendChild(el("h4", "", `Siblings in ${node.parent.name} · ${siblings.length}`));
+      pop.appendChild(el("h4", "chrome-menu-label", `Siblings in ${node.parent.name} · ${siblings.length}`));
       for (const sibling of siblings) pop.appendChild(popoverEntry(sibling.name, current));
     }
-    const itself = button("variant-pop-row variant-pop-itself", `Open ${node.name} itself`, () => go(node.name));
-    if (node.name === current) itself.classList.add("current");
+    const itself = button("variant-pop-row chrome-menu-item variant-pop-itself", `Open ${node.name} itself`, () => go(node.name));
+    if (node.name === current) itself.classList.add("current", "is-current");
     pop.appendChild(itself);
     return pop;
   }

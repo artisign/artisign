@@ -229,3 +229,27 @@ describe("project picker is tab-local (CHR-775)", () => {
     expect(err).toHaveBeenCalledWith("failed to refresh projects:", "daemon gone");
   });
 });
+
+describe("menu and empty-state rows are buttons without glyph icons (CHR-911)", () => {
+  const GLYPH_ICON = /[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFF0B\u25B8\u25BE]/u;
+
+  it("renders project-menu rows as buttons with a check icon on the current one", async () => {
+    projects = { ...projects, recent: ["/r"] };
+    await boot();
+    const rows = [...document.querySelectorAll("#project-menu .menu-item")];
+    expect(rows).toHaveLength(3);
+    for (const row of rows) expect(row.tagName).toBe("BUTTON");
+    expect(menuRow("alpha").querySelector(".menu-item-check").textContent).toBe("check");
+    expect(menuRow("alpha").getAttribute("aria-current")).toBe("true");
+    expect($("#project-menu").textContent).not.toMatch(GLYPH_ICON);
+  });
+
+  it("renders the empty-state recent rows as buttons", async () => {
+    projects = { active: null, open: [], recent: ["/work/acme"] };
+    await boot();
+    const row = $("#empty-recent-list .empty-recent-row");
+    expect(row.tagName).toBe("BUTTON");
+    expect(row.querySelector(".empty-recent-name").textContent).toBe("acme");
+    expect($("#no-project-state").textContent).not.toMatch(GLYPH_ICON);
+  });
+});

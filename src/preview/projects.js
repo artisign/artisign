@@ -29,7 +29,7 @@ export function shortPath(path) {
  *   recentLabelEl: HTMLElement, recentListEl: HTMLElement,
  *   actionOpenEl: HTMLElement, actionInitEl: HTMLElement,
  *   noProjectEl: HTMLElement, bodyEl: HTMLElement,
- *   viewTabsEl: HTMLElement, flowToggleEl: HTMLElement, commentToggleEl: HTMLElement,
+ *   topbarEl: HTMLElement,
  *   emptyRecentListEl: HTMLElement, emptyBtnOpenEl: HTMLElement, emptyBtnInitEl: HTMLElement,
  * }} elements
  * @param {{ onSwitch: (root: string) => void, onOpenRecent: (dir: string) => void, onOpenDialog: () => void, onInitDialog: () => void }} callbacks
@@ -48,9 +48,7 @@ export function createProjectUI(elements, callbacks) {
     actionInitEl,
     noProjectEl,
     bodyEl,
-    viewTabsEl,
-    flowToggleEl,
-    commentToggleEl,
+    topbarEl,
     emptyRecentListEl,
     emptyBtnOpenEl,
     emptyBtnInitEl,
@@ -126,9 +124,7 @@ export function createProjectUI(elements, callbacks) {
     const isEmpty = state.active === null;
     noProjectEl.hidden = !isEmpty;
     bodyEl.hidden = isEmpty;
-    viewTabsEl.hidden = isEmpty;
-    flowToggleEl.hidden = isEmpty;
-    commentToggleEl.hidden = isEmpty;
+    topbarEl.classList.toggle("is-empty", isEmpty); // hides every .project-only topbar element
     if (!isEmpty) return;
 
     emptyRecentListEl.innerHTML = "";
@@ -159,6 +155,7 @@ export function createProjectUI(elements, callbacks) {
     state = next;
     const activeProject = state.open.find((p) => p.root === state.active);
     nameEl.textContent = activeProject ? activeProject.name : "No project open";
+    nameEl.title = nameEl.textContent; // truncated by CSS when long
     triggerEl.classList.toggle("project-picker-empty", state.active === null);
     renderMenu();
     renderEmptyState();

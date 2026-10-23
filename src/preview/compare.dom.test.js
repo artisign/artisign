@@ -141,6 +141,7 @@ describe("member selection", () => {
     expect(chipNames()).toEqual(["family", "a", "b", "c"]);
     expect(columnNames()).toEqual(["family", "a", "b", "c"]);
     expect(els.barEl.querySelector(".compare-chip-add").disabled).toBe(true);
+    expect(els.barEl.querySelector(".compare-chip-add").dataset.tooltip).toMatch(/^At most \d+ screens/); // the reason is the shared tooltip, not a native title
   });
 
   it("the chip's remove button unticks the member, and the reference cannot be toggled", () => {

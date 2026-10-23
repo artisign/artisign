@@ -22,9 +22,10 @@
       <header id="topbar">
         <span id="app-title">Artisign</span>
         <div id="project-picker">
-          <button type="button" id="project-picker-trigger" aria-haspopup="true" aria-expanded="false">
+          <button type="button" id="project-picker-trigger" class="chrome-dropdown" aria-haspopup="true" aria-expanded="false">
+            <span id="project-picker-icon" class="icon" aria-hidden="true">folder_open</span>
             <span id="project-picker-name">No project open</span>
-            <span id="project-picker-chevron" aria-hidden="true">▾</span>
+            <span id="project-picker-chevron" class="icon" aria-hidden="true">expand_more</span>
           </button>
           <div id="project-menu" class="chrome-menu" hidden>
             <p id="menu-label-open" class="chrome-menu-label" hidden>Open projects</p>
@@ -41,11 +42,13 @@
             </button>
           </div>
         </div>
-        <nav id="view-tabs">
-          <button type="button" class="view-tab" data-view="screens" aria-pressed="true">Screens</button>
-          <button type="button" class="view-tab" data-view="design-system" aria-pressed="false">Design System</button>
-          <button type="button" class="view-tab" data-view="board" aria-pressed="false">Board</button>
+        <span class="chrome-divider-v project-only" aria-hidden="true"></span>
+        <nav id="view-tabs" class="project-only">
+          <button type="button" class="view-tab chrome-tab" data-view="screens" aria-pressed="true">Screens</button>
+          <button type="button" class="view-tab chrome-tab" data-view="design-system" aria-pressed="false">Design System</button>
+          <button type="button" class="view-tab chrome-tab" data-view="board" aria-pressed="false">Board</button>
         </nav>
+        <span class="chrome-divider-v project-only" aria-hidden="true"></span>
         <!-- CHR-628/CHR-629/CHR-631: one always-present follow-mode toggle, not a fork per
              tab/state — see the `$follow-toggle` component's usage note. data-state (off/
              following/paused) drives the look; the divider + "Resume" button only show
@@ -53,7 +56,7 @@
              affordance nested inside it (review fix 4) — a button can't contain another
              interactive descendant, and a keyboard activation's own event.target is the
              outer button either way, never a nested span. -->
-        <span id="follow-toggle" class="follow-toggle" data-state="off">
+        <span id="follow-toggle" class="follow-toggle chrome-pill project-only" data-state="off">
           <button type="button" id="follow-toggle-toggle" class="follow-toggle-toggle" aria-pressed="false">
             <span id="follow-toggle-dot" class="follow-toggle-dot" aria-hidden="true"></span>
             <span id="follow-toggle-label" class="follow-toggle-label">Follow</span>
@@ -61,27 +64,39 @@
           <span id="follow-toggle-divider" class="follow-toggle-divider" aria-hidden="true"></span>
           <button type="button" id="follow-toggle-resume" class="follow-toggle-resume">Resume</button>
         </span>
-        <button type="button" id="flow-mode-toggle" class="toggle-button" aria-pressed="false">Flow mode</button>
-        <button type="button" id="comment-mode-toggle" class="toggle-button" aria-pressed="false">Comment mode</button>
-        <button
-          type="button"
-          id="inspect-mode-toggle"
-          class="toggle-button"
-          aria-pressed="false"
-          title="When on, clicking an element in the canvas focuses and expands its entry in the Elements panel"
-        >
-          Inspect mode
+        <span class="topbar-spacer" aria-hidden="true"></span>
+        <!-- CHR-912: icon-only mode toggles. aria-label is the accessible name; data-tooltip is the shared tooltip (app.js swaps it for the disabled reason while comparing). data-shortcut stays empty until the shortcut ticket (CHR-916) binds the keys. -->
+        <button type="button" id="flow-mode-toggle" class="chrome-icon-btn project-only" aria-pressed="false" aria-label="Flow mode" data-tooltip="Flow mode" data-shortcut="">
+          <span class="icon" aria-hidden="true">route</span>
         </button>
-        <div id="canvas-controls">
-          <div id="zoom-controls" role="group" aria-label="Zoom">
-            <button type="button" class="zoom-button" data-zoom="fit" aria-pressed="true">Fit</button>
-            <button type="button" class="zoom-button" data-zoom="0.5" aria-pressed="false">50%</button>
-            <button type="button" class="zoom-button" data-zoom="1" aria-pressed="false">100%</button>
-            <button type="button" class="zoom-button" data-zoom="2" aria-pressed="false">200%</button>
+        <button type="button" id="comment-mode-toggle" class="chrome-icon-btn project-only" aria-pressed="false" aria-label="Comment mode" data-tooltip="Comment mode" data-shortcut="">
+          <span class="icon" aria-hidden="true">chat_bubble</span>
+        </button>
+        <button type="button" id="inspect-mode-toggle" class="chrome-icon-btn project-only" aria-pressed="false" aria-label="Inspect mode" data-tooltip="Inspect mode" data-shortcut="">
+          <span class="icon" aria-hidden="true">frame_inspect</span>
+        </button>
+        <div id="canvas-controls" class="project-only">
+          <span class="chrome-divider-v" aria-hidden="true"></span>
+          <!-- Zoom: a dropdown showing the current preset; the preset buttons keep .zoom-button / data-zoom / aria-pressed (app.js syncs them and the label). -->
+          <div id="zoom-controls">
+            <button type="button" id="zoom-trigger" class="chrome-dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Zoom">
+              <span id="zoom-label">Fit</span>
+              <span class="icon" aria-hidden="true">expand_more</span>
+            </button>
+            <div id="zoom-menu" class="chrome-menu" role="group" aria-label="Zoom" hidden>
+              <button type="button" class="zoom-button chrome-menu-item" data-zoom="fit" aria-pressed="true"><span class="icon chrome-menu-check" aria-hidden="true"></span>Fit</button>
+              <button type="button" class="zoom-button chrome-menu-item" data-zoom="0.5" aria-pressed="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>50%</button>
+              <button type="button" class="zoom-button chrome-menu-item" data-zoom="1" aria-pressed="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>100%</button>
+              <button type="button" class="zoom-button chrome-menu-item" data-zoom="2" aria-pressed="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>200%</button>
+            </div>
           </div>
-          <button type="button" id="status-bar-toggle" class="toggle-button" aria-pressed="false">Status bar</button>
+          <button type="button" id="status-bar-toggle" class="chrome-icon-btn" aria-pressed="false" aria-label="Status bar" data-tooltip="Status bar" data-shortcut="">
+            <span class="icon" aria-hidden="true">smartphone</span>
+          </button>
         </div>
-        <button type="button" id="warning-badge" title="Render diagnostics — click to step through" hidden></button>
+        <!-- Always shown (the empty no-project topbar has it too): separates the tools from theme / Live. -->
+        <span class="chrome-divider-v" aria-hidden="true"></span>
+        <button type="button" id="warning-badge" class="chrome-chip chrome-chip--warning" title="Render diagnostics — click to step through" hidden></button>
         <button
           type="button"
           id="theme-toggle"
@@ -91,7 +106,10 @@
         >
           <span class="icon" aria-hidden="true">contrast</span>
         </button>
-        <span id="connection-status" title="Live reload connection">●</span>
+        <span id="connection-status" class="chrome-live" data-tooltip="Live reload: connected">
+          <span id="connection-status-dot" class="chrome-live-dot" aria-hidden="true"></span>
+          <span id="connection-status-label">Live</span>
+        </span>
       </header>
       <div id="body">
         <aside id="sidebar-screens" class="side-panel" data-collapsed="false">
@@ -188,6 +206,7 @@
                   </li>
                 </ol>
               </div>
+              <div id="frame-caption" hidden></div>
               <div id="screen-holder">
                 <!--
                   sandbox="allow-same-origin" only, NEVER "allow-scripts": this

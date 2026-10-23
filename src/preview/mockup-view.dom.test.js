@@ -103,17 +103,22 @@ describe("renderMockupView", () => {
     expect(() => iframe.dispatchEvent(new Event("load"))).not.toThrow();
   });
 
-  it("calls onColumnMeasured once per column, only once its iframe's FINAL size (post-rAF) is known — not at load, while height is still a placeholder", async () => {
+  it("calls onColumnMeasured for every column only once its iframe's final size is known — never while the height is still the CSS placeholder", async () => {
     const container = document.createElement("div");
-    const onColumnMeasured = vi.fn();
+    const heightsAtCall = [];
+    const onColumnMeasured = vi.fn(() => {
+      heightsAtCall.push([...container.querySelectorAll(".mockup-column iframe")].map((f) => f.style.height));
+    });
     renderMockupView(
       container,
       { name: "a", variants: [{ id: "1", title: "V1" }, { id: "2", title: "V2" }] },
       { fetchRenderFor: () => Promise.resolve({ ok: true, html: "<p>x</p>" }), onColumnMeasured },
     );
     await flush();
+    expect(onColumnMeasured).not.toHaveBeenCalled(); // nothing loaded yet
 
-    for (const iframe of container.querySelectorAll(".mockup-column iframe")) {
+    const iframes = [...container.querySelectorAll(".mockup-column iframe")];
+    for (const iframe of iframes) {
       // jsdom never actually navigates a srcdoc iframe — stub contentDocument
       // the way createFittingIframe (iframe-fit.js) reads it, so its `load`
       // listener runs its real width/height/onFitted logic instead of
@@ -123,17 +128,13 @@ describe("renderMockupView", () => {
         value: { documentElement: { scrollWidth: 300, scrollHeight: 900 } },
       });
       iframe.dispatchEvent(new Event("load"));
-    }
-    // onFitted (and so onColumnMeasured) fires one animation frame after
-    // load, once the real height replaces the CSS-default placeholder —
-    // asserting BEFORE that frame proves the callback isn't (mis)called early.
-    expect(onColumnMeasured).not.toHaveBeenCalled();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-
-    expect(onColumnMeasured).toHaveBeenCalledTimes(2);
-    for (const iframe of container.querySelectorAll(".mockup-column iframe")) {
+      // Fitted synchronously on load, no animation frame needed.
       expect(iframe.style.height).toBe("900px");
     }
+    expect(onColumnMeasured).toHaveBeenCalled();
+    // Every call (fit, and again after the column took the frame's width) saw the first column already sized.
+    expect(heightsAtCall.every((heights) => heights[0] === "900px")).toBe(true);
+    expect(heightsAtCall.at(-1)).toEqual(["900px", "900px"]);
   });
 
   it("clears previous content on re-render", () => {

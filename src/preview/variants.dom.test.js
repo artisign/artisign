@@ -182,7 +182,9 @@ describe("variant tree map", () => {
   it("keeps off-path subtrees collapsed with a count", () => {
     const { map } = setup("two-parents");
     expect(nodes(map)).toEqual(["family", "leave", "two-parents", "name-sheet"]);
-    expect(map.querySelector('.map-node[data-screen="leave"] .map-node-note').textContent).toBe("▸ 3");
+    const note = map.querySelector('.map-node[data-screen="leave"] .map-node-note');
+    expect(note.querySelector(".icon").textContent).toBe("chevron_right");
+    expect(note.textContent).toBe("chevron_right3");
   });
 
   it("an entry click navigates", () => {
@@ -235,6 +237,25 @@ describe("compare mode controls (CHR-738)", () => {
     ]);
     seg(bar)[0].click();
     expect(calls).toEqual([["mode", false]]);
+  });
+
+  it("hides the variant-map toggle while comparing, shows it otherwise", () => {
+    const map = { visible: () => true, onToggle: () => {} };
+    const make = (state) => {
+      document.body.innerHTML = '<nav id="bar"></nav><aside id="map"></aside><section id="insp"></section>';
+      const ui = createVariantUI({
+        barEl: document.getElementById("bar"),
+        mapEl: document.getElementById("map"),
+        inspectorEl: document.getElementById("insp"),
+        onSelect: () => {},
+        map,
+        compare: { state: () => ({ cap: 3, selected: [], on: false, ...state }), onMode: () => {}, onPick: () => {} },
+      });
+      ui.update(screens, flows, "confirm");
+      return document.getElementById("bar");
+    };
+    expect(make({}).querySelector(".variant-map-toggle")).not.toBeNull();
+    expect(make({ on: true, selected: ["dissolve"] }).querySelector(".variant-map-toggle")).toBeNull();
   });
 
   it("has no toggle without the compare option", () => {

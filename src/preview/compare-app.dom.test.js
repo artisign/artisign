@@ -184,18 +184,18 @@ describe("picking members", () => {
 describe("other modes", () => {
   it("comment and inspect are disabled with a tooltip while comparing, and back afterwards", async () => {
     await boot("a");
-    const inspectTitle = $("#inspect-mode-toggle").title;
+    const inspectTooltip = $("#inspect-mode-toggle").dataset.tooltip;
     seg("compare").click();
     await flush();
     for (const id of ["comment-mode-toggle", "inspect-mode-toggle"]) {
       expect($(`#${id}`).disabled).toBe(true);
-      expect($(`#${id}`).title).toBe("Not available while comparing variants");
+      expect($(`#${id}`).dataset.tooltip).toBe("Not available while comparing variants");
     }
     seg("single").click();
     await flush();
     expect($("#comment-mode-toggle").disabled).toBe(false);
     expect($("#inspect-mode-toggle").disabled).toBe(false);
-    expect($("#inspect-mode-toggle").title).toBe(inspectTitle);
+    expect($("#inspect-mode-toggle").dataset.tooltip).toBe(inspectTooltip);
   });
 
   it("turning flow mode on leaves compare first", async () => {

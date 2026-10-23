@@ -111,7 +111,21 @@ export function initTooltips(doc) {
     if (target && target === current) show(target);
   };
 
+  // Disabled controls get no (or unreliable, browser-dependent) mouse events, so a disabled trigger — whose reason is the whole point of its tooltip — is hit-tested by position instead.
+  const onMove = (event) => {
+    hideIfStale();
+    if (triggerOf(event)) return;
+    // Occlusion-aware: whatever is topmost under the pointer, not a rect scan.
+    const hit = doc.elementFromPoint?.(event.clientX, event.clientY)?.closest("[data-tooltip]");
+    if (hit?.disabled && hit !== current && hit !== dismissed) show(hit);
+    else if (!hit?.disabled && current?.disabled) {
+      dismissed = null;
+      hide();
+    }
+  };
+
   doc.addEventListener("mouseover", onOver);
+  doc.addEventListener("mousemove", onMove);
   doc.addEventListener("mouseout", onOut);
   doc.addEventListener("focusin", onFocusIn);
   doc.addEventListener("focusout", onFocusOut);
@@ -123,6 +137,7 @@ export function initTooltips(doc) {
 
   const dispose = () => {
     doc.removeEventListener("mouseover", onOver);
+    doc.removeEventListener("mousemove", onMove);
     doc.removeEventListener("mouseout", onOut);
     doc.removeEventListener("focusin", onFocusIn);
     doc.removeEventListener("focusout", onFocusOut);

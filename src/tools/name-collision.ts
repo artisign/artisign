@@ -19,9 +19,9 @@ function collectMatches(sources: SourceDoc[], matches: (unit: Unit, syntax: "cla
   for (const source of sources) {
     for (const node of Object.values(source.doc.nodes)) {
       if (matches(node, node.instanceSyntax)) found.add(formatNodeRef(source.address, node.id));
-      // Slot fills are never in doc.nodes; the owner is the addressable node. A fill is class-form unless parsed from data-component.
+      // Slot fills are never in doc.nodes; the owner is the addressable node. Screens are re-serialized and the serializer writes every fill in class form; definitions are stored verbatim, so only there a data-component fill stays one.
       const visit = (sub: NodeSubtree): void => {
-        if (matches(sub, sub.instanceSyntax ?? "class")) found.add(`${formatNodeRef(source.address, node.id)} (slot fill)`);
+        if (matches(sub, source.kind === "screen" ? "class" : (sub.instanceSyntax ?? "class"))) found.add(`${formatNodeRef(source.address, node.id)} (slot fill)`);
         for (const child of sub.children) visit(child);
         for (const child of Object.values(sub.slotOverrides ?? {})) visit(child);
       };
@@ -83,10 +83,8 @@ export async function checkNewComponentName(
 
   const { docs } = await loadAllDocuments(store, registry);
   const affected = collectMatches(docs, (u) => u.kind === "element" && u.refs.tokens.class === name);
-  const incomingUses = (options.incoming ?? []).some((doc) =>
-    Object.values(doc.nodes).some((n) => n.kind === "element" && n.refs.tokens.class === name),
-  );
-  if (incomingUses) affected.push("the new definition");
+  const incoming: SourceDoc[] = (options.incoming ?? []).map((doc) => ({ kind: "component", name, address: name, doc }));
+  if (collectMatches(incoming, (u) => u.kind === "element" && u.refs.tokens.class === name).length > 0) affected.push("the new definition");
   if (affected.length > 0 || options.breaksNewInstances) {
     const where = affected.length > 0 ? ` and would stop resolving as the token class on ${affected.join(", ")}` : "";
     throw new ToolError(

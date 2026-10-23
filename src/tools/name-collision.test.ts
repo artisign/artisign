@@ -31,9 +31,18 @@ describe("component / bare token member name collision (CHR-772)", () => {
       expect(await fx.store.readTokens()).toEqual(before);
     });
 
-    it("does not count a data-component slot fill as a class-form instance", async () => {
+    it("counts a data-component fill in a screen as class-form (screens are re-serialized in class form)", async () => {
       await fx.store.writeComponent("card", `<div id="c"><span data-slot="body">d</span></div>`);
       await fx.store.writeScreen("home", `<div id="n1"><div id="n2" class="$card"><p data-slot="body" data-component="eyebrow">x</p></div></div>`);
+      await expect(setTokens(fx.store, { tokens: { "typography.eyebrow": "12px" }, mode: "patch" })).rejects.toMatchObject({
+        code: "conflict",
+        message: expect.stringContaining("home.n2 (slot fill)"),
+      });
+    });
+
+    it("does not count a data-component fill in a definition (stored verbatim)", async () => {
+      await fx.store.writeComponent("card", `<div id="c"><span data-slot="body">d</span></div>`);
+      await fx.store.writeComponent("wrapper", `<div id="w"><div id="i" class="$card"><p data-slot="body" data-component="eyebrow">x</p></div></div>`);
       const res = await setTokens(fx.store, { tokens: { "typography.eyebrow": "12px" }, mode: "patch" });
       expect(res.warnings).toEqual([expect.objectContaining({ kind: "ambiguous_ref", target: "eyebrow" })]);
     });
@@ -80,6 +89,18 @@ describe("component / bare token member name collision (CHR-772)", () => {
         writeHtml(fx.store, { kind: "component", screen: "eyebrow", mode: "create", html_aug: `<p id="p" class="$eyebrow">x</p>` }),
       ).rejects.toMatchObject({ code: "conflict", message: expect.stringContaining("the new definition") });
       expect(await fx.store.listComponents()).toEqual([]);
+    });
+
+    it("refuses when the incoming definition uses class=$name as token class inside a slot fill", async () => {
+      await fx.store.writeComponent("card", `<div id="c"><span data-slot="body">d</span></div>`);
+      await expect(
+        writeHtml(fx.store, {
+          kind: "component",
+          screen: "eyebrow",
+          mode: "create",
+          html_aug: `<div id="w"><div id="i" class="$card"><p data-slot="body" class="$eyebrow">x</p></div></div>`,
+        }),
+      ).rejects.toMatchObject({ code: "conflict", message: expect.stringContaining("the new definition") });
     });
 
     it("does not re-check when the component already exists (replace)", async () => {

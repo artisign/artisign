@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A component name and a bare token member name share one namespace for `class="$name"`: `set_tokens`, `write_html` and
+  `promote_to_system` now refuse (`conflict`) when introducing the second meaning would unbind existing nodes and otherwise warn
+  `ambiguous_ref`; an already ambiguous ref renders with the red outline instead of silently as a plain element. (CHR-772)
 - `patch_html` no longer duplicates or orphans `flows.json` edges: replacing or deleting a node with `data-flow-target` (or an
   ancestor of one) now leaves exactly one edge per trigger, in document order, and `update_refs` keeps `flows.json` in sync. (CHR-813)
 - The preview's project picker is now tab-local: choosing a project in one tab no longer moves every other open tab to

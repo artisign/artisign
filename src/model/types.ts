@@ -55,6 +55,8 @@ export type NodeSubtree = {
   children: NodeSubtree[];
   /** Only meaningful when kind is "component_instance" — its content lives here, not in `children`. */
   slotOverrides?: Record<string, NodeSubtree>;
+  /** Set only for a `data-component` fill instance as parsed; absent means class form (what the serializer writes). */
+  instanceSyntax?: "data-attr";
 };
 
 export type Node = {

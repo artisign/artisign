@@ -34,6 +34,15 @@ describe("flow edges on slot-fill content (CHR-778)", () => {
     expect(await fx.store.readFlows()).toEqual([edge("cart.deep", "home", "longpress"), edge("cart.inner-back", "checkout")]);
   });
 
+  it("a data-component fill carrying data-flow-target still produces its edge and survives a rewrite", async () => {
+    await fx.store.writeComponent("icon-btn", `<button id="ib">i</button>`);
+    const html = `<div id="root"><div id="bar" class="$nav-bar"><div id="cart-back" data-slot="back" data-component="icon-btn" data-flow-target="home"></div></div></div>`;
+    await write(html);
+    await writeHtml(fx.store, { screen: "cart", mode: "replace", html_aug: html });
+    expect(await fx.store.readFlows()).toEqual([edge("cart.cart-back", "home")]);
+    expect(await fx.store.readScreen("cart")).toContain('data-flow-target="home"');
+  });
+
   it("find_nodes has_flow matches a fill with an edge", async () => {
     await write(`<div id="root"><div id="bar" class="$nav-bar"><button id="cart-back" data-slot="back" data-flow-target="home">Back</button></div></div>`);
     const res = (await findNodes(fx.store, { where: [{ kind: "has_flow" }] } as never)) as { nodes: Array<{ id?: string }> };

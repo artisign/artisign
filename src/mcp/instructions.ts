@@ -39,11 +39,12 @@ NODE IDS:
   id="btn-login"  stable, human-chosen; generated if omitted — keep it
   stable across writes (patches and comments address nodes by id).
 NODE REFS: "<screen>.<node-id>"; a definition node is
-"component:<name>#<variant>.<node-id>" or "pattern:<name>.<node-id>" (get_node,
-find_nodes, update_refs, patch_html, inspect_node, get_screenshot) and needs an
-explicit id, else its ref holds for one call only (missing_id warning). A node in
-a component instance's slot fill is no ref for get_node/update_refs; with an
-authored id, patch_html/inspect_node take "<screen>.<id>".
+"component:<name>#<variant>.<node-id>" or "pattern:<name>.<node-id>". Taken by
+get_node, update_refs, patch_html, inspect_node, get_screenshot; returned by
+find_nodes. A definition node without an explicit id keeps its ref for one call
+only (find_nodes: id_stability "derived"; writes warn missing_id). A node in a
+slot fill is no ref for get_node/update_refs; with an authored id,
+patch_html/inspect_node take "<screen>.<id>".
 
 EXAMPLE:
   <section id="hero" style="padding: $spacing.lg">

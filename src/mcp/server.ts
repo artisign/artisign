@@ -137,19 +137,19 @@ export function createMcpServer(
   // zod's draft-7 output carries an uninformative "$schema" on every inputSchema
   // (25 x 52 chars per tools/list, CHR-884). The SDK has no switch for it, so
   // strip it from the registered handler's result. This reaches into a private
-  // SDK field, hence the throw: an SDK upgrade that renames it must fail loudly
-  // here, not silently bring the overhead back. Pinned by a test in server.test.ts.
+  // SDK field, so it degrades to a no-op if the field is gone (a newer SDK must
+  // not break every MCP call): the "no $schema" test in server.test.ts is the
+  // tripwire that fails in CI on such an SDK bump.
   type ListToolsHandler = (req: unknown, extra: unknown) => Promise<{ tools: { inputSchema: Record<string, unknown> }[] }>;
   const handlers = (server.server as unknown as { _requestHandlers?: Map<string, ListToolsHandler> })._requestHandlers;
   const listTools = handlers?.get("tools/list");
-  if (!handlers || !listTools) {
-    throw new Error('MCP SDK assumption broken: Server._requestHandlers has no "tools/list" handler after registerTool');
+  if (handlers && listTools) {
+    handlers.set("tools/list", async (req, extra) => {
+      const result = await listTools(req, extra);
+      for (const tool of result.tools) delete tool.inputSchema.$schema;
+      return result;
+    });
   }
-  handlers.set("tools/list", async (req, extra) => {
-    const result = await listTools(req, extra);
-    for (const tool of result.tools) delete tool.inputSchema.$schema;
-    return result;
-  });
 
   return server;
 }

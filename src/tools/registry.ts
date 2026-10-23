@@ -20,6 +20,9 @@ import { getGuide } from "./guide.js";
 import { writeMockup, getMockup, promoteMockup } from "./mockups.js";
 import { setBoardState } from "./board-state.js";
 
+// Repeated on every node-ref input; INSTRUCTIONS (NODE REFS) has the full rule, but some clients drop instructions.
+const NODE_REF = "<screen>.<node-id>, or component:<name>#<variant>.<node-id> / pattern:<name>.<node-id>";
+
 const viewSchema = z.enum(["summary", "tree", "full"]);
 const responseModeSchema = z.enum(["summary", "diff", "full"]);
 const flowEventSchema = z.enum(["tap", "hover", "longpress", "swipe-left", "swipe-right"]);
@@ -114,7 +117,7 @@ export const TOOLS: ToolDefinition[] = [
   tool(
     "get_node",
     "Subtree of one node (node refs: see the server instructions). Tiered, with fields selection. view \"full\" on a component instance adds slots: its fills in document order, each with slot name, tag, refs and rendered id.",
-    { node: z.string(), view: viewSchema.optional(), fields: z.array(z.string()).optional() },
+    { node: z.string().describe(NODE_REF), view: viewSchema.optional(), fields: z.array(z.string()).optional() },
     (store, input) => getNode(store, input as never),
   ),
   tool(
@@ -125,7 +128,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "find_nodes",
-    "Where-query across screens and, always, component/pattern definitions (screens only narrows which screens). where: style_ref, component_ref, variant, has_comments, text_match, has_flow. Definition matches carry source and id_stability; a match inside a slot fill has node: null, addressable: false. Far cheaper than reading screens.",
+    "Where-query across screens and, always, component/pattern definitions (screens only narrows which screens). where: style_ref, component_ref, variant, has_comments, text_match, has_flow. Definition matches carry source and id_stability; a match inside a slot fill has node: null, addressable: false. Far cheaper than reading screens. id_stability \"derived\": the ref holds for this call only; \"explicit\" is stable across writes.",
     {
       where: z.array(predicateSchema),
       screens: z.array(z.string()).optional(),
@@ -188,7 +191,7 @@ export const TOOLS: ToolDefinition[] = [
     "Surgical patch by node ref or CSS selector (selector: screens only): replace, insert_before, insert_after, delete, set_attr. html_aug for replace/insert_* is a fragment in the write_html grammar — in a definition, never style the slot element itself. Example: { target: { kind: \"node\", node: \"home.btn1\" }, operation: \"set_attr\", attr: { name: \"data-variant\", value: \"hover\" } }.",
     {
       target: z.union([
-        z.object({ kind: z.literal("node"), node: z.string() }),
+        z.object({ kind: z.literal("node"), node: z.string().describe(NODE_REF) }),
         z.object({ kind: z.literal("selector"), screen: z.string(), css_selector: z.string() }),
       ]),
       operation: z.enum(["replace", "insert_before", "insert_after", "delete", "set_attr"]),
@@ -202,7 +205,7 @@ export const TOOLS: ToolDefinition[] = [
     "update_refs",
     "Change a node's $token/$component/variant bindings without an HTML parse — the cheapest write. token_refs maps a CSS property to a token path (\"color.primary\"; null clears). Setting a property replaces its whole value with one plain ref; author mixed values with write_html/patch_html.",
     {
-      node: z.string(),
+      node: z.string().describe(NODE_REF),
       refs: z.object({
         component_ref: z.string().nullable().optional(),
         variant: z.string().nullable().optional(),
@@ -274,7 +277,7 @@ export const TOOLS: ToolDefinition[] = [
     "PNG of a screen, one mockup variant (mockup + variant) or, on its own, a definition node ref — exactly one target. node clips a screen to one element (+8px): far fewer vision tokens. For a mockup, width sets the viewport (default 390) and the capture is full-page; a screen renders at its root's declared size. scale 1-3 (default 1) multiplies vision cost. browser re-renders in another installed engine; the result names the one used.",
     {
       screen: z.string().optional(),
-      node: z.string().optional(),
+      node: z.string().describe(NODE_REF).optional(),
       scale: z.number().optional(),
       mockup: z.string().optional(),
       variant: z.string().optional(),
@@ -285,8 +288,8 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "inspect_node",
-    "Computed bounding box (x/y/width/height) and a fixed set of 12 styles (display, position, spacing, border, font, color, background, overflow) of one node, rendered headlessly. Prefer it to get_screenshot for geometry, alignment and color questions — text is far cheaper than vision; use get_screenshot for visual judgment. Same browser input.",
-    { node: z.string(), browser: z.enum(BROWSER_KINDS).optional() },
+    "Computed bounding box (x/y/width/height) and 12 computed styles (display, position, margin, padding, border, border_radius, font_size, line_height, font_weight, color, background_color, overflow) of one node, rendered headlessly. Prefer it to get_screenshot for geometry, alignment and color questions — text is far cheaper than vision; use get_screenshot for visual judgment. Same browser input.",
+    { node: z.string().describe(NODE_REF), browser: z.enum(BROWSER_KINDS).optional() },
     (store, input) => inspectNode(store, input as never),
   ),
 

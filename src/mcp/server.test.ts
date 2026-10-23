@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { createRequire } from "node:module";
 import { NO_BROWSER_MESSAGE, selectBrowser } from "../tools/browser.js";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -211,7 +211,7 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   let client: Client;
   let tools: Awaited<ReturnType<Client["listTools"]>>["tools"];
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const resolver = async () => {
       throw new Error("not called");
     };
@@ -222,7 +222,7 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
     tools = (await client.listTools()).tools;
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     await client.close();
   });
 

@@ -1,5 +1,5 @@
 import { parseFragment } from "parse5";
-import { collectFillFlows } from "./fill-flows.js";
+import { collectFillFlows, fillTriggerIssues } from "./fill-flows.js";
 import type { DefaultTreeAdapterTypes } from "parse5";
 import { findSuspiciousAttr } from "./augmentation-attrs.js";
 import { NodeIdAllocator } from "./node-id.js";
@@ -718,6 +718,7 @@ export function parseSubtreeFragment(
   const subtrees = fragment.childNodes
     .filter((n) => !(n.nodeName === "#text" && (n as DefaultTreeAdapterTypes.TextNode).value.trim() === ""))
     .map((n) => buildSubtree(n, false, registry, errors));
+  errors.push(...fillTriggerIssues(subtrees));
   return { subtrees, errors, explicitIds: [...idCounts.keys()] };
 }
 

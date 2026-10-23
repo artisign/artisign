@@ -431,7 +431,7 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
     path: `screens/${screen}.html`,
     ...commitFields(commitResult),
     affected_nodes: [...affected],
-    warnings: [...refWarnings, ...fillFlowWarnings(doc), ...scopedDriftWarnings, ...scopedRepeatedPatternWarnings],
+    warnings: [...refWarnings, ...fillFlowWarnings(doc, new Set(affectedNodeIds)), ...scopedDriftWarnings, ...scopedRepeatedPatternWarnings],
     preexisting_drift_count: preexistingDriftCount,
     // Only when the index was actually built: absent means "not measured",
     // `0` means "measured, nothing repeated". Reporting a flat `0` on the

@@ -110,10 +110,24 @@ export async function syncScreenFlows(store: Store, doc: ScreenDocument): Promis
 /**
  * A slot fill with `data-flow-target` but no authored id cannot be addressed,
  * so it produces no edge (CHR-778). One `missing_id` warning per owning
- * instance, never blocking.
+ * instance, never blocking. `touched` (raw node and fill ids a patch changed)
+ * narrows it to instances at or below a touched node, or owning a touched
+ * fill; without it every instance in the screen is reported.
  */
-export function fillFlowWarnings(doc: ScreenDocument): Warning[] {
-  return collectFillFlows(doc).missingIdOwners.map((ownerId) => {
+export function fillFlowWarnings(doc: ScreenDocument, touched?: ReadonlySet<string>): Warning[] {
+  let owners = collectFillFlows(doc).missingIdOwners;
+  if (touched) {
+    const touchedFillOwners = new Set<string>();
+    forEachFill(doc, (sub, ownerId) => {
+      if (sub.id !== undefined && touched.has(sub.id)) touchedFillOwners.add(ownerId);
+    });
+    const underTouched = (id: string | null): boolean => {
+      for (let cur = id; cur; cur = doc.nodes[cur]?.parentId ?? null) if (touched.has(cur)) return true;
+      return false;
+    };
+    owners = owners.filter((ownerId) => touchedFillOwners.has(ownerId) || underTouched(ownerId));
+  }
+  return owners.map((ownerId) => {
     const target = formatNodeRef(doc.id, ownerId);
     return {
       kind: "missing_id",

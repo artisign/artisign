@@ -77,6 +77,33 @@ describe("flow edges on slot-fill content (CHR-778)", () => {
     expect(await fx.store.readFlows()).toEqual([]);
   });
 
+  it("patch_html rejects an invalid data-flow-trigger on a fill replacement", async () => {
+    await write(`<div id="root"><div id="bar" class="$nav-bar"><button id="cart-back" data-slot="back">Back</button></div></div>`);
+    await expect(
+      patchHtml(fx.store, {
+        target: { kind: "node", node: "cart.cart-back" },
+        operation: "replace",
+        html_aug: `<button id="cart-back" data-slot="back" data-flow-target="home" data-flow-trigger="shake">Back</button>`,
+      }),
+    ).rejects.toMatchObject({ code: "validation_failed", message: expect.stringContaining("not a valid data-flow-trigger") });
+    expect(await fx.store.readFlows()).toEqual([]);
+  });
+
+  it("patch_html scopes the missing_id warning to the touched nodes", async () => {
+    await fx.store.writeScreen(
+      "cart",
+      `<div id="root"><div id="bar" class="$nav-bar"><button data-slot="back" data-flow-target="home">Back</button></div><p id="plain">x</p><section id="sec"><div id="bar2" class="$nav-bar"><button data-slot="back" data-flow-target="home">Back</button></div></section></div>`,
+    );
+    const untouched = await patchHtml(fx.store, { target: { kind: "node", node: "cart.plain" }, operation: "set_attr", attr: { name: "title", value: "t" } });
+    expect(warningKinds(untouched)).not.toContain("missing_id");
+
+    const touched = await patchHtml(fx.store, { target: { kind: "node", node: "cart.bar" }, operation: "set_attr", attr: { name: "title", value: "t" } });
+    expect(touched.warnings).toEqual([expect.objectContaining({ kind: "missing_id", target: "cart.bar" })]);
+
+    const ancestor = await patchHtml(fx.store, { target: { kind: "node", node: "cart.sec" }, operation: "set_attr", attr: { name: "title", value: "t" } });
+    expect(ancestor.warnings).toEqual([expect.objectContaining({ kind: "missing_id", target: "cart.bar2" })]);
+  });
+
   describe("folding a subtree into slot fills keeps its flows", () => {
     const body = `<div id="root"><div id="box"><a id="go" data-flow-target="home" data-flow-trigger="hover">go</a><a data-flow-target="cart">anon</a></div></div>`;
 

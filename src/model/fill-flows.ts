@@ -14,6 +14,24 @@ export function forEachFill(doc: ScreenDocument, visit: (sub: NodeSubtree, owner
   }
 }
 
+function invalidTrigger(sub: NodeSubtree): string | undefined {
+  const raw = sub.attributes["data-flow-trigger"];
+  return sub.attributes["data-flow-target"] && raw && !(ALLOWED_FLOW_TRIGGERS as readonly string[]).includes(raw) ? raw : undefined;
+}
+
+/** `unknown_flow_trigger` issues for freshly parsed fill content (patch_html fragments, which never go through `parseScreen`). */
+export function fillTriggerIssues(subs: NodeSubtree[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const walk = (sub: NodeSubtree): void => {
+    const raw = invalidTrigger(sub);
+    if (raw) issues.push({ code: "unknown_flow_trigger", message: `"${raw}" is not a valid data-flow-trigger` });
+    for (const child of sub.children) walk(child);
+    for (const child of Object.values(sub.slotOverrides ?? {})) walk(child);
+  };
+  subs.forEach(walk);
+  return issues;
+}
+
 /**
  * Flow edges authored on slot-fill content. Fills live outside `doc.nodes`, so
  * `buildElement` never sees them; the raw `data-flow-target` /

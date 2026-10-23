@@ -6,7 +6,7 @@ import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { writeHtml, patchHtml, updateRefs, setTokens, setFlow } from "./writes.js";
 import { buildRenderContext } from "./render-context.js";
 import { parseScreen, renderScreen, loadRegistry } from "../model/index.js";
-import { FsStore } from "../store/index.js";
+import { FsStore, type FlowRecord } from "../store/index.js";
 import { ToolError, type Warning } from "./types.js";
 
 describe("write_html", () => {
@@ -435,6 +435,61 @@ describe("patch_html", () => {
     expect(res.affected_nodes).toEqual(["home.n2"]);
     expect(await fx.store.readScreen("home")).toContain("New");
     expect(await fx.store.readScreen("home")).not.toContain("Old");
+  });
+
+  describe("flows.json sync", () => {
+    const edge = (node: string, to: string): FlowRecord => ({ from: `home.${node}`, event: "tap", to, to_kind: "screen" });
+
+    beforeEach(async () => {
+      await fx.store.writeScreen(
+        "home",
+        `<section id="n1"><a id="n2" data-flow-target="checkout">A</a><a id="n3" data-flow-target="cart">B</a></section>`,
+      );
+      await writeHtml(fx.store, { screen: "home", mode: "replace", html_aug: await fx.store.readScreen("home") });
+    });
+
+    it("keeps exactly one edge when a flow node is replaced with the same target", async () => {
+      expect(await fx.store.readFlows()).toHaveLength(2);
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.n2" },
+        operation: "replace",
+        html_aug: `<a id="n2" data-flow-target="checkout">A2</a>`,
+      });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart"), edge("n2", "checkout")]);
+    });
+
+    it("follows a changed data-flow-target on replace", async () => {
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.n2" },
+        operation: "replace",
+        html_aug: `<a id="n2" data-flow-target="payment">A</a>`,
+      });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart"), edge("n2", "payment")]);
+    });
+
+    it("removes the edge when the replacement drops data-flow-target", async () => {
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.n2" },
+        operation: "replace",
+        html_aug: `<a id="n2">A</a>`,
+      });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+    });
+
+    it("removes the edge when the flow node is deleted", async () => {
+      await patchHtml(fx.store, { target: { kind: "node", node: "home.n2" }, operation: "delete" });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+    });
+
+    it("cleans up duplicates that already exist for the patched screen", async () => {
+      await fx.store.writeFlows([edge("n2", "checkout"), edge("n2", "checkout"), edge("n3", "cart")]);
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.n3" },
+        operation: "set_attr",
+        attr: { name: "title", value: "x" },
+      });
+      expect(await fx.store.readFlows()).toEqual([edge("n2", "checkout"), edge("n3", "cart")]);
+    });
   });
 
   it("inserts a sibling after a node", async () => {

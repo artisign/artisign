@@ -52,8 +52,8 @@ async function readBody(req: IncomingMessage, res: ServerResponse): Promise<Reco
 
 /**
  * `/api/projects*` — the preview's project switcher: list open/recent
- * projects, open one, scaffold+open a new one, or switch which one is
- * active. Unlike every other route, these operate on the `ProjectRegistry`
+ * projects, open one, or scaffold+open a new one (which also becomes the
+ * default project of a freshly opened tab). Unlike every other route, these operate on the `ProjectRegistry`
  * itself rather than one project's `Store`, so they're routed before (and
  * independently of) the per-request project resolution in `server.ts`.
  * Returns `false` when `req` doesn't match `/api/projects*`, so the caller

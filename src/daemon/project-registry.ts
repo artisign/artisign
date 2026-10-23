@@ -157,7 +157,8 @@ export class ProjectRegistry {
     this.lifecycle.broadcast({ type: "project-opened", root });
     // Routed through the public setter (not a direct field write) so the
     // very first project a daemon opens also broadcasts project-switched —
-    // it just became what the preview UI shows, same as any later activate.
+    // it just became the default for a freshly opened preview tab. Open tabs
+    // do not follow the event (CHR-775).
     if (this.active === undefined) this.activeProject = root;
 
     await this.rememberProject(root);

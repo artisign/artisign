@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The preview's project picker is now tab-local: choosing a project in one tab no longer moves every other open tab to
+  it. The daemon's active project is only the default for a freshly opened tab. The internal
+  `POST /api/projects/activate` route is removed. (CHR-775)
+
 ## [2.1.1] - 2026-10-21
 
 ### Fixed

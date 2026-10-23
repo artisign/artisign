@@ -614,15 +614,15 @@ const projectUI = createProjectUI(
   {
     // Tab-local (CHR-775): the daemon's activeProject is only the default for a fresh tab.
     onSwitch: async (root) => {
+      renderProjects(projectsState, root); // before the load, so the picker never lags behind (or lies after a failed boot)
       await switchToProject(root);
-      renderProjects(projectsState);
     },
     onOpenRecent: async (dir) => {
       const result = await openProject(dir);
       if (result.ok) await applyProjectsResult(result.projects);
       else {
         console.error(result.message);
-        await refreshProjectsState(); // the recent path may no longer exist — drop it from the list
+        await syncProjects(); // the recent path may no longer exist — drop it from the list
       }
     },
     onOpenDialog: () => projectDialogs.showOpenDialog(),
@@ -661,10 +661,22 @@ async function applyProjectsResult(state) {
   await switchToProject(state.active);
 }
 
-async function refreshProjectsState() {
+let projectsRequestId = 0; // a later syncProjects call supersedes an earlier one still in flight
+
+/**
+ * Re-reads `/api/projects` and renders the picker. The tab only moves when it has no project or its own
+ * project is no longer open (closed, or the daemon restarted without it) — then to the daemon's default.
+ * @returns {Promise<boolean>} true when the tab switched project; false when it stayed or the response was superseded
+ */
+async function syncProjects() {
+  const requestId = ++projectsRequestId;
   const state = await fetchProjects();
-  renderProjects(state);
-  return state;
+  if (requestId !== projectsRequestId) return false; // a newer response is already (or about to be) applied
+  const stranded = activeProjectRoot === null || !state.open.some((p) => p.root === activeProjectRoot);
+  renderProjects(state, stranded ? state.active : activeProjectRoot);
+  if (!stranded || state.active === activeProjectRoot) return false;
+  await switchToProject(state.active);
+  return true;
 }
 
 /** Resets every module-level piece of state tied to the previously active project, ready for a fresh boot. */
@@ -991,15 +1003,9 @@ async function handleChangeEvent(event) {
   }
 }
 
-/** @param {{ type: "project-switched" | "project-opened" | "project-closed", root: string }} event */
-async function handleLifecycleEvent(event) {
-  const state = await fetchProjects();
-  // Only this tab's own project closing moves it (or an empty tab picking up a first project);
-  // project-switched is ignored — the daemon-global default must not drag other tabs along (CHR-775).
-  if (activeProjectRoot === null || (event.type === "project-closed" && event.root === activeProjectRoot)) {
-    await switchToProject(state.active);
-  }
-  renderProjects(state);
+/** Every lifecycle event (project-switched/-opened/-closed) just refreshes the picker list; none of them moves the tab by itself — the daemon-global default must not drag other tabs along (CHR-775). */
+async function handleLifecycleEvent() {
+  await syncProjects();
 }
 
 /**
@@ -1405,8 +1411,31 @@ function reconnectSse(project) {
       // drop — so resync from scratch on reconnect.
       if (isReconnect) resyncCurrentProject();
     },
-    onDisconnect: () => connectionStatus.classList.add("disconnected"),
+    onDisconnect: () => {
+      connectionStatus.classList.add("disconnected");
+      // readyState 2 (CLOSED): the browser gave up for good — e.g. the restarted daemon answered 404 because this
+      // tab's project isn't open there. EventSource never retries that by itself, so do it here (CHR-775).
+      if (eventSource?.readyState === 2) scheduleSseRetry();
+    },
   });
+}
+
+let sseRetryTimer = null;
+
+/** Re-checks `/api/projects` until the daemon answers: a tab whose project is gone moves to the default, otherwise it just reconnects. */
+function scheduleSseRetry() {
+  if (sseRetryTimer !== null) return;
+  sseRetryTimer = setTimeout(async () => {
+    sseRetryTimer = null;
+    try {
+      if (await syncProjects()) return; // switchToProject reconnected
+    } catch {
+      scheduleSseRetry(); // daemon still down
+      return;
+    }
+    reconnectSse(activeProjectRoot ?? undefined);
+    resyncCurrentProject();
+  }, 3000);
 }
 
 // Bumped on every loadCurrentScreen()/loadComments() call; a fetch only

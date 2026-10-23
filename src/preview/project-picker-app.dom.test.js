@@ -46,6 +46,10 @@ function stubDaemon() {
     const path = String(url).split("?")[0];
     const json = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => "" });
     if (path === "/api/projects") return json(projects);
+    if (path === "/api/projects/open") {
+      projects = { active: "/r", open: [...projects.open, { root: "/r", name: "gamma" }], recent: [] };
+      return json(projects);
+    }
     if (path === "/api/screens") return json({ screens: [] });
     if (path === "/api/board-state") return json({ filter: null, pinned: [], expanded: [] });
     if (path === "/api/mockups") return json({ mockups: [] });
@@ -84,7 +88,10 @@ beforeEach(() => {
   };
   stubDaemon();
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 describe("project picker is tab-local (CHR-775)", () => {
   it("switching in the picker changes this tab only and never activates on the daemon", async () => {
@@ -129,6 +136,69 @@ describe("project picker is tab-local (CHR-775)", () => {
     projects = { active: "/p", open: [{ root: "/p", name: "alpha" }], recent: [] };
     emit(liveSource(), { type: "project-closed", root: "/q" }); // this tab's own project
     await flush();
+    expect(liveSource().url).toBe("/events?project=%2Fp");
+    expect(pickerName()).toBe("alpha");
+  });
+
+  it("opening a project from the picker switches the opening tab to it and highlights it", async () => {
+    projects = { ...projects, recent: ["/r"] };
+    await boot();
+    const sourcesBefore = sources.length;
+
+    document.querySelector("#menu-recent-list .menu-item").click();
+    await flush();
+
+    expect(calls).toContain("POST /api/projects/open");
+    expect(sources.length).toBeGreaterThan(sourcesBefore);
+    expect(liveSource().url).toBe("/events?project=%2Fr");
+    expect(pickerName()).toBe("gamma");
+    expect(menuRow("gamma").classList.contains("menu-item-active")).toBe(true);
+    expect(menuRow("alpha").classList.contains("menu-item-active")).toBe(false);
+  });
+
+  it("an empty tab picks up the daemon default on a lifecycle event", async () => {
+    projects = { active: null, open: [], recent: [] };
+    await boot();
+    expect(pickerName()).toBe("No project open");
+
+    projects = { active: "/p", open: [{ root: "/p", name: "alpha" }], recent: [] };
+    emit(liveSource(), { type: "project-opened", root: "/p" });
+    await flush();
+
+    expect(liveSource().url).toBe("/events?project=%2Fp");
+    expect(pickerName()).toBe("alpha");
+  });
+
+  it("the picker names the new project before its screens finish loading", async () => {
+    await boot();
+    let release;
+    const gate = new Promise((r) => (release = r));
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (url, init) => {
+      if (String(url).startsWith("/api/screens?project=%2Fq")) await gate;
+      return realFetch(url, init);
+    });
+
+    menuRow("beta").click();
+    await flush();
+    expect(pickerName()).toBe("beta");
+    release();
+    await flush();
+  });
+
+  it("a tab whose SSE stream the daemon refuses for good (project not open after a restart) moves to the default", async () => {
+    await boot();
+    menuRow("beta").click(); // tab shows /q
+    await flush();
+
+    projects = { active: "/p", open: [{ root: "/p", name: "alpha" }], recent: [] }; // restarted daemon opened only /p
+    const realSetTimeout = globalThis.setTimeout;
+    vi.spyOn(globalThis, "setTimeout").mockImplementation((fn, ms, ...rest) => realSetTimeout(fn, ms === 3000 ? 0 : ms, ...rest));
+    const dead = liveSource();
+    dead.readyState = 2; // CLOSED: the 404 for ?project=/q
+    dead.onerror();
+    await flush();
+
     expect(liveSource().url).toBe("/events?project=%2Fp");
     expect(pickerName()).toBe("alpha");
   });

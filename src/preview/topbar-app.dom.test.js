@@ -224,12 +224,19 @@ describe("topbar dividers", () => {
       .flatMap((el) => (el.id === "canvas-controls" ? [...el.children].filter((c) => !c.hidden) : [el]))
       .map((el) => (el.classList.contains("chrome-divider-v") ? "|" : "x"));
 
-  it("never leaves a divider at an end or two dividers side by side, in any view", async () => {
+  it("has the approved dividers per view and never one at an edge or two side by side", async () => {
     await boot();
+    // title picker | tabs | follow flow comment inspect [| zoom status] | theme live
+    const expected = {
+      screens: "xx|x|xxxx|xx|xx",
+      "design-system": "xx|x|xxxx|xx",
+      board: "xx|x|xxxx|xx",
+    };
     for (const view of ["screens", "design-system", "board"]) {
       $(`.view-tab[data-view="${view}"]`).click();
       await flush();
       const kinds = visibleKinds().join("");
+      expect(kinds, view).toBe(expected[view]);
       expect(kinds, view).not.toMatch(/\|\||^\||\|$/);
     }
   });

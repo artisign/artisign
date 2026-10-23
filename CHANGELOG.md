@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- The preview's project picker is now tab-local: choosing a project in one tab no longer moves every other open tab to
+  it. The daemon's active project is only the default for a freshly opened tab. The internal
+  `POST /api/projects/activate` route is removed. (CHR-775)
 - `repeated_pattern` no longer warns on the screen root frame, which cannot be promoted, and a node is no longer flagged
   merely for matching another screen's root. (CHR-774)
 - `delete_entity` now also removes the deleted component's or pattern's usage text from `design-system/meta.json`, in the same

@@ -34,6 +34,17 @@ export function applyMockupZoom({ paneEl, columnsEl, zoom }) {
 
   columnsEl.style.transform = `scale(${scale})`;
   columnsEl.style.transformOrigin = "top left";
+  columnsEl.style.setProperty("--zoom", String(scale));
+
+  // The column headers (index, title, description) are chrome text, not the user's variant: they counter-scale to native size (style.css: width x --zoom, scale(1 / --zoom)). The counter-scaled box still occupies its unscaled layout height, which after the row's own scale is `h * scale` — short of the `h` it paints — so the frame below is pushed down by the difference, in the row's own (pre-scale) units.
+  let heads = 0;
+  for (const head of columnsEl.querySelectorAll(".mockup-column-head")) {
+    const h = head.offsetHeight;
+    head.style.marginBottom = `${h / scale - h}px`;
+    heads += 1;
+  }
+  const scaledHeight = heads > 0 ? columnsEl.scrollHeight : height; // margins changed the row's height
+
   wrapperEl.style.width = `${width * scale}px`;
-  wrapperEl.style.height = `${height * scale}px`;
+  wrapperEl.style.height = `${scaledHeight * scale}px`;
 }

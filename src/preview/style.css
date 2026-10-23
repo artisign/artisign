@@ -1817,6 +1817,13 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   margin-bottom: var(--space-2xs);
 }
 
+/* Counter-scaled against the row's zoom (--zoom, set by applyMockupZoom): the header paints at native chrome size, laid out at width x zoom so its wrapping matches the column. */
+.mockup-column-head {
+  width: calc(100% * var(--zoom, 1));
+  transform: scale(calc(1 / var(--zoom, 1)));
+  transform-origin: top left;
+}
+
 /* The header (index, title, description) sits on the canvas above the frame; the frame itself is the white card. */
 .mockup-column {
   flex: 0 0 auto;

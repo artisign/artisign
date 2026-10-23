@@ -84,4 +84,30 @@ describe("applyMockupZoom", () => {
     const columnsEl = document.createElement("div");
     expect(() => applyMockupZoom({ paneEl, columnsEl, zoom: "fit" })).not.toThrow();
   });
+
+  it("publishes --zoom and pushes the frame down by what the counter-scaled header lacks", () => {
+    const { paneEl, wrapperEl, columnsEl } = setup({ paneW: 500, paneH: 900, columnsW: 1000, columnsH: 400 });
+    const head = document.createElement("div");
+    head.className = "mockup-column-head";
+    Object.defineProperty(head, "offsetHeight", { value: 40 });
+    columnsEl.appendChild(head);
+    applyMockupZoom({ paneEl, columnsEl, zoom: "fit" });
+
+    expect(columnsEl.style.getPropertyValue("--zoom")).toBe("0.5");
+    // Painted at 40px after counter-scaling, allotted 40 * 0.5: the row (pre-scale units) needs 40 / 0.5 - 40 more.
+    expect(head.style.marginBottom).toBe("40px");
+    expect(wrapperEl.style.width).toBe("500px");
+  });
+
+  it("adds no margin at zoom 1 and removes room above 1", () => {
+    const { paneEl, columnsEl } = setup({ paneW: 2000, paneH: 2000, columnsW: 400, columnsH: 200 });
+    const head = document.createElement("div");
+    head.className = "mockup-column-head";
+    Object.defineProperty(head, "offsetHeight", { value: 40 });
+    columnsEl.appendChild(head);
+    applyMockupZoom({ paneEl, columnsEl, zoom: 1 });
+    expect(head.style.marginBottom).toBe("0px");
+    applyMockupZoom({ paneEl, columnsEl, zoom: 2 });
+    expect(head.style.marginBottom).toBe("-20px");
+  });
 });

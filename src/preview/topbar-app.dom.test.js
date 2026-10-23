@@ -3,6 +3,9 @@
 // CHR-912 — the topbar and canvas bar wired in app.js: icon mode toggles with tooltips, the zoom dropdown, the Live chip, the variant-map toggle and the frame caption.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { cwd } from "node:process";
 
 const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
 
@@ -150,5 +153,14 @@ describe("variant map toggle", () => {
     memoryStorage.set("artisign.lastSelection", JSON.stringify({ screen: "family-leave" }));
     await boot();
     expect($("#variant-map").hidden).toBe(true);
+  });
+});
+
+describe("mockup column header", () => {
+  it("counter-scales against the row zoom so it keeps its native size", () => {
+    const css = readFileSync(resolve(cwd(), "src/preview/style.css"), "utf8");
+    const rule = /\.mockup-column-head\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(rule).toContain("width: calc(100% * var(--zoom, 1))");
+    expect(rule).toContain("transform: scale(calc(1 / var(--zoom, 1)))");
   });
 });

@@ -68,21 +68,26 @@ function renderColumn(variant, index, fetchRenderFor, onColumnMeasured) {
   const column = document.createElement("div");
   column.className = "mockup-column";
 
+  // The header is chrome text, kept at native size under the row's zoom (see applyMockupZoom / .mockup-column-head).
+  const head = document.createElement("div");
+  head.className = "mockup-column-head";
+  column.appendChild(head);
+
   const indexEl = document.createElement("div");
   indexEl.className = "mockup-column-index";
   indexEl.textContent = `Variant ${index + 1}`;
-  column.appendChild(indexEl);
+  head.appendChild(indexEl);
 
   const title = document.createElement("div");
   title.className = "mockup-column-title";
   title.textContent = variant.title;
-  column.appendChild(title);
+  head.appendChild(title);
 
   if (variant.description) {
     const description = document.createElement("div");
     description.className = "mockup-column-description md";
     setMarkdown(description, variant.description);
-    column.appendChild(description);
+    head.appendChild(description);
   }
 
   const errorEl = document.createElement("p");

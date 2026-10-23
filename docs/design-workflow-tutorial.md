@@ -195,10 +195,16 @@ Two rules of thumb:
   own sizing (`width`, `height`, `display`) — see `docs/agent-guide.md` for
   the worked example.
 
-`get_screenshot` renders screens, not component definitions — so you review a
-component through its first instance: place it on the screen that needs it,
-screenshot that screen (or clip to the instance node) and look. Red outlines
-mean an unresolved ref — a typo'd token name, usually. Fix before moving on.
+Review a component twice. On its own: give the variant's root an explicit `id`
+(the example above has none — add one, say `id="btn"`), then call
+`get_screenshot` with only `node: "component:btn-primary#hover.btn"`. The
+variant is picked inside the ref, not by the `variant` input, which belongs to
+mockups — leave `screen`, `mockup`, `variant` and `width` out. The capture
+clips to the node you name, so name the root to see the whole variant. A
+pattern works the same way, as `pattern:<name>.<node-id>`. In context: place
+it on the screen that needs it, screenshot that screen (or clip to the instance
+node) and look. Red outlines mean an unresolved ref — a typo'd token name,
+usually. Fix before moving on.
 
 ---
 

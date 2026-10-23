@@ -53,12 +53,14 @@ function readScreenSize(iframeEl) {
  *   holderEl: HTMLElement,
  *   iframeEl: HTMLIFrameElement,
  *   zoom: "fit" | number,
- * }} args
+ *   topInset?: number,
+ * }} args `topInset` reserves a band above the frame (the frame caption, CHR-912).
+ * @returns {{ width: number, height: number }} the screen's unscaled size
  */
-export function applyCanvas({ canvasEl, holderEl, iframeEl, zoom }) {
+export function applyCanvas({ canvasEl, holderEl, iframeEl, zoom, topInset = 0 }) {
   const { width, height } = readScreenSize(iframeEl);
   const availW = canvasEl.clientWidth;
-  const availH = canvasEl.clientHeight;
+  const availH = canvasEl.clientHeight - topInset;
   const scale = zoom === "fit" ? fitScale(availW, availH, width, height) : zoom;
 
   holderEl.style.width = `${width}px`;
@@ -66,8 +68,9 @@ export function applyCanvas({ canvasEl, holderEl, iframeEl, zoom }) {
   holderEl.style.transform = `scale(${scale})`;
   holderEl.style.setProperty("--zoom", String(scale)); // overlay labels counter-scale with it (CHR-780)
   holderEl.style.left = `${Math.max(0, (availW - width * scale) / 2)}px`;
-  holderEl.style.top = `${Math.max(0, (availH - height * scale) / 2)}px`;
+  holderEl.style.top = `${topInset + Math.max(0, (availH - height * scale) / 2)}px`;
 
   iframeEl.style.width = `${width}px`;
   iframeEl.style.height = `${height}px`;
+  return { width, height };
 }

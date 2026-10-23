@@ -44,6 +44,12 @@ function el(tag, className, text) {
   return node;
 }
 
+function icon(name, className = "") {
+  const node = el("span", `icon ${className}`.trim(), name);
+  node.setAttribute("aria-hidden", "true");
+  return node;
+}
+
 function button(className, text, onClick) {
   const b = el("button", className, text);
   b.type = "button";
@@ -226,13 +232,13 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
   function renderBar() {
     barEl.replaceChildren();
     barEl.appendChild(el("b", "compare-title", "Compare"));
-    const ref = el("span", "compare-chip compare-chip-reference");
+    const ref = el("span", "compare-chip compare-chip-reference chrome-chip chrome-chip--hit");
     ref.dataset.screen = reference;
     ref.title = reference;
-    ref.append(el("span", "compare-chip-lock", "🔒"), el("span", "compare-chip-name", `⌂ ${reference}`), el("span", "compare-chip-note", "· reference"));
+    ref.append(icon("lock", "compare-chip-lock"), icon("home"), el("span", "compare-chip-name", reference), el("span", "compare-chip-note", "· reference"));
     barEl.appendChild(ref);
     for (const name of selected) {
-      const chip = el("span", "compare-chip");
+      const chip = el("span", "compare-chip chrome-chip");
       chip.dataset.screen = name;
       chip.title = name;
       chip.appendChild(el("span", "compare-chip-name", name));
@@ -242,15 +248,17 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
         share.title = "Share of node ids in common with the reference";
         chip.appendChild(share);
       }
-      const remove = button("compare-chip-remove", "✕", () => toggle(name));
+      const remove = button("compare-chip-remove", "", () => toggle(name));
+      remove.appendChild(icon("close"));
       remove.setAttribute("aria-label", `Remove ${name} from the comparison`);
       chip.appendChild(remove);
       barEl.appendChild(chip);
     }
-    const add = button("compare-chip compare-chip-add", "+ add", (evt) => {
+    const add = button("compare-chip compare-chip-add chrome-chip", "", (evt) => {
       evt.stopPropagation(); // the popover closes on any outside click; this one opens it
       deps.onAdd();
     });
+    add.append(icon("add"), "add");
     add.disabled = selected.length >= COMPARE_MAX_MEMBERS;
     if (add.disabled) add.title = `At most ${COMPARE_MAX_MEMBERS} screens next to the reference`;
     barEl.appendChild(add);
@@ -264,7 +272,7 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
     diffLabel.append(diffBox, "Diff");
     barEl.appendChild(diffLabel);
 
-    const zoomGroup = el("span", "compare-zoom");
+    const zoomGroup = el("span", "compare-zoom chrome-seg");
     zoomGroup.setAttribute("role", "group");
     zoomGroup.setAttribute("aria-label", "Compare zoom");
     for (const { value, label } of ZOOMS) {

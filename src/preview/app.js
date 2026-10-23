@@ -100,11 +100,22 @@ const screenFrame = document.getElementById("screen-frame");
 const canvasEl = document.getElementById("canvas");
 // CHR-732 — variant breadcrumb / tree map / inspector cards. onSelect is the sidebar's own human-navigation path (pauses follow).
 let variantLayoutShown = false;
+let variantMapVisible = true; // restored from the pref once prefsStorage exists (below)
 const variantUI = createVariantUI({
   barEl: document.getElementById("variant-bar"),
   mapEl: document.getElementById("variant-map"),
   inspectorEl: document.getElementById("variant-inspector"),
   onSelect: (name) => selectScreenHuman(name),
+  // CHR-912 — the tree map can be hidden; per-browser, shown by default (today's behaviour).
+  map: {
+    visible: () => variantMapVisible,
+    onToggle: (visible) => {
+      variantMapVisible = visible;
+      writeBoolPref(prefsStorage, "artisign.variantMap", visible);
+      // The map takes canvas width, so the fit zoom is recomputed (the caller re-renders the bar).
+      queueMicrotask(updateCanvas);
+    },
+  },
   // CHR-738 — the Single | Compare toggle and the popover checkboxes; `compare` (below) is only read once the UI renders.
   compare: {
     state: () => compare.state(),
@@ -126,6 +137,7 @@ const comparePanelEl = document.getElementById("compare-panel");
 const comparePanelTitleEl = document.getElementById("compare-panel-title");
 const panelTabsEl = document.getElementById("panel-tabs");
 const screenHolderEl = document.getElementById("screen-holder");
+const frameCaptionEl = document.getElementById("frame-caption");
 const statusBarOverlayEl = document.getElementById("status-bar-overlay");
 const emptyGuideEl = document.getElementById("empty-guide");
 const emptyGuidePromptEl = document.getElementById("empty-guide-prompt");
@@ -169,6 +181,9 @@ const flowModeToggle = document.getElementById("flow-mode-toggle");
 const commentModeToggle = document.getElementById("comment-mode-toggle");
 const canvasControlsEl = document.getElementById("canvas-controls");
 const zoomButtons = document.querySelectorAll(".zoom-button");
+const zoomTrigger = document.getElementById("zoom-trigger");
+const zoomMenu = document.getElementById("zoom-menu");
+const zoomLabel = document.getElementById("zoom-label");
 const statusBarToggle = document.getElementById("status-bar-toggle");
 const warningBadge = document.getElementById("warning-badge");
 const connectionStatus = document.getElementById("connection-status");
@@ -185,7 +200,6 @@ const sidebarScreensCollapseBtn = document.getElementById("sidebar-screens-colla
 const sidebarContextEl = document.getElementById("sidebar-context");
 const sidebarContextCollapseBtn = document.getElementById("sidebar-context-collapse");
 const inspectModeToggle = document.getElementById("inspect-mode-toggle");
-const INSPECT_TOGGLE_TITLE = inspectModeToggle.title;
 const inspectorEl = document.getElementById("inspector");
 const inspectorCollapseBtn = document.getElementById("inspector-collapse");
 const inspectorListEl = document.getElementById("inspector-list");
@@ -327,6 +341,8 @@ const prefsStorage = (() => {
     return null;
   }
 })();
+
+variantMapVisible = readBoolPref(prefsStorage, "artisign.variantMap", true);
 
 // CHR-738 — side-by-side variant compare. Mode, selection and zoom are per-browser prefs (compare.js -> prefs.js).
 const compare = createCompareView(
@@ -633,6 +649,7 @@ const projectUI = createProjectUI(
     noProjectEl: noProjectStateEl,
     bodyEl,
     viewTabsEl: viewTabsNav,
+    topbarEl: document.getElementById("topbar"),
     flowToggleEl: flowModeToggle,
     commentToggleEl: commentModeToggle,
     emptyRecentListEl: emptyRecentList,
@@ -1439,14 +1456,21 @@ function reconnectSse(project) {
     onBoardState: handleBoardStateEvent,
     onActivity: handleActivityEvent,
     onOpen: (isReconnect) => {
-      connectionStatus.classList.remove("disconnected");
+      renderConnectionStatus(true);
       // The SSE gap while disconnected is invisible to us — EventSource only
       // replays events sent after it reopens, not what happened during the
       // drop — so resync from scratch on reconnect.
       if (isReconnect) resyncCurrentProject();
     },
-    onDisconnect: () => connectionStatus.classList.add("disconnected"),
+    onDisconnect: () => renderConnectionStatus(false),
   });
+}
+
+/** The Live chip: dot + "Live" / "Offline" (decision chr905-c-rollout-details). Informational, never a button. */
+function renderConnectionStatus(connected) {
+  connectionStatus.classList.toggle("disconnected", !connected);
+  document.getElementById("connection-status-label").textContent = connected ? "Live" : "Offline";
+  connectionStatus.dataset.tooltip = connected ? "Live reload: connected" : "Live reload disconnected, retrying";
 }
 
 // Bumped on every loadCurrentScreen()/loadComments() call; a fetch only
@@ -1606,6 +1630,7 @@ async function loadScreens() {
       iframeRenderedScreen = null;
     }
     currentScreen = null; // a later first screen must be picked up as a fresh selection (handleChangeEvent)
+    frameCaptionEl.hidden = true;
     syncGuidePrompt();
   }
 }
@@ -1820,8 +1845,14 @@ function handleInspectSelect(modelId, clickedDomId) {
   syncInspectOverlay();
 }
 
+const FRAME_CAPTION_BAND = 28;
+
 function updateCanvas() {
-  applyCanvas({ canvasEl, holderEl: screenHolderEl, iframeEl: screenFrame, zoom });
+  // CHR-912 — "<screen> · <w> × <h>" above the frame, in a reserved band; not while the how-to-start guide replaces the frame.
+  const showCaption = currentScreen !== null && !screenHolderEl.hidden;
+  const { width, height } = applyCanvas({ canvasEl, holderEl: screenHolderEl, iframeEl: screenFrame, zoom, topInset: showCaption ? FRAME_CAPTION_BAND : 0 });
+  frameCaptionEl.hidden = !showCaption;
+  if (showCaption) frameCaptionEl.textContent = `${currentScreen} · ${width} × ${height}`;
 }
 
 /** Whether the zoom buttons currently control the mockup row instead of the screen canvas — see applyMainVisibility. */
@@ -1955,10 +1986,35 @@ window.addEventListener("resize", () => {
 });
 
 function syncZoomButtons(value) {
+  let currentLabel = value === "fit" ? "Fit" : `${Math.round(value * 100)}%`;
   for (const button of zoomButtons) {
-    button.setAttribute("aria-pressed", String(button.dataset.zoom === (value === "fit" ? "fit" : String(value))));
+    const current = button.dataset.zoom === (value === "fit" ? "fit" : String(value));
+    button.setAttribute("aria-pressed", String(current));
+    button.classList.toggle("is-current", current);
+    button.querySelector(".chrome-menu-check").textContent = current ? "check" : "";
+    if (current) currentLabel = button.textContent.replace("check", "").trim();
   }
+  zoomLabel.textContent = currentLabel;
 }
+
+function setZoomMenuOpen(open) {
+  zoomMenu.hidden = !open;
+  zoomTrigger.setAttribute("aria-expanded", String(open));
+}
+
+zoomTrigger.addEventListener("click", (evt) => {
+  evt.stopPropagation();
+  setZoomMenuOpen(zoomMenu.hidden);
+});
+document.addEventListener("click", (evt) => {
+  if (!zoomMenu.hidden && !zoomMenu.contains(evt.target)) setZoomMenuOpen(false);
+});
+document.addEventListener("keydown", (evt) => {
+  if (evt.key === "Escape" && !zoomMenu.hidden) {
+    setZoomMenuOpen(false);
+    zoomTrigger.focus();
+  }
+});
 
 /** Sets the zoom level for whichever the buttons currently target — the mockup row or the screen canvas (see isMockupZoomActive) — each remembered under its own pref key. */
 function setZoom(next) {
@@ -1978,6 +2034,8 @@ for (const button of zoomButtons) {
   button.addEventListener("click", () => {
     const value = button.dataset.zoom;
     setZoom(value === "fit" ? "fit" : Number(value));
+    setZoomMenuOpen(false);
+    zoomTrigger.focus();
   });
 }
 
@@ -2155,9 +2213,11 @@ function applyMainVisibility() {
   flowModeToggle.disabled = toggles.flow.disabled;
   commentModeToggle.disabled = toggles.comment.disabled;
   inspectModeToggle.disabled = toggles.inspect.disabled;
-  flowModeToggle.title = toggles.flow.title;
-  commentModeToggle.title = toggles.comment.title;
-  inspectModeToggle.title = toggles.inspect.title ?? INSPECT_TOGGLE_TITLE;
+  // The disabled reason (or the label) is the shared tooltip, not a native title.
+  flowModeToggle.dataset.tooltip = toggles.flow.title || "Flow mode";
+  commentModeToggle.dataset.tooltip = toggles.comment.title || "Comment mode";
+  inspectModeToggle.dataset.tooltip = toggles.inspect.title || "Inspect mode";
+  if (comparing || currentView !== "screens") setZoomMenuOpen(false);
   // The compare panel replaces the Elements/Activity panel while comparing.
   const activityTab = panelTabActivityEl.getAttribute("aria-pressed") === "true";
   panelTabsEl.hidden = comparing;

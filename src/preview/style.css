@@ -418,6 +418,190 @@
   outline-offset: -2px;
 }
 
+/* Topbar / canvas-bar primitives (CHR-912). */
+.chrome-divider-v {
+  flex: none;
+  width: 1px;
+  height: var(--size-icon-sm);
+  background: var(--chrome-border);
+}
+
+.chrome-icon-btn[hidden],
+.chrome-pill[hidden],
+.chrome-chip[hidden],
+.chrome-dropdown[hidden] {
+  display: none;
+}
+
+/* Underline tab: the pressed tab is full-weight text over a 2px bar on the bar's bottom edge. */
+.chrome-tab {
+  align-self: stretch;
+  padding: 0 var(--space-md);
+  border: none;
+  background: transparent;
+  color: var(--chrome-text-secondary);
+  font: inherit;
+  font-size: var(--ui-base);
+  cursor: pointer;
+}
+
+.chrome-tab:hover {
+  color: var(--chrome-text);
+}
+
+.chrome-tab[aria-pressed="true"],
+.chrome-tab[aria-selected="true"] {
+  color: var(--chrome-text);
+  font-weight: 500;
+  box-shadow: inset 0 -2px 0 var(--chrome-text);
+}
+
+.chrome-tab:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
+.chrome-pill {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-sm);
+  height: var(--size-control);
+  padding: 0 var(--space-pad);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-field);
+  color: var(--chrome-text-secondary);
+  font-size: var(--ui-base);
+  white-space: nowrap;
+}
+
+.chrome-dropdown {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-sm);
+  height: var(--size-control);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-raised);
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-base);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chrome-dropdown:hover {
+  background: var(--chrome-hover);
+}
+
+.chrome-dropdown .icon {
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.chrome-dropdown:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+.chrome-chip {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-xs);
+  height: var(--size-chip-h);
+  padding: 0 var(--space-sm);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-field);
+  color: var(--chrome-text-secondary);
+  font: inherit;
+  font-size: var(--ui-chip);
+  white-space: nowrap;
+}
+
+.chrome-chip--hit {
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+}
+
+.chrome-chip--warning {
+  background: var(--chrome-warning-subtle);
+  color: var(--chrome-warning);
+}
+
+/* Segmented control (Single | Compare). */
+.chrome-seg {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-2xs);
+  padding: var(--space-2xs);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-field);
+}
+
+.chrome-seg > button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: var(--size-control-sm);
+  padding: 0 var(--space-md);
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--chrome-text-secondary);
+  font: inherit;
+  font-size: var(--ui-base);
+  cursor: pointer;
+}
+
+.chrome-seg > button .icon {
+  font-size: var(--size-icon-sm);
+}
+
+.chrome-seg > button:hover:not(:disabled) {
+  color: var(--chrome-text);
+}
+
+.chrome-seg > button[aria-pressed="true"] {
+  background: var(--chrome-active);
+  color: var(--chrome-text);
+}
+
+.chrome-seg > button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.chrome-seg > button:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+/* Live chip: dot + label, informational (never a button). */
+.chrome-live {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-sm);
+  padding: 0 var(--space-sm);
+  color: var(--chrome-text-secondary);
+  font-size: var(--ui-xs);
+}
+
+.chrome-live-dot {
+  width: var(--size-indicator);
+  height: var(--size-indicator);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-ok);
+}
+
+.chrome-live.disconnected .chrome-live-dot {
+  background: var(--chrome-danger);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -444,20 +628,32 @@ body {
   flex: none;
   display: flex;
   align-items: center;
-  gap: var(--space-xl);
-  padding: 0 var(--space-xl);
-  height: 48px;
+  gap: var(--space-md);
+  padding: 0 var(--space-lg);
+  height: var(--size-bar-main);
   border-bottom: 1px solid var(--chrome-border);
   background: var(--chrome-bar);
 }
 
+/* No project open: only the title, the picker, the theme toggle and the Live chip remain. */
+#topbar.is-empty .project-only {
+  display: none;
+}
+
+.topbar-spacer {
+  flex: 1;
+  min-width: 0;
+}
+
 #app-title {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--ui-base);
+  margin-right: var(--space-xs);
 }
 
 #view-tabs {
   display: flex;
+  align-self: stretch;
   gap: var(--space-xs);
 }
 
@@ -465,25 +661,7 @@ body {
   display: none;
 }
 
-.view-tab {
-  border: 1px solid transparent;
-  background: transparent;
-  padding: var(--space-sm) 10px;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  color: var(--chrome-text-secondary);
-  cursor: pointer;
-}
-
-.view-tab[aria-pressed="true"] {
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-  font-weight: 600;
-}
-
-/* Shared base for the topbar mode toggles (flow/comment/inspect) and the
-   status-bar toggle in #canvas-controls — identical shape, only the active
-   accent color and a couple of one-off placements differ. */
+/* Text toggle buttons still used by the sidebar (Tags) and the board toolbar; restyled with their areas (CHR-913/CHR-914). */
 .toggle-button {
   border: 1px solid var(--chrome-border-strong);
   background: var(--chrome-raised);
@@ -504,35 +682,11 @@ body {
   cursor: not-allowed;
 }
 
-/* CHR-628/CHR-629/CHR-631 — the follow toggle. Review fix 4: two SIBLING
-   <button>s (the toggle itself, and "Resume") inside a plain, non-
-   interactive <span> pill — not one button with a span nested inside it
-   masquerading as a second control, which is both invalid HTML (no
-   interactive descendants inside a button) and mouse-only (a keyboard
-   activation's own event.target is the outer button, never the inner
-   span, so `.closest("#follow-toggle-resume")` could never match). The
-   pill's border/background/padding/color live on the outer span (still
-   carries the "push the mode-button cluster right" job `#flow-mode-toggle`
-   used to do on its own — $follow-toggle's usage note / $topbar's
-   `follow`/`follow-paused` variants); the two buttons are UA-reset to look
-   like plain inline content sharing it. */
-.follow-toggle {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  border: 1px solid var(--chrome-border-strong);
-  background: var(--chrome-raised);
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: 6px;
-  font-size: 0.85rem;
-  color: var(--chrome-text-secondary);
-}
-
+/* CHR-628/CHR-629/CHR-631 — the follow toggle: a pill with two SIBLING <button>s (toggle, "Resume") inside a non-interactive <span> (review fix 4 — no interactive descendants inside a button, and a keyboard activation's target is the button itself). The pill look lives on the outer span; the buttons are UA-reset to read as plain content. */
 .follow-toggle-toggle {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
   border: none;
   background: none;
   padding: 0;
@@ -542,17 +696,16 @@ body {
 }
 
 .follow-toggle-dot {
-  width: 6px;
-  height: 6px;
+  width: var(--size-indicator);
+  height: var(--size-indicator);
   border-radius: var(--radius-pill);
   background: var(--chrome-text-tertiary);
 }
 
 .follow-toggle[data-state="following"] {
-  border-color: var(--chrome-accent);
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .follow-toggle[data-state="following"] .follow-toggle-dot {
@@ -560,7 +713,6 @@ body {
 }
 
 .follow-toggle[data-state="paused"] {
-  border-color: var(--chrome-warning);
   background: var(--chrome-warning-subtle);
   color: var(--chrome-warning);
 }
@@ -574,6 +726,7 @@ body {
   display: none;
   width: 1px;
   align-self: stretch;
+  margin: var(--space-sm) 0;
   background: var(--chrome-warning);
   opacity: 0.35;
 }
@@ -584,7 +737,7 @@ body {
   background: none;
   padding: 0;
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--chrome-accent);
   cursor: pointer;
 }
@@ -594,16 +747,27 @@ body {
   display: inline-flex;
 }
 
-#comment-mode-toggle[aria-pressed="true"] {
-  background: var(--chrome-warning);
-  border-color: var(--chrome-warning);
-  color: var(--chrome-primary-text);
+.follow-toggle-toggle:focus-visible,
+.follow-toggle-resume:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+.chrome-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chrome-icon-btn:disabled:hover {
+  background: transparent;
+  color: var(--chrome-text-secondary);
 }
 
 #canvas-controls {
   display: flex;
   align-items: center;
-  gap: var(--space-lg);
+  gap: var(--space-xs);
 }
 
 #canvas-controls[hidden] {
@@ -611,55 +775,35 @@ body {
 }
 
 #zoom-controls {
-  display: flex;
-  gap: 2px;
-  border: 1px solid var(--chrome-border-strong);
-  border-radius: 6px;
-  overflow: hidden;
+  position: relative;
 }
 
-.zoom-button {
-  border: none;
-  border-right: 1px solid var(--chrome-border-strong);
-  background: var(--chrome-raised);
-  padding: var(--space-sm) 10px;
-  font-size: 0.8rem;
-  color: var(--chrome-text-secondary);
-  cursor: pointer;
+#zoom-menu {
+  position: absolute;
+  top: calc(100% + var(--space-xs));
+  right: 0;
+  width: 160px;
+  z-index: 20;
 }
 
-.zoom-button:last-child {
-  border-right: none;
-}
-
-.zoom-button[aria-pressed="true"] {
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-  font-weight: 600;
+#zoom-menu[hidden] {
+  display: none;
 }
 
 #warning-badge {
-  border: none;
-  background: var(--chrome-danger);
-  color: var(--chrome-primary-text);
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 3px 10px;
-  border-radius: var(--radius-pill);
+  height: var(--size-control-compact);
+  padding: 0 var(--space-md);
+  font-size: var(--ui-xs);
+  font-weight: 500;
   cursor: pointer;
+}
+
+#warning-badge .icon {
+  font-size: var(--size-icon-sm);
 }
 
 #warning-badge[hidden] {
   display: none;
-}
-
-#connection-status {
-  font-size: 0.7rem;
-  color: var(--chrome-ok);
-}
-
-#connection-status.disconnected {
-  color: var(--chrome-danger);
 }
 
 #body {
@@ -1665,39 +1809,32 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .mockup-column-index {
-  font-size: 0.65rem;
-  font-weight: 600;
+  font-size: var(--ui-chip);
+  font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--chrome-text-tertiary);
-  margin-bottom: var(--space-xs);
+  margin-bottom: var(--space-2xs);
 }
 
+/* The header (index, title, description) sits on the canvas above the frame; the frame itself is the white card. */
 .mockup-column {
   flex: 0 0 auto;
   min-width: 280px;
-  /* Matches .mockup-column-frame's own default size below (360px content +
-     this padding/border) until the iframe measures its rendered variant and
-     JS (see mockup-view.js) narrows/widens the column to match exactly —
-     the column's width must follow the variant, never the description
-     text. */
-  width: calc(360px + 2 * var(--space-lg) + 2px);
-  border: 1px solid var(--chrome-border);
-  border-radius: 8px;
-  background: var(--frame-surface);
-  padding: var(--space-lg);
+  /* Matches .mockup-column-frame's own default size below until the iframe measures its rendered variant and JS (see mockup-view.js) narrows/widens the column to match exactly — the column's width must follow the variant, never the description text. */
+  width: 360px;
 }
 
 .mockup-column-title {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: var(--ui-base);
+  font-weight: 500;
   color: var(--chrome-text);
-  margin-bottom: var(--space-xs);
+  margin-bottom: var(--space-2xs);
   overflow-wrap: break-word;
 }
 
 .mockup-column-description {
-  font-size: 0.78rem;
+  font-size: var(--ui-2xs);
   color: var(--chrome-text-tertiary);
   line-height: 1.5;
   white-space: pre-line;
@@ -1707,7 +1844,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 .mockup-column-error {
   margin: 0 0 var(--space-md);
-  font-size: 0.78rem;
+  font-size: var(--ui-sm);
   color: var(--chrome-error);
 }
 
@@ -1717,8 +1854,10 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 .mockup-column-frame {
   display: block;
-  border: 1px solid var(--chrome-border);
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--frame-surface);
+  box-shadow: var(--frame-shadow);
   width: 360px;
   height: 200px;
 }
@@ -1736,6 +1875,24 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
    `transform: scale()` applied there does the zooming without affecting
    this element's own layout box, which is why left/top are also computed
    in JS instead of via flex centering. */
+#frame-caption {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+  pointer-events: none;
+}
+
+#frame-caption[hidden] {
+  display: none;
+}
+
 #screen-holder {
   position: absolute;
   transform-origin: top left;
@@ -2941,16 +3098,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 #project-picker-trigger {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  border: 1px solid var(--chrome-border-strong);
-  background: var(--chrome-raised);
-  border-radius: 6px;
-  padding: var(--space-sm) var(--space-lg);
-  font-size: 0.85rem;
-  color: var(--chrome-text);
-  cursor: pointer;
+  max-width: 280px;
 }
 
 #project-picker-trigger.project-picker-empty {
@@ -2959,16 +3107,15 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 #project-picker-name {
-  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
 }
 
 .project-picker-empty #project-picker-name {
   font-weight: 400;
-}
-
-#project-picker-chevron {
-  color: var(--chrome-text-secondary);
-  font-size: 0.8rem;
 }
 
 #project-menu {
@@ -3458,17 +3605,17 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 /* CHR-732 — variant breadcrumb bar (approved `variants-screen-view` c-breadcrumb-tree). */
 #variant-bar {
   flex: none;
-  min-height: 46px;
+  min-height: var(--size-bar-sub);
   min-width: 0;
   display: flex;
   /* Deep chains wrap onto a second line instead of widening the screen view. */
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-xs) var(--space-md);
-  padding: 0 var(--space-2xl);
+  padding: var(--space-xs) var(--space-lg);
   background: var(--chrome-bar);
   border-bottom: 1px solid var(--chrome-border);
-  font-size: 0.8rem;
+  font-size: var(--ui-base);
   position: relative;
 }
 
@@ -3484,8 +3631,9 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   align-items: center;
   flex: 0 1 auto;
   min-width: 56px;
+  height: var(--size-control);
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--chrome-text);
 }
 
@@ -3499,7 +3647,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   background: var(--chrome-accent-subtle);
   border-color: var(--chrome-accent);
   color: var(--chrome-accent);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 #variant-bar .crumb,
@@ -3518,9 +3666,10 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 #variant-bar .crumb {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-sm);
   min-width: 0;
-  padding: 5px 4px 5px 9px;
+  height: 100%;
+  padding: 0 var(--space-xs) 0 var(--space-md);
 }
 
 .crumb-name {
@@ -3534,13 +3683,28 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .crumb-toggle {
-  padding: 5px 8px 5px 2px;
-  font-size: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--space-sm) 0 var(--space-2xs);
   color: var(--chrome-text-tertiary);
 }
 
+.crumb-toggle .icon {
+  font-size: var(--size-icon-xs);
+}
+
+.kind-icon.icon,
 .crumb-home {
-  font-size: 0.7rem;
+  font-size: var(--size-icon-sm);
+}
+
+.variant-map-toggle {
+  flex: none;
+}
+
+#variant-bar .crumb-sep {
+  font-size: var(--size-icon-xs);
 }
 
 #variant-bar .crumb-sep {
@@ -3552,13 +3716,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .variant-chip {
-  flex: none;
   white-space: nowrap;
-  font-size: 0.65rem;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--chrome-hover);
-  color: var(--chrome-text-secondary);
 }
 
 .variant-chip-overlay {
@@ -3573,12 +3731,6 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 .variant-back {
   flex: none;
-  white-space: nowrap;
-  border: 1px solid var(--chrome-border-strong);
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  color: var(--chrome-text-secondary);
 }
 
 .variant-pop {
@@ -3663,9 +3815,9 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .map-node.on {
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-  font-weight: 600;
+  background: var(--chrome-active);
+  color: var(--chrome-text);
+  font-weight: 500;
 }
 
 .map-node-name {
@@ -3676,9 +3828,15 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .map-node-note {
+  display: inline-flex;
+  align-items: center;
   margin-left: auto;
-  font-size: 0.62rem;
+  font-size: var(--ui-2xs);
   color: var(--chrome-text-tertiary);
+}
+
+.map-node-note .icon {
+  font-size: var(--size-icon-xs);
 }
 
 /* Inspector cards (Elements tab, above the element list). */
@@ -3888,33 +4046,35 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-md);
-  padding: var(--space-md) var(--space-xl);
+  padding: var(--space-xs) var(--space-lg);
+  min-height: var(--size-bar-sub);
   background: var(--chrome-bar);
   border-bottom: 1px solid var(--chrome-border);
-  font-size: 0.75rem;
+  font-size: var(--ui-sm);
   color: var(--chrome-text-secondary);
 }
 
 .compare-title {
-  font-size: 0.8rem;
+  font-size: var(--ui-base);
+  font-weight: 500;
   color: var(--chrome-text);
 }
 
+/* Chips here carry controls (remove, add), so they run taller than the 16px static .chrome-chip. */
 .compare-chip {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
+  height: calc(var(--size-chip-h) + var(--space-md));
   max-width: 260px;
-  padding: 4px 9px;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--chrome-hover);
+  gap: var(--space-sm);
+  padding: 0 var(--space-md);
+  font-size: var(--ui-xs);
   color: var(--chrome-text);
-  font: inherit;
+}
+
+.compare-chip .icon {
+  font-size: var(--size-icon-xs);
 }
 
 .compare-chip-reference {
-  background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
 }
 
@@ -3928,7 +4088,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 .compare-chip-note,
 .compare-chip-overlap {
   flex: none;
-  font-size: 0.65rem;
+  font-size: var(--ui-chip);
 }
 
 .compare-chip-overlap {
@@ -3938,17 +4098,24 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   color: var(--chrome-warning);
 }
 
-.compare-chip-lock {
-  font-size: 0.6rem;
-}
-
 .compare-chip-remove {
+  display: inline-flex;
   padding: 0;
   border: none;
   background: transparent;
   color: var(--chrome-text-tertiary);
   font: inherit;
   cursor: pointer;
+}
+
+.compare-chip-remove:hover {
+  color: var(--chrome-text);
+}
+
+.compare-chip-remove:focus-visible,
+.compare-chip-add:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
 }
 
 .compare-chip-add {
@@ -3969,37 +4136,6 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   align-items: center;
   gap: 5px;
   cursor: pointer;
-}
-
-.compare-zoom,
-.compare-seg {
-  display: flex;
-  border: 1px solid var(--chrome-border-strong);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.compare-zoom-button,
-.compare-seg-button {
-  padding: 5px 11px;
-  border: none;
-  background: transparent;
-  font: inherit;
-  font-size: 0.78rem;
-  color: var(--chrome-text-secondary);
-  cursor: pointer;
-}
-
-.compare-zoom-button[aria-pressed="true"],
-.compare-seg-button[aria-pressed="true"] {
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-  font-weight: 600;
-}
-
-.compare-seg-button:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 
 #compare-canvas {

@@ -63,7 +63,14 @@ function flash(el) {
  */
 export function updateWarningBadge(badgeEl, doc) {
   const elements = doc ? findDiagnostics(doc) : [];
-  badgeEl.textContent = `⚠ ${elements.length}`;
+  const icon = document.createElement("span");
+  icon.className = "icon";
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = "warning";
+  const count = document.createElement("span");
+  count.textContent = String(elements.length);
+  badgeEl.replaceChildren(icon, count);
+  badgeEl.setAttribute("aria-label", `${elements.length} render diagnostic${elements.length === 1 ? "" : "s"}`);
   badgeEl.hidden = elements.length === 0;
 
   let current = -1;

@@ -132,4 +132,14 @@ describe("initTooltips", () => {
     second();
     expect(document.querySelectorAll("#chrome-tooltip")).toHaveLength(0);
   });
+
+  it("shows a disabled trigger's tooltip by hit-testing the pointer, and hides when it leaves", () => {
+    btn.disabled = true;
+    btn.getBoundingClientRect = () => ({ left: 10, right: 40, top: 10, bottom: 38, width: 30, height: 28 });
+    document.body.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: 20, clientY: 20 }));
+    expect(tip().hidden).toBe(false);
+    expect(tip().textContent).toContain("Flow mode");
+    document.body.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: 200, clientY: 200 }));
+    expect(tip().hidden).toBe(true);
+  });
 });

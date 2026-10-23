@@ -4,7 +4,7 @@
 // stored `variant_of` chain — never the flow arrival path) and /api/flows.
 // The pure functions come first, the DOM wiring (createVariantUI) last.
 
-import { buildScreenTree, displayName, createKindIcon } from "./screens.js";
+import { buildScreenTree, displayName } from "./screens.js";
 import { canCompare } from "./compare-data.js";
 
 /** The screen part of a flow ref — "screen" or "screen.node-id". */
@@ -72,6 +72,27 @@ export function flowCounts(flows, name) {
   return { in: into, out };
 }
 
+// Material Symbols for the variant kinds in the screen view (crumbs, popover rows, map); the sidebar tree keeps screens.js's own glyphs until its area ticket.
+const KIND_MATERIAL = { state: "description", overlay: "web_asset", step: "subdirectory_arrow_right" };
+
+function createKindIcon(kind) {
+  if (!(kind in KIND_MATERIAL)) return null;
+  const icon = document.createElement("span");
+  icon.className = "kind-icon icon";
+  icon.dataset.kind = kind;
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = KIND_MATERIAL[kind];
+  return icon;
+}
+
+function materialIcon(name, className = "") {
+  const icon = document.createElement("span");
+  icon.className = `icon ${className}`.trim();
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = name;
+  return icon;
+}
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -90,12 +111,13 @@ function button(className, text, onClick) {
  * @param {{
  *   barEl: HTMLElement, mapEl: HTMLElement, inspectorEl: HTMLElement,
  *   onSelect: (screen: string) => void,
+ *   map?: { visible: () => boolean, onToggle: (visible: boolean) => void },
  *   compare?: {
  *     state: () => { on: boolean, selected: string[], cap: number },
  *     onMode: (on: boolean) => void,
  *     onPick: (screen: string) => void,
  *   },
- * }} els CHR-738 — `compare` adds the Single | Compare toggle to the bar and a
+ * }} els CHR-912 — `map` is the per-browser show/hide of the variant map (default visible when absent). CHR-738 — `compare` adds the Single | Compare toggle to the bar and a
  *   checkbox per popover row while compare is on; without it the bar is as before.
  * @returns {{
  *   update: (screens: object[], flows: object[], currentScreen: string | null) => boolean,
@@ -103,9 +125,9 @@ function button(className, text, onClick) {
  * }}
  *   `update` re-renders everything and returns whether the bar/map are showing,
  *   so the caller can re-fit the canvas when that changes. `openPopover` opens
- *   the variants popover of one crumb (the compare chip row's "+ add").
+ *   the variants popover of one crumb (the compare chip row's "add" chip).
  */
-export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare }) {
+export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, map }) {
   let openCrumb = null;
   let last = { screens: [], flows: [], currentScreen: null };
   // Where keyboard focus goes after the next render instead of the element
@@ -210,8 +232,20 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare }
 
   function renderBar(ctx, current) {
     barEl.innerHTML = "";
+    if (map) {
+      const shown = map.visible();
+      const mapToggle = button("variant-map-toggle chrome-icon-btn chrome-icon-btn--sm", "", () => {
+        map.onToggle(!shown);
+        rerender();
+      });
+      mapToggle.setAttribute("aria-pressed", String(shown));
+      mapToggle.setAttribute("aria-label", "Variant map");
+      mapToggle.dataset.tooltip = "Variant map";
+      mapToggle.appendChild(materialIcon("account_tree"));
+      barEl.append(mapToggle, el("span", "chrome-divider-v"));
+    }
     ctx.chain.forEach((node, i) => {
-      if (i > 0) barEl.appendChild(el("span", "crumb-sep", "›"));
+      if (i > 0) barEl.appendChild(materialIcon("chevron_right", "crumb-sep"));
       const group = el("span", "crumb-group");
       group.dataset.screen = node.name;
       group.classList.toggle("on", node.name === current);
@@ -219,7 +253,7 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare }
       const crumb = button("crumb", "", () => go(node.name));
       crumb.setAttribute("aria-current", String(node.name === current));
       crumb.title = node.name;
-      if (i === 0) crumb.appendChild(el("span", "crumb-home", "⌂"));
+      if (i === 0) crumb.appendChild(materialIcon("home", "crumb-home"));
       else {
         const icon = createKindIcon(node.screen.variant_kind);
         if (icon) crumb.appendChild(icon);
@@ -231,12 +265,13 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare }
       text.textContent = node.name;
       name.appendChild(text);
       crumb.appendChild(name);
-      const toggle = button("crumb-toggle", "▾", (evt) => {
+      const toggle = button("crumb-toggle", "", (evt) => {
         evt.stopPropagation();
         openCrumb = openCrumb === node.name ? null : node.name;
         focusNext = openCrumb ? { cls: "variant-pop-row", screen: null } : { cls: "crumb-toggle", screen: node.name };
         rerender();
       });
+      toggle.appendChild(materialIcon("expand_more"));
       toggle.setAttribute("aria-expanded", String(openCrumb === node.name));
       toggle.setAttribute("aria-label", `Variants around ${node.name}`);
       group.append(crumb, toggle);
@@ -245,11 +280,13 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare }
     });
     barEl.appendChild(el("span", "variant-bar-spacer"));
     if (ctx.parent) {
-      barEl.appendChild(el("span", "variant-chip", `depth ${ctx.depth}`));
-      if (ctx.kind) barEl.appendChild(el("span", `variant-chip variant-chip-${ctx.kind}`, ctx.kind));
-      barEl.appendChild(button("variant-back", `⤴ Back to ${ctx.root.name}`, () => go(ctx.root.name)));
+      barEl.appendChild(el("span", "variant-chip chrome-chip", `depth ${ctx.depth}`));
+      if (ctx.kind) barEl.appendChild(el("span", `variant-chip variant-chip-${ctx.kind} chrome-chip`, ctx.kind));
+      const back = button("variant-back chrome-btn chrome-btn--ghost chrome-btn--compact", `Back to ${ctx.root.name}`, () => go(ctx.root.name));
+      back.prepend(materialIcon("arrow_upward"));
+      barEl.appendChild(back);
     } else {
-      barEl.appendChild(el("span", "variant-chip", `${ctx.node.total} variant${ctx.node.total === 1 ? "" : "s"}`));
+      barEl.appendChild(el("span", "variant-chip chrome-chip", `${ctx.node.total} variant${ctx.node.total === 1 ? "" : "s"}`));
     }
     if (compare) barEl.appendChild(renderModeToggle(current));
   }
@@ -257,7 +294,7 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare }
   /** CHR-738 — Single | Compare · N; Compare is disabled when the family has nothing to compare. */
   function renderModeToggle(current) {
     const state = compare.state();
-    const group = el("span", "compare-seg");
+    const group = el("span", "compare-seg chrome-seg");
     group.setAttribute("role", "group");
     group.setAttribute("aria-label", "Screen view mode");
     const single = button("compare-seg-button", "Single", () => state.on && compare.onMode(false));
@@ -287,7 +324,7 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare }
       row.classList.toggle("dim", !onPath.has(node));
       row.setAttribute("aria-current", String(node.name === current));
       row.title = node.name;
-      if (node === ctx.root) row.appendChild(el("span", "crumb-home", "⌂"));
+      if (node === ctx.root) row.appendChild(materialIcon("home", "crumb-home"));
       else {
         const icon = createKindIcon(node.screen.variant_kind);
         if (icon) row.appendChild(icon);
@@ -295,7 +332,11 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare }
       row.appendChild(el("span", "map-node-name", displayName(node)));
       const expanded = onPath.has(node);
       if (node === ctx.root) row.appendChild(el("span", "map-node-note", "base"));
-      else if (!expanded && node.children.length > 0) row.appendChild(el("span", "map-node-note", `▸ ${node.total}`));
+      else if (!expanded && node.children.length > 0) {
+        const note = el("span", "map-node-note");
+        note.append(materialIcon("chevron_right"), String(node.total));
+        row.appendChild(note);
+      }
       card.appendChild(row);
       if (expanded) node.children.forEach(visit);
     };
@@ -369,7 +410,7 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare }
     renderMap(ctx, currentScreen);
     inspectorEl.hidden = !renderInspector(ctx, flows, currentScreen);
     barEl.hidden = false;
-    mapEl.hidden = false;
+    mapEl.hidden = map ? !map.visible() : false;
     return true;
   }
 

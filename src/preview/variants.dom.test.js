@@ -182,7 +182,9 @@ describe("variant tree map", () => {
   it("keeps off-path subtrees collapsed with a count", () => {
     const { map } = setup("two-parents");
     expect(nodes(map)).toEqual(["family", "leave", "two-parents", "name-sheet"]);
-    expect(map.querySelector('.map-node[data-screen="leave"] .map-node-note').textContent).toBe("▸ 3");
+    const note = map.querySelector('.map-node[data-screen="leave"] .map-node-note');
+    expect(note.querySelector(".icon").textContent).toBe("chevron_right");
+    expect(note.textContent).toBe("chevron_right3");
   });
 
   it("an entry click navigates", () => {

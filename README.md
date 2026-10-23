@@ -273,6 +273,8 @@ npm run lint         # eslint
 npm test             # vitest run
 npm run build        # compile src/ to dist/
 npm run dev -- serve ./my-project   # run the CLI from source via tsx
+./artisign-dev.sh start [dir...]     # build, stop the running Artisign, start this checkout in the background
+./artisign-dev.sh stop               # stop it (also: status)
 ```
 
 Only `dist/`, `src/preview/` (minus its test files), `assets/` and the two guide documents in `docs/` ship in the published package — see `files` in `package.json`. `prepack` runs the build automatically before `npm pack`/`npm publish`, so the tarball can't ship a stale `dist/`.

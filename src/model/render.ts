@@ -1,4 +1,5 @@
 import type { TokensDocument } from "../store/index.js";
+import { flowFromAttributes } from "./fill-flows.js";
 import { parseScreen } from "./parser.js";
 import { isMixedTokenValue } from "./token-ref.js";
 import { VOID_ELEMENTS, escapeAttr, escapeTextIn } from "./html-syntax.js";
@@ -240,7 +241,9 @@ function renderSubtree(sub: NodeSubtree, ctx: RenderContext, origin: Origin, fil
   if (sub.kind === "text") return escapeTextIn(parent, sub.text ?? "");
 
   if (sub.kind === "component_instance") {
-    return renderComponentInstance(sub, ctx, undefined, origin, fillInstanceId(sub, origin, fillIds));
+    // A fill instance navigates through its expanded root, so its raw data-flow-* (dropped by the attribute merge) is applied as a flow.
+    const id = fillInstanceId(sub, origin, fillIds);
+    return renderComponentInstance(sub, ctx, flowFromAttributes(id, sub.attributes).flow, origin, id);
   }
 
   const authoredId = fillAuthoredId(sub, origin);

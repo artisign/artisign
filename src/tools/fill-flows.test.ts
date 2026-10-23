@@ -4,7 +4,8 @@ import { writeHtml, patchHtml, updateRefs, setFlow } from "./writes.js";
 import { promoteToSystem } from "./lifecycle.js";
 import { findNodes } from "./reads.js";
 import { revertComponentInstanceToElement } from "./node-convert.js";
-import { loadRegistry, parseScreen } from "../model/index.js";
+import { loadRegistry, parseScreen, renderScreen } from "../model/index.js";
+import { buildRenderContext } from "./render-context.js";
 
 const NAV = `<nav id="nb"><span data-slot="back">x</span><span data-slot="title">t</span></nav>`;
 const edge = (from: string, to: string, event = "tap") => ({ from, event, to, to_kind: "screen" });
@@ -144,7 +145,38 @@ describe("flow edges on slot-fill content (CHR-778)", () => {
     expect(Object.values(doc.nodes).filter((n) => n.tag === "a")).toHaveLength(1);
   });
 
+  it("renders data-flow-target on a fill that is itself a component instance (preview navigation), and on a plain fill", async () => {
+    await fx.store.writeComponent("icon-btn", `<button id="ib">i</button>`);
+    await write(
+      `<div id="root"><div id="bar" class="$nav-bar"><div id="inst" data-slot="back" data-component="icon-btn" data-flow-target="home" data-flow-trigger="hover"></div>` +
+        `<a id="plain" data-slot="title" data-flow-target="checkout">t</a></div></div>`,
+    );
+    const registry = await loadRegistry(fx.store);
+    const { doc } = parseScreen(await fx.store.readScreen("cart"), "cart", registry);
+    const html = renderScreen(doc, await buildRenderContext(fx.store));
+    expect(html.match(/data-flow-target="home"/g)).toHaveLength(1);
+    expect(html).toMatch(/<button[^>]*data-flow-target="home"/);
+    expect(html).toContain('data-flow-trigger="hover"');
+    expect(html).toMatch(/<a[^>]*data-flow-target="checkout"/);
+  });
+
   describe("folding a subtree into slot fills keeps its flows", () => {
+    it("revert never mints an id that a folded fill already uses (no duplicate id, no wrong edge)", async () => {
+      await fx.store.writeComponent("card", `<div id="c"><span data-slot="slot-0">d</span></div>`);
+      await write(`<div id="root"><section id="a"><a data-flow-target="home">x</a></section><section id="b"><p>y</p></section></div>`);
+      await updateRefs(fx.store, { node: "cart.a", refs: { component_ref: "card" } });
+      const flows = await fx.store.readFlows();
+      expect(flows).toHaveLength(1);
+      await updateRefs(fx.store, { node: "cart.b", refs: { component_ref: "card" } });
+      await updateRefs(fx.store, { node: "cart.b", refs: { component_ref: null } });
+
+      const html = await fx.store.readScreen("cart");
+      const ids = [...html.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(await fx.store.readFlows()).toEqual(flows);
+    });
+
+
     const body = `<div id="root"><div id="box"><a id="go" data-flow-target="home" data-flow-trigger="hover">go</a><a data-flow-target="cart">anon</a></div></div>`;
 
     it("update_refs component_ref: every folded flow survives as a fill edge, generated ids included, without warnings", async () => {

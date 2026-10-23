@@ -24,7 +24,7 @@ export type {
 export { NodeIdAllocator, isGeneratedId } from "./node-id.js";
 export { isMixedTokenValue, tokenRefPaths } from "./token-ref.js";
 export { loadRegistry, type DesignSystemRegistry } from "./registry.js";
-export { ALLOWED_FLOW_TRIGGERS, collectFillFlows, forEachFill, guessFlowTargetKind } from "./fill-flows.js";
+export { ALLOWED_FLOW_TRIGGERS, collectFillFlows, collectFills, flowFromAttributes, forEachFill, guessFlowTargetKind, type FillLocation } from "./fill-flows.js";
 export { parseScreen, parseSubtreeFragment, parseTokenValue, type ParseScreenOptions, type TokenValueParse } from "./parser.js";
 export { serializeScreen, serializeNodeSubtree, serializeDetachedSubtree, serializeTokenRef } from "./serializer.js";
 export {

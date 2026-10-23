@@ -1,5 +1,5 @@
 import type { Store, FlowRecord } from "../store/index.js";
-import { collectFillFlows, forEachFill, type Flow as InternalFlow, type ScreenDocument } from "../model/index.js";
+import { collectFillFlows, collectFills, forEachFill, type Flow as InternalFlow, type NodeSubtree, type ScreenDocument } from "../model/index.js";
 import { formatNodeRef } from "./node-ref.js";
 import type { FlowEventName, PublicFlow, Warning } from "./types.js";
 
@@ -64,24 +64,22 @@ export async function readScreenFlows(store: Store, screenId: string): Promise<F
 }
 
 /**
- * Every trigger id's position in document order (depth-first preorder from the
- * root) — the order the parser emits flows in. A slot fill's authored id sorts
- * right after its owning node; ids not reachable from the root are absent.
+ * Every trigger id's position in document order: depth-first preorder from the
+ * root, with a node's slot-fill ids numbered right after the node itself. Ids
+ * not reachable from the root are absent.
  */
 function documentOrderIndex(doc: ScreenDocument): Map<string, number> {
+  const fillsByOwner = new Map<string, NodeSubtree[]>();
+  for (const { sub, owner } of collectFills(doc)) fillsByOwner.set(owner.id, [...(fillsByOwner.get(owner.id) ?? []), sub]);
   const index = new Map<string, number>();
   const visit = (id: string): void => {
     const node = doc.nodes[id];
     if (!node) return;
     index.set(id, index.size);
+    for (const fill of fillsByOwner.get(id) ?? []) if (fill.id !== undefined) index.set(fill.id, index.size);
     for (const childId of node.childIds) visit(childId);
   };
   visit(doc.rootNodeId);
-  let fills = 0;
-  forEachFill(doc, (sub, ownerId) => {
-    const ownerPosition = index.get(ownerId);
-    if (sub.id !== undefined && ownerPosition !== undefined) index.set(sub.id, ownerPosition + ++fills / 1e6);
-  });
   return index;
 }
 
@@ -91,16 +89,14 @@ function documentOrderIndex(doc: ScreenDocument): Map<string, number> {
  * does not churn with patch history). Flows whose trigger node is no longer
  * in the tree are dropped: edits that delete nodes (patch_html, promote to
  * component) must not leave orphan edges behind.
- * Flows on slot-fill content are not tracked in `doc.flows` across edits —
- * the fill's `data-flow-*` attributes are the truth — so they are re-derived
- * here from the current tree (CHR-778).
+ * Edges on slot-fill content are derived here from the fills' own
+ * `data-flow-*` attributes (CHR-778); `doc.flows` is not touched.
  */
 export async function syncScreenFlows(store: Store, doc: ScreenDocument): Promise<void> {
   const all = await store.readFlows();
   const others = all.filter((record) => !belongsToScreen(record, doc.id));
-  doc.flows = [...doc.flows.filter((flow) => doc.nodes[flow.triggerNodeId]), ...collectFillFlows(doc).flows];
   const order = documentOrderIndex(doc);
-  const fresh = doc.flows
+  const fresh = [...doc.flows.filter((flow) => doc.nodes[flow.triggerNodeId]), ...collectFillFlows(doc).flows]
     .filter((flow) => order.has(flow.triggerNodeId))
     .sort((a, b) => order.get(a.triggerNodeId)! - order.get(b.triggerNodeId)!)
     .map((flow) => toFlowRecord(toPublicFlow(doc.id, flow)));

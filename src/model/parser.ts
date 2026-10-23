@@ -811,9 +811,7 @@ export function parseScreen(
     nodes,
   };
 
-  const fillFlows = collectFillFlows(doc);
-  flows.push(...fillFlows.flows);
-  errors.push(...fillFlows.errors);
+  errors.push(...collectFillFlows(doc).errors);
 
   return { doc, errors };
 }

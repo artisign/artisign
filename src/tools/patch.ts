@@ -1,6 +1,8 @@
 import {
   parseScreen,
   parseSubtreeFragment,
+  collectFills,
+  type FillLocation,
   type DesignSystemRegistry,
   type Node as InternalNode,
   type NodeSubtree,
@@ -51,36 +53,6 @@ export function findBySelector(doc: ScreenDocument, selector: string): InternalN
   return Object.values(doc.nodes).filter((node) => matchesSelector(parsed, node));
 }
 
-/**
- * A slot-fill subtree and where it hangs. Fill content lives in a component
- * instance's `slotOverrides`, never in `doc.nodes` (Schema-Spec, CHR-584), so
- * it is addressed here by walking the instances instead. `container` is what
- * a write needs to splice it: the slot record + key for a top-level fill, the
- * parent's `children` array for anything nested deeper.
- */
-export type FillLocation = {
-  sub: NodeSubtree;
-  owner: InternalNode;
-  container: { kind: "slot"; slots: Record<string, NodeSubtree>; key: string } | { kind: "children"; siblings: NodeSubtree[] };
-};
-
-/** Every slot-fill subtree in the document, pre-order. */
-export function collectFills(doc: ScreenDocument): FillLocation[] {
-  const out: FillLocation[] = [];
-  const visit = (sub: NodeSubtree, owner: InternalNode, container: FillLocation["container"]): void => {
-    out.push({ sub, owner, container });
-    for (const child of sub.children) visit(child, owner, { kind: "children", siblings: sub.children });
-    if (sub.slotOverrides) {
-      for (const [key, nested] of Object.entries(sub.slotOverrides)) visit(nested, owner, { kind: "slot", slots: sub.slotOverrides, key });
-    }
-  };
-  for (const node of Object.values(doc.nodes)) {
-    if (!node.slotOverrides) continue;
-    for (const [key, sub] of Object.entries(node.slotOverrides)) visit(sub, node, { kind: "slot", slots: node.slotOverrides, key });
-  }
-  return out;
-}
-
 export function findFillById(doc: ScreenDocument, id: string): FillLocation | undefined {
   return collectFills(doc).find((f) => f.sub.id === id);
 }
@@ -98,7 +70,7 @@ function subtreeIds(sub: NodeSubtree, out: Set<string>): Set<string> {
 }
 
 /** Every id in use on the screen — flat-map nodes plus authored slot-fill ids — minus `exclude` (the ids of a subtree about to be replaced). */
-function takenIds(doc: ScreenDocument, exclude?: ReadonlySet<string>): Set<string> {
+export function takenIds(doc: ScreenDocument, exclude?: ReadonlySet<string>): Set<string> {
   const taken = new Set(Object.keys(doc.nodes));
   for (const f of collectFills(doc)) if (f.sub.id !== undefined) taken.add(f.sub.id);
   if (exclude) for (const id of exclude) taken.delete(id);

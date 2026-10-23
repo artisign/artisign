@@ -1,4 +1,5 @@
-import { ALLOWED_FLOW_TRIGGERS, NodeIdAllocator, guessFlowTargetKind, type FlowTriggerEvent, type Node as InternalNode, type NodeSubtree, type ScreenDocument } from "../model/index.js";
+import { NodeIdAllocator, flowFromAttributes, type Node as InternalNode, type NodeSubtree, type ScreenDocument } from "../model/index.js";
+import { takenIds } from "./patch.js";
 
 /**
  * Converts a live document node (with its screen-local id) into a detached,
@@ -131,17 +132,9 @@ function materializeSubtree(
   // The fill's flow is a real node flow again: it moves from the raw
   // attributes into doc.flows (the serializer emits it from there).
   const attributes = { ...subtree.attributes };
-  const flowTarget = attributes["data-flow-target"];
-  if (flowTarget) {
-    const trigger = attributes["data-flow-trigger"];
-    // parseScreen already listed this fill's edge under its authored id, which is now this node's id.
-    doc.flows = doc.flows.filter((f) => f.triggerNodeId !== id);
-    doc.flows.push({
-      triggerNodeId: id,
-      triggerEvent: (ALLOWED_FLOW_TRIGGERS as readonly string[]).includes(trigger ?? "") ? (trigger as FlowTriggerEvent) : "tap",
-      targetKind: guessFlowTargetKind(flowTarget),
-      targetId: flowTarget,
-    });
+  const { flow } = flowFromAttributes(id, attributes);
+  if (flow) {
+    doc.flows.push(flow);
     delete attributes["data-flow-target"];
     delete attributes["data-flow-trigger"];
   }
@@ -175,7 +168,8 @@ function materializeSubtree(
  */
 export function revertComponentInstanceToElement(doc: ScreenDocument, node: InternalNode): void {
   const allocator = new NodeIdAllocator();
-  allocator.seedUsed(Object.keys(doc.nodes));
+  // Live ids plus fill ids (folded fills keep theirs), so a minted id never repeats one.
+  allocator.seedUsed(takenIds(doc));
 
   const slotOverrides = node.slotOverrides ?? {};
   const childIds = Object.values(slotOverrides).map((subtree) => materializeSubtree(doc, subtree, node.id, allocator));

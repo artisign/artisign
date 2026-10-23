@@ -765,8 +765,7 @@ function matchesPredicate(predicate: Predicate, subject: MatchSubject, commentsB
       // text nodes AND'd with any other predicate (which never matches a
       // text node) would always return empty.
       return subject.kind !== "text" && subject.hasTextMatch(predicate.pattern);
-    case "has_flow":
-      {
+    case "has_flow": {
       const flowRef = subject.flowRef ?? subject.nodeRef;
       return flowRef !== undefined && flowFroms.has(flowRef);
     }

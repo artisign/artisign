@@ -1,6 +1,11 @@
 import type { Flow, FlowTriggerEvent, NodeId, NodeSubtree, ScreenDocument, ValidationIssue } from "./types.js";
 
-const ALLOWED_FLOW_TRIGGERS: readonly FlowTriggerEvent[] = ["tap", "hover", "longpress", "swipe-left", "swipe-right"];
+export const ALLOWED_FLOW_TRIGGERS: readonly FlowTriggerEvent[] = ["tap", "hover", "longpress", "swipe-left", "swipe-right"];
+
+/** `"checkout.node-id"` targets a node, anything else a screen. */
+export function guessFlowTargetKind(flowTarget: string): "screen" | "node" {
+  return flowTarget.includes(".") ? "node" : "screen";
+}
 
 /** Every slot-fill subtree below `owner`, depth first (fills of fills included), with the live node that owns the outermost slot. */
 export function forEachFill(doc: ScreenDocument, visit: (sub: NodeSubtree, ownerId: NodeId) => void): void {
@@ -16,7 +21,7 @@ export function forEachFill(doc: ScreenDocument, visit: (sub: NodeSubtree, owner
 
 function invalidTrigger(sub: NodeSubtree): string | undefined {
   const raw = sub.attributes["data-flow-trigger"];
-  return sub.attributes["data-flow-target"] && raw && !(ALLOWED_FLOW_TRIGGERS as readonly string[]).includes(raw) ? raw : undefined;
+  return raw && !(ALLOWED_FLOW_TRIGGERS as readonly string[]).includes(raw) ? raw : undefined;
 }
 
 /** `unknown_flow_trigger` issues for freshly parsed fill content (patch_html fragments, which never go through `parseScreen`). */
@@ -47,18 +52,15 @@ export function collectFillFlows(doc: ScreenDocument): { flows: Flow[]; errors: 
   const missingIdOwners = new Set<NodeId>();
   forEachFill(doc, (sub, ownerId) => {
     const target = sub.attributes["data-flow-target"];
+    const invalid = invalidTrigger(sub);
+    if (invalid) errors.push({ code: "unknown_flow_trigger", message: `"${invalid}" is not a valid data-flow-trigger`, nodeId: ownerId });
     if (!target) return;
-    const rawTrigger = sub.attributes["data-flow-trigger"];
-    let triggerEvent: FlowTriggerEvent = "tap";
-    if (rawTrigger) {
-      if ((ALLOWED_FLOW_TRIGGERS as readonly string[]).includes(rawTrigger)) triggerEvent = rawTrigger as FlowTriggerEvent;
-      else errors.push({ code: "unknown_flow_trigger", message: `"${rawTrigger}" is not a valid data-flow-trigger`, nodeId: ownerId });
-    }
+    const triggerEvent = (invalid ? undefined : (sub.attributes["data-flow-trigger"] as FlowTriggerEvent | undefined)) ?? "tap";
     if (sub.id === undefined) {
       missingIdOwners.add(ownerId);
       return;
     }
-    flows.push({ triggerNodeId: sub.id, triggerEvent, targetKind: target.includes(".") ? "node" : "screen", targetId: target });
+    flows.push({ triggerNodeId: sub.id, triggerEvent, targetKind: guessFlowTargetKind(target), targetId: target });
   });
   return { flows, errors, missingIdOwners: [...missingIdOwners] };
 }

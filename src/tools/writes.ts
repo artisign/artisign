@@ -531,7 +531,7 @@ export async function updateRefs(store: Store, input: UpdateRefsInput): Promise<
   await syncScreenFlows(store, doc);
   const commitResult = await store.commit(`update_refs: ${input.node}`);
 
-  warnings.push(...fillFlowWarnings(doc));
+  warnings.push(...fillFlowWarnings(doc, new Set([nodeId])));
   return { node: input.node, ...commitFields(commitResult), applied_refs: applied, warnings };
 }
 
@@ -709,7 +709,12 @@ export type SetFlowInput = {
 export async function setFlow(store: Store, input: SetFlowInput): Promise<Record<string, unknown>> {
   const { screen, nodeId } = requireScreenNodeRef(parseNodeRef(input.node), "set_flow");
   const { doc } = await loadScreen(store, screen);
-  if (!doc.nodes[nodeId]) throw new ToolError("not_found", `node "${input.node}" was not found`);
+  if (!doc.nodes[nodeId]) {
+    const hint = findFillById(doc, nodeId)
+      ? " — it is slot-fill content; change its flow by replacing the fill (patch_html replace) or with write_html"
+      : "";
+    throw new ToolError("not_found", `node "${input.node}" was not found${hint}`);
+  }
 
   // The edge is written into the trigger node's data-flow-target/-trigger
   // attributes, not flows.json alone — flows.json is a derived mirror kept

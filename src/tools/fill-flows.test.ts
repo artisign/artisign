@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
-import { writeHtml, patchHtml, updateRefs } from "./writes.js";
+import { writeHtml, patchHtml, updateRefs, setFlow } from "./writes.js";
 import { promoteToSystem } from "./lifecycle.js";
 import { findNodes } from "./reads.js";
+import { revertComponentInstanceToElement } from "./node-convert.js";
+import { loadRegistry, parseScreen } from "../model/index.js";
 
 const NAV = `<nav id="nb"><span data-slot="back">x</span><span data-slot="title">t</span></nav>`;
 const edge = (from: string, to: string, event = "tap") => ({ from, event, to, to_kind: "screen" });
@@ -113,18 +115,50 @@ describe("flow edges on slot-fill content (CHR-778)", () => {
     expect(ancestor.warnings).toEqual([expect.objectContaining({ kind: "missing_id", target: "cart.bar2" })]);
   });
 
+  it("an invalid data-flow-trigger on a fill is reported even without a target", async () => {
+    const res = await write(`<div id="root"><div id="bar" class="$nav-bar"><button id="b" data-slot="back" data-flow-trigger="shake">Back</button></div></div>`);
+    expect(JSON.stringify(res)).toContain("shake");
+  });
+
+  it("set_attr and set_flow point at the replace route for a fill's flow", async () => {
+    await write(`<div id="root"><div id="bar" class="$nav-bar"><button id="cart-back" data-slot="back" data-flow-target="home">Back</button></div></div>`);
+    await expect(
+      patchHtml(fx.store, { target: { kind: "node", node: "cart.cart-back" }, operation: "set_attr", attr: { name: "data-flow-target", value: "x" } }),
+    ).rejects.toMatchObject({ message: expect.stringContaining("replace the fill") });
+    await expect(setFlow(fx.store, { node: "cart.cart-back", flow: null })).rejects.toMatchObject({
+      code: "not_found",
+      message: expect.stringContaining("replacing the fill"),
+    });
+  });
+
+  it("reverting an instance does not let a fill id overwrite a live node with the same id", async () => {
+    await fx.store.writeComponent("card", `<div id="c"><span data-slot="slot-0">d</span></div>`);
+    const registry = await loadRegistry(fx.store);
+    const { doc } = parseScreen(`<div id="root"><div id="box" class="$card"><a id="fill-a">go</a></div><p id="live">x</p></div>`, "cart", registry);
+    // Hand-edit collision: the fill id equals a live node id.
+    doc.nodes.box!.slotOverrides!["slot-0"]!.id = "live";
+
+    revertComponentInstanceToElement(doc, doc.nodes.box!);
+
+    expect(doc.nodes.live!.tag).toBe("p");
+    expect(Object.values(doc.nodes).filter((n) => n.tag === "a")).toHaveLength(1);
+  });
+
   describe("folding a subtree into slot fills keeps its flows", () => {
     const body = `<div id="root"><div id="box"><a id="go" data-flow-target="home" data-flow-trigger="hover">go</a><a data-flow-target="cart">anon</a></div></div>`;
 
-    it("update_refs component_ref: an authored id keeps its edge as a fill edge, an id-less trigger warns", async () => {
+    it("update_refs component_ref: every folded flow survives as a fill edge, generated ids included, without warnings", async () => {
       await fx.store.writeComponent("card", `<div id="c"><span data-slot="slot-0">d</span></div>`);
       await write(body);
       expect(await fx.store.readFlows()).toHaveLength(2);
 
       const res = await updateRefs(fx.store, { node: "cart.box", refs: { component_ref: "card" } });
-      expect(await fx.store.readFlows()).toEqual([edge("cart.go", "home", "hover")]);
+      const flows = await fx.store.readFlows();
+      expect(flows).toHaveLength(2);
+      expect(flows).toContainEqual(edge("cart.go", "home", "hover"));
+      expect(flows.find((f) => f.to === "cart")?.from).toMatch(/^cart\.n\d+$/);
       expect(await fx.store.readScreen("cart")).toContain('data-flow-target="home"');
-      expect(res.warnings).toContainEqual(expect.objectContaining({ kind: "missing_id", target: "cart.box" }));
+      expect(warningKinds(res)).not.toContain("missing_id");
     });
 
     it("promote_to_system kind=component carries edges on this screen and on structurally equal occurrences elsewhere", async () => {

@@ -511,7 +511,8 @@ async function promoteComponentOrPattern(
     for (const [screenName, touchedDoc] of touchedDocs) {
       await store.writeScreen(screenName, serializeScreen(touchedDoc));
       await syncScreenFlows(store, touchedDoc);
-      definitionWarnings.push(...fillFlowWarnings(touchedDoc));
+      const converted = new Set(rewrittenNodes.filter((r) => r.startsWith(`${screenName}.`)).map((r) => r.slice(screenName.length + 1)));
+      definitionWarnings.push(...fillFlowWarnings(touchedDoc, converted));
     }
   }
 

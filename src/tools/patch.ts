@@ -150,7 +150,7 @@ export function patchFill(
     case "set_attr": {
       if (!patch.attr) throw new ToolError("validation_failed", 'attr is required for operation "set_attr"');
       if (RESERVED_SET_ATTR_NAMES.has(patch.attr.name)) {
-        throw new ToolError("validation_failed", reservedSetAttrMessage(patch.attr.name));
+        throw new ToolError("validation_failed", reservedSetAttrMessage(patch.attr.name, true));
       }
       if (patch.attr.value === null) delete sub.attributes[patch.attr.name];
       else sub.attributes[patch.attr.name] = patch.attr.value;

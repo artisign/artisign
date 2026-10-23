@@ -10,7 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - A `data-flow-target` on component slot-fill content (for example a back button passed into `$nav-bar`) now becomes a
   flow edge keyed by the fill's id; a fill without an id returns a `missing_id` warning. Promoting a node to a component
-  or setting `component_ref` no longer silently drops the flows of the folded elements. (CHR-778)
+  or setting `component_ref` no longer silently drops the flows of the folded elements. Fill edges in existing screens
+  appear in `flows.json` the next time that screen is written. (CHR-778)
 - A component name and a bare token member name share one namespace for `class="$name"`: `set_tokens`, `write_html` and
   `promote_to_system` now refuse (`conflict`) when introducing the second meaning would unbind existing nodes and otherwise warn
   `ambiguous_ref`; an already ambiguous ref renders with the red outline instead of silently as a plain element. (CHR-772)

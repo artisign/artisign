@@ -766,7 +766,10 @@ function matchesPredicate(predicate: Predicate, subject: MatchSubject, commentsB
       // text node) would always return empty.
       return subject.kind !== "text" && subject.hasTextMatch(predicate.pattern);
     case "has_flow":
-      return (subject.flowRef ?? subject.nodeRef) !== undefined && flowFroms.has((subject.flowRef ?? subject.nodeRef)!);
+      {
+      const flowRef = subject.flowRef ?? subject.nodeRef;
+      return flowRef !== undefined && flowFroms.has(flowRef);
+    }
     default:
       return false;
   }

@@ -1,4 +1,4 @@
-import { NodeIdAllocator, isGeneratedId, type FlowTriggerEvent, type Node as InternalNode, type NodeSubtree, type ScreenDocument } from "../model/index.js";
+import { ALLOWED_FLOW_TRIGGERS, NodeIdAllocator, guessFlowTargetKind, type FlowTriggerEvent, type Node as InternalNode, type NodeSubtree, type ScreenDocument } from "../model/index.js";
 
 /**
  * Converts a live document node (with its screen-local id) into a detached,
@@ -67,16 +67,15 @@ export function collectDescendantIds(doc: ScreenDocument, nodeId: string, out: s
  * A node's flow edge lives in `doc.flows`, not in its attributes, so folding a
  * subtree into slot fills would drop it from the HTML and from flows.json
  * (CHR-778). Fill content keeps its `data-flow-*` as raw attributes instead,
- * and a fill with an authored id keeps that id, which is what addresses the
- * edge (`<screen>.<id>`). A generated id is meaningless once the node is gone,
- * so such a fill stays id-less; callers surface that as a `missing_id` warning.
+ * and the fill keeps the node's id (generated or authored — ids are serialized
+ * and stay stable), which is what addresses the edge (`<screen>.<id>`).
  */
 function carryFlowsIntoFills(doc: ScreenDocument, nodeId: string, sub: NodeSubtree): void {
   const flow = doc.flows.find((f) => f.triggerNodeId === nodeId);
   if (flow) {
     sub.attributes = { ...sub.attributes, "data-flow-target": flow.targetId };
     if (flow.triggerEvent !== "tap") sub.attributes["data-flow-trigger"] = flow.triggerEvent;
-    if (!isGeneratedId(nodeId)) sub.id = nodeId;
+    sub.id = nodeId;
   }
   const node = doc.nodes[nodeId]!;
   for (const [i, childId] of node.childIds.entries()) carryFlowsIntoFills(doc, childId, sub.children[i]!);
@@ -105,8 +104,6 @@ export function convertToComponentInstance(doc: ScreenDocument, node: InternalNo
   for (const id of descendantIds) delete doc.nodes[id];
 }
 
-const FLOW_TRIGGERS: readonly FlowTriggerEvent[] = ["tap", "hover", "longpress", "swipe-left", "swipe-right"];
-
 function materializeSubtree(
   doc: ScreenDocument,
   subtree: NodeSubtree,
@@ -129,7 +126,8 @@ function materializeSubtree(
     return id;
   }
 
-  const id = allocator.allocateElementId(subtree.id);
+  // Keep the fill's own id unless a live node already uses it (only via hand edits).
+  const id = allocator.allocateElementId(subtree.id !== undefined && !doc.nodes[subtree.id] ? subtree.id : undefined);
   // The fill's flow is a real node flow again: it moves from the raw
   // attributes into doc.flows (the serializer emits it from there).
   const attributes = { ...subtree.attributes };
@@ -140,8 +138,8 @@ function materializeSubtree(
     doc.flows = doc.flows.filter((f) => f.triggerNodeId !== id);
     doc.flows.push({
       triggerNodeId: id,
-      triggerEvent: (FLOW_TRIGGERS as readonly string[]).includes(trigger ?? "") ? (trigger as FlowTriggerEvent) : "tap",
-      targetKind: flowTarget.includes(".") ? "node" : "screen",
+      triggerEvent: (ALLOWED_FLOW_TRIGGERS as readonly string[]).includes(trigger ?? "") ? (trigger as FlowTriggerEvent) : "tap",
+      targetKind: guessFlowTargetKind(flowTarget),
       targetId: flowTarget,
     });
     delete attributes["data-flow-target"];
@@ -170,10 +168,10 @@ function materializeSubtree(
 /**
  * Reverses `convertToComponentInstance`: turns a `component_instance` back
  * into a plain element, re-materializing its `slotOverrides` content as real
- * (freshly-id'd) entries in the flat node map. The original screen-local ids
- * from before promotion aren't recoverable — they were discarded when the
- * content moved into `slotOverrides` — so this mints new ones, the same way
- * `patch_html`'s fragment splicing does for newly-inserted content.
+ * entries in the flat node map. A fill that carries its own id (every fill
+ * with a flow does, see `carryFlowsIntoFills`) gets that id back; the rest were
+ * never recorded, so new ones are minted, the same way `patch_html`'s fragment
+ * splicing does for newly-inserted content.
  */
 export function revertComponentInstanceToElement(doc: ScreenDocument, node: InternalNode): void {
   const allocator = new NodeIdAllocator();

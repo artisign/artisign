@@ -146,8 +146,9 @@ export type TokenValue = string | number | { [key: string]: TokenValue | null };
  */
 export const RESERVED_SET_ATTR_NAMES = new Set(["class", "style", "id", "data-node-id", "data-variant", "data-flow-target", "data-flow-trigger"]);
 
-export function reservedSetAttrMessage(name: string): string {
+export function reservedSetAttrMessage(name: string, onFill = false): string {
   if (name === "data-flow-target" || name === "data-flow-trigger") {
+    if (onFill) return `"${name}" on a slot fill cannot be set with set_attr or set_flow — replace the fill (patch_html replace) or use write_html`;
     return `"${name}" is ref-bearing — use set_flow instead`;
   }
   if (name === "id" || name === "data-node-id") {

@@ -212,7 +212,7 @@ describe("write_html", () => {
       screen: "home",
       mode: "create",
       title: "Home",
-      html_aug: `<div id="root" style="${frame}"><div id="n1" style="background: #fff; color: #111; width: 10px"></div></div>`,
+      html_aug: `<div id="root" style="${frame}"><div id="n1" style="${frame}"></div></div>`,
     });
     expect((res.warnings as unknown[]).filter((w) => (w as { kind: string }).kind === "repeated_pattern")).toEqual([]);
 
@@ -222,17 +222,19 @@ describe("write_html", () => {
       attr: { name: "data-testid", value: "r" },
     });
     expect((patched.warnings as unknown[]).filter((w) => (w as { kind: string }).kind === "repeated_pattern")).toEqual([]);
+    expect(patched.preexisting_repeated_pattern_count ?? 0).toBe(0);
   });
 
   it("never warns repeated_pattern for a pure layout wrapper, even one repeated everywhere", async () => {
-    await fx.store.writeScreen("checkout", `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`);
-    await fx.store.writeScreen("cart", `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`);
+    const wrapper = `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`;
+    await fx.store.writeScreen("checkout", `<div id="root">${wrapper}</div>`);
+    await fx.store.writeScreen("cart", `<div id="root">${wrapper}</div>`);
 
     const res = await writeHtml(fx.store, {
       screen: "home",
       mode: "create",
       title: "Home",
-      html_aug: `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`,
+      html_aug: `<div id="root">${wrapper}</div>`,
     });
 
     expect((res.warnings as unknown[]).filter((w) => (w as { kind: string }).kind === "repeated_pattern")).toEqual([]);

@@ -55,6 +55,10 @@ function collectFillOccurrences(subtree: NodeSubtree, screen: ScreenId, byScreen
 }
 
 /**
+ * The screen root is never an occurrence (`isRepeatedPatternCandidate`
+ * excludes it — it carries the frame size and can't be promoted), so a
+ * non-root node is never flagged merely for matching some screen's root.
+ *
  * `byScreen` is built from `source.kind === "screen"` sources only —
  * patterns/components must never feed it (the AC is screen-occurrence
  * only; a repeated *definition* is a design-system authoring choice, not
@@ -73,9 +77,7 @@ export async function buildStyleOccurrenceIndex(store: Store, registry: DesignSy
   for (const source of docs) {
     if (source.kind !== "screen") continue;
     for (const node of Object.values(source.doc.nodes)) {
-      // A screen root is never an occurrence: it can't be promoted (it carries the
-      // frame size), so a non-root node must not be flagged for matching one.
-      if (node.id !== source.doc.rootNodeId && isRepeatedPatternCandidate(node)) {
+      if (isRepeatedPatternCandidate(node)) {
         recordOccurrence(repeatedPatternFingerprint(node), source.name, byScreen);
       }
       if (node.slotOverrides) {

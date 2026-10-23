@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - `repeated_pattern` no longer warns on the screen root frame, which cannot be promoted, and a node is no longer flagged
   merely for matching another screen's root. (CHR-774)
+- `delete_entity` now also removes the deleted component's or pattern's usage text from `design-system/meta.json`, in the same
+  commit, so a later component of the same name no longer inherits it. (CHR-773)
 
 ## [2.1.1] - 2026-10-21
 

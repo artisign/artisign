@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `repeated_pattern` no longer warns on the screen root frame, which cannot be promoted, and a node is no longer flagged
+  merely for matching another screen's root. (CHR-774)
+
 ## [2.1.1] - 2026-10-21
 
 ### Fixed

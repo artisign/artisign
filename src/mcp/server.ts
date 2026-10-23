@@ -35,8 +35,10 @@ export type ResolvedProject = { store: Store; ctx: ToolHandlerContext; activity:
  */
 export type ProjectResolver = (project: string | undefined) => Promise<ResolvedProject>;
 
-// Repeated in every project-bound tool's schema, so it stays short.
-const PROJECT_INPUT = z.string({ error: "project is required — call list_projects" }).describe("Project name (see list_projects) or absolute path");
+// Repeated in every project-bound tool's schema, so the description stays
+// minimal (CHR-884): INSTRUCTIONS (PROJECT) carries the full rule, and the
+// error above names the fix.
+const PROJECT_INPUT = z.string({ error: "project is required — call list_projects" }).describe("Project name or absolute path");
 
 /**
  * Derives and broadcasts one `activity` event (CHR-630/ADR-005) for a tool
@@ -130,6 +132,23 @@ export function createMcpServer(
         }
       },
     );
+  }
+
+  // zod's draft-7 output carries an uninformative "$schema" on every inputSchema
+  // (25 x 52 chars per tools/list, CHR-884). The SDK has no switch for it, so
+  // strip it from the registered handler's result. This reaches into a private
+  // SDK field, so it degrades to a no-op if the field is gone (a newer SDK must
+  // not break every MCP call): the "no $schema" test in server.test.ts is the
+  // tripwire that fails in CI on such an SDK bump.
+  type ListToolsHandler = (req: unknown, extra: unknown) => Promise<{ tools: { inputSchema: Record<string, unknown> }[] }>;
+  const handlers = (server.server as unknown as { _requestHandlers?: Map<string, ListToolsHandler> })._requestHandlers;
+  const listTools = handlers?.get("tools/list");
+  if (handlers && listTools) {
+    handlers.set("tools/list", async (req, extra) => {
+      const result = await listTools(req, extra);
+      for (const tool of result.tools) delete tool.inputSchema.$schema;
+      return result;
+    });
   }
 
   return server;

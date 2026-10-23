@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { createRequire } from "node:module";
 import { NO_BROWSER_MESSAGE, selectBrowser } from "../tools/browser.js";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -197,8 +197,61 @@ describe("MCP server — instructions budget", () => {
   // MCP entry an agent must know how to find and name a project. CHR-832
   // moved that block to the top and made `project` a required input of every
   // call (no implicit fallback any more): 985 to 995, measured at 992.
-  it("stays within the ~995 token cheat-sheet budget (chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(995);
+  // CHR-884 moved tool-local content (set_meta targets, delete_entity detail)
+  // into the tool descriptions and added the NODE REFS block: tightened from
+  // 995 to 975, measured at 956 (NODE REFS block included).
+  it("stays within the ~975 token cheat-sheet budget (chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(975);
+  });
+});
+
+describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
+  // Measured on what a client actually receives from tools/list, in the
+  // daemon's project-bound shape (every tool but three takes `project`).
+  let client: Client;
+  let tools: Awaited<ReturnType<Client["listTools"]>>["tools"];
+
+  beforeAll(async () => {
+    const resolver = async () => {
+      throw new Error("not called");
+    };
+    const server = createMcpServer(undefined, undefined, undefined, resolver);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    client = new Client({ name: "test-client", version: "0.1.0" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+    tools = (await client.listTools()).tools;
+  });
+
+  afterAll(async () => {
+    await client.close();
+  });
+
+  it("keeps the whole tools/list within 21,500 chars (~5,375 tokens)", () => {
+    expect(JSON.stringify(tools).length).toBeLessThanOrEqual(21_500);
+  });
+
+  it("keeps every advertised tool entry within 2,000 chars", () => {
+    for (const tool of tools) {
+      expect(JSON.stringify(tool).length, tool.name).toBeLessThanOrEqual(2_000);
+    }
+  });
+
+  it("keeps every description within 500 chars", () => {
+    for (const tool of tools) {
+      expect((tool.description ?? "").length, tool.name).toBeLessThanOrEqual(500);
+    }
+  });
+
+  it("advertises no $schema key on any inputSchema", () => {
+    expect(tools).toHaveLength(25);
+    for (const tool of tools) {
+      expect(tool.inputSchema, tool.name).not.toHaveProperty("$schema");
+    }
+  });
+
+  it("keeps the slot-styling clauses in the advertised descriptions", () => {
+    expect(tools.find((t) => t.name === "write_html")!.description).toMatch(/never style the data-slot element/);
+    expect(tools.find((t) => t.name === "patch_html")!.description).toMatch(/never style the slot element/);
   });
 });
 

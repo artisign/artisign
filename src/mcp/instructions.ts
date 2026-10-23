@@ -6,9 +6,9 @@
  */
 export const INSTRUCTIONS = `Artisign — augmentation grammar for screen HTML (html_aug).
 
-PROJECT: start with list_projects. Every tool but init_project/get_guide takes
-a required "project" (its name, or an absolute path). init_project returns it;
-ask the user where a new project goes.
+PROJECT: start with list_projects. Every tool but list_projects/init_project/
+get_guide takes a required "project": a project name or an absolute path.
+init_project returns it.
 
 WORKFLOW: tokens -> components -> screens; inline values only while exploring
 screen one of a direction, promoted before screen two; second occurrence of a
@@ -38,6 +38,13 @@ FLOWS:
 NODE IDS:
   id="btn-login"  stable, human-chosen; generated if omitted — keep it
   stable across writes (patches and comments address nodes by id).
+NODE REFS: "<screen>.<node-id>"; a definition node is
+"component:<name>#<variant>.<node-id>" or "pattern:<name>.<node-id>". Taken by
+get_node, update_refs, patch_html, inspect_node, get_screenshot; returned by
+find_nodes. A definition node without an explicit id keeps its ref for one call
+only (find_nodes: id_stability "derived"; writes warn missing_id). A node in a
+slot fill is no ref for get_node/update_refs; with an authored id,
+patch_html/inspect_node take "<screen>.<id>".
 
 EXAMPLE:
   <section id="hero" style="padding: $spacing.lg">
@@ -51,30 +58,21 @@ REVIEW LOOP: after every write_html / patch_html, call get_screenshot
 {screen} and check the image before the next edit — red outlines mark an
 unresolved token, component, or variant ref.
 
-METADATA: set_meta writes notes/tags/variant_of (target: {kind:"screen", screen}),
-tags/title/description (target: {kind:"mockup", mockup}), idea/decisions
-(target: {kind:"design_system"}), usage guidance on a component/pattern
-(target: {kind:"component"|"pattern", name}, field: usage), or a tag's own
-notes (target: {kind:"tag", tag}) — a spec spanning several screens, set
-once instead of duplicated into each one's own notes; get_project/get_screen
-surface it as tag_notes. All notes/idea/decisions/usage bodies render as
-Markdown in the preview. Find screens or mockups by tag via get_project
-{tags: [...]}.
+METADATA: set_meta (targets in its description). A tag's notes (a spec spanning
+several screens) surface as tag_notes in get_project/get_screen; find screens or
+mockups by tag via get_project {tags: [...]}. Notes, idea, decisions and usage
+render as Markdown in the preview.
 
-LIFECYCLE: write_html kind:"component"|"pattern" writes a definition
-(default variant + <template data-variant> siblings). delete_entity
-{kind, name} deletes a screen/component/pattern/mockup; refused if
-referenced (screen/component only).
+LIFECYCLE: write_html kind:"component"|"pattern" writes a definition (default
+variant + <template data-variant> siblings); delete_entity removes a
+screen/component/pattern/mockup.
 
-MOCKUPS: for several options of one screen, or early directions before a
-design system exists — raw HTML, outside the ref model, no drift warnings.
-write_mockup {mockup, variant, mode, html} per variant -> get_screenshot
-{mockup, variant} in a loop while iterating -> promote_mockup {mockup,
-variant, screen} copies the chosen one into a real screen (the mockup
-stays as exploration history; delete_entity it when done). Refs/drift
-discipline applies to that screen from then on, same as any other. Tag a
-mockup via set_meta (target: {kind:"mockup", mockup}) to make it findable
-in get_project {tags: [...]}, same as a screen.
+MOCKUPS: several options of one screen, or early directions before a design
+system exists — raw HTML, outside the ref model, no drift warnings.
+write_mockup per variant -> get_screenshot {mockup, variant} in a loop ->
+promote_mockup {mockup, variant, screen} copies the chosen one into a real
+screen (the mockup stays as history; delete_entity it when done). Refs/drift
+discipline applies to that screen from then on.
 
 RENDER ENVIRONMENT (guaranteed, no re-declare needed): border-box sizing,
 zero body margin — declared widths/heights render exactly as given. A screen

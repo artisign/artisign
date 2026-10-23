@@ -20,6 +20,9 @@ import { getGuide } from "./guide.js";
 import { writeMockup, getMockup, promoteMockup } from "./mockups.js";
 import { setBoardState } from "./board-state.js";
 
+// Repeated on every node-ref input; INSTRUCTIONS (NODE REFS) has the full rule, but some clients drop instructions.
+const NODE_REF = "<screen>.<node-id>, or component:<name>#<variant>.<node-id> / pattern:<name>.<node-id>";
+
 const viewSchema = z.enum(["summary", "tree", "full"]);
 const responseModeSchema = z.enum(["summary", "diff", "full"]);
 const flowEventSchema = z.enum(["tap", "hover", "longpress", "swipe-left", "swipe-right"]);
@@ -96,13 +99,13 @@ export const TOOLS: ToolDefinition[] = [
   // Reads ---------------------------------------------------------------
   tool(
     "get_project",
-    "Project root: screen list, design-system pointer, counts. Tiered, cold-start read. view \"tree\" marks a variant screen with variant_of/variant_kind and gives each screen its viewport {width, height, declared} — declared: false means the root declares no px width and the 390x844 phone default applies. fields: [\"reuse\"] adds design-system reuse coverage (component/token, project-wide and per screen) plus unused components/tokens and the lowest-reuse screens.",
+    "Project root: screens, design-system pointer, counts — the cold-start read. view \"tree\" adds per-screen variant_of/variant_kind and viewport {width, height, declared}. fields: [\"reuse\"] adds design-system reuse coverage and the lowest-reuse screens. tags (any-of) filters screens and mockups and adds their tag_notes.",
     { view: viewSchema.optional(), fields: z.array(z.string()).optional(), tags: z.array(z.string()).optional() },
     (store, input) => getProject(store, input),
   ),
   tool(
     "get_screen",
-    "One screen with comment/flow indicators. Tiered + field selection. view \"full\" adds variants (direct child screens with their variant_kind) and reached_from (screens with a flow into this one), each only when non-empty. fields: [\"rendered_html\"] at view \"full\" returns the resolved (component/token) render as a standalone HTML document — an MCP-only fallback for reading resolved output without a browser render; never included by default.",
+    "One screen with comment/flow indicators. Tiered (default summary) with fields selection. view \"full\" adds variants and reached_from when non-empty; fields: [\"rendered_html\"] at \"full\" returns the resolved render as a standalone HTML document (MCP-only fallback, never default).",
     {
       screen: z.string(),
       view: viewSchema.optional(),
@@ -113,39 +116,19 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "get_node",
-    "Subtree of one node, addressed as \"<screen>.<node-id>\", or " +
-      "\"component:<name>#<variant>.<node-id>\" / \"pattern:<name>.<node-id>\" for a design-system " +
-      "definition node. Tiered + field selection. On a component instance, view \"full\" also carries " +
-      "\"slots\": a list of its slot fills in document order, each with its slot name, tag, refs and the id it " +
-      "renders with where this node is addressed (on the screen for a screen ref; in the standalone " +
-      "definition render for a definition ref, where a screen namespaces it further). Slot content is never " +
-      "addressable by get_node/update_refs (not in \"children\"); patch_html and inspect_node do accept " +
-      "\"<screen>.<id>\" for a fill node that carries an authored id.",
-    { node: z.string(), view: viewSchema.optional(), fields: z.array(z.string()).optional() },
+    "Subtree of one node (node refs: see the server instructions). Tiered, with fields selection. view \"full\" on a component instance adds slots: its fills in document order, each with slot name, tag, refs and rendered id.",
+    { node: z.string().describe(NODE_REF), view: viewSchema.optional(), fields: z.array(z.string()).optional() },
     (store, input) => getNode(store, input as never),
   ),
   tool(
     "get_design_system",
-    "Tokens, components (with variants and the default variant's slot names), and patterns. tree groups token values by " +
-      "bucket into one compact string per bucket, not one entry per token path — full adds the " +
-      "flat per-path form plus definition markup.",
+    "Tokens, components (variants plus the default variant's slot names) and patterns. tree packs token values into one compact string per bucket; full adds per-path values and definition markup.",
     { view: viewSchema.optional(), fields: z.array(z.string()).optional() },
     (store, input) => getDesignSystem(store, input),
   ),
   tool(
     "find_nodes",
-    "Where-query across screens and design-system definitions — components and patterns are searched too, " +
-      "always, since refs concentrated there are just as findable as inline ones on a screen " +
-      "(style_ref, component_ref, variant, has_comments, text_match, has_flow; screens filters which screens, " +
-      "never excludes components/patterns). A match with source:\"component\"|\"pattern\" carries " +
-      "id_stability:\"explicit\"|\"derived\" instead of a screen match's implicit stability: its node ref IS " +
-      "addressable by get_node/update_refs/patch_html, but only reliably resolves to the same element across " +
-      "a later write when id_stability is \"explicit\" — a \"derived\" id is only guaranteed for this one call. " +
-      "reply_comment stays screen-only. A predicate can also match inside a component instance's slot fills; " +
-      "that match carries node: null, addressable: false, inside: \"<screen>.<node-id>\" pointing at the " +
-      "enclosing instance, and (screen matches only) its authored id when it has one — patch_html/inspect_node take \"<screen>.<id>\" " +
-      "for it; get_node/update_refs do not, and a fill without an id can only be reached by patch_html's " +
-      "css_selector. The headline token-saver.",
+    "Where-query across screens and, always, component/pattern definitions (screens only narrows which screens). where: style_ref, component_ref, variant, has_comments, text_match, has_flow. Definition matches carry source and id_stability; a match inside a slot fill has node: null, addressable: false. Far cheaper than reading screens. id_stability \"derived\": the ref holds for this call only; \"explicit\" is stable across writes.",
     {
       where: z.array(predicateSchema),
       screens: z.array(z.string()).optional(),
@@ -170,25 +153,21 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "list_projects",
-    "Lists every project this daemon knows (opened or created before), each as {name, root, open}. Works with no " +
-      "project open. A project whose artisign.json is gone is left out. Pass a project's name to later calls " +
-      "that take a project.",
+    "Lists every project the daemon knows, each as {name, root, open}. Works with no project open. Pass a name as the project input of later calls.",
     {},
     (_store, _input, ctx) => listProjects(ctx),
     { requiresProject: false },
   ),
   tool(
     "get_guide",
-    "Returns the agent-facing design methodology guide (design-system-first workflow, refs, promote " +
-      "discipline, review loop, handoff).",
+    "Returns the design methodology guide: design-system-first workflow, refs, promote discipline, review loop, handoff.",
     {},
     () => getGuide(),
     { requiresProject: false },
   ),
   tool(
     "get_mockup",
-    "Reads a mockup's variants — raw HTML, outside the ref model. summary omits html per variant; full " +
-      "includes it. Pass variant to read a single one.",
+    "Reads a mockup's variants (raw HTML, outside the ref model). summary omits html, full includes it; variant reads a single one.",
     { mockup: z.string(), view: z.enum(["summary", "full"]).optional(), variant: z.string().optional() },
     (store, input) => getMockup(store, input as never),
   ),
@@ -196,15 +175,7 @@ export const TOOLS: ToolDefinition[] = [
   // Writes ----------------------------------------------------------------
   tool(
     "write_html",
-    "Create or fully replace a screen from augmented HTML (html_aug): one root element, " +
-      "class=\"$name\" or data-component=\"name\" for component instances, $ref in style values " +
-      "for tokens, data-variant/data-flow-target for state/flows. See server instructions for the " +
-      "full grammar. Example: html_aug: '<section id=\"s1\" style=\"padding: $spacing.md\">...</section>'. " +
-      "kind:\"component\"|\"pattern\" writes a design-system definition file instead of a screen: " +
-      "a default-variant root element plus optional sibling <template data-variant=\"x\"> blocks; " +
-      "screen names the definition. In a definition, never style the data-slot element itself " +
-      "— an instance filling it discards that style; style a wrapper around it instead " +
-      "(an <img> slot: size the <img> per instance, not in the definition).",
+    "Create or fully replace a screen from augmented HTML (html_aug; grammar in the server instructions) with one root element. kind:\"component\"|\"pattern\" writes a design-system definition instead, named by screen: a default-variant root plus optional sibling <template data-variant=\"x\"> blocks, each the complete variant. In a definition, never style the data-slot element itself — an instance discards that style; style a wrapper.",
     {
       screen: z.string(),
       mode: z.enum(["create", "replace"]),
@@ -217,21 +188,10 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "patch_html",
-    "Surgical patch by node ref or CSS selector: replace, insert_before, insert_after, delete, set_attr. " +
-      "html_aug for replace/insert_* is a fragment in the same augmented-HTML grammar as write_html " +
-      "(see server instructions), including its data-slot rule — never style the slot element itself " +
-      "when patching into a definition. node also accepts a component:<name>#<variant>.<node-id> / " +
-      "pattern:<name>.<node-id> ref (css_selector targeting stays screen-only); touching a node with no " +
-      "explicit id in source returns a missing_id warning, not blocking. Nodes inside a component instance's " +
-      "slot fill are patchable too, by \"<screen>.<id>\" (they need an authored id) or css_selector; the " +
-      "authored fill markup is edited, and a slot's top-level fill can be replaced by one element or deleted " +
-      "but has no siblings to insert. response_mode \"diff\"/\"full\" " +
-      "are rejected against a definition ref — only \"summary\" is supported there. " +
-      "Example: { target: { kind: \"node\", node: \"home.btn1\" }, " +
-      "operation: \"set_attr\", attr: { name: \"data-variant\", value: \"hover\" } }.",
+    "Surgical patch by node ref or CSS selector (selector: screens only): replace, insert_before, insert_after, delete, set_attr. html_aug for replace/insert_* is a fragment in the write_html grammar — in a definition, never style the slot element itself. Example: { target: { kind: \"node\", node: \"home.btn1\" }, operation: \"set_attr\", attr: { name: \"data-variant\", value: \"hover\" } }.",
     {
       target: z.union([
-        z.object({ kind: z.literal("node"), node: z.string() }),
+        z.object({ kind: z.literal("node"), node: z.string().describe(NODE_REF) }),
         z.object({ kind: z.literal("selector"), screen: z.string(), css_selector: z.string() }),
       ]),
       operation: z.enum(["replace", "insert_before", "insert_after", "delete", "set_attr"]),
@@ -243,16 +203,9 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "update_refs",
-    "Change a node's $token/$component/variant bindings without an HTML parse — the cheapest write. " +
-      "token_refs is keyed by CSS property, value is a dot-path like \"color.primary\" (null clears it). " +
-      "Setting a property always replaces its whole value with a single plain ref, even if that property " +
-      "currently holds a ref mixed with literal text or more than one ref — to author a mixed value, use " +
-      "write_html/patch_html instead. node also accepts a component:<name>#<variant>.<node-id> / " +
-      "pattern:<name>.<node-id> ref; touching a node with no explicit id in source returns a missing_id " +
-      "warning, not blocking. " +
-      "Example: { node: \"home.btn1\", refs: { token_refs: { color: \"color.primary\" }, variant: \"hover\" } }.",
+    "Change a node's $token/$component/variant bindings without an HTML parse — the cheapest write. token_refs maps a CSS property to a token path (\"color.primary\"; null clears). Setting a property replaces its whole value with one plain ref; author mixed values with write_html/patch_html.",
     {
-      node: z.string(),
+      node: z.string().describe(NODE_REF),
       refs: z.object({
         component_ref: z.string().nullable().optional(),
         variant: z.string().nullable().optional(),
@@ -263,8 +216,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "set_tokens",
-    "Design-system token mutation. One call rewrites tokens.json; every bound screen, component, and pattern " +
-      "re-resolves. The propagation lever.",
+    "Design-system token mutation. One call rewrites tokens.json; every bound screen, component, and pattern re-resolves. The propagation lever.",
     {
       tokens: z.record(z.string(), tokenValueSchema.nullable()),
       mode: z.enum(["replace", "patch"]),
@@ -280,15 +232,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "set_meta",
-    "Set screen notes/tags, mockup tags/title/description, design-system idea/decisions, component/pattern " +
-      "usage guidance, or a tag's own notes — the handoff contract coding agents rely on. One field group per " +
-      "call: notes/tags for a screen target, tags/title/description for a mockup target, idea/decisions for " +
-      "design_system, usage for a component/pattern target, notes for a tag target ({kind:\"tag\", tag}) — a " +
-      "spec that spans several screens, set once instead of duplicated into every tagged screen's own notes; no " +
-      "screen has to carry the tag yet. tags and decisions replace the full list, not just add to it — read the " +
-      "current value first if you need to append. A screen target can also declare itself a variant of another " +
-      "screen: variant_of (parent screen name, null clears) plus variant_kind (state | overlay | step, required " +
-      "with variant_of). Rejected: missing parent, self, cycle.",
+    "Set handoff metadata, one field group per call, by target: screen → notes, tags, variant_of + variant_kind (state|overlay|step; variant_of null clears); mockup → tags, title, description; design_system → idea, decisions; component/pattern {name} → usage; tag {tag} → notes, a spec spanning several screens. tags and decisions replace the whole list — read first to append.",
     {
       target: metaTargetSchema,
       notes: z.string().optional(),
@@ -305,13 +249,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "write_mockup",
-    "Create or revise one variant of a mockup — a design exploration outside the design system: raw HTML " +
-      "written verbatim (fragment or full document), no refs resolved, no drift warnings, inline <style> " +
-      "allowed. Use for side-by-side option exploration before committing to a direction; promote_mockup " +
-      "copies a chosen variant into a real screen — the mockup stays as exploration history. create requires " +
-      "html and fails on an existing variant (conflict); replace fails if the variant doesn't exist " +
-      "(not_found) and can be meta-only (omit html to retitle/redescribe without touching the markup). " +
-      "title defaults to the variant id.",
+    "Create or revise one variant of a mockup: raw HTML written verbatim (fragment or full document, inline <style> allowed), no refs, no drift warnings. create requires html; replace needs an existing variant and may omit html to retitle/redescribe only. title defaults to the variant id.",
     {
       mockup: z.string(),
       variant: z.string(),
@@ -324,19 +262,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "set_board_state",
-    "Reads or mutates the Board's shared filter, pinned screens and expanded clusters — held in daemon memory only, shared by " +
-      "every client (browser and agents) currently viewing this project; never persisted, never written to " +
-      "the project folder. filter: omit to leave it unchanged, a string to set it (case-insensitive substring " +
-      "match against a screen's name or any of its tags), null (or an empty/whitespace-only string — the same " +
-      "state as null) to clear it. pins: {op:\"add\"|\"remove\"|\"set\", screens} to add/remove/replace the " +
-      "pinned set, or {op:\"clear\"} to unpin everything; omit to leave pins unchanged. expanded: the same " +
-      "shape as pins, naming the variant clusters (ADR-006) shown expanded on the Board — name a main screen, " +
-      "or any variant to expand the cluster that contains it; omit to leave it unchanged. A call with every " +
-      "field omitted is a pure read — no broadcast, no side effect. The response always reports the current " +
-      "filter/pinned/expanded plus shown_screens (filter matches ∪ pinned, restricted to screens that currently " +
-      "exist). An unknown screen name in an add/set never enters pinned or expanded — it's dropped with a warning, never " +
-      "blocking; the known names in the same call still apply, and a set whose names are all unknown changes " +
-      "nothing. Board state lives in the daemon; without one the tool fails with invalid_state.",
+    "Reads or sets the Board's shared view state — filter, pinned screens, expanded variant clusters — in daemon memory only, shared with every viewer. filter: case-insensitive substring of a screen's name or tag; null or blank clears. pins/expanded: {op: add|remove|set, screens} or {op: clear}; expanded names a main screen or any of its variants. Omitted fields stay unchanged; none = pure read. Returns the state plus shown_screens (filter matches + pins).",
     {
       filter: z.string().nullable().optional(),
       pins: pinsPatchSchema.optional(),
@@ -348,24 +274,10 @@ export const TOOLS: ToolDefinition[] = [
   // Visual review -----------------------------------------------------------
   tool(
     "get_screenshot",
-    "Screenshots a rendered screen, or one mockup variant, as a PNG — exactly one of screen or mockup+variant " +
-      "is required. Call this after every write_html/patch_html (or write_mockup) to visually review what " +
-      "actually changed before making the next edit — the write -> screenshot -> adjust loop. Pass node " +
-      "(\"<screen>.<node-id>\", must belong to screen and not valid with mockup) to clip to just that element " +
-      "plus 8px padding — far fewer vision tokens than a full screen when iterating on one component. A " +
-      "component:<name>#<variant>.<node-id> / pattern:<name>.<node-id> ref renders that definition standalone " +
-      "and stands alone — it takes neither screen nor mockup. A screen renders at its root element's declared " +
-      "width/height (e.g. style=\"width: 1440px; height: 900px\" on the root, or $tokens), 390x844 when undeclared — " +
-      "change the root to change the frame; width is not accepted with screen. For a mockup, " +
-      "width sets the viewport (default 390, height fixed 844) and the capture is always full-page, uncropped, " +
-      "since a variant can run taller than the fold. Renders in a browser already installed on this machine " +
-      "(Chrome, Edge, Brave, Chromium or Firefox — nothing to install); the result names it. Pass browser " +
-      "(\"chrome\" | \"edge\" | \"brave\" | \"chromium\" | \"firefox\") to check the same design in another " +
-      "installed browser before calling it done. scale defaults to 1x, higher scales cost more " +
-      "tokens once the image reaches a model.",
+    "PNG of a screen, one mockup variant (mockup + variant) or, on its own, a definition node ref — exactly one target. node clips a screen to one element (+8px): far fewer vision tokens. For a mockup, width sets the viewport (default 390) and the capture is full-page; a screen renders at its root's declared size. scale 1-3 (default 1) multiplies vision cost. browser re-renders in another installed engine; the result names the one used.",
     {
       screen: z.string().optional(),
-      node: z.string().optional(),
+      node: z.string().describe(NODE_REF).optional(),
       scale: z.number().optional(),
       mockup: z.string().optional(),
       variant: z.string().optional(),
@@ -376,22 +288,15 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "inspect_node",
-    "Reads a node's computed bounding box (x/y/width/height) and a curated set of computed styles (display, " +
-      "position, margin, padding, border, border_radius, font_size, line_height, font_weight, color, " +
-      "background_color, overflow) by rendering the screen headlessly. Prefer this over get_screenshot for " +
-      "geometry/alignment/color questions (\"is this button 44px tall?\", \"do these two elements align?\") — " +
-      "text is far cheaper than vision tokens. Use get_screenshot instead when the question is visual (layout " +
-      "looks right, imagery, overall composition). Also measures a node inside a component instance's slot fill " +
-      "when it carries an authored id. Renders in an installed browser, same as get_screenshot, and takes the same " +
-      "optional browser input for a cross-browser check.",
-    { node: z.string(), browser: z.enum(BROWSER_KINDS).optional() },
+    "Computed bounding box (x/y/width/height) and 12 computed styles (display, position, margin, padding, border, border_radius, font_size, line_height, font_weight, color, background_color, overflow) of one node, rendered headlessly. Prefer it to get_screenshot for geometry, alignment and color questions — text is far cheaper than vision; use get_screenshot for visual judgment. Same browser input.",
+    { node: z.string().describe(NODE_REF), browser: z.enum(BROWSER_KINDS).optional() },
     (store, input) => inspectNode(store, input as never),
   ),
 
   // Lifecycle ---------------------------------------------------------------
   tool(
     "init_project",
-    "Scaffold a project directory: empty, from HTML, or from a Stitch export URL. Returns `project`, the name to pass in later calls (the root when the name is taken). If the user has not named a location, ask them for it — do not pick a directory yourself.",
+    "Scaffold a project directory: empty, from HTML, or from a Stitch export URL. Returns project, the value for the project input of later calls. Ask the user for dir; never pick one yourself.",
     {
       dir: z.string(),
       name: z.string().optional(),
@@ -419,14 +324,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "promote_to_system",
-    "Lift a node's inline value or a repeated element into a design-system token, component, or pattern. " +
-      "kind:token rewrites project-wide — every screen, component, and pattern definition that carried the " +
-      "matching inline value, not just the promoted node. kind:component rewrites every structurally identical " +
-      "occurrence across screens only, not inside other component/pattern definitions — a call targeting one " +
-      "screen node must not have the side effect of rewriting curated design-system source files. Pattern " +
-      "promotion only creates the pattern file and leaves the source node's markup untouched — patterns have no " +
-      "ref/instance mechanism in the canonical model, so there is nothing to rewrite elsewhere. Example: " +
-      "{ node: \"home.btn1\", kind: \"component\", name: \"btn-primary\" }.",
+    "Lift a node's inline value or a repeated element into a design-system token, component or pattern. token rewrites every matching inline value project-wide, definitions included; component rewrites identical occurrences across screens only, never inside definitions; pattern only creates the file and leaves the source markup.",
     {
       node: z.string(),
       kind: z.enum(["token", "component", "pattern"]),
@@ -437,26 +335,13 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "promote_mockup",
-    "Copies a chosen mockup variant into a new design-system-bound screen via writeHtml(mode:\"create\"), " +
-      "returning its response (errors/warnings/root_node_id) plus the source mockup/variant. The mockup stays " +
-      "on disk as exploration history — delete it with delete_entity when done. A screen has one root, so " +
-      "promotion normalizes the mockup first: for a full <html> document only the <head> <style> elements and " +
-      "the <body> content are kept; every top-level <style> (head and body) moves, in document order, to the " +
-      "start of the root so the screen renders like the mockup; several top-level nodes are wrapped in one " +
-      "<div> (a <body> style/class is carried onto that <div>); <script>, <meta>, <title>, <link> and <base> and other <body>/<html> attributes are dropped. Any restructuring or drop is reported " +
-      "as a mockup_normalized warning; a single-root variant without styles is written unchanged. Refs/drift " +
-      "discipline applies to the resulting screen from this point on, same as any other screen.",
+    "Copy a mockup variant into a new design-system-bound screen (write_html create); returns that response plus mockup and variant. The variant is normalized to one root (styles moved in, extra top-level nodes wrapped in a div, script/meta/title/link/base dropped); changes are reported as a mockup_normalized warning.",
     { mockup: z.string(), variant: z.string(), screen: z.string(), title: z.string().optional() },
     (store, input) => promoteMockup(store, input as never),
   ),
   tool(
     "delete_entity",
-    "Delete a screen, component, pattern, or mockup (whole mockup, or one variant via variant). Screens also " +
-      "drop their outgoing flow edges and meta sidecar (comments are kept as history). A component still " +
-      "referenced by any screen, component, or pattern is refused with the referencing nodes listed. A screen with " +
-      "variant screens below it is refused with has_variants (subtree size and example names) unless " +
-      "cascade: true, which deletes the whole variant subtree in one commit and returns deleted_screens; " +
-      "cascade is screen-only.",
+    "Delete a screen, component, pattern or mockup (or one mockup variant via variant). A screen takes its flow edges and meta with it; comments stay. Referenced components are refused (references listed), as are screens with variant screens unless cascade: true (screen only) deletes the subtree.",
     { kind: z.enum(["screen", "component", "pattern", "mockup"]), name: z.string(), variant: z.string().optional(), cascade: z.boolean().optional() },
     // ctx threaded through the way init_project's is — deleteEntity uses
     // ctx.viewState.pruneScreen(name) to drop a deleted screen from the
@@ -467,7 +352,7 @@ export const TOOLS: ToolDefinition[] = [
   // Comments ---------------------------------------------------------------
   tool(
     "reply_comment",
-    "Answer a comment and optionally resolve it. Takes any id list_comments returned — a thread root or one of its replies; the answer lands on the thread root either way.",
+    "Answer a comment, optionally resolving it. Accepts any id from list_comments (root or reply); the answer lands on the thread root.",
     { comment_id: z.string(), body: z.string(), resolve: z.boolean().optional() },
     (store, input) => replyComment(store, input as never),
   ),

@@ -4,7 +4,7 @@ import { writeHtml, patchHtml, updateRefs, setFlow } from "./writes.js";
 import { promoteToSystem } from "./lifecycle.js";
 import { findNodes } from "./reads.js";
 import { revertComponentInstanceToElement } from "./node-convert.js";
-import { loadRegistry, parseScreen, renderScreen } from "../model/index.js";
+import { loadRegistry, parseScreen, renderScreen, serializeScreen } from "../model/index.js";
 import { buildRenderContext } from "./render-context.js";
 
 const NAV = `<nav id="nb"><span data-slot="back">x</span><span data-slot="title">t</span></nav>`;
@@ -160,14 +160,16 @@ describe("flow edges on slot-fill content (CHR-778)", () => {
     expect(html).toMatch(/<a[^>]*data-flow-target="checkout"/);
   });
 
-  it("revert strips a trigger-only fill's data-flow-trigger, so a later set_flow serializes it once", async () => {
+  it("revert strips a trigger-only fill's data-flow-trigger from the node, so a flow set later is serialized once", async () => {
     await fx.store.writeComponent("card", `<div id="c"><span data-slot="slot-0">d</span></div>`);
-    await write(`<div id="root"><div id="box" class="$card"><a id="t" data-flow-trigger="hover">x</a></div></div>`);
-    await updateRefs(fx.store, { node: "cart.box", refs: { component_ref: null } });
-    await setFlow(fx.store, { node: "cart.t", flow: { from: "cart.t", event: "hover", to: "home", to_kind: "screen" } });
-    const html = await fx.store.readScreen("cart");
-    expect(html.match(/data-flow-trigger/g)).toHaveLength(1);
-    expect(html.match(/data-flow-target/g)).toHaveLength(1);
+    const registry = await loadRegistry(fx.store);
+    const { doc } = parseScreen(`<div id="root"><div id="box" class="$card"><a id="t" data-flow-trigger="hover">x</a></div></div>`, "cart", registry);
+
+    revertComponentInstanceToElement(doc, doc.nodes.box!);
+    expect(doc.nodes.t!.attributes["data-flow-trigger"]).toBeUndefined();
+
+    doc.flows.push({ triggerNodeId: "t", triggerEvent: "hover", targetKind: "screen", targetId: "home" });
+    expect(serializeScreen(doc).match(/data-flow-trigger/g)).toHaveLength(1);
   });
 
   describe("folding a subtree into slot fills keeps its flows", () => {

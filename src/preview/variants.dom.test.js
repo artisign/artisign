@@ -239,6 +239,25 @@ describe("compare mode controls (CHR-738)", () => {
     expect(calls).toEqual([["mode", false]]);
   });
 
+  it("hides the variant-map toggle while comparing, shows it otherwise", () => {
+    const map = { visible: () => true, onToggle: () => {} };
+    const make = (state) => {
+      document.body.innerHTML = '<nav id="bar"></nav><aside id="map"></aside><section id="insp"></section>';
+      const ui = createVariantUI({
+        barEl: document.getElementById("bar"),
+        mapEl: document.getElementById("map"),
+        inspectorEl: document.getElementById("insp"),
+        onSelect: () => {},
+        map,
+        compare: { state: () => ({ cap: 3, selected: [], on: false, ...state }), onMode: () => {}, onPick: () => {} },
+      });
+      ui.update(screens, flows, "confirm");
+      return document.getElementById("bar");
+    };
+    expect(make({}).querySelector(".variant-map-toggle")).not.toBeNull();
+    expect(make({ on: true, selected: ["dissolve"] }).querySelector(".variant-map-toggle")).toBeNull();
+  });
+
   it("has no toggle without the compare option", () => {
     const { bar } = setup("confirm");
     expect(bar.querySelector(".compare-seg")).toBeNull();

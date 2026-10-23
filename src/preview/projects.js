@@ -29,7 +29,7 @@ export function shortPath(path) {
  *   recentLabelEl: HTMLElement, recentListEl: HTMLElement,
  *   actionOpenEl: HTMLElement, actionInitEl: HTMLElement,
  *   noProjectEl: HTMLElement, bodyEl: HTMLElement,
- *   viewTabsEl: HTMLElement, topbarEl?: HTMLElement, flowToggleEl: HTMLElement, commentToggleEl: HTMLElement,
+ *   topbarEl: HTMLElement,
  *   emptyRecentListEl: HTMLElement, emptyBtnOpenEl: HTMLElement, emptyBtnInitEl: HTMLElement,
  * }} elements
  * @param {{ onSwitch: (root: string) => void, onOpenRecent: (dir: string) => void, onOpenDialog: () => void, onInitDialog: () => void }} callbacks
@@ -48,10 +48,7 @@ export function createProjectUI(elements, callbacks) {
     actionInitEl,
     noProjectEl,
     bodyEl,
-    viewTabsEl,
     topbarEl,
-    flowToggleEl,
-    commentToggleEl,
     emptyRecentListEl,
     emptyBtnOpenEl,
     emptyBtnInitEl,
@@ -127,10 +124,7 @@ export function createProjectUI(elements, callbacks) {
     const isEmpty = state.active === null;
     noProjectEl.hidden = !isEmpty;
     bodyEl.hidden = isEmpty;
-    viewTabsEl.hidden = isEmpty;
-    topbarEl?.classList.toggle("is-empty", isEmpty);
-    flowToggleEl.hidden = isEmpty;
-    commentToggleEl.hidden = isEmpty;
+    topbarEl.classList.toggle("is-empty", isEmpty); // hides every .project-only topbar element
     if (!isEmpty) return;
 
     emptyRecentListEl.innerHTML = "";

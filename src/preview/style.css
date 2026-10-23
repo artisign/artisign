@@ -3712,9 +3712,6 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 #variant-bar .crumb-sep {
   font-size: var(--size-icon-xs);
-}
-
-#variant-bar .crumb-sep {
   color: var(--chrome-text-tertiary);
 }
 

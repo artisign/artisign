@@ -113,7 +113,7 @@ const variantUI = createVariantUI({
       variantMapVisible = visible;
       writeBoolPref(prefsStorage, "artisign.variantMap", visible);
       // The map takes canvas width, so the fit zoom is recomputed (the caller re-renders the bar).
-      queueMicrotask(updateCanvas);
+      queueMicrotask(refitActivePane);
     },
   },
   // CHR-738 — the Single | Compare toggle and the popover checkboxes; `compare` (below) is only read once the UI renders.
@@ -183,6 +183,7 @@ const canvasControlsEl = document.getElementById("canvas-controls");
 const zoomButtons = document.querySelectorAll(".zoom-button");
 const zoomTrigger = document.getElementById("zoom-trigger");
 const zoomMenu = document.getElementById("zoom-menu");
+const zoomControlsEl = document.getElementById("zoom-controls");
 const zoomLabel = document.getElementById("zoom-label");
 const statusBarToggle = document.getElementById("status-bar-toggle");
 const warningBadge = document.getElementById("warning-badge");
@@ -207,7 +208,6 @@ const inspectorEmptyEl = document.getElementById("inspector-empty");
 const inspectorErrorEl = document.getElementById("inspector-error");
 const inspectOverlayEl = document.getElementById("inspect-overlay");
 const noProjectStateEl = document.getElementById("no-project-state");
-const viewTabsNav = document.getElementById("view-tabs");
 const projectPickerTrigger = document.getElementById("project-picker-trigger");
 const projectPickerName = document.getElementById("project-picker-name");
 const projectMenu = document.getElementById("project-menu");
@@ -330,6 +330,8 @@ let eventSource; // current /events connection — closed and reopened with a fr
 // `currentScreen` has since moved on again.
 let iframeRenderedScreen = null;
 let pendingRenderScreen = null;
+let pendingRenderOk = true; // whether the render pending in pendingRenderScreen succeeded
+let iframeRenderOk = true; // ...and the one the iframe currently shows
 
 // `localStorage` itself can throw on access (not just on getItem/setItem) in
 // some privacy modes — resolve it once, tolerantly, rather than letting that
@@ -648,10 +650,7 @@ const projectUI = createProjectUI(
     actionInitEl: menuActionInit,
     noProjectEl: noProjectStateEl,
     bodyEl,
-    viewTabsEl: viewTabsNav,
     topbarEl: document.getElementById("topbar"),
-    flowToggleEl: flowModeToggle,
-    commentToggleEl: commentModeToggle,
     emptyRecentListEl: emptyRecentList,
     emptyBtnOpenEl: emptyBtnOpen,
     emptyBtnInitEl: emptyBtnInit,
@@ -1716,6 +1715,7 @@ async function loadCurrentScreen() {
   const requestId = ++renderRequestId;
   const result = await fetchRender(currentScreen, activeProjectRoot);
   if (requestId !== renderRequestId) return; // a newer request has since started — drop this stale result
+  pendingRenderOk = result.ok;
   pendingRenderScreen = currentScreen; // read by the `load` handler below once this srcdoc assignment actually lands
   screenFrame.srcdoc = result.ok
     ? result.html
@@ -1849,10 +1849,11 @@ const FRAME_CAPTION_BAND = 28;
 
 function updateCanvas() {
   // CHR-912 — "<screen> · <w> × <h>" above the frame, in a reserved band; not while the how-to-start guide replaces the frame.
-  const showCaption = currentScreen !== null && !screenHolderEl.hidden;
+  // Name and size come from the same rendered document: while a newly selected screen is still loading, the frame (and so its size) is the previous one, and a failed render shows an error note, not a screen.
+  const showCaption = iframeRenderedScreen !== null && iframeRenderOk && !screenHolderEl.hidden;
   const { width, height } = applyCanvas({ canvasEl, holderEl: screenHolderEl, iframeEl: screenFrame, zoom, topInset: showCaption ? FRAME_CAPTION_BAND : 0 });
   frameCaptionEl.hidden = !showCaption;
-  if (showCaption) frameCaptionEl.textContent = `${currentScreen} · ${width} × ${height}`;
+  if (showCaption) frameCaptionEl.textContent = `${iframeRenderedScreen} · ${width} × ${height}`;
 }
 
 /** Whether the zoom buttons currently control the mockup row instead of the screen canvas — see applyMainVisibility. */
@@ -1946,6 +1947,7 @@ screenFrame.addEventListener("load", () => {
   // syncInspectOverlay() below lets both correctly read this (now current)
   // document instead of treating it as still-loading.
   iframeRenderedScreen = pendingRenderScreen;
+  iframeRenderOk = pendingRenderOk;
   inspectorPanel.refreshExpanded(); // re-reads computed values for whatever's still expanded against the fresh document
   syncInspectOverlay(); // repositions the overlay if something's still focused on this same screen, hides it otherwise
   applyPendingActivityHighlight(); // CHR-631 — the re-render a pending write/navigate highlight was waiting for has now landed
@@ -2002,19 +2004,27 @@ function setZoomMenuOpen(open) {
   zoomTrigger.setAttribute("aria-expanded", String(open));
 }
 
-zoomTrigger.addEventListener("click", (evt) => {
-  evt.stopPropagation();
-  setZoomMenuOpen(zoomMenu.hidden);
-});
-document.addEventListener("click", (evt) => {
-  if (!zoomMenu.hidden && !zoomMenu.contains(evt.target)) setZoomMenuOpen(false);
-});
-document.addEventListener("keydown", (evt) => {
-  if (evt.key === "Escape" && !zoomMenu.hidden) {
-    setZoomMenuOpen(false);
-    zoomTrigger.focus();
-  }
-});
+zoomTrigger.addEventListener("click", () => setZoomMenuOpen(zoomMenu.hidden));
+// Capture on pointerdown, not a bubbling click: the project menu's trigger and the compare "add" chip stop propagation, so a click handler would never hear that another menu was opened.
+document.addEventListener(
+  "pointerdown",
+  (evt) => {
+    if (!zoomMenu.hidden && !zoomControlsEl.contains(evt.target)) setZoomMenuOpen(false);
+  },
+  true,
+);
+// Capture + stopImmediatePropagation: this Escape only closes the menu, so inspect mode's Escape (clears its focus) must not also fire.
+document.addEventListener(
+  "keydown",
+  (evt) => {
+    if (evt.key === "Escape" && !zoomMenu.hidden) {
+      evt.stopImmediatePropagation();
+      setZoomMenuOpen(false);
+      zoomTrigger.focus();
+    }
+  },
+  true,
+);
 
 /** Sets the zoom level for whichever the buttons currently target — the mockup row or the screen canvas (see isMockupZoomActive) — each remembered under its own pref key. */
 function setZoom(next) {

@@ -6,6 +6,7 @@
 
 import { buildScreenTree, displayName } from "./screens.js";
 import { canCompare } from "./compare-data.js";
+import { icon } from "./icons.js";
 
 /** The screen part of a flow ref — "screen" or "screen.node-id". */
 export function screenOfRef(ref) {
@@ -75,22 +76,11 @@ export function flowCounts(flows, name) {
 // Material Symbols for the variant kinds in the screen view (crumbs, popover rows, map); the sidebar tree keeps screens.js's own glyphs until its area ticket.
 const KIND_MATERIAL = { state: "description", overlay: "web_asset", step: "subdirectory_arrow_right" };
 
-function createKindIcon(kind) {
+function createVariantKindIcon(kind) {
   if (!(kind in KIND_MATERIAL)) return null;
-  const icon = document.createElement("span");
-  icon.className = "kind-icon icon";
-  icon.dataset.kind = kind;
-  icon.setAttribute("aria-hidden", "true");
-  icon.textContent = KIND_MATERIAL[kind];
-  return icon;
-}
-
-function materialIcon(name, className = "") {
-  const icon = document.createElement("span");
-  icon.className = `icon ${className}`.trim();
-  icon.setAttribute("aria-hidden", "true");
-  icon.textContent = name;
-  return icon;
+  const node = icon(KIND_MATERIAL[kind], "kind-icon");
+  node.dataset.kind = kind;
+  return node;
 }
 
 function el(tag, className, text) {
@@ -200,8 +190,8 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
     const row = button("variant-pop-row chrome-menu-item", "", () => go(name));
     row.dataset.screen = name;
     const kind = last.tree.nodes.get(name)?.screen.variant_kind;
-    const icon = createKindIcon(kind);
-    if (icon) row.appendChild(icon);
+    const kindIcon = createVariantKindIcon(kind);
+    if (kindIcon) row.appendChild(kindIcon);
     row.appendChild(el("span", "variant-pop-name", name));
     if (name === current) {
       row.classList.add("current", "is-current");
@@ -232,7 +222,8 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
 
   function renderBar(ctx, current) {
     barEl.innerHTML = "";
-    if (map) {
+    // Hidden while comparing: the map lives in the single-screen stage, which compare replaces.
+    if (map && !compare?.state().on) {
       const shown = map.visible();
       const mapToggle = button("variant-map-toggle chrome-icon-btn chrome-icon-btn--sm", "", () => {
         map.onToggle(!shown);
@@ -241,11 +232,11 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
       mapToggle.setAttribute("aria-pressed", String(shown));
       mapToggle.setAttribute("aria-label", "Variant map");
       mapToggle.dataset.tooltip = "Variant map";
-      mapToggle.appendChild(materialIcon("account_tree"));
+      mapToggle.appendChild(icon("account_tree"));
       barEl.append(mapToggle, el("span", "chrome-divider-v"));
     }
     ctx.chain.forEach((node, i) => {
-      if (i > 0) barEl.appendChild(materialIcon("chevron_right", "crumb-sep"));
+      if (i > 0) barEl.appendChild(icon("chevron_right", "crumb-sep"));
       const group = el("span", "crumb-group");
       group.dataset.screen = node.name;
       group.classList.toggle("on", node.name === current);
@@ -253,10 +244,10 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
       const crumb = button("crumb", "", () => go(node.name));
       crumb.setAttribute("aria-current", String(node.name === current));
       crumb.title = node.name;
-      if (i === 0) crumb.appendChild(materialIcon("home", "crumb-home"));
+      if (i === 0) crumb.appendChild(icon("home", "crumb-home"));
       else {
-        const icon = createKindIcon(node.screen.variant_kind);
-        if (icon) crumb.appendChild(icon);
+        const kindIcon = createVariantKindIcon(node.screen.variant_kind);
+        if (kindIcon) crumb.appendChild(kindIcon);
       }
       const name = el("span", "crumb-name");
       // Long names truncate from the left (the distinguishing suffix stays);
@@ -271,7 +262,7 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
         focusNext = openCrumb ? { cls: "variant-pop-row", screen: null } : { cls: "crumb-toggle", screen: node.name };
         rerender();
       });
-      toggle.appendChild(materialIcon("expand_more"));
+      toggle.appendChild(icon("expand_more"));
       toggle.setAttribute("aria-expanded", String(openCrumb === node.name));
       toggle.setAttribute("aria-label", `Variants around ${node.name}`);
       group.append(crumb, toggle);
@@ -283,7 +274,7 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
       barEl.appendChild(el("span", "variant-chip chrome-chip", `depth ${ctx.depth}`));
       if (ctx.kind) barEl.appendChild(el("span", `variant-chip variant-chip-${ctx.kind} chrome-chip`, ctx.kind));
       const back = button("variant-back chrome-btn chrome-btn--ghost chrome-btn--compact", `Back to ${ctx.root.name}`, () => go(ctx.root.name));
-      back.prepend(materialIcon("arrow_upward"));
+      back.prepend(icon("arrow_upward"));
       barEl.appendChild(back);
     } else {
       barEl.appendChild(el("span", "variant-chip chrome-chip", `${ctx.node.total} variant${ctx.node.total === 1 ? "" : "s"}`));
@@ -305,7 +296,7 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
     both.setAttribute("aria-pressed", String(state.on));
     if (!canCompare(last.tree, current)) {
       both.disabled = true;
-      both.title = "no variants to compare";
+      both.dataset.tooltip = "No variants to compare";
     }
     group.append(single, both);
     return group;
@@ -324,17 +315,17 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
       row.classList.toggle("dim", !onPath.has(node));
       row.setAttribute("aria-current", String(node.name === current));
       row.title = node.name;
-      if (node === ctx.root) row.appendChild(materialIcon("home", "crumb-home"));
+      if (node === ctx.root) row.appendChild(icon("home", "crumb-home"));
       else {
-        const icon = createKindIcon(node.screen.variant_kind);
-        if (icon) row.appendChild(icon);
+        const kindIcon = createVariantKindIcon(node.screen.variant_kind);
+        if (kindIcon) row.appendChild(kindIcon);
       }
       row.appendChild(el("span", "map-node-name", displayName(node)));
       const expanded = onPath.has(node);
       if (node === ctx.root) row.appendChild(el("span", "map-node-note", "base"));
       else if (!expanded && node.children.length > 0) {
         const note = el("span", "map-node-note");
-        note.append(materialIcon("chevron_right"), String(node.total));
+        note.append(icon("chevron_right"), String(node.total));
         row.appendChild(note);
       }
       card.appendChild(row);

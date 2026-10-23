@@ -115,12 +115,10 @@ export function initTooltips(doc) {
   const onMove = (event) => {
     hideIfStale();
     if (triggerOf(event)) return;
-    const hit = [...doc.querySelectorAll("[data-tooltip]:disabled")].find((el) => {
-      const r = el.getBoundingClientRect();
-      return event.clientX >= r.left && event.clientX <= r.right && event.clientY >= r.top && event.clientY <= r.bottom;
-    });
-    if (hit && hit !== current && hit !== dismissed) show(hit);
-    else if (!hit && current?.disabled) {
+    // Occlusion-aware: whatever is topmost under the pointer, not a rect scan.
+    const hit = doc.elementFromPoint?.(event.clientX, event.clientY)?.closest("[data-tooltip]");
+    if (hit?.disabled && hit !== current && hit !== dismissed) show(hit);
+    else if (!hit?.disabled && current?.disabled) {
       dismissed = null;
       hide();
     }

@@ -135,11 +135,23 @@ describe("initTooltips", () => {
 
   it("shows a disabled trigger's tooltip by hit-testing the pointer, and hides when it leaves", () => {
     btn.disabled = true;
-    btn.getBoundingClientRect = () => ({ left: 10, right: 40, top: 10, bottom: 38, width: 30, height: 28 });
+    // jsdom has no layout; elementFromPoint answers "the topmost element under the pointer".
+    let under = btn.firstElementChild ?? btn;
+    document.elementFromPoint = () => under;
     document.body.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: 20, clientY: 20 }));
     expect(tip().hidden).toBe(false);
     expect(tip().textContent).toContain("Flow mode");
+    under = document.body;
     document.body.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: 200, clientY: 200 }));
     expect(tip().hidden).toBe(true);
+    delete document.elementFromPoint;
+  });
+
+  it("does not show a disabled trigger's tooltip while something else covers it", () => {
+    btn.disabled = true;
+    document.elementFromPoint = () => document.getElementById("plain");
+    document.body.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: 20, clientY: 20 }));
+    expect(tip().hidden).toBe(true);
+    delete document.elementFromPoint;
   });
 });

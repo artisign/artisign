@@ -43,7 +43,7 @@
           </div>
         </div>
         <span class="chrome-divider-v project-only" aria-hidden="true"></span>
-        <nav id="view-tabs">
+        <nav id="view-tabs" class="project-only">
           <button type="button" class="view-tab chrome-tab" data-view="screens" aria-pressed="true">Screens</button>
           <button type="button" class="view-tab chrome-tab" data-view="design-system" aria-pressed="false">Design System</button>
           <button type="button" class="view-tab chrome-tab" data-view="board" aria-pressed="false">Board</button>
@@ -75,8 +75,8 @@
         <button type="button" id="inspect-mode-toggle" class="chrome-icon-btn project-only" aria-pressed="false" aria-label="Inspect mode" data-tooltip="Inspect mode" data-shortcut="">
           <span class="icon" aria-hidden="true">frame_inspect</span>
         </button>
-        <span class="chrome-divider-v project-only" aria-hidden="true"></span>
         <div id="canvas-controls" class="project-only">
+          <span class="chrome-divider-v" aria-hidden="true"></span>
           <!-- Zoom: a dropdown showing the current preset; the preset buttons keep .zoom-button / data-zoom / aria-pressed (app.js syncs them and the label). -->
           <div id="zoom-controls">
             <button type="button" id="zoom-trigger" class="chrome-dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Zoom">
@@ -93,8 +93,8 @@
           <button type="button" id="status-bar-toggle" class="chrome-icon-btn" aria-pressed="false" aria-label="Status bar" data-tooltip="Status bar" data-shortcut="">
             <span class="icon" aria-hidden="true">smartphone</span>
           </button>
+          <span class="chrome-divider-v" aria-hidden="true"></span>
         </div>
-        <span class="chrome-divider-v project-only" aria-hidden="true"></span>
         <button type="button" id="warning-badge" class="chrome-chip chrome-chip--warning" title="Render diagnostics — click to step through" hidden></button>
         <button
           type="button"

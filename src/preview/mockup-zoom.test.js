@@ -99,6 +99,28 @@ describe("applyMockupZoom", () => {
     expect(wrapperEl.style.width).toBe("500px");
   });
 
+  it("settles Fit on the first call and again after 200% -> Fit, header margins included", () => {
+    const { paneEl, wrapperEl, columnsEl } = setup({ paneW: 500, paneH: 900, columnsW: 1000, columnsH: 400 });
+    const head = document.createElement("div");
+    head.className = "mockup-column-head";
+    Object.defineProperty(head, "offsetHeight", { value: 40 });
+    columnsEl.appendChild(head);
+    // The row is 400px of frames plus whatever the header margin adds — so the measured height depends on the zoom.
+    Object.defineProperty(columnsEl, "scrollHeight", { get: () => 400 + parseFloat(head.style.marginBottom || "0"), configurable: true });
+
+    applyMockupZoom({ paneEl, columnsEl, zoom: "fit" });
+    expect(wrapperEl.style.width).toBe("500px");
+    expect(wrapperEl.style.height).toBe("220px"); // (400 + 40) * 0.5, not 400 * 0.5
+
+    applyMockupZoom({ paneEl, columnsEl, zoom: 2 });
+    expect(wrapperEl.style.width).toBe("2000px");
+    expect(wrapperEl.style.height).toBe("760px"); // (400 - 20) * 2: no overflow beyond the measured row
+
+    applyMockupZoom({ paneEl, columnsEl, zoom: "fit" });
+    expect(columnsEl.style.getPropertyValue("--zoom")).toBe("0.5");
+    expect(wrapperEl.style.height).toBe("220px");
+  });
+
   it("adds no margin at zoom 1 and removes room above 1", () => {
     const { paneEl, columnsEl } = setup({ paneW: 2000, paneH: 2000, columnsW: 400, columnsH: 200 });
     const head = document.createElement("div");

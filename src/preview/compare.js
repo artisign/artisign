@@ -6,6 +6,7 @@
 // panel. Zoom reuses mockup-zoom.js / iframe-fit.js. State lives in the
 // factory's closure; per-browser prefs go through prefs.js.
 
+import { icon } from "./icons.js";
 import { buildScreenTree } from "./screens.js";
 import { createFittingIframe } from "./iframe-fit.js";
 import { applyMockupZoom } from "./mockup-zoom.js";
@@ -41,12 +42,6 @@ function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-function icon(name, className = "") {
-  const node = el("span", `icon ${className}`.trim(), name);
-  node.setAttribute("aria-hidden", "true");
   return node;
 }
 
@@ -260,7 +255,7 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
     });
     add.append(icon("add"), "add");
     add.disabled = selected.length >= COMPARE_MAX_MEMBERS;
-    if (add.disabled) add.title = `At most ${COMPARE_MAX_MEMBERS} screens next to the reference`;
+    if (add.disabled) add.dataset.tooltip = `At most ${COMPARE_MAX_MEMBERS} screens next to the reference`;
     barEl.appendChild(add);
 
     const diffLabel = el("label", "compare-diff");

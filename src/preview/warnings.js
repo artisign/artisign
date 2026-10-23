@@ -6,6 +6,8 @@
 // content. Nothing here reads/writes anything outside the iframe's already
 // rendered DOM — no second render engine, per render determinism.
 
+import { icon } from "./icons.js";
+
 const DIAGNOSTIC_SELECTOR =
   "[data-unresolved-component],[data-invalid-component],[data-recursive-component],[data-empty-component],[data-unresolved-token],[data-unresolved-icon-font]";
 
@@ -63,13 +65,9 @@ function flash(el) {
  */
 export function updateWarningBadge(badgeEl, doc) {
   const elements = doc ? findDiagnostics(doc) : [];
-  const icon = document.createElement("span");
-  icon.className = "icon";
-  icon.setAttribute("aria-hidden", "true");
-  icon.textContent = "warning";
   const count = document.createElement("span");
   count.textContent = String(elements.length);
-  badgeEl.replaceChildren(icon, count);
+  badgeEl.replaceChildren(icon("warning"), count);
   badgeEl.setAttribute("aria-label", `${elements.length} render diagnostic${elements.length === 1 ? "" : "s"}`);
   badgeEl.hidden = elements.length === 0;
 

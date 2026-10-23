@@ -25,6 +25,7 @@ const SCREENS = [
 ];
 
 let sources;
+let renderOk;
 
 function stubDaemon() {
   vi.stubGlobal("localStorage", storageStub);
@@ -37,6 +38,9 @@ function stubDaemon() {
   vi.stubGlobal("fetch", async (url) => {
     const path = String(url).split("?")[0];
     const json = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => "<div style='width:390px;height:844px'></div>" });
+    if (path.startsWith("/api/render/")) {
+      return { ok: renderOk, status: renderOk ? 200 : 500, json: async () => ({ message: "boom" }), text: async () => "<div style='width:390px;height:844px'></div>" };
+    }
     if (path === "/api/projects") return json({ active: "/p", open: [{ root: "/p", name: "p" }], recent: [] });
     if (path === "/api/screens") return json({ screens: SCREENS });
     if (path === "/api/board-state") return json({ filter: null, pinned: [], expanded: [] });
@@ -60,6 +64,7 @@ async function boot() {
 
 beforeEach(() => {
   memoryStorage.clear();
+  renderOk = true;
   vi.resetModules();
   document.body.innerHTML = bodyHtml;
   stubDaemon();
@@ -162,5 +167,70 @@ describe("mockup column header", () => {
     const rule = /\.mockup-column-head\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
     expect(rule).toContain("width: calc(100% * var(--zoom, 1))");
     expect(rule).toContain("transform: scale(calc(1 / var(--zoom, 1)))");
+  });
+});
+
+describe("frame caption", () => {
+  it("names the rendered screen and its size once the frame has loaded", async () => {
+    await boot();
+    expect($("#frame-caption").hidden).toBe(true); // nothing has rendered yet
+    $("#screen-frame").dispatchEvent(new Event("load")); // jsdom does not run srcdoc documents
+    expect($("#frame-caption").hidden).toBe(false);
+    expect($("#frame-caption").textContent).toBe("family \u00B7 390 \u00D7 844");
+  });
+
+  it("stays hidden when the render failed", async () => {
+    renderOk = false;
+    await boot();
+    $("#screen-frame").dispatchEvent(new Event("load"));
+    expect($("#frame-caption").hidden).toBe(true);
+  });
+});
+
+describe("zoom menu vs the other floating things", () => {
+  it("Escape closes only the zoom menu: inspect mode's own Escape does not also fire", async () => {
+    await boot();
+    const inspect = $("#inspect-mode-toggle");
+    inspect.disabled = false;
+    inspect.click();
+    expect(inspect.getAttribute("aria-pressed")).toBe("true");
+    $("#zoom-trigger").click();
+    const reachedBubble = vi.fn();
+    document.addEventListener("keydown", reachedBubble);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    document.removeEventListener("keydown", reachedBubble);
+    expect($("#zoom-menu").hidden).toBe(true);
+    expect(reachedBubble).not.toHaveBeenCalled();
+    expect(inspect.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("opening the zoom menu closes the project menu, and the project menu's trigger closes the zoom menu", async () => {
+    await boot();
+    $("#project-picker-trigger").click();
+    expect($("#project-menu").hidden).toBe(false);
+    $("#zoom-trigger").click();
+    expect($("#project-menu").hidden).toBe(true);
+    expect($("#zoom-menu").hidden).toBe(false);
+    // The project trigger stops click propagation, so only a pointerdown capture hears it.
+    $("#project-picker-trigger").dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect($("#zoom-menu").hidden).toBe(true);
+  });
+});
+
+describe("topbar dividers", () => {
+  const visibleKinds = () =>
+    [...$("#topbar").children]
+      .filter((el) => !el.closest("[hidden]") && !el.hidden && !el.classList.contains("topbar-spacer"))
+      .flatMap((el) => (el.id === "canvas-controls" ? [...el.children].filter((c) => !c.hidden) : [el]))
+      .map((el) => (el.classList.contains("chrome-divider-v") ? "|" : "x"));
+
+  it("never leaves a divider at an end or two dividers side by side, in any view", async () => {
+    await boot();
+    for (const view of ["screens", "design-system", "board"]) {
+      $(`.view-tab[data-view="${view}"]`).click();
+      await flush();
+      const kinds = visibleKinds().join("");
+      expect(kinds, view).not.toMatch(/\|\||^\||\|$/);
+    }
   });
 });

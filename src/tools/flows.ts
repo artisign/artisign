@@ -63,7 +63,7 @@ export async function readScreenFlows(store: Store, screenId: string): Promise<F
   return all.filter((record) => belongsToScreen(record, screenId));
 }
 
-/** Trigger-node ids in document order (depth-first preorder from the root) — the order the parser emits flows in. */
+/** Every node id's position in document order (depth-first preorder from the root) — the order the parser emits flows in; ids not reachable from the root are absent. */
 function documentOrderIndex(doc: ScreenDocument): Map<string, number> {
   const index = new Map<string, number>();
   const visit = (id: string): void => {

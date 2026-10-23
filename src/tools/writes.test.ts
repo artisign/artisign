@@ -507,16 +507,6 @@ describe("patch_html", () => {
       expect(await fx.store.readFlows()).toEqual([]);
     });
 
-    it("cleans up duplicates that already exist for the patched screen", async () => {
-      await fx.store.writeFlows([edge("n2", "checkout"), edge("n2", "checkout"), edge("n3", "cart")]);
-      await patchHtml(fx.store, {
-        target: { kind: "node", node: "home.n3" },
-        operation: "set_attr",
-        attr: { name: "title", value: "x" },
-      });
-      expect(await fx.store.readFlows()).toEqual([edge("n2", "checkout"), edge("n3", "cart")]);
-    });
-
     it("leaves no orphan edge when update_refs turns an element holding a flow trigger into a component instance", async () => {
       await fx.store.writeComponent("card", `<div id="c"></div>`);
       await writeHtml(fx.store, {

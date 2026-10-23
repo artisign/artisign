@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
 
-const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.indexOf("<script"));
+const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
 
 const s = (name, variant_of, variant_kind = "state") => ({ name, tags: [], notes: "", ...(variant_of ? { variant_of, variant_kind } : {}) });
 const SCREENS = [s("plain"), s("family"), s("a", "family"), s("a1", "a", "step"), s("b", "family")];

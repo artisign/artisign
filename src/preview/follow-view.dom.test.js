@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
 
-const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.indexOf("<script"));
+const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
 
 const s = (name) => ({ name, tags: [], notes: "" });
 let sources;

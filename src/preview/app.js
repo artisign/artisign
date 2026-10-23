@@ -20,6 +20,8 @@ import {
   fetchBoardState,
   setBoardState,
 } from "./api.js";
+import { THEME_PREFS, THEME_PREF_KEY, DEFAULT_THEME_PREF, applyTheme, nextThemePref, prefersDarkQuery, watchSystemTheme } from "./theme.js";
+import { initTooltips } from "./tooltip.js";
 import { renderScreenList, filterScreens, buildScreenTree, ancestorNames } from "./screens.js";
 import { createVariantUI } from "./variants.js";
 import { createCompareView } from "./compare.js";
@@ -520,7 +522,7 @@ function updateBoardToolbar() {
   // review finding 8).
   boardZoomRangeInput.setAttribute("aria-valuetext", `${rounded}%`);
   const fillPct = zoomSliderOffset(boardZoom, 100);
-  boardZoomRangeInput.style.background = `linear-gradient(to right, var(--color-accent) ${fillPct}%, var(--color-border) ${fillPct}%)`;
+  boardZoomRangeInput.style.background = `linear-gradient(to right, var(--chrome-accent) ${fillPct}%, var(--chrome-border) ${fillPct}%)`;
   board100Btn.setAttribute("aria-pressed", String(boardZoom === 100));
   boardFitallBtn.setAttribute("aria-pressed", String(lastFitAllZoom !== null && boardZoom === lastFitAllZoom));
   // aria-disabled, not the `disabled` attribute (CHR-623 review finding 8):
@@ -563,6 +565,32 @@ boardClustersToggleBtn.addEventListener("click", () => {
 
 boardClustersOn = readBoolPref(prefsStorage, "artisign.boardClusters", boardClustersOn);
 renderBoardClustersToggle();
+
+// CHR-910 — interim chrome theme toggle (System -> Light -> Dark -> System) until the redesigned topbar (CHR-906) takes over. The pre-paint inline script in index.html already set data-theme; this re-applies it with the full module and keeps it live.
+const THEME_TOGGLE_ICONS = { system: "contrast", light: "light_mode", dark: "dark_mode" };
+const THEME_TOGGLE_LABELS = { system: "System", light: "Light", dark: "Dark" };
+const themeToggleBtn = document.getElementById("theme-toggle");
+const osDarkQuery = prefersDarkQuery(window);
+let themePref = parseEnumPref(readStringPref(prefsStorage, THEME_PREF_KEY, DEFAULT_THEME_PREF), THEME_PREFS, DEFAULT_THEME_PREF);
+
+function renderThemeToggle() {
+  const label = `Theme: ${THEME_TOGGLE_LABELS[themePref]}`;
+  themeToggleBtn.querySelector(".icon").textContent = THEME_TOGGLE_ICONS[themePref];
+  themeToggleBtn.setAttribute("aria-label", label);
+  themeToggleBtn.dataset.tooltip = label;
+}
+
+themeToggleBtn.addEventListener("click", () => {
+  themePref = nextThemePref(themePref);
+  writeStringPref(prefsStorage, THEME_PREF_KEY, themePref);
+  applyTheme(document.documentElement, themePref, osDarkQuery);
+  renderThemeToggle();
+});
+
+applyTheme(document.documentElement, themePref, osDarkQuery);
+watchSystemTheme(document.documentElement, osDarkQuery, () => themePref);
+renderThemeToggle();
+initTooltips(document);
 
 boardEdgesToggleBtn.addEventListener("click", () => {
   boardEdgesVisible = !boardEdgesVisible;

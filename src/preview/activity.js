@@ -318,7 +318,7 @@ export function renderActivityFeed(listEl, emptyEl, feed, { exists, onSelect, no
 
 // --- Node/screen highlight --------------------------------------------------
 
-// Literal colors, not var(--color-...): these apply inline inside the
+// Literal colors, not var(--chrome-...): these apply inline inside the
 // sandboxed iframe document, which never sees the preview shell's own
 // stylesheet/custom properties — same reason comments.js's own outline
 // styles are literal hex, not CSS variables.

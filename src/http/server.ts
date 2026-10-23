@@ -25,6 +25,23 @@ const STATIC_CONTENT_TYPES: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
 };
 
+// The preview chrome's icon font (CHR-910): the bundled Material Symbols file the render path already ships (`assets/` sits next to `dist/` and `src/`, so this resolves from both). One allowlisted URL — nothing else under `assets/` is reachable.
+const PREVIEW_ICON_FONT_PATH = "/fonts/material-symbols-rounded.woff2";
+const PREVIEW_ICON_FONT_FILE = new URL("../../assets/fonts/material-symbols-rounded.woff2", import.meta.url);
+
+/** Serves the icon font for the preview chrome, with no project open and cacheable for good (the file only changes with a release). */
+function serveIconFont(res: ServerResponse): void {
+  readFile(PREVIEW_ICON_FONT_FILE)
+    .then((body) => {
+      res.writeHead(200, { "content-type": "font/woff2", "cache-control": "public, max-age=31536000, immutable" });
+      res.end(body);
+    })
+    .catch(() => {
+      res.writeHead(404, { "content-type": "text/plain" });
+      res.end("Not found");
+    });
+}
+
 /** Serves a static file from `src/preview/` — the only build-free way to give `.js` modules and `.css` their required MIME type. `/` maps to `index.html`; anything outside the known extensions or the preview dir 404s. Served even with zero projects open — the empty-state UI has to load from somewhere. */
 function servePreviewFile(pathname: string, res: ServerResponse): void {
   const relative = pathname === "/" ? "index.html" : pathname.slice(1);
@@ -290,6 +307,11 @@ export function createServer(registry: ProjectRegistry): HttpServer {
 
     if (isApiPath) {
       sendJson(res, 404, { code: "not_found", message: "unknown API route" });
+      return;
+    }
+
+    if (url.pathname === PREVIEW_ICON_FONT_PATH) {
+      serveIconFont(res);
       return;
     }
 

@@ -186,20 +186,46 @@ describe("project picker is tab-local (CHR-775)", () => {
     await flush();
   });
 
-  it("a tab whose SSE stream the daemon refuses for good (project not open after a restart) moves to the default", async () => {
+  it("a lifecycle sync that was in flight when the user opened a project does not move the tab back", async () => {
+    projects = { ...projects, recent: ["/r"] };
     await boot();
-    menuRow("beta").click(); // tab shows /q
+    let release;
+    const gate = new Promise((r) => (release = r));
+    const realFetch = globalThis.fetch;
+    let gated = false;
+    vi.stubGlobal("fetch", async (url, init) => {
+      if (String(url) === "/api/projects" && !init && !gated) {
+        gated = true;
+        const stale = JSON.parse(JSON.stringify(projects)); // computed before /r was opened
+        await gate;
+        return { ok: true, status: 200, json: async () => stale };
+      }
+      return realFetch(url, init);
+    });
+
+    emit(liveSource(), { type: "project-switched", root: "/q" }); // sync starts, response held back
+    await flush();
+    document.querySelector("#menu-recent-list .menu-item").click(); // user opens /r meanwhile
+    await flush();
+    release();
     await flush();
 
-    projects = { active: "/p", open: [{ root: "/p", name: "alpha" }], recent: [] }; // restarted daemon opened only /p
-    const realSetTimeout = globalThis.setTimeout;
-    vi.spyOn(globalThis, "setTimeout").mockImplementation((fn, ms, ...rest) => realSetTimeout(fn, ms === 3000 ? 0 : ms, ...rest));
-    const dead = liveSource();
-    dead.readyState = 2; // CLOSED: the 404 for ?project=/q
-    dead.onerror();
+    expect(liveSource().url).toBe("/events?project=%2Fr");
+    expect(pickerName()).toBe("gamma");
+  });
+
+  it("a failed /api/projects refresh from an SSE event is logged, not left unhandled", async () => {
+    await boot();
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (url, init) => {
+      if (String(url) === "/api/projects") throw new Error("daemon gone");
+      return realFetch(url, init);
+    });
+
+    emit(liveSource(), { type: "project-closed", root: "/q" });
     await flush();
 
-    expect(liveSource().url).toBe("/events?project=%2Fp");
-    expect(pickerName()).toBe("alpha");
+    expect(err).toHaveBeenCalledWith("failed to refresh projects:", "daemon gone");
   });
 });

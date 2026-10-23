@@ -614,6 +614,7 @@ const projectUI = createProjectUI(
   {
     // Tab-local (CHR-775): the daemon's activeProject is only the default for a fresh tab.
     onSwitch: async (root) => {
+      projectsRequestId++; // supersede any in-flight sync: it was computed before this pick
       renderProjects(projectsState, root); // before the load, so the picker never lags behind (or lies after a failed boot)
       await switchToProject(root);
     },
@@ -657,6 +658,7 @@ function renderProjects(state, active = activeProjectRoot) {
 
 /** Applies the `/api/projects` response of an open/init this tab triggered: the opening tab switches to the new project. */
 async function applyProjectsResult(state) {
+  projectsRequestId++; // supersede any in-flight sync: it predates this open/init
   renderProjects(state, state.active);
   await switchToProject(state.active);
 }
@@ -1003,9 +1005,13 @@ async function handleChangeEvent(event) {
   }
 }
 
-/** Every lifecycle event (project-switched/-opened/-closed) just refreshes the picker list; none of them moves the tab by itself — the daemon-global default must not drag other tabs along (CHR-775). */
+/** Every lifecycle event (project-switched/-opened/-closed) only refreshes the picker list; the tab itself moves only when its project is gone (CHR-775). */
 async function handleLifecycleEvent() {
-  await syncProjects();
+  try {
+    await syncProjects();
+  } catch (err) {
+    console.error("failed to refresh projects:", err instanceof Error ? err.message : err);
+  }
 }
 
 /**
@@ -1411,31 +1417,8 @@ function reconnectSse(project) {
       // drop — so resync from scratch on reconnect.
       if (isReconnect) resyncCurrentProject();
     },
-    onDisconnect: () => {
-      connectionStatus.classList.add("disconnected");
-      // readyState 2 (CLOSED): the browser gave up for good — e.g. the restarted daemon answered 404 because this
-      // tab's project isn't open there. EventSource never retries that by itself, so do it here (CHR-775).
-      if (eventSource?.readyState === 2) scheduleSseRetry();
-    },
+    onDisconnect: () => connectionStatus.classList.add("disconnected"),
   });
-}
-
-let sseRetryTimer = null;
-
-/** Re-checks `/api/projects` until the daemon answers: a tab whose project is gone moves to the default, otherwise it just reconnects. */
-function scheduleSseRetry() {
-  if (sseRetryTimer !== null) return;
-  sseRetryTimer = setTimeout(async () => {
-    sseRetryTimer = null;
-    try {
-      if (await syncProjects()) return; // switchToProject reconnected
-    } catch {
-      scheduleSseRetry(); // daemon still down
-      return;
-    }
-    reconnectSse(activeProjectRoot ?? undefined);
-    resyncCurrentProject();
-  }, 3000);
 }
 
 // Bumped on every loadCurrentScreen()/loadComments() call; a fetch only

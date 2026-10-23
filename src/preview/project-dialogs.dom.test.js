@@ -22,6 +22,7 @@ function section(withNameInput) {
     <p class="dialog-error"></p>
     <button class="btn-confirm"></button>
     <button class="btn-cancel"></button>
+    <button class="dialog-close"></button>
     ${withNameInput ? '<input class="field-name-input" />' : ""}
   `;
   return el;
@@ -244,6 +245,19 @@ describe("folder browser: + New folder", () => {
     expect(document.activeElement).toBe(initSectionEl.querySelector(".dir-row-created"));
   });
 
+  it("keeps Enter and Space on the just-created row from navigating into it", async () => {
+    await typeAndCreate(initSectionEl, "clients");
+    const row = initSectionEl.querySelector(".dir-row-created");
+    for (const [type, key] of [["keydown", "Enter"], ["keyup", " "], ["keydown", " "]]) {
+      const evt = new KeyboardEvent(type, { key, bubbles: true, cancelable: true });
+      row.dispatchEvent(evt);
+      expect(evt.defaultPrevented).toBe(true);
+    }
+    const other = new KeyboardEvent("keydown", { key: "a", bubbles: true, cancelable: true });
+    row.dispatchEvent(other);
+    expect(other.defaultPrevented).toBe(false);
+  });
+
   it("ignores a second Create while the request is in flight", async () => {
     let release;
     const gate = new Promise((r) => (release = r));
@@ -331,5 +345,79 @@ describe("folder browser: + New folder", () => {
     const input = initSectionEl.querySelector(".new-folder-input");
     input.dispatchEvent(new Event("input"));
     expect(message.hidden).toBe(true);
+  });
+});
+
+describe("folder browser controls are buttons without glyph icons (CHR-911)", () => {
+  let openSectionEl;
+  let initSectionEl;
+
+  beforeEach(async () => {
+    globalThis.fetch = vi.fn(async (url) => {
+      const path = new URL(url, "http://127.0.0.1").searchParams.get("path") ?? HOME;
+      const entries = [
+        { name: "plain", path: `${path}/plain`, isArtisignProject: false },
+        { name: "proj", path: `${path}/proj`, isArtisignProject: true },
+      ];
+      return { ok: true, json: async () => ({ path, parent: null, entries, home: HOME }) };
+    });
+    openSectionEl = section(false);
+    initSectionEl = section(true);
+    const dialogs = createProjectDialogs(
+      { scrimEl: document.createElement("div"), openSectionEl, initSectionEl },
+      { onOpen: async () => ({ ok: true }), onInit: async () => ({ ok: true }) },
+    );
+    dialogs.showOpenDialog();
+    await settle();
+    dialogs.showInitDialog();
+    await settle();
+  });
+
+  afterEach(() => {
+    delete globalThis.fetch;
+  });
+
+  const glyphs = /[\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFF0B\u25B8\u25BE]/u;
+
+  it("renders dir rows as buttons with a folder icon; inert project rows are disabled in init mode", () => {
+    for (const row of openSectionEl.querySelectorAll(".dir-row")) expect(row.tagName).toBe("BUTTON");
+    expect(openSectionEl.querySelector(".dir-row-icon").textContent).toBe("folder");
+    expect(openSectionEl.querySelector(".dir-row-badge").textContent).toBe("project");
+    const rows = [...initSectionEl.querySelectorAll(".dir-row")];
+    expect(rows.map((r) => r.disabled)).toEqual([false, true]);
+    expect(initSectionEl.querySelector(".dir-list").textContent.replaceAll("folder", "")).not.toMatch(glyphs);
+  });
+
+  it("renders the clickable crumbs as buttons and the current one as text, with icon separators", () => {
+    const crumbs = [...openSectionEl.querySelectorAll(".breadcrumbs .crumb")];
+    expect(crumbs.map((c) => c.tagName)).toEqual(["BUTTON", "BUTTON", "SPAN"]);
+    expect(openSectionEl.querySelector(".breadcrumbs .crumb-sep").textContent).toBe("chevron_right");
+  });
+
+  it("builds the new-folder row from chrome buttons and a field, with an icon instead of a triangle", () => {
+    openSectionEl.querySelector(".btn-new-folder").click();
+    const row = openSectionEl.querySelector(".new-folder-row");
+    expect(row.querySelector(".new-folder-icon").textContent).toBe("chevron_right");
+    expect(row.querySelector(".new-folder-input").classList.contains("chrome-field")).toBe(true);
+    expect(row.querySelector(".new-folder-create").classList.contains("chrome-btn")).toBe(true);
+    expect(row.querySelector(".new-folder-cancel").tagName).toBe("BUTTON");
+  });
+});
+
+describe("dialog close button (CHR-911)", () => {
+  it("closes the dialog like Cancel, with no other side effect", async () => {
+    globalThis.fetch = stubFs();
+    const scrimEl = document.createElement("div");
+    const openSectionEl = section(false);
+    const onOpen = vi.fn(async () => ({ ok: true }));
+    const dialogs = createProjectDialogs({ scrimEl, openSectionEl, initSectionEl: section(true) }, { onOpen, onInit: async () => ({ ok: true }) });
+    dialogs.showOpenDialog();
+    await settle();
+    expect(scrimEl.hidden).toBe(false);
+    openSectionEl.querySelector(".dialog-close").click();
+    expect(scrimEl.hidden).toBe(true);
+    expect(openSectionEl.hidden).toBe(true);
+    expect(onOpen).not.toHaveBeenCalled();
+    delete globalThis.fetch;
   });
 });

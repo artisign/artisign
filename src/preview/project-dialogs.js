@@ -29,7 +29,7 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
   let homePath = null;
   let workspacePath = null; // ~/Workspace — null until checked, false once checked-and-absent
   let selectedProjectPath = null; // "open" mode only: a badged row the user picked
-  let createdFolderPath = null; // the folder "+ New folder" just made: badged "new" and highlighted until the user navigates away
+  let createdFolderPath = null; // the folder "New folder" just made: badged "new" and highlighted until the user navigates away
   let newFolderRowEl = null; // the inline create row while it is open
 
   /** @param {string} path */
@@ -52,7 +52,7 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
 
   /**
    * The folder /api/projects/init scaffolds into: a folder named after the
-   * project, inside the folder "+ New folder" just made and selected, else
+   * project, inside the folder "New folder" just made and selected, else
    * inside the current one. `name` alone never creates a subfolder server-side.
    * @returns {string | null}
    */
@@ -88,14 +88,18 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       // No separator after the root crumb — it already reads as one.
       if (i > 1) {
         const sep = document.createElement("span");
-        sep.className = "crumb-sep";
-        sep.textContent = "/";
+        sep.className = "crumb-sep icon";
+        sep.setAttribute("aria-hidden", "true");
+        sep.textContent = "chevron_right";
         breadcrumbsEl.appendChild(sep);
       }
-      const crumb = document.createElement("span");
+      // The current crumb is plain text; the ones above it are buttons (Tab-reachable).
+      const isCurrent = i === crumbs.length - 1;
+      const crumb = document.createElement(isCurrent ? "span" : "button");
+      if (!isCurrent) crumb.type = "button";
       crumb.className = "crumb";
       crumb.textContent = label;
-      if (i === crumbs.length - 1) {
+      if (isCurrent) {
         crumb.classList.add("crumb-current");
       } else {
         crumb.addEventListener("click", () => loadPath(path));
@@ -115,12 +119,15 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       return;
     }
     for (const entry of entries) {
-      const row = document.createElement("div");
+      // A button, so every row is reachable and shows the focus ring; the inert ones (init mode project folders) are disabled.
+      const row = document.createElement("button");
+      row.type = "button";
       row.className = "dir-row";
 
       const icon = document.createElement("span");
-      icon.className = "dir-row-icon";
-      icon.textContent = "\u{1F4C1}"; // 📁
+      icon.className = "dir-row-icon icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = "folder";
       row.appendChild(icon);
 
       const name = document.createElement("span");
@@ -131,7 +138,7 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       if (entry.isArtisignProject) {
         const badge = document.createElement("span");
         badge.className = "dir-row-badge";
-        badge.textContent = "artisign project";
+        badge.textContent = "project";
         row.appendChild(badge);
       }
 
@@ -140,7 +147,12 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       // (per spec) — so it's inert, neither selectable nor navigable.
       if (entry.path === createdFolderPath) {
         row.classList.add("dir-row-selected", "dir-row-created");
-        row.tabIndex = -1;
+        // The created row stays selected until the user clicks away; Enter/Space on it (it holds focus after creating) must not navigate into it.
+        const swallowActivation = (evt) => {
+          if (evt.key === "Enter" || evt.key === " ") evt.preventDefault();
+        };
+        row.addEventListener("keydown", swallowActivation);
+        row.addEventListener("keyup", swallowActivation);
         const badge = document.createElement("span");
         badge.className = "dir-row-badge dir-row-badge-new";
         badge.textContent = "new";
@@ -158,6 +170,8 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       } else if (!entry.isArtisignProject) {
         row.classList.add("dir-row-navigable");
         row.addEventListener("click", () => loadPath(entry.path));
+      } else {
+        row.disabled = true;
       }
 
       dirListEl.appendChild(row);
@@ -196,10 +210,10 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
     row.className = "new-folder-row";
     row.innerHTML = `
       <div class="new-folder-line">
-        <span class="new-folder-icon">\u25B8</span>
-        <input type="text" class="new-folder-input" placeholder="Folder name" autocomplete="off" aria-label="New folder name" />
-        <button type="button" class="new-folder-create">Create</button>
-        <button type="button" class="new-folder-cancel">Cancel</button>
+        <span class="new-folder-icon icon" aria-hidden="true">chevron_right</span>
+        <input type="text" class="new-folder-input chrome-field" placeholder="Folder name" autocomplete="off" aria-label="New folder name" />
+        <button type="button" class="new-folder-create chrome-btn chrome-btn--compact">Create</button>
+        <button type="button" class="new-folder-cancel chrome-btn chrome-btn--ghost chrome-btn--compact">Cancel</button>
       </div>
       <div class="new-folder-message" hidden></div>`;
     const input = row.querySelector(".new-folder-input");
@@ -297,6 +311,7 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
   });
   nameInput?.addEventListener("input", updateHint);
   cancelButton.addEventListener("click", () => onCancel());
+  sectionEl.querySelector(".dialog-close")?.addEventListener("click", () => onCancel());
 
   confirmButton.addEventListener("click", async () => {
     const target = mode === "open" ? { dir: selectedProjectPath } : { dir: initTargetDir(), name: nameInput.value.trim() };

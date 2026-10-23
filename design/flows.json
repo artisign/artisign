@@ -168,18 +168,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "init-project-dialog.init-dialog-newfolder",
-    "event": "tap",
-    "to": "init-project-dialog-new-folder",
-    "to_kind": "screen"
-  },
-  {
-    "from": "open-project-dialog.open-dialog-newfolder",
-    "event": "tap",
-    "to": "open-project-dialog-new-folder",
-    "to_kind": "screen"
-  },
-  {
     "from": "screen-view-variant-breadcrumb-dark.bar",
     "event": "tap",
     "to": "app-shell",
@@ -225,6 +213,18 @@
     "from": "app-shell.el-checkout",
     "event": "tap",
     "to": "inspector-selected",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog.init-dialog-newfolder",
+    "event": "tap",
+    "to": "init-project-dialog-new-folder",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog.open-dialog-newfolder",
+    "event": "tap",
+    "to": "open-project-dialog-new-folder",
     "to_kind": "screen"
   }
 ]

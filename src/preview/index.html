@@ -26,18 +26,18 @@
             <span id="project-picker-name">No project open</span>
             <span id="project-picker-chevron" aria-hidden="true">▾</span>
           </button>
-          <div id="project-menu" hidden>
-            <p id="menu-label-open" class="project-menu-label" hidden>Open projects</p>
+          <div id="project-menu" class="chrome-menu" hidden>
+            <p id="menu-label-open" class="chrome-menu-label" hidden>Open projects</p>
             <div id="menu-open-list"></div>
-            <div id="menu-divider-1" class="project-menu-divider" hidden></div>
-            <p id="menu-label-recent" class="project-menu-label" hidden>Recent</p>
+            <div id="menu-divider-1" class="chrome-menu-divider" hidden></div>
+            <p id="menu-label-recent" class="chrome-menu-label" hidden>Recent</p>
             <div id="menu-recent-list"></div>
-            <div id="menu-divider-2" class="project-menu-divider"></div>
-            <button type="button" id="menu-action-open" class="project-menu-action">
-              <span class="project-menu-action-icon" aria-hidden="true">📂</span>Open project…
+            <div id="menu-divider-2" class="chrome-menu-divider"></div>
+            <button type="button" id="menu-action-open" class="chrome-menu-item">
+              <span class="icon chrome-menu-icon" aria-hidden="true">folder_open</span>Open project…
             </button>
-            <button type="button" id="menu-action-init" class="project-menu-action">
-              <span class="project-menu-action-icon" aria-hidden="true">＋</span>New project…
+            <button type="button" id="menu-action-init" class="chrome-menu-item">
+              <span class="icon chrome-menu-icon" aria-hidden="true">add</span>New project…
             </button>
           </div>
         </div>
@@ -174,7 +174,7 @@
                       <div class="empty-guide-text">Ask your AI tool to design a screen in this project.</div>
                       <div id="empty-guide-prompt-box">
                         <span id="empty-guide-prompt"></span>
-                        <button type="button" id="empty-guide-copy">Copy</button>
+                        <button type="button" id="empty-guide-copy" class="chrome-btn chrome-btn--compact">Copy</button>
                       </div>
                     </div>
                   </li>
@@ -355,12 +355,12 @@
       </div>
       <main id="no-project-state" hidden>
         <section id="empty-card">
-          <span id="empty-icon" aria-hidden="true">🗂️</span>
+          <span id="empty-icon" class="icon" aria-hidden="true">folder_open</span>
           <h1 id="empty-title">No project open</h1>
           <p id="empty-copy">Artisign is running, but no project is open yet. Open or create one here, or ask your AI tool to do it.</p>
           <div id="empty-actions">
-            <button type="button" id="empty-btn-open" class="btn-confirm">Open project…</button>
-            <button type="button" id="empty-btn-init" class="btn-cancel">New project…</button>
+            <button type="button" id="empty-btn-open" class="chrome-btn chrome-btn--primary">Open project…</button>
+            <button type="button" id="empty-btn-init" class="chrome-btn">New project…</button>
           </div>
           <div id="empty-ai">
             <p id="empty-ai-label">Or ask your AI tool</p>
@@ -374,48 +374,54 @@
         </section>
       </main>
     </div>
-    <div id="dialog-scrim" hidden>
-      <section id="open-project-dialog" class="project-dialog" hidden>
-        <h1 class="dialog-title">Open project</h1>
+    <div id="dialog-scrim" class="chrome-scrim" hidden>
+      <section id="open-project-dialog" class="project-dialog chrome-dialog" hidden>
+        <div class="dialog-head">
+          <h1 class="dialog-title">Open project</h1>
+          <button type="button" class="dialog-close chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </div>
         <div class="quick-access">
-          <button type="button" class="quick-chip" data-quick="home">🏠 Home</button>
-          <button type="button" class="quick-chip" data-quick="workspace">Workspace</button>
-          <button type="button" class="quick-chip" data-quick="desktop">Desktop</button>
+          <button type="button" class="quick-chip" data-quick="home"><span class="icon" aria-hidden="true">home</span>Home</button>
+          <button type="button" class="quick-chip" data-quick="workspace"><span class="icon" aria-hidden="true">folder_special</span>Workspace</button>
+          <button type="button" class="quick-chip" data-quick="desktop"><span class="icon" aria-hidden="true">desktop_windows</span>Desktop</button>
         </div>
         <div class="browse-bar">
           <nav class="breadcrumbs"></nav>
-          <button type="button" class="btn-new-folder">+ New folder</button>
+          <button type="button" class="btn-new-folder chrome-btn chrome-btn--ghost" aria-pressed="false"><span class="icon" aria-hidden="true">create_new_folder</span>New folder</button>
         </div>
         <div class="dir-list"></div>
         <p class="selection-hint">Selected: <span class="selection-path">—</span> — folders already containing a project are badged.</p>
         <p class="dialog-error" hidden></p>
         <div class="dialog-actions">
-          <button type="button" class="btn-cancel">Cancel</button>
-          <button type="button" class="btn-confirm" disabled>Open</button>
+          <button type="button" class="btn-cancel chrome-btn">Cancel</button>
+          <button type="button" class="btn-confirm chrome-btn chrome-btn--primary" disabled>Open</button>
         </div>
       </section>
-      <section id="init-project-dialog" class="project-dialog" hidden>
-        <h1 class="dialog-title">New project</h1>
+      <section id="init-project-dialog" class="project-dialog chrome-dialog" hidden>
+        <div class="dialog-head">
+          <h1 class="dialog-title">New project</h1>
+          <button type="button" class="dialog-close chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </div>
         <p class="dialog-sub">Choose where the new project folder is created.</p>
         <div class="quick-access">
-          <button type="button" class="quick-chip" data-quick="home">🏠 Home</button>
-          <button type="button" class="quick-chip" data-quick="workspace">Workspace</button>
-          <button type="button" class="quick-chip" data-quick="desktop">Desktop</button>
+          <button type="button" class="quick-chip" data-quick="home"><span class="icon" aria-hidden="true">home</span>Home</button>
+          <button type="button" class="quick-chip" data-quick="workspace"><span class="icon" aria-hidden="true">folder_special</span>Workspace</button>
+          <button type="button" class="quick-chip" data-quick="desktop"><span class="icon" aria-hidden="true">desktop_windows</span>Desktop</button>
         </div>
         <div class="browse-bar">
           <nav class="breadcrumbs"></nav>
-          <button type="button" class="btn-new-folder">+ New folder</button>
+          <button type="button" class="btn-new-folder chrome-btn chrome-btn--ghost" aria-pressed="false"><span class="icon" aria-hidden="true">create_new_folder</span>New folder</button>
         </div>
         <div class="dir-list"></div>
         <div class="field-name">
           <label for="init-name-input">Project name</label>
-          <input type="text" id="init-name-input" class="field-name-input" placeholder="my-new-project" autocomplete="off" />
+          <input type="text" id="init-name-input" class="field-name-input chrome-field" placeholder="my-new-project" autocomplete="off" />
         </div>
         <p class="selection-hint">Will create: <span class="selection-path">—</span></p>
         <p class="dialog-error" hidden></p>
         <div class="dialog-actions">
-          <button type="button" class="btn-cancel">Cancel</button>
-          <button type="button" class="btn-confirm" disabled>Create &amp; open</button>
+          <button type="button" class="btn-cancel chrome-btn">Cancel</button>
+          <button type="button" class="btn-confirm chrome-btn chrome-btn--primary" disabled>Create &amp; open</button>
         </div>
       </section>
     </div>

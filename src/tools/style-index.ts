@@ -73,7 +73,9 @@ export async function buildStyleOccurrenceIndex(store: Store, registry: DesignSy
   for (const source of docs) {
     if (source.kind !== "screen") continue;
     for (const node of Object.values(source.doc.nodes)) {
-      if (isRepeatedPatternCandidate(node)) {
+      // A screen root is never an occurrence: it can't be promoted (it carries the
+      // frame size), so a non-root node must not be flagged for matching one.
+      if (node.id !== source.doc.rootNodeId && isRepeatedPatternCandidate(node)) {
         recordOccurrence(repeatedPatternFingerprint(node), source.name, byScreen);
       }
       if (node.slotOverrides) {

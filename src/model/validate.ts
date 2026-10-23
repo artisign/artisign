@@ -435,6 +435,9 @@ export function computeRepeatedPatternWarnings(
 
   const groups = new Map<string, string[]>();
   for (const node of nodesInDocumentOrder(doc)) {
+    // The screen root carries the frame size itself (`resolveViewport` reads only
+    // the root), so it can't be promoted — nothing an agent could act on.
+    if (node.id === doc.rootNodeId) continue;
     if (!isRepeatedPatternCandidate(node)) continue;
     const fingerprint = repeatedPatternFingerprint(node);
     const occurrences = index.byScreen.get(fingerprint);

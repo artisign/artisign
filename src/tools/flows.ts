@@ -63,10 +63,36 @@ export async function readScreenFlows(store: Store, screenId: string): Promise<F
   return all.filter((record) => belongsToScreen(record, screenId));
 }
 
-/** Replaces every flows.json entry for `doc.id` with the flows just parsed from its HTML. */
+/** Every node id's position in document order (depth-first preorder from the root) — the order the parser emits flows in; ids not reachable from the root are absent. */
+function documentOrderIndex(doc: ScreenDocument): Map<string, number> {
+  const index = new Map<string, number>();
+  const visit = (id: string): void => {
+    const node = doc.nodes[id];
+    if (!node) return;
+    index.set(id, index.size);
+    for (const childId of node.childIds) visit(childId);
+  };
+  visit(doc.rootNodeId);
+  return index;
+}
+
+/**
+ * Replaces every flows.json entry for `doc.id` with the flows of `doc`, in
+ * document order (what write_html produces for the same HTML, so the file
+ * does not churn with patch history). Flows whose trigger node is no longer
+ * in the tree are dropped: edits that delete nodes (patch_html, promote to
+ * component) must not leave orphan edges behind.
+ * NOTE (CHR-778): this only knows `doc.nodes`; a flow trigger that is an
+ * authored id inside a slot fill is not in it and would be dropped here —
+ * widen this filter when fill triggers are supported.
+ */
 export async function syncScreenFlows(store: Store, doc: ScreenDocument): Promise<void> {
   const all = await store.readFlows();
   const others = all.filter((record) => !belongsToScreen(record, doc.id));
-  const fresh = doc.flows.map((flow) => toFlowRecord(toPublicFlow(doc.id, flow)));
+  const order = documentOrderIndex(doc);
+  const fresh = doc.flows
+    .filter((flow) => order.has(flow.triggerNodeId))
+    .sort((a, b) => order.get(a.triggerNodeId)! - order.get(b.triggerNodeId)!)
+    .map((flow) => toFlowRecord(toPublicFlow(doc.id, flow)));
   await store.writeFlows([...others, ...fresh]);
 }

@@ -23,7 +23,6 @@ import {
   fetchProjects,
   openProject,
   initProject,
-  activateProject,
   fetchFsDirs,
 } from "./api.js";
 
@@ -141,12 +140,6 @@ describe("api.js project scoping (CHR-651)", () => {
     globalThis.fetch = vi.fn(async () => okJson({}));
     await initProject("/tmp/some-dir");
     expect(globalThis.fetch).toHaveBeenCalledWith("/api/projects/init", expect.objectContaining({ method: "POST" }));
-  });
-
-  it("activateProject carries no ?project=", async () => {
-    globalThis.fetch = vi.fn(async () => okJson({}));
-    await activateProject("/tmp/some-dir");
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/projects/activate", expect.objectContaining({ method: "POST" }));
   });
 
   it("fetchFsDirs carries no ?project=", async () => {

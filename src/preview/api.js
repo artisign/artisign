@@ -158,23 +158,6 @@ export async function initProject(dir, name) {
 }
 
 /**
- * Switches the active project among the ones already open — no filesystem
- * work, just a registry pointer flip.
- * @param {string} root
- * @returns {Promise<{ ok: true, projects: object } | { ok: false, message: string }>}
- */
-export async function activateProject(root) {
-  const res = await fetch("/api/projects/activate", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ root }),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) return { ok: false, message: body.message ?? res.statusText };
-  return { ok: true, projects: body };
-}
-
-/**
  * Directory listing for the open/init-project folder browser.
  * @param {string} path
  * @returns {Promise<{ ok: true, path: string, parent: string | null, entries: { name: string, path: string, isArtisignProject: boolean }[], home: string } | { ok: false, message: string }>}

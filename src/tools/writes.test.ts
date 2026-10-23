@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { writeHtml, patchHtml, updateRefs, setTokens, setFlow } from "./writes.js";
+import { promoteToSystem } from "./lifecycle.js";
 import { buildRenderContext } from "./render-context.js";
 import { parseScreen, renderScreen, loadRegistry } from "../model/index.js";
 import { FsStore } from "../store/index.js";
@@ -184,13 +185,13 @@ describe("write_html", () => {
   });
 
   it("warns repeated_pattern for an ad-hoc styled node whose style already occurs on another screen — full-doc scope (CHR-635)", async () => {
-    await fx.store.writeScreen("checkout", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div>`);
+    await fx.store.writeScreen("checkout", `<div id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div></div>`);
 
     const res = await writeHtml(fx.store, {
       screen: "home",
       mode: "create",
       title: "Home",
-      html_aug: `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div>`,
+      html_aug: `<div id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div></div>`,
     });
 
     expect(res.errors).toBeUndefined();
@@ -204,15 +205,37 @@ describe("write_html", () => {
     ]);
   });
 
-  it("never warns repeated_pattern for a pure layout wrapper, even one repeated everywhere", async () => {
-    await fx.store.writeScreen("checkout", `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`);
-    await fx.store.writeScreen("cart", `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`);
+  it("never warns repeated_pattern on the screen root, and a non-root node does not match another screen's root (CHR-774)", async () => {
+    const frame = "width: 1440px; height: 900px; background: #fff; color: #111";
+    await fx.store.writeScreen("checkout", `<div id="root" style="${frame}"></div>`);
 
     const res = await writeHtml(fx.store, {
       screen: "home",
       mode: "create",
       title: "Home",
-      html_aug: `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`,
+      html_aug: `<div id="root" style="${frame}"><div id="n1" style="${frame}"></div></div>`,
+    });
+    expect((res.warnings as unknown[]).filter((w) => (w as { kind: string }).kind === "repeated_pattern")).toEqual([]);
+
+    const patched = await patchHtml(fx.store, {
+      target: { kind: "node", node: "home.root" },
+      operation: "set_attr",
+      attr: { name: "data-testid", value: "r" },
+    });
+    expect((patched.warnings as unknown[]).filter((w) => (w as { kind: string }).kind === "repeated_pattern")).toEqual([]);
+    expect(patched.preexisting_repeated_pattern_count ?? 0).toBe(0);
+  });
+
+  it("never warns repeated_pattern for a pure layout wrapper, even one repeated everywhere", async () => {
+    const wrapper = `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`;
+    await fx.store.writeScreen("checkout", `<div id="root">${wrapper}</div>`);
+    await fx.store.writeScreen("cart", `<div id="root">${wrapper}</div>`);
+
+    const res = await writeHtml(fx.store, {
+      screen: "home",
+      mode: "create",
+      title: "Home",
+      html_aug: `<div id="root">${wrapper}</div>`,
     });
 
     expect((res.warnings as unknown[]).filter((w) => (w as { kind: string }).kind === "repeated_pattern")).toEqual([]);
@@ -220,13 +243,13 @@ describe("write_html", () => {
 
   it("names a component whose default-variant root matches the repeated style", async () => {
     await fx.store.writeComponent("modal-scrim", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div>`);
-    await fx.store.writeScreen("checkout", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div>`);
+    await fx.store.writeScreen("checkout", `<div id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div></div>`);
 
     const res = await writeHtml(fx.store, {
       screen: "home",
       mode: "create",
       title: "Home",
-      html_aug: `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div>`,
+      html_aug: `<div id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div></div>`,
     });
 
     const repeated = (res.warnings as Array<{ kind: string; suggestion?: string }>).find((w) => w.kind === "repeated_pattern");
@@ -437,6 +460,97 @@ describe("patch_html", () => {
     expect(await fx.store.readScreen("home")).not.toContain("Old");
   });
 
+  describe("flows.json sync", () => {
+    const edge = (node: string, to: string) => ({ from: `home.${node}`, event: "tap", to, to_kind: "screen" as const });
+    const withFlows = `<section id="n1"><a id="n2" data-flow-target="checkout">A</a><a id="n3" data-flow-target="cart">B</a></section>`;
+
+    beforeEach(async () => {
+      await writeHtml(fx.store, { screen: "home", mode: "replace", html_aug: withFlows });
+    });
+
+    it("keeps exactly one edge, in document order, when a flow node is replaced with the same target", async () => {
+      expect(await fx.store.readFlows()).toHaveLength(2);
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.n2" },
+        operation: "replace",
+        html_aug: `<a id="n2" data-flow-target="checkout">A2</a>`,
+      });
+      expect(await fx.store.readFlows()).toEqual([edge("n2", "checkout"), edge("n3", "cart")]);
+    });
+
+    it("writes the same flows.json as write_html for the same resulting HTML", async () => {
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.n2" },
+        operation: "replace",
+        html_aug: `<a id="n2" data-flow-target="checkout">A2</a>`,
+      });
+      const patched = await fx.store.readFlows();
+      await writeHtml(fx.store, { screen: "home", mode: "replace", html_aug: await fx.store.readScreen("home") });
+      expect(await fx.store.readFlows()).toEqual(patched);
+    });
+
+    it("follows a changed data-flow-target on replace", async () => {
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.n2" },
+        operation: "replace",
+        html_aug: `<a id="n2" data-flow-target="payment">A</a>`,
+      });
+      expect(await fx.store.readFlows()).toEqual([edge("n2", "payment"), edge("n3", "cart")]);
+    });
+
+    it("removes the edge when the replacement drops data-flow-target", async () => {
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.n2" },
+        operation: "replace",
+        html_aug: `<a id="n2">A</a>`,
+      });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+    });
+
+    it("removes the edge when the flow node is deleted", async () => {
+      await patchHtml(fx.store, { target: { kind: "node", node: "home.n2" }, operation: "delete" });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+    });
+
+    it("removes nested edges when an ancestor of a flow trigger is deleted or replaced", async () => {
+      await writeHtml(fx.store, {
+        screen: "home",
+        mode: "replace",
+        html_aug: `<section id="n1"><div id="box"><a id="n2" data-flow-target="checkout">A</a></div><a id="n3" data-flow-target="cart">B</a></section>`,
+      });
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.box" },
+        operation: "replace",
+        html_aug: `<div id="box"><p id="p">plain</p></div>`,
+      });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+
+      await patchHtml(fx.store, { target: { kind: "node", node: "home.n3" }, operation: "delete" });
+      expect(await fx.store.readFlows()).toEqual([]);
+    });
+
+    it("leaves no orphan edge when update_refs turns an element holding a flow trigger into a component instance", async () => {
+      await fx.store.writeComponent("card", `<div id="c"></div>`);
+      await writeHtml(fx.store, {
+        screen: "home",
+        mode: "replace",
+        html_aug: `<section id="n1"><div id="box"><a id="n2" data-flow-target="checkout">A</a></div><a id="n3" data-flow-target="cart">B</a></section>`,
+      });
+      await updateRefs(fx.store, { node: "home.box", refs: { component_ref: "card" } });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+    });
+
+    it("leaves no orphan edge when promote_to_system turns an element holding a flow trigger into a component", async () => {
+      await writeHtml(fx.store, {
+        screen: "home",
+        mode: "replace",
+        html_aug: `<section id="n1"><div id="box"><a id="n2" data-flow-target="checkout">A</a></div><a id="n3" data-flow-target="cart">B</a></section>`,
+      });
+      await promoteToSystem(fx.store, { node: "home.box", kind: "component", name: "card" });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+    });
+  });
+
   it("inserts a sibling after a node", async () => {
     await patchHtml(fx.store, {
       target: { kind: "node", node: "home.n2" },
@@ -519,8 +633,8 @@ describe("patch_html", () => {
   });
 
   it("scopes repeated_pattern warnings to affected_nodes and counts the rest (CHR-635)", async () => {
-    await fx.store.writeScreen("checkout", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div>`);
-    await fx.store.writeScreen("cart", `<div id="n1" style="border: 1px solid #000; color: #111"></div>`);
+    await fx.store.writeScreen("checkout", `<div id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div></div>`);
+    await fx.store.writeScreen("cart", `<div id="root"><div id="n1" style="border: 1px solid #000; color: #111"></div></div>`);
     // n1 and n2 carry two DISTINCT repeated patterns — this patch only
     // touches n1, so n2's own (different) pattern is what
     // preexisting_repeated_pattern_count reports; grouping n1 with n2 would

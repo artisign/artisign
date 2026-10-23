@@ -214,31 +214,6 @@ describe("/api/projects*", () => {
     expect(json.code).toBe("conflict");
   });
 
-  it("POST /api/projects/activate switches the active project", async () => {
-    const other = await mkdtemp(join(tmpdir(), "artisign-projects-activate-"));
-    scratch.push(other);
-    await initProject(other);
-    daemon = await startDaemon({ port: 0, projects: [dir, other] });
-    expect((await getJson(daemon.port, "/api/projects")).json.active).toBe(dir);
-
-    const { status, json } = await postJson(daemon.port, "/api/projects/activate", { root: other });
-
-    expect(status).toBe(200);
-    expect(json.active).toBe(other);
-  });
-
-  it("POST /api/projects/activate 400s for a project that isn't open", async () => {
-    const notOpen = await mkdtemp(join(tmpdir(), "artisign-projects-not-open-"));
-    scratch.push(notOpen);
-    await initProject(notOpen);
-    daemon = await startDaemon({ port: 0, projects: [dir] });
-
-    const { status, json } = await postJson(daemon.port, "/api/projects/activate", { root: notOpen });
-
-    expect(status).toBe(400);
-    expect(json.code).toBe("validation_failed");
-  });
-
   it("rejects a cross-origin request to /api/projects", async () => {
     daemon = await startDaemon({ port: 0, projects: [dir] });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { initProjectTool, listProjects, importHtml, promoteToSystem, deleteEntity } from "./lifecycle.js";
 import { updateRefs, writeHtml } from "./writes.js";
+import { setMeta } from "./meta.js";
 import { getDesignSystem, listComments } from "./reads.js";
 import { buildRenderContext } from "./render-context.js";
 import { parseScreen, renderScreen, loadRegistry } from "../model/index.js";
@@ -625,6 +626,52 @@ describe("delete_entity", () => {
       expect((err as Error).message).toContain("component:wrapper#default.w2");
     }
     expect(await fx.store.listComponents()).toEqual(["btn-primary", "wrapper"]);
+  });
+
+  it("drops the component's usage text with the file, so a same-name component does not inherit it (CHR-773)", async () => {
+    await fx.store.writeComponent("btn-primary", `<button id="btn">Go</button>`);
+    await setMeta(fx.store, { target: { kind: "component", name: "btn-primary" }, usage: "primary CTAs only" });
+
+    await deleteEntity(fx.store, { kind: "component", name: "btn-primary" });
+    expect((await fx.store.readDesignSystemMeta()).component_usage).toEqual({});
+
+    await fx.store.writeComponent("btn-primary", `<button id="btn">Go</button>`);
+    const ds = (await getDesignSystem(fx.store, { view: "full" })) as { components: Array<{ name: string; usage?: string }> };
+    expect(ds.components.find((c) => c.name === "btn-primary")?.usage).toBeUndefined();
+  });
+
+  it("drops the pattern's usage text with the file, leaving other entries alone (CHR-773)", async () => {
+    await fx.store.writePattern("card-grid", `<div id="g"></div>`);
+    await fx.store.writePattern("hero", `<div id="h"></div>`);
+    await setMeta(fx.store, { target: { kind: "pattern", name: "card-grid" }, usage: "listings" });
+    await setMeta(fx.store, { target: { kind: "pattern", name: "hero" }, usage: "landing" });
+
+    await deleteEntity(fx.store, { kind: "pattern", name: "card-grid" });
+
+    expect((await fx.store.readDesignSystemMeta()).pattern_usage).toEqual({ hero: "landing" });
+  });
+
+  it("does not rewrite meta.json when the deleted entity has no usage entry (CHR-773)", async () => {
+    await fx.store.writeComponent("btn-primary", `<button id="btn">Go</button>`);
+    await fx.store.writePattern("card-grid", `<div id="g"></div>`);
+    const writeSpy = vi.spyOn(fx.store, "writeDesignSystemMeta");
+
+    await deleteEntity(fx.store, { kind: "component", name: "btn-primary" });
+    await deleteEntity(fx.store, { kind: "pattern", name: "card-grid" });
+
+    expect(writeSpy).not.toHaveBeenCalled();
+    writeSpy.mockRestore();
+  });
+
+  it("deleting a component named like an Object.prototype key does not touch meta.json (CHR-773)", async () => {
+    await fx.store.writeComponent("constructor", `<button id="btn">Go</button>`);
+    const writeSpy = vi.spyOn(fx.store, "writeDesignSystemMeta");
+
+    await deleteEntity(fx.store, { kind: "component", name: "constructor" });
+
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(await fx.store.listComponents()).toEqual([]);
+    writeSpy.mockRestore();
   });
 
   it("deletes a component even when its own file has a duplicate variant name", async () => {

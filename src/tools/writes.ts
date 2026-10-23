@@ -23,6 +23,7 @@ import { findBySelector, findFillById, findFillsBySelector, patchFill, spliceFra
 import { convertToComponentInstance, revertComponentInstanceToElement } from "./node-convert.js";
 import { isBlockingIssue, issueToWarning } from "./issue-filter.js";
 import { slotStylingWarnings } from "./definition-checks.js";
+import { checkNewTokenMembers, checkNewComponentName } from "./name-collision.js";
 import { assertValidEntityName, assertValidVariantName } from "./name-validation.js";
 import { patchDefinitionHtml, updateRefsDefinition } from "./definition-patch.js";
 import {
@@ -173,6 +174,9 @@ async function writeDefinition(
       }
     }
   }
+
+  // Patterns are not in the registry (NodeRefs has no pattern ref), so only a new component can collide with a token member.
+  if (kind === "component" && !exists) warnings.push(...(await checkNewComponentName(store, input.screen)));
 
   if (kind === "component") await store.writeComponent(input.screen, input.html_aug);
   else await store.writePattern(input.screen, input.html_aug);
@@ -601,6 +605,12 @@ export async function setTokens(store: Store, input: SetTokensInput): Promise<Re
   const pathsAfter = flattenTokenPaths(tokens);
   const deletedPaths = [...pathsBefore].filter((p) => !pathsAfter.has(p));
 
+  // Bare member names (what class="$name" resolves against) that this call introduces.
+  const bareName = (path: string): string => path.slice(path.indexOf(".") + 1);
+  const bareNamesBefore = new Set([...pathsBefore].map(bareName));
+  const newBareNames = [...pathsAfter].map(bareName).filter((name) => !bareNamesBefore.has(name));
+  const collisionWarnings = await checkNewTokenMembers(store, newBareNames);
+
   // Pre-write scan for the dangling-ref check: a class="$..." ref to a path
   // that's about to be deleted only resolves (and lands in refs.tokens at
   // all — resolveClassRef in model/parser.ts) against the registry that
@@ -671,7 +681,7 @@ export async function setTokens(store: Store, input: SetTokensInput): Promise<Re
       kind: "unknown_ref",
       message: `"$${path}" was deleted but is still referenced in: ${[...addresses].sort().join(", ")}`,
     }));
-  const warnings: Warning[] = [...loadWarningsAfter, ...danglingWarnings];
+  const warnings: Warning[] = [...loadWarningsAfter, ...danglingWarnings, ...collisionWarnings];
 
   return {
     ...commitFields(commitResult),

@@ -235,6 +235,17 @@ someone has to maintain.
 - Name promoted entities by role, not appearance: `color.accent`, not
   `color.orange`; `btn-primary`, not `btn-rounded-blue`.
 
+**One namespace for `class="$name"`:** a flat `$name` in `class` resolves
+against component names *and* bare token member names (`eyebrow` from
+`typography.eyebrow`). A name that is both is ambiguous: the node renders
+unbound with a red outline, so keep the two sets disjoint. Introducing the
+second meaning is guarded — `set_tokens`, `write_html` (kind `component`) and
+`promote_to_system` refuse with `conflict` when it would unbind existing
+nodes (the error names them; rename one side, or switch the nodes to
+`data-component="name"` / a dot-path token ref like `$typography.eyebrow`),
+and otherwise succeed with an `ambiguous_ref` warning. `data-component`
+instances and dot-path refs are never affected, and patterns cannot collide.
+
 `write_html`/`patch_html` also enforce the second-occurrence rule
 automatically: a `repeated_pattern` warning fires when an ad-hoc, visually
 styled element you just wrote (at least two real declarations — one alone

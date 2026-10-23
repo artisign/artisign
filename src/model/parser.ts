@@ -376,6 +376,8 @@ function buildSubtree(
       break;
     case "ambiguous_class":
       kind = "element";
+      // Kept as a plain class so the ref survives serialization and the renderer can flag it.
+      plainClasses.push(`$${classification.classRef}`);
       errors.push({ code: "ambiguous_class_ref", message: `"$${classification.classRef}" resolves to both a component and a token` });
       break;
     case "unresolved_class":
@@ -541,6 +543,8 @@ function buildElement(el: P5Element, parentId: NodeId | null, inSvg: boolean, ct
       break;
     case "ambiguous_class":
       kind = "element";
+      // Kept as a plain class so the ref survives serialization and the renderer can flag it.
+      plainClasses.push(`$${classification.classRef}`);
       ctx.errors.push({
         code: "ambiguous_class_ref",
         message: `"$${classification.classRef}" resolves to both a component and a token`,

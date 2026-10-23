@@ -264,9 +264,7 @@ async function promoteToken(store: Store, doc: ScreenDocument, node: InternalNod
   // concern here at all (this path only ever adds a token, never removes
   // one), so a single post-write scan is strictly sufficient.
   const tokens = await store.readTokens();
-  // Only a bare name that is new to the registry can start shadowing a component.
-  const bareNameExists = Object.values(tokens).some((members) => member in members);
-  const collisionWarnings = bareNameExists ? [] : await checkNewTokenMembers(store, [member]);
+  const collisionWarnings = await checkNewTokenMembers(store, [member]);
   tokens[bucket] ??= {};
   tokens[bucket]![member] = value;
   await store.writeTokens(tokens);
@@ -440,7 +438,10 @@ async function promoteComponentOrPattern(
     kind === "component" ? `design-system/components/${name}.html` : `design-system/patterns/${name}.html`;
 
   // Promoted instances are class-form `$name`, so a bare token member of the same name would leave them unbound at birth.
-  const definitionWarnings: Warning[] = kind === "component" ? await checkNewComponentName(store, name, true) : [];
+  const definitionWarnings: Warning[] =
+    kind === "component" && !(await store.listComponents()).includes(name)
+      ? await checkNewComponentName(store, name, { breaksNewInstances: true })
+      : [];
 
   if (kind === "component") {
     await store.writeComponent(name, fileContent);

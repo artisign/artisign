@@ -31,6 +31,13 @@ describe("component / bare token member name collision (CHR-772)", () => {
       expect(await fx.store.readTokens()).toEqual(before);
     });
 
+    it("does not count a data-component slot fill as a class-form instance", async () => {
+      await fx.store.writeComponent("card", `<div id="c"><span data-slot="body">d</span></div>`);
+      await fx.store.writeScreen("home", `<div id="n1"><div id="n2" class="$card"><p data-slot="body" data-component="eyebrow">x</p></div></div>`);
+      const res = await setTokens(fx.store, { tokens: { "typography.eyebrow": "12px" }, mode: "patch" });
+      expect(res.warnings).toEqual([expect.objectContaining({ kind: "ambiguous_ref", target: "eyebrow" })]);
+    });
+
     it("also counts instances in another component definition and in slot fills", async () => {
       await fx.store.writeComponent("card", `<div id="c"><span data-slot="body">d</span></div>`);
       await fx.store.writeScreen("home", `<div id="n1"><div id="n2" class="$card"><p data-slot="body" class="$eyebrow">x</p></div></div>`);
@@ -68,6 +75,19 @@ describe("component / bare token member name collision (CHR-772)", () => {
       expect(await fx.store.listComponents()).toEqual([]);
     });
 
+    it("refuses when the incoming definition itself uses class=$name as the token class", async () => {
+      await expect(
+        writeHtml(fx.store, { kind: "component", screen: "eyebrow", mode: "create", html_aug: `<p id="p" class="$eyebrow">x</p>` }),
+      ).rejects.toMatchObject({ code: "conflict", message: expect.stringContaining("the new definition") });
+      expect(await fx.store.listComponents()).toEqual([]);
+    });
+
+    it("does not re-check when the component already exists (replace)", async () => {
+      await fx.store.writeComponent("eyebrow", EYEBROW);
+      const res = await writeHtml(fx.store, { kind: "component", screen: "eyebrow", mode: "replace", html_aug: EYEBROW });
+      expect(res.warnings).toEqual([]);
+    });
+
     it("warns ambiguous_ref and succeeds when nothing uses the token class", async () => {
       const res = await writeHtml(fx.store, { kind: "component", screen: "eyebrow", mode: "create", html_aug: EYEBROW });
       expect(res.warnings).toEqual([expect.objectContaining({ kind: "ambiguous_ref", target: "eyebrow" })]);
@@ -101,6 +121,13 @@ describe("component / bare token member name collision (CHR-772)", () => {
       expect(res.warnings).toEqual([expect.objectContaining({ kind: "ambiguous_ref", target: "brand" })]);
     });
 
+    it("kind=component into an existing component of that name is not re-checked", async () => {
+      await fx.store.writeComponent("card", `<div id="c"></div>`);
+      await fx.store.writeTokens({ typography: { card: "12px" } });
+      await fx.store.writeScreen("home", `<div id="n1"><p id="n2">x</p></div>`);
+      await expect(promoteToSystem(fx.store, { node: "home.n2", kind: "component", name: "card" })).resolves.toBeDefined();
+    });
+
     it("kind=component refuses a name equal to a token member (its new instances would be born ambiguous)", async () => {
       await fx.store.writeTokens({ typography: { card: "12px" } });
       await fx.store.writeScreen("home", `<div id="n1"><p id="n2">x</p></div>`);
@@ -117,6 +144,28 @@ describe("component / bare token member name collision (CHR-772)", () => {
   });
 
   describe("an ambiguous instance that already exists on disk (hand edit, git checkout)", () => {
+    it("does not flag a valid data-component instance that keeps a $-class token (the recommended escape hatch)", async () => {
+      await fx.store.writeComponent("card", `<div id="c"></div>`);
+      await fx.store.writeComponent("btn", `<button id="b"></button>`);
+      await fx.store.writeTokens({ typography: { card: "12px" }, color: { primary: "#111" } });
+      const registry = await loadRegistry(fx.store);
+      const { doc } = parseScreen(
+        `<div id="n1"><div id="a" data-component="card" class="$card"></div><button id="b" data-component="btn" class="$primary"></button></div>`,
+        "home",
+        registry,
+      );
+      const html = renderScreen(doc, await buildRenderContext(fx.store));
+      expect(html).not.toContain("data-unresolved-token");
+    });
+
+    it("keeps the ambiguous ref in its original class position", async () => {
+      await fx.store.writeComponent("eyebrow", EYEBROW);
+      await fx.store.writeTokens({ typography: { eyebrow: "12px" } });
+      const registry = await loadRegistry(fx.store);
+      const { doc } = parseScreen(`<div id="n1"><p id="n2" class="a $eyebrow muted">x</p></div>`, "home", registry);
+      expect(serializeScreen(doc)).toContain('class="a $eyebrow muted"');
+    });
+
     it("keeps the class ref through serialization and renders with the red-outline marker", async () => {
       await fx.store.writeComponent("eyebrow", EYEBROW);
       await fx.store.writeTokens({ typography: { eyebrow: "12px" } });

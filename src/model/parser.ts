@@ -377,7 +377,7 @@ function buildSubtree(
     case "ambiguous_class":
       kind = "element";
       // Kept as a plain class so the ref survives serialization and the renderer can flag it.
-      plainClasses.push(`$${classification.classRef}`);
+      plainClasses.splice(0, plainClasses.length, ...classParts.filter((p) => !p.startsWith("$") || p === `$${classification.classRef}`));
       errors.push({ code: "ambiguous_class_ref", message: `"$${classification.classRef}" resolves to both a component and a token` });
       break;
     case "unresolved_class":
@@ -429,6 +429,7 @@ function buildSubtree(
     children: [],
   };
   if (explicitId) sub.id = explicitId;
+  if (classification.kind === "component_instance" && classification.instanceSyntax === "data-attr") sub.instanceSyntax = "data-attr";
 
   if (kind === "component_instance") {
     // Same rule as a top-level instance: its content is slot fills, never
@@ -544,7 +545,7 @@ function buildElement(el: P5Element, parentId: NodeId | null, inSvg: boolean, ct
     case "ambiguous_class":
       kind = "element";
       // Kept as a plain class so the ref survives serialization and the renderer can flag it.
-      plainClasses.push(`$${classification.classRef}`);
+      plainClasses.splice(0, plainClasses.length, ...parts.filter((p) => !p.startsWith("$") || p === `$${classification.classRef}`));
       ctx.errors.push({
         code: "ambiguous_class_ref",
         message: `"$${classification.classRef}" resolves to both a component and a token`,

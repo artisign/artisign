@@ -176,7 +176,7 @@ async function writeDefinition(
   }
 
   // Patterns are not in the registry (NodeRefs has no pattern ref), so only a new component can collide with a token member.
-  if (kind === "component" && !exists) warnings.push(...(await checkNewComponentName(store, input.screen)));
+  if (kind === "component" && !exists) warnings.push(...(await checkNewComponentName(store, input.screen, { incoming: variantDocs })));
 
   if (kind === "component") await store.writeComponent(input.screen, input.html_aug);
   else await store.writePattern(input.screen, input.html_aug);
@@ -605,10 +605,9 @@ export async function setTokens(store: Store, input: SetTokensInput): Promise<Re
   const pathsAfter = flattenTokenPaths(tokens);
   const deletedPaths = [...pathsBefore].filter((p) => !pathsAfter.has(p));
 
-  // Bare member names (what class="$name" resolves against) that this call introduces.
+  // Bare member names (what class="$name" resolves against); checkNewTokenMembers keeps only those new to the registry.
   const bareName = (path: string): string => path.slice(path.indexOf(".") + 1);
-  const bareNamesBefore = new Set([...pathsBefore].map(bareName));
-  const newBareNames = [...pathsAfter].map(bareName).filter((name) => !bareNamesBefore.has(name));
+  const newBareNames = [...pathsAfter].map(bareName);
   const collisionWarnings = await checkNewTokenMembers(store, newBareNames);
 
   // Pre-write scan for the dangling-ref check: a class="$..." ref to a path

@@ -1,5 +1,5 @@
 import type { Store } from "../store/index.js";
-import { loadRegistry, type NodeSubtree } from "../model/index.js";
+import { loadRegistry, type NodeSubtree, type ScreenDocument } from "../model/index.js";
 import { loadAllDocuments, type SourceDoc } from "./definitions.js";
 import { formatNodeRef } from "./node-ref.js";
 import { ToolError, type Warning } from "./types.js";
@@ -19,9 +19,9 @@ function collectMatches(sources: SourceDoc[], matches: (unit: Unit, syntax: "cla
   for (const source of sources) {
     for (const node of Object.values(source.doc.nodes)) {
       if (matches(node, node.instanceSyntax)) found.add(formatNodeRef(source.address, node.id));
-      // Slot fills are never in doc.nodes and always serialize in class form; the owner is the addressable node.
+      // Slot fills are never in doc.nodes; the owner is the addressable node. A fill is class-form unless parsed from data-component.
       const visit = (sub: NodeSubtree): void => {
-        if (matches(sub, "class")) found.add(`${formatNodeRef(source.address, node.id)} (slot fill)`);
+        if (matches(sub, sub.instanceSyntax ?? "class")) found.add(`${formatNodeRef(source.address, node.id)} (slot fill)`);
         for (const child of sub.children) visit(child);
         for (const child of Object.values(sub.slotOverrides ?? {})) visit(child);
       };
@@ -41,13 +41,13 @@ function ambiguousWarning(name: string): Warning {
 }
 
 /**
- * Call before adding token members. For each new bare member name that equals
- * a component name: refuses (`conflict`) when class-form instances
+ * Call before adding token members (any names; only those new to the registry
+ * count). For each new bare member name that equals a component name: refuses (`conflict`) when class-form instances
  * `class="$name"` would lose their binding, otherwise warns `ambiguous_ref`.
  */
 export async function checkNewTokenMembers(store: Store, newMembers: string[]): Promise<Warning[]> {
   const registry = await loadRegistry(store);
-  const colliding = [...new Set(newMembers)].filter((m) => registry.componentNames.has(m)).sort();
+  const colliding = [...new Set(newMembers)].filter((m) => registry.componentNames.has(m) && !registry.tokenFlatNames.has(m)).sort();
   if (colliding.length === 0) return [];
 
   const { docs } = await loadAllDocuments(store, registry);
@@ -68,17 +68,26 @@ export async function checkNewTokenMembers(store: Store, newMembers: string[]): 
 /**
  * Call before creating a component. When its name equals a bare token member
  * name: refuses (`conflict`) when nodes currently use `class="$name"` as the
- * token class, otherwise warns `ambiguous_ref`. `breaksNewInstances` is for
- * promote_to_system, whose new instances are class-form themselves and would
- * be born ambiguous — always a conflict there.
+ * token class — on disk or inside `incoming` (the definition being written,
+ * parsed with the pre-write registry) — otherwise warns `ambiguous_ref`.
+ * `breaksNewInstances` is for promote_to_system, whose new instances are
+ * class-form themselves and would be born ambiguous — always a conflict there.
  */
-export async function checkNewComponentName(store: Store, name: string, breaksNewInstances = false): Promise<Warning[]> {
+export async function checkNewComponentName(
+  store: Store,
+  name: string,
+  options: { incoming?: ScreenDocument[]; breaksNewInstances?: boolean } = {},
+): Promise<Warning[]> {
   const registry = await loadRegistry(store);
   if (!registry.tokenFlatNames.has(name)) return [];
 
   const { docs } = await loadAllDocuments(store, registry);
   const affected = collectMatches(docs, (u) => u.kind === "element" && u.refs.tokens.class === name);
-  if (affected.length > 0 || breaksNewInstances) {
+  const incomingUses = (options.incoming ?? []).some((doc) =>
+    Object.values(doc.nodes).some((n) => n.kind === "element" && n.refs.tokens.class === name),
+  );
+  if (incomingUses) affected.push("the new definition");
+  if (affected.length > 0 || options.breaksNewInstances) {
     const where = affected.length > 0 ? ` and would stop resolving as the token class on ${affected.join(", ")}` : "";
     throw new ToolError(
       "conflict",

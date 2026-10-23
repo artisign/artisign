@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- A `data-flow-target` on component slot-fill content (for example a back button passed into `$nav-bar`) now becomes a
+  flow edge keyed by the fill's id; a fill without an id returns a `missing_id` warning. Promoting a node to a component
+  or setting `component_ref` no longer silently drops the flows of the folded elements. (CHR-778)
 - `patch_html` no longer duplicates or orphans `flows.json` edges: replacing or deleting a node with `data-flow-target` (or an
   ancestor of one) now leaves exactly one edge per trigger, in document order, and `update_refs` keeps `flows.json` in sync. (CHR-813)
 

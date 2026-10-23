@@ -1,7 +1,7 @@
 import type { Store, FlowRecord } from "../store/index.js";
-import type { Flow as InternalFlow, ScreenDocument } from "../model/index.js";
+import { collectFillFlows, forEachFill, type Flow as InternalFlow, type ScreenDocument } from "../model/index.js";
 import { formatNodeRef } from "./node-ref.js";
-import type { FlowEventName, PublicFlow } from "./types.js";
+import type { FlowEventName, PublicFlow, Warning } from "./types.js";
 
 const FLOW_EVENTS = new Set<FlowEventName>(["tap", "hover", "longpress", "swipe-left", "swipe-right"]);
 
@@ -63,7 +63,11 @@ export async function readScreenFlows(store: Store, screenId: string): Promise<F
   return all.filter((record) => belongsToScreen(record, screenId));
 }
 
-/** Every node id's position in document order (depth-first preorder from the root) — the order the parser emits flows in; ids not reachable from the root are absent. */
+/**
+ * Every trigger id's position in document order (depth-first preorder from the
+ * root) — the order the parser emits flows in. A slot fill's authored id sorts
+ * right after its owning node; ids not reachable from the root are absent.
+ */
 function documentOrderIndex(doc: ScreenDocument): Map<string, number> {
   const index = new Map<string, number>();
   const visit = (id: string): void => {
@@ -73,6 +77,11 @@ function documentOrderIndex(doc: ScreenDocument): Map<string, number> {
     for (const childId of node.childIds) visit(childId);
   };
   visit(doc.rootNodeId);
+  let fills = 0;
+  forEachFill(doc, (sub, ownerId) => {
+    const ownerPosition = index.get(ownerId);
+    if (sub.id !== undefined && ownerPosition !== undefined) index.set(sub.id, ownerPosition + ++fills / 1e6);
+  });
   return index;
 }
 
@@ -82,17 +91,35 @@ function documentOrderIndex(doc: ScreenDocument): Map<string, number> {
  * does not churn with patch history). Flows whose trigger node is no longer
  * in the tree are dropped: edits that delete nodes (patch_html, promote to
  * component) must not leave orphan edges behind.
- * NOTE (CHR-778): this only knows `doc.nodes`; a flow trigger that is an
- * authored id inside a slot fill is not in it and would be dropped here —
- * widen this filter when fill triggers are supported.
+ * Flows on slot-fill content are not tracked in `doc.flows` across edits —
+ * the fill's `data-flow-*` attributes are the truth — so they are re-derived
+ * here from the current tree (CHR-778).
  */
 export async function syncScreenFlows(store: Store, doc: ScreenDocument): Promise<void> {
   const all = await store.readFlows();
   const others = all.filter((record) => !belongsToScreen(record, doc.id));
+  doc.flows = [...doc.flows.filter((flow) => doc.nodes[flow.triggerNodeId]), ...collectFillFlows(doc).flows];
   const order = documentOrderIndex(doc);
   const fresh = doc.flows
     .filter((flow) => order.has(flow.triggerNodeId))
     .sort((a, b) => order.get(a.triggerNodeId)! - order.get(b.triggerNodeId)!)
     .map((flow) => toFlowRecord(toPublicFlow(doc.id, flow)));
   await store.writeFlows([...others, ...fresh]);
+}
+
+/**
+ * A slot fill with `data-flow-target` but no authored id cannot be addressed,
+ * so it produces no edge (CHR-778). One `missing_id` warning per owning
+ * instance, never blocking.
+ */
+export function fillFlowWarnings(doc: ScreenDocument): Warning[] {
+  return collectFillFlows(doc).missingIdOwners.map((ownerId) => {
+    const target = formatNodeRef(doc.id, ownerId);
+    return {
+      kind: "missing_id",
+      target,
+      message: `a slot fill inside "${target}" has data-flow-target but no id — the flow edge needs an id on the fill element`,
+      suggestion: "add an id to the fill element that carries data-flow-target",
+    };
+  });
 }

@@ -1,4 +1,4 @@
-import { NodeIdAllocator, type Node as InternalNode, type NodeSubtree, type ScreenDocument } from "../model/index.js";
+import { NodeIdAllocator, isGeneratedId, type FlowTriggerEvent, type Node as InternalNode, type NodeSubtree, type ScreenDocument } from "../model/index.js";
 
 /**
  * Converts a live document node (with its screen-local id) into a detached,
@@ -64,6 +64,25 @@ export function collectDescendantIds(doc: ScreenDocument, nodeId: string, out: s
 }
 
 /**
+ * A node's flow edge lives in `doc.flows`, not in its attributes, so folding a
+ * subtree into slot fills would drop it from the HTML and from flows.json
+ * (CHR-778). Fill content keeps its `data-flow-*` as raw attributes instead,
+ * and a fill with an authored id keeps that id, which is what addresses the
+ * edge (`<screen>.<id>`). A generated id is meaningless once the node is gone,
+ * so such a fill stays id-less; callers surface that as a `missing_id` warning.
+ */
+function carryFlowsIntoFills(doc: ScreenDocument, nodeId: string, sub: NodeSubtree): void {
+  const flow = doc.flows.find((f) => f.triggerNodeId === nodeId);
+  if (flow) {
+    sub.attributes = { ...sub.attributes, "data-flow-target": flow.targetId };
+    if (flow.triggerEvent !== "tap") sub.attributes["data-flow-trigger"] = flow.triggerEvent;
+    if (!isGeneratedId(nodeId)) sub.id = nodeId;
+  }
+  const node = doc.nodes[nodeId]!;
+  for (const [i, childId] of node.childIds.entries()) carryFlowsIntoFills(doc, childId, sub.children[i]!);
+}
+
+/**
  * Converts `node` in-place from a plain element into a `component_instance`
  * bound to `componentName`. Its current children are preserved by moving
  * them into `slotOverrides` (positional `slot-0`, `slot-1`, …) and removing
@@ -77,6 +96,7 @@ export function convertToComponentInstance(doc: ScreenDocument, node: InternalNo
   const descendantIds: string[] = [];
   collectDescendantIds(doc, node.id, descendantIds);
   const subtree = nodeToSubtree(doc, node.id);
+  for (const [i, child] of node.childIds.entries()) carryFlowsIntoFills(doc, child, subtree.children[i]!);
 
   node.kind = "component_instance";
   node.refs.component = componentName;
@@ -84,6 +104,8 @@ export function convertToComponentInstance(doc: ScreenDocument, node: InternalNo
   node.childIds = [];
   for (const id of descendantIds) delete doc.nodes[id];
 }
+
+const FLOW_TRIGGERS: readonly FlowTriggerEvent[] = ["tap", "hover", "longpress", "swipe-left", "swipe-right"];
 
 function materializeSubtree(
   doc: ScreenDocument,
@@ -107,7 +129,24 @@ function materializeSubtree(
     return id;
   }
 
-  const id = allocator.allocateElementId(undefined);
+  const id = allocator.allocateElementId(subtree.id);
+  // The fill's flow is a real node flow again: it moves from the raw
+  // attributes into doc.flows (the serializer emits it from there).
+  const attributes = { ...subtree.attributes };
+  const flowTarget = attributes["data-flow-target"];
+  if (flowTarget) {
+    const trigger = attributes["data-flow-trigger"];
+    // parseScreen already listed this fill's edge under its authored id, which is now this node's id.
+    doc.flows = doc.flows.filter((f) => f.triggerNodeId !== id);
+    doc.flows.push({
+      triggerNodeId: id,
+      triggerEvent: (FLOW_TRIGGERS as readonly string[]).includes(trigger ?? "") ? (trigger as FlowTriggerEvent) : "tap",
+      targetKind: flowTarget.includes(".") ? "node" : "screen",
+      targetId: flowTarget,
+    });
+    delete attributes["data-flow-target"];
+    delete attributes["data-flow-trigger"];
+  }
   // A component_instance's content stays embedded in slotOverrides, never
   // flat-mapped via childIds — materializing its (empty) `children` instead
   // would silently drop it, the same bug this subtree machinery had before.
@@ -119,7 +158,7 @@ function materializeSubtree(
     screenId: doc.id,
     kind: subtree.kind,
     tag: subtree.tag,
-    attributes: subtree.attributes,
+    attributes,
     refs: subtree.refs,
     inlineStyles: subtree.inlineStyles,
     slotOverrides: isInstance ? subtree.slotOverrides : undefined,

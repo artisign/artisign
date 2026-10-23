@@ -729,6 +729,8 @@ type MatchSubject = {
   kind: InternalNode["kind"];
   refs: NodeRefs;
   nodeRef: string | undefined;
+  /** What `has_flow` keys by: the node ref, or a fill's `<screen>.<authored-id>` (CHR-778). */
+  flowRef?: string;
   hasTextMatch: (pattern: string) => boolean;
 };
 
@@ -741,8 +743,8 @@ function nodeSubject(node: InternalNode, screen: string, doc: ScreenDocument): M
   };
 }
 
-function fillSubject(sub: NodeSubtree): MatchSubject {
-  return { kind: sub.kind, refs: sub.refs, nodeRef: undefined, hasTextMatch: (pattern) => hasDescendantTextMatchInFill(sub, pattern) };
+function fillSubject(sub: NodeSubtree, flowRef?: string): MatchSubject {
+  return { kind: sub.kind, refs: sub.refs, nodeRef: undefined, flowRef, hasTextMatch: (pattern) => hasDescendantTextMatchInFill(sub, pattern) };
 }
 
 function matchesPredicate(predicate: Predicate, subject: MatchSubject, commentsByNode: Map<string, boolean>, flowFroms: Set<string>): boolean {
@@ -764,7 +766,8 @@ function matchesPredicate(predicate: Predicate, subject: MatchSubject, commentsB
       // text node) would always return empty.
       return subject.kind !== "text" && subject.hasTextMatch(predicate.pattern);
     case "has_flow":
-      return subject.nodeRef !== undefined && flowFroms.has(subject.nodeRef);
+      const flowRef = subject.flowRef ?? subject.nodeRef;
+      return flowRef !== undefined && flowFroms.has(flowRef);
     default:
       return false;
   }
@@ -853,7 +856,7 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
       // instead; patch_html/inspect_node additionally accept the fill's own
       // authored id (CHR-746), which is why it is reported.
       for (const fillNode of collectFillDescendants(node)) {
-        const fill = fillSubject(fillNode);
+        const fill = fillSubject(fillNode, source.kind === "screen" && fillNode.id !== undefined ? formatNodeRef(source.address, fillNode.id) : undefined);
         if (input.where.every((p) => matchesPredicate(p, fill, commentedNodes, flowFroms))) {
           matches.push({
             node: null,

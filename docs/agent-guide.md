@@ -296,6 +296,13 @@ Click routes are data, not annotations. Wire navigation with
 edit edges later with `set_flow`. A screen nobody can reach, or a CTA that goes
 nowhere, is an unfinished design.
 
+`data-flow-target` also works on content you pass into a component's slot
+(a back button filled into `$nav-bar`): the edge is keyed by that element's
+own `id` (`from: "<screen>.<id>"`), so give every flow-carrying fill an `id`.
+A fill with `data-flow-target` but no `id` records no edge and returns a
+`missing_id` warning naming the owning instance. `set_flow` does not address
+fills; edit the attribute with `patch_html` (target the fill's id).
+
 To present work on the Board, `set_board_state` filters and pins screens and
 takes `expanded` to open variant clusters (name the main screen or any of its
 variants).

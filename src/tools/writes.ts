@@ -17,7 +17,7 @@ import { loadScreen } from "./context.js";
 import { loadAllDocuments } from "./definitions.js";
 import { buildStyleOccurrenceIndex } from "./style-index.js";
 import { parseNodeRef, formatNodeRef, requireScreenNodeRef } from "./node-ref.js";
-import { syncScreenFlows } from "./flows.js";
+import { syncScreenFlows, fillFlowWarnings } from "./flows.js";
 import { diffScreenDocuments } from "./diff.js";
 import { findBySelector, findFillById, findFillsBySelector, patchFill, spliceFragment, removeNode } from "./patch.js";
 import { convertToComponentInstance, revertComponentInstanceToElement } from "./node-convert.js";
@@ -255,7 +255,7 @@ export async function writeHtml(store: Store, input: WriteHtmlInput): Promise<Re
     repeatedPatternOmittedCount = allRepeatedPatternWarnings.length - repeatedPatternWarnings.length;
   }
 
-  const warnings = [...refWarnings, ...driftWarnings, ...repeatedPatternWarnings];
+  const warnings = [...refWarnings, ...fillFlowWarnings(doc), ...driftWarnings, ...repeatedPatternWarnings];
 
   const base = {
     screen: input.screen,
@@ -431,7 +431,7 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
     path: `screens/${screen}.html`,
     ...commitFields(commitResult),
     affected_nodes: [...affected],
-    warnings: [...refWarnings, ...scopedDriftWarnings, ...scopedRepeatedPatternWarnings],
+    warnings: [...refWarnings, ...fillFlowWarnings(doc), ...scopedDriftWarnings, ...scopedRepeatedPatternWarnings],
     preexisting_drift_count: preexistingDriftCount,
     // Only when the index was actually built: absent means "not measured",
     // `0` means "measured, nothing repeated". Reporting a flat `0` on the
@@ -527,6 +527,7 @@ export async function updateRefs(store: Store, input: UpdateRefsInput): Promise<
   await syncScreenFlows(store, doc);
   const commitResult = await store.commit(`update_refs: ${input.node}`);
 
+  warnings.push(...fillFlowWarnings(doc));
   return { node: input.node, ...commitFields(commitResult), applied_refs: applied, warnings };
 }
 

@@ -1,4 +1,5 @@
 import { parseFragment } from "parse5";
+import { collectFillFlows } from "./fill-flows.js";
 import type { DefaultTreeAdapterTypes } from "parse5";
 import { findSuspiciousAttr } from "./augmentation-attrs.js";
 import { NodeIdAllocator } from "./node-id.js";
@@ -808,6 +809,10 @@ export function parseScreen(
     flows,
     nodes,
   };
+
+  const fillFlows = collectFillFlows(doc);
+  flows.push(...fillFlows.flows);
+  errors.push(...fillFlows.errors);
 
   return { doc, errors };
 }

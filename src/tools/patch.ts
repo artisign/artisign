@@ -240,12 +240,13 @@ export function spliceFragment(
   return { ids: newTopLevelIds, refWarnings };
 }
 
-/** Removes a node and its entire descendant subtree from `doc`, unlinking it from its parent's childIds. */
+/** Removes a node and its entire descendant subtree from `doc`, dropping its flows and unlinking it from its parent's childIds. */
 export function removeNode(doc: ScreenDocument, nodeId: string): void {
   const node = doc.nodes[nodeId];
   if (!node) return;
 
   for (const childId of node.childIds) removeNode(doc, childId);
+  doc.flows = doc.flows.filter((flow) => flow.triggerNodeId !== nodeId);
 
   if (node.parentId) {
     const parent = doc.nodes[node.parentId];

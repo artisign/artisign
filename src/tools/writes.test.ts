@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { writeHtml, patchHtml, updateRefs, setTokens, setFlow } from "./writes.js";
+import { promoteToSystem } from "./lifecycle.js";
 import { buildRenderContext } from "./render-context.js";
 import { parseScreen, renderScreen, loadRegistry } from "../model/index.js";
 import { FsStore } from "../store/index.js";
@@ -457,6 +458,97 @@ describe("patch_html", () => {
     expect(res.affected_nodes).toEqual(["home.n2"]);
     expect(await fx.store.readScreen("home")).toContain("New");
     expect(await fx.store.readScreen("home")).not.toContain("Old");
+  });
+
+  describe("flows.json sync", () => {
+    const edge = (node: string, to: string) => ({ from: `home.${node}`, event: "tap", to, to_kind: "screen" as const });
+    const withFlows = `<section id="n1"><a id="n2" data-flow-target="checkout">A</a><a id="n3" data-flow-target="cart">B</a></section>`;
+
+    beforeEach(async () => {
+      await writeHtml(fx.store, { screen: "home", mode: "replace", html_aug: withFlows });
+    });
+
+    it("keeps exactly one edge, in document order, when a flow node is replaced with the same target", async () => {
+      expect(await fx.store.readFlows()).toHaveLength(2);
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.n2" },
+        operation: "replace",
+        html_aug: `<a id="n2" data-flow-target="checkout">A2</a>`,
+      });
+      expect(await fx.store.readFlows()).toEqual([edge("n2", "checkout"), edge("n3", "cart")]);
+    });
+
+    it("writes the same flows.json as write_html for the same resulting HTML", async () => {
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.n2" },
+        operation: "replace",
+        html_aug: `<a id="n2" data-flow-target="checkout">A2</a>`,
+      });
+      const patched = await fx.store.readFlows();
+      await writeHtml(fx.store, { screen: "home", mode: "replace", html_aug: await fx.store.readScreen("home") });
+      expect(await fx.store.readFlows()).toEqual(patched);
+    });
+
+    it("follows a changed data-flow-target on replace", async () => {
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.n2" },
+        operation: "replace",
+        html_aug: `<a id="n2" data-flow-target="payment">A</a>`,
+      });
+      expect(await fx.store.readFlows()).toEqual([edge("n2", "payment"), edge("n3", "cart")]);
+    });
+
+    it("removes the edge when the replacement drops data-flow-target", async () => {
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.n2" },
+        operation: "replace",
+        html_aug: `<a id="n2">A</a>`,
+      });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+    });
+
+    it("removes the edge when the flow node is deleted", async () => {
+      await patchHtml(fx.store, { target: { kind: "node", node: "home.n2" }, operation: "delete" });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+    });
+
+    it("removes nested edges when an ancestor of a flow trigger is deleted or replaced", async () => {
+      await writeHtml(fx.store, {
+        screen: "home",
+        mode: "replace",
+        html_aug: `<section id="n1"><div id="box"><a id="n2" data-flow-target="checkout">A</a></div><a id="n3" data-flow-target="cart">B</a></section>`,
+      });
+      await patchHtml(fx.store, {
+        target: { kind: "node", node: "home.box" },
+        operation: "replace",
+        html_aug: `<div id="box"><p id="p">plain</p></div>`,
+      });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+
+      await patchHtml(fx.store, { target: { kind: "node", node: "home.n3" }, operation: "delete" });
+      expect(await fx.store.readFlows()).toEqual([]);
+    });
+
+    it("leaves no orphan edge when update_refs turns an element holding a flow trigger into a component instance", async () => {
+      await fx.store.writeComponent("card", `<div id="c"></div>`);
+      await writeHtml(fx.store, {
+        screen: "home",
+        mode: "replace",
+        html_aug: `<section id="n1"><div id="box"><a id="n2" data-flow-target="checkout">A</a></div><a id="n3" data-flow-target="cart">B</a></section>`,
+      });
+      await updateRefs(fx.store, { node: "home.box", refs: { component_ref: "card" } });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+    });
+
+    it("leaves no orphan edge when promote_to_system turns an element holding a flow trigger into a component", async () => {
+      await writeHtml(fx.store, {
+        screen: "home",
+        mode: "replace",
+        html_aug: `<section id="n1"><div id="box"><a id="n2" data-flow-target="checkout">A</a></div><a id="n3" data-flow-target="cart">B</a></section>`,
+      });
+      await promoteToSystem(fx.store, { node: "home.box", kind: "component", name: "card" });
+      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+    });
   });
 
   it("inserts a sibling after a node", async () => {

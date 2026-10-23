@@ -277,7 +277,8 @@ These tools are built for small contexts — use the levers:
   definition) in one call — never read all screens to search. A match with
   `source: "component"|"pattern"` carries `id_stability: "explicit"|"derived"`
   in place of a screen match's (always-stable) node ref: definition node refs
-  are addressable — `get_node`, `update_refs`, and `patch_html` all accept
+  are addressable — `get_node`, `update_refs`, `patch_html`, `inspect_node`
+  and `get_screenshot` all accept
   `component:<name>#<variant>.<node-id>` / `pattern:<name>.<node-id>` — but
   only reliably stable across writes when the node carries an explicit `id`.
   A `"derived"` id is allocator-generated and only guaranteed to resolve to

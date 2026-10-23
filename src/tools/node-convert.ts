@@ -1,4 +1,5 @@
-import { NodeIdAllocator, type Node as InternalNode, type NodeSubtree, type ScreenDocument } from "../model/index.js";
+import { NodeIdAllocator, flowFromAttributes, flowToAttributes, type Flow, type Node as InternalNode, type NodeSubtree, type ScreenDocument } from "../model/index.js";
+import { takenIds } from "./patch.js";
 
 /**
  * Converts a live document node (with its screen-local id) into a detached,
@@ -64,6 +65,23 @@ export function collectDescendantIds(doc: ScreenDocument, nodeId: string, out: s
 }
 
 /**
+ * A node's flow edge lives in `doc.flows`, not in its attributes, so folding a
+ * subtree into slot fills would drop it from the HTML and from flows.json
+ * (CHR-778). Fill content keeps its `data-flow-*` as raw attributes instead,
+ * and the fill keeps the node's id (generated or authored — ids are serialized
+ * and stay stable), which is what addresses the edge (`<screen>.<id>`).
+ */
+function carryFlowsIntoFills(doc: ScreenDocument, flows: Map<string, Flow>, nodeId: string, sub: NodeSubtree): void {
+  const flow = flows.get(nodeId);
+  if (flow) {
+    sub.attributes = { ...sub.attributes, ...flowToAttributes(flow) };
+    sub.id = nodeId;
+  }
+  const node = doc.nodes[nodeId]!;
+  for (const [i, childId] of node.childIds.entries()) carryFlowsIntoFills(doc, flows, childId, sub.children[i]!);
+}
+
+/**
  * Converts `node` in-place from a plain element into a `component_instance`
  * bound to `componentName`. Its current children are preserved by moving
  * them into `slotOverrides` (positional `slot-0`, `slot-1`, …) and removing
@@ -77,12 +95,17 @@ export function convertToComponentInstance(doc: ScreenDocument, node: InternalNo
   const descendantIds: string[] = [];
   collectDescendantIds(doc, node.id, descendantIds);
   const subtree = nodeToSubtree(doc, node.id);
+  const flowsByTrigger = new Map(doc.flows.map((f) => [f.triggerNodeId, f]));
+  for (const [i, child] of node.childIds.entries()) carryFlowsIntoFills(doc, flowsByTrigger, child, subtree.children[i]!);
 
   node.kind = "component_instance";
   node.refs.component = componentName;
   node.slotOverrides = Object.fromEntries(subtree.children.map((child, i) => [`slot-${i}`, child]));
   node.childIds = [];
   for (const id of descendantIds) delete doc.nodes[id];
+  // Their flows now live on the fills' attributes (carried above), not in doc.flows.
+  const gone = new Set(descendantIds);
+  doc.flows = doc.flows.filter((f) => !gone.has(f.triggerNodeId));
 }
 
 function materializeSubtree(
@@ -107,7 +130,16 @@ function materializeSubtree(
     return id;
   }
 
-  const id = allocator.allocateElementId(undefined);
+  // Keep the fill's own id unless a live node already uses it (only via hand edits).
+  const id = allocator.allocateElementId(subtree.id !== undefined && !doc.nodes[subtree.id] ? subtree.id : undefined);
+  // The fill's flow is a real node flow again: it moves from the raw
+  // attributes into doc.flows (the serializer emits it from there).
+  const attributes = { ...subtree.attributes };
+  const { flow } = flowFromAttributes(id, attributes);
+  if (flow) doc.flows.push(flow);
+  // Always stripped: a trigger without a target must not stay behind as a reserved attribute.
+  delete attributes["data-flow-target"];
+  delete attributes["data-flow-trigger"];
   // A component_instance's content stays embedded in slotOverrides, never
   // flat-mapped via childIds — materializing its (empty) `children` instead
   // would silently drop it, the same bug this subtree machinery had before.
@@ -119,7 +151,7 @@ function materializeSubtree(
     screenId: doc.id,
     kind: subtree.kind,
     tag: subtree.tag,
-    attributes: subtree.attributes,
+    attributes,
     refs: subtree.refs,
     inlineStyles: subtree.inlineStyles,
     slotOverrides: isInstance ? subtree.slotOverrides : undefined,
@@ -131,14 +163,15 @@ function materializeSubtree(
 /**
  * Reverses `convertToComponentInstance`: turns a `component_instance` back
  * into a plain element, re-materializing its `slotOverrides` content as real
- * (freshly-id'd) entries in the flat node map. The original screen-local ids
- * from before promotion aren't recoverable — they were discarded when the
- * content moved into `slotOverrides` — so this mints new ones, the same way
- * `patch_html`'s fragment splicing does for newly-inserted content.
+ * entries in the flat node map. A fill that carries its own id (every fill
+ * with a flow does, see `carryFlowsIntoFills`) gets that id back; the rest were
+ * never recorded, so new ones are minted, the same way `patch_html`'s fragment
+ * splicing does for newly-inserted content.
  */
 export function revertComponentInstanceToElement(doc: ScreenDocument, node: InternalNode): void {
   const allocator = new NodeIdAllocator();
-  allocator.seedUsed(Object.keys(doc.nodes));
+  // Live ids plus fill ids (folded fills keep theirs), so a minted id never repeats one.
+  allocator.seedUsed(takenIds(doc));
 
   const slotOverrides = node.slotOverrides ?? {};
   const childIds = Object.values(slotOverrides).map((subtree) => materializeSubtree(doc, subtree, node.id, allocator));

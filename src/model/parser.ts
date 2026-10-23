@@ -1,4 +1,5 @@
 import { parseFragment } from "parse5";
+import { ALLOWED_FLOW_TRIGGERS, collectFillFlows, fillTriggerIssues, guessFlowTargetKind } from "./fill-flows.js";
 import type { DefaultTreeAdapterTypes } from "parse5";
 import { findSuspiciousAttr } from "./augmentation-attrs.js";
 import { NodeIdAllocator } from "./node-id.js";
@@ -32,7 +33,6 @@ const CALL_RE = /^([a-zA-Z_][a-zA-Z0-9_]*)\((.*)\)$/;
 // known modifier call, or a bare $path — anywhere in the string, not
 // anchored to the whole value like PATH_RE/CALL_RE above.
 const MIXED_TOKEN_RE = /(alpha|oklab|mix)\([^)]*\)|\$[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*/g;
-const ALLOWED_FLOW_TRIGGERS: readonly FlowTriggerEvent[] = ["tap", "hover", "longpress", "swipe-left", "swipe-right"];
 
 const RESERVED_ATTRS = new Set([
   "id",
@@ -275,10 +275,6 @@ export function classifyElement(
   if (resolution === "token-class") return { kind: "token_class", classRef: refName };
   if (resolution === "ambiguous") return { kind: "ambiguous_class", classRef: refName };
   return { kind: "unresolved_class", classRef: refName };
-}
-
-function guessFlowTargetKind(flowTarget: string): "screen" | "node" {
-  return flowTarget.includes(".") ? "node" : "screen";
 }
 
 /** Checks style/SVG token refs (dot-paths, including modifier-fn args) against the DS registry. */
@@ -722,6 +718,7 @@ export function parseSubtreeFragment(
   const subtrees = fragment.childNodes
     .filter((n) => !(n.nodeName === "#text" && (n as DefaultTreeAdapterTypes.TextNode).value.trim() === ""))
     .map((n) => buildSubtree(n, false, registry, errors));
+  errors.push(...fillTriggerIssues(subtrees));
   return { subtrees, errors, explicitIds: [...idCounts.keys()] };
 }
 
@@ -813,6 +810,8 @@ export function parseScreen(
     flows,
     nodes,
   };
+
+  errors.push(...collectFillFlows(doc).errors);
 
   return { doc, errors };
 }

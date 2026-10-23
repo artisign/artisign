@@ -529,7 +529,7 @@ describe("patch_html", () => {
       expect(await fx.store.readFlows()).toEqual([]);
     });
 
-    it("leaves no orphan edge when update_refs turns an element holding a flow trigger into a component instance", async () => {
+    it("keeps the edge as a fill edge when update_refs turns an element holding a flow trigger into a component instance", async () => {
       await fx.store.writeComponent("card", `<div id="c"></div>`);
       await writeHtml(fx.store, {
         screen: "home",
@@ -537,17 +537,19 @@ describe("patch_html", () => {
         html_aug: `<section id="n1"><div id="box"><a id="n2" data-flow-target="checkout">A</a></div><a id="n3" data-flow-target="cart">B</a></section>`,
       });
       await updateRefs(fx.store, { node: "home.box", refs: { component_ref: "card" } });
-      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+      expect(await fx.store.readFlows()).toEqual([edge("n2", "checkout"), edge("n3", "cart")]);
+      expect(await fx.store.readScreen("home")).toContain('data-flow-target="checkout"');
     });
 
-    it("leaves no orphan edge when promote_to_system turns an element holding a flow trigger into a component", async () => {
+    it("keeps the edge as a fill edge when promote_to_system turns an element holding a flow trigger into a component", async () => {
       await writeHtml(fx.store, {
         screen: "home",
         mode: "replace",
         html_aug: `<section id="n1"><div id="box"><a id="n2" data-flow-target="checkout">A</a></div><a id="n3" data-flow-target="cart">B</a></section>`,
       });
       await promoteToSystem(fx.store, { node: "home.box", kind: "component", name: "card" });
-      expect(await fx.store.readFlows()).toEqual([edge("n3", "cart")]);
+      expect(await fx.store.readFlows()).toEqual([edge("n2", "checkout"), edge("n3", "cart")]);
+      expect(await fx.store.readScreen("home")).toContain('data-flow-target="checkout"');
     });
   });
 

@@ -17,7 +17,7 @@ import {
 import { loadScreen } from "./context.js";
 import { loadAllDocuments } from "./definitions.js";
 import { parseNodeRef, formatNodeRef, requireScreenNodeRef } from "./node-ref.js";
-import { syncScreenFlows, belongsToScreen } from "./flows.js";
+import { syncScreenFlows, belongsToScreen, fillFlowWarnings } from "./flows.js";
 import { readVariantLinks } from "./variants.js";
 import { nodeToSubtree, convertToComponentInstance, subtreesStructurallyEqual } from "./node-convert.js";
 import { deleteMockupEntity } from "./mockups.js";
@@ -511,6 +511,8 @@ async function promoteComponentOrPattern(
     for (const [screenName, touchedDoc] of touchedDocs) {
       await store.writeScreen(screenName, serializeScreen(touchedDoc));
       await syncScreenFlows(store, touchedDoc);
+      const converted = new Set(rewrittenNodes.filter((r) => r.startsWith(`${screenName}.`)).map((r) => r.slice(screenName.length + 1)));
+      definitionWarnings.push(...fillFlowWarnings(touchedDoc, converted));
     }
   }
 

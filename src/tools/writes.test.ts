@@ -185,13 +185,13 @@ describe("write_html", () => {
   });
 
   it("warns repeated_pattern for an ad-hoc styled node whose style already occurs on another screen — full-doc scope (CHR-635)", async () => {
-    await fx.store.writeScreen("checkout", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div>`);
+    await fx.store.writeScreen("checkout", `<div id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div></div>`);
 
     const res = await writeHtml(fx.store, {
       screen: "home",
       mode: "create",
       title: "Home",
-      html_aug: `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div>`,
+      html_aug: `<div id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div></div>`,
     });
 
     expect(res.errors).toBeUndefined();
@@ -205,15 +205,37 @@ describe("write_html", () => {
     ]);
   });
 
-  it("never warns repeated_pattern for a pure layout wrapper, even one repeated everywhere", async () => {
-    await fx.store.writeScreen("checkout", `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`);
-    await fx.store.writeScreen("cart", `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`);
+  it("never warns repeated_pattern on the screen root, and a non-root node does not match another screen's root (CHR-774)", async () => {
+    const frame = "width: 1440px; height: 900px; background: #fff; color: #111";
+    await fx.store.writeScreen("checkout", `<div id="root" style="${frame}"></div>`);
 
     const res = await writeHtml(fx.store, {
       screen: "home",
       mode: "create",
       title: "Home",
-      html_aug: `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`,
+      html_aug: `<div id="root" style="${frame}"><div id="n1" style="${frame}"></div></div>`,
+    });
+    expect((res.warnings as unknown[]).filter((w) => (w as { kind: string }).kind === "repeated_pattern")).toEqual([]);
+
+    const patched = await patchHtml(fx.store, {
+      target: { kind: "node", node: "home.root" },
+      operation: "set_attr",
+      attr: { name: "data-testid", value: "r" },
+    });
+    expect((patched.warnings as unknown[]).filter((w) => (w as { kind: string }).kind === "repeated_pattern")).toEqual([]);
+    expect(patched.preexisting_repeated_pattern_count ?? 0).toBe(0);
+  });
+
+  it("never warns repeated_pattern for a pure layout wrapper, even one repeated everywhere", async () => {
+    const wrapper = `<div id="n1" style="display: flex; gap: 8px; padding: 16px"></div>`;
+    await fx.store.writeScreen("checkout", `<div id="root">${wrapper}</div>`);
+    await fx.store.writeScreen("cart", `<div id="root">${wrapper}</div>`);
+
+    const res = await writeHtml(fx.store, {
+      screen: "home",
+      mode: "create",
+      title: "Home",
+      html_aug: `<div id="root">${wrapper}</div>`,
     });
 
     expect((res.warnings as unknown[]).filter((w) => (w as { kind: string }).kind === "repeated_pattern")).toEqual([]);
@@ -221,13 +243,13 @@ describe("write_html", () => {
 
   it("names a component whose default-variant root matches the repeated style", async () => {
     await fx.store.writeComponent("modal-scrim", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div>`);
-    await fx.store.writeScreen("checkout", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div>`);
+    await fx.store.writeScreen("checkout", `<div id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div></div>`);
 
     const res = await writeHtml(fx.store, {
       screen: "home",
       mode: "create",
       title: "Home",
-      html_aug: `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div>`,
+      html_aug: `<div id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; inset: 0"></div></div>`,
     });
 
     const repeated = (res.warnings as Array<{ kind: string; suggestion?: string }>).find((w) => w.kind === "repeated_pattern");
@@ -611,8 +633,8 @@ describe("patch_html", () => {
   });
 
   it("scopes repeated_pattern warnings to affected_nodes and counts the rest (CHR-635)", async () => {
-    await fx.store.writeScreen("checkout", `<div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div>`);
-    await fx.store.writeScreen("cart", `<div id="n1" style="border: 1px solid #000; color: #111"></div>`);
+    await fx.store.writeScreen("checkout", `<div id="root"><div id="n1" style="background: rgba(0,0,0,.4); color: #fff; position: fixed"></div></div>`);
+    await fx.store.writeScreen("cart", `<div id="root"><div id="n1" style="border: 1px solid #000; color: #111"></div></div>`);
     // n1 and n2 carry two DISTINCT repeated patterns — this patch only
     // touches n1, so n2's own (different) pattern is what
     // preexisting_repeated_pattern_count reports; grouping n1 with n2 would

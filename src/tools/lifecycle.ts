@@ -540,6 +540,15 @@ export async function promoteToSystem(store: Store, input: PromoteToSystemInput)
 
 export type DeleteEntityInput = { kind: "screen" | "component" | "pattern" | "mockup"; name: string; variant?: string; cascade?: boolean };
 
+/** Drops a deleted component's/pattern's `set_meta` usage text so a later same-name entity doesn't inherit it. Writes nothing when there is none. */
+async function dropUsageMeta(store: Store, kind: "component" | "pattern", name: string): Promise<void> {
+  const meta = await store.readDesignSystemMeta();
+  const usage = kind === "component" ? meta.component_usage : meta.pattern_usage;
+  if (!Object.hasOwn(usage, name)) return;
+  delete usage[name];
+  await store.writeDesignSystemMeta(meta);
+}
+
 async function deleteComponent(store: Store, name: string): Promise<Record<string, unknown>> {
   const path = `design-system/components/${name}.html`;
   if (!(await store.listComponents()).includes(name)) {
@@ -576,6 +585,8 @@ async function deleteComponent(store: Store, name: string): Promise<Record<strin
     );
   }
 
+  // Meta first: if its write throws, the file is still there and a retry works.
+  await dropUsageMeta(store, "component", name);
   await store.deleteComponent(name);
   const commitResult = await store.commit(`delete_entity: component:${name}`);
   return { kind: "component", name, path, ...commitFields(commitResult), warnings: [] };
@@ -590,6 +601,8 @@ async function deletePattern(store: Store, name: string): Promise<Record<string,
   // `pattern` field, so nothing in the canonical model can ever hold a
   // pattern ref — a pattern's inclusion into a screen or another pattern is
   // opaque, unmarked HTML, not a tracked reference.
+  // Meta first: if its write throws, the file is still there and a retry works.
+  await dropUsageMeta(store, "pattern", name);
   await store.deletePattern(name);
   const commitResult = await store.commit(`delete_entity: pattern:${name}`);
   return { kind: "pattern", name, path, ...commitFields(commitResult), warnings: [] };

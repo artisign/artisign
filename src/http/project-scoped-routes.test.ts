@@ -357,18 +357,13 @@ describe("project-scoped /mcp and UI routes", () => {
     expect(await res.text()).toContain("Artisign");
   });
 
-  it("a client connected to /events receives project-switched when another client activates a different project", async () => {
+  it("a client connected to /events receives project-switched when the daemon's default project changes", async () => {
     daemon = await startDaemon({ port: 0, projects: [dirA, dirB] });
 
     const sseRes = await fetch(`http://127.0.0.1:${daemon.port}/events`);
     const waiter = waitForSseEvent(sseRes, (evt) => evt.type === "project-switched", 2000);
 
-    const activateRes = await fetch(`http://127.0.0.1:${daemon.port}/api/projects/activate`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ root: dirB }),
-    });
-    expect(activateRes.status).toBe(200);
+    daemon.registry.activeProject = dirB;
 
     const evt = await waiter;
     expect(evt).toEqual({ type: "project-switched", root: dirB });
@@ -422,16 +417,11 @@ describe("project-scoped /mcp and UI routes", () => {
     controller.abort();
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // A lifecycle broadcast (activate) and a project-scoped broadcast
+    // A lifecycle broadcast (default project change) and a project-scoped broadcast
     // (writing a screen) must not throw trying to write to the now-closed
     // response — proven by the daemon staying healthy and able to answer
     // further requests, and by stop() not hanging on the dead connection.
-    const activateRes = await fetch(`http://127.0.0.1:${daemon.port}/api/projects/activate`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ root: dirB }),
-    });
-    expect(activateRes.status).toBe(200);
+    daemon.registry.activeProject = dirB;
 
     await new FsStore(dirB).writeScreen("dashboard", `<div id="n1"></div>`);
     await new Promise((resolve) => setTimeout(resolve, 200));

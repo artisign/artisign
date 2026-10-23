@@ -230,8 +230,8 @@ const LAYOUT_ONLY_PROPERTIES: ReadonlySet<string> = new Set([
   "inset-inline-end",
 ]);
 
-/** A live `Node` or a slot-fill `NodeSubtree` — both carry the three fields every predicate here looks at. */
-type StyleableNode = { kind: NodeKind; refs: NodeRefs; inlineStyles: Record<string, string> };
+/** A live `Node` or a slot-fill `NodeSubtree` — both carry the three fields every predicate here looks at. `parentId` exists on live nodes only (`null` = the screen root). */
+type StyleableNode = { kind: NodeKind; refs: NodeRefs; inlineStyles: Record<string, string>; parentId?: string | null };
 
 /**
  * CHR-637's `component_coverage`/`token_coverage` denominator: an element
@@ -322,6 +322,9 @@ function styleDeclarations(node: StyleableNode): Record<string, string> {
  * drift out of sync on what counts as a candidate.
  */
 export function isRepeatedPatternCandidate(node: StyleableNode): boolean {
+  // The screen root carries the frame size itself (`resolveViewport` reads only
+  // the root), so it can't be promoted — nothing an agent could act on.
+  if (node.parentId === null) return false;
   if (!(node.kind === "element" || node.kind === "svg" || node.kind === "svg_path")) return false;
   if (node.refs.component !== undefined) return false;
   const decls = styleDeclarations(node);
@@ -422,7 +425,10 @@ function nodesInDocumentOrder(doc: ScreenDocument): Node[] {
  * its own (CHR-584) — nothing here invents one. Fill content elsewhere in
  * the project still counts toward `index.byScreen` (built by
  * `buildStyleOccurrenceIndex`, which does walk fills) as an *occurrence*,
- * just never as something this function warns *on*.
+ * just never as something this function warns *on*. The screen root is
+ * never warned on either (`isRepeatedPatternCandidate` excludes it: it
+ * carries the frame size and cannot be promoted), nor counted as an
+ * occurrence in the index.
  */
 export function computeRepeatedPatternWarnings(
   doc: ScreenDocument,

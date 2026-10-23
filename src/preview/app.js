@@ -15,7 +15,6 @@ import {
   fetchCompare,
   postComment,
   fetchProjects,
-  activateProject,
   openProject,
   initProject,
   fetchBoardState,
@@ -613,17 +612,18 @@ const projectUI = createProjectUI(
     emptyBtnInitEl: emptyBtnInit,
   },
   {
+    // Tab-local (CHR-775): the daemon's activeProject is only the default for a fresh tab.
     onSwitch: async (root) => {
-      const result = await activateProject(root);
-      if (result.ok) await applyProjectsResult(result.projects);
-      else console.error(result.message);
+      projectsRequestId++; // supersede any in-flight sync: it was computed before this pick
+      renderProjects(projectsState, root); // before the load, so the picker never lags behind (or lies after a failed boot)
+      await switchToProject(root);
     },
     onOpenRecent: async (dir) => {
       const result = await openProject(dir);
       if (result.ok) await applyProjectsResult(result.projects);
       else {
         console.error(result.message);
-        await refreshProjectsState(); // the recent path may no longer exist — drop it from the list
+        await syncProjects(); // the recent path may no longer exist — drop it from the list
       }
     },
     onOpenDialog: () => projectDialogs.showOpenDialog(),
@@ -647,18 +647,38 @@ const projectDialogs = createProjectDialogs(
   },
 );
 
-/** Applies a fresh `/api/projects` response: updates the picker/empty-state and, if the active project changed, switches to it. */
-async function applyProjectsResult(state) {
-  projectUI.render(state);
+let projectsState = { active: null, open: [], recent: [] }; // last /api/projects response; its `active` is the daemon's default, not this tab's
+
+/** Renders the picker/empty-state for this tab: the highlighted project is the tab's own, never the daemon-global default. */
+function renderProjects(state, active = activeProjectRoot) {
+  projectsState = state;
+  projectUI.render({ ...state, active });
   syncGuidePrompt();
-  if (state.active !== activeProjectRoot) await switchToProject(state.active);
 }
 
-async function refreshProjectsState() {
+/** Applies the `/api/projects` response of an open/init this tab triggered: the opening tab switches to the new project. */
+async function applyProjectsResult(state) {
+  projectsRequestId++; // supersede any in-flight sync: it predates this open/init
+  renderProjects(state, state.active);
+  await switchToProject(state.active);
+}
+
+let projectsRequestId = 0; // a later syncProjects call supersedes an earlier one still in flight
+
+/**
+ * Re-reads `/api/projects` and renders the picker. The tab only moves when it has no project or its own
+ * project is no longer open (closed, or the daemon restarted without it) — then to the daemon's default.
+ * @returns {Promise<boolean>} true when the tab switched project; false when it stayed or the response was superseded
+ */
+async function syncProjects() {
+  const requestId = ++projectsRequestId;
   const state = await fetchProjects();
-  projectUI.render(state);
-  syncGuidePrompt();
-  return state;
+  if (requestId !== projectsRequestId) return false; // a newer response is already (or about to be) applied
+  const stranded = activeProjectRoot === null || !state.open.some((p) => p.root === activeProjectRoot);
+  renderProjects(state, stranded ? state.active : activeProjectRoot);
+  if (!stranded || state.active === activeProjectRoot) return false;
+  await switchToProject(state.active);
+  return true;
 }
 
 /** Resets every module-level piece of state tied to the previously active project, ready for a fresh boot. */
@@ -985,10 +1005,13 @@ async function handleChangeEvent(event) {
   }
 }
 
-/** @param {{ type: "project-switched" | "project-opened" | "project-closed", root: string }} event */
-async function handleLifecycleEvent(event) {
-  const state = await refreshProjectsState();
-  if (event.type === "project-switched" || event.type === "project-closed") await switchToProject(state.active);
+/** Every lifecycle event (project-switched/-opened/-closed) only refreshes the picker list; the tab itself moves only when its project is gone (CHR-775). */
+async function handleLifecycleEvent() {
+  try {
+    await syncProjects();
+  } catch (err) {
+    console.error("failed to refresh projects:", err instanceof Error ? err.message : err);
+  }
 }
 
 /**
@@ -2168,8 +2191,9 @@ for (const tab of viewTabs) {
  * the single /events connection everything else reacts to.
  */
 async function boot() {
-  const state = await refreshProjectsState();
+  const state = await fetchProjects();
   activeProjectRoot = state.active;
+  renderProjects(state);
   reconnectSse(activeProjectRoot ?? undefined);
   if (activeProjectRoot) {
     await bootScreens();

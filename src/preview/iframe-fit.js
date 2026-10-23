@@ -9,16 +9,15 @@
  * size once it loads. Callers set `srcdoc` (directly, or via an async
  * fetch) after creating it.
  *
- * Width settles synchronously on `load`; height only one animation frame
- * later (see the comment below) — a caller that needs to react once the
- * iframe's FINAL size (both dimensions) is known must use `onFitted`
- * rather than its own `load` listener, which would read a stale
- * placeholder height. `mockup-zoom.js`'s `applyMockupZoom` is exactly that
- * case: reading `scrollHeight` from a `load` listener silently measured
- * every column at its CSS-default height, not its rendered content's.
+ * Width and height both settle synchronously on `load` (the height read
+ * flushes layout, so it follows the new width); a second pass one animation
+ * frame later catches content that grows after load. A caller that needs to
+ * react once the iframe's size is known must use `onFitted` rather than its
+ * own `load` listener, which would read a stale placeholder height.
+ * `mockup-zoom.js`'s `applyMockupZoom` is exactly that case.
  *
- * @param {() => void} [onFitted] called once, after both width and height
- *   have been set to the content's natural size.
+ * @param {() => void} [onFitted] called after the height was set to the
+ *   content's natural size, and again whenever a later pass changes it.
  * @returns {HTMLIFrameElement}
  */
 export function createFittingIframe(onFitted) {
@@ -35,12 +34,22 @@ export function createFittingIframe(onFitted) {
     const root = iframe.contentDocument?.documentElement;
     if (!root) return;
     iframe.style.width = `${Math.ceil(root.scrollWidth)}px`;
-    // Height only after the new width has been laid out — widening the frame
-    // re-wraps text, so a height measured in the same tick clips the last line.
-    requestAnimationFrame(() => {
-      iframe.style.height = `${Math.ceil(root.scrollHeight)}px`;
-      onFitted?.();
-    });
+    // Height right away: reading scrollHeight flushes the iframe's layout, so it already reflects the new width (widening re-wraps text). Not deferred to a frame — requestAnimationFrame never fires in a hidden or throttled window, which left the frame at its 200px default for good.
+    fitHeight();
+    // One more pass a frame later: images, web fonts and late style recalcs can still grow the document after load.
+    requestAnimationFrame(fitHeight);
   });
+
+  let fittedHeight = null;
+  function fitHeight() {
+    const root = iframe.contentDocument?.documentElement;
+    if (!root) return;
+    const height = Math.ceil(root.scrollHeight);
+    if (height === fittedHeight) return;
+    fittedHeight = height;
+    iframe.style.height = `${height}px`;
+    onFitted?.();
+  }
+
   return iframe;
 }

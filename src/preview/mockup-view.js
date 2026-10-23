@@ -117,6 +117,8 @@ function renderColumn(variant, index, fetchRenderFor, onColumnMeasured) {
       parseFloat(columnStyle.borderLeftWidth) +
       parseFloat(columnStyle.borderRightWidth);
     column.style.width = `${Math.ceil(frameWidth + extra)}px`;
+    // The column just changed width, which re-wraps its header: the fit pass that already ran (it fires first) measured the row at the old width.
+    onColumnMeasured?.();
   });
   column.appendChild(iframe);
 

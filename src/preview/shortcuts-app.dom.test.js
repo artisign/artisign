@@ -36,7 +36,7 @@ function stubDaemon() {
     if (path === "/api/tags") return json({ tags: [] });
     if (path === "/api/flows") return json({ flows: [] });
     if (path === "/api/comments") return json({ comments: [] });
-    if (path === "/api/tools/get_screen") return json({ nodes: [] });
+    if (path === "/api/tools/get_screen") return json({ nodes: [{ id: "root", tag: "div" }, { id: "child", tag: "div" }] });
     if (path === "/api/fs/dirs") return json({ path: "/home/u", parent: "/home", home: "/home/u", entries: [] });
     if (path.startsWith("/api/render/")) return { ok: true, status: 200, text: async () => `<div id="root" style="width:390px;height:844px"></div>` };
     return json({ entries: [], dirs: [] });
@@ -260,10 +260,18 @@ describe("zoom", () => {
     const before = Number($("#board-zoom-range").value);
     key("-");
     expect(Number($("#board-zoom-range").value)).toBeLessThan(before);
+    const fitAll = vi.fn();
+    const hundred = vi.fn();
+    $("#board-fitall-btn").addEventListener("click", fitAll);
+    $("#board-100-btn").addEventListener("click", hundred);
     shift("!", "Digit1");
-    expect($("#board-fitall-btn")).not.toBeNull();
+    expect(fitAll).toHaveBeenCalledTimes(1);
+    shift(")", "Digit0");
+    expect(hundred).toHaveBeenCalledTimes(1);
     // Board keys do nothing in Screens.
     key("1");
+    shift("!", "Digit1"); // in Screens that is the zoom preset, not Fit all
+    expect(fitAll).toHaveBeenCalledTimes(1);
     key("e");
     expect(pressed("board-edges-toggle")).toBe("false");
   });
@@ -306,5 +314,159 @@ describe("reference dialog", () => {
     key("?", { shiftKey: true });
     key("?", { shiftKey: true });
     expect($("#shortcuts-scrim").hidden).toBe(true);
+  });
+});
+
+describe("Escape consumed by an overlay does not also leave the mode", () => {
+  it("closing the project menu keeps the active mode", async () => {
+    await boot();
+    key("f");
+    key("p");
+    expect($("#project-menu").hidden).toBe(false);
+    key("Escape");
+    expect($("#project-menu").hidden).toBe(true);
+    expect(pressed("flow-mode-toggle")).toBe("true");
+    key("Escape"); // nothing open any more: this one leaves
+    expect(pressed("flow-mode-toggle")).toBe("false");
+  });
+
+  it("closing a project dialog keeps the active mode", async () => {
+    await boot();
+    key("c");
+    key("p");
+    key("o");
+    expect($("#dialog-scrim").hidden).toBe(false);
+    key("Escape");
+    expect($("#dialog-scrim").hidden).toBe(true);
+    expect(pressed("comment-mode-toggle")).toBe("true");
+  });
+
+  it("dismissing a visible tooltip keeps the active mode", async () => {
+    await boot();
+    key("f");
+    $("#comment-mode-toggle").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    expect($("#chrome-tooltip").hidden).toBe(false);
+    key("Escape");
+    expect($("#chrome-tooltip").hidden).toBe(true);
+    expect(pressed("flow-mode-toggle")).toBe("true");
+  });
+
+  it("closing the zoom menu keeps the active mode", async () => {
+    await boot();
+    key("i");
+    $("#zoom-trigger").click();
+    key("Escape");
+    expect($("#zoom-menu").hidden).toBe(true);
+    expect(pressed("inspect-mode-toggle")).toBe("true");
+  });
+});
+
+/** The screen frame's document with an element to click, as after a render (jsdom does not load srcdoc itself). */
+function frameDoc() {
+  const doc = $("#screen-frame").contentDocument;
+  doc.body.innerHTML = '<div id="root" style="width:390px"><div id="child">child</div><input id="field"></div>';
+  $("#screen-frame").dispatchEvent(new Event("load"));
+  return doc;
+}
+function frameKey(doc, k, init = {}, target = doc.body) {
+  const evt = new doc.defaultView.KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init });
+  target.dispatchEvent(evt);
+  return evt;
+}
+
+describe("keys pressed inside the screen frame", () => {
+  it("run the same shortcuts, but not while typing in a field of the screen", async () => {
+    await boot();
+    const doc = frameDoc();
+    frameKey(doc, "f");
+    expect(pressed("flow-mode-toggle")).toBe("true");
+    frameKey(doc, "f", {}, doc.getElementById("field"));
+    expect(pressed("flow-mode-toggle")).toBe("true"); // typing guard on the frame's own target
+    frameKey(doc, "f", { ctrlKey: true });
+    expect(pressed("flow-mode-toggle")).toBe("true");
+    frameKey(doc, "f");
+    expect(pressed("flow-mode-toggle")).toBe("false");
+  });
+
+  it("inspect's own Escape (deselect) has priority; a second Escape leaves the mode", async () => {
+    await boot();
+    const doc = frameDoc();
+    await flush(); // entries
+    key("i");
+    doc.getElementById("child").click();
+    expect($(".inspector-entry-focused")).not.toBeNull();
+    frameKey(doc, "Escape");
+    expect($(".inspector-entry-focused")).toBeNull();
+    expect(pressed("inspect-mode-toggle")).toBe("true");
+    frameKey(doc, "Escape");
+    expect(pressed("inspect-mode-toggle")).toBe("false");
+  });
+});
+
+describe("Escape in a text field", () => {
+  it("clears inspect's focused element but does not leave the mode", async () => {
+    await boot();
+    const doc = frameDoc();
+    await flush();
+    key("i");
+    doc.getElementById("child").click();
+    expect($(".inspector-entry-focused")).not.toBeNull();
+    const filter = $("#screen-filter-input");
+    filter.focus();
+    key("Escape", {}, filter);
+    expect($(".inspector-entry-focused")).toBeNull();
+    expect(pressed("inspect-mode-toggle")).toBe("true");
+  });
+
+  it("does nothing to comment mode or the compose form", async () => {
+    await boot();
+    frameDoc();
+    key("c");
+    $("#comment-add").click();
+    const input = $("#comment-body-input");
+    input.focus();
+    key("Escape", {}, input);
+    expect(pressed("comment-mode-toggle")).toBe("true");
+    expect($("#comment-compose").hidden).toBe(false);
+  });
+});
+
+describe("zoom steps", () => {
+  it("step from the effective Fit scale and never zoom the wrong way", async () => {
+    await boot();
+    const holder = $("#screen-holder");
+    holder.style.setProperty("--zoom", "0.35");
+    key("-");
+    expect($("#zoom-label").textContent).toBe("Fit"); // already below 50%: out does nothing
+    key("+", { shiftKey: true });
+    expect($("#zoom-label").textContent).toBe("50%");
+    shift("!", "Digit1");
+    holder.style.setProperty("--zoom", "0.8");
+    key("-");
+    expect($("#zoom-label").textContent).toBe("50%");
+    shift("!", "Digit1");
+    holder.style.setProperty("--zoom", "0.8");
+    $('.zoom-step-button[data-zoom-step="in"]').click(); // the menu item takes the same path
+    expect($("#zoom-label").textContent).toBe("100%");
+  });
+
+  it("a preset key does not move keyboard focus", async () => {
+    await boot();
+    const flow = $("#flow-mode-toggle");
+    flow.focus();
+    shift("%", "Digit5");
+    expect($("#zoom-label").textContent).toBe("50%");
+    expect(memoryStorage.get("artisign.zoom")).toBe("0.5");
+    expect(document.activeElement).toBe(flow);
+  });
+});
+
+describe("reference dialog focus", () => {
+  it("opens without focusing the close button (no tooltip pops up)", async () => {
+    await boot();
+    key("?", { shiftKey: true });
+    expect(document.activeElement).toBe($("#shortcuts-dialog"));
+    expect($("#chrome-tooltip").hidden).toBe(true);
+    key("Escape");
   });
 });

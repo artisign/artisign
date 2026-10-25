@@ -169,7 +169,11 @@ export function createProjectUI(elements, callbacks) {
     if (menuOpen && !menuEl.contains(evt.target) && evt.target !== triggerEl) closeMenu();
   });
   document.addEventListener("keydown", (evt) => {
-    if (evt.key === "Escape" && menuOpen) closeMenu();
+    if (evt.key === "Escape" && menuOpen) {
+      // This Escape is consumed here: the global shortcut handler must not also read it as "leave the mode".
+      evt.preventDefault();
+      closeMenu();
+    }
   });
   actionOpenEl.addEventListener("click", () => {
     closeMenu();

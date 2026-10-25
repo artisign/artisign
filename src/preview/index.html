@@ -22,7 +22,7 @@
       <header id="topbar">
         <span id="app-title">Artisign</span>
         <div id="project-picker">
-          <button type="button" id="project-picker-trigger" class="chrome-dropdown" aria-haspopup="true" aria-expanded="false">
+          <button type="button" id="project-picker-trigger" class="chrome-dropdown" aria-haspopup="true" aria-expanded="false" data-shortcut-id="project-menu">
             <span id="project-picker-icon" class="icon" aria-hidden="true">folder_open</span>
             <span id="project-picker-name">No project open</span>
             <span id="project-picker-chevron" class="icon" aria-hidden="true">expand_more</span>
@@ -280,8 +280,8 @@
               chr-621 design-system tag notes' "Filter ∪ pins" section.
             -->
             <div id="board-toolbar">
-              <button type="button" id="board-fitall-btn" class="board-quickjump">Fit all</button>
-              <button type="button" id="board-100-btn" class="board-quickjump">100%</button>
+              <button type="button" id="board-fitall-btn" class="board-quickjump" data-shortcut-id="board-fit-all">Fit all</button>
+              <button type="button" id="board-100-btn" class="board-quickjump" data-shortcut-id="board-100">100%</button>
               <span id="board-toolbar-divider" aria-hidden="true"></span>
               <div id="board-zoom-slider">
                 <button type="button" id="board-zoom-minus" class="board-zoom-step" aria-label="Zoom out"><span class="icon" aria-hidden="true">remove</span></button>
@@ -289,9 +289,9 @@
                 <button type="button" id="board-zoom-plus" class="board-zoom-step" aria-label="Zoom in"><span class="icon" aria-hidden="true">add</span></button>
                 <span id="board-zoom-readout">80%</span>
               </div>
-              <button type="button" id="board-edges-toggle" class="toggle-button" aria-pressed="true">Edges: On</button>
-              <button type="button" id="board-clusters-toggle" class="toggle-button" aria-pressed="true">Clusters: On</button>
-              <button type="button" id="board-collapse-all-btn" class="board-quickjump">Collapse all</button>
+              <button type="button" id="board-edges-toggle" class="toggle-button" aria-pressed="true" data-shortcut-id="board-edges">Edges: On</button>
+              <button type="button" id="board-clusters-toggle" class="toggle-button" aria-pressed="true" data-shortcut-id="board-clusters">Clusters: On</button>
+              <button type="button" id="board-collapse-all-btn" class="board-quickjump" data-shortcut-id="board-collapse-all">Collapse all</button>
               <span id="board-toolbar-spacer"></span>
               <span id="board-toolbar-status"></span>
               <span id="board-toolbar-actions">
@@ -406,7 +406,7 @@
     </div>
     <!-- CHR-916: the keyboard shortcut reference (?), built from the shortcut mapping by shortcuts-dialog.js. -->
     <div id="shortcuts-scrim" class="chrome-scrim" hidden>
-      <section id="shortcuts-dialog" class="chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+      <section id="shortcuts-dialog" class="chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" tabindex="-1">
         <div class="dialog-head">
           <h1 id="shortcuts-title" class="dialog-title">Keyboard shortcuts</h1>
           <button type="button" id="shortcuts-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>

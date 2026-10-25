@@ -402,10 +402,11 @@ export function createInspectorPanel({ listEl, emptyEl, errorEl }, { getRendered
  *   onSelect: (modelId: string, clickedDomId: string) => void,
  *   onDeselect: () => void,
  *   onScroll: () => void,
+ *   hasFocus?: () => boolean, // whether an element is currently focused (an Escape that clears it is marked as handled)
  * }} handlers
  * @returns {() => void} cleanup
  */
-export function applyInspectMode(doc, enabled, { getModelIds, onSelect, onDeselect, onScroll }) {
+export function applyInspectMode(doc, enabled, { getModelIds, onSelect, onDeselect, onScroll, hasFocus }) {
   if (!enabled) return () => {};
   const root = doc.body.firstElementChild;
 
@@ -421,7 +422,10 @@ export function applyInspectMode(doc, enabled, { getModelIds, onSelect, onDesele
   }
 
   function handleKeydown(evt) {
-    if (evt.key === "Escape") onDeselect();
+    if (evt.key !== "Escape") return;
+    // An Escape that cleared a selection is spent: marking it keeps the shortcut handler from also leaving the mode in the same keystroke (the next Escape does).
+    if (hasFocus?.()) evt.preventDefault();
+    onDeselect();
   }
 
   // `scroll` doesn't bubble, but it does fire during the capture phase on

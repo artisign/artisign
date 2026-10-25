@@ -13,6 +13,7 @@ const SHARED_WITH_ZOOM = new Set(["board-fit-all", "board-100"]);
  * @returns {{ show: () => void, hide: () => void, isOpen: () => boolean }}
  */
 export function createShortcutsDialog({ scrimEl, columnsEl, closeEl, mac }) {
+  const dialogEl = /** @type {HTMLElement} */ (scrimEl.querySelector("#shortcuts-dialog"));
   /** @type {Element | null} */
   let returnFocusTo = null;
 
@@ -50,7 +51,8 @@ export function createShortcutsDialog({ scrimEl, columnsEl, closeEl, mac }) {
     if (isOpen()) return;
     returnFocusTo = document.activeElement;
     scrimEl.hidden = false;
-    closeEl.focus();
+    // Focus the dialog itself, not its close button: that would pop the button's tooltip. There is no focus trap yet (CHR-920): Tab still leaves the dialog.
+    dialogEl.focus();
   }
 
   function hide() {

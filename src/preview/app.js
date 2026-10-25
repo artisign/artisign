@@ -22,7 +22,7 @@ import {
 } from "./api.js";
 import { THEME_PREFS, THEME_PREF_KEY, DEFAULT_THEME_PREF, applyTheme, nextThemePref, prefersDarkQuery, watchSystemTheme } from "./theme.js";
 import { initTooltips } from "./tooltip.js";
-import { applyShortcutHints, isMacPlatform, resolveShortcut } from "./shortcuts.js";
+import { applyShortcutHints, isMacPlatform, isTypingTarget, nextZoomLevel, resolveShortcut, shortcutById } from "./shortcuts.js";
 import { createShortcutsDialog } from "./shortcuts-dialog.js";
 import { renderScreenList, filterScreens, buildScreenTree, ancestorNames } from "./screens.js";
 import { createVariantUI } from "./variants.js";
@@ -1854,6 +1854,7 @@ function applyActiveMode() {
       onSelect: handleInspectSelect,
       onDeselect: clearInspectFocus,
       onScroll: syncInspectOverlay,
+      hasFocus: () => inspectorPanel.getFocusedDomId() !== null,
     });
   } else {
     modeCleanup = () => {};
@@ -1961,6 +1962,8 @@ screenFrame.addEventListener("load", () => {
   // createInspectorPanel.setEntries' same-screen carry-over (see its own
   // comment) — nothing to redo for it here.
   const doc = screenFrame.contentDocument;
+  // The screen document is same-origin (srcdoc) and replaced on every load: forward its keys into the same shortcut path (the typing guard looks at the frame's own target, so inputs inside a user screen keep their keys).
+  doc?.addEventListener("keydown", onShortcutKeydown);
   const nodeExists = typeof selectedNode === "string" && !!doc?.getElementById(selectedNode);
   const resolvedSelection = resolveSelectionAfterReload({
     selectedNode,
@@ -2076,16 +2079,22 @@ for (const button of zoomButtons) {
   });
 }
 
-/** The presets the +/- steps walk through (the menu's own levels); from Fit the first step goes to 100% / 50%. */
-const ZOOM_LADDER = [0.5, 1, 2];
+/** The zoom levels the preset buttons offer, ascending ("fit" is not a level). The +/- steps walk this ladder. */
+function zoomLadder() {
+  return [...zoomButtons].map((b) => b.dataset.zoom).filter((v) => v !== "fit").map(Number).sort((x, y) => x - y);
+}
 
-/** One step along ZOOM_LADDER for whichever of the mockup row / screen canvas the zoom controls currently target. */
-function stepZoom(direction) {
+/** The scale the zoom controls' target is drawn at right now, with "fit" resolved to its number. */
+function effectiveZoomScale() {
   const current = isMockupZoomActive() ? mockupZoom : zoom;
-  let target;
-  if (current === "fit") target = direction > 0 ? 1 : 0.5;
-  else if (direction > 0) target = ZOOM_LADDER.find((level) => level > current);
-  else target = [...ZOOM_LADDER].reverse().find((level) => level < current);
+  if (current !== "fit") return current;
+  const drawn = isMockupZoomActive() ? mockupViewEl.querySelector(".mockup-columns") : screenHolderEl;
+  return parseFloat(drawn?.style.getPropertyValue("--zoom") ?? "") || 1;
+}
+
+/** One step along the ladder from the effective scale (also from Fit); out of Fit never zooms in, nor in out. */
+function stepZoom(direction) {
+  const target = nextZoomLevel(effectiveZoomScale(), direction, zoomLadder());
   if (target !== undefined) setZoom(target);
 }
 
@@ -2329,7 +2338,7 @@ for (const tab of viewTabs) {
 }
 
 // --- Keyboard shortcuts (CHR-916) -------------------------------------------
-// One global keydown handler. shortcuts.js decides WHAT a key means (mapping, modifier / typing / IME / overlay guards); this only runs the matching action, through the same control the click would use, so a disabled or hidden control makes the key a no-op. Keys pressed while focus is inside the sandboxed screen iframe never reach this document (its own Escape handler for inspect mode is untouched).
+// One keydown handler. shortcuts.js decides WHAT a key means (mapping, modifier / typing / IME / overlay guards); this only runs the matching action, through the control the click would use, so a disabled or hidden control makes the key a no-op. The handler listens on the top document and on each screen frame's document (same-origin srcdoc, re-attached on every load), so keys keep working once focus is inside the screen; the typing guard then looks at the frame's own target, so inputs in a user screen keep their keys. Inspect mode's own in-frame Escape (deselect) runs first (capture) and marks the event handled.
 
 const macPlatform = isMacPlatform(navigator);
 const shortcutsDialog = createShortcutsDialog({
@@ -2357,73 +2366,70 @@ function openOverlay() {
   return document.querySelector(".chrome-menu:not([hidden])") ? "other" : null;
 }
 
-const VIEW_SHORTCUTS = { "view-screens": "screens", "view-design-system": "design-system", "view-board": "board" };
-const ZOOM_SHORTCUTS = { "zoom-fit": "fit", "zoom-50": "0.5", "zoom-100": "1", "zoom-200": "2" };
-const BOARD_SHORTCUTS = {
-  "board-fit-all": boardFitallBtn,
-  "board-100": board100Btn,
-  "board-edges": boardEdgesToggleBtn,
-  "board-clusters": boardClustersToggleBtn,
-  "board-collapse-all": boardCollapseAllBtn,
-};
+/** The control a shortcut id belongs to: the element carrying `data-shortcut-id`, or the button a menu hint sits in. */
+function controlFor(id) {
+  const carriers = [...document.querySelectorAll(`[data-shortcut-id="${id}"]`)];
+  const control = carriers.find((el) => !el.classList.contains("chrome-menu-hint"));
+  return control ?? carriers[0]?.closest("button") ?? null;
+}
+
 /** Still available with no project open: the picker, its menu, the theme and the reference. */
 const NO_PROJECT_SHORTCUTS = new Set(["project-menu", "menu-open", "menu-new", "theme", "help"]);
 
 /** @param {string} id a SHORTCUTS id (shortcuts.js) */
 function runShortcut(id) {
-  if (VIEW_SHORTCUTS[id]) return pressControl([...viewTabs].find((tab) => tab.dataset.view === VIEW_SHORTCUTS[id]));
-  if (ZOOM_SHORTCUTS[id]) {
-    // The preset buttons live in the (closed) zoom menu; the zoom controls themselves must be showing.
+  const def = shortcutById(id);
+  if (def?.target) return pressControl([...viewTabs].find((tab) => tab.dataset.view === def.target));
+  if (def?.zoom !== undefined) {
+    // The zoom controls themselves must be showing; the level goes straight to the setter (the preset button's click would also move focus to the trigger).
     if (canvasControlsEl.hidden) return false;
-    document.querySelector(`.zoom-button[data-zoom="${ZOOM_SHORTCUTS[id]}"]`)?.click();
+    setZoom(def.zoom);
     return true;
   }
-  if (BOARD_SHORTCUTS[id]) return pressControl(BOARD_SHORTCUTS[id]);
   switch (id) {
-    case "flow": return pressControl(flowModeToggle);
-    case "comment": return pressControl(commentModeToggle);
-    case "inspect": return pressControl(inspectModeToggle);
-    case "status-bar": return pressControl(statusBarToggle);
-    case "follow": return pressControl(followToggleToggleEl);
-    case "follow-resume": return followState.paused && pressControl(followToggleResumeEl);
+    case "follow-resume": return followState.paused && pressControl(controlFor(id));
     case "zoom-in":
     case "zoom-out":
       if (currentView === "board") return pressControl(id === "zoom-in" ? boardZoomPlusBtn : boardZoomMinusBtn);
       if (canvasControlsEl.hidden) return false;
-      document.querySelector(`.zoom-step-button[data-zoom-step="${id === "zoom-in" ? "in" : "out"}"]`)?.click();
+      stepZoom(id === "zoom-in" ? 1 : -1);
       return true;
-    case "panel-screens": return pressControl(sidebarScreensCollapseBtn);
-    case "panel-context": return pressControl(sidebarContextCollapseBtn);
-    case "panel-elements": return pressControl(inspectorCollapseBtn);
-    case "project-menu": return pressControl(projectPickerTrigger);
-    case "menu-open": return pressControl(document.getElementById("menu-action-open"));
-    case "menu-new": return pressControl(document.getElementById("menu-action-init"));
     case "filter":
       if (sidebarScreensEl.dataset.collapsed === "true") pressControl(sidebarScreensCollapseBtn);
       screenFilterInput.focus();
       screenFilterInput.select();
       return true;
-    case "theme": return pressControl(themeToggleBtn);
     case "help":
       shortcutsDialog.show();
       return true;
     case "leave":
-      // Inspect mode's Escape first clears the focused element, the next one leaves the mode (the one place inspect's Escape lived before the shortcuts).
+      // Inspect mode's Escape first clears the focused element, the next one leaves the mode.
       if (activeMode === "inspect" && inspectorPanel.getFocusedDomId()) clearInspectFocus();
       else if (activeMode !== "none") setMode(activeMode);
       else return false;
       return true;
     default:
-      return false;
+      // Everything else is "click its control": modes, status bar, follow, panels, theme, project menu and its items, the Board toolbar.
+      return pressControl(controlFor(id));
   }
 }
 
-document.addEventListener("keydown", (evt) => {
-  const id = resolveShortcut(evt, { view: currentView, overlay: openOverlay() });
+function onShortcutKeydown(evt) {
+  // An Escape (or any key) that an overlay's own handler consumed is spent.
+  if (evt.defaultPrevented) return;
+  const overlay = openOverlay();
+  // Inspect mode with a focused element: Escape in a text field still clears that focus (it never leaves the mode, nor touches the comment compose).
+  if (evt.key === "Escape" && !overlay && activeMode === "inspect" && inspectorPanel.getFocusedDomId() && isTypingTarget(evt.target)) {
+    clearInspectFocus();
+    return;
+  }
+  const id = resolveShortcut(evt, { view: currentView, overlay });
   if (!id) return;
   if (topbarEl.classList.contains("is-empty") && !NO_PROJECT_SHORTCUTS.has(id)) return;
   if (runShortcut(id) && id !== "leave") evt.preventDefault();
-});
+}
+
+document.addEventListener("keydown", onShortcutKeydown);
 
 /**
  * Boots the whole preview: loads the daemon's project registry state first

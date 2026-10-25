@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import html from "./index.html?raw";
-import { SHORTCUTS, SHORTCUT_GROUPS, applyShortcutHints, formatShortcut, isMacPlatform, resolveShortcut, shortcutById } from "./shortcuts.js";
+import { SHORTCUTS, SHORTCUT_GROUPS, applyShortcutHints, ariaKeyShortcut, formatShortcut, isMacPlatform, nextZoomLevel, resolveShortcut, shortcutById } from "./shortcuts.js";
 
 /** A KeyboardEvent look-alike: the resolver only reads these fields. */
 function key(k, init = {}) {
-  return { key: k, code: init.code ?? "", shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, isComposing: false, keyCode: 0, repeat: false, target: null, ...init };
+  const { altGraph = false, ...rest } = init;
+  return { key: k, code: init.code ?? "", shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, isComposing: false, keyCode: 0, repeat: false, target: null, getModifierState: (name) => name === "AltGraph" && altGraph, ...rest };
 }
 const ctx = (over = {}) => ({ view: "screens", overlay: null, ...over });
 const press = (k, init, c) => resolveShortcut(key(k, init), ctx(c));
@@ -84,10 +85,35 @@ describe("resolveShortcut", () => {
     expect(press("n", {}, { overlay: "project-menu" })).toBe("menu-new");
   });
 
-  it("modifier guard: nothing fires with Ctrl, Cmd or Alt held", () => {
+  it("modifier guard: letters and digits never fire with Ctrl, Cmd or Alt held", () => {
     for (const mod of ["ctrlKey", "metaKey", "altKey"]) {
-      for (const k of ["f", "o", "n", "1", "p", "t", "/", "+", "-"]) expect(press(k, { [mod]: true })).toBeNull();
+      for (const k of ["f", "o", "n", "1", "p", "t"]) expect(press(k, { [mod]: true })).toBeNull();
     }
+    // Option+letter types another character on a Mac; and a Shift+digit preset with Alt is not a preset.
+    expect(press("f", { altKey: true })).toBeNull();
+    expect(press("!", { shiftKey: true, altKey: true, code: "Digit1" })).toBeNull();
+  });
+
+  it("character keys: Ctrl or Cmd alone never fire", () => {
+    for (const k of ["[", "]", "\\", "/", "+", "-"]) {
+      expect(press(k, { ctrlKey: true })).toBeNull();
+      expect(press(k, { metaKey: true })).toBeNull();
+      expect(press(k, { metaKey: true, altKey: true })).toBeNull();
+    }
+    expect(press("?", { shiftKey: true, ctrlKey: true })).toBeNull();
+  });
+
+  it("non-US layouts: the produced character counts, with Shift / Option / AltGr as the layout needs", () => {
+    // German Mac: [ is Option+5, ] is Option+6, / is Shift+7, ? is Shift+ß.
+    expect(press("[", { altKey: true, code: "Digit5" })).toBe("panel-screens");
+    expect(press("]", { altKey: true, code: "Digit6" })).toBe("panel-elements");
+    expect(press("/", { shiftKey: true, code: "Digit7" })).toBe("filter");
+    expect(press("?", { shiftKey: true, code: "Minus" })).toBe("help");
+    // German Windows: AltGr+8 is [, reported as ctrl+alt with AltGraph set.
+    expect(press("[", { ctrlKey: true, altKey: true, altGraph: true, code: "Digit8" })).toBe("panel-screens");
+    expect(press("\\", { ctrlKey: true, altKey: true, altGraph: true, code: "Minus" })).toBe("panel-context");
+    // ...but a real Ctrl+Alt without AltGraph is not.
+    expect(press("[", { ctrlKey: true, altKey: true })).toBeNull();
   });
 
   it("IME guard: composition events never trigger", () => {
@@ -151,7 +177,7 @@ describe("display strings", () => {
 describe("mapping ↔ rendered hints", () => {
   const body = html.slice(html.indexOf("<body>") + 6);
 
-  it("every data-shortcut-id in the markup names a bound shortcut, and its hint is filled", () => {
+  it("every data-shortcut-id in the markup names a bound shortcut; hints and aria-keyshortcuts are filled from it", () => {
     const root = document.createElement("div");
     root.innerHTML = body;
     const hinted = [...root.querySelectorAll("[data-shortcut-id]")];
@@ -161,8 +187,14 @@ describe("mapping ↔ rendered hints", () => {
       const def = shortcutById(el.dataset.shortcutId);
       expect(def, `unknown id ${el.dataset.shortcutId}`).toBeDefined();
       expect(def.unbound).toBeFalsy();
-      const shown = el.classList.contains("chrome-menu-hint") ? el.textContent : el.dataset.shortcut;
-      expect(shown).toBe(formatShortcut(def, false));
+      if (el.classList.contains("chrome-menu-hint")) {
+        expect(el.textContent).toBe(formatShortcut(def, false));
+        expect(el.getAttribute("aria-hidden")).toBe("true"); // the control carries the key, the hint is decoration
+        expect(el.closest("button")?.getAttribute("aria-keyshortcuts") ?? "label").toBe(el.closest("button") ? ariaKeyShortcut(def) : "label");
+      } else {
+        expect(el.dataset.shortcut).toBe(formatShortcut(def, false));
+        expect(el.getAttribute("aria-keyshortcuts")).toBe(ariaKeyShortcut(def));
+      }
     }
   });
 
@@ -174,5 +206,28 @@ describe("mapping ↔ rendered hints", () => {
       expect(el.dataset.shortcutId).toBeUndefined();
       expect(el.dataset.shortcut).toBe("");
     }
+  });
+});
+
+describe("nextZoomLevel", () => {
+  const ladder = [0.5, 1, 2];
+  it("steps along the ladder from the effective scale, never the wrong way", () => {
+    expect(nextZoomLevel(0.35, -1, ladder)).toBeUndefined(); // already below the smallest level: out does nothing
+    expect(nextZoomLevel(0.35, 1, ladder)).toBe(0.5);
+    expect(nextZoomLevel(0.8, -1, ladder)).toBe(0.5);
+    expect(nextZoomLevel(0.8, 1, ladder)).toBe(1);
+    expect(nextZoomLevel(1, 1, ladder)).toBe(2);
+    expect(nextZoomLevel(1, -1, ladder)).toBe(0.5);
+    expect(nextZoomLevel(2, 1, ladder)).toBeUndefined();
+    expect(nextZoomLevel(0.5, -1, ladder)).toBeUndefined();
+  });
+});
+
+describe("aria-keyshortcuts", () => {
+  it("names the keys platform-independently", () => {
+    expect(ariaKeyShortcut(shortcutById("flow"))).toBe("F");
+    expect(ariaKeyShortcut(shortcutById("zoom-fit"))).toBe("Shift+1");
+    expect(ariaKeyShortcut(shortcutById("zoom-out"))).toBe("-");
+    expect(ariaKeyShortcut(shortcutById("leave"))).toBe("Escape");
   });
 });

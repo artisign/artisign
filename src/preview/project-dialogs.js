@@ -390,7 +390,10 @@ export function createProjectDialogs({ scrimEl, openSectionEl, initSectionEl }, 
     if (evt.target === scrimEl) hide();
   });
   document.addEventListener("keydown", (evt) => {
-    if (evt.key === "Escape" && !scrimEl.hidden) hide();
+    if (evt.key === "Escape" && !scrimEl.hidden) {
+      evt.preventDefault(); // consumed: the global shortcut handler must not also leave the mode
+      hide();
+    }
   });
 
   return { showOpenDialog, showInitDialog, hide };

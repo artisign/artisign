@@ -22,6 +22,8 @@ import {
 } from "./api.js";
 import { THEME_PREFS, THEME_PREF_KEY, DEFAULT_THEME_PREF, applyTheme, nextThemePref, prefersDarkQuery, watchSystemTheme } from "./theme.js";
 import { initTooltips } from "./tooltip.js";
+import { applyShortcutHints, isMacPlatform, resolveShortcut } from "./shortcuts.js";
+import { createShortcutsDialog } from "./shortcuts-dialog.js";
 import { renderScreenList, filterScreens, buildScreenTree, ancestorNames } from "./screens.js";
 import { createVariantUI } from "./variants.js";
 import { createCompareView } from "./compare.js";
@@ -611,6 +613,7 @@ themeToggleBtn.addEventListener("click", () => {
 applyTheme(document.documentElement, themePref, osDarkQuery);
 watchSystemTheme(document.documentElement, osDarkQuery, () => themePref);
 renderThemeToggle();
+applyShortcutHints(document, isMacPlatform(navigator)); // the keys shown in tooltips and menus come from the same mapping the handler below binds
 initTooltips(document);
 
 boardEdgesToggleBtn.addEventListener("click", () => {
@@ -2017,7 +2020,8 @@ function syncZoomButtons(value) {
     button.setAttribute("aria-pressed", String(current));
     button.classList.toggle("is-current", current);
     button.querySelector(".chrome-menu-check").textContent = current ? "check" : "";
-    if (current) currentLabel = button.textContent.replace("check", "").trim();
+    // The label is the button's own text, not the check icon's ligature or the shortcut hint.
+    if (current) currentLabel = [...button.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join("").trim();
   }
   zoomLabel.textContent = currentLabel;
 }
@@ -2072,6 +2076,23 @@ for (const button of zoomButtons) {
   });
 }
 
+/** The presets the +/- steps walk through (the menu's own levels); from Fit the first step goes to 100% / 50%. */
+const ZOOM_LADDER = [0.5, 1, 2];
+
+/** One step along ZOOM_LADDER for whichever of the mockup row / screen canvas the zoom controls currently target. */
+function stepZoom(direction) {
+  const current = isMockupZoomActive() ? mockupZoom : zoom;
+  let target;
+  if (current === "fit") target = direction > 0 ? 1 : 0.5;
+  else if (direction > 0) target = ZOOM_LADDER.find((level) => level > current);
+  else target = [...ZOOM_LADDER].reverse().find((level) => level < current);
+  if (target !== undefined) setZoom(target);
+}
+
+for (const button of document.querySelectorAll(".zoom-step-button")) {
+  button.addEventListener("click", () => stepZoom(button.dataset.zoomStep === "in" ? 1 : -1));
+}
+
 statusBarToggle.addEventListener("click", () => {
   const isOn = statusBarToggle.getAttribute("aria-pressed") === "true";
   statusBarToggle.setAttribute("aria-pressed", String(!isOn));
@@ -2113,14 +2134,6 @@ commentAddButton.addEventListener("click", () => {
   selectCommentTarget(null, currentScreen);
 });
 inspectModeToggle.addEventListener("click", () => setMode("inspect"));
-
-// Esc clears inspect focus even when keyboard focus is in the parent
-// document (e.g. right after clicking a list entry's own header) — the
-// iframe-level listener in applyInspectMode only catches it while the
-// canvas itself has focus.
-document.addEventListener("keydown", (evt) => {
-  if (evt.key === "Escape" && activeMode === "inspect") clearInspectFocus();
-});
 
 commentCancelButton.addEventListener("click", () => clearSelection());
 
@@ -2314,6 +2327,103 @@ for (const tab of viewTabs) {
     setView(tab.dataset.view);
   });
 }
+
+// --- Keyboard shortcuts (CHR-916) -------------------------------------------
+// One global keydown handler. shortcuts.js decides WHAT a key means (mapping, modifier / typing / IME / overlay guards); this only runs the matching action, through the same control the click would use, so a disabled or hidden control makes the key a no-op. Keys pressed while focus is inside the sandboxed screen iframe never reach this document (its own Escape handler for inspect mode is untouched).
+
+const macPlatform = isMacPlatform(navigator);
+const shortcutsDialog = createShortcutsDialog({
+  scrimEl: document.getElementById("shortcuts-scrim"),
+  columnsEl: document.getElementById("shortcuts-columns"),
+  closeEl: document.getElementById("shortcuts-close"),
+  mac: macPlatform,
+});
+const topbarEl = document.getElementById("topbar");
+const dialogScrimEl = document.getElementById("dialog-scrim");
+const projectMenuEl = document.getElementById("project-menu");
+
+/** Clicks `el` unless it is disabled or sits inside a hidden container; true when it acted. */
+function pressControl(el) {
+  if (!el || el.disabled || el.getAttribute("aria-disabled") === "true" || el.closest("[hidden]")) return false;
+  el.click();
+  return true;
+}
+
+/** The open menu / dialog / popover, if any — while one is open only its own keys act. */
+function openOverlay() {
+  if (!dialogScrimEl.hidden || shortcutsDialog.isOpen()) return "other";
+  if (!projectMenuEl.hidden) return "project-menu";
+  if (!zoomMenu.hidden) return "zoom-menu";
+  return document.querySelector(".chrome-menu:not([hidden])") ? "other" : null;
+}
+
+const VIEW_SHORTCUTS = { "view-screens": "screens", "view-design-system": "design-system", "view-board": "board" };
+const ZOOM_SHORTCUTS = { "zoom-fit": "fit", "zoom-50": "0.5", "zoom-100": "1", "zoom-200": "2" };
+const BOARD_SHORTCUTS = {
+  "board-fit-all": boardFitallBtn,
+  "board-100": board100Btn,
+  "board-edges": boardEdgesToggleBtn,
+  "board-clusters": boardClustersToggleBtn,
+  "board-collapse-all": boardCollapseAllBtn,
+};
+/** Still available with no project open: the picker, its menu, the theme and the reference. */
+const NO_PROJECT_SHORTCUTS = new Set(["project-menu", "menu-open", "menu-new", "theme", "help"]);
+
+/** @param {string} id a SHORTCUTS id (shortcuts.js) */
+function runShortcut(id) {
+  if (VIEW_SHORTCUTS[id]) return pressControl([...viewTabs].find((tab) => tab.dataset.view === VIEW_SHORTCUTS[id]));
+  if (ZOOM_SHORTCUTS[id]) {
+    // The preset buttons live in the (closed) zoom menu; the zoom controls themselves must be showing.
+    if (canvasControlsEl.hidden) return false;
+    document.querySelector(`.zoom-button[data-zoom="${ZOOM_SHORTCUTS[id]}"]`)?.click();
+    return true;
+  }
+  if (BOARD_SHORTCUTS[id]) return pressControl(BOARD_SHORTCUTS[id]);
+  switch (id) {
+    case "flow": return pressControl(flowModeToggle);
+    case "comment": return pressControl(commentModeToggle);
+    case "inspect": return pressControl(inspectModeToggle);
+    case "status-bar": return pressControl(statusBarToggle);
+    case "follow": return pressControl(followToggleToggleEl);
+    case "follow-resume": return followState.paused && pressControl(followToggleResumeEl);
+    case "zoom-in":
+    case "zoom-out":
+      if (currentView === "board") return pressControl(id === "zoom-in" ? boardZoomPlusBtn : boardZoomMinusBtn);
+      if (canvasControlsEl.hidden) return false;
+      document.querySelector(`.zoom-step-button[data-zoom-step="${id === "zoom-in" ? "in" : "out"}"]`)?.click();
+      return true;
+    case "panel-screens": return pressControl(sidebarScreensCollapseBtn);
+    case "panel-context": return pressControl(sidebarContextCollapseBtn);
+    case "panel-elements": return pressControl(inspectorCollapseBtn);
+    case "project-menu": return pressControl(projectPickerTrigger);
+    case "menu-open": return pressControl(document.getElementById("menu-action-open"));
+    case "menu-new": return pressControl(document.getElementById("menu-action-init"));
+    case "filter":
+      if (sidebarScreensEl.dataset.collapsed === "true") pressControl(sidebarScreensCollapseBtn);
+      screenFilterInput.focus();
+      screenFilterInput.select();
+      return true;
+    case "theme": return pressControl(themeToggleBtn);
+    case "help":
+      shortcutsDialog.show();
+      return true;
+    case "leave":
+      // Inspect mode's Escape first clears the focused element, the next one leaves the mode (the one place inspect's Escape lived before the shortcuts).
+      if (activeMode === "inspect" && inspectorPanel.getFocusedDomId()) clearInspectFocus();
+      else if (activeMode !== "none") setMode(activeMode);
+      else return false;
+      return true;
+    default:
+      return false;
+  }
+}
+
+document.addEventListener("keydown", (evt) => {
+  const id = resolveShortcut(evt, { view: currentView, overlay: openOverlay() });
+  if (!id) return;
+  if (topbarEl.classList.contains("is-empty") && !NO_PROJECT_SHORTCUTS.has(id)) return;
+  if (runShortcut(id) && id !== "leave") evt.preventDefault();
+});
 
 /**
  * Boots the whole preview: loads the daemon's project registry state first

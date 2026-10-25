@@ -75,17 +75,17 @@ describe("topbar markup", () => {
   it("has no glyph icons and an accessible name plus tooltip on every icon toggle", async () => {
     await boot();
     expect($("#topbar").textContent.replaceAll(/[a-z_]+(?=\b)/g, "")).not.toMatch(GLYPH_ICON);
-    for (const [id, label, icon] of [
-      ["flow-mode-toggle", "Flow mode", "route"],
-      ["comment-mode-toggle", "Comment mode", "chat_bubble"],
-      ["inspect-mode-toggle", "Inspect mode", "frame_inspect"],
-      ["status-bar-toggle", "Status bar", "smartphone"],
+    for (const [id, label, icon, key] of [
+      ["flow-mode-toggle", "Flow mode", "route", "F"],
+      ["comment-mode-toggle", "Comment mode", "chat_bubble", "C"],
+      ["inspect-mode-toggle", "Inspect mode", "frame_inspect", "I"],
+      ["status-bar-toggle", "Status bar", "smartphone", "S"],
     ]) {
       const btn = document.getElementById(id);
       expect(btn.getAttribute("aria-label")).toBe(label);
       expect(btn.dataset.tooltip).toBe(label);
       expect(btn.querySelector(".icon").textContent).toBe(icon);
-      expect(btn.dataset.shortcut).toBe(""); // hints arrive with the shortcut ticket
+      expect(btn.dataset.shortcut).toBe(key); // filled from the shortcut mapping (CHR-916)
     }
   });
 });

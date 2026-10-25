@@ -24,6 +24,7 @@ import { THEME_PREFS, THEME_PREF_KEY, DEFAULT_THEME_PREF, applyTheme, nextThemeP
 import { initTooltips } from "./tooltip.js";
 import { applyShortcutHints, isMacPlatform, isTypingTarget, nextZoomLevel, resolveShortcut, shortcutById } from "./shortcuts.js";
 import { createShortcutsDialog } from "./shortcuts-dialog.js";
+import { setRovingTabindex, wireMenu } from "./menu-keys.js";
 import { renderScreenList, filterScreens, buildScreenTree, ancestorNames } from "./screens.js";
 import { createVariantUI } from "./variants.js";
 import { createCompareView } from "./compare.js";
@@ -682,7 +683,7 @@ const projectUI = createProjectUI(
 );
 
 const projectDialogs = createProjectDialogs(
-  { scrimEl: dialogScrim, openSectionEl: openProjectDialogEl, initSectionEl: initProjectDialogEl },
+  { scrimEl: dialogScrim, openSectionEl: openProjectDialogEl, initSectionEl: initProjectDialogEl, fallbackFocusEl: projectPickerTrigger },
   {
     onOpen: async (dir) => {
       const result = await openProject(dir);
@@ -2022,7 +2023,7 @@ function syncZoomButtons(value) {
   let currentLabel = value === "fit" ? "Fit" : `${Math.round(value * 100)}%`;
   for (const button of zoomButtons) {
     const current = button.dataset.zoom === (value === "fit" ? "fit" : String(value));
-    button.setAttribute("aria-pressed", String(current));
+    button.setAttribute("aria-checked", String(current));
     button.classList.toggle("is-current", current);
     button.querySelector(".chrome-menu-check").textContent = current ? "check" : "";
     // The label is the button's own text, not the check icon's ligature or the shortcut hint.
@@ -2031,10 +2032,23 @@ function syncZoomButtons(value) {
   zoomLabel.textContent = currentLabel;
 }
 
+const zoomMenuRows = () => /** @type {HTMLElement[]} */ ([...zoomMenu.querySelectorAll("button")]);
+
+/** An ARIA menu like the project menu (CHR-920): opening focuses the current level, arrows move, Escape (below) and Tab out close it. */
 function setZoomMenuOpen(open) {
   zoomMenu.hidden = !open;
   zoomTrigger.setAttribute("aria-expanded", String(open));
+  if (!open) return;
+  const rows = zoomMenuRows();
+  const start = rows.find((row) => row.classList.contains("is-current")) ?? rows[0];
+  setRovingTabindex(rows, start);
+  start?.focus();
 }
+wireMenu(zoomMenu, zoomMenuRows, {
+  onTabOut: () => {
+    if (!zoomMenu.hidden) setZoomMenuOpen(false);
+  },
+});
 
 zoomTrigger.addEventListener("click", () => setZoomMenuOpen(zoomMenu.hidden));
 // Capture on pointerdown, not a bubbling click: the project menu's trigger and the compare "add" chip stop propagation, so a click handler would never hear that another menu was opened.
@@ -2348,6 +2362,7 @@ const shortcutsDialog = createShortcutsDialog({
   columnsEl: document.getElementById("shortcuts-columns"),
   closeEl: document.getElementById("shortcuts-close"),
   mac: macPlatform,
+  fallbackFocusEl: projectPickerTrigger,
 });
 const topbarEl = document.getElementById("topbar");
 const dialogScrimEl = document.getElementById("dialog-scrim");

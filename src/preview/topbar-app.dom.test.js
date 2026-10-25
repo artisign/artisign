@@ -102,7 +102,7 @@ describe("zoom dropdown", () => {
     expect($("#zoom-menu").hidden).toBe(true);
     expect($("#zoom-label").textContent).toBe("200%");
     expect(memoryStorage.get("artisign.zoom")).toBe("2");
-    expect($('.zoom-button[data-zoom="2"]').getAttribute("aria-pressed")).toBe("true");
+    expect($('.zoom-button[data-zoom="2"]').getAttribute("aria-checked")).toBe("true");
     expect($('.zoom-button[data-zoom="2"] .chrome-menu-check').textContent).toBe("check");
     expect($('.zoom-button[data-zoom="fit"] .chrome-menu-check').textContent).toBe("");
   });

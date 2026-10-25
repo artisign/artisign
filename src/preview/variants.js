@@ -7,6 +7,7 @@
 import { buildScreenTree, createKindIcon, displayName } from "./screens.js";
 import { canCompare } from "./compare-data.js";
 import { icon } from "./icons.js";
+import { setRovingTabindex, wireMenu } from "./menu-keys.js";
 
 /** The screen part of a flow ref — "screen" or "screen.node-id". */
 export function screenOfRef(ref) {
@@ -170,14 +171,17 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
     box.checked = picked;
     box.disabled = !picked && state.selected.length >= state.cap;
     box.setAttribute("aria-label", `Compare ${name}`);
+    box.setAttribute("role", "menuitemcheckbox");
     box.addEventListener("change", () => compare.onPick(name));
     const wrap = el("div", "variant-pop-entry");
+    wrap.setAttribute("role", "none");
     wrap.append(box, row);
     return wrap;
   }
 
   function popoverRow(name, current) {
     const row = button("variant-pop-row chrome-menu-item", "", () => go(name));
+    row.setAttribute("role", "menuitem");
     row.dataset.screen = name;
     const kind = last.tree.nodes.get(name)?.screen.variant_kind;
     const kindIcon = createKindIcon(kind);
@@ -193,21 +197,42 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
 
   function renderPopover(node, current) {
     const pop = el("div", "variant-pop chrome-menu");
-    pop.setAttribute("role", "dialog");
+    // An ARIA menu (CHR-920): rows are menuitems with a roving tab stop, ↑/↓/Home/End move between them, Escape closes (above) and returns focus to the crumb's toggle. The compare checkboxes stay native controls (menuitemcheckbox) reached with Tab.
+    pop.setAttribute("role", "menu");
     pop.setAttribute("aria-label", `Variants around ${node.name}`);
     if (node.children.length > 0) {
-      pop.appendChild(el("h4", "chrome-menu-label chrome-menu-label--caps", `Inside ${node.name} · ${node.children.length}`));
+      pop.appendChild(popoverLabel(`Inside ${node.name} · ${node.children.length}`));
       for (const child of node.children) pop.appendChild(popoverEntry(child.name, current));
     }
     const siblings = node.parent ? node.parent.children.filter((c) => c !== node) : [];
     if (siblings.length > 0) {
-      pop.appendChild(el("h4", "chrome-menu-label chrome-menu-label--caps", `Siblings in ${node.parent.name} · ${siblings.length}`));
+      pop.appendChild(popoverLabel(`Siblings in ${node.parent.name} · ${siblings.length}`));
       for (const sibling of siblings) pop.appendChild(popoverEntry(sibling.name, current));
     }
     const itself = button("variant-pop-row chrome-menu-item variant-pop-itself", `Open ${node.name} itself`, () => go(node.name));
+    itself.setAttribute("role", "menuitem");
     if (node.name === current) itself.classList.add("current", "is-current");
     pop.appendChild(itself);
+    // Every control the arrows visit, in DOM order: a compare checkbox, then its row (a disabled checkbox cannot take focus).
+    const rows = () => /** @type {HTMLElement[]} */ ([...pop.querySelectorAll(".variant-pop-row, .variant-pop-check:not(:disabled)")]);
+    const all = rows();
+    setRovingTabindex(all, all.find((row) => row.classList.contains("current")) ?? all[0]);
+    wireMenu(pop, rows, {
+      // A keyboard Tab out of the popover closes it like an outside click; the focus move has already happened, update() keeps focus on the equivalent control after the rebuild.
+      onTabOut: () => {
+        if (!openCrumb) return;
+        openCrumb = null;
+        rerender();
+      },
+    });
     return pop;
+  }
+
+  /** A section label inside the menu: presentation only (the menu itself carries the name). */
+  function popoverLabel(text) {
+    const label = el("h4", "chrome-menu-label chrome-menu-label--caps", text);
+    label.setAttribute("role", "presentation");
+    return label;
   }
 
   function renderBar(ctx, current) {
@@ -367,7 +392,8 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
     const key = focusNext ?? focusKey();
     focusNext = null;
     const shown = render(screens, flows, currentScreen);
-    if (key?.cls === "variant-pop-row" && key.screen === null) barEl.querySelector(".variant-pop-row")?.focus();
+    // Opening a popover focuses its tab stop: the current screen's row, else the first.
+    if (key?.cls === "variant-pop-row" && key.screen === null) (barEl.querySelector('.variant-pop-row[tabindex="0"]') ?? barEl.querySelector(".variant-pop-row"))?.focus();
     else restoreFocus(key);
     return shown;
   }

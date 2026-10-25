@@ -105,6 +105,33 @@ describe("variant breadcrumb", () => {
     expect(laterListenerSaw).toBe(false);
   });
 
+  it("the popover is an ARIA menu: ↑/↓/Home/End move between the rows, one roving tab stop, Enter-style activation selects", () => {
+    const { bar, selected } = setup("confirm");
+    const toggle = bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle");
+    toggle.focus();
+    toggle.click();
+    const pop = bar.querySelector(".variant-pop");
+    expect(pop.getAttribute("role")).toBe("menu");
+    const rows = () => [...pop.querySelectorAll(".variant-pop-row")];
+    expect(rows().every((r) => r.getAttribute("role") === "menuitem")).toBe(true);
+    expect(rows().map((r) => r.tabIndex)).toEqual([0, ...rows().slice(1).map(() => -1)]);
+    const press = (key) => document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(rows()[0]);
+    press("ArrowDown");
+    expect(document.activeElement).toBe(rows()[1]);
+    expect(rows().map((r) => r.tabIndex).filter((t) => t === 0)).toHaveLength(1);
+    expect(rows()[1].tabIndex).toBe(0);
+    press("End");
+    expect(document.activeElement).toBe(rows().at(-1));
+    press("ArrowDown"); // menus wrap
+    expect(document.activeElement).toBe(rows()[0]);
+    press("ArrowUp");
+    expect(document.activeElement).toBe(rows().at(-1));
+    press("Home");
+    rows()[0].click();
+    expect(selected).toEqual([rows()[0].dataset.screen]);
+  });
+
   it("keyboard focus survives a re-render from outside (e.g. an SSE refresh)", () => {
     const { ui, bar } = setup("confirm");
     bar.querySelector(".crumb-group[data-screen=leave] .crumb").focus();
@@ -206,7 +233,7 @@ describe("compare mode controls (CHR-738)", () => {
       barEl: document.getElementById("bar"),
       mapEl: document.getElementById("map"),
       inspectorEl: document.getElementById("insp"),
-      onSelect: () => {},
+      onSelect: (name) => calls.push(["select", name]),
       compare: {
         state: () => ({ cap: 3, selected: [], on: false, ...state }),
         onMode: (on) => calls.push(["mode", on]),
@@ -256,6 +283,96 @@ describe("compare mode controls (CHR-738)", () => {
     };
     expect(make({}).querySelector(".variant-map-toggle")).not.toBeNull();
     expect(make({ on: true, selected: ["dissolve"] }).querySelector(".variant-map-toggle")).toBeNull();
+  });
+
+  it("the compare checkboxes are part of the arrow order: each one, then its row, in DOM order", () => {
+    const { bar } = setupCompare("confirm", { on: true, selected: ["dissolve"] });
+    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    const pop = bar.querySelector(".variant-pop");
+    const entries = [...pop.querySelectorAll(".variant-pop-entry")];
+    const [box0, row0] = [entries[0].querySelector(".variant-pop-check"), entries[0].querySelector(".variant-pop-row")];
+    const [box1, row1] = [entries[1].querySelector(".variant-pop-check"), entries[1].querySelector(".variant-pop-row")];
+    const press = (key) => document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    row0.focus();
+    press("ArrowUp");
+    expect(document.activeElement).toBe(box0);
+    press("ArrowDown");
+    press("ArrowDown");
+    expect(document.activeElement).toBe(box1);
+    press("ArrowDown");
+    expect(document.activeElement).toBe(row1);
+    // The disabled boxes (cap reached) are skipped; exactly one control is a tab stop, checkboxes included.
+    const items = [...pop.querySelectorAll(".variant-pop-row, .variant-pop-check:not(:disabled)")];
+    expect(items.filter((i) => i.tabIndex === 0)).toEqual([row1]);
+  });
+
+  const tab = (target, init = {}) => target.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true, ...init }));
+  const later = () => new Promise((resolve) => setTimeout(resolve, 5));
+
+  it("a keyboard Tab out of the popover closes it; Tab onto its own checkboxes does not", async () => {
+    const { bar } = setupCompare("confirm", { on: true, selected: [] });
+    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    const pop = bar.querySelector(".variant-pop");
+    const box = pop.querySelector(".variant-pop-check");
+    pop.querySelector(".variant-pop-row").focus();
+    tab(document.activeElement);
+    box.focus();
+    await later();
+    expect(bar.querySelector(".variant-pop")).not.toBeNull();
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    tab(document.activeElement);
+    outside.focus();
+    await later();
+    expect(bar.querySelector(".variant-pop")).toBeNull();
+    expect(document.activeElement).toBe(outside); // not dropped to <body> by the rebuild
+  });
+
+  it("Shift+Tab from the first row ends on the crumb toggle, not on <body>", async () => {
+    const { bar } = setupCompare("confirm", { on: false, selected: [] });
+    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    document.activeElement.focus();
+    tab(document.activeElement, { shiftKey: true });
+    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").focus();
+    await later();
+    expect(bar.querySelector(".variant-pop")).toBeNull();
+    expect(document.activeElement.classList.contains("crumb-toggle")).toBe(true);
+    expect(document.activeElement.isConnected).toBe(true);
+  });
+
+  it("a pointer press elsewhere with the popover open does not rebuild the bar under the click: the first click navigates", async () => {
+    for (const pick of [
+      (ui) => ui.bar.querySelector(".crumb-group[data-screen=family] .crumb"),
+      (ui) => ui.bar.querySelector(".variant-back"),
+      (ui) => ui.bar.querySelector(".compare-seg-button[data-mode=compare]"),
+    ]) {
+      const ui = setupCompare("confirm", { on: false, selected: [] });
+      ui.bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+      const target = pick(ui);
+      target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); // Chrome moves focus on mousedown
+      target.focus();
+      await later();
+      expect(target.isConnected).toBe(true); // the control under the pointer survived the focus move
+      target.click();
+      // The handler ran on this very click: navigating closes the popover, the mode toggle reports to compare.
+      expect(ui.calls).toHaveLength(1);
+      expect(ui.calls[0][0]).toBe(target.classList.contains("compare-seg-button") ? "mode" : "select");
+    }
+  });
+
+  it("the roving tab stop starts on the current screen's row and a rebuild keeps focus on the row it was on", () => {
+    const { bar } = setupCompare("confirm", { on: true, selected: [] });
+    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    const stops = () => [...bar.querySelectorAll(".variant-pop-row")].filter((r) => r.tabIndex === 0);
+    expect(stops()).toHaveLength(1);
+    expect(stops()[0].classList.contains("current")).toBe(true);
+    expect(document.activeElement).toBe(stops()[0]);
+    const rows = [...bar.querySelectorAll(".variant-pop-row")];
+    const second = rows.find((r) => !r.classList.contains("current"));
+    second.focus();
+    bar.querySelector(".variant-pop-check").click(); // toggling a compare checkbox rebuilds the popover
+    expect(document.activeElement.dataset.screen).toBe(second.dataset.screen);
+    expect(stops()).toEqual([document.activeElement]);
   });
 
   it("has no toggle without the compare option", () => {

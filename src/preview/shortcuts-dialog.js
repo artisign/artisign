@@ -1,6 +1,7 @@
 // The keyboard shortcut reference (CHR-916, screen `chrome-c-shell-shortcuts`): three columns of grouped rows, label left, key chip right. Built from the same SHORTCUTS mapping the keys are bound from. Escape, a click on the scrim, the close button and "?" close it.
 
 import { SHORTCUTS, formatShortcut } from "./shortcuts.js";
+import { isShown, trapFocus } from "./menu-keys.js";
 
 /** Group order per column, as drawn. */
 const COLUMNS = [["Modes", "Views"], ["Zoom", "Board"], ["Panels", "Project", "General"]];
@@ -9,10 +10,10 @@ const COLUMNS = [["Modes", "Views"], ["Zoom", "Board"], ["Panels", "Project", "G
 const SHARED_WITH_ZOOM = new Set(["board-fit-all", "board-100"]);
 
 /**
- * @param {{ scrimEl: HTMLElement, columnsEl: HTMLElement, closeEl: HTMLElement, mac: boolean }} els
+ * @param {{ scrimEl: HTMLElement, columnsEl: HTMLElement, closeEl: HTMLElement, mac: boolean, fallbackFocusEl?: HTMLElement }} els `fallbackFocusEl`: where focus goes on close when the opener is gone or hidden
  * @returns {{ show: () => void, hide: () => void, isOpen: () => boolean }}
  */
-export function createShortcutsDialog({ scrimEl, columnsEl, closeEl, mac }) {
+export function createShortcutsDialog({ scrimEl, columnsEl, closeEl, mac, fallbackFocusEl }) {
   const dialogEl = /** @type {HTMLElement} */ (scrimEl.querySelector("#shortcuts-dialog"));
   /** @type {Element | null} */
   let returnFocusTo = null;
@@ -51,18 +52,23 @@ export function createShortcutsDialog({ scrimEl, columnsEl, closeEl, mac }) {
     if (isOpen()) return;
     returnFocusTo = document.activeElement;
     scrimEl.hidden = false;
-    // Focus the dialog itself, not its close button: that would pop the button's tooltip. There is no focus trap yet (CHR-920): Tab still leaves the dialog.
+    // Focus the dialog itself, not its close button: that would pop the button's tooltip. Tab is trapped inside (below).
     dialogEl.focus();
   }
 
   function hide() {
     if (!isOpen()) return;
     scrimEl.hidden = true;
-    if (returnFocusTo instanceof HTMLElement) returnFocusTo.focus();
+    // The opener can be gone or hidden by now: the project picker, or <body> as a last resort.
+    (returnFocusTo instanceof HTMLElement && isShown(returnFocusTo) ? returnFocusTo : (fallbackFocusEl ?? document.body)).focus();
     returnFocusTo = null;
   }
 
   closeEl.addEventListener("click", hide);
+  // On the document, not the scrim: with focus on <body> Tab must still enter the dialog.
+  document.addEventListener("keydown", (evt) => {
+    if (isOpen()) trapFocus(evt, dialogEl);
+  });
   scrimEl.addEventListener("click", (evt) => {
     if (evt.target === scrimEl) hide();
   });

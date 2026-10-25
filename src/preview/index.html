@@ -27,18 +27,18 @@
             <span id="project-picker-name">No project open</span>
             <span id="project-picker-chevron" class="icon" aria-hidden="true">expand_more</span>
           </button>
-          <div id="project-menu" class="chrome-menu" hidden>
-            <p id="menu-label-open" class="chrome-menu-label" hidden>Open projects<span class="chrome-menu-hint" data-shortcut-id="project-menu"></span></p>
-            <div id="menu-open-list"></div>
-            <div id="menu-divider-1" class="chrome-menu-divider" hidden></div>
-            <p id="menu-label-recent" class="chrome-menu-label" hidden>Recent</p>
-            <div id="menu-recent-list"></div>
-            <div id="menu-divider-2" class="chrome-menu-divider"></div>
-            <button type="button" id="menu-action-open" class="chrome-menu-item">
-              <span class="icon chrome-menu-icon" aria-hidden="true">folder_open</span>Open project…<span class="chrome-menu-hint" data-shortcut-id="menu-open"></span>
+          <div id="project-menu" class="chrome-menu" role="menu" aria-label="Projects" hidden>
+            <p id="menu-label-open" class="chrome-menu-label" role="presentation" hidden>Open projects<span class="chrome-menu-hint" aria-hidden="true" data-shortcut-id="project-menu"></span></p>
+            <div id="menu-open-list" role="group" aria-labelledby="menu-label-open"></div>
+            <div id="menu-divider-1" class="chrome-menu-divider" role="separator" hidden></div>
+            <p id="menu-label-recent" class="chrome-menu-label" role="presentation" hidden>Recent</p>
+            <div id="menu-recent-list" role="group" aria-labelledby="menu-label-recent"></div>
+            <div id="menu-divider-2" class="chrome-menu-divider" role="separator"></div>
+            <button type="button" id="menu-action-open" class="chrome-menu-item" role="menuitem">
+              <span class="icon chrome-menu-icon" aria-hidden="true">folder_open</span>Open project…<span class="chrome-menu-hint" aria-hidden="true" data-shortcut-id="menu-open"></span>
             </button>
-            <button type="button" id="menu-action-init" class="chrome-menu-item">
-              <span class="icon chrome-menu-icon" aria-hidden="true">add</span>New project…<span class="chrome-menu-hint" data-shortcut-id="menu-new"></span>
+            <button type="button" id="menu-action-init" class="chrome-menu-item" role="menuitem">
+              <span class="icon chrome-menu-icon" aria-hidden="true">add</span>New project…<span class="chrome-menu-hint" aria-hidden="true" data-shortcut-id="menu-new"></span>
             </button>
           </div>
         </div>
@@ -83,14 +83,14 @@
               <span id="zoom-label">Fit</span>
               <span class="icon" aria-hidden="true">expand_more</span>
             </button>
-            <div id="zoom-menu" class="chrome-menu" role="group" aria-label="Zoom" hidden>
-              <button type="button" class="zoom-button chrome-menu-item" data-zoom="fit" aria-pressed="true"><span class="icon chrome-menu-check" aria-hidden="true"></span>Fit<span class="chrome-menu-hint" data-shortcut-id="zoom-fit"></span></button>
-              <button type="button" class="zoom-button chrome-menu-item" data-zoom="0.5" aria-pressed="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>50%<span class="chrome-menu-hint" data-shortcut-id="zoom-50"></span></button>
-              <button type="button" class="zoom-button chrome-menu-item" data-zoom="1" aria-pressed="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>100%<span class="chrome-menu-hint" data-shortcut-id="zoom-100"></span></button>
-              <button type="button" class="zoom-button chrome-menu-item" data-zoom="2" aria-pressed="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>200%<span class="chrome-menu-hint" data-shortcut-id="zoom-200"></span></button>
+            <div id="zoom-menu" class="chrome-menu" role="menu" aria-label="Zoom" hidden>
+              <button type="button" class="zoom-button chrome-menu-item" data-zoom="fit" role="menuitemradio" aria-checked="true"><span class="icon chrome-menu-check" aria-hidden="true"></span>Fit<span class="chrome-menu-hint" aria-hidden="true" data-shortcut-id="zoom-fit"></span></button>
+              <button type="button" class="zoom-button chrome-menu-item" data-zoom="0.5" role="menuitemradio" aria-checked="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>50%<span class="chrome-menu-hint" aria-hidden="true" data-shortcut-id="zoom-50"></span></button>
+              <button type="button" class="zoom-button chrome-menu-item" data-zoom="1" role="menuitemradio" aria-checked="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>100%<span class="chrome-menu-hint" aria-hidden="true" data-shortcut-id="zoom-100"></span></button>
+              <button type="button" class="zoom-button chrome-menu-item" data-zoom="2" role="menuitemradio" aria-checked="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>200%<span class="chrome-menu-hint" aria-hidden="true" data-shortcut-id="zoom-200"></span></button>
               <div class="chrome-menu-divider" role="separator"></div>
-              <button type="button" class="zoom-step-button chrome-menu-item" data-zoom-step="in">Zoom in<span class="chrome-menu-hint" data-shortcut-id="zoom-in"></span></button>
-              <button type="button" class="zoom-step-button chrome-menu-item" data-zoom-step="out">Zoom out<span class="chrome-menu-hint" data-shortcut-id="zoom-out"></span></button>
+              <button type="button" class="zoom-step-button chrome-menu-item" role="menuitem" data-zoom-step="in">Zoom in<span class="chrome-menu-hint" aria-hidden="true" data-shortcut-id="zoom-in"></span></button>
+              <button type="button" class="zoom-step-button chrome-menu-item" role="menuitem" data-zoom-step="out">Zoom out<span class="chrome-menu-hint" aria-hidden="true" data-shortcut-id="zoom-out"></span></button>
             </div>
           </div>
           <button type="button" id="status-bar-toggle" class="chrome-icon-btn" aria-pressed="false" aria-label="Status bar" data-tooltip="Status bar" data-shortcut-id="status-bar">
@@ -416,9 +416,9 @@
       </section>
     </div>
     <div id="dialog-scrim" class="chrome-scrim" hidden>
-      <section id="open-project-dialog" class="project-dialog chrome-dialog" hidden>
+      <section id="open-project-dialog" class="project-dialog chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="open-project-title" tabindex="-1" hidden>
         <div class="dialog-head">
-          <h1 class="dialog-title">Open project</h1>
+          <h1 id="open-project-title" class="dialog-title">Open project</h1>
           <button type="button" class="dialog-close chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
         </div>
         <div class="quick-access">
@@ -438,9 +438,9 @@
           <button type="button" class="btn-confirm chrome-btn chrome-btn--primary" disabled>Open</button>
         </div>
       </section>
-      <section id="init-project-dialog" class="project-dialog chrome-dialog" hidden>
+      <section id="init-project-dialog" class="project-dialog chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="init-project-title" tabindex="-1" hidden>
         <div class="dialog-head">
-          <h1 class="dialog-title">New project</h1>
+          <h1 id="init-project-title" class="dialog-title">New project</h1>
           <button type="button" class="dialog-close chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
         </div>
         <p class="dialog-sub">Choose where the new project folder is created.</p>

@@ -90,11 +90,15 @@ describe("openThreadCount", () => {
 });
 
 describe("formatCommentTime", () => {
-  const now = Date.parse("2026-10-25T12:00:00Z");
-  it("is relative inside a day", () => {
-    expect(formatCommentTime("2026-10-25T11:59:50Z", now)).toBe("just now");
-    expect(formatCommentTime("2026-10-25T11:30:00Z", now)).toBe("30m ago");
-    expect(formatCommentTime("2026-10-25T09:00:00Z", now)).toBe("3h ago");
+  // Local-time dates, so the assertions hold in any time zone.
+  const now = new Date(2026, 9, 25, 12, 0).getTime();
+  it("shows the clock time for today", () => {
+    expect(formatCommentTime(new Date(2026, 9, 25, 10, 2).toISOString(), now)).toBe("10:02");
+    expect(formatCommentTime(new Date(2026, 9, 25, 0, 5).toISOString(), now)).toBe("00:05");
+  });
+  it("shows a short date for any other day", () => {
+    const at = new Date(2026, 9, 23, 10, 2);
+    expect(formatCommentTime(at.toISOString(), now)).toBe(at.toLocaleDateString(undefined, { month: "short", day: "numeric" }));
   });
   it("is empty for a missing or unparseable timestamp", () => {
     expect(formatCommentTime(undefined, now)).toBe("");

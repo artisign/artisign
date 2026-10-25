@@ -661,27 +661,6 @@ body {
   display: none;
 }
 
-/* Text toggle buttons still used by the board toolbar; restyled with that area. */
-.toggle-button {
-  border: 1px solid var(--chrome-border-strong);
-  background: var(--chrome-raised);
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: 6px;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.toggle-button[aria-pressed="true"] {
-  background: var(--chrome-accent);
-  border-color: var(--chrome-accent);
-  color: var(--chrome-primary-text);
-}
-
-.toggle-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 /* CHR-628/CHR-629/CHR-631 — the follow toggle: a pill with two SIBLING <button>s (toggle, "Resume") inside a non-interactive <span> (review fix 4 — no interactive descendants inside a button, and a keyboard activation's target is the button itself). The pill look lives on the outer span; the buttons are UA-reset to read as plain content. */
 .follow-toggle-toggle {
   display: inline-flex;
@@ -2575,19 +2554,23 @@ button.chrome-section-header:focus-visible {
   display: none;
 }
 
-/* Design system view */
-
+/* Design system view (CHR-915): each section is a raised card in a centred column, the way `design-system-view` draws it. */
 #design-system-view {
   padding: var(--space-2xl);
 }
 
 .ds-section {
-  margin-bottom: 32px;
+  max-width: 960px;
+  margin: 0 auto var(--space-xl);
+  padding: var(--space-2xl);
+  background: var(--chrome-raised);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-md);
 }
 
 .ds-section h2 {
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: var(--ui-title);
+  font-weight: 500;
   margin: 0 0 var(--space-lg);
   color: var(--chrome-text);
 }
@@ -2600,23 +2583,25 @@ button.chrome-section-header:focus-visible {
 
 .ds-swatch {
   border: 1px solid var(--chrome-border);
-  border-radius: 8px;
-  background: var(--chrome-raised);
-  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--chrome-field);
+  padding: var(--space-pad);
   min-width: 140px;
-  font-size: 0.75rem;
+  font-size: var(--ui-xs);
 }
 
+/* The swatch fill is the token's own value (set inline), never a chrome token — it reads the same in both themes. */
 .ds-swatch .ds-color-chip {
   width: 100%;
   height: 48px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--chrome-border);
   margin-bottom: var(--space-md);
 }
 
 .ds-swatch .ds-name {
-  font-weight: 600;
+  font-family: ui-monospace, Menlo, monospace;
+  font-weight: 500;
   color: var(--chrome-text);
 }
 
@@ -2653,12 +2638,8 @@ button.chrome-section-header:focus-visible {
 }
 
 .ds-idea-body {
-  background: var(--chrome-raised);
-  border: 1px solid var(--chrome-border);
-  border-radius: 8px;
-  padding: var(--space-xl);
   max-width: 820px;
-  font-size: 0.85rem;
+  font-size: var(--ui-base);
   color: var(--chrome-text);
   line-height: 1.6;
 }
@@ -2676,9 +2657,9 @@ button.chrome-section-header:focus-visible {
 .ds-decision {
   display: flex;
   gap: var(--space-xl);
-  background: var(--chrome-raised);
+  background: var(--chrome-field);
   border: 1px solid var(--chrome-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: var(--space-lg) var(--space-xl);
 }
 
@@ -2689,7 +2670,7 @@ button.chrome-section-header:focus-visible {
 .ds-decision-date {
   flex: none;
   width: 78px;
-  font-size: 0.7rem;
+  font-size: var(--ui-2xs);
   color: var(--chrome-text-tertiary);
   line-height: 1.5;
 }
@@ -2706,8 +2687,8 @@ button.chrome-section-header:focus-visible {
 }
 
 .ds-decision-title {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: var(--ui-base);
+  font-weight: 500;
   color: var(--chrome-text);
 }
 
@@ -2717,25 +2698,28 @@ button.chrome-section-header:focus-visible {
 }
 
 .ds-decision-status {
-  font-size: 0.65rem;
-  font-weight: 600;
-  line-height: 17px;
-  padding: 0 var(--space-md);
+  display: inline-flex;
+  align-items: center;
+  height: var(--size-chip-h);
+  font-size: var(--ui-chip);
+  font-weight: 500;
+  padding: 0 var(--space-sm);
   border-radius: var(--radius-pill);
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
 }
 
 .ds-decision-status-superseded {
-  background: var(--chrome-border);
+  background: var(--chrome-raised);
+  border: 1px solid var(--chrome-border-strong);
   color: var(--chrome-text-tertiary);
   font-weight: 400;
 }
 
 .ds-decision-text {
   margin: var(--space-sm) 0 0;
-  font-size: 0.78rem;
-  color: var(--chrome-text-tertiary);
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
   line-height: 1.5;
   max-width: 760px;
 }
@@ -2745,8 +2729,8 @@ button.chrome-section-header:focus-visible {
 }
 
 .ds-component h3 {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: var(--ui-base);
+  font-weight: 500;
   margin: 0 0 var(--space-md);
   color: var(--chrome-text);
 }
@@ -2757,16 +2741,17 @@ button.chrome-section-header:focus-visible {
   gap: var(--space-lg);
 }
 
+/* The cell frame is chrome; the iframe inside shows the variant unthemed (user data). */
 .ds-variant-cell {
   border: 1px solid var(--chrome-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--chrome-raised);
   overflow: hidden;
 }
 
 .ds-variant-cell .ds-variant-label {
   padding: var(--space-xs) var(--space-md);
-  font-size: 0.7rem;
+  font-size: var(--ui-2xs);
   color: var(--chrome-text-tertiary);
   border-bottom: 1px solid var(--chrome-border);
 }
@@ -2781,7 +2766,7 @@ button.chrome-section-header:focus-visible {
   margin: var(--space-lg) 0 0;
   padding-top: var(--space-lg);
   border-top: 1px solid var(--chrome-border);
-  font-size: 0.78rem;
+  font-size: var(--ui-sm);
   color: var(--chrome-text-tertiary);
   line-height: 1.5;
   max-width: 780px;
@@ -2799,7 +2784,7 @@ button.chrome-section-header:focus-visible {
   overflow: hidden;
 }
 
-/* Board-tab-only bar (CHR-623), same chrome tokens as #topbar. */
+/* Board-tab-only bar (CHR-623), same chrome tokens as #topbar. CHR-915: 12px labels, 6px radius, the zoom slider as drawn in `$zoom-slider`. */
 #board-toolbar {
   flex: none;
   display: flex;
@@ -2811,32 +2796,53 @@ button.chrome-section-header:focus-visible {
   background: var(--chrome-bar);
 }
 
-.board-quickjump {
+.board-quickjump,
+.toggle-button {
   border: 1px solid var(--chrome-border-strong);
-  border-radius: 6px;
-  padding: var(--space-sm) 10px;
-  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-pad);
+  font: inherit;
+  font-size: var(--ui-sm);
   color: var(--chrome-text-secondary);
   background: var(--chrome-raised);
   cursor: pointer;
   white-space: nowrap;
 }
 
-/* Active only when the slider's current value exactly matches this
-   shortcut's target — see board.js's updateBoardToolbar in board-view.js. */
+.board-quickjump:hover,
+.toggle-button:hover {
+  background: var(--chrome-hover);
+}
+
+.board-quickjump:focus-visible,
+.toggle-button:focus-visible,
+.board-zoom-step:focus-visible,
+#board-zoom-range:focus-visible,
+#board-presented-dismiss:focus-visible,
+.board-cluster-header:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+/* Active only when the slider's current value exactly matches this shortcut's target — see board.js's updateBoardToolbar in board-view.js. */
 .board-quickjump[aria-pressed="true"] {
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
-  font-weight: 600;
+  font-weight: 500;
   border-color: var(--chrome-accent);
 }
 
-/* "Edges: On" is the resting state, so it takes the quiet tinted look of the
-   design (chr-621) rather than .toggle-button's filled accent. */
-#board-edges-toggle[aria-pressed="true"] {
+/* The Edges / Clusters toggles: "On" is the resting state, so it takes the quiet tinted look of the design rather than a filled accent. */
+.toggle-button[aria-pressed="true"] {
   background: var(--chrome-accent-subtle);
+  border-color: var(--chrome-border-strong);
   color: var(--chrome-accent);
-  border-color: var(--chrome-accent);
+  font-weight: 500;
+}
+
+.toggle-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 #board-toolbar-divider {
@@ -2857,32 +2863,26 @@ button.chrome-section-header:focus-visible {
   justify-content: center;
   width: 22px;
   height: 22px;
+  padding: 0;
   border: 1px solid var(--chrome-border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--chrome-raised);
   color: var(--chrome-text);
-  font-size: 0.85rem;
-  line-height: 1;
   cursor: pointer;
 }
 
-/* aria-disabled, not the disabled attribute (CHR-623 review finding 8) — a
-   hard-disabled button can't hold keyboard focus; see app.js's
-   updateBoardToolbar for the full reasoning. Same look as :disabled used
-   to have. */
+.board-zoom-step .icon {
+  font-size: var(--size-icon-sm);
+}
+
+/* aria-disabled, not the disabled attribute (CHR-623 review finding 8) — a hard-disabled button can't hold keyboard focus; see app.js's updateBoardToolbar for the full reasoning. */
 .board-zoom-step[aria-disabled="true"] {
   background: var(--chrome-field);
   color: var(--chrome-text-tertiary);
   cursor: not-allowed;
 }
 
-/* A native <input type="range"> styled to the $zoom-slider design (a thin
-   filled track + a round thumb) rather than a hand-built track/thumb pair —
-   keyboard control and accessible semantics come for free this way. The
-   filled portion is a background gradient recomputed in JS on every value
-   change (updateZoomRangeFill in board-view.js), since a plain <input
-   type=range> has no CSS-only way to color only the "filled" side of the
-   track. */
+/* A native <input type="range"> styled to the $zoom-slider design (a thin filled track + a round thumb) rather than a hand-built track/thumb pair — keyboard control and accessible semantics come for free this way. The filled portion is a background gradient recomputed in JS on every value change (app.js's updateBoardToolbar), since a plain <input type=range> has no CSS-only way to color only the "filled" side of the track. */
 #board-zoom-range {
   appearance: none;
   -webkit-appearance: none;
@@ -2932,7 +2932,7 @@ button.chrome-section-header:focus-visible {
 }
 
 #board-zoom-readout {
-  font-size: 0.85rem;
+  font-size: var(--ui-sm);
   color: var(--chrome-text);
   min-width: 36px;
 }
@@ -2942,7 +2942,7 @@ button.chrome-section-header:focus-visible {
 }
 
 #board-toolbar-status {
-  font-size: 0.75rem;
+  font-size: var(--ui-2xs);
   color: var(--chrome-text-tertiary);
 }
 
@@ -2987,24 +2987,29 @@ button.chrome-section-header:focus-visible {
   display: none;
 }
 
-#board-presented-icon,
-#board-presented-text {
+#board-presented-icon {
+  font-size: var(--size-icon-sm);
   color: var(--chrome-accent);
-  font-size: 0.85rem;
 }
 
 #board-presented-text {
-  font-weight: 600;
+  color: var(--chrome-accent);
+  font-size: var(--ui-sm);
+  font-weight: 500;
 }
 
 #board-presented-dismiss {
+  display: flex;
   border: none;
   background: none;
   color: var(--chrome-accent);
-  font-size: 0.85rem;
-  line-height: 1;
   padding: 0 0 0 var(--space-xs);
+  border-radius: var(--radius-xs);
   cursor: pointer;
+}
+
+#board-presented-dismiss .icon {
+  font-size: var(--size-icon-sm);
 }
 
 /* CHR-624 — centered over #board-surface, independent of #board-canvas's
@@ -3030,17 +3035,17 @@ button.chrome-section-header:focus-visible {
 
 #board-empty-icon {
   color: var(--chrome-text-tertiary);
-  font-size: 2rem;
+  font-size: 32px;
 }
 
 #board-empty-title {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: var(--ui-title);
+  font-weight: 500;
   color: var(--chrome-text);
 }
 
 #board-empty-body {
-  font-size: 0.85rem;
+  font-size: var(--ui-base);
   color: var(--chrome-text-tertiary);
   line-height: 1.5;
 }
@@ -3132,9 +3137,9 @@ button.chrome-section-header:focus-visible {
   bottom: 100%;
   right: 0;
   margin-bottom: var(--space-2xl);
-  font-size: 0.65rem;
-  line-height: 17px;
-  padding: 0 var(--space-md);
+  font-size: var(--ui-chip);
+  line-height: var(--size-chip-h);
+  padding: 0 var(--space-sm);
   border-radius: var(--radius-pill);
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
@@ -3159,8 +3164,8 @@ button.chrome-section-header:focus-visible {
   bottom: 100%;
   left: 0;
   margin-bottom: var(--space-sm);
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: var(--ui-xs);
+  font-weight: 500;
   color: var(--chrome-text);
   white-space: nowrap;
 }
@@ -3982,12 +3987,6 @@ button.chrome-section-header:focus-visible {
 }
 
 /* CHR-733 — board clusters (approved `variants-board` c-clusters / c-clusters-collapsed). */
-#board-clusters-toggle[aria-pressed="true"] {
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-  border-color: var(--chrome-accent);
-}
-
 #board-collapse-all-btn[hidden] {
   display: none;
 }
@@ -4002,8 +4001,8 @@ button.chrome-section-header:focus-visible {
 .board-cluster-frame {
   position: absolute;
   box-sizing: border-box;
-  border: 1.5px solid var(--chrome-border-strong);
-  border-radius: 10px;
+  border: 1.5px solid var(--chrome-edge);
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--chrome-raised) 45%, transparent);
 }
 
@@ -4016,21 +4015,58 @@ button.chrome-section-header:focus-visible {
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-md);
   width: 100%;
-  padding: 0 12px;
+  overflow: hidden;
+  padding: 0 var(--space-lg);
   border: none;
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--ui-xs);
   color: var(--chrome-text);
+  white-space: nowrap;
   cursor: pointer;
   text-align: left;
 }
 
-.board-cluster-header span {
-  font-size: 11px;
-  color: var(--chrome-text-secondary);
+.board-cluster-header b {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-weight: 500;
+}
+
+.board-cluster-chevron {
+  font-size: var(--size-icon-sm);
+}
+
+/* In a narrow frame the meta shrinks first (flex-shrink 10), then the name ellipsizes; the "collapse" action never shrinks. */
+.board-cluster-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-cluster-header > span:not(.board-cluster-action) {
+  flex: 0 10 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+/* "collapse" on an open cluster, pushed to the right edge. */
+.board-cluster-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex: none;
+  margin-left: auto;
+  font-size: var(--ui-2xs);
+  color: var(--chrome-accent);
 }
 
 .board-cluster-thumbs {
@@ -4039,15 +4075,16 @@ button.chrome-section-header:focus-visible {
   right: 12px;
   display: flex;
   align-items: flex-end;
-  gap: 4px;
+  gap: 3px;
   height: 36px;
 }
 
+/* The $micro-thumb: 12 x 26, a sheet strip for overlays, dashed for a deeper level. */
 .board-cluster-thumb {
   position: relative;
   display: inline-block;
-  width: 20px;
-  height: 34px;
+  width: 12px;
+  height: 26px;
   box-sizing: border-box;
   border: 1px solid var(--chrome-border-strong);
   border-radius: 3px;
@@ -4088,8 +4125,8 @@ button.chrome-section-header:focus-visible {
 
 .board-cluster-thumbs-more {
   align-self: center;
-  font-size: 11px;
-  color: var(--chrome-text-secondary);
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
 }
 
 .board-more-tile {
@@ -4099,10 +4136,10 @@ button.chrome-section-header:focus-visible {
   align-items: center;
   justify-content: center;
   border: 1.5px dashed var(--chrome-accent);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--chrome-raised) 70%, transparent);
   color: var(--chrome-accent);
-  font-size: 13px;
+  font-size: var(--ui-base);
 }
 
 .board-tile.context {
@@ -4111,18 +4148,23 @@ button.chrome-section-header:focus-visible {
 
 .board-connector {
   fill: none;
-  stroke: var(--chrome-border-strong);
+  stroke: var(--chrome-connector);
   stroke-width: 2px;
 }
 
 .board-edge-label rect {
   fill: var(--chrome-raised);
-  stroke: var(--chrome-border-strong);
+  stroke: var(--chrome-edge);
 }
 
 .board-edge-label text {
-  font-size: 11px;
+  font-size: var(--ui-2xs);
   fill: var(--chrome-text-secondary);
+}
+
+/* The arrow of a target label: the Material path, in the label's accent. */
+.board-edge-label-arrow {
+  fill: var(--chrome-accent);
 }
 
 .board-edge-label.target rect {

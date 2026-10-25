@@ -10,6 +10,7 @@
 
 import { fetchRender } from "./api.js";
 import { applyFlowMode } from "./flows.js";
+import { icon } from "./icons.js";
 import { PIN_ICON_SVG } from "./screens.js";
 import {
   computeLayout,
@@ -19,6 +20,7 @@ import {
   findTile,
   elementSideAnchor,
   tileAnchor,
+  OUTSIDE_FILTER_BADGE,
   bezierPath,
   computeCenterScroll,
   edgesFromNode,
@@ -36,6 +38,9 @@ import {
 } from "./board.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+/** The target edge label's arrow: drawn at this size, with this much of the pill reserved for it (arrow + gap), in px. */
+const EDGE_LABEL_ARROW_SIZE = 12;
+const EDGE_LABEL_ARROW_PX = 16;
 // The base layout (tile positions, gaps, padding) is always computed at
 // native (unscaled) tile size, with the board's own 100%-zoom reference
 // gap/padding. Board zoom (5%-200%) is then a single CSS `transform:
@@ -138,6 +143,11 @@ export function createBoardView({
   // comment), never patched independently.
   let pinnedScreens = new Set();
   let outsideFilterScreens = new Set();
+
+  /** GRID_OPTIONS plus the tiles that draw the outside-filter badge, so cluster frames leave room for it. */
+  function gridOptions() {
+    return { ...GRID_OPTIONS, badged: outsideFilterScreens };
+  }
   let edgesVisible = true;
   // CHR-623 review findings 3/5: a single coalescing timer shared by every
   // relayout TRIGGER that isn't already synchronous/immediate (an iframe
@@ -266,8 +276,8 @@ export function createBoardView({
    * their cursor.
    */
   function relayout() {
-    currentColumns = computeBoardColumns(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, GRID_OPTIONS);
-    layout = computeLayout(model.items, measuredSizes, { ...GRID_OPTIONS, scale: 1, columns: currentColumns });
+    currentColumns = computeBoardColumns(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, gridOptions());
+    layout = computeLayout(model.items, measuredSizes, { ...gridOptions(), scale: 1, columns: currentColumns });
     layout = { frames: [], mores: [], connectors: [], ...layout };
     tilesEl.style.width = `${layout.contentWidth}px`;
     tilesEl.style.height = `${layout.contentHeight}px`;
@@ -396,7 +406,7 @@ export function createBoardView({
    */
   function fitAll() {
     setZoom(
-      computeFitAllZoom(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, { ...GRID_OPTIONS, columns: currentColumns }),
+      computeFitAllZoom(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, { ...gridOptions(), columns: currentColumns }),
       { source: "fitall" },
     );
   }
@@ -421,9 +431,10 @@ export function createBoardView({
     return { from, to, sides, fromEnd, toEnd };
   }
 
-  /** A pill naming the variant a docked edge really touches: accent for the target end, grey for the source end. */
+  /** A pill naming the variant a docked edge really touches: accent with an arrow for the target end, grey for the source end. */
   function buildEdgeLabel(point, side, text, role) {
-    const width = text.length * 6.2 + 14;
+    const hasArrow = role === "target";
+    const width = text.length * 6.2 + 14 + (hasArrow ? EDGE_LABEL_ARROW_PX : 0);
     const height = 18;
     const x = side === "left" ? point.x - width - 6 : side === "right" ? point.x + 6 : point.x - width / 2;
     const y = side === "top" ? point.y - height - 6 : side === "bottom" ? point.y + 6 : point.y - height / 2;
@@ -436,12 +447,25 @@ export function createBoardView({
     rect.setAttribute("height", String(height));
     rect.setAttribute("rx", "9");
     const label = document.createElementNS(SVG_NS, "text");
-    label.setAttribute("x", String(x + width / 2));
     label.setAttribute("y", String(y + height / 2));
-    label.setAttribute("text-anchor", "middle");
     label.setAttribute("dominant-baseline", "central");
     label.textContent = text;
-    g.append(rect, label);
+    g.append(rect);
+    if (hasArrow) {
+      // Material "arrow_forward" drawn as a path (24px grid scaled to the pill), so it needs no icon font and cannot change the pill's width.
+      const arrow = document.createElementNS(SVG_NS, "path");
+      arrow.setAttribute("class", "board-edge-label-arrow");
+      arrow.setAttribute("d", "M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z");
+      arrow.setAttribute("transform", `translate(${x + 6} ${y + (height - EDGE_LABEL_ARROW_SIZE) / 2}) scale(${EDGE_LABEL_ARROW_SIZE / 24})`);
+      arrow.setAttribute("aria-hidden", "true");
+      g.append(arrow);
+      label.setAttribute("x", String(x + 6 + EDGE_LABEL_ARROW_PX));
+      label.setAttribute("text-anchor", "start");
+    } else {
+      label.setAttribute("x", String(x + width / 2));
+      label.setAttribute("text-anchor", "middle");
+    }
+    g.append(label);
     return g;
   }
 
@@ -496,7 +520,7 @@ export function createBoardView({
       path.setAttribute("class", highlighted ? "board-edge highlighted" : "board-edge");
       path.setAttribute("marker-end", highlighted ? "url(#board-arrowhead-highlighted)" : "url(#board-arrowhead)");
       edgesEl.appendChild(path);
-      if (endpoints.toEnd.kind !== "tile") edgesEl.appendChild(buildEdgeLabel(endpoints.to, endpoints.sides.to, `→ ${endpoints.toEnd.screen}`, "target"));
+      if (endpoints.toEnd.kind !== "tile") edgesEl.appendChild(buildEdgeLabel(endpoints.to, endpoints.sides.to, endpoints.toEnd.screen, "target"));
       if (endpoints.fromEnd.kind !== "tile") edgesEl.appendChild(buildEdgeLabel(endpoints.from, endpoints.sides.from, endpoints.fromEnd.screen, "source"));
     }
   }
@@ -520,10 +544,19 @@ export function createBoardView({
       header.setAttribute("aria-label", `${frame.expanded ? "Collapse" : "Expand"} ${frame.root}`);
       header.style.height = `${frame.headerHeight}px`;
       const name = document.createElement("b");
-      name.textContent = `${frame.expanded ? "▾" : "▸"} ${frame.root}`;
+      const nameText = document.createElement("span");
+      nameText.className = "board-cluster-name";
+      nameText.textContent = frame.root;
+      name.append(icon(frame.expanded ? "expand_more" : "chevron_right", "board-cluster-chevron"), nameText);
       const meta = document.createElement("span");
       meta.textContent = `${frame.size} in subtree · depth ${frame.depth}`;
       header.append(name, meta);
+      if (frame.expanded) {
+        const action = document.createElement("span");
+        action.className = "board-cluster-action";
+        action.append(icon("expand_less", "icon-xs"), "collapse");
+        header.appendChild(action);
+      }
       header.addEventListener("click", (evt) => {
         evt.stopPropagation();
         if (cluster) onToggleCluster?.(cluster);
@@ -533,7 +566,7 @@ export function createBoardView({
         const main = findTile(layout.tiles, frame.root);
         const strip = document.createElement("div");
         strip.className = "board-cluster-thumbs";
-        strip.style.top = `${frame.headerHeight + (main?.height ?? 0) + 12}px`;
+        strip.style.top = `${main ? main.y - frame.y + main.height + 12 : frame.headerHeight}px`;
         for (const thumb of frame.thumbs) {
           const micro = document.createElement("span");
           micro.className = `board-cluster-thumb kind-${thumb.kind ?? "state"}`;
@@ -587,7 +620,7 @@ export function createBoardView({
     if (outsideFilterScreens.has(screen)) {
       const badge = document.createElement("span");
       badge.className = "board-tile-badge";
-      badge.textContent = "pinned · outside filter";
+      badge.textContent = OUTSIDE_FILTER_BADGE;
       tile.appendChild(badge);
     }
 

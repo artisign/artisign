@@ -115,9 +115,9 @@
         <aside id="sidebar-screens" class="side-panel" data-collapsed="false">
           <div class="side-panel-header">
             <span class="side-panel-title">Screens</span>
-            <span class="side-panel-rail-icon" aria-hidden="true">▤</span>
-            <button type="button" id="sidebar-screens-collapse" class="side-panel-collapse" aria-expanded="true" aria-label="Collapse Screens panel">
-              <span class="side-panel-collapse-chevron" aria-hidden="true">◂</span>
+            <span class="side-panel-rail-icon icon" aria-hidden="true">view_list</span>
+            <button type="button" id="sidebar-screens-collapse" class="side-panel-collapse chrome-icon-btn chrome-icon-btn--sm" aria-expanded="true" aria-label="Collapse Screens panel" data-panel="Screens" data-tooltip="Collapse Screens panel" data-shortcut="">
+              <span class="icon side-panel-collapse-icon" aria-hidden="true">left_panel_close</span>
             </button>
           </div>
           <div class="side-panel-body">
@@ -141,32 +141,39 @@
         <aside id="sidebar-context" class="side-panel" data-collapsed="false">
           <div class="side-panel-header">
             <span class="side-panel-title">Context</span>
-            <span class="side-panel-rail-icon" aria-hidden="true">💬</span>
-            <button type="button" id="sidebar-context-collapse" class="side-panel-collapse" aria-expanded="true" aria-label="Collapse Context panel">
-              <span class="side-panel-collapse-chevron" aria-hidden="true">◂</span>
+            <span class="side-panel-rail-icon icon" aria-hidden="true">chat_bubble</span>
+            <button type="button" id="sidebar-context-collapse" class="side-panel-collapse chrome-icon-btn chrome-icon-btn--sm" aria-expanded="true" aria-label="Collapse Context panel" data-panel="Context" data-tooltip="Collapse Context panel" data-shortcut="">
+              <span class="icon side-panel-collapse-icon" aria-hidden="true">left_panel_close</span>
             </button>
           </div>
           <div class="side-panel-body">
             <section id="notes-panel" hidden>
-              <button type="button" id="notes-panel-header" aria-expanded="true">
-                <span id="notes-panel-chevron" aria-hidden="true"></span>
+              <button type="button" id="notes-panel-header" class="chrome-section-header" aria-expanded="true">
+                <span id="notes-panel-chevron" class="icon section-chevron" aria-hidden="true">expand_more</span>
                 <span id="notes-panel-title">Notes</span>
                 <span id="notes-panel-screen"></span>
               </button>
               <div id="notes-panel-body">
                 <div id="notes-panel-text" class="md"></div>
+                <div id="notes-panel-chips"></div>
                 <div id="notes-panel-tags"></div>
               </div>
             </section>
             <section id="comments-panel">
-              <h2>Comments</h2>
+              <div id="comments-header" class="chrome-section-header">
+                <h2 id="comments-title">Comments</h2>
+                <span id="comments-count"></span>
+                <button type="button" id="comment-add" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Add comment" data-tooltip="Add comment" data-shortcut="">
+                  <span class="icon" aria-hidden="true">add_comment</span>
+                </button>
+              </div>
               <form id="comment-compose" hidden>
                 <p id="comment-target-label"></p>
-                <textarea id="comment-body-input" placeholder="Write a comment…" required></textarea>
+                <textarea id="comment-body-input" class="chrome-field" placeholder="Write a comment…" required></textarea>
                 <p id="comment-error" hidden></p>
                 <div id="comment-compose-actions">
-                  <button type="submit">Post</button>
-                  <button type="button" id="comment-cancel">Cancel</button>
+                  <button type="submit" class="chrome-btn chrome-btn--primary chrome-btn--compact">Post</button>
+                  <button type="button" id="comment-cancel" class="chrome-btn chrome-btn--compact">Cancel</button>
                 </div>
               </form>
               <ul id="comments-list"></ul>
@@ -348,13 +355,13 @@
                  ARIA pattern reads worse to a screen reader than a plain toggle-button pair,
                  the same convention .view-tab/.toggle-button already use elsewhere here. -->
             <div id="panel-tabs" class="panel-tabs">
-              <button type="button" id="panel-tab-elements" class="panel-tab" aria-pressed="true">Elements</button>
-              <button type="button" id="panel-tab-activity" class="panel-tab" aria-pressed="false">Activity</button>
+              <button type="button" id="panel-tab-elements" class="chrome-tab panel-tab" aria-pressed="true">Elements</button>
+              <button type="button" id="panel-tab-activity" class="chrome-tab panel-tab" aria-pressed="false">Activity</button>
             </div>
             <span id="compare-panel-title" class="side-panel-title" hidden>Compare</span>
-            <span class="side-panel-rail-icon" aria-hidden="true">☰</span>
-            <button type="button" id="inspector-collapse" class="side-panel-collapse" aria-expanded="true" aria-label="Collapse Elements panel">
-              <span class="side-panel-collapse-chevron" aria-hidden="true">▸</span>
+            <span class="side-panel-rail-icon icon" aria-hidden="true">code</span>
+            <button type="button" id="inspector-collapse" class="side-panel-collapse chrome-icon-btn chrome-icon-btn--sm" aria-expanded="true" aria-label="Collapse Elements panel" data-panel="Elements" data-tooltip="Collapse Elements panel" data-shortcut="">
+              <span class="icon side-panel-collapse-icon" aria-hidden="true">right_panel_close</span>
             </button>
           </div>
           <div class="side-panel-body">

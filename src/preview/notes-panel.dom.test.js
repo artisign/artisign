@@ -3,7 +3,7 @@
 // Smoke tests for renderTagNotes's DOM output — structure, aria state and
 // click wiring only. Mirrors mockups.dom.test.js.
 import { describe, it, expect } from "vitest";
-import { renderTagNotes } from "./notes-panel.js";
+import { renderScreenChips, renderTagNotes } from "./notes-panel.js";
 
 describe("renderTagNotes", () => {
   const allTagNotes = [
@@ -109,5 +109,15 @@ describe("renderTagNotes — expand state across re-renders (CHR-596)", () => {
     expect([...expanded]).toEqual([]);
     renderTagNotes(container, ["chr-244"], allTagNotes, expanded);
     expect(container.querySelector(".tag-notes-header").getAttribute("aria-expanded")).toBe("false");
+  });
+});
+
+describe("renderScreenChips", () => {
+  it("renders one static chip per screen tag and replaces the previous row", () => {
+    const container = document.createElement("div");
+    renderScreenChips(container, ["chr-379", "sheet"]);
+    expect([...container.querySelectorAll(".chrome-chip")].map((c) => c.textContent)).toEqual(["chr-379", "sheet"]);
+    renderScreenChips(container, []);
+    expect(container.children).toHaveLength(0);
   });
 });

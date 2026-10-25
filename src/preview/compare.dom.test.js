@@ -218,14 +218,14 @@ describe("diff marks", () => {
     expect(ghosts[0].querySelector(".compare-mark-badge").textContent).toBe("− removed");
   });
 
-  it("lists one signed row per node id with its member", async () => {
+  it("lists one icon-marked row per node id with its member", async () => {
     await enterAndLoad();
     const rows = [...els.panelEl.querySelectorAll(".compare-diff-row")];
     expect(rows.map((r) => [r.querySelector(".compare-diff-sign").textContent, r.dataset.id, r.dataset.member])).toEqual([
-      ["+", "new-card", "a"],
-      ["~", "title", "a"],
-      ["−", "old-card", "a"],
-      ["−", "gone", "a"],
+      ["add", "new-card", "a"],
+      ["edit", "title", "a"],
+      ["remove", "old-card", "a"],
+      ["remove", "gone", "a"],
     ]);
     expect(els.panelEl.querySelector(".compare-summary h3").textContent).toBe("vs. reference family");
     expect(els.panelEl.querySelector(".compare-summary-row").textContent).toContain("4 nodes");

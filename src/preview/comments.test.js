@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { openNodeIds, resolveSelectionAfterReload } from "./comments.js";
+import { formatCommentTime, openNodeIds, openThreadCount, resolveSelectionAfterReload } from "./comments.js";
 
 // node_id on a comment record is a full "<screen>.<node-id>" ref (see
 // src/tools/comments.ts createComment) — DOM element ids inside the iframe
@@ -72,5 +72,32 @@ describe("resolveSelectionAfterReload", () => {
 
   it("drops a screen-level target when the reload is for a different screen", () => {
     expect(resolveSelectionAfterReload({ ...base, selectedNode: null, reloadedScreen: "second" })).toBeUndefined();
+  });
+});
+
+describe("openThreadCount", () => {
+  it("counts root threads without a resolved record on the root or any reply", () => {
+    const comments = [
+      { id: "c1", parent_id: null, resolved: false },
+      { id: "c2", parent_id: "c1", resolved: true },
+      { id: "c3", parent_id: null, resolved: false },
+      { id: "c4", parent_id: "c3", resolved: false },
+      { id: "c5", parent_id: null, resolved: false },
+    ];
+    expect(openThreadCount(comments)).toBe(2);
+    expect(openThreadCount([])).toBe(0);
+  });
+});
+
+describe("formatCommentTime", () => {
+  const now = Date.parse("2026-10-25T12:00:00Z");
+  it("is relative inside a day", () => {
+    expect(formatCommentTime("2026-10-25T11:59:50Z", now)).toBe("just now");
+    expect(formatCommentTime("2026-10-25T11:30:00Z", now)).toBe("30m ago");
+    expect(formatCommentTime("2026-10-25T09:00:00Z", now)).toBe("3h ago");
+  });
+  it("is empty for a missing or unparseable timestamp", () => {
+    expect(formatCommentTime(undefined, now)).toBe("");
+    expect(formatCommentTime("nope", now)).toBe("");
   });
 });

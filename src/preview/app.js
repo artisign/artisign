@@ -27,11 +27,11 @@ import { createVariantUI } from "./variants.js";
 import { createCompareView } from "./compare.js";
 import { modeToggleStates } from "./compare-data.js";
 import { renderMockupList, filterMockups } from "./mockups.js";
-import { renderTagNotes } from "./notes-panel.js";
+import { renderScreenChips, renderTagNotes } from "./notes-panel.js";
 import { renderMockupView } from "./mockup-view.js";
 import { applyMockupZoom } from "./mockup-zoom.js";
 import { applyFlowMode } from "./flows.js";
-import { applyCommentMode, highlightSelection, bareNodeId, openNodeIds, renderCommentsPanel, resolveSelectionAfterReload } from "./comments.js";
+import { applyCommentMode, highlightSelection, bareNodeId, openNodeIds, openThreadCount, renderCommentsPanel, resolveSelectionAfterReload } from "./comments.js";
 import {
   pushActivityEntry,
   activityTargetExists,
@@ -95,6 +95,7 @@ const notesPanelEl = document.getElementById("notes-panel");
 const notesPanelHeader = document.getElementById("notes-panel-header");
 const notesPanelScreen = document.getElementById("notes-panel-screen");
 const notesPanelText = document.getElementById("notes-panel-text");
+const notesPanelChipsEl = document.getElementById("notes-panel-chips");
 const notesPanelTagsEl = document.getElementById("notes-panel-tags");
 const screenFrame = document.getElementById("screen-frame");
 const canvasEl = document.getElementById("canvas");
@@ -194,6 +195,8 @@ const commentComposeForm = document.getElementById("comment-compose");
 const commentTargetLabel = document.getElementById("comment-target-label");
 const commentBodyInput = document.getElementById("comment-body-input");
 const commentErrorEl = document.getElementById("comment-error");
+const commentsCountEl = document.getElementById("comments-count");
+const commentAddButton = document.getElementById("comment-add");
 const commentCancelButton = document.getElementById("comment-cancel");
 const bodyEl = document.getElementById("body");
 const sidebarScreensEl = document.getElementById("sidebar-screens");
@@ -1585,6 +1588,7 @@ function updateNotesPanel() {
   // replaces its children wholesale, so the tag sections render into their
   // own sibling element (notesPanelTagsEl), never inside this one.
   setMarkdown(notesPanelText, notes);
+  renderScreenChips(notesPanelChipsEl, screenTags);
   notesPanelHeader.setAttribute("aria-expanded", String(notesExpanded));
   renderTagNotes(notesPanelTagsEl, screenTags, tagNotes, expandedTagNotes);
 }
@@ -1728,6 +1732,8 @@ async function loadComments() {
   if (requestId !== commentsRequestId) return; // a newer request has since started — drop this stale result
   comments = result;
   renderCommentsPanel(commentsListEl, comments, handleReply);
+  const open = openThreadCount(comments);
+  commentsCountEl.textContent = comments.length === 0 ? "" : `${open} open`;
   // Markers depend on `comments`, not on the iframe's load event — refresh
   // them here, right when the data they're derived from actually changes,
   // rather than relying on applyActiveMode() being re-triggered by
@@ -1888,9 +1894,16 @@ function refitActivePane() {
  * the panel the same way a click on the chevron would.
  */
 function setupSidePanel(panelEl, collapseBtn, prefKey, defaultCollapsed = false) {
+  const iconEl = collapseBtn.querySelector(".side-panel-collapse-icon");
+  const openIcon = iconEl.textContent; // left_panel_close / right_panel_close; the rail shows a chevron pointing back at the content
+  const railIcon = panelEl.classList.contains("side-panel-right") ? "chevron_left" : "chevron_right";
   function apply(collapsed) {
     panelEl.dataset.collapsed = String(collapsed);
     collapseBtn.setAttribute("aria-expanded", String(!collapsed));
+    const label = `${collapsed ? "Expand" : "Collapse"} ${collapseBtn.dataset.panel} panel`;
+    collapseBtn.setAttribute("aria-label", label);
+    collapseBtn.dataset.tooltip = label;
+    iconEl.textContent = collapsed ? railIcon : openIcon;
   }
   apply(readBoolPref(prefsStorage, prefKey, defaultCollapsed));
   function set(collapsed) {
@@ -2082,6 +2095,12 @@ flowModeToggle.addEventListener("click", () => {
   setMode("flow");
 });
 commentModeToggle.addEventListener("click", () => setMode("comment"));
+// The Comments header's add action: comment mode on (once), then a screen-level compose — a click on an element in the frame retargets it.
+commentAddButton.addEventListener("click", () => {
+  if (!currentScreen) return;
+  if (activeMode !== "comment") setMode("comment");
+  selectCommentTarget(null);
+});
 inspectModeToggle.addEventListener("click", () => setMode("inspect"));
 
 // Esc clears inspect focus even when keyboard focus is in the parent
@@ -2222,10 +2241,12 @@ function applyMainVisibility() {
   const toggles = modeToggleStates({ view: currentView, showMockup, comparing });
   flowModeToggle.disabled = toggles.flow.disabled;
   commentModeToggle.disabled = toggles.comment.disabled;
+  commentAddButton.disabled = toggles.comment.disabled;
   inspectModeToggle.disabled = toggles.inspect.disabled;
   // The disabled reason (or the label) is the shared tooltip, not a native title.
   flowModeToggle.dataset.tooltip = toggles.flow.title || "Flow mode";
   commentModeToggle.dataset.tooltip = toggles.comment.title || "Comment mode";
+  commentAddButton.dataset.tooltip = toggles.comment.title || "Add comment";
   inspectModeToggle.dataset.tooltip = toggles.inspect.title || "Inspect mode";
   if (comparing || currentView !== "screens") setZoomMenuOpen(false);
   // The compare panel replaces the Elements/Activity panel while comparing.

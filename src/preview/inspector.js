@@ -23,6 +23,7 @@
 // compute real layout. The actual logic it leans on (token-ref-format.js,
 // inspector-data.js) is unit-tested on its own.
 
+import { icon } from "./icons.js";
 import { formatTokenRef, isRefUnresolved } from "./token-ref-format.js";
 import { relativeRect, resolveModelId, parseUnresolvedPaths, rgbToHex, formatPosition, formatTypography, formatSpacing } from "./inspector-data.js";
 
@@ -108,10 +109,7 @@ function dsRow({ property, display, unresolved, resolvedValue }) {
   row.className = unresolved ? "inspector-ds-row inspector-ds-row-warning" : "inspector-ds-row";
 
   if (unresolved) {
-    const icon = document.createElement("span");
-    icon.className = "inspector-ds-warning-icon";
-    icon.textContent = "⚠";
-    row.appendChild(icon);
+    row.appendChild(icon("warning", "inspector-ds-warning-icon icon-xs"));
   }
 
   const prop = document.createElement("span");
@@ -143,7 +141,7 @@ function statusNote(text) {
 /** @param {{ id: string, tag: string, componentRef: string | null, variant: string | null, tokenRefs: { property: string, ref: unknown }[] }} entry */
 function buildEntryBody(entry, details) {
   const body = document.createElement("div");
-  body.className = "inspector-entry-body";
+  body.className = "inspector-entry-groups";
   body.appendChild(group("Position", textValue(formatPosition(details.rect))));
   body.appendChild(group("Colors", colorSwatchRow(details)));
   body.appendChild(group("Typography", textValue(details.typography)));
@@ -237,7 +235,7 @@ export function createInspectorPanel({ listEl, emptyEl, errorEl }, { getRendered
     if (!row) return;
     row.expanded = expanded;
     row.headEl.setAttribute("aria-expanded", String(expanded));
-    row.chevronEl.textContent = expanded ? "▾" : "▶";
+    row.chevronEl.textContent = expanded ? "expand_more" : "chevron_right";
     if (expanded) {
       renderBody(id, clickedDomId ?? id);
       row.bodyEl.hidden = false;
@@ -255,10 +253,7 @@ export function createInspectorPanel({ listEl, emptyEl, errorEl }, { getRendered
     head.className = "inspector-entry-head";
     head.setAttribute("aria-expanded", "false");
 
-    const chevron = document.createElement("span");
-    chevron.className = "inspector-entry-chevron";
-    chevron.setAttribute("aria-hidden", "true");
-    chevron.textContent = "▶";
+    const chevron = icon("chevron_right", "inspector-entry-chevron icon-xs");
     head.appendChild(chevron);
 
     const label = document.createElement("span");

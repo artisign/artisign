@@ -4,7 +4,24 @@
 // of duplicated into every tagged screen's own notes. Pure DOM rendering;
 // app.js owns fetching /api/tags and wiring SSE refresh.
 
+import { icon } from "./icons.js";
 import { setMarkdown } from "./markdown.js";
+
+/**
+ * The selected screen's own tags as a row of static chips under its notes.
+ * @param {HTMLElement} container
+ * @param {string[]} screenTags
+ */
+export function renderScreenChips(container, screenTags) {
+  container.replaceChildren(
+    ...screenTags.map((tag) => {
+      const chip = document.createElement("span");
+      chip.className = "chrome-chip";
+      chip.textContent = tag;
+      return chip;
+    }),
+  );
+}
 
 /**
  * @param {HTMLElement} container — a sibling holder for tag sections, never
@@ -39,10 +56,7 @@ export function renderTagNotes(container, screenTags, allTagNotes, expandedTags 
     const isExpanded = expandedTags.has(tag);
     header.setAttribute("aria-expanded", String(isExpanded));
 
-    const chevron = document.createElement("span");
-    chevron.className = "tag-notes-chevron";
-    chevron.setAttribute("aria-hidden", "true");
-    header.appendChild(chevron);
+    header.appendChild(icon("expand_more", "section-chevron tag-notes-chevron"));
 
     const title = document.createElement("span");
     title.className = "tag-notes-title";

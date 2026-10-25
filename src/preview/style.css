@@ -831,26 +831,31 @@ body {
   width: 36px;
 }
 
+/* One header for all three panels (CHR-913): title (or the right panel's tabs) and a 24px collapse icon button. */
 .side-panel-header {
   flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  padding: 10px var(--space-md);
+  height: var(--size-panel-header);
+  padding: 0 var(--space-md) 0 var(--space-lg);
   border-bottom: 1px solid var(--chrome-border);
+  color: var(--chrome-text);
+  font-size: var(--ui-base);
+  font-weight: 500;
 }
 
+/* The rail stacks a panel icon over the expand button. */
 .side-panel[data-collapsed="true"] .side-panel-header {
   flex-direction: column;
+  height: auto;
   padding: var(--space-md) 0;
+  gap: var(--space-xs);
 }
 
 .side-panel-title {
   flex: 1;
   min-width: 0;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--chrome-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -860,34 +865,19 @@ body {
   display: none;
 }
 
-/* CHR-628/CHR-629/CHR-631 — $panel-tabs: the Elements/Activity split in the
-   right-hand panel. Same flex:1/hidden-when-collapsed role as
-   .side-panel-title above, which it replaces in that header. */
+/* CHR-628/CHR-629/CHR-631 — $panel-tabs: the Elements/Activity split in the right-hand panel, underline tabs (the topbar's .chrome-tab) that take the title's place and sit over the header's bottom border. */
 .panel-tabs {
   flex: 1;
   min-width: 0;
   display: flex;
-  gap: var(--space-lg);
+  align-items: stretch;
+  align-self: stretch;
+  gap: var(--space-2xs);
+  margin-bottom: -1px;
 }
 
 .side-panel[data-collapsed="true"] .panel-tabs {
   display: none;
-}
-
-.panel-tab {
-  border: none;
-  background: none;
-  padding: 0 0 9px;
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--chrome-text-secondary);
-  cursor: pointer;
-}
-
-.panel-tab[aria-pressed="true"] {
-  font-weight: 600;
-  color: var(--chrome-accent);
-  border-bottom: 2px solid var(--chrome-accent);
 }
 
 #panel-body-activity[hidden] {
@@ -896,30 +886,12 @@ body {
 
 .side-panel-rail-icon {
   display: none;
-  font-size: 0.95rem;
+  font-size: var(--size-icon-sm);
   color: var(--chrome-text-tertiary);
 }
 
 .side-panel[data-collapsed="true"] .side-panel-rail-icon {
   display: block;
-}
-
-.side-panel-collapse {
-  flex: none;
-  border: none;
-  background: none;
-  padding: var(--space-xs);
-  color: var(--chrome-text-tertiary);
-  cursor: pointer;
-  line-height: 1;
-}
-
-.side-panel-collapse-chevron {
-  display: inline-block;
-}
-
-.side-panel[data-collapsed="true"] .side-panel-collapse-chevron {
-  transform: rotate(180deg);
 }
 
 .side-panel-body {
@@ -932,22 +904,11 @@ body {
   display: none;
 }
 
-/* Right-hand panel: mirrored border and
-   chevron — its rail sits on the RIGHT of the content row, so "collapse"
-   points right (▸) and "expand" points left, the reverse of the left
-   panels' ◂/▸. */
+/* Right-hand panel: mirrored border; its rail sits on the RIGHT of the content row (app.js swaps the collapse icon for the matching chevron). */
 .side-panel-right {
   border-right: none;
   border-left: 1px solid var(--chrome-border);
   width: 300px;
-}
-
-.side-panel-right .side-panel-collapse-chevron {
-  transform: rotate(180deg);
-}
-
-.side-panel-right[data-collapsed="true"] .side-panel-collapse-chevron {
-  transform: rotate(0deg);
 }
 
 /* Only shown next to the single-screen canvas (Screens view) — the base
@@ -1366,7 +1327,21 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 .md h5,
 .md h6 {
   margin: var(--space-md) 0 var(--space-sm);
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--chrome-text);
+}
+
+.md h3 {
+  font-size: 1.15em;
+}
+
+.md h4 {
+  font-size: 1.05em;
+}
+
+.md h5,
+.md h6 {
+  font-size: 1em;
 }
 
 .md p {
@@ -1407,7 +1382,9 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .md th {
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--chrome-text);
+  background: var(--chrome-field);
 }
 
 .md .md-align-center {
@@ -1420,21 +1397,27 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 .md pre {
   margin: var(--space-sm) 0;
-  padding: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
   background: var(--chrome-field);
   border: 1px solid var(--chrome-border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   overflow-x: auto;
   white-space: pre-wrap;
 }
 
 .md code {
-  font-family: ui-monospace, monospace;
-  font-size: 0.9em;
+  padding: 1px var(--space-xs);
+  border-radius: var(--radius-xs);
+  background: var(--chrome-field);
+  color: var(--chrome-text);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.92em;
 }
 
 .md pre code {
-  font-family: ui-monospace, monospace;
+  padding: 0;
+  background: none;
+  border-radius: 0;
 }
 
 .md a {
@@ -1447,116 +1430,121 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   margin: var(--space-md) 0;
 }
 
-#notes-panel {
-  padding: var(--space-lg);
+/* Section header (CHR-913): 32px row with a chevron, a title and right-aligned meta; used by Notes and Comments. */
+.chrome-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  height: var(--size-row-section);
+  padding: 0 var(--space-pad);
+  border: none;
+  border-bottom: 1px solid var(--chrome-border);
+  background: none;
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-base);
+  font-weight: 500;
+  text-align: left;
+}
+
+button.chrome-section-header {
+  cursor: pointer;
+}
+
+button.chrome-section-header:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
+.section-chevron {
+  font-size: var(--size-icon-sm);
+  font-weight: 400;
+  color: var(--chrome-text-secondary);
+}
+
+[aria-expanded="false"] > .section-chevron {
+  transform: rotate(-90deg);
 }
 
 #notes-panel[hidden] {
   display: none;
 }
 
-#notes-panel-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  width: 100%;
-  border: none;
-  background: none;
-  padding: 0;
-  margin-bottom: 10px;
-  cursor: pointer;
-  text-align: left;
-}
-
-#notes-panel-chevron {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  margin-bottom: 3px;
-  border-right: 1.5px solid var(--chrome-text-tertiary);
-  border-bottom: 1.5px solid var(--chrome-text-tertiary);
-  transform: rotate(45deg);
-  transition: transform 0.1s ease;
-}
-
-#notes-panel-header[aria-expanded="false"] #notes-panel-chevron {
-  transform: rotate(-45deg);
-  margin-bottom: 0;
-}
-
-#notes-panel-title {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+#notes-panel-screen,
+#comments-count {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ui-2xs);
+  font-weight: 400;
   color: var(--chrome-text-tertiary);
-  text-transform: uppercase;
-}
-
-#notes-panel-screen {
-  font-size: 0.7rem;
-  color: var(--chrome-text-tertiary);
-}
-
-#notes-panel-body {
-  background: var(--chrome-field);
-  border: 1px solid var(--chrome-border);
-  border-radius: 8px;
-  padding: var(--space-lg);
 }
 
 #notes-panel-header[aria-expanded="false"] + #notes-panel-body {
   display: none;
 }
 
+#notes-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-pad) var(--space-lg);
+}
+
 #notes-panel-text {
   margin: 0;
-  font-size: 0.8rem;
+  font-size: 12.5px;
   color: var(--chrome-text-secondary);
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
-#notes-panel-tags:not(:empty) {
-  margin-top: var(--space-md);
+#notes-panel-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
 }
 
+#notes-panel-chips:empty,
+#notes-panel-tags:empty {
+  display: none;
+}
+
+/* The tag spec sections: collapsed by default, quieter than the Notes header above them. */
 .tag-notes-section + .tag-notes-section {
-  margin-top: var(--space-sm);
+  margin-top: var(--space-xs);
 }
 
 .tag-notes-header {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-xs);
   width: 100%;
+  height: var(--size-control-sm);
   border: none;
   background: none;
   padding: 0;
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-xs);
+  font-weight: 500;
   cursor: pointer;
   text-align: left;
 }
 
-.tag-notes-chevron {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  margin-bottom: 3px;
-  border-right: 1.5px solid var(--chrome-text-tertiary);
-  border-bottom: 1.5px solid var(--chrome-text-tertiary);
-  transform: rotate(45deg);
-  transition: transform 0.1s ease;
-}
-
-.tag-notes-header[aria-expanded="false"] .tag-notes-chevron {
-  transform: rotate(-45deg);
-  margin-bottom: 0;
+.tag-notes-header:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
 }
 
 .tag-notes-title {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--chrome-text-tertiary);
-  text-transform: uppercase;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tag-notes-header[aria-expanded="false"] + .tag-notes-body {
@@ -1564,164 +1552,224 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .tag-notes-body {
-  margin: 6px 0 0;
-  font-size: 0.8rem;
+  margin: var(--space-xs) 0 0;
+  padding: var(--space-md) var(--space-pad);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-field);
+  font-size: var(--ui-sm);
   color: var(--chrome-text-secondary);
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
-#comments-panel {
-  padding: var(--space-lg) var(--space-md);
-}
-
-/* A divider between Notes and Comments only when Notes is actually shown —
-   the `.side-panel-header` above already provides the divider otherwise. */
-#notes-panel:not([hidden]) + #comments-panel {
+/* Comments: the header carries the open count and the add action; a divider above it only when Notes is shown (the panel header's own border covers the other case). */
+#notes-panel:not([hidden]) + #comments-panel #comments-header {
   border-top: 1px solid var(--chrome-border);
 }
 
-#comments-panel h2 {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  color: var(--chrome-text-tertiary);
-  margin: 0 var(--space-xs) var(--space-md);
+#comments-title {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+#comments-count {
+  margin-right: var(--space-xs);
+}
+
+#comments-count:empty {
+  margin-left: auto;
 }
 
 #comment-compose {
-  background: var(--chrome-warning-subtle);
-  border: 1px solid color-mix(in srgb, var(--chrome-warning) 40%, transparent);
-  border-radius: 8px;
-  padding: var(--space-md);
-  margin: 0 var(--space-xs) 10px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: var(--space-pad) var(--space-pad) 0;
+  padding: var(--space-pad);
+  border: 1px solid var(--chrome-accent);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-raised);
+}
+
+#comment-compose[hidden] {
+  display: none;
 }
 
 #comment-target-label {
-  margin: 0 0 var(--space-sm);
-  font-size: 0.75rem;
-  color: var(--chrome-warning);
-  font-weight: 600;
+  margin: 0;
+  font-size: var(--ui-xs);
+  font-weight: 500;
+  color: var(--chrome-text);
+  overflow-wrap: anywhere;
 }
 
-#comment-body-input {
+/* Textareas share the field look but not its fixed single-line height. */
+#comment-body-input.chrome-field,
+.comment-reply-form textarea.chrome-field {
   width: 100%;
-  min-height: 60px;
-  resize: vertical;
-  font: inherit;
-  font-size: 0.8rem;
-  padding: var(--space-sm);
-  border: 1px solid var(--chrome-border-strong);
-  border-radius: 6px;
   box-sizing: border-box;
+  height: auto;
+  padding: var(--space-sm) var(--space-md);
+  resize: vertical;
 }
 
-#comment-error {
+#comment-body-input.chrome-field {
+  min-height: 60px;
+}
+
+.comment-reply-form textarea.chrome-field {
+  min-height: 44px;
+}
+
+#comment-error,
+.comment-reply-error {
+  margin: 0;
+  font-size: var(--ui-xs);
   color: var(--chrome-error);
-  font-size: 0.75rem;
-  margin: var(--space-sm) 0 0;
+}
+
+#comment-error[hidden],
+.comment-reply-error[hidden] {
+  display: none;
 }
 
 #comment-compose-actions {
-  margin-top: var(--space-md);
   display: flex;
   gap: var(--space-md);
-}
-
-#comment-compose-actions button {
-  border: 1px solid var(--chrome-border-strong);
-  background: var(--chrome-raised);
-  border-radius: 6px;
-  padding: var(--space-xs) 10px;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-
-#comment-compose-actions button[type="submit"] {
-  background: var(--chrome-warning);
-  border-color: var(--chrome-warning);
-  color: var(--chrome-primary-text);
 }
 
 #comments-list {
   list-style: none;
   margin: 0;
-  padding: 0 var(--space-xs);
+  padding: var(--space-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
 }
 
+/* A thread is a raised card, its replies indented field-coloured cards below it, then a ghost Reply button. */
 .comment-item {
-  border-bottom: 1px solid var(--chrome-border);
-  padding: var(--space-md) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-pad);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-raised);
 }
 
 .comment-item.comment-reply {
-  margin-left: 14px;
-  border-left: 2px solid var(--chrome-accent-subtle);
-  padding-left: var(--space-md);
+  margin-left: var(--space-xl);
+  background: var(--chrome-field);
 }
 
 .comment-meta {
-  font-size: 0.7rem;
-  color: var(--chrome-text-tertiary);
-  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
+}
+
+.comment-author {
+  font-weight: 500;
+  color: var(--chrome-text);
+}
+
+.comment-target {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: ui-monospace, Menlo, monospace;
 }
 
 .comment-body {
-  font-size: 0.8rem;
+  font-size: var(--ui-base);
+  line-height: 1.4;
   color: var(--chrome-text);
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .comments-empty {
-  font-size: 0.8rem;
+  font-size: var(--ui-sm);
   color: var(--chrome-text-tertiary);
-  padding: var(--space-md) var(--space-xs);
+  padding: var(--space-xs) 0;
 }
 
 .comment-reply-affordance {
-  margin-top: var(--space-xs);
+  margin-top: calc(-1 * var(--space-xs));
 }
 
 .comment-reply-toggle {
-  border: none;
-  background: none;
-  color: var(--chrome-accent);
-  font-size: 0.7rem;
-  cursor: pointer;
-  padding: 0;
+  color: var(--chrome-text);
+}
+
+.comment-reply-toggle:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
 }
 
 .comment-reply-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
   margin-top: var(--space-sm);
 }
 
-.comment-reply-form textarea {
+.comment-reply-form[hidden] {
+  display: none;
+}
+
+/* The "N resolved" row: dashed, collapsed until opened. */
+.comments-resolved {
+  list-style: none;
+}
+
+.comments-resolved-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
   width: 100%;
-  min-height: 44px;
-  resize: vertical;
+  padding: var(--space-pad);
+  border: 1px dashed var(--chrome-border-strong);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--chrome-text-tertiary);
   font: inherit;
-  font-size: 0.75rem;
-  padding: 5px;
-  border: 1px solid var(--chrome-border-strong);
-  border-radius: 6px;
-  box-sizing: border-box;
-}
-
-.comment-reply-error {
-  color: var(--chrome-error);
-  font-size: 0.7rem;
-  margin: var(--space-xs) 0;
-}
-
-.comment-reply-form button[type="submit"] {
-  margin-top: var(--space-xs);
-  border: 1px solid var(--chrome-border-strong);
-  background: var(--chrome-raised);
-  border-radius: 6px;
-  padding: 3px var(--space-md);
-  font-size: 0.75rem;
+  font-size: var(--ui-base);
+  text-align: left;
   cursor: pointer;
+}
+
+.comments-resolved-toggle .icon {
+  font-size: var(--size-icon-sm);
+}
+
+.comments-resolved-toggle:hover {
+  background: var(--chrome-hover);
+}
+
+.comments-resolved-toggle:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+.comments-resolved-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comments-resolved-list[hidden] {
+  display: none;
 }
 
 #main {
@@ -2135,8 +2183,9 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 #activity-feed-empty {
-  padding: 0 var(--space-xl);
-  font-size: 0.8rem;
+  margin: 0;
+  padding: var(--space-2xl) var(--space-xl);
+  font-size: var(--ui-sm);
   color: var(--chrome-text-tertiary);
   text-align: center;
 }
@@ -2161,6 +2210,11 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   cursor: default;
 }
 
+.activity-entry:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
 .activity-entry-mark {
   flex: none;
   width: 8px;
@@ -2178,13 +2232,13 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .activity-entry-tool {
-  font-family: monospace;
-  font-size: 0.78rem;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-xs);
   color: var(--chrome-text);
 }
 
 .activity-entry-target {
-  font-size: 0.7rem;
+  font-size: var(--ui-2xs);
   color: var(--chrome-text-tertiary);
   white-space: nowrap;
   overflow: hidden;
@@ -2193,7 +2247,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 .activity-entry-time {
   flex: none;
-  font-size: 0.7rem;
+  font-size: var(--ui-2xs);
   color: var(--chrome-text-tertiary);
 }
 
@@ -2211,18 +2265,15 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .activity-entry-error .activity-entry-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 14px;
   height: 14px;
   border-radius: var(--radius-pill);
   background: var(--chrome-error);
   color: var(--chrome-primary-text);
-  font-size: 9px;
-  line-height: 14px;
-  text-align: center;
-}
-
-.activity-entry-error .activity-entry-mark::before {
-  content: "\2715";
+  font-size: 10px;
 }
 
 .activity-entry-error .activity-entry-tool {
@@ -2268,38 +2319,43 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 #inspector-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: var(--space-xs) 0 0;
 }
 
 .inspector-entry {
   border-bottom: 1px solid var(--chrome-border);
 }
 
-.inspector-entry-focused {
-  background: var(--chrome-active);
-  border-left: 3px solid var(--chrome-text-secondary);
-}
-
+/* Element row: 30px, chevron + "<tag> · id" in the code face. An open row takes the active fill; the entry focused by inspect mode also tints its chevron. */
 .inspector-entry-head {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   width: 100%;
-  padding: var(--space-md) var(--space-lg);
+  height: var(--size-row-menu);
+  padding: 0 var(--space-pad);
   border: none;
   background: none;
+  color: var(--chrome-text-secondary);
   cursor: pointer;
   text-align: left;
 }
 
-.inspector-entry-focused .inspector-entry-head {
-  padding-left: 9px; /* 12px - the 3px focus border, so the row's content still lines up */
+.inspector-entry-head:hover {
+  background: var(--chrome-hover);
+}
+
+.inspector-entry-head[aria-expanded="true"] {
+  background: var(--chrome-active);
+  color: var(--chrome-text);
+}
+
+.inspector-entry-head:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
 }
 
 .inspector-entry-chevron {
-  flex: none;
-  width: 12px;
-  font-size: 0.7rem;
   color: var(--chrome-text-tertiary);
 }
 
@@ -2310,60 +2366,81 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 .inspector-entry-label {
   flex: 1;
   min-width: 0;
-  font-family: monospace;
-  font-size: 0.78rem;
-  color: var(--chrome-text);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-xs);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.inspector-entry-focused .inspector-entry-label {
-  color: var(--chrome-accent);
-  font-weight: 600;
+.inspector-entry-head[aria-expanded="true"] .inspector-entry-label {
+  font-weight: 500;
 }
 
+/* The component ref on the row: the design system's token-hit chip. */
 .inspector-entry-badge {
   flex: none;
-  font-size: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
-  border-radius: var(--radius-pill);
-  padding: 1px var(--space-md);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-chip);
+  font-weight: 400;
+}
+
+/* The detail card under an open row: Position / Colors / Typography / Spacing, then the design-system refs. */
+.inspector-entry-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: var(--space-sm) var(--space-md) var(--space-md);
+  padding: var(--space-md) var(--space-pad) var(--space-pad);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-field);
+}
+
+.inspector-entry-body[hidden] {
+  display: none;
+}
+
+.inspector-entry-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
 }
 
 .inspector-entry-note {
-  margin: calc(-1 * var(--space-xs)) 0 0 34px;
-  font-size: 0.7rem;
+  margin: 0;
+  font-size: var(--ui-2xs);
   color: var(--chrome-text-tertiary);
 }
 
 .inspector-entry-note strong {
-  font-family: monospace;
-  font-weight: 600;
+  font-family: ui-monospace, Menlo, monospace;
+  font-weight: 500;
   color: var(--chrome-accent);
-}
-
-.inspector-entry-body {
-  padding: 0 var(--space-lg) var(--space-lg) 34px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
 }
 
 .inspector-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2xs);
 }
 
 .inspector-group-label {
-  font-size: 0.68rem;
+  font-size: var(--ui-chip);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--chrome-text-tertiary);
 }
 
 .inspector-group-value {
-  font-size: 0.78rem;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-xs);
   color: var(--chrome-text);
 }
 
@@ -2372,10 +2449,12 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-sm);
-  font-size: 0.78rem;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-xs);
   color: var(--chrome-text);
 }
 
+/* The swatch fill is the element's own computed colour (set inline), never a chrome token — it reads the same in both themes. */
 .inspector-color-chip {
   flex: none;
   width: 12px;
@@ -2387,28 +2466,32 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 .inspector-ds-refs {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
 .inspector-ds-chip {
-  font-size: 0.68rem;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
-  border-radius: 6px;
-  padding: 2px var(--space-md);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-chip);
 }
 
 .inspector-ds-chip-variant {
-  background: var(--chrome-field);
-  color: var(--chrome-text-tertiary);
-  border: 1px solid var(--chrome-border-strong);
+  background: var(--chrome-raised);
+  color: var(--chrome-text-secondary);
+  border: 1px solid var(--chrome-border);
 }
 
 .inspector-ds-row {
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  font-size: 0.72rem;
+  font-size: var(--ui-2xs);
 }
 
 .inspector-ds-prop {
@@ -2421,7 +2504,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 .inspector-ds-path {
   flex: 1;
   min-width: 0;
-  font-family: monospace;
+  font-family: ui-monospace, Menlo, monospace;
   color: var(--chrome-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2430,15 +2513,15 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 .inspector-ds-value {
   flex: none;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: 1px var(--space-sm);
-  background: var(--chrome-field);
+  background: var(--chrome-raised);
   border: 1px solid var(--chrome-border);
 }
 
 .inspector-ds-row-warning {
   background: color-mix(in srgb, var(--chrome-danger) 10%, transparent);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: var(--space-xs) var(--space-sm);
 }
 
@@ -2458,7 +2541,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 #inspector-empty {
   margin: 0;
   padding: var(--space-xl);
-  font-size: 0.8rem;
+  font-size: var(--ui-sm);
   color: var(--chrome-text-tertiary);
 }
 
@@ -2469,7 +2552,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 #inspector-error {
   margin: 0;
   padding: var(--space-xl);
-  font-size: 0.8rem;
+  font-size: var(--ui-sm);
   color: var(--chrome-error);
 }
 
@@ -3780,19 +3863,20 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 .variant-card,
 .variant-map-card {
-  padding: 12px;
+  padding: var(--space-lg);
   background: var(--chrome-raised);
   border: 1px solid var(--chrome-border);
-  border-radius: 10px;
-  font-size: 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: var(--ui-sm);
+  line-height: 1.5;
   color: var(--chrome-text);
 }
 
 .variant-card h3,
 .variant-map-card h3 {
-  margin: 0 0 8px;
-  font-size: 0.68rem;
-  font-weight: 600;
+  margin: 0 0 var(--space-sm);
+  font-size: var(--ui-2xs);
+  font-weight: 500;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--chrome-text-tertiary);
@@ -3845,10 +3929,10 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 /* Inspector cards (Elements tab, above the element list). */
 #variant-inspector {
-  padding: var(--space-lg);
+  padding: var(--space-md);
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
+  gap: var(--space-md);
   border-bottom: 1px solid var(--chrome-border);
 }
 
@@ -3856,7 +3940,6 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   display: flex;
   justify-content: space-between;
   gap: var(--space-lg);
-  padding: 3px 0;
 }
 
 .variant-kv b {
@@ -3865,21 +3948,21 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--chrome-text);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .variant-link {
   display: block;
   width: 100%;
-  padding: 3px 0;
+  padding: 0;
   text-align: left;
   color: var(--chrome-accent);
-  font-size: 0.75rem;
+  font-size: var(--ui-sm);
 }
 
 .variant-home-note {
-  margin: 4px 0 0;
-  font-size: 0.68rem;
+  margin: var(--space-xs) 0 0;
+  font-size: var(--ui-2xs);
   color: var(--chrome-text-tertiary);
 }
 
@@ -4288,9 +4371,14 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 /* The compare panel: summary card, then one row per diff node. */
 #compare-panel {
-  padding: var(--space-lg);
-  font-size: 0.75rem;
+  padding: var(--space-md) 0 0;
+  font-size: var(--ui-sm);
   color: var(--chrome-text);
+}
+
+.compare-panel-empty,
+.compare-panel-error {
+  padding: 0 var(--space-lg);
 }
 
 .compare-panel-empty,
@@ -4304,16 +4392,17 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .compare-summary {
-  padding: 12px;
+  margin: 0 var(--space-md);
+  padding: var(--space-lg);
   background: var(--chrome-raised);
   border: 1px solid var(--chrome-border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .compare-summary h3 {
-  margin: 0 0 8px;
-  font-size: 0.68rem;
-  font-weight: 600;
+  margin: 0 0 var(--space-sm);
+  font-size: var(--ui-2xs);
+  font-weight: 500;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--chrome-text-tertiary);
@@ -4336,26 +4425,35 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 .compare-summary-row b {
   flex: none;
+  font-weight: 500;
   color: var(--chrome-text);
 }
 
 .compare-diff-list {
-  margin: var(--space-lg) calc(var(--space-lg) * -1) 0;
+  margin-top: var(--space-md);
+  border-top: 1px solid var(--chrome-border);
 }
 
+/* One element-row per changed node: kind icon, node id in the code face, member on the right. */
 .compare-diff-row {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
   width: 100%;
-  padding: 5px var(--space-lg);
+  min-height: var(--size-row-menu);
+  padding: var(--space-xs) var(--space-pad);
   border: none;
   border-bottom: 1px solid var(--chrome-border);
   background: transparent;
   font: inherit;
   text-align: left;
-  color: var(--chrome-text);
+  color: var(--chrome-text-secondary);
   cursor: pointer;
+}
+
+.compare-diff-row:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
 }
 
 .compare-diff-row:hover,
@@ -4364,8 +4462,6 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .compare-diff-sign {
-  width: 10px;
-  flex: none;
   color: var(--chrome-warning);
 }
 
@@ -4374,7 +4470,8 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11.5px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-xs);
 }
 
 .compare-diff-member {

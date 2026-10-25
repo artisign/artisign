@@ -291,6 +291,11 @@ export function renderActivityFeed(listEl, emptyEl, feed, { exists, onSelect, no
     const mark = document.createElement("span");
     mark.className = "activity-entry-mark";
     mark.setAttribute("aria-hidden", "true");
+    // A failed call carries a cross, not just a colour: the mark's shape is what tells the four kinds apart.
+    if (variant === "error") {
+      mark.classList.add("icon");
+      mark.textContent = "close";
+    }
     row.appendChild(mark);
 
     const body = document.createElement("span");

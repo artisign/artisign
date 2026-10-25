@@ -92,10 +92,10 @@ describe("diffRows", () => {
       ],
     });
     expect(rows).toEqual([
-      { sign: "+", kind: "added", id: "x", member: "a" },
-      { sign: "+", kind: "added", id: "y", member: "b" },
-      { sign: "~", kind: "changed", id: "g", member: "a" },
-      { sign: "−", kind: "removed", id: "card", member: "b" },
+      { kind: "added", id: "x", member: "a" },
+      { kind: "added", id: "y", member: "b" },
+      { kind: "changed", id: "g", member: "a" },
+      { kind: "removed", id: "card", member: "b" },
     ]);
   });
 

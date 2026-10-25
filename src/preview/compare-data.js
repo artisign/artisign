@@ -54,24 +54,20 @@ export function toggleMember(selected, name, family) {
   return [...selected, name];
 }
 
-const SIGNS = [
-  ["added", "+"],
-  ["changed", "~"],
-  ["removed", "−"],
-];
+const DIFF_KINDS = ["added", "changed", "removed"];
 
 /**
  * One row per node id and member for the compare panel's diff list: added,
  * then changed, then removed, members in response order within each.
  * @param {{ members: { screen: string, status: string, added: string[], changed: string[], removed: { id: string }[] }[] } | null} compare
- * @returns {{ sign: "+" | "~" | "−", kind: "added" | "changed" | "removed", id: string, member: string }[]}
+ * @returns {{ kind: "added" | "changed" | "removed", id: string, member: string }[]}
  */
 export function diffRows(compare) {
   const rows = [];
-  for (const [kind, sign] of SIGNS) {
+  for (const kind of DIFF_KINDS) {
     for (const member of compare?.members ?? []) {
       if (member.status !== "ok") continue;
-      for (const entry of member[kind]) rows.push({ sign, kind, id: typeof entry === "string" ? entry : entry.id, member: member.screen });
+      for (const entry of member[kind]) rows.push({ kind, id: typeof entry === "string" ? entry : entry.id, member: member.screen });
     }
   }
   return rows;

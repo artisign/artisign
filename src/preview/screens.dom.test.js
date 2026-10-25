@@ -202,6 +202,12 @@ describe("renderScreenList — variant tree", () => {
     expect(chips[2].title).toBe("a, b, c, d");
   });
 
+  it("gives every tag chip its full name as title (a long tag is truncated by CSS)", () => {
+    const listEl = render();
+    const chips = [...listEl.querySelectorAll('[data-screen="family"] .tag-chip:not(.tag-more)')];
+    expect(chips.map((c) => c.title)).toEqual(["a", "b"]);
+  });
+
   it("hides every chip when showTags is false", () => {
     expect(render({ showTags: false }).querySelector(".tag-row")).toBeNull();
   });

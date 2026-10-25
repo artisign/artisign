@@ -320,6 +320,7 @@ export function renderScreenList(
         chip.className = "tag-chip";
         if (tagMatches(tag)) chip.classList.add("match");
         chip.textContent = tag;
+        chip.title = tag;
         tagRow.appendChild(chip);
       }
       if (rest > 0) {

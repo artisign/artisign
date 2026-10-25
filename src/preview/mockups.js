@@ -62,6 +62,7 @@ export function renderMockupList(listEl, mockups, { activeName, onSelect }) {
         const chip = document.createElement("span");
         chip.className = "tag-chip";
         chip.textContent = tag;
+        chip.title = tag;
         tagRow.appendChild(chip);
       }
       button.appendChild(tagRow);

@@ -918,7 +918,7 @@ body {
   display: none;
 }
 
-/* Screens sidebar (CHR-914): recessed surface, search field, Tags toggle, match counter, then the tree. The panel is 264px wide expanded (the 36px rail rule is more specific on purpose). */
+/* Screens sidebar (CHR-914): search field, Tags toggle, match counter, then the tree. 264px wide while expanded; scoped to data-collapsed="false" because an id selector would otherwise beat the 36px rail rule. */
 #sidebar-screens[data-collapsed="false"] {
   width: 264px;
 }
@@ -989,7 +989,9 @@ body {
 
 #screen-list li {
   margin-bottom: var(--space-2xs);
-  /* Positioning context for the toggle, pin and compare controls — SIBLINGS of .screen-item, not children (see renderScreenList), so the positioned ancestor is the row. */
+  /* Positioning context for .screen-item-pin (CHR-624) — a SIBLING of
+     .screen-item, not a child (see screens.js's renderScreenList), so the
+     positioned ancestor has to be one level up. */
   position: relative;
 }
 
@@ -999,7 +1001,8 @@ body {
   text-align: left;
   border: none;
   background: transparent;
-  /* Right padding clears the pin, which overlaps this corner. */
+  /* Right padding wider than the other three sides (CHR-624) — clears
+     .screen-item-pin, which overlaps this corner. */
   padding: 5px 34px 6px var(--space-md);
   border-radius: var(--radius-sm);
   font: inherit;
@@ -1012,10 +1015,11 @@ body {
   background: var(--chrome-hover);
 }
 
-.screen-item[aria-current="true"] {
+.screen-item[aria-current="true"],
+li[data-depth="0"] > .screen-item.in-tree[aria-current="true"] {
   background: var(--chrome-active);
   color: var(--chrome-text);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .screen-item:focus-visible,
@@ -1130,16 +1134,21 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 /* Tag chip ($tag-chip): the 16px pill; match = accent, +N = dashed. */
 .tag-chip {
-  display: inline-flex;
-  align-items: center;
+  display: block;
   box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
   height: var(--size-chip-h);
   padding: 0 var(--space-sm);
   border-radius: var(--radius-pill);
   background: var(--chrome-field);
   color: var(--chrome-text-secondary);
   font-size: var(--ui-chip);
+  line-height: var(--size-chip-h);
   white-space: nowrap;
+  /* A long tag truncates inside the panel instead of widening it. */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tag-chip.match {
@@ -1153,6 +1162,14 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   border: 1px dashed var(--chrome-border-strong);
   color: var(--chrome-text-tertiary);
   padding: 0 5px;
+  line-height: calc(var(--size-chip-h) - 2px);
+}
+
+/* A +N chip that hides a matching tag keeps the match highlight (dashed accent). */
+.tag-chip.tag-more.match {
+  background: var(--chrome-accent-subtle);
+  border-color: var(--chrome-accent);
+  color: var(--chrome-accent);
 }
 
 .tag-row {
@@ -1168,11 +1185,15 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 /* On the selected row the chips lift onto the raised surface. */
 .screen-item[aria-current="true"] .tag-chip:not(.match):not(.tag-more),
-.mockup-item[aria-current="true"] .tag-chip:not(.match) {
+.mockup-item[aria-current="true"] .tag-chip {
   background: var(--chrome-raised);
 }
 
-/* Shared `$pin-button` look (CHR-624) — the sidebar row's own pin button (.screen-item-pin) and the board tile's (.board-tile-pin) both carry this base class, then add their own positioning on top. */
+/* Shared `$pin-button` look (CHR-624) — the sidebar row's own pin button
+   (.screen-item-pin) and the board tile's (.board-tile-pin) both carry this
+   base class, then add their own positioning on top (a sidebar row and a
+   board tile size/place it differently, but the button itself — the 22px
+   box, the icon, the pinned/unpinned color swap — is identical). */
 .pin-button {
   display: flex;
   align-items: center;
@@ -1193,21 +1214,31 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   color: var(--chrome-primary-text);
 }
 
-/* A sidebar row's pin shows on hover/focus and always once pinned, so the unpinned rows stay quiet (opacity only: no layout shift). */
+/* A sidebar row's pin shows on hover/focus and always once pinned, so the unpinned rows stay quiet (opacity only: no layout shift). While hidden it takes no clicks; keyboard focus still reaches it and reveals it. Without hover (touch) it is always shown. */
 .screen-item-pin {
   position: absolute;
   top: 4px;
   right: var(--space-md);
   opacity: 0;
+  pointer-events: none;
 }
 
 #screen-list li:hover > .screen-item-pin,
 #screen-list li:focus-within > .screen-item-pin,
 .screen-item-pin.pinned {
   opacity: 1;
+  pointer-events: auto;
 }
 
-/* Mockup sidebar section — always visually distinct from #screen-list, even though both share the row shape. */
+@media (hover: none) {
+  .screen-item-pin {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Mockup sidebar section — always visually distinct from #screen-list, even
+   though both share the row shape. */
 #mockup-section[hidden] {
   display: none;
 }

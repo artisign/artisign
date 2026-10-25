@@ -682,7 +682,7 @@ const projectUI = createProjectUI(
 );
 
 const projectDialogs = createProjectDialogs(
-  { scrimEl: dialogScrim, openSectionEl: openProjectDialogEl, initSectionEl: initProjectDialogEl },
+  { scrimEl: dialogScrim, openSectionEl: openProjectDialogEl, initSectionEl: initProjectDialogEl, fallbackFocusEl: projectPickerTrigger },
   {
     onOpen: async (dir) => {
       const result = await openProject(dir);

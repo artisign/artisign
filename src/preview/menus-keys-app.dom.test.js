@@ -25,6 +25,7 @@ function stubDaemon() {
     const path = String(url).split("?")[0];
     const json = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => "" });
     if (path === "/api/projects") return json({ active: "/p", open: [{ root: "/p", name: "alpha" }, { root: "/q", name: "beta" }], recent: ["/r/gamma"] });
+    if (path === "/api/projects/open") return json({ active: "/r/gamma", open: [{ root: "/r/gamma", name: "gamma" }], recent: [] });
     if (path === "/api/screens") return json({ screens: [{ name: "one", tags: [], notes: "" }] });
     if (path === "/api/board-state") return json({ filter: null, pinned: [], expanded: [] });
     if (path === "/api/mockups") return json({ mockups: [] });
@@ -78,14 +79,17 @@ describe("project menu", () => {
     trigger.focus();
     trigger.click();
     expect($("#project-menu").hidden).toBe(false);
-    expect(rows().map((r) => r.title || r.id)).toEqual(["/q", "/r/gamma", "menu-action-open", "menu-action-init"]);
+    expect(rows().map((r) => r.title || r.id)).toEqual(["/p", "/q", "/r/gamma", "menu-action-open", "menu-action-init"]);
     expect(document.activeElement).toBe(rows()[0]);
-    expect(rows()[0].getAttribute("role")).toBe("menuitemradio");
-    expect(rows()[0].getAttribute("aria-checked")).toBe("false");
     const current = $("#project-menu [aria-current]");
+    expect(current).toBe(rows()[0]); // the current project is a row like the others
     expect([current.getAttribute("role"), current.getAttribute("aria-checked")]).toEqual(["menuitemradio", "true"]);
+    expect(rows()[1].getAttribute("role")).toBe("menuitemradio");
+    expect(rows()[1].getAttribute("aria-checked")).toBe("false");
     expect($("#menu-action-open").getAttribute("role")).toBe("menuitem");
-    expect(rows().map((r) => r.tabIndex)).toEqual([0, -1, -1, -1]);
+    expect(rows().map((r) => r.tabIndex)).toEqual([0, -1, -1, -1, -1]);
+    // The shortcut hint in the group label is decoration.
+    expect($("#menu-label-open .chrome-menu-hint").getAttribute("aria-hidden")).toBe("true");
   });
 
   it("↑/↓/Home/End move through the rows, Escape closes and returns focus to the trigger", () => {
@@ -94,11 +98,11 @@ describe("project menu", () => {
     keydown(document.activeElement, "ArrowDown");
     expect(document.activeElement).toBe(rows()[1]);
     keydown(document.activeElement, "End");
-    expect(document.activeElement).toBe(rows()[3]);
+    expect(document.activeElement).toBe(rows()[4]);
     keydown(document.activeElement, "ArrowDown");
     expect(document.activeElement).toBe(rows()[0]);
     keydown(document.activeElement, "ArrowUp");
-    expect(document.activeElement).toBe(rows()[3]);
+    expect(document.activeElement).toBe(rows()[4]);
     keydown(document.activeElement, "Home");
     expect(document.activeElement).toBe(rows()[0]);
     keydown(document.activeElement, "Escape");
@@ -120,6 +124,24 @@ describe("project menu", () => {
     $("#menu-action-open").click();
     expect($("#project-menu").hidden).toBe(true);
     expect($("#dialog-scrim").hidden).toBe(false);
+  });
+});
+
+describe("choosing a project row", () => {
+  const rows = () => [...document.querySelectorAll("#project-menu button.chrome-menu-item")];
+
+  it.each([
+    ["an open project", 1],
+    ["a recent project", 2],
+    ["the current project", 0],
+  ])("%s closes the menu and focuses the trigger", async (_name, index) => {
+    const trigger = $("#project-picker-trigger");
+    trigger.click();
+    rows()[index].focus();
+    rows()[index].click();
+    expect($("#project-menu").hidden).toBe(true);
+    expect(document.activeElement).toBe(trigger);
+    await flush(); // let the switch / open request finish inside the stubs
   });
 });
 

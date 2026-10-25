@@ -111,12 +111,19 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
 
   /** @param {{ name: string, path: string, isArtisignProject: boolean }[]} entries */
   function renderDirList(entries) {
+    // The rows are rebuilt (navigating into a folder, picking a project): focus that was on a row stays on the same folder, or goes to the first row of the new list so the arrows keep working.
+    const active = document.activeElement;
+    const focusedPath = active instanceof HTMLElement && dirListEl.contains(active) ? (active.dataset.path ?? "") : null;
     dirListEl.innerHTML = "";
     if (entries.length === 0) {
       const empty = document.createElement("p");
       empty.className = "dir-list-empty";
       empty.textContent = "No subfolders.";
       dirListEl.appendChild(empty);
+      if (focusedPath !== null) {
+        dirListEl.tabIndex = -1; // keeps focus inside the dialog when the list it was on has no rows
+        dirListEl.focus();
+      }
       return;
     }
     for (const entry of entries) {
@@ -124,6 +131,7 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       const row = document.createElement("button");
       row.type = "button";
       row.className = "dir-row";
+      row.dataset.path = entry.path;
 
       const icon = document.createElement("span");
       icon.className = "dir-row-icon icon";
@@ -176,6 +184,10 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       }
 
       dirListEl.appendChild(row);
+    }
+    if (focusedPath !== null) {
+      const rows = /** @type {HTMLElement[]} */ ([...dirListEl.querySelectorAll(".dir-row:not(:disabled)")]);
+      (rows.find((r) => r.dataset.path === focusedPath) ?? rows[0] ?? dirListEl).focus();
     }
   }
 
@@ -345,13 +357,13 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
 }
 
 /**
- * @param {{ scrimEl: HTMLElement, openSectionEl: HTMLElement, initSectionEl: HTMLElement }} elements
+ * @param {{ scrimEl: HTMLElement, openSectionEl: HTMLElement, initSectionEl: HTMLElement, fallbackFocusEl?: HTMLElement }} elements `fallbackFocusEl`: where focus goes on close when the element that opened the dialog is gone or hidden
  * @param {{
  *   onOpen: (dir: string) => Promise<{ ok: true } | { ok: false, message: string }>,
  *   onInit: (dir: string, name: string) => Promise<{ ok: true } | { ok: false, message: string }>,
  * }} callbacks
  */
-export function createProjectDialogs({ scrimEl, openSectionEl, initSectionEl }, { onOpen, onInit }) {
+export function createProjectDialogs({ scrimEl, openSectionEl, initSectionEl, fallbackFocusEl }, { onOpen, onInit }) {
   /** Where focus goes back to when the dialog closes: whatever had it when the dialog opened (CHR-920). */
   /** @type {Element | null} */
   let returnFocusTo = null;
@@ -360,7 +372,9 @@ export function createProjectDialogs({ scrimEl, openSectionEl, initSectionEl }, 
     scrimEl.hidden = true;
     openSectionEl.hidden = true;
     initSectionEl.hidden = true;
-    if (returnFocusTo instanceof HTMLElement && returnFocusTo.isConnected) returnFocusTo.focus();
+    // The opener can be gone or hidden by now (the empty-state button after a successful open): fall back to the project picker.
+    const opener = returnFocusTo instanceof HTMLElement && returnFocusTo.isConnected && !returnFocusTo.closest("[hidden]") && returnFocusTo.checkVisibility?.() !== false ? returnFocusTo : fallbackFocusEl;
+    opener?.focus();
     returnFocusTo = null;
   }
 
@@ -410,8 +424,9 @@ export function createProjectDialogs({ scrimEl, openSectionEl, initSectionEl }, 
   scrimEl.addEventListener("click", (evt) => {
     if (evt.target === scrimEl) hide();
   });
-  // Modal: Tab and Shift+Tab cycle inside the visible dialog.
-  scrimEl.addEventListener("keydown", (evt) => {
+  // Modal: Tab and Shift+Tab cycle inside the visible dialog. On the document, not the scrim: focus can be on <body> (a re-render dropped it) and Tab must still come back in.
+  document.addEventListener("keydown", (evt) => {
+    if (scrimEl.hidden) return;
     const section = [openSectionEl, initSectionEl].find((el) => !el.hidden);
     if (section) trapFocus(evt, section);
   });

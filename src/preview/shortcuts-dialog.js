@@ -64,8 +64,9 @@ export function createShortcutsDialog({ scrimEl, columnsEl, closeEl, mac }) {
   }
 
   closeEl.addEventListener("click", hide);
-  scrimEl.addEventListener("keydown", (evt) => {
-    trapFocus(evt, dialogEl);
+  // On the document, not the scrim: with focus on <body> Tab must still enter the dialog.
+  document.addEventListener("keydown", (evt) => {
+    if (isOpen()) trapFocus(evt, dialogEl);
   });
   scrimEl.addEventListener("click", (evt) => {
     if (evt.target === scrimEl) hide();

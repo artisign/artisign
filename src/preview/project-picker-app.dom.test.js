@@ -238,8 +238,8 @@ describe("menu and empty-state rows are buttons without glyph icons (CHR-911)", 
     await boot();
     const rows = [...document.querySelectorAll("#project-menu .menu-item")];
     expect(rows).toHaveLength(3);
-    // The current project is plain content; every actionable row is a button.
-    expect(rows.map((r) => r.tagName)).toEqual(["DIV", "BUTTON", "BUTTON"]);
+    // Every row is a button, the current project included (CHR-920: it must be keyboard-reachable).
+    expect(rows.map((r) => r.tagName)).toEqual(["BUTTON", "BUTTON", "BUTTON"]);
     expect(menuRow("alpha").classList.contains("menu-item-active")).toBe(true);
     expect(menuRow("alpha").querySelector(".menu-item-check").textContent).toBe("check");
     expect(menuRow("alpha").getAttribute("aria-current")).toBe("true");

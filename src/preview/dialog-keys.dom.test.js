@@ -28,6 +28,10 @@ const keydown = (target, key, init = {}) => {
   return evt;
 };
 
+// createProjectDialogs registers document-level listeners; drop the previous test's so stale dialogs do not also react.
+let documentListeners = [];
+const nativeAddEventListener = document.addEventListener.bind(document);
+
 let scrimEl;
 let openEl;
 let initEl;
@@ -36,6 +40,11 @@ let dialogs;
 let entries;
 
 beforeEach(() => {
+  documentListeners = [];
+  document.addEventListener = (type, fn, opts) => {
+    documentListeners.push([type, fn, opts]);
+    nativeAddEventListener(type, fn, opts);
+  };
   entries = [
     { name: "alpha", path: `${HOME}/alpha`, isArtisignProject: false },
     { name: "beta", path: `${HOME}/beta`, isArtisignProject: false },
@@ -55,6 +64,8 @@ beforeEach(() => {
   dialogs = createProjectDialogs({ scrimEl, openSectionEl: openEl, initSectionEl: initEl }, { onOpen: async () => ({ ok: true }), onInit: async () => ({ ok: true }) });
 });
 afterEach(() => {
+  for (const [type, fn, opts] of documentListeners) document.removeEventListener(type, fn, opts);
+  document.addEventListener = nativeAddEventListener;
   delete globalThis.fetch;
 });
 
@@ -96,7 +107,11 @@ describe("focus trap", () => {
     chip.focus();
     expect(keydown(chip, "Tab").defaultPrevented).toBe(false);
     opener.focus();
-    keydown(scrimEl, "Tab");
+    keydown(opener, "Tab"); // focus outside the dialog (e.g. on <body> after a re-render): Tab comes back in
+    expect(openEl.contains(document.activeElement)).toBe(true);
+    document.body.focus();
+    document.activeElement.blur?.();
+    keydown(document.body, "Tab");
     expect(openEl.contains(document.activeElement)).toBe(true);
   });
 
@@ -170,5 +185,50 @@ describe("folder list arrow keys", () => {
     const evt = keydown(input, "ArrowDown");
     expect(evt.defaultPrevented).toBe(false);
     expect(document.activeElement).toBe(input);
+  });
+});
+
+describe("folder navigation keeps keyboard focus in the dialog", () => {
+  it("Enter on a folder row, then Tab and the arrows still work inside the dialog", async () => {
+    await openFromButton("open");
+    const rows = () => [...openEl.querySelectorAll(".dir-row")];
+    rows()[0].focus();
+    rows()[0].click(); // Enter on a button
+    await settle();
+    expect(document.activeElement).toBe(rows()[0]); // the list was rebuilt, focus is on its first row
+    keydown(document.activeElement, "ArrowDown");
+    expect(document.activeElement).toBe(rows()[1]);
+    document.activeElement.blur();
+    keydown(document.body, "Tab");
+    expect(openEl.contains(document.activeElement)).toBe(true);
+  });
+
+  it("an empty folder keeps focus on the list instead of dropping it to <body>", async () => {
+    await openFromButton("open");
+    const row = openEl.querySelector(".dir-row");
+    row.focus();
+    entries = [];
+    row.click();
+    await settle();
+    expect(openEl.contains(document.activeElement)).toBe(true);
+  });
+});
+
+describe("focus restore target", () => {
+  it("falls back to the given element when the opener is hidden by the time the dialog closes", async () => {
+    const fallback = document.createElement("button");
+    document.body.append(fallback);
+    scrimEl.hidden = true;
+    dialogs = createProjectDialogs({ scrimEl, openSectionEl: openEl, initSectionEl: initEl, fallbackFocusEl: fallback }, { onOpen: async () => ({ ok: true }), onInit: async () => ({ ok: true }) });
+    const holder = document.createElement("div");
+    const emptyStateButton = document.createElement("button");
+    holder.append(emptyStateButton);
+    document.body.append(holder);
+    emptyStateButton.focus();
+    dialogs.showOpenDialog();
+    await settle();
+    holder.hidden = true; // the no-project state disappears once a project opened
+    dialogs.hide();
+    expect(document.activeElement).toBe(fallback);
   });
 });

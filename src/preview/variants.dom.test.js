@@ -285,6 +285,34 @@ describe("compare mode controls (CHR-738)", () => {
     expect(make({ on: true, selected: ["dissolve"] }).querySelector(".variant-map-toggle")).toBeNull();
   });
 
+  it("an arrow key on a compare checkbox moves to the neighbouring row, not to the first or last", () => {
+    const { bar } = setupCompare("confirm", { on: true, selected: ["dissolve"] });
+    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    const pop = bar.querySelector(".variant-pop");
+    const rows = [...pop.querySelectorAll(".variant-pop-row")];
+    const boxes = [...pop.querySelectorAll(".variant-pop-check")];
+    boxes[1].focus(); // the checkbox of the second entry
+    boxes[1].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(rows[2]);
+    boxes[2].focus();
+    boxes[2].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(rows[1]);
+  });
+
+  it("Tab out of the popover closes it; Tab onto its checkboxes does not", () => {
+    const { bar } = setupCompare("confirm", { on: true, selected: [] });
+    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    const pop = bar.querySelector(".variant-pop");
+    const box = pop.querySelector(".variant-pop-check");
+    pop.querySelector(".variant-pop-row").focus();
+    pop.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: box }));
+    expect(bar.querySelector(".variant-pop")).not.toBeNull();
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    pop.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: outside }));
+    expect(bar.querySelector(".variant-pop")).toBeNull();
+  });
+
   it("has no toggle without the compare option", () => {
     const { bar } = setup("confirm");
     expect(bar.querySelector(".compare-seg")).toBeNull();

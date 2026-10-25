@@ -7,7 +7,7 @@
 import { buildScreenTree, createKindIcon, displayName } from "./screens.js";
 import { canCompare } from "./compare-data.js";
 import { icon } from "./icons.js";
-import { handleListArrowKeys, setRovingTabindex } from "./menu-keys.js";
+import { setRovingTabindex, wireMenu } from "./menu-keys.js";
 
 /** The screen part of a flow ref — "screen" or "screen.node-id". */
 export function screenOfRef(ref) {
@@ -213,14 +213,16 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
     itself.setAttribute("role", "menuitem");
     if (node.name === current) itself.classList.add("current", "is-current");
     pop.appendChild(itself);
-    const rows = () => [...pop.querySelectorAll(".variant-pop-row")];
+    const rows = () => /** @type {HTMLElement[]} */ ([...pop.querySelectorAll(".variant-pop-row")]);
     setRovingTabindex(rows(), rows()[0]);
-    pop.addEventListener("keydown", (evt) => {
-      handleListArrowKeys(evt, rows());
-    });
-    pop.addEventListener("focusin", (evt) => {
-      const target = rows().find((row) => row === evt.target);
-      if (target) setRovingTabindex(rows(), target);
+    wireMenu(pop, rows, {
+      // A compare checkbox sits beside its row: the arrows go from there to the neighbouring row.
+      rowOf: (target) => (target instanceof Element ? target.closest(".variant-pop-entry")?.querySelector(".variant-pop-row") ?? target : null),
+      // Tab leaves the popover (its checkboxes are inside it, so they stay reachable): close it like an outside click.
+      onTabOut: () => {
+        openCrumb = null;
+        rerender();
+      },
     });
     return pop;
   }

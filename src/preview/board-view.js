@@ -539,7 +539,10 @@ export function createBoardView({
       header.setAttribute("aria-label", `${frame.expanded ? "Collapse" : "Expand"} ${frame.root}`);
       header.style.height = `${frame.headerHeight}px`;
       const name = document.createElement("b");
-      name.append(icon(frame.expanded ? "expand_more" : "chevron_right", "board-cluster-chevron"), frame.root);
+      const nameText = document.createElement("span");
+      nameText.className = "board-cluster-name";
+      nameText.textContent = frame.root;
+      name.append(icon(frame.expanded ? "expand_more" : "chevron_right", "board-cluster-chevron"), nameText);
       const meta = document.createElement("span");
       meta.textContent = `${frame.size} in subtree · depth ${frame.depth}`;
       header.append(name, meta);

@@ -4037,6 +4037,8 @@ button.chrome-section-header:focus-visible {
   align-items: center;
   gap: var(--space-md);
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
   padding: 0 var(--space-lg);
   border: none;
   background: transparent;
@@ -4049,7 +4051,8 @@ button.chrome-section-header:focus-visible {
 }
 
 .board-cluster-header b {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: var(--space-md);
@@ -4060,7 +4063,15 @@ button.chrome-section-header:focus-visible {
   font-size: var(--size-icon-sm);
 }
 
+/* In a narrow frame the meta shrinks first (flex-shrink 10), then the name ellipsizes; the "collapse" action never shrinks. */
+.board-cluster-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .board-cluster-header > span:not(.board-cluster-action) {
+  flex: 0 10 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

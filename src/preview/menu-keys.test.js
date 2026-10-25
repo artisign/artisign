@@ -128,16 +128,22 @@ describe("wireMenu tab-out", () => {
     const m = document.getElementById("m");
     const outs = [];
     wireMenu(m, () => [...m.querySelectorAll("button")], { onTabOut: (to) => outs.push(to.id) });
+    const later = () => new Promise((r) => setTimeout(r, 5));
     document.getElementById("r1").focus();
     document.getElementById("out").focus(); // e.g. mousedown on another control
+    await later();
     expect(outs).toEqual([]);
     document.getElementById("r1").focus();
     document.getElementById("r1").dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
-    document.getElementById("out").focus();
+    document.getElementById("out").focus(); // the focus move the Tab caused
+    await later();
     expect(outs).toEqual(["out"]);
-    await new Promise((r) => setTimeout(r, 5));
+    // A Tab that keeps focus inside the menu is not a tab-out; a later pointer-style move is not either.
+    document.getElementById("r1").dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
     document.getElementById("r1").focus();
+    await later();
     document.getElementById("out").focus();
-    expect(outs).toEqual(["out"]); // the Tab flag does not linger
+    await later();
+    expect(outs).toEqual(["out"]);
   });
 });

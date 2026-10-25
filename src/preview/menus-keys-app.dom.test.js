@@ -42,6 +42,7 @@ const flush = async () => {
   for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0));
 };
 const $ = (sel) => document.querySelector(sel);
+const later = () => new Promise((r) => setTimeout(r, 5));
 const keydown = (target, key, init = {}) => {
   const evt = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init });
   target.dispatchEvent(evt);
@@ -110,7 +111,7 @@ describe("project menu", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it("tabbing out of the menu closes it without pulling focus back", () => {
+  it("tabbing out of the menu closes it without pulling focus back", async () => {
     $("#project-picker-trigger").click();
     const outside = $("#flow-mode-toggle");
     // A pointer press or a programmatic focus move elsewhere is not a tab-out ...
@@ -122,6 +123,28 @@ describe("project menu", () => {
     row.focus();
     keydown(row, "Tab");
     outside.focus();
+    await later();
+    expect($("#project-menu").hidden).toBe(true);
+    expect(document.activeElement).toBe(outside);
+  });
+
+  it("Shift+Tab from the first row onto the trigger closes the menu (aria-expanded false)", async () => {
+    const trigger = $("#project-picker-trigger");
+    trigger.click();
+    const first = document.querySelector("#project-menu button.chrome-menu-item");
+    keydown(first, "Tab", { shiftKey: true });
+    trigger.focus();
+    await later();
+    expect($("#project-menu").hidden).toBe(true);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("an outside click closes the menu without pulling focus back", () => {
+    $("#project-picker-trigger").click();
+    const outside = $("#flow-mode-toggle");
+    outside.focus();
+    outside.click();
     expect($("#project-menu").hidden).toBe(true);
     expect(document.activeElement).toBe(outside);
   });
@@ -137,7 +160,7 @@ describe("project menu", () => {
 describe("zoom menu", () => {
   const rows = () => [...document.querySelectorAll("#zoom-menu button")];
 
-  it("is an ARIA menu: opening focuses the current level, arrows move, Escape and a keyboard Tab close it", () => {
+  it("is an ARIA menu: opening focuses the current level, arrows move, Escape and a keyboard Tab close it", async () => {
     const trigger = $("#zoom-trigger");
     expect($("#zoom-menu").getAttribute("role")).toBe("menu");
     trigger.focus();
@@ -157,8 +180,16 @@ describe("zoom menu", () => {
     const outside = $("#flow-mode-toggle");
     keydown(document.activeElement, "Tab");
     outside.focus();
+    await later();
     expect($("#zoom-menu").hidden).toBe(true);
     expect(document.activeElement).toBe(outside);
+    // Shift+Tab from the first row onto the trigger closes it as well.
+    trigger.click();
+    keydown(document.activeElement, "Tab", { shiftKey: true });
+    trigger.focus();
+    await later();
+    expect($("#zoom-menu").hidden).toBe(true);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("picking a level checks it and the next open starts on it", () => {
@@ -212,6 +243,18 @@ describe("project dialogs", () => {
     expect(document.activeElement).toBe($("#init-name-input"));
     $("#init-project-dialog .btn-cancel").click();
     expect(document.activeElement).toBe(trigger);
+  });
+});
+
+describe("shortcut reference focus restore", () => {
+  it("falls back to the project picker when the element that opened it is hidden by then", () => {
+    const flow = $("#flow-mode-toggle");
+    flow.focus();
+    keydown(document.body, "?", { shiftKey: true });
+    flow.hidden = true;
+    keydown(document.activeElement, "Escape");
+    expect($("#shortcuts-scrim").hidden).toBe(true);
+    expect(document.activeElement).toBe($("#project-picker-trigger"));
   });
 });
 

@@ -2045,8 +2045,8 @@ function setZoomMenuOpen(open) {
   start?.focus();
 }
 wireMenu(zoomMenu, zoomMenuRows, {
-  onTabOut: (to) => {
-    if (!zoomMenu.hidden && to !== zoomTrigger) setZoomMenuOpen(false);
+  onTabOut: () => {
+    if (!zoomMenu.hidden) setZoomMenuOpen(false);
   },
 });
 
@@ -2362,6 +2362,7 @@ const shortcutsDialog = createShortcutsDialog({
   columnsEl: document.getElementById("shortcuts-columns"),
   closeEl: document.getElementById("shortcuts-close"),
   mac: macPlatform,
+  fallbackFocusEl: projectPickerTrigger,
 });
 const topbarEl = document.getElementById("topbar");
 const dialogScrimEl = document.getElementById("dialog-scrim");

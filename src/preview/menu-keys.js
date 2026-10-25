@@ -3,6 +3,16 @@
 const FOCUSABLE = 'button, [href], input:not([type="hidden"]), select, textarea, [tabindex]';
 
 /**
+ * Whether an element is really on screen: in the document, not inside a [hidden] container, not hidden by CSS (jsdom has no checkVisibility, hence the optional call).
+ *
+ * @param {HTMLElement} el
+ * @returns {boolean}
+ */
+export function isShown(el) {
+  return el.isConnected && !el.closest("[hidden]") && el.checkVisibility?.() !== false;
+}
+
+/**
  * The elements inside `container` that Tab can reach, in DOM order: enabled, not hidden, not taken out of the tab order.
  *
  * @param {HTMLElement} container
@@ -10,13 +20,7 @@ const FOCUSABLE = 'button, [href], input:not([type="hidden"]), select, textarea,
  */
 export function tabbableWithin(container) {
   return [...container.querySelectorAll(FOCUSABLE)].filter(
-    (el) =>
-      !el.disabled &&
-      el.tabIndex >= 0 &&
-      !el.closest("[hidden]") &&
-      el.getAttribute("aria-hidden") !== "true" &&
-      // Hidden by CSS (display: none, visibility: hidden); jsdom has no checkVisibility, hence the optional call.
-      el.checkVisibility?.() !== false,
+    (el) => !el.disabled && el.tabIndex >= 0 && el.getAttribute("aria-hidden") !== "true" && isShown(el),
   );
 }
 
@@ -25,13 +29,12 @@ export function tabbableWithin(container) {
  *
  * @param {KeyboardEvent} evt
  * @param {HTMLElement[]} rows the actionable rows, in order
- * @param {{ wrap?: boolean, rowOf?: (target: EventTarget | null) => Element | null | undefined }} [options] wrap past the ends (menus do, plain lists do not); `rowOf` maps a focused control that is not itself a row (a checkbox beside it) to its row, so the arrows move to the neighbour
+ * @param {{ wrap?: boolean }} [options] wrap past the ends (menus do, plain lists do not)
  * @returns {boolean}
  */
-export function handleListArrowKeys(evt, rows, { wrap = true, rowOf } = {}) {
+export function handleListArrowKeys(evt, rows, { wrap = true } = {}) {
   if (evt.defaultPrevented || evt.ctrlKey || evt.metaKey || evt.altKey || evt.shiftKey || rows.length === 0) return false;
-  const anchor = /** @type {Node} */ (rowOf?.(evt.target) ?? evt.target);
-  const current = rows.findIndex((row) => row === anchor || row.contains(anchor));
+  const current = rows.findIndex((row) => row === evt.target || row.contains(/** @type {Node} */ (evt.target)));
   let next;
   if (evt.key === "ArrowDown") next = current === -1 ? 0 : current + 1;
   else if (evt.key === "ArrowUp") next = current === -1 ? rows.length - 1 : current - 1;
@@ -107,32 +110,24 @@ export function captureFocus(container, attr, fallback) {
 }
 
 /**
- * The keyboard wiring of an ARIA menu, in one place: arrow keys / Home / End move between the rows, the focused row is the single tab stop, and a keyboard Tab that leaves the menu calls `onTabOut`. Only a real Tab counts: a pointer press or a programmatic focus move elsewhere must not trigger it (those are the outside-click close's business, and acting on them would rebuild the page under the click).
+ * The keyboard wiring of an ARIA menu, in one place: arrow keys / Home / End move between the rows, the focused row is the single tab stop, and a keyboard Tab that takes focus out of the menu calls `onTabOut` with where focus went. Only a Tab counts, and it is checked once its focus move has happened (a task later): a pointer press or a programmatic focus move elsewhere is not a tab-out, and acting on those would rebuild the page under a click.
  *
  * @param {HTMLElement} container the menu element
- * @param {() => HTMLElement[]} getRows the actionable rows, read fresh on every key
- * @param {{ rowOf?: (target: EventTarget | null) => Element | null | undefined, onTabOut?: (to: Node) => void }} [options]
+ * @param {() => HTMLElement[]} getRows the rows (every control the arrows visit), read fresh on every key
+ * @param {{ onTabOut?: (to: Element | null) => void }} [options]
  */
-export function wireMenu(container, getRows, { rowOf, onTabOut } = {}) {
-  // True from a Tab keydown until the end of that task: the focus move the key causes happens inside it.
-  let tabbing = false;
+export function wireMenu(container, getRows, { onTabOut } = {}) {
   container.addEventListener("keydown", (evt) => {
     if (evt.key === "Tab") {
-      tabbing = true;
       setTimeout(() => {
-        tabbing = false;
+        if (!container.contains(document.activeElement)) onTabOut?.(document.activeElement);
       }, 0);
     }
-    handleListArrowKeys(evt, getRows(), { rowOf });
+    handleListArrowKeys(evt, getRows());
   });
   container.addEventListener("focusin", (evt) => {
     const rows = getRows();
-    const anchor = rowOf?.(evt.target) ?? evt.target;
-    const row = rows.find((r) => r === anchor);
+    const row = rows.find((r) => r === evt.target);
     if (row) setRovingTabindex(rows, row);
-  });
-  container.addEventListener("focusout", (evt) => {
-    const to = /** @type {Node | null} */ (evt.relatedTarget);
-    if (tabbing && to && !container.contains(to)) onTabOut?.(to);
   });
 }

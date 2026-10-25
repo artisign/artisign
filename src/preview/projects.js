@@ -201,12 +201,12 @@ export function createProjectUI(elements, callbacks) {
     toggleMenu();
   });
   document.addEventListener("click", (evt) => {
-    if (menuOpen && !menuEl.contains(evt.target) && evt.target !== triggerEl) closeMenu();
+    if (menuOpen && !menuEl.contains(evt.target) && evt.target !== triggerEl) closeMenu({ focusTrigger: false }); // a pointer close never pulls focus back
   });
   // Tabbing out of the menu closes it (focus is already where the user sent it).
   wireMenu(menuEl, menuRows, {
-    onTabOut: (to) => {
-      if (menuOpen && to !== triggerEl) closeMenu({ focusTrigger: false });
+    onTabOut: () => {
+      if (menuOpen) closeMenu({ focusTrigger: false });
     },
   });
   document.addEventListener("keydown", (evt) => {

@@ -285,18 +285,25 @@ describe("compare mode controls (CHR-738)", () => {
     expect(make({ on: true, selected: ["dissolve"] }).querySelector(".variant-map-toggle")).toBeNull();
   });
 
-  it("an arrow key on a compare checkbox moves to the neighbouring row, not to the first or last", () => {
+  it("the compare checkboxes are part of the arrow order: each one, then its row, in DOM order", () => {
     const { bar } = setupCompare("confirm", { on: true, selected: ["dissolve"] });
     bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
     const pop = bar.querySelector(".variant-pop");
-    const rows = [...pop.querySelectorAll(".variant-pop-row")];
-    const boxes = [...pop.querySelectorAll(".variant-pop-check")];
-    boxes[1].focus(); // the checkbox of the second entry
-    boxes[1].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
-    expect(document.activeElement).toBe(rows[2]);
-    boxes[2].focus();
-    boxes[2].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true }));
-    expect(document.activeElement).toBe(rows[1]);
+    const entries = [...pop.querySelectorAll(".variant-pop-entry")];
+    const [box0, row0] = [entries[0].querySelector(".variant-pop-check"), entries[0].querySelector(".variant-pop-row")];
+    const [box1, row1] = [entries[1].querySelector(".variant-pop-check"), entries[1].querySelector(".variant-pop-row")];
+    const press = (key) => document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    row0.focus();
+    press("ArrowUp");
+    expect(document.activeElement).toBe(box0);
+    press("ArrowDown");
+    press("ArrowDown");
+    expect(document.activeElement).toBe(box1);
+    press("ArrowDown");
+    expect(document.activeElement).toBe(row1);
+    // The disabled boxes (cap reached) are skipped; exactly one control is a tab stop, checkboxes included.
+    const items = [...pop.querySelectorAll(".variant-pop-row, .variant-pop-check:not(:disabled)")];
+    expect(items.filter((i) => i.tabIndex === 0)).toEqual([row1]);
   });
 
   const tab = (target, init = {}) => target.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true, ...init }));

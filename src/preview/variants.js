@@ -213,19 +213,16 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
     itself.setAttribute("role", "menuitem");
     if (node.name === current) itself.classList.add("current", "is-current");
     pop.appendChild(itself);
-    const rows = () => /** @type {HTMLElement[]} */ ([...pop.querySelectorAll(".variant-pop-row")]);
+    // Every control the arrows visit, in DOM order: a compare checkbox, then its row (a disabled checkbox cannot take focus).
+    const rows = () => /** @type {HTMLElement[]} */ ([...pop.querySelectorAll(".variant-pop-row, .variant-pop-check:not(:disabled)")]);
     const all = rows();
     setRovingTabindex(all, all.find((row) => row.classList.contains("current")) ?? all[0]);
     wireMenu(pop, rows, {
-      // A compare checkbox sits beside its row: the arrows go from there to the neighbouring row.
-      rowOf: (target) => (target instanceof Element ? target.closest(".variant-pop-entry")?.querySelector(".variant-pop-row") ?? target : null),
-      // A keyboard Tab leaves the popover (its checkboxes are inside it, so they stay reachable): close it like an outside click. Deferred until the focus move has landed: the rebuild replaces the controls, and update() puts focus back on the equivalent of wherever it went.
+      // A keyboard Tab out of the popover closes it like an outside click; the focus move has already happened, update() keeps focus on the equivalent control after the rebuild.
       onTabOut: () => {
-        setTimeout(() => {
-          if (!openCrumb) return;
-          openCrumb = null;
-          rerender();
-        }, 0);
+        if (!openCrumb) return;
+        openCrumb = null;
+        rerender();
       },
     });
     return pop;

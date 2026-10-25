@@ -6,7 +6,7 @@
 // module is DOM wiring + directory-tree state only.
 
 import { fetchFsDirs, createFsDir } from "./api.js";
-import { captureFocus, handleListArrowKeys, tabbableWithin, trapFocus } from "./menu-keys.js";
+import { captureFocus, handleListArrowKeys, isShown, tabbableWithin, trapFocus } from "./menu-keys.js";
 
 /**
  * Wires one dialog section (open or init) to the shared `/api/fs/dirs`
@@ -121,7 +121,7 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       empty.textContent = "No subfolders.";
       dirListEl.appendChild(empty);
       // Focus was on a row that is gone: no rows to land on, so the first sensible control (the New folder button, else the first tabbable) — never <body>.
-      if (restoreFocus() === undefined && wasInList) (newFolderButton.disabled ? tabbableWithin(sectionEl)[0] : newFolderButton)?.focus();
+      if (restoreFocus() === undefined && wasInList) focusFallback();
       return;
     }
     for (const entry of entries) {
@@ -183,7 +183,13 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
 
       dirListEl.appendChild(row);
     }
-    restoreFocus();
+    if (restoreFocus() === undefined && wasInList) focusFallback();
+  }
+
+  /** Focus was inside the list (a row, or the inline New folder row) and its element is gone: the first folder row, else the New folder button, else the first tabbable — never <body>. */
+  function focusFallback() {
+    const firstRow = /** @type {HTMLElement | null} */ (dirListEl.querySelector(".dir-row:not(:disabled)"));
+    (firstRow ?? (newFolderButton.disabled ? tabbableWithin(sectionEl)[0] : newFolderButton))?.focus();
   }
 
   function basename(path) {
@@ -368,7 +374,7 @@ export function createProjectDialogs({ scrimEl, openSectionEl, initSectionEl, fa
     openSectionEl.hidden = true;
     initSectionEl.hidden = true;
     // The opener can be gone or hidden by now (the empty-state button after a successful open): fall back to the project picker.
-    const opener = returnFocusTo instanceof HTMLElement && returnFocusTo.isConnected && !returnFocusTo.closest("[hidden]") && returnFocusTo.checkVisibility?.() !== false ? returnFocusTo : fallbackFocusEl;
+    const opener = returnFocusTo instanceof HTMLElement && isShown(returnFocusTo) ? returnFocusTo : fallbackFocusEl;
     opener?.focus();
     returnFocusTo = null;
   }
@@ -419,17 +425,16 @@ export function createProjectDialogs({ scrimEl, openSectionEl, initSectionEl, fa
   scrimEl.addEventListener("click", (evt) => {
     if (evt.target === scrimEl) hide();
   });
-  // Modal: Tab and Shift+Tab cycle inside the visible dialog. On the document, not the scrim: focus can be on <body> (a re-render dropped it) and Tab must still come back in.
+  // Modal: Tab and Shift+Tab cycle inside the visible dialog, Escape closes it. On the document, not the scrim: focus can be on <body> (a re-render dropped it) and Tab must still come back in.
   document.addEventListener("keydown", (evt) => {
     if (scrimEl.hidden) return;
-    const section = [openSectionEl, initSectionEl].find((el) => !el.hidden);
-    if (section) trapFocus(evt, section);
-  });
-  document.addEventListener("keydown", (evt) => {
-    if (evt.key === "Escape" && !scrimEl.hidden) {
+    if (evt.key === "Escape") {
       evt.preventDefault(); // consumed: the global shortcut handler must not also leave the mode
       hide();
+      return;
     }
+    const section = [openSectionEl, initSectionEl].find((el) => !el.hidden);
+    if (section) trapFocus(evt, section);
   });
 
   return { showOpenDialog, showInitDialog, hide };

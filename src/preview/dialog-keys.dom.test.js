@@ -203,6 +203,17 @@ describe("folder navigation keeps keyboard focus in the dialog", () => {
     expect(openEl.contains(document.activeElement)).toBe(true);
   });
 
+  it("focus in the inline New folder field falls back to the first folder row when the list is rebuilt", async () => {
+    await openFromButton("open");
+    openEl.querySelector(".btn-new-folder").click();
+    const input = openEl.querySelector(".new-folder-input");
+    input.focus();
+    entries = [{ name: "other", path: `${HOME}/other`, isArtisignProject: false }];
+    openEl.querySelector('.quick-chip[data-quick="home"]').click(); // navigates without moving focus
+    await settle();
+    expect(document.activeElement).toBe(openEl.querySelector(".dir-row"));
+  });
+
   it("an empty folder moves focus to the New folder button, not <body> and not a stale tabindex on the list", async () => {
     await openFromButton("open");
     const row = openEl.querySelector(".dir-row");

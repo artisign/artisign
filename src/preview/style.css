@@ -672,27 +672,6 @@ body {
   display: none;
 }
 
-/* Text toggle buttons still used by the board toolbar; restyled with that area. */
-.toggle-button {
-  border: 1px solid var(--chrome-border-strong);
-  background: var(--chrome-raised);
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: 6px;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.toggle-button[aria-pressed="true"] {
-  background: var(--chrome-accent);
-  border-color: var(--chrome-accent);
-  color: var(--chrome-primary-text);
-}
-
-.toggle-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 /* CHR-628/CHR-629/CHR-631 — the follow toggle: a pill with two SIBLING <button>s (toggle, "Resume") inside a non-interactive <span> (review fix 4 — no interactive descendants inside a button, and a keyboard activation's target is the button itself). The pill look lives on the outer span; the buttons are UA-reset to read as plain content. */
 .follow-toggle-toggle {
   display: inline-flex;
@@ -2742,7 +2721,8 @@ button.chrome-section-header:focus-visible {
 }
 
 .ds-decision-status-superseded {
-  background: var(--chrome-hover);
+  background: var(--chrome-raised);
+  border: 1px solid var(--chrome-border-strong);
   color: var(--chrome-text-tertiary);
   font-weight: 400;
 }
@@ -2828,7 +2808,7 @@ button.chrome-section-header:focus-visible {
 }
 
 .board-quickjump,
-#board-toolbar .toggle-button {
+.toggle-button {
   border: 1px solid var(--chrome-border-strong);
   border-radius: var(--radius-sm);
   padding: var(--space-sm) var(--space-pad);
@@ -2841,12 +2821,12 @@ button.chrome-section-header:focus-visible {
 }
 
 .board-quickjump:hover,
-#board-toolbar .toggle-button:hover {
+.toggle-button:hover {
   background: var(--chrome-hover);
 }
 
 .board-quickjump:focus-visible,
-#board-toolbar .toggle-button:focus-visible,
+.toggle-button:focus-visible,
 .board-zoom-step:focus-visible,
 #board-zoom-range:focus-visible,
 #board-presented-dismiss:focus-visible,
@@ -2863,12 +2843,17 @@ button.chrome-section-header:focus-visible {
   border-color: var(--chrome-accent);
 }
 
-/* "Edges: On" / "Clusters: On" are the resting state, so they take the quiet tinted look of the design rather than a filled accent. */
-#board-toolbar .toggle-button[aria-pressed="true"] {
+/* The Edges / Clusters toggles: "On" is the resting state, so it takes the quiet tinted look of the design rather than a filled accent. */
+.toggle-button[aria-pressed="true"] {
   background: var(--chrome-accent-subtle);
   border-color: var(--chrome-border-strong);
   color: var(--chrome-accent);
   font-weight: 500;
+}
+
+.toggle-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 #board-toolbar-divider {
@@ -2938,7 +2923,7 @@ button.chrome-section-header:focus-visible {
 #board-zoom-range::-moz-range-track {
   height: 4px;
   border-radius: var(--radius-pill);
-  background: var(--chrome-field);
+  background: var(--chrome-border);
 }
 
 #board-zoom-range::-moz-range-progress {
@@ -3183,11 +3168,6 @@ button.chrome-section-header:focus-visible {
   position: absolute;
   top: -8px;
   right: -8px;
-}
-
-.board-tile.framed > .board-tile-label,
-.board-tile.framed > .board-tile-badge {
-  display: none;
 }
 
 .board-tile-label {
@@ -4048,7 +4028,6 @@ button.chrome-section-header:focus-visible {
   align-items: center;
   gap: var(--space-md);
   width: 100%;
-  min-width: 0;
   overflow: hidden;
   padding: 0 var(--space-lg);
   border: none;
@@ -4194,11 +4173,9 @@ button.chrome-section-header:focus-visible {
   fill: var(--chrome-text-secondary);
 }
 
-/* The arrow of a target label: a Material Symbol run inside the SVG text. */
-.board-edge-label-icon {
-  font-family: "Material Symbols Rounded";
-  font-size: var(--size-icon-xs);
-  font-feature-settings: "liga";
+/* The arrow of a target label: the Material path, in the label's accent. */
+.board-edge-label-arrow {
+  fill: var(--chrome-accent);
 }
 
 .board-edge-label.target rect {

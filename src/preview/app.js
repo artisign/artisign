@@ -545,7 +545,7 @@ function updateBoardToolbar() {
   // review finding 8).
   boardZoomRangeInput.setAttribute("aria-valuetext", `${rounded}%`);
   const fillPct = zoomSliderOffset(boardZoom, 100);
-  boardZoomRangeInput.style.background = `linear-gradient(to right, var(--chrome-accent) ${fillPct}%, var(--chrome-field) ${fillPct}%)`;
+  boardZoomRangeInput.style.background = `linear-gradient(to right, var(--chrome-accent) ${fillPct}%, var(--chrome-border) ${fillPct}%)`;
   board100Btn.setAttribute("aria-pressed", String(boardZoom === 100));
   boardFitallBtn.setAttribute("aria-pressed", String(lastFitAllZoom !== null && boardZoom === lastFitAllZoom));
   // aria-disabled, not the `disabled` attribute (CHR-623 review finding 8):

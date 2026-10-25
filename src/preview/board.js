@@ -570,6 +570,21 @@ const DEPTH_GAP = 56;
 const TILE_GAP = 28;
 const MORE_HEIGHT = 56;
 const MAX_THUMBS = 8;
+/** The badge on a tile that is on the board only because it is pinned (the design's `outside-filter` variant). */
+export const OUTSIDE_FILTER_BADGE = "pinned · outside filter";
+
+/** Room a tile's name label takes above its box (CSS `.board-tile-label`: ~17px line + 6px margin), and with the "pinned · outside filter" badge (`.board-tile-badge`: 16px high, 24px above the box) — plus a little air. */
+const LABEL_ABOVE = 24;
+const BADGE_ABOVE = 42;
+
+/**
+ * How far above its box a tile draws its label / badge, in board px. Cluster frames reserve this so neither lands on the frame header or on the tile above.
+ * @param {boolean} badged whether the tile carries the outside-filter badge
+ * @returns {number}
+ */
+export function tileAboveExtent(badged) {
+  return badged ? BADGE_ABOVE : LABEL_ABOVE;
+}
 
 function allNodes(node) {
   return [node, ...node.children.flatMap(allNodes)];
@@ -690,11 +705,12 @@ function layoutTile(screen, x, y, sizes, scale) {
   return { screen, x, y, width: natural.width * scale, height: natural.height * scale, naturalWidth: natural.width, naturalHeight: natural.height };
 }
 
-function collapsedBlock(cluster, sizes) {
+function collapsedBlock(cluster, sizes, badged) {
   const main = screenSize(sizes, cluster.root);
+  const above = tileAboveExtent(badged.has(cluster.root));
   const width = Math.max(FRAME_MIN_WIDTH, main.width + FRAME_PAD * 2);
   const others = cluster.members.filter((m) => m.parent !== null);
-  const height = FRAME_HEADER + main.height + (others.length > 0 ? 12 + THUMB_ROW : 0) + FRAME_PAD;
+  const height = FRAME_HEADER + above + main.height + (others.length > 0 ? 12 + THUMB_ROW : 0) + FRAME_PAD;
   return {
     width,
     height,
@@ -713,7 +729,7 @@ function collapsedBlock(cluster, sizes) {
         thumbs: others.slice(0, MAX_THUMBS).map((m) => ({ screen: m.screen, kind: m.kind, deeper: m.depth >= 2 })),
         moreThumbs: Math.max(0, others.length - MAX_THUMBS),
       });
-      out.tiles.push(layoutTile(cluster.root, x + (width - main.width) / 2, y + FRAME_HEADER, sizes, 1));
+      out.tiles.push(layoutTile(cluster.root, x + (width - main.width) / 2, y + FRAME_HEADER + above, sizes, 1));
     },
   };
 }
@@ -729,22 +745,26 @@ export function clusterTileScale(cluster, sizes) {
   return Math.max(MIN_CLUSTER_TILE_SCALE, Math.min(CLUSTER_TILE_SCALE, MAX_LEVEL_HEIGHT / tallest));
 }
 
-function expandedBlock(cluster, sizes) {
+function expandedBlock(cluster, sizes, badged) {
   const scale = clusterTileScale(cluster, sizes);
   const columns = cluster.levels.map((level) => {
-    const entries = level.tiles.map((m) => ({ member: m, size: screenSize(sizes, m.screen) }));
+    const entries = level.tiles.map((m) => ({ member: m, size: screenSize(sizes, m.screen), above: tileAboveExtent(badged.has(m.screen)) }));
     const tileWidth = Math.max(...entries.map((e) => e.size.width * scale));
     const moreWidth = level.hidden.length > 0 ? 140 : 0;
     const width = Math.max(tileWidth, moreWidth);
     const heights = entries.map((e) => e.size.height * scale);
     if (level.hidden.length > 0) heights.push(MORE_HEIGHT);
-    const height = heights.reduce((sum, h) => sum + h, 0) + TILE_GAP * Math.max(0, heights.length - 1);
-    return { level, entries, width, height };
+    // Between two tiles: the plain gap, or the next tile's label / badge if that needs more. The "+N more" tile has no label.
+    const gaps = heights.map((_, i) => (i === 0 ? 0 : Math.max(TILE_GAP, entries[i]?.above ?? 0)));
+    const height = heights.reduce((sum, h) => sum + h, 0) + gaps.reduce((sum, g) => sum + g, 0);
+    return { level, entries, gaps, width, height };
   });
+  // The first tile of a column sits below the header: pad by the frame padding or the tallest label / badge there.
+  const topPad = Math.max(FRAME_PAD, ...columns.map((c) => c.entries[0]?.above ?? 0));
   const innerWidth = columns.reduce((sum, c) => sum + c.width, 0) + DEPTH_GAP * Math.max(0, columns.length - 1);
   const innerHeight = Math.max(...columns.map((c) => c.height));
   const width = Math.max(FRAME_MIN_WIDTH, innerWidth + FRAME_PAD * 2);
-  const height = FRAME_HEADER + FRAME_PAD + innerHeight + FRAME_PAD;
+  const height = FRAME_HEADER + topPad + innerHeight + FRAME_PAD;
   return {
     width,
     height,
@@ -766,13 +786,15 @@ function expandedBlock(cluster, sizes) {
       let cx = x + FRAME_PAD + (width - FRAME_PAD * 2 - innerWidth) / 2;
       const placed = new Map();
       for (const col of columns) {
-        let cy = y + FRAME_HEADER + FRAME_PAD + (innerHeight - col.height) / 2;
-        for (const { member, size } of col.entries) {
+        let cy = y + FRAME_HEADER + topPad + (innerHeight - col.height) / 2;
+        for (const [i, { member, size }] of col.entries.entries()) {
+          if (i > 0) cy += col.gaps[i];
           const tile = layoutTile(member.screen, cx + (col.width - size.width * scale) / 2, cy, sizes, scale);
           out.tiles.push(tile);
           placed.set(member.screen, tile);
-          cy += tile.height + TILE_GAP;
+          cy += tile.height;
         }
+        if (col.level.hidden.length > 0) cy += TILE_GAP;
         if (col.level.hidden.length > 0) {
           out.mores.push({
             id: `${cluster.root}:${col.level.depth}`,
@@ -818,7 +840,7 @@ function expandedBlock(cluster, sizes) {
  *
  * @param {(string | { type: "tile", screen: string } | object)[]} items
  * @param {Record<string, { width: number, height: number }>} sizes
- * @param {{ columns?: number, gapX?: number, gapY?: number, padding?: number }} [options]
+ * @param {{ columns?: number, gapX?: number, gapY?: number, padding?: number, badged?: Set<string> }} [options]
  * @returns {{
  *   tiles: ReturnType<typeof computeBoardLayout>["tiles"],
  *   frames: object[], mores: object[], connectors: { from: string, to: string, more?: boolean }[],
@@ -830,6 +852,7 @@ export function computeClusterLayout(items, sizes, options = {}) {
   const gapX = options.gapX ?? BASE_GAP;
   const gapY = options.gapY ?? BASE_GAP;
   const padding = options.padding ?? BASE_PADDING;
+  const badged = options.badged ?? new Set(); // tiles drawing the "pinned · outside filter" badge above their box
   const out = { tiles: [], frames: [], mores: [], connectors: [], contentWidth: padding * 2, contentHeight: padding * 2 };
 
   const blocks = items.map((item) => {
@@ -838,7 +861,7 @@ export function computeClusterLayout(items, sizes, options = {}) {
       const natural = screenSize(sizes, screen);
       return { width: natural.width, height: natural.height, emit: (x, y, o) => o.tiles.push(layoutTile(screen, x, y, sizes, 1)) };
     }
-    return item.expanded ? expandedBlock(item, sizes) : collapsedBlock(item, sizes);
+    return item.expanded ? expandedBlock(item, sizes, badged) : collapsedBlock(item, sizes, badged);
   });
 
   let y = padding;

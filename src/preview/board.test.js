@@ -669,6 +669,7 @@ import {
   resolveEdgeEnd,
   resolveFlowEdge,
   clusterTileScale,
+  tileAboveExtent,
   MAX_TILES_PER_DEPTH,
 } from "./board.js";
 
@@ -968,5 +969,49 @@ describe("Fit all with clusters", () => {
     const columns = computeBoardColumns(items, sizes, 1200, 800, options);
     expect(columns).toBeGreaterThanOrEqual(1);
     expect(columns).toBeLessThanOrEqual(items.length);
+  });
+});
+
+// A tile's name label (and, for a pinned-outside-filter tile, its badge) is drawn ABOVE the tile, outside its box. The frame layout has to leave that room, or the label / badge lands on the frame header (or on the tile above).
+describe("label and badge room in cluster frames", () => {
+  const options = { columns: 3, gapX: 10, gapY: 10, padding: 10 };
+  const layoutOf = (expanded, badged) => {
+    const model = buildBoardModel(clusterScreens, allNames, expanded);
+    return computeClusterLayout(model.items, sizes, { ...options, badged: new Set(badged) });
+  };
+  /** The y the tile's label / badge starts at. */
+  const top = (tile, badged) => tile.y - tileAboveExtent(badged.has(tile.screen));
+
+  it("reserves the extent in the collapsed frame: a pinned-outside-filter root's badge stays below the header", () => {
+    const badged = new Set(["family"]);
+    const layout = layoutOf([], badged);
+    const frame = layout.frames.find((f) => f.root === "family");
+    const main = layout.tiles.find((t) => t.screen === "family");
+    expect(top(main, badged)).toBeGreaterThanOrEqual(frame.y + frame.headerHeight);
+    expect(main.y + main.height).toBeLessThanOrEqual(frame.y + frame.height);
+    // The unbadged cluster only reserves the label.
+    const other = layout.tiles.find((t) => t.screen === "dashboard");
+    const otherFrame = layout.frames.find((f) => f.root === "dashboard");
+    expect(top(other, badged)).toBeGreaterThanOrEqual(otherFrame.y + otherFrame.headerHeight);
+  });
+
+  it("an expanded frame clears the header for the first tile of every column and the tile above for the rest", () => {
+    const badged = new Set(["family", "family-leave", "family-leave-confirm", "family-leave-dissolve", "family-leave-no-transfer", "family-two-parents"]);
+    const layout = layoutOf(["family"], badged);
+    const frame = layout.frames.find((f) => f.root === "family");
+    const inFrame = layout.tiles.filter((t) => frame.members.includes(t.screen));
+    expect(inFrame.length).toBe(6);
+    for (const tile of inFrame) {
+      expect(top(tile, badged), `${tile.screen} vs header`).toBeGreaterThanOrEqual(frame.y + frame.headerHeight);
+      for (const above of inFrame) {
+        const sameColumn = above.x < tile.x + tile.width && tile.x < above.x + above.width;
+        if (above !== tile && sameColumn && above.y < tile.y) expect(top(tile, badged), `${tile.screen} vs ${above.screen}`).toBeGreaterThanOrEqual(above.y + above.height);
+      }
+      expect(tile.y + tile.height).toBeLessThanOrEqual(frame.y + frame.height);
+    }
+  });
+
+  it("without a badged tile the extent is just the label's", () => {
+    expect(tileAboveExtent(false)).toBeLessThan(tileAboveExtent(true));
   });
 });

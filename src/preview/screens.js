@@ -3,6 +3,8 @@
 // nest under it as a tree at any depth. Filter and expand state live in
 // app.js — this module only filters/renders what it's given.
 
+import { icon } from "./icons.js";
+
 // The `$pin-button` design-system component's inline map-pin glyph (CHR-624)
 // — a static SVG, not an emoji (poor contrast on the accent fill, and
 // inconsistent rendering across OSes, per the component's own usage note).
@@ -180,22 +182,20 @@ function matchesFilter(screen, needle) {
   );
 }
 
-const KIND_GLYPH = { state: "", overlay: "", step: "↪" };
+// Material Symbols per screen kind; "main" is a screen without a `variant_kind` (a root of the tree).
+const KIND_ICONS = { main: "phone_iphone", state: "description", overlay: "web_asset", step: "subdirectory_arrow_right" };
 
 /**
- * The variant-kind glyph (state / overlay / step) shared by the sidebar tree
+ * The kind icon (main / state / overlay / step) shared by the sidebar tree
  * and the screen view's breadcrumb, popover and tree map.
  * @param {string | undefined} kind
  * @returns {HTMLSpanElement | null} null for an unknown or absent kind
  */
 export function createKindIcon(kind) {
-  if (!(kind in KIND_GLYPH)) return null;
-  const icon = document.createElement("span");
-  icon.className = `kind-icon kind-${kind}`;
-  icon.dataset.kind = kind;
-  icon.setAttribute("aria-hidden", "true");
-  icon.textContent = KIND_GLYPH[kind];
-  return icon;
+  if (!(kind in KIND_ICONS)) return null;
+  const node = icon(KIND_ICONS[kind], "kind-icon");
+  node.dataset.kind = kind;
+  return node;
 }
 
 /**
@@ -280,9 +280,9 @@ export function renderScreenList(
 
     const nameEl = document.createElement("div");
     nameEl.className = "screen-item-name";
-    if (treeMode && node.parent) {
-      const icon = createKindIcon(screen.variant_kind);
-      if (icon) nameEl.appendChild(icon);
+    if (treeMode) {
+      const kindIcon = createKindIcon(node.parent ? screen.variant_kind : "main");
+      if (kindIcon) nameEl.appendChild(kindIcon);
     }
     const textEl = document.createElement("span");
     textEl.className = "screen-item-text";
@@ -344,7 +344,7 @@ export function renderScreenList(
       toggle.className = "screen-item-toggle";
       toggle.setAttribute("aria-expanded", String(row.expanded));
       toggle.setAttribute("aria-label", `${row.expanded ? "Collapse" : "Expand"} ${screen.name}`);
-      toggle.textContent = row.expanded ? "▾" : "▸";
+      toggle.appendChild(icon(row.expanded ? "expand_more" : "chevron_right", "icon-xs"));
       // Disabled while the filter holds the row open — a click would change
       // the saved expand state without any visible effect.
       if (row.forcedOpen) toggle.disabled = true;

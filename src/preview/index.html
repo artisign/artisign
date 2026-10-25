@@ -280,9 +280,9 @@
               <button type="button" id="board-100-btn" class="board-quickjump">100%</button>
               <span id="board-toolbar-divider" aria-hidden="true"></span>
               <div id="board-zoom-slider">
-                <button type="button" id="board-zoom-minus" class="board-zoom-step" aria-label="Zoom out">−</button>
+                <button type="button" id="board-zoom-minus" class="board-zoom-step" aria-label="Zoom out"><span class="icon" aria-hidden="true">remove</span></button>
                 <input type="range" id="board-zoom-range" min="5" max="200" step="1" value="80" aria-label="Board zoom" />
-                <button type="button" id="board-zoom-plus" class="board-zoom-step" aria-label="Zoom in">+</button>
+                <button type="button" id="board-zoom-plus" class="board-zoom-step" aria-label="Zoom in"><span class="icon" aria-hidden="true">add</span></button>
                 <span id="board-zoom-readout">80%</span>
               </div>
               <button type="button" id="board-edges-toggle" class="toggle-button" aria-pressed="true">Edges: On</button>
@@ -319,9 +319,9 @@
                 dismissed (no auto-dismiss timer).
               -->
               <div id="board-presented-banner" role="status" hidden>
-                <span id="board-presented-icon" aria-hidden="true">◆</span>
+                <span id="board-presented-icon" class="icon" aria-hidden="true">visibility</span>
                 <span id="board-presented-text"></span>
-                <button type="button" id="board-presented-dismiss" aria-label="Dismiss agent presentation notice">✕</button>
+                <button type="button" id="board-presented-dismiss" aria-label="Dismiss agent presentation notice"><span class="icon" aria-hidden="true">close</span></button>
               </div>
               <!--
                 CHR-624/ADR-005 — shown instead of the (empty) tile canvas
@@ -333,7 +333,7 @@
                 canvas — see the `board-view-empty` design screen.
               -->
               <div id="board-empty-state" hidden>
-                <span id="board-empty-icon" aria-hidden="true">▤</span>
+                <span id="board-empty-icon" class="icon" aria-hidden="true">view_list</span>
                 <div id="board-empty-title">No screens to show</div>
                 <div id="board-empty-body"></div>
               </div>

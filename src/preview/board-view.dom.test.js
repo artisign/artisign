@@ -103,9 +103,11 @@ describe("board clusters — DOM", () => {
     await board.setScreens(names, flows, "p", { screens, expanded: [], clusters: true });
     const labels = [...edges.querySelectorAll(".board-edge-label")].map((g) => [g.getAttribute("class"), g.textContent]);
     expect(labels).toEqual([
-      ["board-edge-label target", "→ dash-empty"],
+      ["board-edge-label target", "arrow_forward dash-empty"],
       ["board-edge-label source", "family-leave-confirm"],
     ]);
+    // The arrow is a Material Symbol run, not a Unicode glyph.
+    expect(edges.querySelector(".board-edge-label.target .board-edge-label-icon").textContent).toBe("arrow_forward");
   });
 
   it("shows a '+N more' tile for a level above the cap", async () => {

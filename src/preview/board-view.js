@@ -10,6 +10,7 @@
 
 import { fetchRender } from "./api.js";
 import { applyFlowMode } from "./flows.js";
+import { icon } from "./icons.js";
 import { PIN_ICON_SVG } from "./screens.js";
 import {
   computeLayout,
@@ -36,6 +37,8 @@ import {
 } from "./board.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+/** Width the target edge label reserves for its arrow icon, in px. */
+const EDGE_LABEL_ARROW_PX = 16;
 // The base layout (tile positions, gaps, padding) is always computed at
 // native (unscaled) tile size, with the board's own 100%-zoom reference
 // gap/padding. Board zoom (5%-200%) is then a single CSS `transform:
@@ -286,6 +289,13 @@ export function createBoardView({
       frame.style.height = `${tile.naturalHeight}px`;
       frame.style.transform = `scale(${tile.width / tile.naturalWidth})`;
     }
+    // A cluster's main tile sits under the frame header that already names it (and the header holds its own meta), so its own label and "pinned · outside filter" badge would draw over the header.
+    const frameRoots = new Set(layout.frames.map((frame) => frame.root));
+    for (const tileEl of tilesEl.querySelectorAll(".board-tile")) {
+      const framed = frameRoots.has(tileEl.dataset.screen);
+      tileEl.classList.toggle("framed", framed);
+      tileEl.title = framed && tileEl.classList.contains("outside-filter") ? "pinned · outside filter" : "";
+    }
     renderFrames();
     applyZoomSizing();
     applyZoomDependentTileChrome();
@@ -421,9 +431,10 @@ export function createBoardView({
     return { from, to, sides, fromEnd, toEnd };
   }
 
-  /** A pill naming the variant a docked edge really touches: accent for the target end, grey for the source end. */
+  /** A pill naming the variant a docked edge really touches: accent with an arrow for the target end, grey for the source end. */
   function buildEdgeLabel(point, side, text, role) {
-    const width = text.length * 6.2 + 14;
+    const hasArrow = role === "target";
+    const width = text.length * 6.2 + 14 + (hasArrow ? EDGE_LABEL_ARROW_PX : 0);
     const height = 18;
     const x = side === "left" ? point.x - width - 6 : side === "right" ? point.x + 6 : point.x - width / 2;
     const y = side === "top" ? point.y - height - 6 : side === "bottom" ? point.y + 6 : point.y - height / 2;
@@ -440,7 +451,15 @@ export function createBoardView({
     label.setAttribute("y", String(y + height / 2));
     label.setAttribute("text-anchor", "middle");
     label.setAttribute("dominant-baseline", "central");
-    label.textContent = text;
+    if (hasArrow) {
+      // The arrow is a Material Symbol ligature inside the SVG text, so it centres with the name as one run.
+      const arrow = document.createElementNS(SVG_NS, "tspan");
+      arrow.setAttribute("class", "board-edge-label-icon");
+      arrow.textContent = "arrow_forward";
+      label.append(arrow, document.createTextNode(` ${text}`));
+    } else {
+      label.textContent = text;
+    }
     g.append(rect, label);
     return g;
   }
@@ -496,7 +515,7 @@ export function createBoardView({
       path.setAttribute("class", highlighted ? "board-edge highlighted" : "board-edge");
       path.setAttribute("marker-end", highlighted ? "url(#board-arrowhead-highlighted)" : "url(#board-arrowhead)");
       edgesEl.appendChild(path);
-      if (endpoints.toEnd.kind !== "tile") edgesEl.appendChild(buildEdgeLabel(endpoints.to, endpoints.sides.to, `→ ${endpoints.toEnd.screen}`, "target"));
+      if (endpoints.toEnd.kind !== "tile") edgesEl.appendChild(buildEdgeLabel(endpoints.to, endpoints.sides.to, endpoints.toEnd.screen, "target"));
       if (endpoints.fromEnd.kind !== "tile") edgesEl.appendChild(buildEdgeLabel(endpoints.from, endpoints.sides.from, endpoints.fromEnd.screen, "source"));
     }
   }
@@ -520,10 +539,16 @@ export function createBoardView({
       header.setAttribute("aria-label", `${frame.expanded ? "Collapse" : "Expand"} ${frame.root}`);
       header.style.height = `${frame.headerHeight}px`;
       const name = document.createElement("b");
-      name.textContent = `${frame.expanded ? "▾" : "▸"} ${frame.root}`;
+      name.append(icon(frame.expanded ? "expand_more" : "chevron_right", "board-cluster-chevron"), frame.root);
       const meta = document.createElement("span");
       meta.textContent = `${frame.size} in subtree · depth ${frame.depth}`;
       header.append(name, meta);
+      if (frame.expanded) {
+        const action = document.createElement("span");
+        action.className = "board-cluster-action";
+        action.append(icon("expand_less", "icon-xs"), "collapse");
+        header.appendChild(action);
+      }
       header.addEventListener("click", (evt) => {
         evt.stopPropagation();
         if (cluster) onToggleCluster?.(cluster);

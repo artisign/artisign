@@ -1,6 +1,7 @@
 // The keyboard shortcut reference (CHR-916, screen `chrome-c-shell-shortcuts`): three columns of grouped rows, label left, key chip right. Built from the same SHORTCUTS mapping the keys are bound from. Escape, a click on the scrim, the close button and "?" close it.
 
 import { SHORTCUTS, formatShortcut } from "./shortcuts.js";
+import { trapFocus } from "./menu-keys.js";
 
 /** Group order per column, as drawn. */
 const COLUMNS = [["Modes", "Views"], ["Zoom", "Board"], ["Panels", "Project", "General"]];
@@ -51,7 +52,7 @@ export function createShortcutsDialog({ scrimEl, columnsEl, closeEl, mac }) {
     if (isOpen()) return;
     returnFocusTo = document.activeElement;
     scrimEl.hidden = false;
-    // Focus the dialog itself, not its close button: that would pop the button's tooltip. There is no focus trap yet (CHR-920): Tab still leaves the dialog.
+    // Focus the dialog itself, not its close button: that would pop the button's tooltip. Tab is trapped inside (below).
     dialogEl.focus();
   }
 
@@ -63,6 +64,9 @@ export function createShortcutsDialog({ scrimEl, columnsEl, closeEl, mac }) {
   }
 
   closeEl.addEventListener("click", hide);
+  scrimEl.addEventListener("keydown", (evt) => {
+    trapFocus(evt, dialogEl);
+  });
   scrimEl.addEventListener("click", (evt) => {
     if (evt.target === scrimEl) hide();
   });

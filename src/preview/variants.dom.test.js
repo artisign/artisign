@@ -105,6 +105,33 @@ describe("variant breadcrumb", () => {
     expect(laterListenerSaw).toBe(false);
   });
 
+  it("the popover is an ARIA menu: ↑/↓/Home/End move between the rows, one roving tab stop, Enter-style activation selects", () => {
+    const { bar, selected } = setup("confirm");
+    const toggle = bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle");
+    toggle.focus();
+    toggle.click();
+    const pop = bar.querySelector(".variant-pop");
+    expect(pop.getAttribute("role")).toBe("menu");
+    const rows = () => [...pop.querySelectorAll(".variant-pop-row")];
+    expect(rows().every((r) => r.getAttribute("role") === "menuitem")).toBe(true);
+    expect(rows().map((r) => r.tabIndex)).toEqual([0, ...rows().slice(1).map(() => -1)]);
+    const press = (key) => document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(rows()[0]);
+    press("ArrowDown");
+    expect(document.activeElement).toBe(rows()[1]);
+    expect(rows().map((r) => r.tabIndex).filter((t) => t === 0)).toHaveLength(1);
+    expect(rows()[1].tabIndex).toBe(0);
+    press("End");
+    expect(document.activeElement).toBe(rows().at(-1));
+    press("ArrowDown"); // menus wrap
+    expect(document.activeElement).toBe(rows()[0]);
+    press("ArrowUp");
+    expect(document.activeElement).toBe(rows().at(-1));
+    press("Home");
+    rows()[0].click();
+    expect(selected).toEqual([rows()[0].dataset.screen]);
+  });
+
   it("keyboard focus survives a re-render from outside (e.g. an SSE refresh)", () => {
     const { ui, bar } = setup("confirm");
     bar.querySelector(".crumb-group[data-screen=leave] .crumb").focus();

@@ -6,6 +6,7 @@
 // module is DOM wiring + directory-tree state only.
 
 import { fetchFsDirs, createFsDir } from "./api.js";
+import { handleListArrowKeys, trapFocus } from "./menu-keys.js";
 
 /**
  * Wires one dialog section (open or init) to the shared `/api/fs/dirs`
@@ -310,6 +311,11 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
     if (currentPath) openNewFolderRow();
   });
   nameInput?.addEventListener("input", updateHint);
+  // ↑/↓ (Home/End) walk the folder rows, Enter / Space activate the focused one as before. The folder rows stay buttons (CHR-920: a listbox role would fight them); keys typed in the inline "New folder" row are left alone.
+  dirListEl.addEventListener("keydown", (evt) => {
+    if (!(evt.target instanceof Element) || !evt.target.closest(".dir-row")) return;
+    handleListArrowKeys(evt, [...dirListEl.querySelectorAll(".dir-row")].filter((row) => !row.disabled), { wrap: false });
+  });
   cancelButton.addEventListener("click", () => onCancel());
   sectionEl.querySelector(".dialog-close")?.addEventListener("click", () => onCancel());
 
@@ -346,10 +352,21 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
  * }} callbacks
  */
 export function createProjectDialogs({ scrimEl, openSectionEl, initSectionEl }, { onOpen, onInit }) {
+  /** Where focus goes back to when the dialog closes: whatever had it when the dialog opened (CHR-920). */
+  /** @type {Element | null} */
+  let returnFocusTo = null;
+
   function hide() {
     scrimEl.hidden = true;
     openSectionEl.hidden = true;
     initSectionEl.hidden = true;
+    if (returnFocusTo instanceof HTMLElement && returnFocusTo.isConnected) returnFocusTo.focus();
+    returnFocusTo = null;
+  }
+
+  function rememberOpener() {
+    const active = document.activeElement;
+    returnFocusTo = active && active !== document.body && !scrimEl.contains(active) ? active : returnFocusTo;
   }
 
   const openBrowser = createBrowser(openSectionEl, {
@@ -373,21 +390,30 @@ export function createProjectDialogs({ scrimEl, openSectionEl, initSectionEl }, 
   });
 
   function showOpenDialog() {
+    rememberOpener();
     scrimEl.hidden = false;
     openSectionEl.hidden = false;
     initSectionEl.hidden = true;
     openBrowser.reset();
+    openSectionEl.querySelector(".quick-chip")?.focus();
   }
 
   function showInitDialog() {
+    rememberOpener();
     scrimEl.hidden = false;
     initSectionEl.hidden = false;
     openSectionEl.hidden = true;
     initBrowser.reset();
+    initSectionEl.querySelector(".field-name-input")?.focus();
   }
 
   scrimEl.addEventListener("click", (evt) => {
     if (evt.target === scrimEl) hide();
+  });
+  // Modal: Tab and Shift+Tab cycle inside the visible dialog.
+  scrimEl.addEventListener("keydown", (evt) => {
+    const section = [openSectionEl, initSectionEl].find((el) => !el.hidden);
+    if (section) trapFocus(evt, section);
   });
   document.addEventListener("keydown", (evt) => {
     if (evt.key === "Escape" && !scrimEl.hidden) {

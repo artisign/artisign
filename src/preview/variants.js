@@ -7,6 +7,7 @@
 import { buildScreenTree, createKindIcon, displayName } from "./screens.js";
 import { canCompare } from "./compare-data.js";
 import { icon } from "./icons.js";
+import { handleListArrowKeys, setRovingTabindex } from "./menu-keys.js";
 
 /** The screen part of a flow ref — "screen" or "screen.node-id". */
 export function screenOfRef(ref) {
@@ -170,14 +171,17 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
     box.checked = picked;
     box.disabled = !picked && state.selected.length >= state.cap;
     box.setAttribute("aria-label", `Compare ${name}`);
+    box.setAttribute("role", "menuitemcheckbox");
     box.addEventListener("change", () => compare.onPick(name));
     const wrap = el("div", "variant-pop-entry");
+    wrap.setAttribute("role", "none");
     wrap.append(box, row);
     return wrap;
   }
 
   function popoverRow(name, current) {
     const row = button("variant-pop-row chrome-menu-item", "", () => go(name));
+    row.setAttribute("role", "menuitem");
     row.dataset.screen = name;
     const kind = last.tree.nodes.get(name)?.screen.variant_kind;
     const kindIcon = createKindIcon(kind);
@@ -193,21 +197,39 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
 
   function renderPopover(node, current) {
     const pop = el("div", "variant-pop chrome-menu");
-    pop.setAttribute("role", "dialog");
+    // An ARIA menu (CHR-920): rows are menuitems with a roving tab stop, ↑/↓/Home/End move between them, Escape closes (above) and returns focus to the crumb's toggle. The compare checkboxes stay native controls (menuitemcheckbox) reached with Tab.
+    pop.setAttribute("role", "menu");
     pop.setAttribute("aria-label", `Variants around ${node.name}`);
     if (node.children.length > 0) {
-      pop.appendChild(el("h4", "chrome-menu-label chrome-menu-label--caps", `Inside ${node.name} · ${node.children.length}`));
+      pop.appendChild(popoverLabel(`Inside ${node.name} · ${node.children.length}`));
       for (const child of node.children) pop.appendChild(popoverEntry(child.name, current));
     }
     const siblings = node.parent ? node.parent.children.filter((c) => c !== node) : [];
     if (siblings.length > 0) {
-      pop.appendChild(el("h4", "chrome-menu-label chrome-menu-label--caps", `Siblings in ${node.parent.name} · ${siblings.length}`));
+      pop.appendChild(popoverLabel(`Siblings in ${node.parent.name} · ${siblings.length}`));
       for (const sibling of siblings) pop.appendChild(popoverEntry(sibling.name, current));
     }
     const itself = button("variant-pop-row chrome-menu-item variant-pop-itself", `Open ${node.name} itself`, () => go(node.name));
+    itself.setAttribute("role", "menuitem");
     if (node.name === current) itself.classList.add("current", "is-current");
     pop.appendChild(itself);
+    const rows = () => [...pop.querySelectorAll(".variant-pop-row")];
+    setRovingTabindex(rows(), rows()[0]);
+    pop.addEventListener("keydown", (evt) => {
+      handleListArrowKeys(evt, rows());
+    });
+    pop.addEventListener("focusin", (evt) => {
+      const target = rows().find((row) => row === evt.target);
+      if (target) setRovingTabindex(rows(), target);
+    });
     return pop;
+  }
+
+  /** A section label inside the menu: presentation only (the menu itself carries the name). */
+  function popoverLabel(text) {
+    const label = el("h4", "chrome-menu-label chrome-menu-label--caps", text);
+    label.setAttribute("role", "presentation");
+    return label;
   }
 
   function renderBar(ctx, current) {

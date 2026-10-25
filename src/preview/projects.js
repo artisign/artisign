@@ -2,6 +2,10 @@
 // the same `/api/projects` shape ({ active, open, recent }) — kept in one
 // module since they're never out of sync with each other, unlike the
 // dialogs (project-dialogs.js), which browse the filesystem independently.
+//
+// The menu is an ARIA menu (CHR-920): role="menu", rows role="menuitem" (the open projects "menuitemradio", the current one checked), opening focuses the first actionable row, ↑/↓/Home/End move between rows with a roving tab stop, Escape closes and puts focus back on the trigger.
+
+import { handleListArrowKeys, setRovingTabindex } from "./menu-keys.js";
 
 /** @typedef {{ active: string | null, open: { root: string, name: string }[], recent: string[] }} ProjectsState */
 
@@ -59,22 +63,39 @@ export function createProjectUI(elements, callbacks) {
   /** @type {ProjectsState} */
   let state = { active: null, open: [], recent: [] };
 
+  /** The actionable rows, in order: open projects, recent projects, then the two actions. The current project is plain content and not among them. */
+  function menuRows() {
+    return /** @type {HTMLElement[]} */ ([...menuEl.querySelectorAll("button.chrome-menu-item")]).filter((row) => !row.closest("[hidden]"));
+  }
+
   function closeMenu() {
+    // Focus inside the menu would be lost with it: hand it back to the trigger.
+    const hadFocus = menuEl.contains(document.activeElement);
     menuOpen = false;
     menuEl.hidden = true;
     triggerEl.setAttribute("aria-expanded", "false");
+    if (hadFocus) triggerEl.focus();
   }
 
   function toggleMenu() {
-    menuOpen = !menuOpen;
-    menuEl.hidden = !menuOpen;
-    triggerEl.setAttribute("aria-expanded", String(menuOpen));
+    if (menuOpen) {
+      closeMenu();
+      return;
+    }
+    menuOpen = true;
+    menuEl.hidden = false;
+    triggerEl.setAttribute("aria-expanded", "true");
+    const rows = menuRows();
+    setRovingTabindex(rows, rows[0]);
+    rows[0]?.focus();
   }
 
-  function renderMenuRow(name, path, isActive, onClick) {
+  function renderMenuRow(name, path, isActive, onClick, isOpenProject = false) {
     // The current project is not actionable, so it is plain content, not a focusable button that does nothing.
     const row = document.createElement(isActive ? "div" : "button");
     if (!isActive) row.type = "button";
+    row.setAttribute("role", isOpenProject ? "menuitemradio" : "menuitem");
+    if (isOpenProject) row.setAttribute("aria-checked", String(isActive));
     row.className = "menu-item chrome-menu-item";
     row.title = path;
     if (isActive) {
@@ -106,7 +127,7 @@ export function createProjectUI(elements, callbacks) {
     for (const project of state.open) {
       const isActive = project.root === state.active;
       openListEl.appendChild(
-        renderMenuRow(project.name, project.root, isActive, isActive ? undefined : () => onSwitch(project.root)),
+        renderMenuRow(project.name, project.root, isActive, isActive ? undefined : () => onSwitch(project.root), true),
       );
     }
     openLabelEl.hidden = state.open.length === 0;
@@ -167,6 +188,18 @@ export function createProjectUI(elements, callbacks) {
   });
   document.addEventListener("click", (evt) => {
     if (menuOpen && !menuEl.contains(evt.target) && evt.target !== triggerEl) closeMenu();
+  });
+  menuEl.addEventListener("keydown", (evt) => {
+    handleListArrowKeys(evt, menuRows());
+  });
+  menuEl.addEventListener("focusin", (evt) => {
+    const rows = menuRows();
+    setRovingTabindex(rows, rows.find((row) => row === evt.target));
+  });
+  // Tabbing out of the menu closes it (focus is already where the user sent it).
+  menuEl.addEventListener("focusout", (evt) => {
+    const to = /** @type {Node | null} */ (evt.relatedTarget);
+    if (menuOpen && to && !menuEl.contains(to) && to !== triggerEl) closeMenu();
   });
   document.addEventListener("keydown", (evt) => {
     if (evt.key === "Escape" && menuOpen) {

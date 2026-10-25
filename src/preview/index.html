@@ -22,23 +22,23 @@
       <header id="topbar">
         <span id="app-title">Artisign</span>
         <div id="project-picker">
-          <button type="button" id="project-picker-trigger" class="chrome-dropdown" aria-haspopup="true" aria-expanded="false">
+          <button type="button" id="project-picker-trigger" class="chrome-dropdown" aria-haspopup="true" aria-expanded="false" data-shortcut-id="project-menu">
             <span id="project-picker-icon" class="icon" aria-hidden="true">folder_open</span>
             <span id="project-picker-name">No project open</span>
             <span id="project-picker-chevron" class="icon" aria-hidden="true">expand_more</span>
           </button>
           <div id="project-menu" class="chrome-menu" hidden>
-            <p id="menu-label-open" class="chrome-menu-label" hidden>Open projects</p>
+            <p id="menu-label-open" class="chrome-menu-label" hidden>Open projects<span class="chrome-menu-hint" data-shortcut-id="project-menu"></span></p>
             <div id="menu-open-list"></div>
             <div id="menu-divider-1" class="chrome-menu-divider" hidden></div>
             <p id="menu-label-recent" class="chrome-menu-label" hidden>Recent</p>
             <div id="menu-recent-list"></div>
             <div id="menu-divider-2" class="chrome-menu-divider"></div>
             <button type="button" id="menu-action-open" class="chrome-menu-item">
-              <span class="icon chrome-menu-icon" aria-hidden="true">folder_open</span>Open project…
+              <span class="icon chrome-menu-icon" aria-hidden="true">folder_open</span>Open project…<span class="chrome-menu-hint" data-shortcut-id="menu-open"></span>
             </button>
             <button type="button" id="menu-action-init" class="chrome-menu-item">
-              <span class="icon chrome-menu-icon" aria-hidden="true">add</span>New project…
+              <span class="icon chrome-menu-icon" aria-hidden="true">add</span>New project…<span class="chrome-menu-hint" data-shortcut-id="menu-new"></span>
             </button>
           </div>
         </div>
@@ -57,22 +57,22 @@
              interactive descendant, and a keyboard activation's own event.target is the
              outer button either way, never a nested span. -->
         <span id="follow-toggle" class="follow-toggle chrome-pill project-only" data-state="off">
-          <button type="button" id="follow-toggle-toggle" class="follow-toggle-toggle" aria-pressed="false">
+          <button type="button" id="follow-toggle-toggle" class="follow-toggle-toggle" aria-pressed="false" data-tooltip="Follow the agent" data-shortcut-id="follow">
             <span id="follow-toggle-dot" class="follow-toggle-dot" aria-hidden="true"></span>
             <span id="follow-toggle-label" class="follow-toggle-label">Follow</span>
           </button>
           <span id="follow-toggle-divider" class="follow-toggle-divider" aria-hidden="true"></span>
-          <button type="button" id="follow-toggle-resume" class="follow-toggle-resume">Resume</button>
+          <button type="button" id="follow-toggle-resume" class="follow-toggle-resume" data-tooltip="Resume follow" data-shortcut-id="follow-resume">Resume</button>
         </span>
         <span class="topbar-spacer" aria-hidden="true"></span>
-        <!-- CHR-912: icon-only mode toggles. aria-label is the accessible name; data-tooltip is the shared tooltip (app.js swaps it for the disabled reason while comparing). data-shortcut stays empty until the shortcut ticket (CHR-916) binds the keys. -->
-        <button type="button" id="flow-mode-toggle" class="chrome-icon-btn project-only" aria-pressed="false" aria-label="Flow mode" data-tooltip="Flow mode" data-shortcut="">
+        <!-- CHR-912: icon-only mode toggles. aria-label is the accessible name; data-tooltip is the shared tooltip (app.js swaps it for the disabled reason while comparing). CHR-916: data-shortcut-id names the entry of the shortcut mapping (shortcuts.js); the key shown in the tooltip is filled in at boot. -->
+        <button type="button" id="flow-mode-toggle" class="chrome-icon-btn project-only" aria-pressed="false" aria-label="Flow mode" data-tooltip="Flow mode" data-shortcut-id="flow">
           <span class="icon" aria-hidden="true">route</span>
         </button>
-        <button type="button" id="comment-mode-toggle" class="chrome-icon-btn project-only" aria-pressed="false" aria-label="Comment mode" data-tooltip="Comment mode" data-shortcut="">
+        <button type="button" id="comment-mode-toggle" class="chrome-icon-btn project-only" aria-pressed="false" aria-label="Comment mode" data-tooltip="Comment mode" data-shortcut-id="comment">
           <span class="icon" aria-hidden="true">chat_bubble</span>
         </button>
-        <button type="button" id="inspect-mode-toggle" class="chrome-icon-btn project-only" aria-pressed="false" aria-label="Inspect mode" data-tooltip="Inspect mode" data-shortcut="">
+        <button type="button" id="inspect-mode-toggle" class="chrome-icon-btn project-only" aria-pressed="false" aria-label="Inspect mode" data-tooltip="Inspect mode" data-shortcut-id="inspect">
           <span class="icon" aria-hidden="true">frame_inspect</span>
         </button>
         <div id="canvas-controls" class="project-only">
@@ -84,13 +84,16 @@
               <span class="icon" aria-hidden="true">expand_more</span>
             </button>
             <div id="zoom-menu" class="chrome-menu" role="group" aria-label="Zoom" hidden>
-              <button type="button" class="zoom-button chrome-menu-item" data-zoom="fit" aria-pressed="true"><span class="icon chrome-menu-check" aria-hidden="true"></span>Fit</button>
-              <button type="button" class="zoom-button chrome-menu-item" data-zoom="0.5" aria-pressed="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>50%</button>
-              <button type="button" class="zoom-button chrome-menu-item" data-zoom="1" aria-pressed="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>100%</button>
-              <button type="button" class="zoom-button chrome-menu-item" data-zoom="2" aria-pressed="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>200%</button>
+              <button type="button" class="zoom-button chrome-menu-item" data-zoom="fit" aria-pressed="true"><span class="icon chrome-menu-check" aria-hidden="true"></span>Fit<span class="chrome-menu-hint" data-shortcut-id="zoom-fit"></span></button>
+              <button type="button" class="zoom-button chrome-menu-item" data-zoom="0.5" aria-pressed="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>50%<span class="chrome-menu-hint" data-shortcut-id="zoom-50"></span></button>
+              <button type="button" class="zoom-button chrome-menu-item" data-zoom="1" aria-pressed="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>100%<span class="chrome-menu-hint" data-shortcut-id="zoom-100"></span></button>
+              <button type="button" class="zoom-button chrome-menu-item" data-zoom="2" aria-pressed="false"><span class="icon chrome-menu-check" aria-hidden="true"></span>200%<span class="chrome-menu-hint" data-shortcut-id="zoom-200"></span></button>
+              <div class="chrome-menu-divider" role="separator"></div>
+              <button type="button" class="zoom-step-button chrome-menu-item" data-zoom-step="in">Zoom in<span class="chrome-menu-hint" data-shortcut-id="zoom-in"></span></button>
+              <button type="button" class="zoom-step-button chrome-menu-item" data-zoom-step="out">Zoom out<span class="chrome-menu-hint" data-shortcut-id="zoom-out"></span></button>
             </div>
           </div>
-          <button type="button" id="status-bar-toggle" class="chrome-icon-btn" aria-pressed="false" aria-label="Status bar" data-tooltip="Status bar" data-shortcut="">
+          <button type="button" id="status-bar-toggle" class="chrome-icon-btn" aria-pressed="false" aria-label="Status bar" data-tooltip="Status bar" data-shortcut-id="status-bar">
             <span class="icon" aria-hidden="true">smartphone</span>
           </button>
         </div>
@@ -103,6 +106,7 @@
           class="chrome-icon-btn"
           aria-label="Theme: System"
           data-tooltip="Theme: System"
+          data-shortcut-id="theme"
         >
           <span class="icon" aria-hidden="true">contrast</span>
         </button>
@@ -116,7 +120,7 @@
           <div class="side-panel-header">
             <span class="side-panel-title">Screens</span>
             <span class="side-panel-rail-icon icon" aria-hidden="true">view_list</span>
-            <button type="button" id="sidebar-screens-collapse" class="side-panel-collapse chrome-icon-btn chrome-icon-btn--sm" aria-expanded="true" aria-label="Collapse Screens panel" data-panel="Screens" data-tooltip="Collapse Screens panel" data-shortcut="">
+            <button type="button" id="sidebar-screens-collapse" class="side-panel-collapse chrome-icon-btn chrome-icon-btn--sm" aria-expanded="true" aria-label="Collapse Screens panel" data-panel="Screens" data-tooltip="Collapse Screens panel" data-shortcut-id="panel-screens">
               <span class="icon side-panel-collapse-icon" aria-hidden="true">left_panel_close</span>
             </button>
           </div>
@@ -142,7 +146,7 @@
           <div class="side-panel-header">
             <span class="side-panel-title">Context</span>
             <span class="side-panel-rail-icon icon" aria-hidden="true">chat_bubble</span>
-            <button type="button" id="sidebar-context-collapse" class="side-panel-collapse chrome-icon-btn chrome-icon-btn--sm" aria-expanded="true" aria-label="Collapse Context panel" data-panel="Context" data-tooltip="Collapse Context panel" data-shortcut="">
+            <button type="button" id="sidebar-context-collapse" class="side-panel-collapse chrome-icon-btn chrome-icon-btn--sm" aria-expanded="true" aria-label="Collapse Context panel" data-panel="Context" data-tooltip="Collapse Context panel" data-shortcut-id="panel-context">
               <span class="icon side-panel-collapse-icon" aria-hidden="true">left_panel_close</span>
             </button>
           </div>
@@ -276,8 +280,8 @@
               chr-621 design-system tag notes' "Filter ∪ pins" section.
             -->
             <div id="board-toolbar">
-              <button type="button" id="board-fitall-btn" class="board-quickjump">Fit all</button>
-              <button type="button" id="board-100-btn" class="board-quickjump">100%</button>
+              <button type="button" id="board-fitall-btn" class="board-quickjump" data-shortcut-id="board-fit-all">Fit all</button>
+              <button type="button" id="board-100-btn" class="board-quickjump" data-shortcut-id="board-100">100%</button>
               <span id="board-toolbar-divider" aria-hidden="true"></span>
               <div id="board-zoom-slider">
                 <button type="button" id="board-zoom-minus" class="board-zoom-step" aria-label="Zoom out"><span class="icon" aria-hidden="true">remove</span></button>
@@ -285,9 +289,9 @@
                 <button type="button" id="board-zoom-plus" class="board-zoom-step" aria-label="Zoom in"><span class="icon" aria-hidden="true">add</span></button>
                 <span id="board-zoom-readout">80%</span>
               </div>
-              <button type="button" id="board-edges-toggle" class="toggle-button" aria-pressed="true">Edges: On</button>
-              <button type="button" id="board-clusters-toggle" class="toggle-button" aria-pressed="true">Clusters: On</button>
-              <button type="button" id="board-collapse-all-btn" class="board-quickjump">Collapse all</button>
+              <button type="button" id="board-edges-toggle" class="toggle-button" aria-pressed="true" data-shortcut-id="board-edges">Edges: On</button>
+              <button type="button" id="board-clusters-toggle" class="toggle-button" aria-pressed="true" data-shortcut-id="board-clusters">Clusters: On</button>
+              <button type="button" id="board-collapse-all-btn" class="board-quickjump" data-shortcut-id="board-collapse-all">Collapse all</button>
               <span id="board-toolbar-spacer"></span>
               <span id="board-toolbar-status"></span>
               <span id="board-toolbar-actions">
@@ -360,7 +364,7 @@
             </div>
             <span id="compare-panel-title" class="side-panel-title" hidden>Compare</span>
             <span class="side-panel-rail-icon icon" aria-hidden="true">code</span>
-            <button type="button" id="inspector-collapse" class="side-panel-collapse chrome-icon-btn chrome-icon-btn--sm" aria-expanded="true" aria-label="Collapse Elements panel" data-panel="Elements" data-tooltip="Collapse Elements panel" data-shortcut="">
+            <button type="button" id="inspector-collapse" class="side-panel-collapse chrome-icon-btn chrome-icon-btn--sm" aria-expanded="true" aria-label="Collapse Elements panel" data-panel="Elements" data-tooltip="Collapse Elements panel" data-shortcut-id="panel-elements">
               <span class="icon side-panel-collapse-icon" aria-hidden="true">right_panel_close</span>
             </button>
           </div>
@@ -399,6 +403,17 @@
           </div>
         </section>
       </main>
+    </div>
+    <!-- CHR-916: the keyboard shortcut reference (?), built from the shortcut mapping by shortcuts-dialog.js. -->
+    <div id="shortcuts-scrim" class="chrome-scrim" hidden>
+      <section id="shortcuts-dialog" class="chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" tabindex="-1">
+        <div class="dialog-head">
+          <h1 id="shortcuts-title" class="dialog-title">Keyboard shortcuts</h1>
+          <button type="button" id="shortcuts-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </div>
+        <p class="dialog-sub">Single keys work while no text field has focus. Nothing fires with Ctrl, Cmd or Alt held, so browser shortcuts stay untouched.</p>
+        <div id="shortcuts-columns"></div>
+      </section>
     </div>
     <div id="dialog-scrim" class="chrome-scrim" hidden>
       <section id="open-project-dialog" class="project-dialog chrome-dialog" hidden>

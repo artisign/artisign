@@ -291,6 +291,12 @@
   text-transform: uppercase;
 }
 
+/* The label row of the project menu carries its shortcut at the right edge. */
+.chrome-menu-label:has(.chrome-menu-hint) {
+  display: flex;
+  align-items: center;
+}
+
 .chrome-menu-hint {
   flex: none;
   margin-left: auto;
@@ -520,6 +526,11 @@
   font: inherit;
   font-size: var(--ui-chip);
   white-space: nowrap;
+}
+
+/* A key or reference in the code face (shortcut reference, mono chips). */
+.chrome-chip--ref {
+  font-family: ui-monospace, Menlo, monospace;
 }
 
 .chrome-chip--hit {
@@ -4582,4 +4593,45 @@ li.has-compare > .screen-item {
   flex: none;
   margin: 0 0 0 6px;
   accent-color: var(--chrome-accent);
+}
+
+/* Keyboard shortcut reference (CHR-916, `chrome-c-shell-shortcuts`): three columns of groups, label left, key chip right. */
+#shortcuts-scrim[hidden] {
+  display: none;
+}
+
+#shortcuts-dialog {
+  width: 640px;
+  max-width: calc(100vw - 2 * var(--space-2xl));
+}
+
+#shortcuts-columns {
+  display: flex;
+  gap: var(--space-3xl);
+}
+
+.shortcuts-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.shortcuts-group-title {
+  padding: var(--space-sm) 0;
+  font-size: var(--ui-chip);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--chrome-text-tertiary);
+}
+
+.shortcuts-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  height: var(--size-control);
+  font-size: var(--ui-base);
+  color: var(--chrome-text);
 }

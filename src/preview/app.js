@@ -22,6 +22,8 @@ import {
 } from "./api.js";
 import { THEME_PREFS, THEME_PREF_KEY, DEFAULT_THEME_PREF, applyTheme, nextThemePref, prefersDarkQuery, watchSystemTheme } from "./theme.js";
 import { initTooltips } from "./tooltip.js";
+import { applyShortcutHints, isMacPlatform, isTypingTarget, nextZoomLevel, resolveShortcut, shortcutById } from "./shortcuts.js";
+import { createShortcutsDialog } from "./shortcuts-dialog.js";
 import { renderScreenList, filterScreens, buildScreenTree, ancestorNames } from "./screens.js";
 import { createVariantUI } from "./variants.js";
 import { createCompareView } from "./compare.js";
@@ -611,6 +613,7 @@ themeToggleBtn.addEventListener("click", () => {
 applyTheme(document.documentElement, themePref, osDarkQuery);
 watchSystemTheme(document.documentElement, osDarkQuery, () => themePref);
 renderThemeToggle();
+applyShortcutHints(document, isMacPlatform(navigator)); // the keys shown in tooltips and menus come from the same mapping the handler below binds
 initTooltips(document);
 
 boardEdgesToggleBtn.addEventListener("click", () => {
@@ -1851,6 +1854,7 @@ function applyActiveMode() {
       onSelect: handleInspectSelect,
       onDeselect: clearInspectFocus,
       onScroll: syncInspectOverlay,
+      hasFocus: () => inspectorPanel.getFocusedDomId() !== null,
     });
   } else {
     modeCleanup = () => {};
@@ -1958,6 +1962,10 @@ screenFrame.addEventListener("load", () => {
   // createInspectorPanel.setEntries' same-screen carry-over (see its own
   // comment) — nothing to redo for it here.
   const doc = screenFrame.contentDocument;
+  // The screen document is same-origin (srcdoc) and replaced on every load: forward its keys into the same shortcut path (the typing guard looks at the frame's own target, so inputs inside a user screen keep their keys).
+  doc?.addEventListener("keydown", onShortcutKeydown);
+  doc?.addEventListener("pointerdown", closeOverlaysOnFramePress, true);
+  doc?.addEventListener("click", closeOverlaysOnFramePress, true);
   const nodeExists = typeof selectedNode === "string" && !!doc?.getElementById(selectedNode);
   const resolvedSelection = resolveSelectionAfterReload({
     selectedNode,
@@ -2017,7 +2025,8 @@ function syncZoomButtons(value) {
     button.setAttribute("aria-pressed", String(current));
     button.classList.toggle("is-current", current);
     button.querySelector(".chrome-menu-check").textContent = current ? "check" : "";
-    if (current) currentLabel = button.textContent.replace("check", "").trim();
+    // The label is the button's own text, not the check icon's ligature or the shortcut hint.
+    if (current) currentLabel = [...button.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join("").trim();
   }
   zoomLabel.textContent = currentLabel;
 }
@@ -2072,6 +2081,29 @@ for (const button of zoomButtons) {
   });
 }
 
+/** The zoom levels the preset buttons offer, ascending ("fit" is not a level). The +/- steps walk this ladder. */
+function zoomLadder() {
+  return [...zoomButtons].map((b) => b.dataset.zoom).filter((v) => v !== "fit").map(Number).sort((x, y) => x - y);
+}
+
+/** The scale the zoom controls' target is drawn at right now, with "fit" resolved to its number. */
+function effectiveZoomScale() {
+  const current = isMockupZoomActive() ? mockupZoom : zoom;
+  if (current !== "fit") return current;
+  const drawn = isMockupZoomActive() ? mockupViewEl.querySelector(".mockup-columns") : screenHolderEl;
+  return parseFloat(drawn?.style.getPropertyValue("--zoom") ?? "") || 1;
+}
+
+/** One step along the ladder from the effective scale (also from Fit); out of Fit never zooms in, nor in out. */
+function stepZoom(direction) {
+  const target = nextZoomLevel(effectiveZoomScale(), direction, zoomLadder());
+  if (target !== undefined) setZoom(target);
+}
+
+for (const button of document.querySelectorAll(".zoom-step-button")) {
+  button.addEventListener("click", () => stepZoom(button.dataset.zoomStep === "in" ? 1 : -1));
+}
+
 statusBarToggle.addEventListener("click", () => {
   const isOn = statusBarToggle.getAttribute("aria-pressed") === "true";
   statusBarToggle.setAttribute("aria-pressed", String(!isOn));
@@ -2113,14 +2145,6 @@ commentAddButton.addEventListener("click", () => {
   selectCommentTarget(null, currentScreen);
 });
 inspectModeToggle.addEventListener("click", () => setMode("inspect"));
-
-// Esc clears inspect focus even when keyboard focus is in the parent
-// document (e.g. right after clicking a list entry's own header) — the
-// iframe-level listener in applyInspectMode only catches it while the
-// canvas itself has focus.
-document.addEventListener("keydown", (evt) => {
-  if (evt.key === "Escape" && activeMode === "inspect") clearInspectFocus();
-});
 
 commentCancelButton.addEventListener("click", () => clearSelection());
 
@@ -2313,6 +2337,116 @@ for (const tab of viewTabs) {
     pauseFollow(); // ADR-005 pause rule 1 — a manual tab switch is human navigation, unlike handleBoardStateEvent's own agent-triggered setView("board")
     setView(tab.dataset.view);
   });
+}
+
+// --- Keyboard shortcuts (CHR-916) -------------------------------------------
+// One keydown handler. shortcuts.js decides WHAT a key means (mapping, modifier / typing / IME / overlay guards); this only runs the matching action, through the control the click would use, so a disabled or hidden control makes the key a no-op. The handler listens on the top document and on each screen frame's document (same-origin srcdoc, re-attached on every load), so keys keep working once focus is inside the screen; the typing guard then looks at the frame's own target, so inputs in a user screen keep their keys. Inspect mode's own in-frame Escape (deselect) runs first (capture) and marks the event handled.
+
+const macPlatform = isMacPlatform(navigator);
+const shortcutsDialog = createShortcutsDialog({
+  scrimEl: document.getElementById("shortcuts-scrim"),
+  columnsEl: document.getElementById("shortcuts-columns"),
+  closeEl: document.getElementById("shortcuts-close"),
+  mac: macPlatform,
+});
+const topbarEl = document.getElementById("topbar");
+const dialogScrimEl = document.getElementById("dialog-scrim");
+const projectMenuEl = document.getElementById("project-menu");
+
+/** Clicks `el` unless it is disabled or sits inside a hidden container; true when it acted. */
+function pressControl(el) {
+  if (!el || el.disabled || el.getAttribute("aria-disabled") === "true" || el.closest("[hidden]")) return false;
+  el.click();
+  return true;
+}
+
+/** The open menu / dialog / popover, if any — while one is open only its own keys act. */
+function openOverlay() {
+  if (!dialogScrimEl.hidden || shortcutsDialog.isOpen()) return "other";
+  if (!projectMenuEl.hidden) return "project-menu";
+  if (!zoomMenu.hidden) return "zoom-menu";
+  return document.querySelector(".chrome-menu:not([hidden])") ? "other" : null;
+}
+
+/** The control a shortcut id belongs to: the element carrying `data-shortcut-id`, or the button a menu hint sits in. */
+function controlFor(id) {
+  const carriers = [...document.querySelectorAll(`[data-shortcut-id="${id}"]`)];
+  const control = carriers.find((el) => !el.classList.contains("chrome-menu-hint"));
+  return control ?? carriers[0]?.closest("button") ?? null;
+}
+
+/** Still available with no project open: the picker, its menu, the theme and the reference. */
+const NO_PROJECT_SHORTCUTS = new Set(["project-menu", "menu-open", "menu-new", "theme", "help"]);
+
+/** @param {string} id a SHORTCUTS id (shortcuts.js) */
+function runShortcut(id) {
+  const def = shortcutById(id);
+  if (def?.target) return pressControl([...viewTabs].find((tab) => tab.dataset.view === def.target));
+  if (def?.zoom !== undefined) {
+    // The zoom controls themselves must be showing; the level goes straight to the setter (the preset button's click would also move focus to the trigger).
+    if (canvasControlsEl.hidden) return false;
+    const menuWasOpen = !zoomMenu.hidden;
+    setZoom(def.zoom);
+    setZoomMenuOpen(false);
+    if (menuWasOpen) zoomTrigger.focus(); // as the preset button's click does; a key with the menu closed leaves focus alone
+    return true;
+  }
+  switch (id) {
+    case "follow-resume": return followState.paused && pressControl(controlFor(id));
+    case "zoom-in":
+    case "zoom-out":
+      if (currentView === "board") return pressControl(id === "zoom-in" ? boardZoomPlusBtn : boardZoomMinusBtn);
+      if (canvasControlsEl.hidden) return false;
+      stepZoom(id === "zoom-in" ? 1 : -1);
+      return true;
+    case "filter":
+      if (sidebarScreensEl.dataset.collapsed === "true") pressControl(sidebarScreensCollapseBtn);
+      screenFilterInput.focus();
+      screenFilterInput.select();
+      return true;
+    case "help":
+      shortcutsDialog.show();
+      return true;
+    case "leave":
+      // Inspect mode's Escape first clears the focused element, the next one leaves the mode.
+      if (activeMode === "inspect" && inspectorPanel.getFocusedDomId()) clearInspectFocus();
+      else if (activeMode !== "none") setMode(activeMode);
+      else return false;
+      return true;
+    default:
+      // Everything else is "click its control": modes, status bar, follow, panels, theme, project menu and its items, the Board toolbar.
+      return pressControl(controlFor(id));
+  }
+}
+
+function onShortcutKeydown(evt) {
+  // An Escape (or any key) that an overlay's own handler consumed is spent.
+  if (evt.defaultPrevented) return;
+  const overlay = openOverlay();
+  // Inspect mode with a focused element: Escape in a text field still clears that focus (it never leaves the mode, nor touches the comment compose).
+  if (evt.key === "Escape" && !overlay && activeMode === "inspect" && inspectorPanel.getFocusedDomId() && isTypingTarget(evt.target) && !evt.isComposing && evt.keyCode !== 229) {
+    clearInspectFocus();
+    return;
+  }
+  // Escape pressed inside the screen frame while a top-document overlay is open: the overlay's own Escape handlers listen on the top document, so hand the key over to them. It closes that overlay and nothing else.
+  if (evt.key === "Escape" && overlay && evt.target?.ownerDocument !== document) {
+    evt.preventDefault();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    return;
+  }
+  const id = resolveShortcut(evt, { view: currentView, overlay, mac: macPlatform });
+  if (!id) return;
+  if (topbarEl.classList.contains("is-empty") && !NO_PROJECT_SHORTCUTS.has(id)) return;
+  if (runShortcut(id) && id !== "leave") evt.preventDefault();
+}
+
+document.addEventListener("keydown", onShortcutKeydown);
+
+/** A press inside the screen frame never reaches the top document, where the open menus and popovers listen for "outside" clicks: replay it on the body so they close like for any outside click. Dialogs are modal and stay. */
+function closeOverlaysOnFramePress(evt) {
+  const overlay = openOverlay();
+  if (!overlay || !dialogScrimEl.hidden || shortcutsDialog.isOpen()) return;
+  document.body.dispatchEvent(new (evt.type === "click" ? MouseEvent : Event)(evt.type, { bubbles: true }));
 }
 
 /**

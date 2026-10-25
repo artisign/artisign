@@ -27,11 +27,11 @@ import { createVariantUI } from "./variants.js";
 import { createCompareView } from "./compare.js";
 import { modeToggleStates } from "./compare-data.js";
 import { renderMockupList, filterMockups } from "./mockups.js";
-import { renderTagNotes } from "./notes-panel.js";
+import { renderScreenChips, renderTagNotes } from "./notes-panel.js";
 import { renderMockupView } from "./mockup-view.js";
 import { applyMockupZoom } from "./mockup-zoom.js";
 import { applyFlowMode } from "./flows.js";
-import { applyCommentMode, highlightSelection, bareNodeId, openNodeIds, renderCommentsPanel, resolveSelectionAfterReload } from "./comments.js";
+import { applyCommentMode, highlightSelection, bareNodeId, openNodeIds, openThreadCount, renderCommentsPanel, resolveSelectionAfterReload } from "./comments.js";
 import {
   pushActivityEntry,
   activityTargetExists,
@@ -95,6 +95,7 @@ const notesPanelEl = document.getElementById("notes-panel");
 const notesPanelHeader = document.getElementById("notes-panel-header");
 const notesPanelScreen = document.getElementById("notes-panel-screen");
 const notesPanelText = document.getElementById("notes-panel-text");
+const notesPanelChipsEl = document.getElementById("notes-panel-chips");
 const notesPanelTagsEl = document.getElementById("notes-panel-tags");
 const screenFrame = document.getElementById("screen-frame");
 const canvasEl = document.getElementById("canvas");
@@ -194,6 +195,8 @@ const commentComposeForm = document.getElementById("comment-compose");
 const commentTargetLabel = document.getElementById("comment-target-label");
 const commentBodyInput = document.getElementById("comment-body-input");
 const commentErrorEl = document.getElementById("comment-error");
+const commentsCountEl = document.getElementById("comments-count");
+const commentAddButton = document.getElementById("comment-add");
 const commentCancelButton = document.getElementById("comment-cancel");
 const bodyEl = document.getElementById("body");
 const sidebarScreensEl = document.getElementById("sidebar-screens");
@@ -1156,11 +1159,22 @@ function setRightPanelTab(tab) {
   panelTabActivityEl.setAttribute("aria-pressed", String(tab === "activity"));
   panelBodyElementsEl.hidden = tab !== "elements";
   panelBodyActivityEl.hidden = tab !== "activity";
-  // review fix 4 — the collapse button's label named a fixed "Elements
-  // panel" from before this panel could show two different tabs; keep it
-  // naming whichever one is actually active instead of going stale the
-  // moment Activity is selected.
-  inspectorCollapseBtn.setAttribute("aria-label", `Collapse ${tab === "elements" ? "Elements" : "Activity"} panel`);
+  syncInspectorPanelName();
+}
+
+/** The right panel's collapse button names whatever the panel currently shows (Compare, Activity or Elements); label and tooltip come from the one place that builds them. */
+function syncInspectorPanelName() {
+  const comparing = !comparePanelEl.hidden;
+  const activity = panelTabActivityEl.getAttribute("aria-pressed") === "true";
+  inspectorCollapseBtn.dataset.panel = comparing ? "Compare" : activity ? "Activity" : "Elements";
+  applyPanelLabel(inspectorEl, inspectorCollapseBtn);
+}
+
+/** Label, tooltip and a11y name of a panel's collapse button from `data-panel` and the collapsed state. */
+function applyPanelLabel(panelEl, collapseBtn) {
+  const label = `${panelEl.dataset.collapsed === "true" ? "Expand" : "Collapse"} ${collapseBtn.dataset.panel} panel`;
+  collapseBtn.setAttribute("aria-label", label);
+  collapseBtn.dataset.tooltip = label;
 }
 
 /** The `{ screenNames, mockupNames }` shape activityTargetExists/activityIsNavigable both take — read fresh at call time, never cached, since `screens`/`mockups` change under it. */
@@ -1578,13 +1592,15 @@ function updateNotesPanel() {
   // A screen with no notes of its own but a tagged spec still gets a panel —
   // the tag section is the whole point, not an addendum to the screen's own
   // notes.
-  notesPanelEl.hidden = notes.length === 0 && matchingTagNotes.length === 0;
+  notesPanelEl.hidden = notes.length === 0 && matchingTagNotes.length === 0 && screenTags.length === 0;
   if (notesPanelEl.hidden) return;
   notesPanelScreen.textContent = screen.name;
   // notesPanelText only ever holds the screen's own notes — setMarkdown
   // replaces its children wholesale, so the tag sections render into their
   // own sibling element (notesPanelTagsEl), never inside this one.
   setMarkdown(notesPanelText, notes);
+  notesPanelText.hidden = notes.length === 0;
+  renderScreenChips(notesPanelChipsEl, screenTags);
   notesPanelHeader.setAttribute("aria-expanded", String(notesExpanded));
   renderTagNotes(notesPanelTagsEl, screenTags, tagNotes, expandedTagNotes);
 }
@@ -1727,7 +1743,9 @@ async function loadComments() {
   const result = currentScreen ? await fetchComments(currentScreen, activeProjectRoot) : [];
   if (requestId !== commentsRequestId) return; // a newer request has since started — drop this stale result
   comments = result;
-  renderCommentsPanel(commentsListEl, comments, handleReply);
+  renderCommentsPanel(commentsListEl, comments, handleReply, `${activeProjectRoot}\n${currentScreen}`);
+  const open = openThreadCount(comments);
+  commentsCountEl.textContent = comments.length === 0 ? "" : `${open} open`;
   // Markers depend on `comments`, not on the iframe's load event — refresh
   // them here, right when the data they're derived from actually changes,
   // rather than relying on applyActiveMode() being re-triggered by
@@ -1802,14 +1820,14 @@ function restoreSelection(nodeId, screen) {
   commentTargetLabel.textContent = nodeId === null ? "New comment on screen" : `New comment on ${nodeId}`;
 }
 
-function selectCommentTarget(nodeId) {
+function selectCommentTarget(nodeId, screen = iframeRenderedScreen) {
   // The screen this click's doc actually renders — see the module comment
   // on iframeRenderedScreen. Tagging with it here (not `currentScreen`)
   // matters if a screen switch is racing this click: `currentScreen` may
   // already read the NEW screen while this doc (whose listeners are what
   // just fired) is still the OLD one; `iframeRenderedScreen` only changes
   // once that new screen's own `load` event lands.
-  restoreSelection(nodeId, iframeRenderedScreen);
+  restoreSelection(nodeId, screen);
   commentErrorEl.hidden = true;
   commentComposeForm.hidden = false;
   commentBodyInput.focus();
@@ -1888,9 +1906,14 @@ function refitActivePane() {
  * the panel the same way a click on the chevron would.
  */
 function setupSidePanel(panelEl, collapseBtn, prefKey, defaultCollapsed = false) {
+  const iconEl = collapseBtn.querySelector(".side-panel-collapse-icon");
+  const openIcon = iconEl.textContent; // left_panel_close / right_panel_close; the rail shows a chevron pointing back at the content
+  const railIcon = panelEl.classList.contains("side-panel-right") ? "chevron_left" : "chevron_right";
   function apply(collapsed) {
     panelEl.dataset.collapsed = String(collapsed);
     collapseBtn.setAttribute("aria-expanded", String(!collapsed));
+    applyPanelLabel(panelEl, collapseBtn);
+    iconEl.textContent = collapsed ? railIcon : openIcon;
   }
   apply(readBoolPref(prefsStorage, prefKey, defaultCollapsed));
   function set(collapsed) {
@@ -2082,6 +2105,13 @@ flowModeToggle.addEventListener("click", () => {
   setMode("flow");
 });
 commentModeToggle.addEventListener("click", () => setMode("comment"));
+// The Comments header's add action: comment mode on (once), then a screen-level compose — a click on an element in the frame retargets it.
+commentAddButton.addEventListener("click", () => {
+  if (!currentScreen) return;
+  if (activeMode !== "comment") setMode("comment");
+  // A screen-wide compose belongs to the screen being shown now, not to the document still in the frame: right after a screen switch the old srcdoc is still there, and tagging with it would make that screen's own load drop the compose form.
+  selectCommentTarget(null, currentScreen);
+});
 inspectModeToggle.addEventListener("click", () => setMode("inspect"));
 
 // Esc clears inspect focus even when keyboard focus is in the parent
@@ -2222,10 +2252,12 @@ function applyMainVisibility() {
   const toggles = modeToggleStates({ view: currentView, showMockup, comparing });
   flowModeToggle.disabled = toggles.flow.disabled;
   commentModeToggle.disabled = toggles.comment.disabled;
+  commentAddButton.disabled = toggles.comment.disabled;
   inspectModeToggle.disabled = toggles.inspect.disabled;
   // The disabled reason (or the label) is the shared tooltip, not a native title.
   flowModeToggle.dataset.tooltip = toggles.flow.title || "Flow mode";
   commentModeToggle.dataset.tooltip = toggles.comment.title || "Comment mode";
+  commentAddButton.dataset.tooltip = toggles.comment.title || "Add comment";
   inspectModeToggle.dataset.tooltip = toggles.inspect.title || "Inspect mode";
   if (comparing || currentView !== "screens") setZoomMenuOpen(false);
   // The compare panel replaces the Elements/Activity panel while comparing.
@@ -2233,6 +2265,7 @@ function applyMainVisibility() {
   panelTabsEl.hidden = comparing;
   comparePanelTitleEl.hidden = !comparing;
   comparePanelEl.hidden = !comparing;
+  syncInspectorPanelName();
   panelBodyElementsEl.hidden = comparing || activityTab;
   panelBodyActivityEl.hidden = comparing || !activityTab;
   syncZoomButtons(showMockup ? mockupZoom : zoom);

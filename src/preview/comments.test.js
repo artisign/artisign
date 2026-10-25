@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { openNodeIds, resolveSelectionAfterReload } from "./comments.js";
+import { formatCommentTime, openNodeIds, openThreadCount, resolveSelectionAfterReload } from "./comments.js";
 
 // node_id on a comment record is a full "<screen>.<node-id>" ref (see
 // src/tools/comments.ts createComment) — DOM element ids inside the iframe
@@ -72,5 +72,36 @@ describe("resolveSelectionAfterReload", () => {
 
   it("drops a screen-level target when the reload is for a different screen", () => {
     expect(resolveSelectionAfterReload({ ...base, selectedNode: null, reloadedScreen: "second" })).toBeUndefined();
+  });
+});
+
+describe("openThreadCount", () => {
+  it("counts root threads without a resolved record on the root or any reply", () => {
+    const comments = [
+      { id: "c1", parent_id: null, resolved: false },
+      { id: "c2", parent_id: "c1", resolved: true },
+      { id: "c3", parent_id: null, resolved: false },
+      { id: "c4", parent_id: "c3", resolved: false },
+      { id: "c5", parent_id: null, resolved: false },
+    ];
+    expect(openThreadCount(comments)).toBe(2);
+    expect(openThreadCount([])).toBe(0);
+  });
+});
+
+describe("formatCommentTime", () => {
+  // Local-time dates, so the assertions hold in any time zone.
+  const now = new Date(2026, 9, 25, 12, 0).getTime();
+  it("shows the clock time for today", () => {
+    expect(formatCommentTime(new Date(2026, 9, 25, 10, 2).toISOString(), now)).toBe("10:02");
+    expect(formatCommentTime(new Date(2026, 9, 25, 0, 5).toISOString(), now)).toBe("00:05");
+  });
+  it("shows a short date for any other day", () => {
+    const at = new Date(2026, 9, 23, 10, 2);
+    expect(formatCommentTime(at.toISOString(), now)).toBe(at.toLocaleDateString(undefined, { month: "short", day: "numeric" }));
+  });
+  it("is empty for a missing or unparseable timestamp", () => {
+    expect(formatCommentTime(undefined, now)).toBe("");
+    expect(formatCommentTime("nope", now)).toBe("");
   });
 });

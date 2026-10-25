@@ -38,6 +38,9 @@ const ZOOMS = [
 ];
 const BADGES = { added: "+ added", changed: "~ changed", removed: "− removed" };
 
+/** The diff row's leading mark, by kind — a shape per kind, matching the badge drawn on the frame. */
+const DIFF_ICONS = { added: "add", changed: "edit", removed: "remove" };
+
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -307,7 +310,7 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
       item.dataset.member = row.member;
       item.classList.toggle("selected", row.id === highlightedId);
       item.setAttribute("aria-pressed", String(row.id === highlightedId));
-      item.append(el("b", "compare-diff-sign", row.sign), el("code", "compare-diff-id", row.id), el("i", "compare-diff-member", row.member));
+      item.append(icon(DIFF_ICONS[row.kind], "compare-diff-sign icon-xs"), el("code", "compare-diff-id", row.id), el("i", "compare-diff-member", row.member));
       list.appendChild(item);
     }
     panelEl.appendChild(list);

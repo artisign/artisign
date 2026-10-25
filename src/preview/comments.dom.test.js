@@ -26,10 +26,11 @@ describe("renderCommentsPanel", () => {
     const items = listEl.querySelectorAll(".comment-item");
     expect(items).toHaveLength(2);
     expect(items[0].classList.contains("comment-reply")).toBe(false);
-    expect(items[0].querySelector(".comment-meta").textContent).toContain("on btn-1");
-    expect(items[0].querySelector(".comment-meta").textContent).toContain("open");
+    expect(items[0].querySelector(".comment-author").textContent).toBe("agent");
+    expect(items[0].querySelector(".comment-target").textContent).toBe("btn-1");
     expect(items[1].classList.contains("comment-reply")).toBe(true);
-    expect(items[1].querySelector(".comment-meta").textContent).toContain("reply");
+    expect(items[1].querySelector(".comment-author").textContent).toBe("human");
+    expect(items[1].querySelector(".comment-target")).toBeNull(); // a reply shares its root's anchor
 
     // The reply affordance must come after the replies it answers, not
     // before (comments.js's renderCommentsPanel doc comment) — assert the
@@ -42,16 +43,57 @@ describe("renderCommentsPanel", () => {
     ]);
   });
 
-  it("marks a thread resolved when any reply carries resolved:true", () => {
+  it("folds a thread any reply of which carries resolved:true into the collapsed N resolved row", () => {
     const listEl = document.createElement("ul");
     const comments = [
       { id: "c1", parent_id: null, node_id: null, author: "agent", text: "Root", resolved: false },
       { id: "c2", parent_id: "c1", node_id: null, author: "human", text: "Done", resolved: true },
+      { id: "c3", parent_id: null, node_id: "home.n1", author: "human", text: "Still open", resolved: false },
     ];
     renderCommentsPanel(listEl, comments, () => {});
-    const [root] = listEl.querySelectorAll(".comment-item");
-    expect(root.querySelector(".comment-meta").textContent).toContain("resolved");
-    expect(root.querySelector(".comment-meta").textContent).toContain("on screen");
+    // The open thread stays in the list; the resolved one hides behind the row.
+    expect([...listEl.children].filter((el) => el.classList.contains("comment-item")).map((el) => el.querySelector(".comment-body").textContent)).toEqual(["Still open"]);
+    const toggle = listEl.querySelector(".comments-resolved-toggle");
+    expect(toggle.textContent).toBe("check_circle1 resolved");
+    const resolvedList = listEl.querySelector(".comments-resolved-list");
+    expect(resolvedList.hidden).toBe(true);
+    expect(resolvedList.querySelector(".comment-target").textContent).toBe("screen");
+    toggle.click();
+    expect(resolvedList.hidden).toBe(false);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    // The open state survives the next re-render (every SSE comments event re-renders).
+    renderCommentsPanel(listEl, comments, () => {});
+    expect(listEl.querySelector(".comments-resolved-list").hidden).toBe(false);
+    listEl.querySelector(".comments-resolved-toggle").click();
+    expect(listEl.querySelector(".comments-resolved-list").hidden).toBe(true);
+  });
+
+  it("shows the time next to the author, the full timestamp in the title", () => {
+    const listEl = document.createElement("ul");
+    const ts = new Date().toISOString();
+    renderCommentsPanel(listEl, [{ id: "c1", parent_id: null, node_id: null, author: "human", text: "t", resolved: false, ts }]);
+    const stamp = listEl.querySelector(".comment-time");
+    expect(stamp.textContent).toMatch(/^· \d{2}:\d{2}$/);
+    expect(stamp.title).toBe(ts);
+  });
+
+  it("truncates a long node id inside the chip and keeps the full id in the title", () => {
+    const listEl = document.createElement("ul");
+    renderCommentsPanel(listEl, [{ id: "c1", parent_id: null, node_id: "home.a-very-long-node-identifier", author: "human", text: "t", resolved: false }]);
+    const chip = listEl.querySelector(".comment-target");
+    expect(chip.title).toBe("a-very-long-node-identifier");
+    expect(chip.querySelector(".comment-target-text").textContent).toBe("a-very-long-node-identifier");
+  });
+
+  it("starts the resolved row collapsed again when the scope (screen or project) changes", () => {
+    const listEl = document.createElement("ul");
+    const comments = [{ id: "c1", parent_id: null, node_id: null, author: "a", text: "t", resolved: true }];
+    renderCommentsPanel(listEl, comments, undefined, "p\none");
+    listEl.querySelector(".comments-resolved-toggle").click();
+    renderCommentsPanel(listEl, comments, undefined, "p\none");
+    expect(listEl.querySelector(".comments-resolved-list").hidden).toBe(false);
+    renderCommentsPanel(listEl, comments, undefined, "p\ntwo");
+    expect(listEl.querySelector(".comments-resolved-list").hidden).toBe(true);
   });
 
   it("only adds a reply affordance when onReply is passed, and wires submit to it", () => {

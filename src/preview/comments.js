@@ -10,6 +10,8 @@
 // its root OR any reply carries resolved:true (comments.jsonl is
 // append-only, so resolution is an event, not a mutation).
 
+import { icon } from "./icons.js";
+
 const COMMENT_SELECTED_STYLE = "outline: 2px solid #d97706; outline-offset: 1px; cursor: pointer;";
 const COMMENT_MARKER_STYLE = "outline: 2px dashed #d97706; outline-offset: 1px; cursor: pointer;";
 
@@ -43,6 +45,42 @@ export function openNodeIds(comments) {
   return new Set(
     roots.filter((root) => !threadIsResolved(comments, root.id)).map((root) => /** @type {string} */ (bareNodeId(root.node_id))),
   );
+}
+
+/**
+ * Ids of the root threads that carry a resolved record on the root or any reply, in one pass.
+ * @param {{ id: string, parent_id: string | null, resolved: boolean }[]} comments
+ * @returns {Set<string>}
+ */
+function resolvedRootIds(comments) {
+  const ids = new Set();
+  for (const c of comments) if (c.resolved) ids.add(c.parent_id ?? c.id);
+  return ids;
+}
+
+/**
+ * How many root threads are still open (no resolved record on the root or any reply).
+ * @param {{ id: string, parent_id: string | null, resolved: boolean }[]} comments
+ * @returns {number}
+ */
+export function openThreadCount(comments) {
+  const resolved = resolvedRootIds(comments);
+  return comments.filter((c) => c.parent_id === null && !resolved.has(c.id)).length;
+}
+
+/**
+ * The time a comment card shows: the clock time for today ("10:02"), a short date ("Oct 23") otherwise. Absolute on purpose — the panel only re-renders on comment events, so a relative "5m ago" would freeze.
+ * @param {string | undefined} ts ISO timestamp of the record; absent on legacy records
+ * @param {number} [now] epoch ms, injectable for tests
+ * @returns {string}
+ */
+export function formatCommentTime(ts, now = Date.now()) {
+  const at = ts ? new Date(ts) : null;
+  if (!at || Number.isNaN(at.getTime())) return "";
+  if (at.toDateString() === new Date(now).toDateString()) {
+    return at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  }
+  return at.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 /**
@@ -160,8 +198,8 @@ function renderReplyAffordance(rootId, onReply) {
 
   const toggle = document.createElement("button");
   toggle.type = "button";
-  toggle.className = "comment-reply-toggle";
-  toggle.textContent = "Reply";
+  toggle.className = "comment-reply-toggle chrome-btn chrome-btn--ghost chrome-btn--compact";
+  toggle.append(icon("reply"), "Reply");
   wrapper.appendChild(toggle);
 
   const form = document.createElement("form");
@@ -169,6 +207,7 @@ function renderReplyAffordance(rootId, onReply) {
   form.hidden = true;
 
   const textarea = document.createElement("textarea");
+  textarea.className = "chrome-field";
   textarea.placeholder = "Write a reply…";
   textarea.required = true;
   form.appendChild(textarea);
@@ -180,6 +219,7 @@ function renderReplyAffordance(rootId, onReply) {
 
   const submit = document.createElement("button");
   submit.type = "submit";
+  submit.className = "chrome-btn chrome-btn--primary chrome-btn--compact";
   submit.textContent = "Reply";
   form.appendChild(submit);
 
@@ -204,15 +244,36 @@ function renderReplyAffordance(rootId, onReply) {
   return wrapper;
 }
 
-/** @param {{ author: string, text: string, node_id: string | null, resolved: boolean }} comment */
-function renderCommentItem(comment, isReply, threadResolved) {
+/** @param {{ author: string, text: string, node_id: string | null, ts?: string }} comment */
+function renderCommentItem(comment, isReply) {
   const item = document.createElement("li");
   item.className = isReply ? "comment-item comment-reply" : "comment-item";
 
   const meta = document.createElement("div");
   meta.className = "comment-meta";
-  const target = comment.node_id ? `on ${bareNodeId(comment.node_id)}` : "on screen";
-  meta.textContent = `${comment.author} · ${isReply ? "reply" : target} · ${threadResolved ? "resolved" : "open"}`;
+  const author = document.createElement("b");
+  author.className = "comment-author";
+  author.textContent = comment.author;
+  meta.appendChild(author);
+  const time = formatCommentTime(comment.ts);
+  if (time) {
+    const stamp = document.createElement("span");
+    stamp.className = "comment-time";
+    stamp.textContent = `· ${time}`;
+    stamp.title = comment.ts;
+    meta.appendChild(stamp);
+  }
+  if (!isReply) {
+    const targetId = comment.node_id ? bareNodeId(comment.node_id) : "screen";
+    const target = document.createElement("span");
+    target.className = "chrome-chip comment-target";
+    target.title = targetId;
+    const targetText = document.createElement("span");
+    targetText.className = "comment-target-text";
+    targetText.textContent = targetId;
+    target.appendChild(targetText);
+    meta.appendChild(target);
+  }
   item.appendChild(meta);
 
   const body = document.createElement("div");
@@ -222,6 +283,10 @@ function renderCommentItem(comment, isReply, threadResolved) {
 
   return item;
 }
+
+// Whether the "N resolved" row shows its threads. Module state: the list re-renders on every comments event and must not snap shut under a reader — but it belongs to one screen of one project, so a new `scopeKey` starts collapsed.
+let resolvedExpanded = false;
+let resolvedScope = null;
 
 /**
  * Renders the comment panel for one screen: root comments with their
@@ -233,8 +298,13 @@ function renderCommentItem(comment, isReply, threadResolved) {
  * @param {HTMLElement} listEl
  * @param {{ id: string, parent_id: string | null, node_id: string | null, author: string, text: string, resolved: boolean }[]} comments
  * @param {(rootId: string, text: string, onError: (message: string) => void) => void} [onReply]
+ * @param {string} [scopeKey] identifies the project + screen the comments belong to; the resolved row collapses when it changes
  */
-export function renderCommentsPanel(listEl, comments, onReply) {
+export function renderCommentsPanel(listEl, comments, onReply, scopeKey = "") {
+  if (scopeKey !== resolvedScope) {
+    resolvedScope = scopeKey;
+    resolvedExpanded = false;
+  }
   listEl.innerHTML = "";
   if (comments.length === 0) {
     const empty = document.createElement("li");
@@ -252,11 +322,11 @@ export function renderCommentsPanel(listEl, comments, onReply) {
     repliesByParent.set(comment.parent_id, replies);
   }
 
-  for (const root of comments.filter((c) => c.parent_id === null)) {
-    const resolved = threadIsResolved(comments, root.id);
-    listEl.appendChild(renderCommentItem(root, false, resolved));
+  /** @param {HTMLElement} into */
+  function appendThread(into, root) {
+    into.appendChild(renderCommentItem(root, false));
     for (const reply of repliesByParent.get(root.id) ?? []) {
-      listEl.appendChild(renderCommentItem(reply, true, resolved));
+      into.appendChild(renderCommentItem(reply, true));
     }
     // The reply affordance comes after the replies it answers, not before —
     // otherwise a thread with existing replies reads oddly (compose box
@@ -264,7 +334,37 @@ export function renderCommentsPanel(listEl, comments, onReply) {
     if (onReply) {
       const affordance = renderReplyAffordance(root.id, onReply);
       affordance.classList.add("comment-reply");
-      listEl.appendChild(affordance);
+      into.appendChild(affordance);
     }
+  }
+
+  const resolvedIds = resolvedRootIds(comments);
+  const resolvedRoots = [];
+  for (const root of comments) {
+    if (root.parent_id !== null) continue;
+    if (resolvedIds.has(root.id)) resolvedRoots.push(root);
+    else appendThread(listEl, root);
+  }
+
+  if (resolvedRoots.length > 0) {
+    const row = document.createElement("li");
+    row.className = "comments-resolved";
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "comments-resolved-toggle";
+    toggle.setAttribute("aria-expanded", String(resolvedExpanded));
+    toggle.append(icon("check_circle"), `${resolvedRoots.length} resolved`);
+    row.appendChild(toggle);
+    const resolvedList = document.createElement("ul");
+    resolvedList.className = "comments-resolved-list";
+    resolvedList.hidden = !resolvedExpanded;
+    for (const root of resolvedRoots) appendThread(resolvedList, root);
+    row.appendChild(resolvedList);
+    toggle.addEventListener("click", () => {
+      resolvedExpanded = !resolvedExpanded;
+      toggle.setAttribute("aria-expanded", String(resolvedExpanded));
+      resolvedList.hidden = !resolvedExpanded;
+    });
+    listEl.appendChild(row);
   }
 }

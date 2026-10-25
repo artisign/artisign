@@ -62,6 +62,19 @@ describe("side panel defaults", () => {
     expect([expanded("sidebar-screens-collapse"), expanded("sidebar-context-collapse"), expanded("inspector-collapse")]).toEqual(["true", "false", "false"]);
   });
 
+  it("the collapse button swaps its icon, label and tooltip with the panel state", async () => {
+    await boot();
+    const btn = document.getElementById("inspector-collapse");
+    const iconOf = () => btn.querySelector(".side-panel-collapse-icon").textContent;
+    expect([iconOf(), btn.getAttribute("aria-label"), btn.dataset.tooltip]).toEqual(["chevron_left", "Expand Elements panel", "Expand Elements panel"]);
+    btn.click();
+    expect([iconOf(), btn.getAttribute("aria-label"), btn.dataset.tooltip]).toEqual(["right_panel_close", "Collapse Elements panel", "Collapse Elements panel"]);
+    const screens = document.getElementById("sidebar-screens-collapse");
+    expect(screens.querySelector(".side-panel-collapse-icon").textContent).toBe("left_panel_close");
+    screens.click();
+    expect(screens.querySelector(".side-panel-collapse-icon").textContent).toBe("chevron_right");
+  });
+
   it("stored prefs win over the defaults", async () => {
     memoryStorage.set("artisign.sidebar-context.collapsed", "false");
     memoryStorage.set("artisign.inspector.collapsed", "false");

@@ -214,14 +214,18 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
     if (node.name === current) itself.classList.add("current", "is-current");
     pop.appendChild(itself);
     const rows = () => /** @type {HTMLElement[]} */ ([...pop.querySelectorAll(".variant-pop-row")]);
-    setRovingTabindex(rows(), rows()[0]);
+    const all = rows();
+    setRovingTabindex(all, all.find((row) => row.classList.contains("current")) ?? all[0]);
     wireMenu(pop, rows, {
       // A compare checkbox sits beside its row: the arrows go from there to the neighbouring row.
       rowOf: (target) => (target instanceof Element ? target.closest(".variant-pop-entry")?.querySelector(".variant-pop-row") ?? target : null),
-      // Tab leaves the popover (its checkboxes are inside it, so they stay reachable): close it like an outside click.
+      // A keyboard Tab leaves the popover (its checkboxes are inside it, so they stay reachable): close it like an outside click. Deferred until the focus move has landed: the rebuild replaces the controls, and update() puts focus back on the equivalent of wherever it went.
       onTabOut: () => {
-        openCrumb = null;
-        rerender();
+        setTimeout(() => {
+          if (!openCrumb) return;
+          openCrumb = null;
+          rerender();
+        }, 0);
       },
     });
     return pop;
@@ -391,7 +395,8 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
     const key = focusNext ?? focusKey();
     focusNext = null;
     const shown = render(screens, flows, currentScreen);
-    if (key?.cls === "variant-pop-row" && key.screen === null) barEl.querySelector(".variant-pop-row")?.focus();
+    // Opening a popover focuses its tab stop: the current screen's row, else the first.
+    if (key?.cls === "variant-pop-row" && key.screen === null) (barEl.querySelector('.variant-pop-row[tabindex="0"]') ?? barEl.querySelector(".variant-pop-row"))?.focus();
     else restoreFocus(key);
     return shown;
   }

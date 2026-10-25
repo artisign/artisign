@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from "vitest";
-import { handleListArrowKeys, setRovingTabindex, tabbableWithin, trapFocus } from "./menu-keys.js";
+import { captureFocus, handleListArrowKeys, setRovingTabindex, tabbableWithin, trapFocus, wireMenu } from "./menu-keys.js";
 
 const key = (k, target, init = {}) => {
   const evt = new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init });
@@ -90,5 +90,54 @@ describe("trapFocus", () => {
     expect(trapFocus(key("Tab", document.getElementById("out")), c)).toBe(true);
     expect(document.activeElement).toBe(rows[1]);
     expect(trapFocus(key("a", rows[1]), c)).toBe(false);
+  });
+});
+
+describe("trapFocus with nothing tabbable", () => {
+  it("lands focus on the container itself (it needs tabindex -1 to take it)", () => {
+    document.body.innerHTML = '<section id="d" tabindex="-1"><p>text only</p></section><button id="out"></button>';
+    const d = document.getElementById("d");
+    document.getElementById("out").focus();
+    expect(trapFocus(key("Tab", document.activeElement), d)).toBe(true);
+    expect(document.activeElement).toBe(d);
+  });
+});
+
+describe("captureFocus", () => {
+  it("puts focus back on the element with the same key after a rebuild, else on the fallback, else nowhere", () => {
+    document.body.innerHTML = '<div id="c"><button data-key="a"></button><button data-key="b"></button></div><button id="out"></button>';
+    const c = document.getElementById("c");
+    c.querySelector('[data-key="b"]').focus();
+    let restore = captureFocus(c, "data-key", () => c.querySelector("button"));
+    c.innerHTML = '<button data-key="a"></button><button data-key="b"></button>';
+    expect(restore()).toBe(c.querySelector('[data-key="b"]'));
+    expect(document.activeElement).toBe(c.querySelector('[data-key="b"]'));
+    restore = captureFocus(c, "data-key", () => c.querySelector("button"));
+    c.innerHTML = '<button data-key="a"></button>';
+    expect(restore()).toBe(c.querySelector('[data-key="a"]'));
+    document.getElementById("out").focus();
+    restore = captureFocus(c, "data-key", () => c.querySelector("button"));
+    expect(restore()).toBeUndefined();
+    expect(document.activeElement).toBe(document.getElementById("out"));
+  });
+});
+
+describe("wireMenu tab-out", () => {
+  it("fires for a keyboard Tab only, not for a pointer or programmatic focus move", async () => {
+    document.body.innerHTML = '<div id="m"><button id="r1"></button></div><button id="out"></button>';
+    const m = document.getElementById("m");
+    const outs = [];
+    wireMenu(m, () => [...m.querySelectorAll("button")], { onTabOut: (to) => outs.push(to.id) });
+    document.getElementById("r1").focus();
+    document.getElementById("out").focus(); // e.g. mousedown on another control
+    expect(outs).toEqual([]);
+    document.getElementById("r1").focus();
+    document.getElementById("r1").dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+    document.getElementById("out").focus();
+    expect(outs).toEqual(["out"]);
+    await new Promise((r) => setTimeout(r, 5));
+    document.getElementById("r1").focus();
+    document.getElementById("out").focus();
+    expect(outs).toEqual(["out"]); // the Tab flag does not linger
   });
 });

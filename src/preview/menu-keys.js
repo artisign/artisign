@@ -88,14 +88,41 @@ export function trapFocus(evt, container) {
 }
 
 /**
- * The keyboard wiring of an ARIA menu, in one place: arrow keys / Home / End move between the rows, the focused row is the single tab stop, and focus leaving the menu (Tab out) calls `onTabOut`.
+ * Before a rebuild: remembers which keyed element inside `container` has focus (`[attr]` names its key). The returned function, called after the rebuild, puts focus on the element with the same key, else on `fallback()`; it does nothing when focus was not on a keyed element, and returns the element that has focus again (or undefined).
+ *
+ * @param {HTMLElement} container
+ * @param {string} attr data attribute carrying the key, e.g. "data-key"
+ * @param {() => HTMLElement | undefined} fallback
+ * @returns {() => HTMLElement | undefined}
+ */
+export function captureFocus(container, attr, fallback) {
+  const active = document.activeElement;
+  const key = active instanceof Element && container.contains(active) ? active.closest(`[${attr}]`)?.getAttribute(attr) : null;
+  return () => {
+    if (key == null) return undefined;
+    const target = /** @type {HTMLElement | undefined} */ ([...container.querySelectorAll(`[${attr}]`)].find((el) => el.getAttribute(attr) === key)) ?? fallback();
+    target?.focus();
+    return target;
+  };
+}
+
+/**
+ * The keyboard wiring of an ARIA menu, in one place: arrow keys / Home / End move between the rows, the focused row is the single tab stop, and a keyboard Tab that leaves the menu calls `onTabOut`. Only a real Tab counts: a pointer press or a programmatic focus move elsewhere must not trigger it (those are the outside-click close's business, and acting on them would rebuild the page under the click).
  *
  * @param {HTMLElement} container the menu element
  * @param {() => HTMLElement[]} getRows the actionable rows, read fresh on every key
  * @param {{ rowOf?: (target: EventTarget | null) => Element | null | undefined, onTabOut?: (to: Node) => void }} [options]
  */
 export function wireMenu(container, getRows, { rowOf, onTabOut } = {}) {
+  // True from a Tab keydown until the end of that task: the focus move the key causes happens inside it.
+  let tabbing = false;
   container.addEventListener("keydown", (evt) => {
+    if (evt.key === "Tab") {
+      tabbing = true;
+      setTimeout(() => {
+        tabbing = false;
+      }, 0);
+    }
     handleListArrowKeys(evt, getRows(), { rowOf });
   });
   container.addEventListener("focusin", (evt) => {
@@ -106,6 +133,6 @@ export function wireMenu(container, getRows, { rowOf, onTabOut } = {}) {
   });
   container.addEventListener("focusout", (evt) => {
     const to = /** @type {Node | null} */ (evt.relatedTarget);
-    if (to && !container.contains(to)) onTabOut?.(to);
+    if (tabbing && to && !container.contains(to)) onTabOut?.(to);
   });
 }

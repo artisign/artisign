@@ -6,7 +6,7 @@
 // module is DOM wiring + directory-tree state only.
 
 import { fetchFsDirs, createFsDir } from "./api.js";
-import { handleListArrowKeys, trapFocus } from "./menu-keys.js";
+import { captureFocus, handleListArrowKeys, tabbableWithin, trapFocus } from "./menu-keys.js";
 
 /**
  * Wires one dialog section (open or init) to the shared `/api/fs/dirs`
@@ -112,18 +112,16 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
   /** @param {{ name: string, path: string, isArtisignProject: boolean }[]} entries */
   function renderDirList(entries) {
     // The rows are rebuilt (navigating into a folder, picking a project): focus that was on a row stays on the same folder, or goes to the first row of the new list so the arrows keep working.
-    const active = document.activeElement;
-    const focusedPath = active instanceof HTMLElement && dirListEl.contains(active) ? (active.dataset.path ?? "") : null;
+    const wasInList = dirListEl.contains(document.activeElement);
+    const restoreFocus = captureFocus(dirListEl, "data-key", () => /** @type {HTMLElement | undefined} */ (dirListEl.querySelector(".dir-row:not(:disabled)") ?? undefined));
     dirListEl.innerHTML = "";
     if (entries.length === 0) {
       const empty = document.createElement("p");
       empty.className = "dir-list-empty";
       empty.textContent = "No subfolders.";
       dirListEl.appendChild(empty);
-      if (focusedPath !== null) {
-        dirListEl.tabIndex = -1; // keeps focus inside the dialog when the list it was on has no rows
-        dirListEl.focus();
-      }
+      // Focus was on a row that is gone: no rows to land on, so the first sensible control (the New folder button, else the first tabbable) — never <body>.
+      if (restoreFocus() === undefined && wasInList) (newFolderButton.disabled ? tabbableWithin(sectionEl)[0] : newFolderButton)?.focus();
       return;
     }
     for (const entry of entries) {
@@ -131,7 +129,7 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       const row = document.createElement("button");
       row.type = "button";
       row.className = "dir-row";
-      row.dataset.path = entry.path;
+      row.dataset.key = entry.path;
 
       const icon = document.createElement("span");
       icon.className = "dir-row-icon icon";
@@ -185,10 +183,7 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
 
       dirListEl.appendChild(row);
     }
-    if (focusedPath !== null) {
-      const rows = /** @type {HTMLElement[]} */ ([...dirListEl.querySelectorAll(".dir-row:not(:disabled)")]);
-      (rows.find((r) => r.dataset.path === focusedPath) ?? rows[0] ?? dirListEl).focus();
-    }
+    restoreFocus();
   }
 
   function basename(path) {

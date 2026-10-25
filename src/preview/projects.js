@@ -5,7 +5,7 @@
 //
 // The menu is an ARIA menu (CHR-920): role="menu", rows role="menuitem" (the open projects "menuitemradio", the current one checked), opening focuses the first actionable row, ↑/↓/Home/End move between rows with a roving tab stop, Escape closes and puts focus back on the trigger.
 
-import { setRovingTabindex, wireMenu } from "./menu-keys.js";
+import { captureFocus, setRovingTabindex, wireMenu } from "./menu-keys.js";
 
 /** @typedef {{ active: string | null, open: { root: string, name: string }[], recent: string[] }} ProjectsState */
 
@@ -59,6 +59,9 @@ export function createProjectUI(elements, callbacks) {
   } = elements;
   const { onSwitch, onOpenRecent, onOpenDialog, onInitDialog } = callbacks;
 
+  actionOpenEl.dataset.key = "action:open";
+  actionInitEl.dataset.key = "action:init";
+
   let menuOpen = false;
   /** @type {ProjectsState} */
   let state = { active: null, open: [], recent: [] };
@@ -93,7 +96,7 @@ export function createProjectUI(elements, callbacks) {
     // The current project is a row like the others (keyboard users must be able to reach it); activating it just closes the menu.
     const row = document.createElement("button");
     row.type = "button";
-    row.dataset.path = path;
+    row.dataset.key = path;
     row.setAttribute("role", isOpenProject ? "menuitemradio" : "menuitem");
     if (isOpenProject) row.setAttribute("aria-checked", String(isActive));
     row.className = "menu-item chrome-menu-item";
@@ -128,8 +131,7 @@ export function createProjectUI(elements, callbacks) {
 
   function renderMenu() {
     // A re-render (an SSE project event) replaces the rows: keep focus on the same project row, or the first row when it is gone.
-    const active = /** @type {HTMLElement | null} */ (document.activeElement);
-    const focusedPath = menuOpen && active && (openListEl.contains(active) || recentListEl.contains(active)) ? (active.dataset.path ?? null) : null;
+    const restoreFocus = menuOpen ? captureFocus(menuEl, "data-key", () => menuRows()[0]) : () => undefined;
     openListEl.innerHTML = "";
     for (const project of state.open) {
       const isActive = project.root === state.active;
@@ -149,9 +151,7 @@ export function createProjectUI(elements, callbacks) {
 
     if (menuOpen) {
       const rows = menuRows();
-      const keep = focusedPath === null ? undefined : rows.find((row) => row.dataset.path === focusedPath) ?? rows[0];
-      setRovingTabindex(rows, keep ?? rows[0]);
-      keep?.focus();
+      setRovingTabindex(rows, restoreFocus() ?? rows[0]);
     }
   }
 

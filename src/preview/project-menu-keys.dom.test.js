@@ -55,7 +55,7 @@ describe("re-render while the menu is open", () => {
     $("project-picker-trigger").click();
     rows()[2].focus();
     ui.render(state(["/a", "/b", "/c"], ["/r"])); // e.g. a lifecycle event added a recent entry
-    expect(document.activeElement.dataset.path).toBe("/c");
+    expect(document.activeElement.dataset.key).toBe("/c");
     expect(rows().filter((r) => r.tabIndex === 0)).toEqual([document.activeElement]);
   });
 
@@ -74,6 +74,7 @@ describe("re-render while the menu is open", () => {
     $("menu-action-open").focus();
     ui.render(state(["/a", "/b", "/c"]));
     expect(document.activeElement).toBe($("menu-action-open"));
+    expect(rows().filter((r) => r.tabIndex === 0)).toEqual([$("menu-action-open")]); // the roving stop stays on the focused action row
     $("project-picker-trigger").click(); // close
     const outside = $("flow-mode-toggle");
     outside.focus();

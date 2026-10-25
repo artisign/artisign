@@ -113,8 +113,15 @@ describe("project menu", () => {
   it("tabbing out of the menu closes it without pulling focus back", () => {
     $("#project-picker-trigger").click();
     const outside = $("#flow-mode-toggle");
+    // A pointer press or a programmatic focus move elsewhere is not a tab-out ...
     outside.focus();
     $("#project-menu").dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: outside }));
+    expect($("#project-menu").hidden).toBe(false);
+    // ... a keyboard Tab is.
+    const row = document.querySelector("#project-menu button.chrome-menu-item");
+    row.focus();
+    keydown(row, "Tab");
+    outside.focus();
     expect($("#project-menu").hidden).toBe(true);
     expect(document.activeElement).toBe(outside);
   });
@@ -124,6 +131,43 @@ describe("project menu", () => {
     $("#menu-action-open").click();
     expect($("#project-menu").hidden).toBe(true);
     expect($("#dialog-scrim").hidden).toBe(false);
+  });
+});
+
+describe("zoom menu", () => {
+  const rows = () => [...document.querySelectorAll("#zoom-menu button")];
+
+  it("is an ARIA menu: opening focuses the current level, arrows move, Escape and a keyboard Tab close it", () => {
+    const trigger = $("#zoom-trigger");
+    expect($("#zoom-menu").getAttribute("role")).toBe("menu");
+    trigger.focus();
+    trigger.click();
+    expect(rows().map((r) => r.getAttribute("role"))).toEqual(["menuitemradio", "menuitemradio", "menuitemradio", "menuitemradio", "menuitem", "menuitem"]);
+    expect(rows().map((r) => r.getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false", null, null]);
+    expect(document.activeElement).toBe(rows()[0]); // Fit is the current level
+    expect(rows().map((r) => r.tabIndex)).toEqual([0, -1, -1, -1, -1, -1]);
+    keydown(document.activeElement, "ArrowDown");
+    expect(document.activeElement).toBe(rows()[1]);
+    keydown(document.activeElement, "End");
+    expect(document.activeElement).toBe(rows()[5]);
+    keydown(document.activeElement, "Escape");
+    expect($("#zoom-menu").hidden).toBe(true);
+    expect(document.activeElement).toBe(trigger);
+    trigger.click();
+    const outside = $("#flow-mode-toggle");
+    keydown(document.activeElement, "Tab");
+    outside.focus();
+    expect($("#zoom-menu").hidden).toBe(true);
+    expect(document.activeElement).toBe(outside);
+  });
+
+  it("picking a level checks it and the next open starts on it", () => {
+    $("#zoom-trigger").click();
+    rows()[2].click();
+    expect($("#zoom-menu").hidden).toBe(true);
+    expect(rows()[2].getAttribute("aria-checked")).toBe("true");
+    $("#zoom-trigger").click();
+    expect(document.activeElement).toBe(rows()[2]);
   });
 });
 

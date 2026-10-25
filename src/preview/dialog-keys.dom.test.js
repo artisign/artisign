@@ -203,14 +203,15 @@ describe("folder navigation keeps keyboard focus in the dialog", () => {
     expect(openEl.contains(document.activeElement)).toBe(true);
   });
 
-  it("an empty folder keeps focus on the list instead of dropping it to <body>", async () => {
+  it("an empty folder moves focus to the New folder button, not <body> and not a stale tabindex on the list", async () => {
     await openFromButton("open");
     const row = openEl.querySelector(".dir-row");
     row.focus();
     entries = [];
     row.click();
     await settle();
-    expect(openEl.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).toBe(openEl.querySelector(".btn-new-folder"));
+    expect(openEl.querySelector(".dir-list").hasAttribute("tabindex")).toBe(false);
   });
 });
 

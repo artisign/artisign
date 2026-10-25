@@ -162,6 +162,13 @@ describe("renderScreenList — variant tree", () => {
     expect(selected).toEqual([]);
   });
 
+  it("the disclosure toggle is a chevron icon that follows the expanded state", () => {
+    const collapsed = render();
+    expect(collapsed.querySelector('[data-screen="family"] .screen-item-toggle .icon').textContent).toBe("chevron_right");
+    const open = render({ expanded: new Set(["family"]) });
+    expect(open.querySelector('[data-screen="family"] .screen-item-toggle .icon').textContent).toBe("expand_more");
+  });
+
   it("nests expanded variants with depth, kind icons, suffix names and a hover title", () => {
     const listEl = render({
       expanded: new Set(["family", "family-sheet", "family-sheet-confirm"]),
@@ -177,8 +184,8 @@ describe("renderScreenList — variant tree", () => {
     expect(row("family-sheet").dataset.depth).toBe("1");
     expect(row("family-sheet-confirm-error").dataset.depth).toBe("3");
     expect(row("family-sheet").querySelector(".kind-icon").dataset.kind).toBe("overlay");
-    expect(row("family-sheet-confirm").querySelector(".kind-icon").textContent).toBe("↪");
-    expect(row("family").querySelector(".kind-icon")).toBeNull();
+    expect(row("family-sheet-confirm").querySelector(".kind-icon").textContent).toBe("subdirectory_arrow_right");
+    expect(row("family").querySelector(".kind-icon").dataset.kind).toBe("main");
     expect(row("family-sheet-confirm").querySelector(".screen-item-text").textContent).toBe(
       "…-confirm",
     );
@@ -193,6 +200,12 @@ describe("renderScreenList — variant tree", () => {
     const chips = [...listEl.querySelectorAll('[data-screen="family"] .tag-chip')];
     expect(chips.map((c) => c.textContent)).toEqual(["a", "b", "+2"]);
     expect(chips[2].title).toBe("a, b, c, d");
+  });
+
+  it("gives every tag chip its full name as title (a long tag is truncated by CSS)", () => {
+    const listEl = render();
+    const chips = [...listEl.querySelectorAll('[data-screen="family"] .tag-chip:not(.tag-more)')];
+    expect(chips.map((c) => c.title)).toEqual(["a", "b"]);
   });
 
   it("hides every chip when showTags is false", () => {

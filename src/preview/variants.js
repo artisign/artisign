@@ -4,7 +4,7 @@
 // stored `variant_of` chain — never the flow arrival path) and /api/flows.
 // The pure functions come first, the DOM wiring (createVariantUI) last.
 
-import { buildScreenTree, displayName } from "./screens.js";
+import { buildScreenTree, createKindIcon, displayName } from "./screens.js";
 import { canCompare } from "./compare-data.js";
 import { icon } from "./icons.js";
 
@@ -71,16 +71,6 @@ export function flowCounts(flows, name) {
     if (from === name) out += 1;
   }
   return { in: into, out };
-}
-
-// Material Symbols for the variant kinds in the screen view (crumbs, popover rows, map); the sidebar tree keeps screens.js's own glyphs until its area ticket.
-const KIND_MATERIAL = { state: "description", overlay: "web_asset", step: "subdirectory_arrow_right" };
-
-function createVariantKindIcon(kind) {
-  if (!(kind in KIND_MATERIAL)) return null;
-  const node = icon(KIND_MATERIAL[kind], "kind-icon");
-  node.dataset.kind = kind;
-  return node;
 }
 
 function el(tag, className, text) {
@@ -190,7 +180,7 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
     const row = button("variant-pop-row chrome-menu-item", "", () => go(name));
     row.dataset.screen = name;
     const kind = last.tree.nodes.get(name)?.screen.variant_kind;
-    const kindIcon = createVariantKindIcon(kind);
+    const kindIcon = createKindIcon(kind);
     if (kindIcon) row.appendChild(kindIcon);
     row.appendChild(el("span", "variant-pop-name", name));
     if (name === current) {
@@ -246,7 +236,7 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
       crumb.title = node.name;
       if (i === 0) crumb.appendChild(icon("home", "crumb-home"));
       else {
-        const kindIcon = createVariantKindIcon(node.screen.variant_kind);
+        const kindIcon = createKindIcon(node.screen.variant_kind);
         if (kindIcon) crumb.appendChild(kindIcon);
       }
       const name = el("span", "crumb-name");
@@ -317,7 +307,7 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
       row.title = node.name;
       if (node === ctx.root) row.appendChild(icon("home", "crumb-home"));
       else {
-        const kindIcon = createVariantKindIcon(node.screen.variant_kind);
+        const kindIcon = createKindIcon(node.screen.variant_kind);
         if (kindIcon) row.appendChild(kindIcon);
       }
       row.appendChild(el("span", "map-node-name", displayName(node)));

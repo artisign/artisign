@@ -661,7 +661,7 @@ body {
   display: none;
 }
 
-/* Text toggle buttons still used by the sidebar (Tags) and the board toolbar; restyled with their areas (CHR-913/CHR-914). */
+/* Text toggle buttons still used by the board toolbar; restyled with that area. */
 .toggle-button {
   border: 1px solid var(--chrome-border-strong);
   background: var(--chrome-raised);
@@ -918,30 +918,18 @@ body {
   display: none;
 }
 
+/* Screens sidebar (CHR-914): search field, Tags toggle, match counter, then the tree. 264px wide while expanded; scoped to data-collapsed="false" because an id selector would otherwise beat the 36px rail rule. */
+#sidebar-screens[data-collapsed="false"] {
+  width: 264px;
+}
+
 #screen-filter {
-  padding: var(--space-lg) var(--space-md);
-  border-bottom: 1px solid var(--chrome-border);
+  padding: var(--space-pad) var(--space-pad) 0;
 }
 
 #screen-filter-row {
   display: flex;
-  gap: var(--space-md);
-}
-
-/* CHR-731 — quieter than the header's filled .toggle-button: on = accent outline on the subtle accent fill (approved `variants-sidebar` c-tree-tags). */
-#screen-tags-toggle {
-  flex: none;
-  height: 32px;
-  padding: 0 var(--space-lg);
-  font-size: 0.75rem;
-  color: var(--chrome-text-secondary);
-}
-
-#screen-tags-toggle[aria-pressed="true"] {
-  background: var(--chrome-accent-subtle);
-  border-color: var(--chrome-accent);
-  color: var(--chrome-accent);
-  font-weight: 600;
+  gap: var(--space-sm);
 }
 
 #screen-filter-input-wrap {
@@ -949,32 +937,22 @@ body {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-md);
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--chrome-border-strong);
-  border-radius: 6px;
+  gap: var(--space-sm);
+  height: var(--size-control);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
   background: var(--chrome-field);
 }
 
-#screen-filter-icon {
-  flex: none;
-  width: 11px;
-  height: 11px;
-  position: relative;
-  border: 1.5px solid var(--chrome-text-tertiary);
-  border-radius: var(--radius-pill);
+#screen-filter-input-wrap:focus-within {
+  border-color: var(--chrome-accent);
+  box-shadow: 0 0 0 2px var(--chrome-focus-ring);
 }
 
-#screen-filter-icon::after {
-  content: "";
-  position: absolute;
-  top: 9px;
-  left: 8px;
-  width: 5px;
-  height: 1.5px;
-  background: var(--chrome-text-tertiary);
-  transform: rotate(45deg);
+#screen-filter-icon {
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-tertiary);
 }
 
 #screen-filter-input {
@@ -984,7 +962,7 @@ body {
   outline: none;
   background: transparent;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--ui-base);
   color: var(--chrome-text);
 }
 
@@ -992,20 +970,25 @@ body {
   color: var(--chrome-text-tertiary);
 }
 
+/* Tags toggle: ghost button with a tag icon; pressed = the active fill (.chrome-btn--ghost). */
+#screen-tags-toggle .icon {
+  font-size: var(--size-icon-sm);
+}
+
 #screen-filter-hint {
-  margin-top: var(--space-sm);
-  font-size: 0.68rem;
+  padding: var(--space-sm) var(--space-xs) var(--space-lg);
+  font-size: var(--ui-2xs);
   color: var(--chrome-text-tertiary);
 }
 
 #screen-list {
   list-style: none;
   margin: 0;
-  padding: var(--space-md);
+  padding: 0 var(--space-pad) var(--space-pad);
 }
 
 #screen-list li {
-  margin-bottom: 2px;
+  margin-bottom: var(--space-2xs);
   /* Positioning context for .screen-item-pin (CHR-624) — a SIBLING of
      .screen-item, not a child (see screens.js's renderScreenList), so the
      positioned ancestor has to be one level up. */
@@ -1020,9 +1003,10 @@ body {
   background: transparent;
   /* Right padding wider than the other three sides (CHR-624) — clears
      .screen-item-pin, which overlaps this corner. */
-  padding: var(--space-md) 30px var(--space-md) 10px;
-  border-radius: 6px;
-  font-size: 0.85rem;
+  padding: 5px 34px 6px var(--space-md);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--ui-base);
   color: var(--chrome-text);
   cursor: pointer;
 }
@@ -1031,34 +1015,47 @@ body {
   background: var(--chrome-hover);
 }
 
-.screen-item[aria-current="true"] {
+.screen-item[aria-current="true"],
+li[data-depth="0"] > .screen-item.in-tree[aria-current="true"] {
   background: var(--chrome-active);
   color: var(--chrome-text);
   font-weight: 600;
 }
 
-/* CHR-731 — variant tree. A row's --depth (set inline by renderScreenList, only when the project has variants) indents 14px per level behind a 2px depth guide. */
+.screen-item:focus-visible,
+.mockup-item:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
+/* CHR-731 — variant tree. A row's --depth (set inline by renderScreenList, only when the project has variants) indents 14px per level behind a 1px depth guide. */
 #screen-list li[data-depth] {
   margin-left: calc(var(--depth) * 14px);
 }
 
 #screen-list li[data-depth]:not([data-depth="0"]) {
-  border-left: 2px solid var(--chrome-border);
-  border-radius: 0 6px 6px 0;
+  border-left: 1px solid var(--chrome-border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
+/* Room for the chevron at the row's left edge. */
 .screen-item.in-tree {
-  padding-left: 22px;
+  padding-left: 26px;
+}
+
+li[data-depth="0"] > .screen-item.in-tree {
+  font-weight: 500;
 }
 
 li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
-  font-size: 0.8rem;
+  font-size: var(--ui-sm);
 }
 
 .screen-item-name {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-xs);
+  min-height: var(--size-icon);
   min-width: 0;
 }
 
@@ -1072,77 +1069,49 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 .screen-item-total {
   margin-left: auto;
   flex: none;
-  font-size: 0.68rem;
+  font-size: var(--ui-2xs);
   font-weight: 400;
-  color: var(--chrome-text-secondary);
-  background: var(--chrome-hover);
-  border-radius: var(--radius-pill);
-  padding: 1px 7px;
+  color: var(--chrome-text-tertiary);
 }
 
 .screen-item-toggle {
   position: absolute;
   top: 5px;
-  left: 3px;
-  width: 18px;
-  height: 22px;
+  left: var(--space-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: var(--size-icon);
   padding: 0;
   border: none;
+  border-radius: var(--radius-xs);
   background: transparent;
-  color: var(--chrome-text-tertiary);
-  font-size: 0.6rem;
+  color: var(--chrome-text-secondary);
   cursor: pointer;
 }
 
+.screen-item-toggle:hover:not(:disabled) {
+  color: var(--chrome-text);
+}
+
+.screen-item-toggle:disabled {
+  cursor: default;
+}
+
+.screen-item-toggle:focus-visible,
+.screen-item-pin:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+/* The kind icon (main / state / overlay / step): a Material Symbol in the secondary text colour, 16px. */
 .kind-icon {
   flex: none;
-  position: relative;
-  display: inline-block;
   color: var(--chrome-text-secondary);
 }
 
-.kind-state,
-.kind-overlay {
-  width: 9px;
-  height: 13px;
-  border: 1.5px solid currentColor;
-  border-radius: 2px;
-}
-
-.kind-state::after {
-  content: "";
-  position: absolute;
-  left: 1px;
-  right: 1px;
-  top: 2px;
-  height: 1.5px;
-  background: currentColor;
-  box-shadow: 0 3px 0 currentColor;
-}
-
-.kind-overlay {
-  color: var(--chrome-accent);
-}
-
-.kind-overlay::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 5px;
-  background: currentColor;
-}
-
-.kind-step {
-  width: 9px;
-  text-align: center;
-  font-size: 0.75rem;
-  line-height: 1;
-  font-weight: 700;
-  color: var(--chrome-warning);
-}
-
+/* A row that only gives context for a match: grey, chips dimmed. */
 #screen-list li.context .screen-item {
   color: var(--chrome-text-tertiary);
 }
@@ -1152,8 +1121,8 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 #screen-list li.screen-hidden-row {
-  padding: 2px 0 6px 22px;
-  font-size: 0.65rem;
+  padding: var(--space-xs) var(--space-md) var(--space-lg) 20px;
+  font-size: var(--ui-2xs);
   color: var(--chrome-text-tertiary);
 }
 
@@ -1163,46 +1132,61 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   border-radius: 2px;
 }
 
+/* Tag chip ($tag-chip): the 16px pill; match = accent, +N = dashed. */
+.tag-chip {
+  display: block;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  height: var(--size-chip-h);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-field);
+  color: var(--chrome-text-secondary);
+  font-size: var(--ui-chip);
+  line-height: var(--size-chip-h);
+  white-space: nowrap;
+  /* A long tag truncates inside the panel instead of widening it. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .tag-chip.match {
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .tag-chip.tag-more {
-  background: var(--chrome-raised);
+  background: transparent;
   border: 1px dashed var(--chrome-border-strong);
-  padding: 0 6px;
+  color: var(--chrome-text-tertiary);
+  padding: 0 5px;
+  line-height: calc(var(--size-chip-h) - 2px);
+}
+
+/* A +N chip that hides a matching tag keeps the match highlight (dashed accent). */
+.tag-chip.tag-more.match {
+  background: var(--chrome-accent-subtle);
+  border-color: var(--chrome-accent);
+  color: var(--chrome-accent);
 }
 
 .tag-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-xs);
-  margin-top: var(--space-sm);
+  margin-top: 3px;
 }
 
-.tag-chip {
-  font-size: 0.65rem;
-  line-height: 17px;
-  padding: 0 var(--space-md);
-  border-radius: var(--radius-pill);
-  background: var(--chrome-border);
-  color: var(--chrome-text-secondary);
+.screen-item.in-tree .tag-row {
+  padding-left: var(--space-xs);
 }
 
-/* Active screen's own chips get accent styling — its first (ticket) chip
-   filled solid, the rest as a light accent outline. Inactive rows stay
-   neutral grey regardless of position. */
-.screen-item[aria-current="true"] .tag-chip:first-child {
-  background: var(--chrome-accent);
-  color: var(--chrome-primary-text);
-  font-weight: 600;
-}
-
-.screen-item[aria-current="true"] .tag-chip:not(:first-child) {
+/* On the selected row the chips lift onto the raised surface. */
+.screen-item[aria-current="true"] .tag-chip:not(.match):not(.tag-more),
+.mockup-item[aria-current="true"] .tag-chip {
   background: var(--chrome-raised);
-  color: var(--chrome-accent);
 }
 
 /* Shared `$pin-button` look (CHR-624) — the sidebar row's own pin button
@@ -1216,7 +1200,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--chrome-raised);
   border: 1px solid var(--chrome-border-strong);
   color: var(--chrome-text-tertiary);
@@ -1230,10 +1214,27 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   color: var(--chrome-primary-text);
 }
 
+/* A sidebar row's pin shows on hover/focus and always once pinned, so the unpinned rows stay quiet (opacity only: no layout shift). While hidden it takes no clicks; keyboard focus still reaches it and reveals it. Without hover (touch) it is always shown. */
 .screen-item-pin {
   position: absolute;
-  top: 9px;
-  right: 8px;
+  top: 4px;
+  right: var(--space-md);
+  opacity: 0;
+  pointer-events: none;
+}
+
+#screen-list li:hover > .screen-item-pin,
+#screen-list li:focus-within > .screen-item-pin,
+.screen-item-pin.pinned {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none) {
+  .screen-item-pin {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 /* Mockup sidebar section — always visually distinct from #screen-list, even
@@ -1243,10 +1244,10 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 }
 
 .sidebar-section-title {
-  padding: var(--space-lg) 10px var(--space-sm);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  padding: var(--space-lg) var(--space-pad) var(--space-sm) var(--space-xl);
+  font-size: var(--ui-2xs);
+  font-weight: 500;
+  letter-spacing: 0.02em;
   color: var(--chrome-text-tertiary);
   text-transform: uppercase;
 }
@@ -1254,11 +1255,11 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 #mockup-list {
   list-style: none;
   margin: 0;
-  padding: 0 var(--space-md) var(--space-md);
+  padding: 0 var(--space-pad) var(--space-pad);
 }
 
 #mockup-list li {
-  margin-bottom: 2px;
+  margin-bottom: var(--space-2xs);
 }
 
 .mockup-item {
@@ -1267,9 +1268,10 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   text-align: left;
   border: none;
   background: transparent;
-  padding: var(--space-md) 10px;
-  border-radius: 6px;
-  font-size: 0.85rem;
+  padding: 5px var(--space-md) 6px;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--ui-base);
   color: var(--chrome-text);
   cursor: pointer;
 }
@@ -1281,7 +1283,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 .mockup-item[aria-current="true"] {
   background: var(--chrome-active);
   color: var(--chrome-text);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .mockup-item-name-row {
@@ -1300,22 +1302,25 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
 
 .mockup-item-badge {
   flex: none;
-  font-size: 0.65rem;
-  line-height: 17px;
-  padding: 0 var(--space-md);
+  display: inline-flex;
+  align-items: center;
+  height: var(--size-chip-h);
+  padding: 0 var(--space-sm);
   border-radius: var(--radius-pill);
-  background: var(--chrome-border);
+  background: var(--chrome-field);
   color: var(--chrome-text-secondary);
+  font-size: var(--ui-chip);
+  font-weight: 400;
 }
 
 .mockup-item[aria-current="true"] .mockup-item-badge {
-  background: var(--chrome-accent);
-  color: var(--chrome-primary-text);
+  background: var(--chrome-raised);
 }
 
 .mockup-item-sub {
-  margin-top: var(--space-sm);
-  font-size: 0.7rem;
+  margin-top: var(--space-xs);
+  font-size: var(--ui-2xs);
+  font-weight: 400;
   color: var(--chrome-text-tertiary);
 }
 
@@ -4065,6 +4070,18 @@ button.chrome-section-header:focus-visible {
   background: var(--frame-surface-muted);
 }
 
+/* Two text lines on a state thumb. */
+.board-cluster-thumb.kind-state::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 2px;
+  height: 1.5px;
+  background: currentColor;
+  box-shadow: 0 3px 0 currentColor;
+}
+
 .board-cluster-thumb.deeper {
   border-style: dashed;
 }
@@ -4498,7 +4515,7 @@ button.chrome-section-header:focus-visible {
 /* Compare checkboxes: sidebar rows (next to the pin) and breadcrumb popover rows. */
 .screen-item-compare {
   position: absolute;
-  top: 11px;
+  top: 8px;
   right: 34px;
   margin: 0;
 }

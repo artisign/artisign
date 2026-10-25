@@ -103,7 +103,7 @@ export function initTooltips(doc) {
     if (event.key === "Escape" && current) {
       dismissed = current;
       hide();
-      event.preventDefault(); // consumed: the global shortcut handler must not also leave the mode
+      // Not consumed on purpose: a clicked toggle keeps focus (and so its tooltip), and "click Flow, press Esc" must still leave the mode in one Escape.
     }
   };
   // A click can change the trigger's own tooltip text (e.g. the theme toggle) while it is still shown.

@@ -8,7 +8,7 @@ function key(k, init = {}) {
   const { altGraph = false, ...rest } = init;
   return { key: k, code: init.code ?? "", shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, isComposing: false, keyCode: 0, repeat: false, target: null, getModifierState: (name) => name === "AltGraph" && altGraph, ...rest };
 }
-const ctx = (over = {}) => ({ view: "screens", overlay: null, ...over });
+const ctx = (over = {}) => ({ view: "screens", overlay: null, mac: false, ...over });
 const press = (k, init, c) => resolveShortcut(key(k, init), ctx(c));
 
 describe("mapping", () => {
@@ -105,8 +105,8 @@ describe("resolveShortcut", () => {
 
   it("non-US layouts: the produced character counts, with Shift / Option / AltGr as the layout needs", () => {
     // German Mac: [ is Option+5, ] is Option+6, / is Shift+7, ? is Shift+ß.
-    expect(press("[", { altKey: true, code: "Digit5" })).toBe("panel-screens");
-    expect(press("]", { altKey: true, code: "Digit6" })).toBe("panel-elements");
+    expect(press("[", { altKey: true, code: "Digit5" }, { mac: true })).toBe("panel-screens");
+    expect(press("]", { altKey: true, code: "Digit6" }, { mac: true })).toBe("panel-elements");
     expect(press("/", { shiftKey: true, code: "Digit7" })).toBe("filter");
     expect(press("?", { shiftKey: true, code: "Minus" })).toBe("help");
     // German Windows: AltGr+8 is [, reported as ctrl+alt with AltGraph set.
@@ -114,6 +114,15 @@ describe("resolveShortcut", () => {
     expect(press("\\", { ctrlKey: true, altKey: true, altGraph: true, code: "Minus" })).toBe("panel-context");
     // ...but a real Ctrl+Alt without AltGraph is not.
     expect(press("[", { ctrlKey: true, altKey: true })).toBeNull();
+  });
+
+  it("a plain Alt/Option on a character key is accepted on macOS only", () => {
+    for (const [k, id] of [["/", "filter"], ["+", "zoom-in"], ["-", "zoom-out"], ["[", "panel-screens"], ["]", "panel-elements"]]) {
+      expect(press(k, { altKey: true }, { mac: true })).toBe(id);
+      expect(press(k, { altKey: true }, { mac: false })).toBeNull(); // Alt+/ etc. belong to the browser or OS elsewhere
+    }
+    // AltGr (ctrl+alt with AltGraph) is a layout's way to type the character on any platform.
+    expect(press("[", { ctrlKey: true, altKey: true, altGraph: true }, { mac: false })).toBe("panel-screens");
   });
 
   it("IME guard: composition events never trigger", () => {
@@ -227,6 +236,7 @@ describe("aria-keyshortcuts", () => {
   it("names the keys platform-independently", () => {
     expect(ariaKeyShortcut(shortcutById("flow"))).toBe("F");
     expect(ariaKeyShortcut(shortcutById("zoom-fit"))).toBe("Shift+1");
+    expect(ariaKeyShortcut(shortcutById("zoom-in"))).toBe("Plus");
     expect(ariaKeyShortcut(shortcutById("zoom-out"))).toBe("-");
     expect(ariaKeyShortcut(shortcutById("leave"))).toBe("Escape");
   });

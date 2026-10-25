@@ -341,14 +341,15 @@ describe("Escape consumed by an overlay does not also leave the mode", () => {
     expect(pressed("comment-mode-toggle")).toBe("true");
   });
 
-  it("dismissing a visible tooltip keeps the active mode", async () => {
+  it("a visible tooltip does not consume Escape: it hides and the same Escape leaves the mode", async () => {
     await boot();
-    key("f");
-    $("#comment-mode-toggle").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    $("#flow-mode-toggle").click();
+    // Chrome focuses a clicked toggle, so its tooltip is up while the mode is on.
+    $("#flow-mode-toggle").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
     expect($("#chrome-tooltip").hidden).toBe(false);
     key("Escape");
     expect($("#chrome-tooltip").hidden).toBe(true);
-    expect(pressed("flow-mode-toggle")).toBe("true");
+    expect(pressed("flow-mode-toggle")).toBe("false");
   });
 
   it("closing the zoom menu keeps the active mode", async () => {
@@ -468,5 +469,79 @@ describe("reference dialog focus", () => {
     expect(document.activeElement).toBe($("#shortcuts-dialog"));
     expect($("#chrome-tooltip").hidden).toBe(true);
     key("Escape");
+  });
+});
+
+describe("zoom preset keys and the zoom menu", () => {
+  it("close an open zoom menu like the button click (focus to the trigger), but leave focus alone when it was closed", async () => {
+    await boot();
+    $("#zoom-trigger").click();
+    expect($("#zoom-menu").hidden).toBe(false);
+    shift("@", "Digit2");
+    expect($("#zoom-label").textContent).toBe("200%");
+    expect($("#zoom-menu").hidden).toBe(true);
+    expect(document.activeElement).toBe($("#zoom-trigger"));
+    const flow = $("#flow-mode-toggle");
+    flow.focus();
+    shift("%", "Digit5");
+    expect(document.activeElement).toBe(flow);
+  });
+});
+
+describe("IME in a text field", () => {
+  it("Escape during composition does not clear inspect's focused element", async () => {
+    await boot();
+    const doc = frameDoc();
+    await flush();
+    key("i");
+    doc.getElementById("child").click();
+    const filter = $("#screen-filter-input");
+    filter.focus();
+    key("Escape", { isComposing: true }, filter);
+    key("Escape", { keyCode: 229 }, filter);
+    expect($(".inspector-entry-focused")).not.toBeNull();
+    key("Escape", {}, filter);
+    expect($(".inspector-entry-focused")).toBeNull();
+  });
+});
+
+describe("a top-document overlay and the screen frame", () => {
+  it("a click inside the frame closes an open project menu and zoom menu like an outside click", async () => {
+    await boot();
+    const doc = frameDoc();
+    key("p");
+    expect($("#project-menu").hidden).toBe(false);
+    doc.getElementById("child").dispatchEvent(new doc.defaultView.Event("pointerdown", { bubbles: true }));
+    doc.getElementById("child").click();
+    expect($("#project-menu").hidden).toBe(true);
+    $("#zoom-trigger").click();
+    expect($("#zoom-menu").hidden).toBe(false);
+    doc.getElementById("child").dispatchEvent(new doc.defaultView.Event("pointerdown", { bubbles: true }));
+    expect($("#zoom-menu").hidden).toBe(true);
+  });
+
+  it("Escape from the frame closes the open overlay and nothing else", async () => {
+    await boot();
+    const doc = frameDoc();
+    key("f");
+    key("p");
+    frameKey(doc, "Escape");
+    expect($("#project-menu").hidden).toBe(true);
+    expect(pressed("flow-mode-toggle")).toBe("true");
+    $("#zoom-trigger").click();
+    frameKey(doc, "Escape");
+    expect($("#zoom-menu").hidden).toBe(true);
+    expect(pressed("flow-mode-toggle")).toBe("true");
+    frameKey(doc, "Escape"); // nothing open: leaves the mode
+    expect(pressed("flow-mode-toggle")).toBe("false");
+  });
+
+  it("O / N from the frame still act while the project menu is open (the menu's own keys)", async () => {
+    await boot();
+    const doc = frameDoc();
+    key("p");
+    frameKey(doc, "n");
+    expect($("#project-menu").hidden).toBe(true);
+    expect($("#dialog-scrim").hidden).toBe(false);
   });
 });

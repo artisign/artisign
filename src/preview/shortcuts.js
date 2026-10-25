@@ -2,7 +2,7 @@
 //
 // Browser-safe by construction: plain single keys, plus Shift for the zoom presets and Collapse all. Nothing matches with Ctrl or Cmd held, in a text field, during IME composition, or while a menu / dialog is open (except that overlay's own keys).
 //
-// Non-US layouts (CHR-916 review, CTO decision): the character keys `[ \ ] / ? + -` are matched by the character the key PRODUCES (`event.key`), and Shift or Option / AltGr may be held when the layout needs them to produce it (German Mac `[` is Option+5, Windows AltGr+8 reports ctrl+alt with AltGraph set, German `/` is Shift+7). Ctrl or Cmd alone is never accepted, and letters and digits keep the strict rule: no Alt at all (Shift only where the mapping lists it).
+// Non-US layouts (CHR-916 review, CTO decision): the character keys `[ \ ] / ? + -` are matched by the character the key PRODUCES (`event.key`), and Shift or Option / AltGr may be held when the layout needs them to produce it (German Mac `[` is Option+5, Windows AltGr+8 reports ctrl+alt with AltGraph set, German `/` is Shift+7). Ctrl or Cmd alone is never accepted; a lone Alt counts as Option on macOS only, elsewhere it is the browser's. Letters and digits keep the strict rule: no Alt at all (Shift only where the mapping lists it).
 
 /**
  * @typedef {{
@@ -43,7 +43,7 @@ export const SHORTCUTS = [
   { id: "zoom-50", group: "Zoom", label: "50%", code: "Digit5", shift: true, display: "5", zoom: 0.5, view: "screens" },
   { id: "zoom-100", group: "Zoom", label: "100%", code: "Digit0", shift: true, display: "0", zoom: 1, view: "screens" },
   { id: "zoom-200", group: "Zoom", label: "200%", code: "Digit2", shift: true, display: "2", zoom: 2, view: "screens" },
-  { id: "zoom-in", group: "Zoom", label: "Zoom in", key: "+", alt: ["="], char: true, display: "+" },
+  { id: "zoom-in", group: "Zoom", label: "Zoom in", key: "+", alt: ["="], char: true, display: "+", aria: "Plus" },
   { id: "zoom-out", group: "Zoom", label: "Zoom out", key: "-", alt: ["_"], char: true, display: "−", aria: "-" },
 
   // Same keys as the Screens zoom presets; the active view picks which one applies.
@@ -126,15 +126,17 @@ function matches(def, event) {
  * Which shortcut, if any, an event triggers.
  *
  * @param {KeyboardEvent} event
- * @param {{ view: string, overlay: null | "project-menu" | "zoom-menu" | "other" }} context `overlay`: the open menu / dialog / popover, if any
+ * @param {{ view: string, overlay: null | "project-menu" | "zoom-menu" | "other", mac: boolean }} context `overlay`: the open menu / dialog / popover, if any; `mac`: whether a plain Option counts for a character key
  * @returns {string | null} a SHORTCUTS id
  */
-export function resolveShortcut(event, { view, overlay }) {
+export function resolveShortcut(event, { view, overlay, mac }) {
   // Cmd never counts; Ctrl only as half of Windows' AltGr (ctrl+alt with AltGraph set), which is how a layout types `[`.
   if (event.metaKey) return null;
   const altGraph = event.ctrlKey && event.altKey && Boolean(event.getModifierState?.("AltGraph"));
   if (event.ctrlKey && !altGraph) return null;
-  const hasAlt = event.altKey || altGraph;
+  // Option types characters on macOS ([ is Option+5 on a German Mac); elsewhere a lone Alt is the browser's or OS's (Alt+arrows, menus), only AltGr counts.
+  const hasAlt = (mac && event.altKey) || altGraph;
+  if (event.altKey && !mac && !altGraph) return null;
   // IME composition (keyCode 229 on browsers that don't set isComposing).
   if (event.isComposing || event.keyCode === 229) return null;
   if (isTypingTarget(event.target)) return null;

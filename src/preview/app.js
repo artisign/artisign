@@ -1964,6 +1964,8 @@ screenFrame.addEventListener("load", () => {
   const doc = screenFrame.contentDocument;
   // The screen document is same-origin (srcdoc) and replaced on every load: forward its keys into the same shortcut path (the typing guard looks at the frame's own target, so inputs inside a user screen keep their keys).
   doc?.addEventListener("keydown", onShortcutKeydown);
+  doc?.addEventListener("pointerdown", closeOverlaysOnFramePress, true);
+  doc?.addEventListener("click", closeOverlaysOnFramePress, true);
   const nodeExists = typeof selectedNode === "string" && !!doc?.getElementById(selectedNode);
   const resolvedSelection = resolveSelectionAfterReload({
     selectedNode,
@@ -2383,7 +2385,10 @@ function runShortcut(id) {
   if (def?.zoom !== undefined) {
     // The zoom controls themselves must be showing; the level goes straight to the setter (the preset button's click would also move focus to the trigger).
     if (canvasControlsEl.hidden) return false;
+    const menuWasOpen = !zoomMenu.hidden;
     setZoom(def.zoom);
+    setZoomMenuOpen(false);
+    if (menuWasOpen) zoomTrigger.focus(); // as the preset button's click does; a key with the menu closed leaves focus alone
     return true;
   }
   switch (id) {
@@ -2419,17 +2424,30 @@ function onShortcutKeydown(evt) {
   if (evt.defaultPrevented) return;
   const overlay = openOverlay();
   // Inspect mode with a focused element: Escape in a text field still clears that focus (it never leaves the mode, nor touches the comment compose).
-  if (evt.key === "Escape" && !overlay && activeMode === "inspect" && inspectorPanel.getFocusedDomId() && isTypingTarget(evt.target)) {
+  if (evt.key === "Escape" && !overlay && activeMode === "inspect" && inspectorPanel.getFocusedDomId() && isTypingTarget(evt.target) && !evt.isComposing && evt.keyCode !== 229) {
     clearInspectFocus();
     return;
   }
-  const id = resolveShortcut(evt, { view: currentView, overlay });
+  // Escape pressed inside the screen frame while a top-document overlay is open: the overlay's own Escape handlers listen on the top document, so hand the key over to them. It closes that overlay and nothing else.
+  if (evt.key === "Escape" && overlay && evt.target?.ownerDocument !== document) {
+    evt.preventDefault();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    return;
+  }
+  const id = resolveShortcut(evt, { view: currentView, overlay, mac: macPlatform });
   if (!id) return;
   if (topbarEl.classList.contains("is-empty") && !NO_PROJECT_SHORTCUTS.has(id)) return;
   if (runShortcut(id) && id !== "leave") evt.preventDefault();
 }
 
 document.addEventListener("keydown", onShortcutKeydown);
+
+/** A press inside the screen frame never reaches the top document, where the open menus and popovers listen for "outside" clicks: replay it on the body so they close like for any outside click. Dialogs are modal and stay. */
+function closeOverlaysOnFramePress(evt) {
+  const overlay = openOverlay();
+  if (!overlay || !dialogScrimEl.hidden || shortcutsDialog.isOpen()) return;
+  document.body.dispatchEvent(new (evt.type === "click" ? MouseEvent : Event)(evt.type, { bubbles: true }));
+}
 
 /**
  * Boots the whole preview: loads the daemon's project registry state first

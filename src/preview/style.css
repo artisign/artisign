@@ -1542,17 +1542,19 @@ button.chrome-section-header:focus-visible {
 }
 
 #comments-title {
+  flex: 1;
   margin: 0;
   font-size: inherit;
   font-weight: inherit;
 }
 
+/* The title takes the free space, so the count sits against the add button; an empty count leaves no gap. */
 #comments-count {
-  margin-right: var(--space-xs);
+  margin-left: 0;
 }
 
 #comments-count:empty {
-  margin-left: auto;
+  display: none;
 }
 
 #comment-compose {
@@ -1652,12 +1654,20 @@ button.chrome-section-header:focus-visible {
   color: var(--chrome-text);
 }
 
+/* The node chip is a .chrome-chip (flex: none); here it may shrink, and the id inside truncates with an ellipsis (full id in the title). */
 .comment-target {
+  flex: 0 1 auto;
   margin-left: auto;
+  min-width: 0;
+  max-width: 60%;
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+.comment-target-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: ui-monospace, Menlo, monospace;
+  white-space: nowrap;
 }
 
 .comment-body {

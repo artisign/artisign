@@ -68,11 +68,32 @@ describe("renderCommentsPanel", () => {
     expect(listEl.querySelector(".comments-resolved-list").hidden).toBe(true);
   });
 
-  it("shows a relative time next to the author when the record has a timestamp", () => {
+  it("shows the time next to the author, the full timestamp in the title", () => {
     const listEl = document.createElement("ul");
-    const ts = new Date(Date.now() - 5 * 60000).toISOString();
+    const ts = new Date().toISOString();
     renderCommentsPanel(listEl, [{ id: "c1", parent_id: null, node_id: null, author: "human", text: "t", resolved: false, ts }]);
-    expect(listEl.querySelector(".comment-time").textContent).toBe("· 5m ago");
+    const stamp = listEl.querySelector(".comment-time");
+    expect(stamp.textContent).toMatch(/^· \d{2}:\d{2}$/);
+    expect(stamp.title).toBe(ts);
+  });
+
+  it("truncates a long node id inside the chip and keeps the full id in the title", () => {
+    const listEl = document.createElement("ul");
+    renderCommentsPanel(listEl, [{ id: "c1", parent_id: null, node_id: "home.a-very-long-node-identifier", author: "human", text: "t", resolved: false }]);
+    const chip = listEl.querySelector(".comment-target");
+    expect(chip.title).toBe("a-very-long-node-identifier");
+    expect(chip.querySelector(".comment-target-text").textContent).toBe("a-very-long-node-identifier");
+  });
+
+  it("starts the resolved row collapsed again when the scope (screen or project) changes", () => {
+    const listEl = document.createElement("ul");
+    const comments = [{ id: "c1", parent_id: null, node_id: null, author: "a", text: "t", resolved: true }];
+    renderCommentsPanel(listEl, comments, undefined, "p\none");
+    listEl.querySelector(".comments-resolved-toggle").click();
+    renderCommentsPanel(listEl, comments, undefined, "p\none");
+    expect(listEl.querySelector(".comments-resolved-list").hidden).toBe(false);
+    renderCommentsPanel(listEl, comments, undefined, "p\ntwo");
+    expect(listEl.querySelector(".comments-resolved-list").hidden).toBe(true);
   });
 
   it("only adds a reply affordance when onReply is passed, and wires submit to it", () => {

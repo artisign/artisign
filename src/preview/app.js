@@ -1159,11 +1159,22 @@ function setRightPanelTab(tab) {
   panelTabActivityEl.setAttribute("aria-pressed", String(tab === "activity"));
   panelBodyElementsEl.hidden = tab !== "elements";
   panelBodyActivityEl.hidden = tab !== "activity";
-  // review fix 4 — the collapse button's label named a fixed "Elements
-  // panel" from before this panel could show two different tabs; keep it
-  // naming whichever one is actually active instead of going stale the
-  // moment Activity is selected.
-  inspectorCollapseBtn.setAttribute("aria-label", `Collapse ${tab === "elements" ? "Elements" : "Activity"} panel`);
+  syncInspectorPanelName();
+}
+
+/** The right panel's collapse button names whatever the panel currently shows (Compare, Activity or Elements); label and tooltip come from the one place that builds them. */
+function syncInspectorPanelName() {
+  const comparing = !comparePanelEl.hidden;
+  const activity = panelTabActivityEl.getAttribute("aria-pressed") === "true";
+  inspectorCollapseBtn.dataset.panel = comparing ? "Compare" : activity ? "Activity" : "Elements";
+  applyPanelLabel(inspectorEl, inspectorCollapseBtn);
+}
+
+/** Label, tooltip and a11y name of a panel's collapse button from `data-panel` and the collapsed state. */
+function applyPanelLabel(panelEl, collapseBtn) {
+  const label = `${panelEl.dataset.collapsed === "true" ? "Expand" : "Collapse"} ${collapseBtn.dataset.panel} panel`;
+  collapseBtn.setAttribute("aria-label", label);
+  collapseBtn.dataset.tooltip = label;
 }
 
 /** The `{ screenNames, mockupNames }` shape activityTargetExists/activityIsNavigable both take — read fresh at call time, never cached, since `screens`/`mockups` change under it. */
@@ -1581,13 +1592,14 @@ function updateNotesPanel() {
   // A screen with no notes of its own but a tagged spec still gets a panel —
   // the tag section is the whole point, not an addendum to the screen's own
   // notes.
-  notesPanelEl.hidden = notes.length === 0 && matchingTagNotes.length === 0;
+  notesPanelEl.hidden = notes.length === 0 && matchingTagNotes.length === 0 && screenTags.length === 0;
   if (notesPanelEl.hidden) return;
   notesPanelScreen.textContent = screen.name;
   // notesPanelText only ever holds the screen's own notes — setMarkdown
   // replaces its children wholesale, so the tag sections render into their
   // own sibling element (notesPanelTagsEl), never inside this one.
   setMarkdown(notesPanelText, notes);
+  notesPanelText.hidden = notes.length === 0;
   renderScreenChips(notesPanelChipsEl, screenTags);
   notesPanelHeader.setAttribute("aria-expanded", String(notesExpanded));
   renderTagNotes(notesPanelTagsEl, screenTags, tagNotes, expandedTagNotes);
@@ -1731,7 +1743,7 @@ async function loadComments() {
   const result = currentScreen ? await fetchComments(currentScreen, activeProjectRoot) : [];
   if (requestId !== commentsRequestId) return; // a newer request has since started — drop this stale result
   comments = result;
-  renderCommentsPanel(commentsListEl, comments, handleReply);
+  renderCommentsPanel(commentsListEl, comments, handleReply, `${activeProjectRoot}\n${currentScreen}`);
   const open = openThreadCount(comments);
   commentsCountEl.textContent = comments.length === 0 ? "" : `${open} open`;
   // Markers depend on `comments`, not on the iframe's load event — refresh
@@ -1808,14 +1820,14 @@ function restoreSelection(nodeId, screen) {
   commentTargetLabel.textContent = nodeId === null ? "New comment on screen" : `New comment on ${nodeId}`;
 }
 
-function selectCommentTarget(nodeId) {
+function selectCommentTarget(nodeId, screen = iframeRenderedScreen) {
   // The screen this click's doc actually renders — see the module comment
   // on iframeRenderedScreen. Tagging with it here (not `currentScreen`)
   // matters if a screen switch is racing this click: `currentScreen` may
   // already read the NEW screen while this doc (whose listeners are what
   // just fired) is still the OLD one; `iframeRenderedScreen` only changes
   // once that new screen's own `load` event lands.
-  restoreSelection(nodeId, iframeRenderedScreen);
+  restoreSelection(nodeId, screen);
   commentErrorEl.hidden = true;
   commentComposeForm.hidden = false;
   commentBodyInput.focus();
@@ -1900,9 +1912,7 @@ function setupSidePanel(panelEl, collapseBtn, prefKey, defaultCollapsed = false)
   function apply(collapsed) {
     panelEl.dataset.collapsed = String(collapsed);
     collapseBtn.setAttribute("aria-expanded", String(!collapsed));
-    const label = `${collapsed ? "Expand" : "Collapse"} ${collapseBtn.dataset.panel} panel`;
-    collapseBtn.setAttribute("aria-label", label);
-    collapseBtn.dataset.tooltip = label;
+    applyPanelLabel(panelEl, collapseBtn);
     iconEl.textContent = collapsed ? railIcon : openIcon;
   }
   apply(readBoolPref(prefsStorage, prefKey, defaultCollapsed));
@@ -2099,7 +2109,8 @@ commentModeToggle.addEventListener("click", () => setMode("comment"));
 commentAddButton.addEventListener("click", () => {
   if (!currentScreen) return;
   if (activeMode !== "comment") setMode("comment");
-  selectCommentTarget(null);
+  // A screen-wide compose belongs to the screen being shown now, not to the document still in the frame: right after a screen switch the old srcdoc is still there, and tagging with it would make that screen's own load drop the compose form.
+  selectCommentTarget(null, currentScreen);
 });
 inspectModeToggle.addEventListener("click", () => setMode("inspect"));
 
@@ -2254,6 +2265,7 @@ function applyMainVisibility() {
   panelTabsEl.hidden = comparing;
   comparePanelTitleEl.hidden = !comparing;
   comparePanelEl.hidden = !comparing;
+  syncInspectorPanelName();
   panelBodyElementsEl.hidden = comparing || activityTab;
   panelBodyActivityEl.hidden = comparing || !activityTab;
   syncZoomButtons(showMockup ? mockupZoom : zoom);

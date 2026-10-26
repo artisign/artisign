@@ -102,9 +102,10 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
     true,
   );
 
-  // One tab stop for the theme control, wherever focus is inside it (wireMenu's focusin only sees the row it picked for the arrows).
+  // One tab stop for the theme control, wherever focus is inside it (wireMenu's focusin only sees the row it picked for the arrows); none left on it once focus moves to another row.
   menuEl.addEventListener("focusin", (evt) => {
-    if (segButtons.includes(/** @type {HTMLElement} */ (evt.target))) for (const b of segButtons) b.tabIndex = b === evt.target ? 0 : -1;
+    const onSegment = segButtons.includes(/** @type {HTMLElement} */ (evt.target));
+    for (const b of segButtons) b.tabIndex = onSegment && b === evt.target ? 0 : -1;
   });
 
   // Theme segments: Left / Right move between the three (Up / Down leave the control), Enter / Space pick.

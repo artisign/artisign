@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- The preview's preferences (theme, zoom levels, panel and toggle states, follow, last opened screen, sidebar expand
+  state, compare selections) are stored by Artisign in `~/.artisign/settings.json` instead of per browser, so every
+  browser and every reload sees the same ones. Existing browser preferences are carried over once on the first start.
+  (CHR-924)
+
 ### Fixed
 
 - A `data-flow-target` on component slot-fill content (for example a back button passed into `$nav-bar`) now becomes a

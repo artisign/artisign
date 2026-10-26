@@ -18,6 +18,7 @@ import { loadScreen } from "./context.js";
 import { loadAllDocuments } from "./definitions.js";
 import { parseNodeRef, formatNodeRef, requireScreenNodeRef } from "./node-ref.js";
 import { syncScreenFlows, belongsToScreen, fillFlowWarnings } from "./flows.js";
+import { danglingBackdropWarnings } from "./backdrop.js";
 import { readVariantLinks } from "./variants.js";
 import { nodeToSubtree, convertToComponentInstance, subtreesStructurallyEqual } from "./node-convert.js";
 import { deleteMockupEntity } from "./mockups.js";
@@ -687,6 +688,7 @@ async function deleteScreenEntity(store: Store, name: string, cascade: boolean, 
     target: r.from,
     message: `flow from "${r.from}" still targets deleted screen "${r.to.split(".")[0]}"`,
   }));
+  warnings.push(...(await danglingBackdropWarnings(store, await loadRegistry(store), deleted)));
 
   return {
     kind: "screen",

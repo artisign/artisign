@@ -244,7 +244,11 @@ export async function promoteMockup(store: Store, input: PromoteMockupInput): Pr
     title: input.title ?? variant.title,
     html_aug: normalized.html,
   });
-  const warnings = [...normalized.warnings, ...((result.warnings as Warning[] | undefined) ?? [])];
+  // backdrop_candidate belongs to a deliberate write of an overlay, not to a promoted mockup.
+  const warnings = [
+    ...normalized.warnings,
+    ...((result.warnings as Warning[] | undefined) ?? []).filter((w) => w.kind !== "backdrop_candidate"),
+  ];
 
   return { ...result, warnings, mockup: input.mockup, variant: input.variant };
 }

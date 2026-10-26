@@ -11,6 +11,8 @@ import { handleProjectsApi } from "./projects-routes.js";
 import { handleFsApi } from "./fs-routes.js";
 import { handleWhatsNewApi } from "./whats-new-routes.js";
 import { readChangelog } from "../changelog.js";
+import { handleAboutApi } from "./about-routes.js";
+import { handleSetupApi } from "./setup-routes.js";
 import { handleSettingsApi } from "./settings-routes.js";
 import { handleSseConnection } from "./sse.js";
 import { isAllowedOrigin, hasJsonContentType } from "./origin-guard.js";
@@ -237,7 +239,7 @@ export type HttpServer = {
  * The version this process started with. Read once: `npm install -g` overwrites package.json while an old daemon keeps
  * running its old code, and `/health` must not claim the new version for it (`update` and `setup` compare against it).
  */
-const STARTED_VERSION = readVersion();
+export const STARTED_VERSION = readVersion();
 /** The changelog as shipped with `STARTED_VERSION`, read once for the same reason. */
 const STARTED_CHANGELOG = readChangelog();
 
@@ -269,11 +271,23 @@ export function createServer(registry: ProjectRegistry): HttpServer {
     const isCommentsApi = url.pathname === "/api/comments";
     const isProjectsApi = url.pathname === "/api/projects" || url.pathname.startsWith("/api/projects/");
     const isFsApi = (req.method === "GET" || req.method === "POST") && url.pathname === "/api/fs/dirs";
+    const isAboutApi = url.pathname === "/api/about";
+    const isSetupApi = url.pathname === "/api/setup";
     const isWhatsNewApi = url.pathname === "/api/whats-new";
     const isSettingsApi = url.pathname === "/api/settings" || url.pathname.startsWith("/api/settings/");
     const isSse = req.method === "GET" && url.pathname === "/events";
     const isApiPath = url.pathname.startsWith("/api/");
-    const isPreviewApi = req.method === "GET" && isApiPath && !isToolsApi && !isCommentsApi && !isProjectsApi && !isFsApi && !isWhatsNewApi && !isSettingsApi;
+    const isPreviewApi =
+      req.method === "GET" &&
+      isApiPath &&
+      !isToolsApi &&
+      !isCommentsApi &&
+      !isProjectsApi &&
+      !isFsApi &&
+      !isAboutApi &&
+      !isSetupApi &&
+      !isWhatsNewApi &&
+      !isSettingsApi;
 
     // A `handle*Routes` helper returns `false` when it recognized the path
     // prefix but not this exact method/pattern (e.g. DELETE /api/comments,
@@ -284,7 +298,7 @@ export function createServer(registry: ProjectRegistry): HttpServer {
       if (!handled) sendJson(res, 404, { code: "not_found", message: "unknown API route" });
     };
 
-    if (isMcp || isToolsApi || isCommentsApi || isProjectsApi || isFsApi || isWhatsNewApi || isSettingsApi || isSse || isPreviewApi) {
+    if (isMcp || isToolsApi || isCommentsApi || isProjectsApi || isFsApi || isAboutApi || isSetupApi || isWhatsNewApi || isSettingsApi || isSse || isPreviewApi) {
       if (!isAllowedOrigin(req) || (req.method === "POST" && !hasJsonContentType(req))) {
         rejectForbidden(res);
         return;
@@ -297,6 +311,16 @@ export function createServer(registry: ProjectRegistry): HttpServer {
 
       if (isFsApi) {
         handleFsApi(req, res).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
+        return;
+      }
+
+      if (isAboutApi) {
+        handleAboutApi(req, res, STARTED_VERSION).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
+        return;
+      }
+
+      if (isSetupApi) {
+        handleSetupApi(req, res, STARTED_VERSION).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
         return;
       }
 

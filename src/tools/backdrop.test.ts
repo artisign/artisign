@@ -95,6 +95,20 @@ describe("data-backdrop write validation", () => {
     expect(res.errors).toBeUndefined();
   });
 
+  it("write_html with an unchanged root backdrop skips the target checks", async () => {
+    await create("b", root());
+    await create("a", root("b"));
+    await fx.store.deleteScreen("b");
+    const res = await writeHtml(fx.store, { screen: "a", mode: "replace", html_aug: root("b", `<p id="p1">new</p>`) });
+    expect(res.errors).toBeUndefined();
+    expect((await rejection(writeHtml(fx.store, { screen: "a", mode: "replace", html_aug: root("other") }))).code).toBe("not_found");
+  });
+
+  it("flags a misspelled data-backdrop as suspicious_attr", async () => {
+    const res = await create("a", root(undefined, `<p id="p1" data-backdorp="b">x</p>`));
+    expect((res.warnings as Warning[]).some((w) => w.kind === "suspicious_attr")).toBe(true);
+  });
+
   it("promote_mockup enforces the same validation", async () => {
     await fx.store.writeMockupMeta("m", { variants: [{ id: "v1", title: "V1", description: "" }] });
     await fx.store.writeMockupVariant("m", "v1", root("ghost"));
@@ -131,6 +145,16 @@ describe("data-backdrop via patch_html", () => {
     );
     expect(err.code).toBe("validation_failed");
     expect(err.message).toContain("p1");
+  });
+
+  it("a misplaced data-backdrop already on disk does not block an unrelated patch, a new one does", async () => {
+    await fx.store.writeScreen("n", root(undefined, `<p id="p1" data-backdrop="b">x</p><p id="p2">y</p>`));
+    await patchHtml(fx.store, { target: { kind: "node", node: "n.p2" }, operation: "set_attr", attr: { name: "title", value: "t" } });
+    const err = await rejection(
+      patchHtml(fx.store, { target: { kind: "node", node: "n.p2" }, operation: "set_attr", attr: { name: "data-backdrop", value: "b" } }),
+    );
+    expect(err.message).toContain("p2");
+    expect(err.message).not.toContain("p1");
   });
 
   it("removing the backdrop always succeeds, even when the target is gone", async () => {
@@ -174,6 +198,11 @@ describe("backdrop_candidate", () => {
     await create("parent", root(undefined, items(parentCount, "p")));
     await fx.store.writeScreenMeta("sheet", { notes: "", tags: [], variant_of: "parent", variant_kind: kind });
   }
+  // deleteScreen drops the sidecar too, so a re-write needs the overlay link again.
+  const resetSheet = async (): Promise<void> => {
+    await fx.store.deleteScreen("sheet");
+    await fx.store.writeScreenMeta("sheet", { notes: "", tags: [], variant_of: "parent", variant_kind: "overlay" });
+  };
   const writeSheet = (inner: string, backdrop?: string) =>
     writeHtml(fx.store, { screen: "sheet", mode: "create", title: "sheet", html_aug: root(backdrop, inner) });
 
@@ -183,10 +212,27 @@ describe("backdrop_candidate", () => {
     expect(w?.message).toContain('data-backdrop="parent"');
   });
 
+  it("different own text does not match, same text does", async () => {
+    const row = (text: string, id: string): string => `<p id="${id}" style="color: #123456; padding: 4px">${text}</p>`;
+    await create("parent", root(undefined, Array.from({ length: 25 }, (_, i) => row(`parent ${i}`, `p${i}`)).join("")));
+    await fx.store.writeScreenMeta("sheet", { notes: "", tags: [], variant_of: "parent", variant_kind: "overlay" });
+    expect(warn(await writeSheet(Array.from({ length: 25 }, (_, i) => row(`other ${i}`, `x${i}`)).join("")))).toBeUndefined();
+    await resetSheet();
+    expect(warn(await writeSheet(Array.from({ length: 25 }, (_, i) => row(`parent ${i}`, `x${i}`)).join("")))).toBeDefined();
+  });
+
+  it("counts component instances, so a component-built parent copied 1:1 is caught", async () => {
+    await fx.store.writeComponent("chip", `<span id="c">chip</span>`);
+    const chips = (tag: string): string => Array.from({ length: 22 }, (_, i) => `<span id="${tag}${i}" class="$chip"></span>`).join("");
+    await create("parent", root(undefined, chips("p")));
+    await fx.store.writeScreenMeta("sheet", { notes: "", tags: [], variant_of: "parent", variant_kind: "overlay" });
+    expect(warn(await writeSheet(chips("x")))).toBeDefined();
+  });
+
   it("is at threshold for the count: 20 matched of 20 fires, 19 does not", async () => {
     await setup(30);
     expect(warn(await writeSheet(items(20, "x")))).toBeDefined();
-    await fx.store.deleteScreen("sheet");
+    await resetSheet();
     expect(warn(await writeSheet(items(19, "x")))).toBeUndefined();
   });
 
@@ -194,7 +240,7 @@ describe("backdrop_candidate", () => {
     await setup(30);
     const own = (n: number): string => Array.from({ length: n }, (_, i) => `<p id="o${i}" style="color: #abcdef; margin: ${i}px">own ${i}</p>`).join("");
     expect(warn(await writeSheet(items(20, "x") + own(20)))).toBeDefined();
-    await fx.store.deleteScreen("sheet");
+    await resetSheet();
     expect(warn(await writeSheet(items(20, "x") + own(21)))).toBeUndefined();
   });
 

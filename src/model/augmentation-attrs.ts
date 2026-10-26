@@ -14,6 +14,7 @@ export const KNOWN_AUGMENTATION_ATTRS: readonly string[] = [
   "data-node-id",
   "data-component",
   "data-component-id",
+  "data-backdrop",
 ];
 
 const SUSPICIOUS_DISTANCE_THRESHOLD = 2;

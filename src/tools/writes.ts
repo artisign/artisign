@@ -231,7 +231,7 @@ export async function writeHtml(store: Store, input: WriteHtmlInput): Promise<Re
     .filter((e) => !isBlockingIssue(e))
     .map((e) => issueToWarning(e, formatNodeRef(input.screen, e.nodeId ?? doc.rootNodeId)));
 
-  await assertValidBackdrop(store, registry, input.screen, doc);
+  await assertValidBackdrop(store, registry, input.screen, doc, { before });
 
   await store.writeScreen(input.screen, serializeScreen(doc));
   await syncScreenFlows(store, doc);
@@ -390,9 +390,7 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
     }
   }
 
-  await assertValidBackdrop(store, registry, screen, doc, {
-    checkTarget: before.nodes[before.rootNodeId]?.attributes["data-backdrop"] !== doc.nodes[doc.rootNodeId]?.attributes["data-backdrop"],
-  });
+  await assertValidBackdrop(store, registry, screen, doc, { before, onlyNewMisplaced: true });
 
   await store.writeScreen(screen, serializeScreen(doc));
   await syncScreenFlows(store, doc);

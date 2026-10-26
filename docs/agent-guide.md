@@ -414,7 +414,7 @@ makes a read fail.
 
 Two advisory warnings, never blocking: `backdrop_candidate` on
 `write_html`/`patch_html` when an `overlay` variant without `data-backdrop`
-repeats at least half of its parent's nodes (and at least 20) — add
+has at least half of its own nodes (and at least 20) repeating its parent — add
 `data-backdrop="<parent>"` on the root and keep only the sheet; and
 `dangling_backdrop` on `delete_entity`, once per remaining screen that still
 names a deleted screen as its backdrop (the attribute is left as written).

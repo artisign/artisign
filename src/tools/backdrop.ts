@@ -10,15 +10,15 @@ import {
 import { ToolError, type Warning } from "./types.js";
 import { formatNodeRef } from "./node-ref.js";
 
-const BACKDROP_ATTR = "data-backdrop";
+export const BACKDROP_ATTR = "data-backdrop";
 
 // backdrop_candidate thresholds (CHR-938): an overlay that repeats at least
-// this share of its parent's element nodes AND at least this many of them is
-// most likely a copy of the parent with a sheet on top.
+// this share of ITS OWN nodes AND at least this many of them repeat the parent
+// is most likely a copy of the parent with a sheet on top.
 export const BACKDROP_CANDIDATE_MIN_SHARE = 0.5;
 export const BACKDROP_CANDIDATE_MIN_MATCHED = 20;
 
-function rootBackdrop(doc: ScreenDocument): string | undefined {
+export function rootBackdrop(doc: ScreenDocument): string | undefined {
   return doc.nodes[doc.rootNodeId]?.attributes[BACKDROP_ATTR];
 }
 
@@ -35,31 +35,43 @@ export async function readBackdropTarget(store: Store, registry: DesignSystemReg
   }
 }
 
+/** Identities of every `data-backdrop` outside the screen root: node ids, `fill:` keys for slot-fill content. */
+function misplacedBackdrops(doc: ScreenDocument): string[] {
+  const out = Object.values(doc.nodes)
+    .filter((n) => n.id !== doc.rootNodeId && n.attributes[BACKDROP_ATTR] !== undefined)
+    .map((n) => n.id);
+  collectFills(doc).forEach(({ sub, owner }, i) => {
+    if (sub.attributes[BACKDROP_ATTR] !== undefined) out.push(`fill:${sub.id ?? `${owner.id}#${i}`}`);
+  });
+  return out;
+}
+
 /**
  * Enforces the `data-backdrop` grammar on a screen about to be written:
  * root-only, an existing target, no self-reference, no cycle back to the
  * written screen. Throws a `ToolError`; nothing has been written yet when it
- * does. `checkTarget: false` skips the target checks (a patch that left the
- * root's value as it was) — the root-only rule always applies.
+ * does. Given `before` (the screen as it is on disk), the target checks are
+ * skipped when the root's value is unchanged, so a dangling backdrop already
+ * on disk does not block an unrelated write; `onlyNewMisplaced` additionally
+ * lets a misplaced attribute that was already there pass (a patch).
  */
 export async function assertValidBackdrop(
   store: Store,
   registry: DesignSystemRegistry,
   screen: string,
   doc: ScreenDocument,
-  options: { checkTarget?: boolean } = {},
+  options: { before?: ScreenDocument | null; onlyNewMisplaced?: boolean } = {},
 ): Promise<void> {
-  const misplaced: Array<Node | { id?: string; tag?: string }> = Object.values(doc.nodes).filter(
-    (n) => n.id !== doc.rootNodeId && n.attributes[BACKDROP_ATTR] !== undefined,
-  );
-  for (const { sub } of collectFills(doc)) if (sub.attributes[BACKDROP_ATTR] !== undefined) misplaced.push(sub);
+  const { before, onlyNewMisplaced } = options;
+  const known = new Set(onlyNewMisplaced && before ? misplacedBackdrops(before) : []);
+  const misplaced = misplacedBackdrops(doc).filter((id) => !known.has(id));
   if (misplaced.length > 0) {
-    const names = misplaced.map((n) => n.id ?? `<${n.tag ?? "element"}>`).join(", ");
+    const names = misplaced.map((id) => (id.startsWith("fill:") ? id.slice(5).replace(/#\d+$/, "<slot content>") : id)).join(", ");
     throw new ToolError("validation_failed", `${BACKDROP_ATTR} is allowed on the screen root only — remove it from ${names}`);
   }
 
   const target = rootBackdrop(doc);
-  if (target === undefined || options.checkTarget === false) return;
+  if (target === undefined || (before && rootBackdrop(before) === target)) return;
 
   if (target === screen) throw new ToolError("validation_failed", `screen "${screen}" cannot be its own backdrop`);
   if (!(await store.listScreens()).includes(target)) {
@@ -82,15 +94,29 @@ export async function assertValidBackdrop(
   }
 }
 
-/** Identity of a node for backdrop matching: tag, own text and normalized style. */
-function nodeKey(node: Node): string {
-  return JSON.stringify([node.tag, node.text ?? "", repeatedPatternFingerprint(node)]);
+/** A node's own text: its direct text children, whitespace-collapsed (element nodes carry no `text` themselves). */
+function ownText(doc: ScreenDocument, node: Node): string {
+  return node.childIds
+    .map((id) => doc.nodes[id])
+    .filter((c): c is Node => c?.kind === "text")
+    .map((c) => c.text ?? "")
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Identity of a node for backdrop matching: tag, own text and normalized style; component instances by component and variant. */
+function nodeKey(doc: ScreenDocument, node: Node): string {
+  if (node.kind === "component_instance") {
+    return JSON.stringify(["component", node.refs.component, node.refs.variant ?? "", repeatedPatternFingerprint(node)]);
+  }
+  return JSON.stringify([node.tag, ownText(doc, node), repeatedPatternFingerprint(node)]);
 }
 
 function elementKeys(doc: ScreenDocument): string[] {
   return Object.values(doc.nodes)
-    .filter((n) => n.kind === "element" && n.parentId !== null)
-    .map(nodeKey);
+    .filter((n) => (n.kind === "element" || n.kind === "component_instance") && n.parentId !== null)
+    .map((n) => nodeKey(doc, n));
 }
 
 /**

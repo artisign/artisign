@@ -177,14 +177,16 @@ describe("menu structure and keyboard", () => {
     }
     press("ArrowDown");
     expect(document.activeElement).toBe($("#settings-mcp"));
+    press("ArrowDown"); // What's New, in About once the version is known (CHR-928)
+    expect(document.activeElement).toBe($("#settings-whats-new"));
     press("ArrowDown"); // wraps to the theme control
     expect(document.activeElement.dataset.themePref).toBe("system");
     press("ArrowUp");
-    expect(document.activeElement).toBe($("#settings-mcp"));
+    expect(document.activeElement).toBe($("#settings-whats-new"));
     press("Home");
     expect(document.activeElement.dataset.themePref).toBe("system");
     press("End");
-    expect(document.activeElement).toBe($("#settings-mcp"));
+    expect(document.activeElement).toBe($("#settings-whats-new"));
   });
 
   it("Left and Right move between the theme segments, Down leaves from the focused one", async () => {

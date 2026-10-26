@@ -138,6 +138,7 @@
                 <span id="settings-update-status" class="settings-update-status" hidden><span id="settings-update-icon" class="icon" aria-hidden="true"></span><span id="settings-update-text"></span></span>
               </div>
               <div id="settings-update-cmd" class="settings-update-cmd" role="presentation" hidden></div>
+              <button type="button" id="settings-whats-new" class="chrome-menu-item" role="menuitem" tabindex="-1"><span class="icon chrome-menu-icon" aria-hidden="true">new_releases</span>What's New</button>
             </div>
           </div>
         </div>
@@ -468,6 +469,20 @@
         <div class="mcp-actions">
           <span id="mcp-summary" class="mcp-summary"></span>
           <button type="button" id="mcp-done" class="chrome-btn chrome-btn--primary">Done</button>
+        </div>
+      </section>
+    </div>
+    <!-- CHR-928: What's New — the CHANGELOG sections since the last seen version, once after an update; reopened from the settings menu. Content built by whats-new.js from GET /api/whats-new. -->
+    <div id="whats-new-scrim" class="chrome-scrim" hidden>
+      <section id="whats-new-dialog" class="chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="whats-new-title" tabindex="-1">
+        <div class="dialog-head whats-new-head">
+          <h1 id="whats-new-title" class="dialog-title">What's New</h1>
+          <button type="button" id="whats-new-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </div>
+        <div id="whats-new-body" class="whats-new-body-scroll"></div>
+        <div class="whats-new-foot">
+          <span id="whats-new-summary" class="whats-new-summary"></span>
+          <button type="button" id="whats-new-done" class="chrome-btn chrome-btn--primary">Close</button>
         </div>
       </section>
     </div>

@@ -14,10 +14,11 @@ import { setRovingTabindex, wireMenu } from "./menu-keys.js";
  *   toggles: Record<string, { get: () => boolean, set: (on: boolean) => void }>,
  *   onOpenMcp: () => void,
  *   onOpen?: () => void,
+ *   onOpenWhatsNew: () => void,
  * }} options `toggles` is keyed by the `data-setting` of the rows; `onOpenMcp` runs after the menu closed and focus is back on the trigger; `onOpen` runs on every open (app.js re-reads /api/about there and calls `renderAbout`)
  * @returns {{ open: () => void, close: () => void, isOpen: () => boolean, sync: () => void, renderAbout: (about: { version: string, updateCheck: "on" | "off", latest?: string, updateAvailable: boolean } | null) => void }}
  */
-export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, setTheme, toggles, onOpenMcp, onOpen }) {
+export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, setTheme, toggles, onOpenMcp, onOpen, onOpenWhatsNew }) {
   const segButtons = /** @type {HTMLElement[]} */ ([...menuEl.querySelectorAll(".settings-seg-button")]);
   const toggleRows = /** @type {HTMLElement[]} */ ([...menuEl.querySelectorAll(".settings-toggle-row")]);
   const mcpItem = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-mcp"));
@@ -28,6 +29,7 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
   const updateIconEl = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-update-icon"));
   const updateTextEl = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-update-text"));
   const updateCmdEl = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-update-cmd"));
+  const whatsNewItem = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-whats-new"));
 
   let setupToken = 0;
 
@@ -37,7 +39,8 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
   const segRow = () => segButtons.find((b) => b === document.activeElement) ?? segButtons.find((b) => b.getAttribute("aria-checked") === "true") ?? segButtons[0];
   /** The copy chip of the "update available" state is a row of its own while it shows. */
   const updateCopyRows = () => /** @type {HTMLElement[]} */ (updateCmdEl.hidden ? [] : [...updateCmdEl.querySelectorAll("button")]);
-  const rows = () => [segRow(), ...toggleRows, mcpItem, ...updateCopyRows()];
+  // What's New sits in the About group, shown once the version is known.
+  const rows = () => [segRow(), ...toggleRows, mcpItem, ...updateCopyRows(), ...(aboutEl.hidden ? [] : [whatsNewItem])];
 
   function sync() {
     const theme = getTheme();
@@ -162,6 +165,12 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
     close();
     triggerEl.focus();
     onOpenMcp();
+  });
+
+  whatsNewItem.addEventListener("click", () => {
+    close();
+    triggerEl.focus();
+    onOpenWhatsNew();
   });
 
   return { open, close, isOpen, sync, renderAbout };

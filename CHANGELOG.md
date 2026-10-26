@@ -20,6 +20,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `ARTISIGN_NO_UPDATE_CHECK=1` and `CI` turn it off). When one exists, the preview shows a notice with
   `artisign update` to copy; closing it hides it for the rest of the day, in every browser. The settings menu's About
   shows the update status. (CHR-927)
+- What's New: on the first preview start after an update, a dialog lists the release notes of every version since
+  the last one you saw; "What's New" in the settings menu reopens it with every release. The notes are this
+  changelog, which now ships in the npm package. (CHR-928)
 
 ### Fixed
 

@@ -404,3 +404,21 @@ export async function fetchSetup() {
     return null;
   }
 }
+
+/**
+ * Release notes from the CHANGELOG the running daemon shipped with (CHR-928, GET /api/whats-new): the released sections newer than `since` up to the running version, newest first — every released section without `since`. `null` on any failure or a malformed body.
+ * @param {string | null} [since]
+ * @returns {Promise<{ version: string, releases: { version: string, date: string | null, body: string }[] } | null>}
+ */
+export async function fetchWhatsNew(since) {
+  try {
+    const res = await fetch(since ? `/api/whats-new?since=${encodeURIComponent(since)}` : "/api/whats-new");
+    if (!res.ok) return null;
+    const body = await res.json();
+    if (typeof body?.version !== "string" || !Array.isArray(body.releases)) return null;
+    const releases = body.releases.filter((r) => typeof r?.version === "string" && typeof r.body === "string").map((r) => ({ version: r.version, date: typeof r.date === "string" ? r.date : null, body: r.body }));
+    return { version: body.version, releases };
+  } catch {
+    return null;
+  }
+}

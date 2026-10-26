@@ -63,6 +63,7 @@ const flush = async () => {
   for (let i = 0; i < 15; i++) await new Promise((r) => setTimeout(r, 0));
 };
 const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => [...document.querySelectorAll(sel)];
 const toast = () => $("#update-toast");
 
 async function boot() {
@@ -187,6 +188,48 @@ describe("dismissal is per version", () => {
   });
 });
 
+describe("dismissal made elsewhere", () => {
+  it("another tab's dismissal hides the toast at the next hourly read", async () => {
+    fakeClock("2026-10-26T10:00:00");
+    await boot();
+    expect(toast().hidden).toBe(false);
+    settings.prefs[DISMISSED] = "2026-10-26|2.2.0"; // written by another tab or browser
+    vi.advanceTimersByTime(HOUR);
+    await flush();
+    expect(toast().hidden).toBe(true);
+  });
+
+  it("and it stays hidden when this tab reads again", async () => {
+    fakeClock("2026-10-26T10:00:00");
+    await boot();
+    settings.prefs[DISMISSED] = "2026-10-26|2.2.0";
+    vi.advanceTimersByTime(HOUR);
+    await flush();
+    vi.advanceTimersByTime(HOUR);
+    await flush();
+    expect(toast().hidden).toBe(true);
+  });
+
+  it("opening the settings menu reads it too", async () => {
+    fakeClock("2026-10-26T10:00:00");
+    await boot();
+    settings.prefs[DISMISSED] = "2026-10-26|2.2.0";
+    $("#settings-trigger").click();
+    await flush();
+    expect(toast().hidden).toBe(true);
+  });
+
+  it("this tab's own dismissal is not undone by a read that predates it", async () => {
+    fakeClock("2026-10-26T10:00:00");
+    await boot();
+    $("#update-toast-close").click();
+    vi.advanceTimersByTime(HOUR);
+    await flush();
+    expect(toast().hidden).toBe(true);
+    expect(settings.prefs[DISMISSED]).toBe("2026-10-26|2.2.0");
+  });
+});
+
 describe("hourly re-read", () => {
   it("shows a version the daemon found after boot", async () => {
     fakeClock("2026-10-26T10:00:00");
@@ -263,6 +306,20 @@ describe("About status in the settings menu", () => {
     await flush();
     expect(writeText).toHaveBeenCalledWith("artisign update");
     expect($("#settings-mcp").closest("#settings-menu").hidden).toBe(false);
+  });
+
+  it("arrow order and the single tab stop include both the copy chip and What's New", async () => {
+    await boot();
+    await openMenu();
+    const down = () => document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    $("#settings-mcp").focus();
+    down();
+    expect(document.activeElement).toBe($("#settings-update-cmd button"));
+    down();
+    expect(document.activeElement).toBe($("#settings-whats-new"));
+    expect($$("#settings-menu button").filter((b) => b.tabIndex === 0)).toEqual([$("#settings-whats-new")]);
+    down(); // wraps to the theme control
+    expect(document.activeElement.dataset.themePref).toBeDefined();
   });
 
   it("the menu keeps showing the update after the toast was dismissed", async () => {

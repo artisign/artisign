@@ -286,10 +286,11 @@ describe("daemon-stored preferences (CHR-924)", () => {
     await boot();
     expect(memoryStorage.get("artisign.theme")).toBe("dark");
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
-    $("#theme-toggle").click();
+    $("#settings-trigger").click();
+    $('.settings-seg-button[data-theme-pref="light"]').click();
     await flush();
-    expect(memoryStorage.get("artisign.theme")).toBe("system");
-    expect(settings.prefs["artisign.theme"]).toBe("system");
+    expect(memoryStorage.get("artisign.theme")).toBe("light");
+    expect(settings.prefs["artisign.theme"]).toBe("light");
   });
 
   it("runs on defaults when the settings request fails", async () => {

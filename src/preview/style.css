@@ -4635,3 +4635,328 @@ li.has-compare > .screen-item {
   font-size: var(--ui-base);
   color: var(--chrome-text);
 }
+
+/* Settings menu (CHR-926, `shell-settings-menu`): theme segmented control, switch rows, MCP setup, About. Built on the zoom menu's .chrome-menu pattern. */
+#settings-controls {
+  position: relative;
+}
+
+#settings-controls .chrome-icon-btn[aria-expanded="true"] {
+  background: var(--chrome-hover);
+}
+
+#settings-menu {
+  position: absolute;
+  top: calc(100% + var(--space-xs));
+  right: 0;
+  width: 288px;
+  z-index: 20;
+}
+
+#settings-menu[hidden],
+#settings-about[hidden],
+#settings-mcp-sub[hidden],
+#mcp-scrim[hidden],
+.mcp-manual[hidden] {
+  display: none;
+}
+
+.settings-theme-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  height: var(--size-bar-sub);
+  padding: 0 var(--space-md);
+  font-size: var(--ui-base);
+}
+
+.settings-seg {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  width: 216px;
+  height: var(--size-control);
+  margin-left: auto;
+  padding: var(--space-2xs);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-field);
+}
+
+.settings-seg-button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  height: var(--size-control-sm);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--chrome-text-secondary);
+  font: inherit;
+  font-size: var(--ui-sm);
+  cursor: pointer;
+}
+
+.settings-seg-button .icon {
+  font-size: var(--size-icon-xs);
+}
+
+.settings-seg-button[aria-checked="true"] {
+  background: var(--chrome-raised);
+  box-shadow: 0 0 0 1px var(--chrome-border-strong);
+  color: var(--chrome-text);
+  font-weight: 500;
+}
+
+.settings-seg-button:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+.settings-toggle-row {
+  justify-content: space-between;
+}
+
+.settings-switch {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-border-strong);
+}
+
+.settings-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: #fff;
+}
+
+.settings-toggle-row[aria-checked="true"] .settings-switch {
+  background: var(--chrome-accent);
+}
+
+.settings-toggle-row[aria-checked="true"] .settings-switch::after {
+  left: 14px;
+}
+
+.settings-item-detail {
+  height: 40px;
+}
+
+.settings-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.settings-item-sub {
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.settings-about-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  height: var(--size-row-menu);
+  padding: 0 var(--space-md);
+  font-size: var(--ui-base);
+}
+
+/* Connect AI tools dialog (CHR-926, `shell-mcp-setup-dialog`). */
+#mcp-dialog {
+  width: 560px;
+  max-width: calc(100vw - 2 * var(--space-2xl));
+  max-height: calc(100vh - 2 * var(--space-2xl));
+  overflow-y: auto;
+}
+
+.mcp-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.mcp-hint {
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.mcp-hint--small {
+  font-size: var(--ui-xs);
+}
+
+.mcp-path {
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--chrome-text);
+}
+
+.mcp-list-label {
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.mcp-note {
+  padding: var(--space-lg);
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.mcp-code {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-field);
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--chrome-text);
+}
+
+.mcp-code--line {
+  height: 36px;
+  padding: 0 var(--space-xs) 0 var(--space-lg);
+  font-size: 12.5px;
+}
+
+.mcp-code--block {
+  align-items: flex-start;
+  padding: var(--space-md) var(--space-xs) var(--space-md) var(--space-lg);
+  font-size: var(--ui-sm);
+  line-height: 1.5;
+}
+
+.mcp-code-text {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+}
+
+.mcp-code--line .mcp-code-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mcp-code--block .mcp-code-text {
+  padding-top: var(--space-xs);
+  word-break: break-all;
+}
+
+.mcp-clients {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.mcp-client + .mcp-client {
+  border-top: 1px solid var(--chrome-border);
+}
+
+.mcp-client-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  height: var(--size-panel-header);
+  padding: 0 var(--space-md) 0 var(--space-lg);
+  border: none;
+  background: transparent;
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-base);
+  text-align: left;
+}
+
+button.mcp-client-row {
+  cursor: pointer;
+}
+
+button.mcp-client-row:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
+.mcp-client-row > .icon:first-child {
+  font-size: var(--size-icon);
+  color: var(--chrome-text-secondary);
+}
+
+.mcp-client-spacer {
+  flex: 1;
+}
+
+.mcp-client--not-installed .mcp-client-name,
+.mcp-client--not-installed .mcp-client-row > .icon:first-child {
+  color: var(--chrome-text-tertiary);
+}
+
+.mcp-chevron,
+.mcp-chevron-slot {
+  flex: none;
+  width: var(--size-icon-sm);
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.mcp-status {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-xs);
+  height: 20px;
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-pill);
+  font-size: var(--ui-2xs);
+  white-space: nowrap;
+}
+
+.mcp-status--connected {
+  padding-left: var(--space-sm);
+  background: color-mix(in srgb, var(--chrome-ok) 14%, transparent);
+  color: var(--chrome-ok);
+  font-weight: 500;
+}
+
+.mcp-status--connected .icon {
+  font-size: var(--size-icon-xs);
+}
+
+.mcp-status--not-connected {
+  border: 1px solid var(--chrome-border-strong);
+  color: var(--chrome-text-secondary);
+}
+
+.mcp-status--not-installed {
+  background: var(--chrome-field);
+  color: var(--chrome-text-tertiary);
+}
+
+.mcp-manual {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-lg) var(--space-lg) 42px;
+}
+
+.mcp-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.mcp-summary {
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-tertiary);
+}

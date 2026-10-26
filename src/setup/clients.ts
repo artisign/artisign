@@ -31,12 +31,21 @@ export function defaultClientEnv(): ClientEnv {
 
 export type Detection = { found: boolean; hasEntry: boolean };
 
+/**
+ * What a human copies to connect one client by hand — the same entry `write` produces, pinned to the same version.
+ * `config.path` is absolute (callers shorten it for display) and absent only where the client's config location is
+ * unknown on this platform.
+ */
+export type Manual = { kind: "command"; text: string } | { kind: "config"; path?: string; text: string };
+
 /** One AI tool Artisign can be connected to. A new tool is one more object in `CLIENTS`. */
 export type Client = {
   name: string;
   detect: (env: ClientEnv) => Promise<Detection>;
   /** Writes (or replaces) the `artisign` entry pinned to `version`. */
   write: (env: ClientEnv, version: string) => Promise<void>;
+  /** Copy-only counterpart of `write`: never touches the client's config. */
+  manual: (env: ClientEnv, version: string) => Promise<Manual>;
   /** Removes the `artisign` entry and nothing else. */
   remove: (env: ClientEnv) => Promise<void>;
 };
@@ -138,6 +147,11 @@ async function editServers(
 
 const npxArgs = (version: string): string[] => ["-y", `${NAME}@${version}`, "mcp"];
 
+const jsonSnippet = (key: ServersKey, entry: JsonObject): string => JSON.stringify({ [key]: { [NAME]: entry } }, null, 2);
+
+const claudeCodeFileEntry = (version: string): JsonObject => ({ type: "stdio", command: "npx", args: npxArgs(version), env: {} });
+const claudeAddArgs = (version: string): string[] => ["mcp", "add", "--scope", "user", "--transport", "stdio", NAME, "--", "npx", ...npxArgs(version)];
+
 /**
  * Claude Code, user scope (`~/.claude.json`, top-level `mcpServers`). The `claude` CLI owns that file and its locking, so
  * it is driven when it is on PATH; only when it is absent but the file exists is the file edited directly (atomically).
@@ -152,13 +166,17 @@ export const claudeCode: Client = {
   async write(env, version) {
     const claude = await findOnPath("claude", env.pathEnv);
     if (claude === undefined) {
-      await editServers(join(env.home, ".claude.json"), { type: "stdio", command: "npx", args: npxArgs(version), env: {} });
+      await editServers(join(env.home, ".claude.json"), claudeCodeFileEntry(version));
       return;
     }
     // `add` refuses an existing name; replacing means remove first (its failure just means there was nothing to remove).
     await env.run(claude, ["mcp", "remove", NAME, "--scope", "user"]);
-    const added = await env.run(claude, ["mcp", "add", "--scope", "user", "--transport", "stdio", NAME, "--", "npx", ...npxArgs(version)]);
+    const added = await env.run(claude, claudeAddArgs(version));
     if (!added) throw new Error("`claude mcp add` failed");
+  },
+  async manual(env, version) {
+    if ((await findOnPath("claude", env.pathEnv)) !== undefined) return { kind: "command", text: `claude ${claudeAddArgs(version).join(" ")}` };
+    return { kind: "config", path: join(env.home, ".claude.json"), text: jsonSnippet("mcpServers", claudeCodeFileEntry(version)) };
   },
   async remove(env) {
     const claude = await findOnPath("claude", env.pathEnv);
@@ -206,6 +224,15 @@ async function absoluteNpxEntry(
   };
 }
 
+/** `absoluteNpxEntry`, or plain `npx` for the copy-only snippet when there is no npx to point at. */
+async function absoluteOrPlainNpxEntry(env: ClientEnv, version: string): Promise<{ command: string; args: string[]; env?: { PATH: string } }> {
+  try {
+    return await absoluteNpxEntry(env, version);
+  } catch {
+    return { command: "npx", args: npxArgs(version) };
+  }
+}
+
 /** Claude Desktop: `claude_desktop_config.json`, key `mcpServers`, absolute npx (see `absoluteNpxEntry`). */
 export const claudeDesktop: Client = {
   name: "Claude Desktop",
@@ -217,6 +244,10 @@ export const claudeDesktop: Client = {
     const path = await desktopConfigPath(env);
     if (path === undefined) throw new Error("Claude Desktop's config directory is gone");
     await editServers(path, await absoluteNpxEntry(env, version));
+  },
+  async manual(env, version) {
+    const path = (await desktopConfigPath(env)) ?? (desktopDirs(env)[0] === undefined ? undefined : join(desktopDirs(env)[0] as string, "claude_desktop_config.json"));
+    return { kind: "config", ...(path === undefined ? {} : { path }), text: jsonSnippet("mcpServers", await absoluteOrPlainNpxEntry(env, version)) };
   },
   async remove(env) {
     const path = await desktopConfigPath(env);
@@ -234,6 +265,10 @@ export const cursor: Client = {
   },
   async write(env, version) {
     await editServers(join(env.home, ".cursor", "mcp.json"), { type: "stdio", ...(await absoluteNpxEntry(env, version)) });
+  },
+  async manual(env, version) {
+    const entry = { type: "stdio", ...(await absoluteOrPlainNpxEntry(env, version)) };
+    return { kind: "config", path: join(env.home, ".cursor", "mcp.json"), text: jsonSnippet("mcpServers", entry) };
   },
   async remove(env) {
     const path = join(env.home, ".cursor", "mcp.json");
@@ -358,6 +393,10 @@ export const codex: Client = {
     if (!(await env.run(bin, ["mcp", "add", NAME, "--", "npx", ...npxArgs(version)]))) throw new Error("`codex mcp add` failed");
     await addCodexStartupTimeout(codexConfig(env));
   },
+  // Always the config entry, even with the `codex` CLI: `codex mcp add` has no timeout option, so only the table carries it.
+  async manual(env, version) {
+    return { kind: "config", path: codexConfig(env), text: codexEntry(version) };
+  },
   async remove(env) {
     const bin = await findOnPath("codex", env.pathEnv);
     if (bin !== undefined) {
@@ -388,6 +427,11 @@ export const vscode: Client = {
     if (dir === undefined) throw new Error("VS Code's user directory is unknown on this platform");
     await editServers(join(dir, "mcp.json"), { type: "stdio", ...(await absoluteNpxEntry(env, version)) }, "servers");
   },
+  async manual(env, version) {
+    const dir = vscodeUserDir(env);
+    const entry = { type: "stdio", ...(await absoluteOrPlainNpxEntry(env, version)) };
+    return { kind: "config", ...(dir === undefined ? {} : { path: join(dir, "mcp.json") }), text: jsonSnippet("servers", entry) };
+  },
   async remove(env) {
     const dir = vscodeUserDir(env);
     if (dir !== undefined && (await exists(join(dir, "mcp.json")))) await editServers(join(dir, "mcp.json"), undefined, "servers");
@@ -401,6 +445,8 @@ async function opencodeConfigPath(env: ClientEnv): Promise<string> {
   return !(await exists(join(dir, "opencode.json"))) && (await exists(jsonc)) ? jsonc : join(dir, "opencode.json");
 }
 
+const opencodeEntry = (version: string): JsonObject => ({ type: "local", command: ["npx", ...npxArgs(version)], enabled: true, timeout: 60_000 });
+
 /** opencode: `~/.config/opencode/opencode.json`, key `mcp`, `{type: "local", command: [...], enabled}`; a terminal tool, so plain `npx`. */
 export const opencode: Client = {
   name: "opencode",
@@ -409,7 +455,10 @@ export const opencode: Client = {
     return { found, hasEntry: found && (await hasServerEntry(await opencodeConfigPath(env), "mcp")) };
   },
   async write(env, version) {
-    await editServers(await opencodeConfigPath(env), { type: "local", command: ["npx", ...npxArgs(version)], enabled: true, timeout: 60_000 }, "mcp");
+    await editServers(await opencodeConfigPath(env), opencodeEntry(version), "mcp");
+  },
+  async manual(env, version) {
+    return { kind: "config", path: await opencodeConfigPath(env), text: jsonSnippet("mcp", opencodeEntry(version)) };
   },
   async remove(env) {
     const path = await opencodeConfigPath(env);

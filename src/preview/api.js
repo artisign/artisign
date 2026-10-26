@@ -368,3 +368,37 @@ function parseSettings(body) {
   for (const [k, v] of Object.entries(prefs)) if (typeof v === "string") clean[k] = v;
   return { prefs: clean, migrated: body.migrated === true };
 }
+
+/**
+ * Facts about the running daemon for the settings menu (CHR-926, GET /api/about). `null` on any failure.
+ * @returns {Promise<{ version: string } | null>}
+ */
+export async function fetchAbout() {
+  try {
+    const res = await fetch("/api/about");
+    if (!res.ok) return null;
+    const body = await res.json();
+    return typeof body?.version === "string" ? { version: body.version } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Which AI tools are installed / connected and what to copy to connect each by hand (CHR-926, GET /api/setup — the daemon reads the disk on every call). Copy-only: nothing is written. `null` on any failure or a malformed body.
+ * @returns {Promise<{ command: string, clients: { name: string, found: boolean, connected: boolean, manual: { kind: "command", text: string } | { kind: "config", path?: string, text: string } }[] } | null>}
+ */
+export async function fetchSetup() {
+  try {
+    const res = await fetch("/api/setup");
+    if (!res.ok) return null;
+    const body = await res.json();
+    if (typeof body?.command !== "string" || !Array.isArray(body.clients)) return null;
+    const clients = body.clients.filter(
+      (c) => typeof c?.name === "string" && typeof c.manual?.text === "string" && (c.manual.kind === "command" || c.manual.kind === "config"),
+    );
+    return { command: body.command, clients };
+  } catch {
+    return null;
+  }
+}

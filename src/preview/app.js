@@ -24,6 +24,8 @@ import { THEME_PREFS, THEME_PREF_KEY, DEFAULT_THEME_PREF, applyTheme, nextThemeP
 import { initTooltips } from "./tooltip.js";
 import { applyShortcutHints, isMacPlatform, isTypingTarget, nextZoomLevel, resolveShortcut, shortcutById } from "./shortcuts.js";
 import { createShortcutsDialog } from "./shortcuts-dialog.js";
+import { createSettingsMenu } from "./settings-menu.js";
+import { createMcpDialog } from "./mcp-dialog.js";
 import { setRovingTabindex, wireMenu } from "./menu-keys.js";
 import { renderScreenList, filterScreens, buildScreenTree, ancestorNames } from "./screens.js";
 import { createVariantUI } from "./variants.js";
@@ -124,12 +126,7 @@ const variantUI = createVariantUI({
   // CHR-912 — the tree map can be hidden; per-browser, shown by default (today's behaviour).
   map: {
     visible: () => variantMapVisible,
-    onToggle: (visible) => {
-      variantMapVisible = visible;
-      writeBoolPref(prefsStorage, "artisign.variantMap", visible);
-      // The map takes canvas width, so the fit zoom is recomputed (the caller re-renders the bar).
-      queueMicrotask(refitActivePane);
-    },
+    onToggle: setVariantMap,
   },
   // CHR-738 — the Single | Compare toggle and the popover checkboxes; `compare` (below) is only read once the UI renders.
   compare: {
@@ -138,6 +135,14 @@ const variantUI = createVariantUI({
     onPick: (name) => compare.toggle(name),
   },
 });
+/** The variant-map toggle, shared by the bar's own button and the settings menu (CHR-926). The bar must be re-rendered afterwards (the bar's caller does; the menu calls refreshVariantUI). */
+function setVariantMap(visible) {
+  variantMapVisible = visible;
+  writeBoolPref(prefsStorage, "artisign.variantMap", visible);
+  // The map takes canvas width, so the fit zoom is recomputed.
+  queueMicrotask(refitActivePane);
+}
+
 function refreshVariantUI() {
   const shown = variantUI.update(screens, screenFlows, currentScreen);
   // The bar and map take canvas space, so the fit zoom has to be recomputed when they appear or go.
@@ -580,20 +585,20 @@ function renderBoardClustersToggle() {
   boardCollapseAllBtn.hidden = !boardClustersOn;
 }
 
-boardClustersToggleBtn.addEventListener("click", () => {
-  boardClustersOn = !boardClustersOn;
+/** Board clusters on/off, shared by the toolbar button and the settings menu (CHR-926). */
+function setBoardClusters(on) {
+  boardClustersOn = on;
   writeBoolPref(prefsStorage, "artisign.boardClusters", boardClustersOn);
   renderBoardClustersToggle();
   if (boardBuilt) board.setClusterState({ clusters: boardClustersOn });
-});
+}
+
+boardClustersToggleBtn.addEventListener("click", () => setBoardClusters(!boardClustersOn));
 
 boardClustersOn = readBoolPref(prefsStorage, "artisign.boardClusters", boardClustersOn);
 renderBoardClustersToggle();
 
-// CHR-910 — interim chrome theme toggle (System -> Light -> Dark -> System) until the redesigned topbar (CHR-906) takes over. The pre-paint inline script in index.html already set data-theme; this re-applies it with the full module and keeps it live.
-const THEME_TOGGLE_ICONS = { system: "contrast", light: "light_mode", dark: "dark_mode" };
-const THEME_TOGGLE_LABELS = { system: "System", light: "Light", dark: "Dark" };
-const themeToggleBtn = document.getElementById("theme-toggle");
+// CHR-910 / CHR-926 — chrome theme (System / Light / Dark), chosen in the settings menu and cycled by T. The pre-paint inline script in index.html already set data-theme; this re-applies it with the full module and keeps it live.
 const osDarkQuery = prefersDarkQuery(window);
 let themePref = parseEnumPref(readStringPref(prefsStorage, THEME_PREF_KEY, DEFAULT_THEME_PREF), THEME_PREFS, DEFAULT_THEME_PREF);
 
@@ -606,35 +611,30 @@ function mirrorTheme() {
   }
 }
 
-function renderThemeToggle() {
-  const label = `Theme: ${THEME_TOGGLE_LABELS[themePref]}`;
-  themeToggleBtn.querySelector(".icon").textContent = THEME_TOGGLE_ICONS[themePref];
-  themeToggleBtn.setAttribute("aria-label", label);
-  themeToggleBtn.dataset.tooltip = label;
-}
-
-themeToggleBtn.addEventListener("click", () => {
-  themePref = nextThemePref(themePref);
+/** The one place the theme changes: the menu's segments and the T shortcut both end here. */
+function setThemePref(pref) {
+  themePref = parseEnumPref(pref, THEME_PREFS, DEFAULT_THEME_PREF);
   writeStringPref(prefsStorage, THEME_PREF_KEY, themePref);
   mirrorTheme();
   applyTheme(document.documentElement, themePref, osDarkQuery);
-  renderThemeToggle();
-});
+}
 
 mirrorTheme();
 applyTheme(document.documentElement, themePref, osDarkQuery);
 watchSystemTheme(document.documentElement, osDarkQuery, () => themePref);
-renderThemeToggle();
 applyShortcutHints(document, isMacPlatform(navigator)); // the keys shown in tooltips and menus come from the same mapping the handler below binds
 initTooltips(document);
 
-boardEdgesToggleBtn.addEventListener("click", () => {
-  boardEdgesVisible = !boardEdgesVisible;
+/** Board edges on/off, shared by the toolbar button and the settings menu (CHR-926). */
+function setBoardEdges(on) {
+  boardEdgesVisible = on;
   writeBoolPref(prefsStorage, "artisign.boardEdgesVisible", boardEdgesVisible);
   board.setEdgesVisible(boardEdgesVisible);
   boardEdgesToggleBtn.setAttribute("aria-pressed", String(boardEdgesVisible));
   boardEdgesToggleBtn.textContent = boardEdgesVisible ? "Edges: On" : "Edges: Off";
-});
+}
+
+boardEdgesToggleBtn.addEventListener("click", () => setBoardEdges(!boardEdgesVisible));
 
 boardZoom = clampZoom(parseBoardZoomPref(readStringPref(prefsStorage, "artisign.boardZoom", null), boardZoom, MIN_BOARD_ZOOM, MAX_BOARD_ZOOM));
 boardEdgesVisible = readBoolPref(prefsStorage, "artisign.boardEdgesVisible", boardEdgesVisible);
@@ -1570,12 +1570,14 @@ function revealScreenInSidebar(screen) {
 }
 
 screenTagsToggle.setAttribute("aria-pressed", String(showSidebarTags));
-screenTagsToggle.addEventListener("click", () => {
-  showSidebarTags = !showSidebarTags;
+/** Tags in the sidebar on/off, shared by the Tags button and the settings menu (CHR-926). */
+function setSidebarTags(on) {
+  showSidebarTags = on;
   screenTagsToggle.setAttribute("aria-pressed", String(showSidebarTags));
   writeBoolPref(prefsStorage, SIDEBAR_TAGS_KEY, showSidebarTags);
   refreshSidebar();
-});
+}
+screenTagsToggle.addEventListener("click", () => setSidebarTags(!showSidebarTags));
 
 /** Re-renders the screen list and the mockup list (both filtered by the same sidebar search), plus everything in the sidebar derived from them/the current selection, plus the board toolbar's status text/Clear pins (CHR-624 — cheap and pure, so it's simplest to always keep in sync here rather than gate it on the Board tab actually showing). */
 function refreshSidebar() {
@@ -2375,6 +2377,42 @@ const shortcutsDialog = createShortcutsDialog({
   mac: macPlatform,
   fallbackFocusEl: projectPickerTrigger,
 });
+const mcpDialog = createMcpDialog({
+  scrimEl: document.getElementById("mcp-scrim"),
+  commandEl: document.getElementById("mcp-command"),
+  clientsEl: document.getElementById("mcp-clients"),
+  summaryEl: document.getElementById("mcp-summary"),
+  closeEl: document.getElementById("mcp-close"),
+  doneEl: document.getElementById("mcp-done"),
+  fallbackFocusEl: projectPickerTrigger,
+});
+const settingsMenu = createSettingsMenu({
+  controlsEl: document.getElementById("settings-controls"),
+  triggerEl: document.getElementById("settings-trigger"),
+  menuEl: document.getElementById("settings-menu"),
+  getTheme: () => themePref,
+  setTheme: setThemePref,
+  // Each setter is the one the control of the same name already uses, so that control follows the menu (CHR-926).
+  toggles: {
+    follow: {
+      get: () => followState.enabled,
+      set: (on) => {
+        if (on !== followState.enabled) applyFollowToggleAction(followToggleClickAction(followState, false));
+      },
+    },
+    clusters: { get: () => boardClustersOn, set: setBoardClusters },
+    edges: { get: () => boardEdgesVisible, set: setBoardEdges },
+    "variant-map": {
+      get: () => variantMapVisible,
+      set: (on) => {
+        setVariantMap(on);
+        refreshVariantUI();
+      },
+    },
+    "sidebar-tags": { get: () => showSidebarTags, set: setSidebarTags },
+  },
+  onOpenMcp: () => mcpDialog.show(),
+});
 const topbarEl = document.getElementById("topbar");
 const dialogScrimEl = document.getElementById("dialog-scrim");
 const projectMenuEl = document.getElementById("project-menu");
@@ -2388,7 +2426,7 @@ function pressControl(el) {
 
 /** The open menu / dialog / popover, if any — while one is open only its own keys act. */
 function openOverlay() {
-  if (!dialogScrimEl.hidden || shortcutsDialog.isOpen()) return "other";
+  if (!dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen()) return "other";
   if (!projectMenuEl.hidden) return "project-menu";
   if (!zoomMenu.hidden) return "zoom-menu";
   return document.querySelector(".chrome-menu:not([hidden])") ? "other" : null;
@@ -2418,6 +2456,10 @@ function runShortcut(id) {
     return true;
   }
   switch (id) {
+    case "theme":
+      setThemePref(nextThemePref(themePref));
+      settingsMenu.sync();
+      return true;
     case "follow-resume": return followState.paused && pressControl(controlFor(id));
     case "zoom-in":
     case "zoom-out":
@@ -2440,7 +2482,7 @@ function runShortcut(id) {
       else return false;
       return true;
     default:
-      // Everything else is "click its control": modes, status bar, follow, panels, theme, project menu and its items, the Board toolbar.
+      // Everything else is "click its control": modes, status bar, follow, panels, project menu and its items, the Board toolbar.
       return pressControl(controlFor(id));
   }
 }
@@ -2471,7 +2513,7 @@ document.addEventListener("keydown", onShortcutKeydown);
 /** A press inside the screen frame never reaches the top document, where the open menus and popovers listen for "outside" clicks: replay it on the body so they close like for any outside click. Dialogs are modal and stay. */
 function closeOverlaysOnFramePress(evt) {
   const overlay = openOverlay();
-  if (!overlay || !dialogScrimEl.hidden || shortcutsDialog.isOpen()) return;
+  if (!overlay || !dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen()) return;
   document.body.dispatchEvent(new (evt.type === "click" ? MouseEvent : Event)(evt.type, { bubbles: true }));
 }
 

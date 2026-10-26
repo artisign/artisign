@@ -14,12 +14,13 @@ const MAX_VALUE_LENGTH = 10_000;
  *
  * @param {Record<string, string>} initial
  * @param {((changes: Record<string, string | null>) => Promise<unknown>) | null} save
- * @returns {{ getItem(key: string): string | null, setItem(key: string, value: string): void, removeItem(key: string): void }}
+ * @returns {{ getItem(key: string): string | null, setItem(key: string, value: string): void, removeItem(key: string): void, setFromDaemon(key: string, value: string | null): void }} `setFromDaemon` takes over a value another tab or browser wrote (read back from the daemon) without sending it again; it yields to a local write that is not yet saved
  */
 export function createDaemonStorage(initial, save) {
   const map = new Map(Object.entries(initial));
   let pending = null;
   let chain = Promise.resolve();
+  let saving = 0;
 
   function queue(key, value) {
     if (!save) return;
@@ -28,7 +29,8 @@ export function createDaemonStorage(initial, save) {
       queueMicrotask(() => {
         const changes = pending;
         pending = null;
-        chain = chain.then(() => save(changes)).catch(() => {});
+        saving++;
+        chain = chain.then(() => save(changes)).catch(() => {}).finally(() => saving--);
       });
     }
     pending[key] = value;
@@ -44,6 +46,11 @@ export function createDaemonStorage(initial, save) {
     removeItem(key) {
       map.delete(key);
       queue(key, null);
+    },
+    setFromDaemon(key, value) {
+      if (pending || saving > 0) return; // our own change is on its way; the daemon's answer may predate it
+      if (value === null) map.delete(key);
+      else map.set(key, value);
     },
   };
 }

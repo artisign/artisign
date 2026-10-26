@@ -2,11 +2,10 @@
 
 import { fetchSetup } from "./api.js";
 import { isShown, trapFocus } from "./menu-keys.js";
+import { copyWithFeedback } from "./clipboard.js";
 
 const CLIENT_ICONS = { "Claude Code": "terminal", "Claude Desktop": "desktop_windows", Cursor: "ads_click", "Codex CLI": "terminal", "VS Code": "code", opencode: "terminal" };
 const FALLBACK_COMMAND = "artisign setup";
-/** How long a copy button shows its check mark. */
-const COPIED_MS = 1500;
 
 /**
  * @param {string} tag
@@ -28,7 +27,7 @@ function icon(name) {
 }
 
 /**
- * A read-only code box with a copy button; the icon turns into a check for a moment. A clipboard that is missing or refuses is tolerated (nothing happens).
+ * A read-only code box with a copy button (feedback and failure handling: clipboard.js).
  *
  * @param {string} text
  * @param {"line" | "block"} kind
@@ -43,17 +42,7 @@ function codeField(text, kind, label) {
   copy.dataset.tooltip = "Copy";
   const glyph = icon("content_copy");
   copy.appendChild(glyph);
-  copy.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      return;
-    }
-    glyph.textContent = "check";
-    setTimeout(() => {
-      glyph.textContent = "content_copy";
-    }, COPIED_MS);
-  });
+  copy.addEventListener("click", () => copyWithFeedback(text, glyph));
   field.append(code, copy);
   return field;
 }

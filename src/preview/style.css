@@ -389,6 +389,7 @@
 .chrome-scrim {
   position: fixed;
   inset: 0;
+  z-index: 30; /* above the update notice (CHR-927) and the menus */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4959,6 +4960,123 @@ button.mcp-client-row:focus-visible {
 .mcp-summary {
   font-size: var(--ui-xs);
   color: var(--chrome-text-tertiary);
+}
+
+/* Update notice (CHR-927, `shell-update-notice`): a toast over the bottom-right of the canvas area. The region is out of the layout (absolute inside #main); dialogs and menus sit above it. */
+#update-notice {
+  position: absolute;
+  right: var(--space-xl);
+  bottom: var(--space-xl);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.update-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  width: 360px;
+  max-width: calc(100vw - 2 * var(--space-xl));
+  padding: var(--space-lg) var(--space-md) var(--space-lg) var(--space-lg);
+  border-radius: var(--radius-md);
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-float);
+  color: var(--chrome-text);
+  font-size: var(--ui-base);
+  pointer-events: auto;
+}
+
+.update-toast[hidden] {
+  display: none;
+}
+
+.update-toast-icon {
+  margin-top: var(--space-2xs);
+  font-size: 20px;
+  color: var(--chrome-accent);
+}
+
+.update-toast-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.update-toast-title {
+  margin-top: var(--space-xs);
+  font-weight: 500;
+}
+
+/* One-button chip that copies a command (clipboard.js). */
+.copy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: var(--size-control);
+  padding: 0 var(--space-md);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-field);
+  color: var(--chrome-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.copy-chip code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-sm);
+}
+
+.copy-chip .icon {
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.copy-chip:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+/* Settings menu About status (CHR-927). */
+#settings-update-status[hidden],
+#settings-update-cmd[hidden] {
+  display: none;
+}
+
+.settings-update-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-left: auto;
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-secondary);
+}
+
+.settings-update-status .icon {
+  font-size: var(--size-icon-xs);
+}
+
+.settings-update-status[data-state="current"] .icon {
+  color: var(--chrome-ok);
+}
+
+.settings-update-status[data-state="available"] .icon {
+  color: var(--chrome-accent);
+}
+
+.settings-update-status[data-state="off"] {
+  color: var(--chrome-text-tertiary);
+}
+
+.settings-update-status[data-state="off"] .icon {
+  color: var(--chrome-text-tertiary);
+}
+
+.settings-update-cmd {
+  padding: 0 var(--space-md) var(--space-sm);
 }
 
 /* What's New dialog (CHR-928, `shell-whats-new`): fixed size, only the body scrolls. */

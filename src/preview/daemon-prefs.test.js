@@ -135,3 +135,33 @@ describe("collectLocalPrefs limits", () => {
     expect(collectLocalPrefs(local)).toEqual({ "artisign.ok": "1" });
   });
 });
+
+describe("setFromDaemon", () => {
+  it("takes over a value written elsewhere, and a removal, without saving it back", async () => {
+    const save = vi.fn(async () => {});
+    const storage = createDaemonStorage({ a: "1" }, save);
+    storage.setFromDaemon("a", "2");
+    storage.setFromDaemon("b", "3");
+    expect(storage.getItem("a")).toBe("2");
+    expect(storage.getItem("b")).toBe("3");
+    storage.setFromDaemon("a", null);
+    expect(storage.getItem("a")).toBeNull();
+    await tick();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("yields to a local change that is not saved yet", async () => {
+    let release;
+    const save = vi.fn(() => new Promise((r) => (release = r)));
+    const storage = createDaemonStorage({}, save);
+    storage.setItem("a", "mine");
+    storage.setFromDaemon("a", "old"); // queued, not sent
+    await tick();
+    storage.setFromDaemon("a", "old"); // in flight
+    expect(storage.getItem("a")).toBe("mine");
+    release();
+    await tick();
+    storage.setFromDaemon("a", "theirs");
+    expect(storage.getItem("a")).toBe("theirs");
+  });
+});

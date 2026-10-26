@@ -1,6 +1,7 @@
 // The settings menu (CHR-926): app settings (theme, five per-browser toggles), MCP setup and About, behind the gear at the right end of the topbar. An ARIA menu like the zoom menu (CHR-920) over static markup in index.html; this module only wires it. The state itself lives in app.js — the menu reads it through `getTheme` / `toggles[id].get` and changes it through the same setters the existing controls use, so both always agree.
 
-import { fetchAbout, fetchSetup } from "./api.js";
+import { fetchSetup } from "./api.js";
+import { createCopyChip } from "./clipboard.js";
 import { setRovingTabindex, wireMenu } from "./menu-keys.js";
 
 /**
@@ -12,28 +13,34 @@ import { setRovingTabindex, wireMenu } from "./menu-keys.js";
  *   setTheme: (pref: string) => void,
  *   toggles: Record<string, { get: () => boolean, set: (on: boolean) => void }>,
  *   onOpenMcp: () => void,
+ *   onOpen?: () => void,
  *   onOpenWhatsNew: () => void,
- * }} options `toggles` is keyed by the `data-setting` of the rows; `onOpenMcp` runs after the menu closed and focus is back on the trigger
- * @returns {{ open: () => void, close: () => void, isOpen: () => boolean, sync: () => void }}
+ * }} options `toggles` is keyed by the `data-setting` of the rows; `onOpenMcp` runs after the menu closed and focus is back on the trigger; `onOpen` runs on every open (app.js re-reads /api/about there and calls `renderAbout`)
+ * @returns {{ open: () => void, close: () => void, isOpen: () => boolean, sync: () => void, renderAbout: (about: { version: string, updateCheck: "on" | "off", latest?: string, updateAvailable: boolean } | null) => void }}
  */
-export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, setTheme, toggles, onOpenMcp, onOpenWhatsNew }) {
+export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, setTheme, toggles, onOpenMcp, onOpen, onOpenWhatsNew }) {
   const segButtons = /** @type {HTMLElement[]} */ ([...menuEl.querySelectorAll(".settings-seg-button")]);
   const toggleRows = /** @type {HTMLElement[]} */ ([...menuEl.querySelectorAll(".settings-toggle-row")]);
   const mcpItem = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-mcp"));
   const mcpSub = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-mcp-sub"));
   const aboutEl = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-about"));
   const versionEl = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-version"));
+  const updateStatusEl = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-update-status"));
+  const updateIconEl = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-update-icon"));
+  const updateTextEl = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-update-text"));
+  const updateCmdEl = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-update-cmd"));
   const whatsNewItem = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-whats-new"));
 
-  let aboutLoaded = false;
   let setupToken = 0;
 
   const isOpen = () => !menuEl.hidden;
 
   /** The theme control is one row for the arrow keys: the segment that has focus, else the checked one. */
   const segRow = () => segButtons.find((b) => b === document.activeElement) ?? segButtons.find((b) => b.getAttribute("aria-checked") === "true") ?? segButtons[0];
+  /** The copy chip of the "update available" state is a row of its own while it shows. */
+  const updateCopyRows = () => /** @type {HTMLElement[]} */ (updateCmdEl.hidden ? [] : [...updateCmdEl.querySelectorAll("button")]);
   // What's New sits in the About group, shown once the version is known.
-  const rows = () => [segRow(), ...toggleRows, mcpItem, ...(aboutEl.hidden ? [] : [whatsNewItem])];
+  const rows = () => [segRow(), ...toggleRows, mcpItem, ...updateCopyRows(), ...(aboutEl.hidden ? [] : [whatsNewItem])];
 
   function sync() {
     const theme = getTheme();
@@ -41,13 +48,32 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
     for (const row of toggleRows) row.setAttribute("aria-checked", String(toggles[row.dataset.setting ?? ""].get()));
   }
 
-  async function loadAbout() {
-    if (aboutLoaded) return;
-    const about = await fetchAbout();
+  /**
+   * About Artisign: the version, and beside it the update state — up to date, a newer version with the command to copy, or the check switched off. An enabled check that has not found out yet (offline) shows nothing.
+   */
+  function renderAbout(about) {
     if (!about) return;
-    aboutLoaded = true;
     versionEl.textContent = `Artisign ${about.version}`;
     aboutEl.hidden = false;
+    /** @type {{ state: string, icon: string, text: string } | null} */
+    let status = null;
+    if (about.updateCheck === "off") status = { state: "off", icon: "block", text: "Update check off" };
+    else if (about.updateAvailable && about.latest) status = { state: "available", icon: "upgrade", text: `Version ${about.latest} available` };
+    else if (about.latest) status = { state: "current", icon: "check_circle", text: "Up to date" };
+    updateStatusEl.hidden = status === null;
+    if (status) {
+      updateStatusEl.dataset.state = status.state;
+      updateIconEl.textContent = status.icon;
+      updateTextEl.textContent = status.text;
+    }
+    const showCmd = status?.state === "available";
+    if (showCmd && updateCmdEl.hidden) {
+      const chip = createCopyChip("artisign update");
+      chip.setAttribute("role", "menuitem");
+      chip.tabIndex = -1; // a row of the menu: reached with the arrows
+      updateCmdEl.replaceChildren(chip);
+    }
+    updateCmdEl.hidden = !showCmd;
   }
 
   /** "N of M connected" under Connect AI tools; left off while loading and when the status cannot be read. */
@@ -68,7 +94,7 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
     setRovingTabindex(rows(), start);
     for (const b of segButtons) if (b !== start) b.tabIndex = -1;
     start.focus();
-    void loadAbout();
+    onOpen?.();
     void loadSetupSummary();
   }
 
@@ -147,5 +173,5 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
     onOpenWhatsNew();
   });
 
-  return { open, close, isOpen, sync };
+  return { open, close, isOpen, sync, renderAbout };
 }

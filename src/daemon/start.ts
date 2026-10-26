@@ -3,6 +3,7 @@ import { createServer } from "../http/server.js";
 import { findRunningDaemon, writeLock, removeLock } from "./lock.js";
 import { readGlobalConfig } from "./global-config.js";
 import { ProjectRegistry, type ProjectHandle } from "./project-registry.js";
+import { createUpdateChecker, type UpdateChecker } from "./update-status.js";
 import { DEFAULT_PORT } from "../init/artisign-config.js";
 
 export class DaemonAlreadyRunningError extends Error {
@@ -21,6 +22,8 @@ export type StartDaemonOptions = {
   port?: number;
   /** Project directories to open on start. Omitted or empty starts the daemon with no project open (server up, /health OK, everything else 503s). */
   projects?: string[];
+  /** Replaces the registry-polling update checker (tests); the default honours `CI` / `ARTISIGN_NO_UPDATE_CHECK`. */
+  updateChecker?: UpdateChecker;
 };
 
 export type DaemonHandle = {
@@ -59,6 +62,7 @@ export async function startDaemon(opts: StartDaemonOptions = {}): Promise<Daemon
   // forever with no `stop()` handle for the caller to release it through.
   const registry = new ProjectRegistry();
   let server: Server | undefined;
+  const updateChecker = opts.updateChecker ?? createUpdateChecker();
   try {
     // Bind the port before opening any project: a project
     // open can be a slow cold start (full index build), and there's no
@@ -67,7 +71,7 @@ export async function startDaemon(opts: StartDaemonOptions = {}): Promise<Daemon
     // work in bootstrap mode. Projects still open
     // sequentially, in `opts.projects` order, so `activeProject` (the first
     // one) stays deterministic.
-    ({ server } = createServer(registry));
+    ({ server } = createServer(registry, updateChecker));
     const boundServer = server;
 
     const boundPort = await new Promise<number>((res, reject) => {
@@ -92,11 +96,14 @@ export async function startDaemon(opts: StartDaemonOptions = {}): Promise<Daemon
     }
 
     await writeLock({ pid: process.pid, port: boundPort });
+    // Not awaited: the first registry request must not delay startup.
+    void updateChecker.start();
 
     let stopped = false;
     const stop = async (): Promise<void> => {
       if (stopped) return;
       stopped = true;
+      updateChecker.stop();
       // Must happen before server.close(): an open SSE connection (e.g. a
       // preview tab left open) never ends on its own, and server.close()'s
       // callback waits for every connection to end — otherwise this hangs
@@ -115,6 +122,7 @@ export async function startDaemon(opts: StartDaemonOptions = {}): Promise<Daemon
 
     return { port: boundPort, registry, stop };
   } catch (err) {
+    updateChecker.stop();
     await registry.closeAll();
     registry.lifecycle.close();
     const openedServer = server;

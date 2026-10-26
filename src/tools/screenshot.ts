@@ -218,7 +218,7 @@ async function screenshotScreen(
     nodeId = ref.nodeId;
   }
 
-  const { documentHtml, viewport } = await renderScreenForBrowser(store, screen);
+  const { documentHtml, viewport } = await renderScreenForBrowser(store, screen, nodeId);
 
   return withPage(documentHtml, viewport, scale, kind, async (page, browser) => {
     if (nodeId) return captureNode(page, browser, nodeId, nodeRef!, viewport);

@@ -24,8 +24,10 @@ const LAYER_OPEN = '<div data-backdrop-layer inert style="position:absolute; ins
 async function put(screen: string, html: string): Promise<void> {
   await fx.store.writeScreen(screen, html);
 }
+// The body only: the baseline CSS in <head> names the layer's attributes too.
+const bodyOf = (html: string): string => html.slice(html.indexOf("<body"));
 const render = async (screen: string, backdrop?: "omit"): Promise<string> =>
-  (await renderScreenDocument(fx.store, screen, { fontMode: "url", backdrop })).documentHtml;
+  bodyOf((await renderScreenDocument(fx.store, screen, { fontMode: "url", backdrop })).documentHtml);
 
 /** The layer's contents, from the opening tag to the matching close — layers nest, so count divs. */
 function layerOf(html: string): string {
@@ -181,7 +183,7 @@ describe("backdrop consumers", () => {
 
   it("get_screen rendered_html renders own nodes only", async () => {
     const res = await getScreen(fx.store, { screen: "sheet", view: "full", fields: ["rendered_html"] });
-    expect(res.rendered_html).not.toContain("data-backdrop-layer");
+    expect(bodyOf(res.rendered_html as string)).not.toContain("data-backdrop-layer");
     expect(res.rendered_html).not.toContain("parent</p>");
   });
 

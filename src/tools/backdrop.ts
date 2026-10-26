@@ -28,14 +28,25 @@ export function backdropHint(doc: ScreenDocument): string {
   return target === undefined ? "" : ` — the node may belong to the backdrop "${target}"; address it as "${target}.<id>"`;
 }
 
+// The root's attributes do not depend on the design system, so reading a
+// backdrop never loads tokens or components (a broken tokens.json must not
+// blind it).
+const NO_REGISTRY: DesignSystemRegistry = { componentNames: new Set(), tokenPaths: new Set(), tokenFlatNames: new Set() };
+
 /**
- * The `data-backdrop` target of a screen on disk, `undefined` when it has
- * none or cannot be read — a missing, unparsable or hand-broken screen ends a
- * chain walk quietly instead of throwing (ADR-008: reads never throw on it).
+ * A screen on disk's `data-backdrop` target and root node id, `undefined`
+ * when it has none or cannot be read — a missing, unparsable or hand-broken
+ * screen ends a chain walk quietly instead of throwing (ADR-008: reads never
+ * throw on it). The one scan the write checks, `delete_entity` and the SSE
+ * fan-out share; a cheap substring check skips the parse of most screens.
  */
-export async function readBackdropTarget(store: Store, registry: DesignSystemRegistry, screen: string): Promise<string | undefined> {
+export async function readBackdropRoot(store: Store, screen: string): Promise<{ target: string; rootNodeId: string } | undefined> {
   try {
-    return rootBackdrop(parseScreen(await store.readScreen(screen), screen, registry).doc);
+    const html = await store.readScreen(screen);
+    if (!html.includes(BACKDROP_ATTR)) return undefined;
+    const { doc } = parseScreen(html, screen, NO_REGISTRY);
+    const target = rootBackdrop(doc);
+    return target === undefined ? undefined : { target, rootNodeId: doc.rootNodeId };
   } catch {
     return undefined;
   }
@@ -63,7 +74,6 @@ function misplacedBackdrops(doc: ScreenDocument): string[] {
  */
 export async function assertValidBackdrop(
   store: Store,
-  registry: DesignSystemRegistry,
   screen: string,
   doc: ScreenDocument,
   options: { before?: ScreenDocument | null; onlyNewMisplaced?: boolean } = {},
@@ -88,7 +98,7 @@ export async function assertValidBackdrop(
   // not involve `screen` (B -> C -> B).
   const chain = [screen, target];
   const visited = new Set(chain);
-  let next = await readBackdropTarget(store, registry, target);
+  let next = (await readBackdropRoot(store, target))?.target;
   while (next !== undefined) {
     chain.push(next);
     if (next === screen) {
@@ -96,7 +106,7 @@ export async function assertValidBackdrop(
     }
     if (visited.has(next)) return;
     visited.add(next);
-    next = await readBackdropTarget(store, registry, next);
+    next = (await readBackdropRoot(store, next))?.target;
   }
 }
 
@@ -166,25 +176,16 @@ export async function backdropCandidateWarning(store: Store, registry: DesignSys
 }
 
 /** Screens outside `deleted` whose backdrop is one of `deleted`, one warning each; nothing is repaired. */
-export async function danglingBackdropWarnings(store: Store, registry: DesignSystemRegistry, deleted: string[]): Promise<Warning[]> {
+export async function danglingBackdropWarnings(store: Store, deleted: string[]): Promise<Warning[]> {
   const warnings: Warning[] = [];
   for (const screen of await store.listScreens()) {
     if (deleted.includes(screen)) continue;
-    let doc: ScreenDocument;
-    try {
-      const html = await store.readScreen(screen);
-      // Cheap prefilter: most screens carry no backdrop, so skip their parse.
-      if (!html.includes(BACKDROP_ATTR)) continue;
-      doc = parseScreen(html, screen, registry).doc;
-    } catch {
-      continue;
-    }
-    const target = rootBackdrop(doc);
-    if (target === undefined || !deleted.includes(target)) continue;
+    const root = await readBackdropRoot(store, screen);
+    if (root === undefined || !deleted.includes(root.target)) continue;
     warnings.push({
       kind: "dangling_backdrop",
-      target: formatNodeRef(screen, doc.rootNodeId),
-      message: `screen "${screen}" still names deleted screen "${target}" as its backdrop`,
+      target: formatNodeRef(screen, root.rootNodeId),
+      message: `screen "${screen}" still names deleted screen "${root.target}" as its backdrop`,
     });
   }
   return warnings;

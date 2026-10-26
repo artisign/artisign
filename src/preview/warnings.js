@@ -9,7 +9,7 @@
 import { icon } from "./icons.js";
 
 const DIAGNOSTIC_SELECTOR =
-  "[data-unresolved-component],[data-invalid-component],[data-recursive-component],[data-empty-component],[data-unresolved-token],[data-unresolved-icon-font]";
+  "[data-unresolved-component],[data-invalid-component],[data-recursive-component],[data-empty-component],[data-unresolved-token],[data-unresolved-icon-font],[data-unresolved-backdrop]";
 
 const CYCLE_HIGHLIGHT_STYLE = "outline: 3px solid #e5484d; outline-offset: 2px;";
 const CYCLE_HIGHLIGHT_DURATION_MS = 1200;
@@ -20,7 +20,8 @@ const CYCLE_HIGHLIGHT_DURATION_MS = 1200;
  * @returns {Element[]}
  */
 export function findDiagnostics(doc) {
-  return Array.from(doc.querySelectorAll(DIAGNOSTIC_SELECTOR));
+  // The inert backdrop layer (ADR-008) is another screen's render: its markers belong to that screen, not this one.
+  return Array.from(doc.querySelectorAll(DIAGNOSTIC_SELECTOR)).filter((el) => !el.closest("[data-backdrop-layer]"));
 }
 
 /**

@@ -27,6 +27,21 @@ describe("wrapRenderedHtml", () => {
     expect(RENDER_BASELINE_CSS).toContain("[data-unresolved-backdrop]");
   });
 
+  it("switches every marker's outline off inside a backdrop layer, but not the marker on the overlay root", () => {
+    const markerRule = /^\[data-unresolved-component\][^{]*\{[^}]*outline: 2px[^}]*\}/m.exec(RENDER_BASELINE_CSS)?.[0] ?? "";
+    const names = ["unresolved-component", "invalid-component", "recursive-component", "empty-component", "unresolved-token", "unresolved-icon-font", "unresolved-backdrop"];
+    for (const name of names) {
+      expect(markerRule).toContain(`[data-${name}]`);
+      expect(RENDER_BASELINE_CSS).toContain(`[data-backdrop-layer] [data-${name}]`);
+    }
+    // the rule that switches them off applies only inside a layer
+    const offRule = /\[data-backdrop-layer\] \[data-unresolved-component\][^{]*\{[^}]*\}/.exec(RENDER_BASELINE_CSS)?.[0] ?? "";
+    expect(offRule).toContain("outline: none");
+    for (const selector of offRule.slice(0, offRule.indexOf("{")).split(",")) {
+      expect(selector.trim().startsWith("[data-backdrop-layer] ")).toBe(true);
+    }
+  });
+
   it("outlines [data-unresolved-icon-font] in the same diagnostic-marker rule as the other unresolved-ref markers", () => {
     const html = wrapRenderedHtml("<div></div>");
     expect(RENDER_BASELINE_CSS).toContain("[data-unresolved-icon-font]");

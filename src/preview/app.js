@@ -30,7 +30,7 @@ import { applyShortcutHints, isMacPlatform, isTypingTarget, nextZoomLevel, resol
 import { createShortcutsDialog } from "./shortcuts-dialog.js";
 import { createSettingsMenu } from "./settings-menu.js";
 import { createMcpDialog } from "./mcp-dialog.js";
-import { createUpdateNotice, UPDATE_DISMISSED_KEY } from "./update-notice.js";
+import { createUpdateNotice, pinBelowTopBars, UPDATE_DISMISSED_KEY } from "./update-notice.js";
 import { setRovingTabindex, wireMenu } from "./menu-keys.js";
 import { renderScreenList, filterScreens, buildScreenTree, ancestorNames } from "./screens.js";
 import { createVariantUI } from "./variants.js";
@@ -2466,6 +2466,7 @@ const updateNotice = createUpdateNotice({
   closeEl: document.getElementById("update-toast-close"),
   storage: prefsStorage,
 });
+pinBelowTopBars(document.getElementById("update-notice"), document.getElementById("main"), ["variant-bar", "compare-bar", "board-toolbar"].map((id) => document.getElementById(id)));
 const ABOUT_REFRESH_MS = 60 * 60 * 1000;
 
 /** Re-reads /api/about and shows it in the update notice and the About group of the settings menu; a failed read keeps what is shown. The dismissal day is read from the daemon too, so a notice closed in another tab or browser goes away here at the next read. */

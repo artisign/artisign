@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseChangelog, readChangelog, releasesBetween } from "./changelog.js";
+import { parseChangelog, readChangelog, releasesBetween, unwrapLines } from "./changelog.js";
 
 describe("readChangelog (real CHANGELOG.md)", () => {
   const releases = readChangelog();
@@ -23,10 +23,10 @@ describe("readChangelog (real CHANGELOG.md)", () => {
 });
 
 describe("parseChangelog", () => {
-  it("keeps the body as-is and reads the date", () => {
+  it("keeps the body, joins hard-wrapped lines and reads the date", () => {
     const text = "# Changelog\n\n## [1.2.0] - 2026-01-02\n\n### Added\n\n- one\n  wrapped\n\n## [1.1.0] - 2026-01-01\n\nProse.\n";
     expect(parseChangelog(text)).toEqual([
-      { version: "1.2.0", date: "2026-01-02", body: "### Added\n\n- one\n  wrapped" },
+      { version: "1.2.0", date: "2026-01-02", body: "### Added\n\n- one wrapped" },
       { version: "1.1.0", date: "2026-01-01", body: "Prose." },
     ]);
   });
@@ -59,5 +59,12 @@ describe("releasesBetween", () => {
   });
   it("returns everything up to upTo without since", () => {
     expect(releasesBetween(all, undefined, "2.0.0").map((r) => r.version)).toEqual(["2.0.0", "1.5.0", "1.0.0"]);
+  });
+});
+
+describe("unwrapLines", () => {
+  it("joins paragraph and list continuations but keeps blocks, blank lines, nested items and fences", () => {
+    const lines = ["Intro that", "wraps.", "", "### Fixed", "", "- item that", "  wraps", "  - nested", "- next", "", "```", "a", "b", "```"];
+    expect(unwrapLines(lines)).toEqual(["Intro that wraps.", "", "### Fixed", "", "- item that wraps", "  - nested", "- next", "", "```", "a", "b", "```"]);
   });
 });

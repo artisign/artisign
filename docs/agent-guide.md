@@ -431,7 +431,9 @@ the overlay's: `get_node`, `patch_html`, `inspect_node` and `get_screenshot
 {node}` address the target as `"<target>.<id>"`, and an unknown ref on an
 overlay says so in its `not_found` message. `get_screen` reports
 `backdrop: "<target>"`; its `rendered_html` and the drift/`repeated_pattern`
-checks cover the screen's own nodes only. A target that is missing or a cycle
+checks cover the screen's own nodes only. A backdrop renders without ids, so its `<style>` rules and in-document id
+references (`url(#...)`, `<use href="#...">`) do not carry over cleanly — keep
+backdrop screens to inline styles and tokens. A target that is missing or a cycle
 that reached disk by hand edit renders without the layer and outlines the
 root in red (`data-unresolved-backdrop`).
 

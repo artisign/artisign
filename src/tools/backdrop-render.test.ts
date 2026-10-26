@@ -3,7 +3,8 @@ import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { writeHtml, patchHtml } from "./writes.js";
 import { getScreen, getNode } from "./reads.js";
 import { inspectNode } from "./inspect-node.js";
-import { getScreenshot } from "./screenshot.js";
+import { getScreenshot, __resetBrowserForTests } from "./screenshot.js";
+import { BROWSER_ENV, discoverBrowsers, getBrowser } from "./browser.js";
 import { renderScreenDocument } from "./render-context.js";
 import { __setFetchForTests } from "../model/index.js";
 import type { Warning } from "./types.js";
@@ -37,6 +38,49 @@ function layerOf(html: string): string {
   }
   throw new Error("unterminated layer");
 }
+
+describe("backdrop render — position and robustness", () => {
+  it("treats position: static like no position", async () => {
+    await put("parent", `<div id="p-root"></div>`);
+    await put("sheet", `<div id="s-root" data-backdrop="parent" style="position: static"></div>`);
+    expect(await render("sheet")).toContain("position: static; isolation: isolate; position: relative");
+  });
+
+  it("composes under a root that is a component instance", async () => {
+    await fx.store.writeComponent("frame", `<div id="f" style="width: 390px"><div data-slot="body"></div></div>`);
+    await put("parent", `<div id="p-root"><p>from parent</p></div>`);
+    await put("sheet", `<div id="s-root" class="$frame" data-backdrop="parent"><div data-slot="body"><p id="own">own</p></div></div>`);
+    const html = await render("sheet");
+    expect(html).toMatch(/<div id="s-root"[^>]*style="[^"]*isolation: isolate; position: relative"[^>]*>/);
+    expect(html).toContain(`>${LAYER_OPEN}<div><p>from parent</p></div></div>`);
+    expect(html.split("data-backdrop-layer").length - 1).toBe(1);
+  });
+
+  it("marks the root unresolved when the target is malformed HTML", async () => {
+    await put("broken", `<div id="a"></div><div id="b"></div>`);
+    await put("sheet", `<div id="s-root" data-backdrop="broken"></div>`);
+    const html = await render("sheet");
+    expect(html).not.toContain("data-backdrop-layer");
+    expect(html.slice(html.indexOf("<body"))).toContain("data-unresolved-backdrop");
+  });
+});
+
+describe.skipIf(!(Boolean(process.env[BROWSER_ENV]) || discoverBrowsers().length > 0))("backdrop screenshots (installed browser)", () => {
+  beforeAll(() => getBrowser(), 90_000);
+  afterAll(() => __resetBrowserForTests());
+
+  it("clips to a template-expanded id on a backdrop screen; an unknown id gets the backdrop hint", async () => {
+    await fx.store.writeComponent("card", `<div id="c"><span id="label" style="display: block; width: 40px; height: 20px">x</span></div>`);
+    await put("parent", `<div id="p-root"><p id="p1">parent</p></div>`);
+    await put("sheet", `<div id="s-root" data-backdrop="parent" style="width: 200px; height: 200px"><div id="card1" class="$card"></div></div>`);
+    const ok = await getScreenshot(fx.store, { screen: "sheet", node: "sheet.card1--label" });
+    expect(ok.width).toBeGreaterThan(0);
+    await expect(getScreenshot(fx.store, { screen: "sheet", node: "sheet.p1" })).rejects.toMatchObject({
+      code: "not_found",
+      message: expect.stringContaining('the node may belong to the backdrop "parent"'),
+    });
+  }, 60_000);
+});
 
 describe("backdrop render", () => {
   it("makes the layer the root's first child, with isolation and a default position", async () => {
@@ -148,10 +192,6 @@ describe("backdrop consumers", () => {
       patchHtml(fx.store, { target: { kind: "node", node: "sheet.p1" }, operation: "delete" }),
     ).rejects.toMatchObject({ code: "not_found", message: expect.stringContaining(hint) });
     await expect(inspectNode(fx.store, { node: "sheet.p1" })).rejects.toMatchObject({ code: "not_found", message: expect.stringContaining(hint) });
-    await expect(getScreenshot(fx.store, { screen: "sheet", node: "sheet.p1" })).rejects.toMatchObject({
-      code: "not_found",
-      message: expect.stringContaining(hint),
-    });
   });
 
   it("gives no hint on a screen without a backdrop", async () => {

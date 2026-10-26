@@ -84,7 +84,10 @@ async function resolveBackdrop(store: Store, doc: ScreenDocument, ctx: RenderCon
   if (visited.has(target)) return { unresolved: true };
   let targetDoc: ScreenDocument;
   try {
-    targetDoc = parseScreen(await store.readScreen(target), target, ctx.registry).doc;
+    const parsed = parseScreen(await store.readScreen(target), target, ctx.registry);
+    // The same rule an unparseable component template gets: no usable tree.
+    if (parsed.errors.some((e) => e.code === "malformed_html")) return { unresolved: true };
+    targetDoc = parsed.doc;
   } catch {
     return { unresolved: true };
   }

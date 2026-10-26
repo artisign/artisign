@@ -289,17 +289,20 @@ function renderNode(
   if (!node) return "";
   if (node.kind === "text") return escapeTextIn(doc.nodes[node.parentId ?? ""], node.text ?? "");
   if (node.kind === "component_instance") {
-    return renderComponentInstance(node, ctx, flowsByTrigger.get(node.id), SCREEN_ORIGIN, node.id);
+    return renderComponentInstance(node, ctx, flowsByTrigger.get(node.id), SCREEN_ORIGIN, node.id, backdrop);
   }
 
   const tag = node.tag ?? "div";
   const attrs: [string, string][] = [...idAttr(ctx, node.id), ...buildAttrs(node, ctx, flowsByTrigger.get(node.id))];
-  if (backdrop) applyBackdropAttrs(attrs, node, backdrop);
+  if (backdrop) applyBackdropAttrs(attrs, backdrop);
   const attrStr = attrsToString(attrs);
   if (VOID_ELEMENTS.has(tag)) return `<${tag}${attrStr ? ` ${attrStr}` : ""}>`;
-  const layer = backdrop?.layerHtml === undefined ? "" : `<div data-backdrop-layer inert style="${BACKDROP_LAYER_STYLE}">${backdrop.layerHtml}</div>`;
-  const inner = layer + node.childIds.map((childId) => renderNode(childId, doc, ctx, flowsByTrigger)).join("");
+  const inner = backdropLayer(backdrop) + node.childIds.map((childId) => renderNode(childId, doc, ctx, flowsByTrigger)).join("");
   return `<${tag}${attrStr ? ` ${attrStr}` : ""}>${inner}</${tag}>`;
+}
+
+function backdropLayer(backdrop: BackdropRender | undefined): string {
+  return backdrop?.layerHtml === undefined ? "" : `<div data-backdrop-layer inert style="${BACKDROP_LAYER_STYLE}">${backdrop.layerHtml}</div>`;
 }
 
 /**
@@ -309,10 +312,12 @@ function renderNode(
  * and the unresolved marker. The root's own background paints beneath the
  * layer — a scrim has to be a child.
  */
-function applyBackdropAttrs(attrs: [string, string][], node: AttrSource, backdrop: BackdropRender): void {
+function applyBackdropAttrs(attrs: [string, string][], backdrop: BackdropRender): void {
   if (backdrop.unresolved) attrs.push(["data-unresolved-backdrop", ""]);
   if (backdrop.layerHtml === undefined) return;
-  const declaresPosition = "position" in node.inlineStyles || "position" in node.refs.tokens;
+  // Read off the rendered style, so tokens and an expanded component root count too; `static` is no position at all.
+  const position = /(?:^|;)\s*position\s*:\s*([^;]+)/i.exec(attrs.find(([key]) => key === "style")?.[1] ?? "")?.[1]?.trim().toLowerCase();
+  const declaresPosition = position !== undefined && position !== "static";
   const extra = `isolation: isolate${declaresPosition ? "" : "; position: relative"}`;
   const style = attrs.find(([key]) => key === "style");
   if (style) style[1] = `${style[1]}; ${extra}`;
@@ -524,6 +529,7 @@ function renderComponentInstance(
   flow: Flow | undefined,
   origin: Origin,
   rootId: string,
+  backdrop?: BackdropRender,
 ): string {
   const componentName = instance.refs.component ?? "";
 
@@ -564,7 +570,7 @@ function renderComponentInstance(
   // instance's own authoring context, while the template renders under the
   // extended path. Id-less instances among them get ids under this root.
   const fillIds: FillIds = { base: rootId, count: 0 };
-  return renderTemplateNode(templateDoc.rootNodeId, templateDoc, ctx, rootId, variantName, flow, substitutions, nextPath, instanceAttrs, origin, fillIds);
+  return renderTemplateNode(templateDoc.rootNodeId, templateDoc, ctx, rootId, variantName, flow, substitutions, nextPath, instanceAttrs, origin, fillIds, backdrop);
 }
 
 function renderTemplateNode(
@@ -579,6 +585,7 @@ function renderTemplateNode(
   instanceAttrs: [string, string][],
   fillOrigin: Origin,
   fillIds: FillIds,
+  backdrop?: BackdropRender,
 ): string {
   const node = templateDoc.nodes[nodeId];
   if (!node) return "";
@@ -620,10 +627,12 @@ function renderTemplateNode(
   // buildAttrs already emitted data-variant if the template's own root
   // happens to declare one — only add the selected variant's name if it didn't.
   if (isRoot && !node.refs.variant) attrs.push(["data-variant", variantName]);
+  // Only the expanded root of a screen's own instance gets a backdrop (the caller passes none for nested ones).
+  if (isRoot && backdrop) applyBackdropAttrs(attrs, backdrop);
   const attrStr = attrsToString(attrs);
   if (VOID_ELEMENTS.has(tag)) return `<${tag}${attrStr ? ` ${attrStr}` : ""}>`;
 
-  const inner = node.childIds
+  const inner = (isRoot ? backdropLayer(backdrop) : "") + node.childIds
     .map((childId) =>
       renderTemplateNode(childId, templateDoc, ctx, rootId, variantName, flow, substitutions, expansionPath, instanceAttrs, fillOrigin, fillIds),
     )

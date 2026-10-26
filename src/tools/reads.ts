@@ -294,6 +294,7 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
   const view = input.view ?? "summary";
   const { doc } = await loadScreen(store, input.screen);
   const nodes = nodesInDocumentOrder(doc);
+  const backdrop = rootBackdrop(doc);
   const [screenFlows, commentRecords, lastCommit, meta, mtime] = await Promise.all([
     readScreenFlows(store, input.screen),
     readCommentRecords(store),
@@ -319,7 +320,7 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
     last_commit: lastCommit.sha,
     mtime,
     tags: meta.tags,
-    ...(rootBackdrop(doc) === undefined ? {} : { backdrop: rootBackdrop(doc) }),
+    ...(backdrop === undefined ? {} : { backdrop }),
   };
   if (view === "summary") return selectFields(summary, SCREEN_ALWAYS, SCREEN_OPTIONAL, input.fields);
 

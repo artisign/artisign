@@ -2506,7 +2506,7 @@ function runShortcut(id) {
       else return false;
       return true;
     default:
-      // Everything else is "click its control": modes, status bar, follow, panels, theme, project menu and its items, the Board toolbar.
+      // Everything else is "click its control": modes, status bar, follow, panels, project menu and its items, the Board toolbar.
       return pressControl(controlFor(id));
   }
 }

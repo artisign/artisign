@@ -126,3 +126,12 @@ describe("loadDaemonStorage", () => {
     expect(storage.getItem("artisign.zoom")).toBeNull();
   });
 });
+
+describe("collectLocalPrefs limits", () => {
+  it("skips values and keys beyond the daemon's limits so the import cannot fail on them", () => {
+    const entries = { "artisign.ok": "1", "artisign.big": "x".repeat(10_001), ["artisign." + "k".repeat(200)]: "1" };
+    const keys = Object.keys(entries);
+    const local = { length: keys.length, key: (i) => keys[i], getItem: (k) => entries[k] ?? null };
+    expect(collectLocalPrefs(local)).toEqual({ "artisign.ok": "1" });
+  });
+});

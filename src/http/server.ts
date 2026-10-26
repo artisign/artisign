@@ -9,12 +9,18 @@ import { handlePreviewRoutes } from "./preview-routes.js";
 import { handleCommentsRoutes } from "./comments-routes.js";
 import { handleProjectsApi } from "./projects-routes.js";
 import { handleFsApi } from "./fs-routes.js";
+import { handleWhatsNewApi } from "./whats-new-routes.js";
+import { readChangelog } from "../changelog.js";
+import { handleAboutApi } from "./about-routes.js";
+import { handleSetupApi } from "./setup-routes.js";
+import { handleSettingsApi } from "./settings-routes.js";
 import { handleSseConnection } from "./sse.js";
 import { isAllowedOrigin, hasJsonContentType } from "./origin-guard.js";
 import { sendJson } from "./json.js";
 import type { ProjectRegistry, ProjectHandle } from "../daemon/project-registry.js";
 import { ToolError, type ViewState, type BoardStatePatch, type ToolHandlerContext } from "../tools/index.js";
 import { readVersion } from "../version.js";
+import { createUpdateChecker, type UpdateChecker } from "../daemon/update-status.js";
 import { BUNDLED_MATERIAL_SYMBOLS_URL } from "../model/fonts.js";
 
 // This module lives at src/http/server.ts (dev) or dist/http/server.js (build);
@@ -228,13 +234,17 @@ function resolveUiProject(registry: ProjectRegistry, url: URL): { handle: Projec
 
 export type HttpServer = {
   server: Server;
+  /** For the `/api/about` handler: `{ version, ...updateChecker.status() }`. */
+  updateChecker: UpdateChecker;
 };
 
 /**
  * The version this process started with. Read once: `npm install -g` overwrites package.json while an old daemon keeps
  * running its old code, and `/health` must not claim the new version for it (`update` and `setup` compare against it).
  */
-const STARTED_VERSION = readVersion();
+export const STARTED_VERSION = readVersion();
+/** The changelog as shipped with `STARTED_VERSION`, read once for the same reason. */
+const STARTED_CHANGELOG = readChangelog();
 
 /**
  * Routes every request. `/health`, `/api/projects*`, `/api/fs/dirs`, and the
@@ -250,7 +260,7 @@ const STARTED_VERSION = readVersion();
  * — see `handleMcpRoute` and `resolveUiProject` for the two different
  * resolution policies.
  */
-export function createServer(registry: ProjectRegistry): HttpServer {
+export function createServer(registry: ProjectRegistry, updateChecker: UpdateChecker = createUpdateChecker()): HttpServer {
   const server = createHttpServer((req, res) => {
     if (req.method === "GET" && req.url === "/health") {
       res.writeHead(200, { "content-type": "application/json" });
@@ -264,9 +274,23 @@ export function createServer(registry: ProjectRegistry): HttpServer {
     const isCommentsApi = url.pathname === "/api/comments";
     const isProjectsApi = url.pathname === "/api/projects" || url.pathname.startsWith("/api/projects/");
     const isFsApi = (req.method === "GET" || req.method === "POST") && url.pathname === "/api/fs/dirs";
+    const isAboutApi = url.pathname === "/api/about";
+    const isSetupApi = url.pathname === "/api/setup";
+    const isWhatsNewApi = url.pathname === "/api/whats-new";
+    const isSettingsApi = url.pathname === "/api/settings" || url.pathname.startsWith("/api/settings/");
     const isSse = req.method === "GET" && url.pathname === "/events";
     const isApiPath = url.pathname.startsWith("/api/");
-    const isPreviewApi = req.method === "GET" && isApiPath && !isToolsApi && !isCommentsApi && !isProjectsApi && !isFsApi;
+    const isPreviewApi =
+      req.method === "GET" &&
+      isApiPath &&
+      !isToolsApi &&
+      !isCommentsApi &&
+      !isProjectsApi &&
+      !isFsApi &&
+      !isAboutApi &&
+      !isSetupApi &&
+      !isWhatsNewApi &&
+      !isSettingsApi;
 
     // A `handle*Routes` helper returns `false` when it recognized the path
     // prefix but not this exact method/pattern (e.g. DELETE /api/comments,
@@ -277,7 +301,7 @@ export function createServer(registry: ProjectRegistry): HttpServer {
       if (!handled) sendJson(res, 404, { code: "not_found", message: "unknown API route" });
     };
 
-    if (isMcp || isToolsApi || isCommentsApi || isProjectsApi || isFsApi || isSse || isPreviewApi) {
+    if (isMcp || isToolsApi || isCommentsApi || isProjectsApi || isFsApi || isAboutApi || isSetupApi || isWhatsNewApi || isSettingsApi || isSse || isPreviewApi) {
       if (!isAllowedOrigin(req) || (req.method === "POST" && !hasJsonContentType(req))) {
         rejectForbidden(res);
         return;
@@ -290,6 +314,26 @@ export function createServer(registry: ProjectRegistry): HttpServer {
 
       if (isFsApi) {
         handleFsApi(req, res).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
+        return;
+      }
+
+      if (isAboutApi) {
+        handleAboutApi(req, res, STARTED_VERSION, () => updateChecker.status()).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
+        return;
+      }
+
+      if (isSetupApi) {
+        handleSetupApi(req, res, STARTED_VERSION).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
+        return;
+      }
+
+      if (isWhatsNewApi) {
+        handleWhatsNewApi(req, res, STARTED_VERSION, STARTED_CHANGELOG).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
+        return;
+      }
+
+      if (isSettingsApi) {
+        handleSettingsApi(req, res).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
         return;
       }
 
@@ -344,5 +388,5 @@ export function createServer(registry: ProjectRegistry): HttpServer {
     servePreviewFile(url.pathname, res);
   });
 
-  return { server };
+  return { server, updateChecker };
 }

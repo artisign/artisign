@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- The preview's preferences (theme, zoom levels, panel and toggle states, follow, last opened screen, sidebar expand
+  state, compare selections) are stored by Artisign in `~/.artisign/settings.json` instead of per browser, so every
+  browser and every reload sees the same ones. Existing browser preferences are carried over once on the first start.
+  (CHR-924)
+- A settings menu at the right end of the preview's topbar: theme (System / Light / Dark) and the standing view
+  preferences, a "Connect AI tools" dialog that shows which AI tools are connected and what to copy to connect the
+  others (`artisign setup`, or the per-tool command or config entry), and the running Artisign version. It replaces the
+  topbar's theme toggle; T still cycles the theme. (CHR-926)
+- The running Artisign checks npm for a newer version once a day (the same check and cache as the CLI's notice;
+  `ARTISIGN_NO_UPDATE_CHECK=1` and `CI` turn it off). When one exists, the preview shows a notice with
+  `artisign update` to copy; closing it hides it for the rest of the day, in every browser. The settings menu's About
+  shows the update status. (CHR-927)
+- What's New: on the first preview start after an update, a dialog lists the release notes of every version since
+  the last one you saw; "What's New" in the settings menu reopens it with every release. The notes are this
+  changelog, which now ships in the npm package. (CHR-928)
+
 ### Fixed
 
 - A `data-flow-target` on component slot-fill content (for example a back button passed into `$nav-bar`) now becomes a

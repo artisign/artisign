@@ -304,3 +304,121 @@ export async function setBoardState(project, patch) {
   }
   return { ok: true };
 }
+
+/**
+ * The daemon-stored preview preferences (CHR-924, GET /api/settings). A failed
+ * request or a malformed body is `null` — the caller then runs without
+ * persistence rather than crashing the preview.
+ * @returns {Promise<{ prefs: Record<string, string>, migrated: boolean } | null>}
+ */
+export async function fetchSettings() {
+  try {
+    const res = await fetch("/api/settings");
+    if (!res.ok) return null;
+    return parseSettings(await res.json());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Merges `prefs` into the stored settings (POST /api/settings); a `null` value removes the key. Best-effort: resolves `false` on any failure.
+ * @param {Record<string, string | null>} prefs
+ * @returns {Promise<boolean>}
+ */
+export async function saveSettings(prefs) {
+  try {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prefs }),
+      keepalive: true, // a pref changed right before a reload or close still reaches the daemon
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * One-time carry-over of this browser's localStorage prefs (POST /api/settings/import) — the daemon applies it only while its settings are not yet `migrated`. `null` on failure or an unusable response.
+ * @param {Record<string, string>} prefs
+ * @returns {Promise<{ prefs: Record<string, string>, migrated: boolean } | null>}
+ */
+export async function importSettings(prefs) {
+  try {
+    const res = await fetch("/api/settings/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prefs }),
+    });
+    if (!res.ok) return null;
+    return parseSettings(await res.json());
+  } catch {
+    return null;
+  }
+}
+
+/** Tolerant reading of a settings body; `{}` counts as "nothing stored, not migrated", anything that is not an object with string-only prefs is rejected. */
+function parseSettings(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const prefs = body.prefs ?? {};
+  if (typeof prefs !== "object" || prefs === null || Array.isArray(prefs)) return null;
+  const clean = {};
+  for (const [k, v] of Object.entries(prefs)) if (typeof v === "string") clean[k] = v;
+  return { prefs: clean, migrated: body.migrated === true };
+}
+
+/**
+ * Facts about the running daemon (GET /api/about): the version for the settings menu, and the update check (CHR-927) — `updateCheck` is "off" when the user disabled it, `latest` the newest published version once the daemon knows it. Fields an older daemon does not send read as "check on, nothing known". `null` on any failure.
+ * @returns {Promise<{ version: string, updateCheck: "on" | "off", latest?: string, updateAvailable: boolean } | null>}
+ */
+export async function fetchAbout() {
+  try {
+    const res = await fetch("/api/about");
+    if (!res.ok) return null;
+    const body = await res.json();
+    if (typeof body?.version !== "string") return null;
+    const latest = typeof body.latest === "string" ? body.latest : undefined;
+    return { version: body.version, updateCheck: body.updateCheck === "off" ? "off" : "on", latest, updateAvailable: body.updateAvailable === true && latest !== undefined };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Which AI tools are installed / connected and what to copy to connect each by hand (CHR-926, GET /api/setup — the daemon reads the disk on every call). Copy-only: nothing is written. `null` on any failure or a malformed body.
+ * @returns {Promise<{ command: string, clients: { name: string, found: boolean, connected: boolean, manual: { kind: "command", text: string } | { kind: "config", path?: string, text: string } }[] } | null>}
+ */
+export async function fetchSetup() {
+  try {
+    const res = await fetch("/api/setup");
+    if (!res.ok) return null;
+    const body = await res.json();
+    if (typeof body?.command !== "string" || !Array.isArray(body.clients)) return null;
+    const clients = body.clients.filter(
+      (c) => typeof c?.name === "string" && typeof c.manual?.text === "string" && (c.manual.kind === "command" || c.manual.kind === "config"),
+    );
+    return { command: body.command, clients };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Release notes from the CHANGELOG the running daemon shipped with (CHR-928, GET /api/whats-new): the released sections newer than `since` up to the running version, newest first — every released section without `since`. `null` on any failure or a malformed body.
+ * @param {string | null} [since]
+ * @returns {Promise<{ version: string, releases: { version: string, date: string | null, body: string }[] } | null>}
+ */
+export async function fetchWhatsNew(since) {
+  try {
+    const res = await fetch(since ? `/api/whats-new?since=${encodeURIComponent(since)}` : "/api/whats-new");
+    if (!res.ok) return null;
+    const body = await res.json();
+    if (typeof body?.version !== "string" || !Array.isArray(body.releases)) return null;
+    const releases = body.releases.filter((r) => typeof r?.version === "string" && typeof r.body === "string").map((r) => ({ version: r.version, date: typeof r.date === "string" ? r.date : null, body: r.body }));
+    return { version: body.version, releases };
+  } catch {
+    return null;
+  }
+}

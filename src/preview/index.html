@@ -97,23 +97,51 @@
             <span class="icon" aria-hidden="true">smartphone</span>
           </button>
         </div>
-        <!-- Always shown (the empty no-project topbar has it too): separates the tools from theme / Live. -->
+        <!-- Always shown (the empty no-project topbar has it too): separates the tools from Live / settings. -->
         <span class="chrome-divider-v" aria-hidden="true"></span>
         <button type="button" id="warning-badge" class="chrome-chip chrome-chip--warning" title="Render diagnostics — click to step through" hidden></button>
-        <button
-          type="button"
-          id="theme-toggle"
-          class="chrome-icon-btn"
-          aria-label="Theme: System"
-          data-tooltip="Theme: System"
-          data-shortcut-id="theme"
-        >
-          <span class="icon" aria-hidden="true">contrast</span>
-        </button>
         <span id="connection-status" class="chrome-live" data-tooltip="Live reload: connected">
           <span id="connection-status-dot" class="chrome-live-dot" aria-hidden="true"></span>
           <span id="connection-status-label">Live</span>
         </span>
+        <!-- CHR-926: app settings (theme, the per-browser toggles), MCP setup and About. An ARIA menu like the zoom menu (CHR-920); wired by settings-menu.js. -->
+        <div id="settings-controls">
+          <button type="button" id="settings-trigger" class="chrome-icon-btn" aria-haspopup="true" aria-expanded="false" aria-controls="settings-menu" aria-label="Settings" data-tooltip="Settings">
+            <span class="icon" aria-hidden="true">settings</span>
+          </button>
+          <div id="settings-menu" class="chrome-menu" role="menu" aria-label="Settings" hidden>
+            <h4 class="chrome-menu-label" role="presentation">App settings</h4>
+            <div class="settings-theme-row" role="presentation">
+              <span id="settings-theme-label">Theme</span>
+              <div id="settings-theme" class="settings-seg" role="group" aria-labelledby="settings-theme-label">
+                <button type="button" class="settings-seg-button" role="menuitemradio" aria-checked="false" data-theme-pref="system"><span class="icon" aria-hidden="true">brightness_auto</span>System</button>
+                <button type="button" class="settings-seg-button" role="menuitemradio" aria-checked="false" data-theme-pref="light"><span class="icon" aria-hidden="true">light_mode</span>Light</button>
+                <button type="button" class="settings-seg-button" role="menuitemradio" aria-checked="false" data-theme-pref="dark"><span class="icon" aria-hidden="true">dark_mode</span>Dark</button>
+              </div>
+            </div>
+            <button type="button" class="chrome-menu-item settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="follow"><span>Follow agent by default</span><span class="settings-switch" aria-hidden="true"></span></button>
+            <button type="button" class="chrome-menu-item settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="clusters"><span>Board clusters</span><span class="settings-switch" aria-hidden="true"></span></button>
+            <button type="button" class="chrome-menu-item settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="edges"><span>Board edges</span><span class="settings-switch" aria-hidden="true"></span></button>
+            <button type="button" class="chrome-menu-item settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="variant-map"><span>Variant map</span><span class="settings-switch" aria-hidden="true"></span></button>
+            <button type="button" class="chrome-menu-item settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="sidebar-tags"><span>Tags in sidebar</span><span class="settings-switch" aria-hidden="true"></span></button>
+            <div class="chrome-menu-divider" role="separator"></div>
+            <h4 class="chrome-menu-label" role="presentation">MCP setup</h4>
+            <button type="button" id="settings-mcp" class="chrome-menu-item settings-item-detail" role="menuitem">
+              <span class="icon chrome-menu-icon" aria-hidden="true">electrical_services</span>
+              <span class="settings-item-text"><span>Connect AI tools…</span><span id="settings-mcp-sub" class="settings-item-sub" hidden></span></span>
+            </button>
+            <div id="settings-about" role="presentation" hidden>
+              <div class="chrome-menu-divider" role="separator"></div>
+              <h4 class="chrome-menu-label" role="presentation">About Artisign</h4>
+              <div id="settings-about-row" class="settings-about-row" role="presentation">
+                <span id="settings-version"></span>
+                <span id="settings-update-status" class="settings-update-status" hidden><span id="settings-update-icon" class="icon" aria-hidden="true"></span><span id="settings-update-text"></span></span>
+              </div>
+              <div id="settings-update-cmd" class="settings-update-cmd" role="presentation" hidden></div>
+              <button type="button" id="settings-whats-new" class="chrome-menu-item" role="menuitem" tabindex="-1"><span class="icon chrome-menu-icon" aria-hidden="true">new_releases</span>What's New</button>
+            </div>
+          </div>
+        </div>
       </header>
       <div id="body">
         <aside id="sidebar-screens" class="side-panel" data-collapsed="false">
@@ -349,6 +377,17 @@
               </div>
             </div>
           </div>
+          <!-- CHR-927: update notice. A polite live region that is always present (so the toast is announced when it appears); the toast over the canvas never moves the layout. -->
+          <div id="update-notice" role="status" aria-live="polite">
+            <div id="update-toast" class="update-toast" hidden>
+              <span class="icon update-toast-icon" aria-hidden="true">upgrade</span>
+              <div class="update-toast-body">
+                <span id="update-toast-title" class="update-toast-title"></span>
+                <div id="update-toast-command"></div>
+              </div>
+              <button type="button" id="update-toast-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Hide for today" data-tooltip="Hide for today"><span class="icon" aria-hidden="true">close</span></button>
+            </div>
+          </div>
         </main>
         <aside id="inspector" class="side-panel side-panel-right" data-collapsed="false">
           <div class="side-panel-header">
@@ -413,6 +452,38 @@
         </div>
         <p class="dialog-sub">Single keys work while no text field has focus. Nothing fires with Ctrl, Cmd or Alt held, so browser shortcuts stay untouched.</p>
         <div id="shortcuts-columns"></div>
+      </section>
+    </div>
+    <!-- CHR-926: Connect AI tools — which tools are connected and what to copy to connect the rest (copy only). Content built by mcp-dialog.js from GET /api/setup. -->
+    <div id="mcp-scrim" class="chrome-scrim" hidden>
+      <section id="mcp-dialog" class="chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="mcp-title" tabindex="-1">
+        <div class="dialog-head">
+          <h1 id="mcp-title" class="dialog-title">Connect AI tools</h1>
+          <button type="button" id="mcp-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </div>
+        <div id="mcp-command" class="mcp-group"></div>
+        <div class="mcp-group">
+          <div class="mcp-list-label">Or add it by hand, per tool</div>
+          <div id="mcp-clients" class="mcp-clients"></div>
+        </div>
+        <div class="mcp-actions">
+          <span id="mcp-summary" class="mcp-summary"></span>
+          <button type="button" id="mcp-done" class="chrome-btn chrome-btn--primary">Done</button>
+        </div>
+      </section>
+    </div>
+    <!-- CHR-928: What's New — the CHANGELOG sections since the last seen version, once after an update; reopened from the settings menu. Content built by whats-new.js from GET /api/whats-new. -->
+    <div id="whats-new-scrim" class="chrome-scrim" hidden>
+      <section id="whats-new-dialog" class="chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="whats-new-title" tabindex="-1">
+        <div class="dialog-head whats-new-head">
+          <h1 id="whats-new-title" class="dialog-title">What's New</h1>
+          <button type="button" id="whats-new-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </div>
+        <div id="whats-new-body" class="whats-new-body-scroll"></div>
+        <div class="whats-new-foot">
+          <span id="whats-new-summary" class="whats-new-summary"></span>
+          <button type="button" id="whats-new-done" class="chrome-btn chrome-btn--primary">Close</button>
+        </div>
       </section>
     </div>
     <div id="dialog-scrim" class="chrome-scrim" hidden>

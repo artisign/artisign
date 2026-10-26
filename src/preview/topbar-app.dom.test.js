@@ -3,6 +3,7 @@
 // CHR-912 — the topbar and canvas bar wired in app.js: icon mode toggles with tooltips, the zoom dropdown, the Live chip, the variant-map toggle and the frame caption.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
+import { fakeSettings } from "./fake-settings.test-helper.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { cwd } from "node:process";
@@ -16,6 +17,8 @@ const storageStub = {
   getItem: (k) => memoryStorage.get(k) ?? null,
   setItem: (k, v) => void memoryStorage.set(k, String(v)),
   removeItem: (k) => void memoryStorage.delete(k),
+  get length() { return memoryStorage.size; },
+  key: (i) => [...memoryStorage.keys()][i] ?? null,
   clear: () => memoryStorage.clear(),
 };
 
@@ -27,7 +30,10 @@ const SCREENS = [
 let sources;
 let renderOk;
 
+let settings;
+
 function stubDaemon() {
+  settings = fakeSettings();
   vi.stubGlobal("localStorage", storageStub);
   Object.defineProperty(window, "localStorage", { configurable: true, value: storageStub });
   sources = [];
@@ -35,8 +41,10 @@ function stubDaemon() {
   vi.stubGlobal("requestAnimationFrame", (cb) => cb());
   vi.stubGlobal("CSS", { escape: (s) => s });
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
-  vi.stubGlobal("fetch", async (url) => {
+  vi.stubGlobal("fetch", async (url, init) => {
     const path = String(url).split("?")[0];
+    const settingsRes = settings.handle(path, init);
+    if (settingsRes) return settingsRes;
     const json = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => "<div style='width:390px;height:844px'></div>" });
     if (path.startsWith("/api/render/")) {
       return { ok: renderOk, status: renderOk ? 200 : 500, json: async () => ({ message: "boom" }), text: async () => "<div style='width:390px;height:844px'></div>" };
@@ -101,7 +109,8 @@ describe("zoom dropdown", () => {
     $('.zoom-button[data-zoom="2"]').click();
     expect($("#zoom-menu").hidden).toBe(true);
     expect($("#zoom-label").textContent).toBe("200%");
-    expect(memoryStorage.get("artisign.zoom")).toBe("2");
+    await flush();
+    expect(settings.prefs["artisign.zoom"]).toBe("2");
     expect($('.zoom-button[data-zoom="2"]').getAttribute("aria-checked")).toBe("true");
     expect($('.zoom-button[data-zoom="2"] .chrome-menu-check').textContent).toBe("check");
     expect($('.zoom-button[data-zoom="fit"] .chrome-menu-check').textContent).toBe("");
@@ -147,10 +156,12 @@ describe("variant map toggle", () => {
     toggle.click();
     expect($("#variant-map").hidden).toBe(true);
     expect($("#variant-bar .variant-map-toggle").getAttribute("aria-pressed")).toBe("false");
-    expect(memoryStorage.get("artisign.variantMap")).toBe("false");
+    await flush();
+    expect(settings.prefs["artisign.variantMap"]).toBe("false");
     $("#variant-bar .variant-map-toggle").click();
     expect($("#variant-map").hidden).toBe(false);
-    expect(memoryStorage.get("artisign.variantMap")).toBe("true");
+    await flush();
+    expect(settings.prefs["artisign.variantMap"]).toBe("true");
   });
 
   it("starts hidden when the stored pref says so", async () => {
@@ -239,5 +250,56 @@ describe("topbar dividers", () => {
       expect(kinds, view).toBe(expected[view]);
       expect(kinds, view).not.toMatch(/\|\||^\||\|$/);
     }
+  });
+});
+
+describe("daemon-stored preferences (CHR-924)", () => {
+  it("carries this browser's localStorage prefs over once and applies them", async () => {
+    memoryStorage.set("artisign.zoom", "0.5");
+    memoryStorage.set("uxd.variantMap", "false");
+    await boot();
+    expect(settings.imports).toEqual([{ "artisign.zoom": "0.5", "artisign.variantMap": "false" }]);
+    expect(settings.migrated).toBe(true);
+    expect($("#zoom-label").textContent).toBe("50%");
+    expect(memoryStorage.get("artisign.zoom")).toBe("0.5"); // localStorage is left alone
+  });
+
+  it("does not import once the daemon settings are migrated, and the daemon value wins", async () => {
+    settings = fakeSettings({ prefs: { "artisign.zoom": "2" }, migrated: true });
+    memoryStorage.set("artisign.zoom", "0.5");
+    await boot();
+    expect(settings.imports).toEqual([]);
+    expect($("#zoom-label").textContent).toBe("200%");
+  });
+
+  it("sends a pref written through a UI control to the daemon", async () => {
+    await boot();
+    settings.saves.length = 0;
+    $("#zoom-trigger").click();
+    $('.zoom-button[data-zoom="2"]').click();
+    await flush();
+    expect(settings.saves.some((c) => c["artisign.zoom"] === "2")).toBe(true);
+  });
+
+  it("keeps the theme in localStorage as a pre-paint mirror of the daemon value", async () => {
+    settings = fakeSettings({ prefs: { "artisign.theme": "dark" }, migrated: true });
+    await boot();
+    expect(memoryStorage.get("artisign.theme")).toBe("dark");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    $("#settings-trigger").click();
+    $('.settings-seg-button[data-theme-pref="light"]').click();
+    await flush();
+    expect(memoryStorage.get("artisign.theme")).toBe("light");
+    expect(settings.prefs["artisign.theme"]).toBe("light");
+  });
+
+  it("runs on defaults when the settings request fails", async () => {
+    const ok = fetch;
+    vi.stubGlobal("fetch", async (url, init) => {
+      if (String(url).startsWith("/api/settings")) throw new Error("down");
+      return ok(url, init);
+    });
+    await boot();
+    expect($("#zoom-label").textContent).toBe("Fit");
   });
 });

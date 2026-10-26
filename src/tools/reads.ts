@@ -21,6 +21,7 @@ import { loadScreen } from "./context.js";
 import { readMockupMetaOrDefault } from "./mockups.js";
 import { loadAllDocuments, loadDefinitionSource, type SourceDoc } from "./definitions.js";
 import { computeReuseMetrics } from "./reuse.js";
+import { backdropHint, rootBackdrop } from "./backdrop.js";
 import { renderScreenDocument, describeViewport } from "./render-context.js";
 import { parseNodeRef, formatNodeRef } from "./node-ref.js";
 import { readAllFlows, readScreenFlows, toPublicFlowRecord } from "./flows.js";
@@ -276,7 +277,7 @@ export type GetScreenInput = {
   output_format?: "html" | "jsx";
 };
 
-const SCREEN_ALWAYS = ["screen", "path", "node_count", "ref_count", "flow_count", "open_comment_count", "last_commit", "mtime", "tags"];
+const SCREEN_ALWAYS = ["screen", "path", "node_count", "ref_count", "flow_count", "open_comment_count", "last_commit", "mtime", "tags", "backdrop"];
 // `tag_notes` is its own field, not folded into `notes` — that would break
 // selectFields' one-name-one-key contract (fields:["notes","tag_notes"] would
 // read oddly if "notes" alone silently carried both). Instead the "notes"
@@ -293,6 +294,7 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
   const view = input.view ?? "summary";
   const { doc } = await loadScreen(store, input.screen);
   const nodes = nodesInDocumentOrder(doc);
+  const backdrop = rootBackdrop(doc);
   const [screenFlows, commentRecords, lastCommit, meta, mtime] = await Promise.all([
     readScreenFlows(store, input.screen),
     readCommentRecords(store),
@@ -318,6 +320,7 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
     last_commit: lastCommit.sha,
     mtime,
     tags: meta.tags,
+    ...(backdrop === undefined ? {} : { backdrop }),
   };
   if (view === "summary") return selectFields(summary, SCREEN_ALWAYS, SCREEN_OPTIONAL, input.fields);
 
@@ -378,7 +381,7 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
     // Only rendered on explicit request — a resolved DOM is far heavier
     // than the augmented source, so it must never ride along in a default
     // summary/tree/full response (PRD §9 token budgets).
-    const { documentHtml } = await renderScreenDocument(store, input.screen, { fontMode: "url" });
+    const { documentHtml } = await renderScreenDocument(store, input.screen, { fontMode: "url", backdrop: "omit" });
     full.rendered_html = documentHtml;
   }
   // "notes" implies "tag_notes" — a tag's spec is part of what "the screen's
@@ -450,7 +453,7 @@ export async function getNode(store: Store, input: GetNodeInput): Promise<Record
   }
 
   const node = doc.nodes[nodeId];
-  if (!node) throw new ToolError("not_found", `node "${input.node}" was not found`);
+  if (!node) throw new ToolError("not_found", `node "${input.node}" was not found${ref.kind === "screen" ? backdropHint(doc) : ""}`);
 
   const refs = serializeNodeRefs(node);
 

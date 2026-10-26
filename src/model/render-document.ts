@@ -15,7 +15,7 @@ export const RENDER_BASELINE_CSS = `*, *::before, *::after { box-sizing: border-
 html, body { margin: 0; padding: 0; }
 body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 [data-unresolved-component], [data-invalid-component], [data-recursive-component],
-[data-empty-component], [data-unresolved-token], [data-unresolved-icon-font] {
+[data-empty-component], [data-unresolved-token], [data-unresolved-icon-font], [data-unresolved-backdrop] {
   outline: 2px solid #e5484d;
   outline-offset: -2px;
   min-height: 8px;

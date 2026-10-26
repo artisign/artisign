@@ -22,6 +22,12 @@ export function rootBackdrop(doc: ScreenDocument): string | undefined {
   return doc.nodes[doc.rootNodeId]?.attributes[BACKDROP_ATTR];
 }
 
+/** Suffix for a `not_found` on a screen with a backdrop: the node may live in the target, and own nodes are all a screen's refs address. */
+export function backdropHint(doc: ScreenDocument): string {
+  const target = rootBackdrop(doc);
+  return target === undefined ? "" : ` — the node may belong to the backdrop "${target}"; address it as "${target}.<id>"`;
+}
+
 /**
  * The `data-backdrop` target of a screen on disk, `undefined` when it has
  * none or cannot be read — a missing, unparsable or hand-broken screen ends a

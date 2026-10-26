@@ -3,6 +3,7 @@
 // Not in the original 15-tool surface.
 
 import type { Store } from "../store/index.js";
+import { backdropHint } from "./backdrop.js";
 import { renderScreenForBrowser, renderMockupDocument, renderDefinitionForBrowser } from "./render-context.js";
 import { parseNodeRef, formatNodeRef, type DefinitionNodeRef } from "./node-ref.js";
 import { ToolError } from "./types.js";
@@ -162,10 +163,11 @@ async function captureNode(
   nodeId: string,
   nodeRef: string,
   viewport: { width: number; height: number },
+  notFoundHint = "",
 ): Promise<ScreenshotResult> {
   const box = (await page.evaluate(nodeBoxScript(nodeId))) as ClipRect | null;
   if (!box) {
-    throw new ToolError("not_found", `node "${nodeRef}" was not found`);
+    throw new ToolError("not_found", `node "${nodeRef}" was not found${notFoundHint}`);
   }
   const clip = computeNodeClip(box, NODE_SCREENSHOT_PADDING_PX);
   if (clip.width <= 0 || clip.height <= 0) {
@@ -218,10 +220,12 @@ async function screenshotScreen(
     nodeId = ref.nodeId;
   }
 
-  const { documentHtml, viewport } = await renderScreenForBrowser(store, screen, nodeId);
+  const { doc, documentHtml, viewport } = await renderScreenForBrowser(store, screen, nodeId);
+  // The layer is id-less, so an id that lives in the backdrop is never found — say where it lives.
+  const hint = backdropHint(doc);
 
   return withPage(documentHtml, viewport, scale, kind, async (page, browser) => {
-    if (nodeId) return captureNode(page, browser, nodeId, nodeRef!, viewport);
+    if (nodeId) return captureNode(page, browser, nodeId, nodeRef!, viewport, hint);
     return pngResult(await page.screenshot(), browser);
   });
 }

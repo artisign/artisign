@@ -17,7 +17,7 @@ import { loadScreen } from "./context.js";
 import { loadAllDocuments } from "./definitions.js";
 import { buildStyleOccurrenceIndex } from "./style-index.js";
 import { parseNodeRef, formatNodeRef, requireScreenNodeRef } from "./node-ref.js";
-import { assertValidBackdrop, backdropCandidateWarning } from "./backdrop.js";
+import { assertValidBackdrop, backdropCandidateWarning, backdropHint } from "./backdrop.js";
 import { syncScreenFlows, fillFlowWarnings } from "./flows.js";
 import { diffScreenDocuments } from "./diff.js";
 import { findBySelector, findFillById, findFillsBySelector, patchFill, spliceFragment, removeNode } from "./patch.js";
@@ -317,7 +317,7 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
   if (input.target.kind === "node") {
     const id = targetNodeRef!.nodeId;
     const fill = doc.nodes[id] ? undefined : findFillById(doc, id);
-    if (!fill && !doc.nodes[id]) throw new ToolError("not_found", `node "${formatNodeRef(screen, id)}" was not found`);
+    if (!fill && !doc.nodes[id]) throw new ToolError("not_found", `node "${formatNodeRef(screen, id)}" was not found${backdropHint(doc)}`);
     targets.push(fill ? { kind: "fill", sub: fill.sub } : { kind: "node", id });
   } else {
     for (const n of findBySelector(doc, input.target.css_selector)) targets.push({ kind: "node", id: n.id });

@@ -96,7 +96,6 @@ describe("hints", () => {
   it("fills the tooltip key slots and the menu hints from the mapping (non-mac strings)", async () => {
     await boot();
     expect($("#flow-mode-toggle").dataset.shortcut).toBe("F");
-    expect($("#theme-toggle").dataset.shortcut).toBe("T");
     expect($("#sidebar-context-collapse").dataset.shortcut).toBe("\\");
     expect($("#follow-toggle-toggle").dataset.shortcut).toBe("W");
     expect($('.zoom-button[data-zoom="fit"] .chrome-menu-hint').textContent).toBe("Shift+1");
@@ -216,13 +215,20 @@ describe("views, panels, filter, theme", () => {
     expect($("#sidebar-screens").dataset.collapsed).toBe("false");
   });
 
-  it("T cycles System → Light → Dark", async () => {
+  it("T cycles System → Light → Dark (the settings menu's theme control, CHR-926)", async () => {
     await boot();
-    expect($("#theme-toggle").getAttribute("aria-label")).toBe("Theme: System");
+    const checked = () => $('.settings-seg-button[aria-checked="true"]')?.dataset.themePref;
+    $("#settings-trigger").click();
+    expect(checked()).toBe("system");
+    $("#settings-trigger").click(); // close: while a menu is open only its own keys act
     key("t");
-    expect($("#theme-toggle").getAttribute("aria-label")).toBe("Theme: Light");
+    await flush();
+    expect(settings.prefs["artisign.theme"]).toBe("light");
     key("t");
-    expect($("#theme-toggle").getAttribute("aria-label")).toBe("Theme: Dark");
+    await flush();
+    expect(settings.prefs["artisign.theme"]).toBe("dark");
+    $("#settings-trigger").click();
+    expect(checked()).toBe("dark");
   });
 });
 

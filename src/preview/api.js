@@ -370,15 +370,17 @@ function parseSettings(body) {
 }
 
 /**
- * Facts about the running daemon for the settings menu (CHR-926, GET /api/about). `null` on any failure.
- * @returns {Promise<{ version: string } | null>}
+ * Facts about the running daemon (GET /api/about): the version for the settings menu, and the update check (CHR-927) — `updateCheck` is "off" when the user disabled it, `latest` the newest published version once the daemon knows it. Fields an older daemon does not send read as "check on, nothing known". `null` on any failure.
+ * @returns {Promise<{ version: string, updateCheck: "on" | "off", latest?: string, updateAvailable: boolean } | null>}
  */
 export async function fetchAbout() {
   try {
     const res = await fetch("/api/about");
     if (!res.ok) return null;
     const body = await res.json();
-    return typeof body?.version === "string" ? { version: body.version } : null;
+    if (typeof body?.version !== "string") return null;
+    const latest = typeof body.latest === "string" ? body.latest : undefined;
+    return { version: body.version, updateCheck: body.updateCheck === "off" ? "off" : "on", latest, updateAvailable: body.updateAvailable === true && latest !== undefined };
   } catch {
     return null;
   }

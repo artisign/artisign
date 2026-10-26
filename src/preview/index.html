@@ -133,7 +133,11 @@
             <div id="settings-about" role="presentation" hidden>
               <div class="chrome-menu-divider" role="separator"></div>
               <h4 class="chrome-menu-label" role="presentation">About Artisign</h4>
-              <div id="settings-about-row" class="settings-about-row" role="presentation"><span id="settings-version"></span></div>
+              <div id="settings-about-row" class="settings-about-row" role="presentation">
+                <span id="settings-version"></span>
+                <span id="settings-update-status" class="settings-update-status" hidden><span id="settings-update-icon" class="icon" aria-hidden="true"></span><span id="settings-update-text"></span></span>
+              </div>
+              <div id="settings-update-cmd" class="settings-update-cmd" role="presentation" hidden></div>
             </div>
           </div>
         </div>
@@ -370,6 +374,17 @@
                   <svg id="board-edges"></svg>
                 </div>
               </div>
+            </div>
+          </div>
+          <!-- CHR-927: update notice. A polite live region that is always present (so the toast is announced when it appears); the toast over the canvas never moves the layout. -->
+          <div id="update-notice" role="status" aria-live="polite">
+            <div id="update-toast" class="update-toast" hidden>
+              <span class="icon update-toast-icon" aria-hidden="true">upgrade</span>
+              <div class="update-toast-body">
+                <span id="update-toast-title" class="update-toast-title"></span>
+                <div id="update-toast-command"></div>
+              </div>
+              <button type="button" id="update-toast-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Hide for today" data-tooltip="Hide for today"><span class="icon" aria-hidden="true">close</span></button>
             </div>
           </div>
         </main>

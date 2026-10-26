@@ -26,7 +26,7 @@ describe("handleSetupApi / handleAboutApi (injected env)", () => {
     const env = { ...defaultClientEnv(), home: join(root, "home"), platform: "darwin" as const, pathEnv: join(root, "bin"), vars: {} };
     server = createServer((req, res) => {
       void (async () => {
-        const handled = (await handleSetupApi(req, res, "7.1.0", env)) || (await handleAboutApi(req, res, "7.1.0"));
+        const handled = (await handleSetupApi(req, res, "7.1.0", env)) || (await handleAboutApi(req, res, "7.1.0", () => ({ updateCheck: "on", latest: "7.2.0", updateAvailable: true })));
         if (!handled) {
           res.writeHead(404);
           res.end();
@@ -41,8 +41,13 @@ describe("handleSetupApi / handleAboutApi (injected env)", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  it("GET /api/about returns the given version", async () => {
-    expect(await (await fetch(`${base}/api/about`)).json()).toEqual({ version: "7.1.0" });
+  it("GET /api/about returns the given version and the update status", async () => {
+    expect(await (await fetch(`${base}/api/about`)).json()).toEqual({
+      version: "7.1.0",
+      updateCheck: "on",
+      latest: "7.2.0",
+      updateAvailable: true,
+    });
   });
 
   it("GET /api/setup reports found/connected and a ~-shortened, pinned manual per client", async () => {
@@ -99,7 +104,8 @@ describe("daemon routes /api/about and /api/setup", () => {
   it("serves the started version with zero projects open", async () => {
     const res = await fetch(url("/api/about"));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ version: STARTED_VERSION });
+    // vitest.config sets ARTISIGN_NO_UPDATE_CHECK, so the default checker is off.
+    expect(await res.json()).toEqual({ version: STARTED_VERSION, updateCheck: "off", updateAvailable: false });
   });
 
   it("serves the setup status with zero projects open", async () => {

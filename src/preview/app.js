@@ -19,6 +19,7 @@ import {
   initProject,
   fetchBoardState,
   setBoardState,
+  fetchAbout,
 } from "./api.js";
 import { THEME_PREFS, THEME_PREF_KEY, DEFAULT_THEME_PREF, applyTheme, nextThemePref, prefersDarkQuery, watchSystemTheme } from "./theme.js";
 import { initTooltips } from "./tooltip.js";
@@ -26,6 +27,7 @@ import { applyShortcutHints, isMacPlatform, isTypingTarget, nextZoomLevel, resol
 import { createShortcutsDialog } from "./shortcuts-dialog.js";
 import { createSettingsMenu } from "./settings-menu.js";
 import { createMcpDialog } from "./mcp-dialog.js";
+import { createUpdateNotice } from "./update-notice.js";
 import { setRovingTabindex, wireMenu } from "./menu-keys.js";
 import { renderScreenList, filterScreens, buildScreenTree, ancestorNames } from "./screens.js";
 import { createVariantUI } from "./variants.js";
@@ -2412,7 +2414,29 @@ const settingsMenu = createSettingsMenu({
     "sidebar-tags": { get: () => showSidebarTags, set: setSidebarTags },
   },
   onOpenMcp: () => mcpDialog.show(),
+  onOpen: refreshAbout,
 });
+
+// CHR-927 — the daemon checks for a newer release once a day; this tab reads the result at boot and hourly (a version found later, or a notice dismissed yesterday, shows up without a reload).
+const updateNotice = createUpdateNotice({
+  toastEl: document.getElementById("update-toast"),
+  titleEl: document.getElementById("update-toast-title"),
+  commandEl: document.getElementById("update-toast-command"),
+  closeEl: document.getElementById("update-toast-close"),
+  storage: prefsStorage,
+});
+const ABOUT_REFRESH_MS = 60 * 60 * 1000;
+
+/** Re-reads /api/about and shows it in the update notice and the About group of the settings menu; a failed read keeps what is shown. */
+async function refreshAbout() {
+  const about = await fetchAbout();
+  if (!about) return;
+  updateNotice.render(about);
+  settingsMenu.renderAbout(about);
+}
+
+void refreshAbout();
+setInterval(refreshAbout, ABOUT_REFRESH_MS);
 const topbarEl = document.getElementById("topbar");
 const dialogScrimEl = document.getElementById("dialog-scrim");
 const projectMenuEl = document.getElementById("project-menu");

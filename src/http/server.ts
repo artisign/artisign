@@ -304,7 +304,7 @@ export function createServer(registry: ProjectRegistry, updateChecker: UpdateChe
       }
 
       if (isAboutApi) {
-        handleAboutApi(req, res, STARTED_VERSION).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
+        handleAboutApi(req, res, STARTED_VERSION, () => updateChecker.status()).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
         return;
       }
 

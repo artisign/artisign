@@ -6,6 +6,7 @@
 // read, so the render cost is only paid when an agent actually asks.
 
 import type { Store } from "../store/index.js";
+import { backdropHint } from "./backdrop.js";
 import { renderScreenForBrowser, renderDefinitionForBrowser } from "./render-context.js";
 import { parseNodeRef } from "./node-ref.js";
 import { findFillById } from "./patch.js";
@@ -95,7 +96,7 @@ export async function inspectNode(store: Store, input: InspectNodeInput): Promis
   // an unknown node never pays the render cost. A slot-fill node is not in the
   // flat map but renders under its authored id (CHR-746), so it is measurable.
   if (!doc.nodes[nodeId] && !findFillById(doc, nodeId)) {
-    throw new ToolError("not_found", `node "${input.node}" was not found`);
+    throw new ToolError("not_found", `node "${input.node}" was not found${ref.kind === "screen" ? backdropHint(doc) : ""}`);
   }
 
   const browser = await getBrowser(input.browser);

@@ -49,6 +49,7 @@ export {
 } from "./patch-definition.js";
 export {
   renderScreen,
+  type BackdropRender,
   resolveTokenRef,
   resolveSlotFillEntries,
   slotsWithDiscardedStyling,

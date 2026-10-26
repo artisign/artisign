@@ -3,6 +3,8 @@
 // Not in the original 15-tool surface.
 
 import type { Store } from "../store/index.js";
+import { backdropHint } from "./backdrop.js";
+import { findFillById } from "./patch.js";
 import { renderScreenForBrowser, renderMockupDocument, renderDefinitionForBrowser } from "./render-context.js";
 import { parseNodeRef, formatNodeRef, type DefinitionNodeRef } from "./node-ref.js";
 import { ToolError } from "./types.js";
@@ -218,7 +220,11 @@ async function screenshotScreen(
     nodeId = ref.nodeId;
   }
 
-  const { documentHtml, viewport } = await renderScreenForBrowser(store, screen, nodeId);
+  const { doc, documentHtml, viewport } = await renderScreenForBrowser(store, screen, nodeId);
+  // The layer is id-less, so an id that lives in the backdrop can never be clipped to — say where it lives.
+  if (nodeId && !doc.nodes[nodeId] && !findFillById(doc, nodeId) && backdropHint(doc)) {
+    throw new ToolError("not_found", `node "${nodeRef}" was not found${backdropHint(doc)}`);
+  }
 
   return withPage(documentHtml, viewport, scale, kind, async (page, browser) => {
     if (nodeId) return captureNode(page, browser, nodeId, nodeRef!, viewport);

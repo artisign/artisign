@@ -23,6 +23,10 @@ describe("wrapRenderedHtml", () => {
     expect(html).toContain(fontFaceCss);
   });
 
+  it("outlines [data-unresolved-backdrop] with the other unresolved-ref markers", () => {
+    expect(RENDER_BASELINE_CSS).toContain("[data-unresolved-backdrop]");
+  });
+
   it("outlines [data-unresolved-icon-font] in the same diagnostic-marker rule as the other unresolved-ref markers", () => {
     const html = wrapRenderedHtml("<div></div>");
     expect(RENDER_BASELINE_CSS).toContain("[data-unresolved-icon-font]");

@@ -15,6 +15,7 @@ import { sendJson } from "./json.js";
 import type { ProjectRegistry, ProjectHandle } from "../daemon/project-registry.js";
 import { ToolError, type ViewState, type BoardStatePatch, type ToolHandlerContext } from "../tools/index.js";
 import { readVersion } from "../version.js";
+import { createUpdateChecker, type UpdateChecker } from "../daemon/update-status.js";
 import { BUNDLED_MATERIAL_SYMBOLS_URL } from "../model/fonts.js";
 
 // This module lives at src/http/server.ts (dev) or dist/http/server.js (build);
@@ -228,6 +229,8 @@ function resolveUiProject(registry: ProjectRegistry, url: URL): { handle: Projec
 
 export type HttpServer = {
   server: Server;
+  /** For the `/api/about` handler: `{ version, ...updateChecker.status() }`. */
+  updateChecker: UpdateChecker;
 };
 
 /**
@@ -250,7 +253,7 @@ const STARTED_VERSION = readVersion();
  * — see `handleMcpRoute` and `resolveUiProject` for the two different
  * resolution policies.
  */
-export function createServer(registry: ProjectRegistry): HttpServer {
+export function createServer(registry: ProjectRegistry, updateChecker: UpdateChecker = createUpdateChecker()): HttpServer {
   const server = createHttpServer((req, res) => {
     if (req.method === "GET" && req.url === "/health") {
       res.writeHead(200, { "content-type": "application/json" });
@@ -344,5 +347,5 @@ export function createServer(registry: ProjectRegistry): HttpServer {
     servePreviewFile(url.pathname, res);
   });
 
-  return { server };
+  return { server, updateChecker };
 }

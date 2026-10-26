@@ -29,6 +29,7 @@
     "dist",
     "src/preview",
     "!src/preview/*.test.js",
+    "!src/preview/*.test-helper.js",
     "assets",
     "docs/agent-guide.md",
     "docs/design-workflow-tutorial.md"

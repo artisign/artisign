@@ -165,7 +165,10 @@ export function selectBrowser(
 const liveChildren = new Set<ChildProcess>();
 const liveProfiles = new Set<string>();
 
-const LAUNCH_TIMEOUT_MS = 20_000;
+// Generous on purpose: the first launch after a reboot reads the whole browser
+// install from a cold disk — on a fresh CI runner 5–25 s for Firefox (CHR-885).
+// The timeout only has to catch a browser that hangs, not one still loading.
+const LAUNCH_TIMEOUT_MS = 60_000;
 const COMMAND_TIMEOUT_MS = 30_000;
 const CDP_LISTENING_PATTERN = /DevTools listening on (ws:\/\/\S+)/;
 const BIDI_LISTENING_PATTERN = /WebDriver BiDi listening on (ws:\/\/\S+)/;

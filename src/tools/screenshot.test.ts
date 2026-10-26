@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { mkdtemp, rm, cp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,7 +12,13 @@ import {
   __setBrowserForTests,
   __resetBrowserForTests,
 } from "./screenshot.js";
-import { NO_BROWSER_MESSAGE, discoverBrowsers, selectBrowser, BROWSER_ENV } from "./browser.js";
+import {
+  NO_BROWSER_MESSAGE,
+  discoverBrowsers,
+  selectBrowser,
+  getBrowser,
+  BROWSER_ENV,
+} from "./browser.js";
 import { parseScreen, loadRegistry } from "../model/index.js";
 import { FsStore } from "../store/index.js";
 import { ToolError } from "./types.js";
@@ -278,6 +284,10 @@ describe("getScreenshot — no usable browser", () => {
 describe.skipIf(!isBrowserAvailable())("getScreenshot — e2e (installed browser)", () => {
   let dir: string;
   let store: FsStore;
+
+  // The first launch reads the browser from a cold disk (CHR-885) — give it its
+  // own budget, so the tests' 30 s cover rendering only.
+  beforeAll(() => getBrowser(), 90_000);
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "artisign-screenshot-e2e-"));

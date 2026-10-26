@@ -304,3 +304,67 @@ export async function setBoardState(project, patch) {
   }
   return { ok: true };
 }
+
+/**
+ * The daemon-stored preview preferences (CHR-924, GET /api/settings). A failed
+ * request or a malformed body is `null` — the caller then runs without
+ * persistence rather than crashing the preview.
+ * @returns {Promise<{ prefs: Record<string, string>, migrated: boolean } | null>}
+ */
+export async function fetchSettings() {
+  try {
+    const res = await fetch("/api/settings");
+    if (!res.ok) return null;
+    return parseSettings(await res.json());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Merges `prefs` into the stored settings (POST /api/settings); a `null` value removes the key. Best-effort: resolves `false` on any failure.
+ * @param {Record<string, string | null>} prefs
+ * @returns {Promise<boolean>}
+ */
+export async function saveSettings(prefs) {
+  try {
+    const res = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prefs }),
+      keepalive: true, // a pref changed right before a reload or close still reaches the daemon
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * One-time carry-over of this browser's localStorage prefs (POST /api/settings/import) — the daemon applies it only while its settings are not yet `migrated`. `null` on failure or an unusable response.
+ * @param {Record<string, string>} prefs
+ * @returns {Promise<{ prefs: Record<string, string>, migrated: boolean } | null>}
+ */
+export async function importSettings(prefs) {
+  try {
+    const res = await fetch("/api/settings/import", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prefs }),
+    });
+    if (!res.ok) return null;
+    return parseSettings(await res.json());
+  } catch {
+    return null;
+  }
+}
+
+/** Tolerant reading of a settings body; `{}` counts as "nothing stored, not migrated", anything that is not an object with string-only prefs is rejected. */
+function parseSettings(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const prefs = body.prefs ?? {};
+  if (typeof prefs !== "object" || prefs === null || Array.isArray(prefs)) return null;
+  const clean = {};
+  for (const [k, v] of Object.entries(prefs)) if (typeof v === "string") clean[k] = v;
+  return { prefs: clean, migrated: body.migrated === true };
+}

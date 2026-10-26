@@ -17,6 +17,8 @@ const storageStub = {
   getItem: (k) => memoryStorage.get(k) ?? null,
   setItem: (k, v) => void memoryStorage.set(k, String(v)),
   removeItem: (k) => void memoryStorage.delete(k),
+  get length() { return memoryStorage.size; },
+  key: (i) => [...memoryStorage.keys()][i] ?? null,
   clear: () => memoryStorage.clear(),
 };
 

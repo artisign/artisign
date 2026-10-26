@@ -7,6 +7,7 @@
 // rendered DOM — no second render engine, per render determinism.
 
 import { icon } from "./icons.js";
+import { queryOutsideBackdrop } from "./backdrop.js";
 
 const DIAGNOSTIC_SELECTOR =
   "[data-unresolved-component],[data-invalid-component],[data-recursive-component],[data-empty-component],[data-unresolved-token],[data-unresolved-icon-font]";
@@ -20,7 +21,7 @@ const CYCLE_HIGHLIGHT_DURATION_MS = 1200;
  * @returns {Element[]}
  */
 export function findDiagnostics(doc) {
-  return Array.from(doc.querySelectorAll(DIAGNOSTIC_SELECTOR));
+  return queryOutsideBackdrop(doc, DIAGNOSTIC_SELECTOR);
 }
 
 /**

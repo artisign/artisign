@@ -81,6 +81,11 @@ async function resolveVariantMeta(store: Store, screen: string, current: ScreenM
   return { variant_of: parent, variant_kind: kind };
 }
 
+/** Names of the fields this call set, in a fixed order — set_meta answers with these, never the (possibly long) values. */
+function updatedFields(input: SetMetaInput, names: Array<keyof SetMetaInput>): string[] {
+  return names.filter((name) => input[name] !== undefined);
+}
+
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -137,7 +142,9 @@ export async function setMeta(store: Store, input: SetMetaInput): Promise<Record
     const meta: ScreenMeta = { notes: input.notes ?? current.notes, tags: input.tags ?? current.tags, ...variant };
     await store.writeScreenMeta(target.screen, meta);
     const commitResult = await store.commit(`set_meta: ${describeTarget(target)}`);
-    return { target, meta, ...commitFields(commitResult) };
+    // `variant_of: null` clears the kind with it, so it reports both.
+    const updated = [...updatedFields(input, ["notes", "tags"]), ...(input.variant_of !== undefined ? ["variant_of"] : []), ...(input.variant_kind !== undefined || input.variant_of === null ? ["variant_kind"] : [])];
+    return { target, updated, ...commitFields(commitResult) };
   }
 
   if (target.kind === "mockup") {
@@ -160,11 +167,7 @@ export async function setMeta(store: Store, input: SetMetaInput): Promise<Record
     };
     await store.writeMockupMeta(target.mockup, meta);
     const commitResult = await store.commit(`set_meta: ${describeTarget(target)}`);
-    return {
-      target,
-      meta: { tags: meta.tags ?? [], ...(meta.title !== undefined ? { title: meta.title } : {}), ...(meta.description !== undefined ? { description: meta.description } : {}) },
-      ...commitFields(commitResult),
-    };
+    return { target, updated: updatedFields(input, ["tags", "title", "description"]), ...commitFields(commitResult) };
   }
 
   if (target.kind === "design_system") {
@@ -192,7 +195,7 @@ export async function setMeta(store: Store, input: SetMetaInput): Promise<Record
     };
     await store.writeDesignSystemMeta(meta);
     const commitResult = await store.commit(`set_meta: ${describeTarget(target)}`);
-    return { target, meta: { idea: meta.idea, decisions: meta.decisions }, ...commitFields(commitResult) };
+    return { target, updated: updatedFields(input, ["idea", "decisions"]), ...commitFields(commitResult) };
   }
 
   if (target.kind === "component" || target.kind === "pattern") {
@@ -216,7 +219,7 @@ export async function setMeta(store: Store, input: SetMetaInput): Promise<Record
     }
     await store.writeDesignSystemMeta(current);
     const commitResult = await store.commit(`set_meta: ${describeTarget(target)}`);
-    return { target, meta: { usage: input.usage }, ...commitFields(commitResult) };
+    return { target, updated: ["usage"], ...commitFields(commitResult) };
   }
 
   // target.kind === "tag" — notes only. Deliberately no not_found check: a
@@ -239,5 +242,5 @@ export async function setMeta(store: Store, input: SetMetaInput): Promise<Record
   assertValidTagName(target.tag);
   await store.writeTagMeta(target.tag, { notes: input.notes });
   const commitResult = await store.commit(`set_meta: ${describeTarget(target)}`);
-  return { target, meta: { notes: input.notes }, ...commitFields(commitResult) };
+  return { target, updated: ["notes"], ...commitFields(commitResult) };
 }

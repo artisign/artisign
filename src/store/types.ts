@@ -93,6 +93,14 @@ export interface Store {
   readScreen(name: string): Promise<string>;
   writeScreen(name: string, html: string): Promise<void>;
   deleteScreen(name: string): Promise<void>;
+  /** ISO 8601 modification time of the screen's HTML file; propagates `ENOENT` for a missing screen. */
+  screenMtime(name: string): Promise<string>;
+  /**
+   * ISO 8601 time of the newest write to any project source (config, screens,
+   * design system, mockups, tags, flows, comments); never `.artisign/` or
+   * `.git/`. `undefined` when none exists.
+   */
+  lastWriteAt(): Promise<string | undefined>;
 
   /** Missing sidecar file yields `{ notes: "", tags: [] }`, never an error. */
   readScreenMeta(name: string): Promise<ScreenMeta>;

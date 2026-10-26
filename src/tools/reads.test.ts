@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, cp } from "node:fs/promises";
+import { mkdtemp, rm, cp, stat, utimes, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setupProject, estimateTokens, type ProjectFixture } from "./test-fixtures.js";
@@ -439,6 +439,69 @@ describe("get_project reuse field", () => {
     const reuse = res.reuse as { screens: Array<{ screen: string }> };
     const names = reuse.screens.map((s) => s.screen);
     expect(names.indexOf("empty-a")).toBeLessThan(names.indexOf("empty-b"));
+  });
+});
+
+describe("real timestamps (CHR-931)", () => {
+  let fx: ProjectFixture;
+  const past = new Date("2020-01-01T00:00:00.000Z");
+
+  beforeEach(async () => {
+    fx = await setupProject();
+    await fx.store.writeScreen("home", `<div id="n1"></div>`);
+  });
+  afterEach(() => fx.cleanup());
+
+  it("get_screen mtime is the file's stat mtime, stable across reads, and moves on a write", async () => {
+    const file = join(fx.dir, "screens", "home.html");
+    await utimes(file, past, past);
+    const first = await getScreen(fx.store, { screen: "home" });
+    const second = await getScreen(fx.store, { screen: "home" });
+    expect(first.mtime).toBe(past.toISOString());
+    expect(second.mtime).toBe(first.mtime);
+    expect(first.mtime).toBe((await stat(file)).mtime.toISOString());
+
+    await fx.store.writeScreen("home", `<div id="n1">changed</div>`);
+    expect((await getScreen(fx.store, { screen: "home" })).mtime).not.toBe(first.mtime);
+  });
+
+  it("get_project last_write_at is the newest source mtime, stable across reads, and follows tokens and flows writes", async () => {
+    const at = (year: number) => new Date(`${year}-01-01T00:00:00.000Z`);
+    await fx.store.writeTokens({ color: { primary: { value: "#f00" } } });
+    await utimes(join(fx.dir, "design-system", "tokens.json"), at(2030), at(2030));
+    const first = await getProject(fx.store, {});
+    expect(first.last_write_at).toBe(at(2030).toISOString());
+    expect((await getProject(fx.store, {})).last_write_at).toBe(first.last_write_at);
+
+    await fx.store.writeFlows([{ from: "home.n1", event: "tap", to: "home" }]);
+    await utimes(join(fx.dir, "flows.json"), at(2031), at(2031));
+    expect((await getProject(fx.store, {})).last_write_at).toBe(at(2031).toISOString());
+  });
+
+  it("get_project last_write_at moves when a screen is deleted", async () => {
+    await fx.store.writeScreen("gone", `<div id="n1"></div>`);
+    const backdate = async (path: string): Promise<void> => {
+      const info = await stat(path);
+      if (info.isDirectory()) for (const entry of await readdir(path)) await backdate(join(path, entry));
+      await utimes(path, past, past);
+    };
+    for (const entry of await readdir(fx.dir)) if (entry !== ".git") await backdate(join(fx.dir, entry));
+    expect((await getProject(fx.store, {})).last_write_at).toBe(past.toISOString());
+
+    await fx.store.deleteScreen("gone");
+    expect((await getProject(fx.store, {})).last_write_at).not.toBe(past.toISOString());
+  });
+
+  it("ignores .artisign/ and omits last_write_at when no source exists", async () => {
+    await fx.store.writeCacheIndex({});
+    const future = new Date("2040-01-01T00:00:00.000Z");
+    await utimes(join(fx.dir, ".artisign", "index.json"), future, future);
+    expect(await fx.store.lastWriteAt()).not.toBe(future.toISOString());
+
+    for (const entry of ["screens", "design-system", "artisign.json", "flows.json", "comments.jsonl", "mockups", "tags"]) {
+      await rm(join(fx.dir, entry), { recursive: true, force: true });
+    }
+    expect(await fx.store.lastWriteAt()).toBeUndefined();
   });
 });
 

@@ -105,7 +105,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "get_screen",
-    "One screen with comment/flow indicators. Tiered (default summary) with fields selection. view \"full\" adds variants and reached_from when non-empty; fields: [\"rendered_html\"] at \"full\" returns the resolved render as a standalone HTML document (MCP-only fallback, never default).",
+    "One screen with comment/flow counts. fields narrows any view. view \"full\" adds variants and reached_from when non-empty (view \"full\", fields [\"variants\",\"reached_from\"] skips the markup); fields [\"rendered_html\"] at \"full\" returns the render as HTML.",
     {
       screen: z.string(),
       view: viewSchema.optional(),
@@ -232,7 +232,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "set_meta",
-    "Set handoff metadata, one field group per call, by target: screen → notes, tags, variant_of + variant_kind (state|overlay|step; variant_of null clears); mockup → tags, title, description; design_system → idea, decisions; component/pattern {name} → usage; tag {tag} → notes, a spec spanning several screens. tags and decisions replace the whole list — read first to append.",
+    "Set handoff metadata by target; a target's fields combine per call: screen → notes, tags, variant_of + variant_kind (state|overlay|step; variant_of null clears); mockup → tags, title, description; design_system → idea, decisions; component/pattern {name} → usage; tag {tag} → notes (cross-screen spec). tags and decisions replace the whole list — read first to append.",
     {
       target: metaTargetSchema,
       notes: z.string().optional(),
@@ -262,11 +262,12 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "set_board_state",
-    "Reads or sets the Board's shared view state — filter, pinned screens, expanded variant clusters — in daemon memory only, shared with every viewer. filter: case-insensitive substring of a screen's name or tag; null or blank clears. pins/expanded: {op: add|remove|set, screens} or {op: clear}; expanded names a main screen or any of its variants. Omitted fields stay unchanged; none = pure read. Returns the state plus shown_screens (filter matches + pins).",
+    "Reads or sets the Board's shared view state (filter, pins, expanded variant clusters), in-memory, shared by viewers. filter: case-insensitive substring of screen name or tag, null/blank clears. pins/expanded: {op: add|remove|set, screens} or {op: clear}; expanded: a main screen or any variant. Omitted fields stay; none = pure read. Returns the state and shown_count; fields [\"shown_screens\"] lists them.",
     {
       filter: z.string().nullable().optional(),
       pins: pinsPatchSchema.optional(),
       expanded: pinsPatchSchema.optional(),
+      fields: z.array(z.string()).optional(),
     },
     (store, input, ctx) => setBoardState(store, input as never, ctx),
   ),

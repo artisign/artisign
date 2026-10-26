@@ -14,6 +14,8 @@ export type SetBoardStateInput = {
   pins?: ScreenListPatch;
   /** CHR-729/ADR-006 — the expanded board clusters; same shape and gate as `pins`. */
   expanded?: ScreenListPatch;
+  /** `["shown_screens"]` lists the shown screens; the default answer carries only their count. */
+  fields?: string[];
 };
 
 /**
@@ -116,5 +118,12 @@ export async function setBoardState(store: Store, input: SetBoardStateInput, ctx
   const pinnedSet = new Set(state.pinned);
   const shownScreens = screenNames.filter((name, i) => pinnedSet.has(name) || matchesFilter(name, metas[i]!.tags, needle));
 
-  return { filter: state.filter, pinned: state.pinned, expanded: state.expanded, shown_screens: shownScreens, warnings };
+  return {
+    filter: state.filter,
+    pinned: state.pinned,
+    expanded: state.expanded,
+    shown_count: shownScreens.length,
+    ...(input.fields?.includes("shown_screens") ? { shown_screens: shownScreens } : {}),
+    warnings,
+  };
 }

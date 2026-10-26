@@ -24,8 +24,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the last one you saw; "What's New" in the settings menu reopens it with every release. The notes are this
   changelog, which now ships in the npm package. (CHR-928)
 
+### Changed
+
+- Changed behaviour for agents: `set_meta` no longer echoes the merged metadata (a screen's full notes, a decisions list,
+  usage text). It answers with `updated`, the names of the fields the call set, plus the commit. Read the values back with
+  `get_screen` or `get_design_system` if needed. (CHR-931)
+- Changed behaviour for agents: `set_board_state` answers with `shown_count` instead of the full `shown_screens` list.
+  Pass `fields: ["shown_screens"]` to get the list. (CHR-931)
+- The tool descriptions of `set_meta` (a target's fields combine in one call), `get_screen` (`fields` narrows any view)
+  and `set_board_state` say so, and the agent guide lists the recurring screen-variant cases (toast, stacked picker,
+  replacing confirmation). (CHR-931)
+
 ### Fixed
 
+- `get_screen` `mtime` and `get_project` `last_write_at` are the real modification times of the files instead of the
+  time of the call, so they no longer change on every read. (CHR-931)
 - A `data-flow-target` on component slot-fill content (for example a back button passed into `$nav-bar`) now becomes a
   flow edge keyed by the fill's id; a fill without an id returns a `missing_id` warning. Promoting a node to a component
   or setting `component_ref` no longer silently drops the flows of the folded elements. Fill edges in existing screens

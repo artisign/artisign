@@ -1,4 +1,4 @@
-import { readFile, readdir, appendFile, rm } from "node:fs/promises";
+import { readFile, readdir, appendFile, rm, stat } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import { resolve, basename, extname, sep } from "node:path";
 import type { ArtisignConfig } from "../init/artisign-config.js";
@@ -161,6 +161,9 @@ function listDirs(dir: string): Promise<string[]> {
   return listEntries(dir, (entry) => (entry.isDirectory() ? entry.name : undefined));
 }
 
+/** Project sources `lastWriteAt` scans — deliberately not `.artisign/` (derived) or `.git/`. */
+const LAST_WRITE_SOURCES = [CONFIG_FILENAME, "screens", "design-system", "mockups", "tags", "flows.json", "comments.jsonl"];
+
 export class FsStore implements Store {
   readonly projectDir: string;
 
@@ -207,6 +210,28 @@ export class FsStore implements Store {
   async deleteScreen(name: string): Promise<void> {
     await rm(this.path("screens", `${name}.html`), { force: true });
     await rm(this.path("screens", `${name}.meta.json`), { force: true });
+  }
+
+  async screenMtime(name: string): Promise<string> {
+    return (await stat(this.path("screens", `${name}.html`))).mtime.toISOString();
+  }
+
+  async lastWriteAt(): Promise<string | undefined> {
+    let newest = 0;
+    const visit = async (full: string): Promise<void> => {
+      let info;
+      try {
+        info = await stat(full);
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
+        throw err;
+      }
+      // A directory's own mtime counts too: deleting a screen or mockup only touches its directory.
+      newest = Math.max(newest, info.mtimeMs);
+      if (info.isDirectory()) for (const entry of await readdir(full)) await visit(resolve(full, entry));
+    };
+    for (const source of LAST_WRITE_SOURCES) await visit(this.path(source));
+    return newest > 0 ? new Date(newest).toISOString() : undefined;
   }
 
   async readScreenMeta(name: string): Promise<ScreenMeta> {

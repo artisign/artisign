@@ -162,7 +162,7 @@ describe("CHR-624 board_state SSE + routes", () => {
     try {
       const { status, json } = await postToolsApi(daemon.port, "set_board_state", { filter: "checkout" });
       expect(status).toBe(200);
-      expect(json).toMatchObject({ filter: "checkout", shown_screens: ["checkout"] });
+      expect(json).toMatchObject({ filter: "checkout", shown_count: 1 });
 
       const evt = await waitForSseEvent(reader, (e) => e.type === "board_state", 2000, carry);
       expect(evt).toEqual({ type: "board_state", filter: "checkout", pinned: [], expanded: [], source: "human" });

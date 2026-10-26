@@ -55,7 +55,7 @@ describe("set_board_state", () => {
     await fx.store.deleteScreen("home"); // e.g. a branch switch — no delete_entity, so no prune hook ran
     broadcasts.length = 0;
 
-    const read = await setBoardState(fx.store, {}, ctx);
+    const read = await setBoardState(fx.store, { fields: ["shown_screens"] }, ctx);
     expect(read.pinned).toEqual(["home", "checkout"]);
     expect(read.shown_screens).toEqual(["checkout"]);
     expect(broadcasts).toEqual([]);
@@ -91,15 +91,23 @@ describe("set_board_state", () => {
 
   it("sets the filter and returns shown_screens matching name or tag, case-insensitively", async () => {
     const { ctx } = fakeViewState();
-    const res = await setBoardState(fx.store, { filter: "PAYMENTS" }, ctx);
+    const res = await setBoardState(fx.store, { filter: "PAYMENTS", fields: ["shown_screens"] }, ctx);
     expect(res.filter).toBe("PAYMENTS");
+    expect(res.shown_count).toBe(1);
     expect(res.shown_screens).toEqual(["checkout"]); // matches the tag, not the name
+  });
+
+  it("answers with shown_count only by default — the list is opt-in via fields", async () => {
+    const { ctx } = fakeViewState();
+    const res = await setBoardState(fx.store, { filter: "checkout" }, ctx);
+    expect(res.shown_count).toBe(1);
+    expect(res).not.toHaveProperty("shown_screens");
   });
 
   it("clearing the filter (null) shows every screen again", async () => {
     const { ctx } = fakeViewState();
     await setBoardState(fx.store, { filter: "checkout" }, ctx);
-    const res = await setBoardState(fx.store, { filter: null }, ctx);
+    const res = await setBoardState(fx.store, { filter: null, fields: ["shown_screens"] }, ctx);
     expect(res.filter).toBeNull();
     // shown_screens follows store.listScreens()'s own order (alphabetical
     // on FsStore), not write order.
@@ -109,7 +117,7 @@ describe("set_board_state", () => {
   it("shown_screens is filter matches UNION pinned — a pinned screen shows even when it doesn't match the filter", async () => {
     const { ctx } = fakeViewState();
     await setBoardState(fx.store, { pins: { op: "add", screens: ["home"] } }, ctx);
-    const res = await setBoardState(fx.store, { filter: "checkout" }, ctx);
+    const res = await setBoardState(fx.store, { filter: "checkout", fields: ["shown_screens"] }, ctx);
     expect((res.shown_screens as string[]).sort()).toEqual(["checkout", "home"]);
   });
 
@@ -187,7 +195,7 @@ describe("set_board_state", () => {
 
   it("a non-empty filter is stored exactly as given, not trimmed", async () => {
     const { ctx } = fakeViewState();
-    const res = await setBoardState(fx.store, { filter: "  checkout  " }, ctx);
+    const res = await setBoardState(fx.store, { filter: "  checkout  ", fields: ["shown_screens"] }, ctx);
     expect(res.filter).toBe("  checkout  ");
     // Matching itself still trims/lowercases, so the untrimmed stored value
     // still matches correctly.

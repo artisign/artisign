@@ -86,6 +86,17 @@ import {
 } from "./prefs.js";
 import { createInspectorPanel, applyInspectMode, updateInspectOverlay } from "./inspector.js";
 import { buildEntries } from "./inspector-data.js";
+import { loadDaemonStorage } from "./daemon-prefs.js";
+
+// CHR-924 — preferences live in the daemon's settings.json, not in this browser. They are loaded (top-level await) before anything below reads one; localStorage is only the source of the one-time carry-over and the pre-paint theme mirror. `localStorage` itself can throw on access in some privacy modes, so it is resolved tolerantly.
+const localPrefs = (() => {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+})();
+const prefsStorage = await loadDaemonStorage(localPrefs);
 
 const screenListEl = document.getElementById("screen-list");
 const mockupSectionEl = document.getElementById("mockup-section");
@@ -339,17 +350,6 @@ let pendingRenderScreen = null;
 let pendingRenderOk = true; // whether the render pending in pendingRenderScreen succeeded
 let iframeRenderOk = true; // ...and the one the iframe currently shows
 
-// `localStorage` itself can throw on access (not just on getItem/setItem) in
-// some privacy modes — resolve it once, tolerantly, rather than letting that
-// crash module evaluation and take down the whole preview.
-const prefsStorage = (() => {
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-})();
-
 variantMapVisible = readBoolPref(prefsStorage, "artisign.variantMap", true);
 
 // CHR-738 — side-by-side variant compare. Mode, selection and zoom are per-browser prefs (compare.js -> prefs.js).
@@ -597,6 +597,15 @@ const themeToggleBtn = document.getElementById("theme-toggle");
 const osDarkQuery = prefersDarkQuery(window);
 let themePref = parseEnumPref(readStringPref(prefsStorage, THEME_PREF_KEY, DEFAULT_THEME_PREF), THEME_PREFS, DEFAULT_THEME_PREF);
 
+// The pre-paint script in index.html can only read localStorage; the daemon value stays the truth and this is just its cache.
+function mirrorTheme() {
+  try {
+    localPrefs?.setItem(THEME_PREF_KEY, themePref);
+  } catch {
+    // ignore — the mirror is best-effort
+  }
+}
+
 function renderThemeToggle() {
   const label = `Theme: ${THEME_TOGGLE_LABELS[themePref]}`;
   themeToggleBtn.querySelector(".icon").textContent = THEME_TOGGLE_ICONS[themePref];
@@ -607,10 +616,12 @@ function renderThemeToggle() {
 themeToggleBtn.addEventListener("click", () => {
   themePref = nextThemePref(themePref);
   writeStringPref(prefsStorage, THEME_PREF_KEY, themePref);
+  mirrorTheme();
   applyTheme(document.documentElement, themePref, osDarkQuery);
   renderThemeToggle();
 });
 
+mirrorTheme();
 applyTheme(document.documentElement, themePref, osDarkQuery);
 watchSystemTheme(document.documentElement, osDarkQuery, () => themePref);
 renderThemeToggle();

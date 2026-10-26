@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   state, compare selections) are stored by Artisign in `~/.artisign/settings.json` instead of per browser, so every
   browser and every reload sees the same ones. Existing browser preferences are carried over once on the first start.
   (CHR-924)
+- A settings menu at the right end of the preview's topbar: theme (System / Light / Dark) and the standing view
+  preferences, a "Connect AI tools" dialog that shows which AI tools are connected and what to copy to connect the
+  others (`artisign setup`, or the per-tool command or config entry), and the running Artisign version. It replaces the
+  topbar's theme toggle; T still cycles the theme. (CHR-926)
 
 ### Fixed
 

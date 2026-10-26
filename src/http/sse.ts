@@ -2,6 +2,7 @@ import type { ServerResponse } from "node:http";
 import type { Store, ChangeCategory } from "../store/index.js";
 import type { ActivityEvent } from "../mcp/activity.js";
 import type { BoardState } from "../daemon/board-state.js";
+import { createBackdropDependents } from "./backdrop-dependents.js";
 
 export type ChangeSseEvent = {
   type: "change";
@@ -147,9 +148,29 @@ export type SseHub = {
 export function createSseHub(store: Store): SseHub {
   const clients = createSseClientSet();
 
+  const dependents = createBackdropDependents(store);
+
   const unwatch = store.watch((event) => {
-    const sseEvent: ChangeSseEvent = { type: "change", kind: event.category, name: baseName(event.path) };
+    const name = baseName(event.path);
+    const sseEvent: ChangeSseEvent = { type: "change", kind: event.category, name };
     clients.broadcast(`data: ${JSON.stringify(sseEvent)}\n\n`);
+
+    // A screen's markup is also the background of every screen naming it in
+    // `data-backdrop` (ADR-008): those reload too, as ordinary `change`
+    // events. The sidecar (`.meta.json`) never changes a rendering.
+    if (event.category !== "screen" || !event.path.endsWith(".html")) return;
+    dependents.invalidate();
+    void dependents
+      .of(name)
+      .then((screens) => {
+        for (const screen of screens) {
+          const dependentEvent: ChangeSseEvent = { type: "change", kind: "screen", name: screen };
+          clients.broadcast(`data: ${JSON.stringify(dependentEvent)}\n\n`);
+        }
+      })
+      .catch(() => {
+        // A project that went away mid-build has nobody left to notify.
+      });
   });
 
   function close(): void {

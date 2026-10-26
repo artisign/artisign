@@ -30,7 +30,15 @@ export type WarningKind =
   | "repeated_pattern"
   // promote_mockup restructured or dropped mockup markup so it fits a
   // screen's single-root rule; the screen no longer mirrors the mockup file.
-  | "mockup_normalized";
+  | "mockup_normalized"
+  // delete_entity removed a screen another screen names in `data-backdrop`
+  // (ADR-008). The dependent keeps its attribute as written — nothing is
+  // repaired — so, like `dangling_flow`, it is reported once per dependent.
+  | "dangling_backdrop"
+  // An overlay variant with no `data-backdrop` repeats most of its parent's
+  // content (CHR-938): it should name the parent as backdrop and keep only
+  // the sheet. Advisory only, never blocks a write.
+  | "backdrop_candidate";
 
 export type Warning = {
   kind: WarningKind;

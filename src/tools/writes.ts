@@ -17,6 +17,7 @@ import { loadScreen } from "./context.js";
 import { loadAllDocuments } from "./definitions.js";
 import { buildStyleOccurrenceIndex } from "./style-index.js";
 import { parseNodeRef, formatNodeRef, requireScreenNodeRef } from "./node-ref.js";
+import { assertValidBackdrop, backdropCandidateWarning } from "./backdrop.js";
 import { syncScreenFlows, fillFlowWarnings } from "./flows.js";
 import { diffScreenDocuments } from "./diff.js";
 import { findBySelector, findFillById, findFillsBySelector, patchFill, spliceFragment, removeNode } from "./patch.js";
@@ -230,6 +231,8 @@ export async function writeHtml(store: Store, input: WriteHtmlInput): Promise<Re
     .filter((e) => !isBlockingIssue(e))
     .map((e) => issueToWarning(e, formatNodeRef(input.screen, e.nodeId ?? doc.rootNodeId)));
 
+  await assertValidBackdrop(store, registry, input.screen, doc, { before });
+
   await store.writeScreen(input.screen, serializeScreen(doc));
   await syncScreenFlows(store, doc);
   const commitResult = await store.commit(`write_html: ${input.screen}`);
@@ -259,7 +262,14 @@ export async function writeHtml(store: Store, input: WriteHtmlInput): Promise<Re
     repeatedPatternOmittedCount = allRepeatedPatternWarnings.length - repeatedPatternWarnings.length;
   }
 
-  const warnings = [...refWarnings, ...fillFlowWarnings(doc), ...driftWarnings, ...repeatedPatternWarnings];
+  const backdropWarning = await backdropCandidateWarning(store, registry, input.screen, doc);
+  const warnings = [
+    ...refWarnings,
+    ...fillFlowWarnings(doc),
+    ...driftWarnings,
+    ...repeatedPatternWarnings,
+    ...(backdropWarning ? [backdropWarning] : []),
+  ];
 
   const base = {
     screen: input.screen,
@@ -380,6 +390,8 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
     }
   }
 
+  await assertValidBackdrop(store, registry, screen, doc, { before, onlyNewMisplaced: true });
+
   await store.writeScreen(screen, serializeScreen(doc));
   await syncScreenFlows(store, doc);
   const commitResult = await store.commit(`patch_html: ${screen}`);
@@ -430,12 +442,20 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
     repeatedPatternOmittedCount = scopedAll.length - scopedRepeatedPatternWarnings.length;
   }
 
+  const backdropWarning = await backdropCandidateWarning(store, registry, screen, doc);
+
   const base = {
     screen,
     path: `screens/${screen}.html`,
     ...commitFields(commitResult),
     affected_nodes: [...affected],
-    warnings: [...refWarnings, ...fillFlowWarnings(doc, new Set(affectedNodeIds)), ...scopedDriftWarnings, ...scopedRepeatedPatternWarnings],
+    warnings: [
+      ...refWarnings,
+      ...fillFlowWarnings(doc, new Set(affectedNodeIds)),
+      ...scopedDriftWarnings,
+      ...scopedRepeatedPatternWarnings,
+      ...(backdropWarning ? [backdropWarning] : []),
+    ],
     preexisting_drift_count: preexistingDriftCount,
     // Only when the index was actually built: absent means "not measured",
     // `0` means "measured, nothing repeated". Reporting a flat `0` on the

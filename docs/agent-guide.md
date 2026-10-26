@@ -395,6 +395,30 @@ subtree at every depth in one commit: `deleted_screens` lists them, their
 outgoing flows are dropped, and a `dangling_flow` warning appears for each
 flow from a screen outside the subtree into it. `cascade` is screen-only.
 
+### Backdrop (`data-backdrop`)
+
+A screen root may carry `data-backdrop="<screen>"` to name another screen as
+its background layer — typically an overlay variant naming its parent, so the
+overlay holds only its sheet. The attribute is accepted on the screen root
+only; `write_html`, `patch_html` and `promote_mockup` validate it and write
+nothing on failure:
+
+- the named screen does not exist: `not_found`
+- the attribute sits on any other element (the error names it), the screen
+  names itself, or the chain of backdrops leads back to it (the error names
+  the chain): `validation_failed`
+
+A longer chain (A names B, B names C) is fine; removing the attribute always
+succeeds. A broken backdrop already on disk (hand edit, git checkout) never
+makes a read fail.
+
+Two advisory warnings, never blocking: `backdrop_candidate` on
+`write_html`/`patch_html` when an `overlay` variant without `data-backdrop`
+has at least half of its own nodes (and at least 20) repeating its parent — add
+`data-backdrop="<parent>"` on the root and keep only the sheet; and
+`dangling_backdrop` on `delete_entity`, once per remaining screen that still
+names a deleted screen as its backdrop (the attribute is left as written).
+
 Write metadata when the decision is fresh, not as a cleanup pass.
 
 ## Anti-pattern checklist

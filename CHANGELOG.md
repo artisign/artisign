@@ -6,57 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Added
+## [2.2.0] - 2026-10-26
 
-- The preview's preferences (theme, zoom levels, panel and toggle states, follow, last opened screen, sidebar expand
-  state, compare selections) are stored by Artisign in `~/.artisign/settings.json` instead of per browser, so every
-  browser and every reload sees the same ones. Existing browser preferences are carried over once on the first start.
-  (CHR-924)
-- A settings menu at the right end of the preview's topbar: theme (System / Light / Dark) and the standing view
-  preferences, a "Connect AI tools" dialog that shows which AI tools are connected and what to copy to connect the
-  others (`artisign setup`, or the per-tool command or config entry), and the running Artisign version. It replaces the
-  topbar's theme toggle; T still cycles the theme. (CHR-926)
-- The running Artisign checks npm for a newer version once a day (the same check and cache as the CLI's notice;
-  `ARTISIGN_NO_UPDATE_CHECK=1` and `CI` turn it off). When one exists, the preview shows a notice with
-  `artisign update` to copy; closing it hides it for the rest of the day, in every browser. The settings menu's About
-  shows the update status. (CHR-927)
-- What's New: on the first preview start after an update, a dialog lists the release notes of every version since
-  the last one you saw; "What's New" in the settings menu reopens it with every release. The notes are this
-  changelog, which now ships in the npm package. (CHR-928)
+A redesigned preview with light and dark themes, a settings menu, update notices and this What's New dialog.
 
-### Changed
+### Features
 
-- Changed behaviour for agents: `set_meta` no longer echoes the merged metadata (a screen's full notes, a decisions list,
-  usage text). It answers with `updated`, the names of the fields the call set, plus the commit. A call that sets
-  `decisions` also returns `decision_ids`, the ids now stored, so a full replace that wipes entries stays visible. Read
-  the values back with `get_screen` or `get_design_system` if needed. (CHR-931)
-- Changed behaviour for agents: `set_board_state` answers with `shown_count` instead of the full `shown_screens` list.
-  Pass `fields: ["shown_screens"]` to get the list. (CHR-931)
-- The tool descriptions of `set_meta` (a target's fields combine in one call), `get_screen` (`fields` narrows any view)
-  and `set_board_state` say so, and the agent guide lists the recurring screen-variant cases (toast, stacked picker,
-  replacing confirmation). (CHR-931)
+- **Redesigned preview:** new topbar, side panels, Screens sidebar, Board and Design System views, with a light,
+  dark or system theme.
+- **Settings menu:** theme, view preferences, which AI tools are connected, and the running version.
+- **Update notice:** Artisign checks once a day for a newer version and shows the command to update.
+- **What's New:** after an update, the release notes of the new versions appear once; the settings menu reopens them.
+- **Backdrops for overlays:** a screen can name another screen with `data-backdrop` and is drawn on top of it,
+  for dialogs, sheets and toasts without copying the screen underneath.
+- **Keyboard:** shortcuts in the preview, arrow keys in menus, focus stays inside open dialogs.
 
-### Fixed
+### Improvements
 
-- `get_screen` `mtime` and `get_project` `last_write_at` are the real modification times of the files instead of the
-  time of the call, so they no longer change on every read. (CHR-931)
-- A `data-flow-target` on component slot-fill content (for example a back button passed into `$nav-bar`) now becomes a
-  flow edge keyed by the fill's id; a fill without an id returns a `missing_id` warning. Promoting a node to a component
-  or setting `component_ref` no longer silently drops the flows of the folded elements. Fill edges in existing screens
-  appear in `flows.json` the next time that screen is written. An invalid `data-flow-trigger` on slot-fill content now
-  blocks `write_html`, as at top level, so existing screens with such a fill need the trigger fixed on their next write. (CHR-778)
-- A component name and a bare token member name share one namespace for `class="$name"`: `set_tokens`, `write_html` and
-  `promote_to_system` now refuse (`conflict`) when introducing the second meaning would unbind existing nodes and otherwise warn
-  `ambiguous_ref`; an already ambiguous ref renders with the red outline instead of silently as a plain element. (CHR-772)
-- `patch_html` no longer duplicates or orphans `flows.json` edges: replacing or deleting a node with `data-flow-target` (or an
-  ancestor of one) now leaves exactly one edge per trigger, in document order, and `update_refs` keeps `flows.json` in sync. (CHR-813)
-- The preview's project picker is now tab-local: choosing a project in one tab no longer moves every other open tab to
-  it. The daemon's active project is only the default for a freshly opened tab. The internal
-  `POST /api/projects/activate` route is removed. (CHR-775)
-- `repeated_pattern` no longer warns on the screen root frame, which cannot be promoted, and a node is no longer flagged
-  merely for matching another screen's root. (CHR-774)
-- `delete_entity` now also removes the deleted component's or pattern's usage text from `design-system/meta.json`, in the same
-  commit, so a later component of the same name no longer inherits it. (CHR-773)
+- Preview preferences are stored by Artisign, so every browser and every reload sees the same ones.
+- An empty project shows a how-to-start guide on the canvas.
+- The Context and Elements panels start collapsed and open when a mode needs them.
+- Tool definitions are a third shorter, so agents spend fewer tokens per session.
+- `set_meta` and `set_board_state` return short confirmations instead of echoing all data back.
+- Clearer hints when an agent addresses a component or pattern like a screen.
+
+### Bugfixes
+
+- Flow links on content placed inside a component are no longer lost.
+- `patch_html` no longer duplicates flow links.
+- A component and a token with the same name no longer break each other silently.
+- Choosing a project in one browser tab no longer switches the other tabs.
+- `get_screen` and `get_project` report real file modification times.
+- Deleting a component also removes its usage notes; `repeated_pattern` no longer warns on the screen root.
+- The first screenshot after a cold start no longer times out.
 
 ## [2.1.1] - 2026-10-21
 

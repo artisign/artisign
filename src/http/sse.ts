@@ -70,6 +70,8 @@ type SseClientSet = {
   broadcast: (payload: string) => void;
   /** Ends and forgets every currently registered client. */
   endAll: () => void;
+  /** Currently registered clients, a closed-but-not-yet-pruned one included. */
+  size: () => number;
 };
 
 function createSseClientSet(): SseClientSet {
@@ -118,7 +120,7 @@ function createSseClientSet(): SseClientSet {
     clients.clear();
   }
 
-  return { add, broadcast, endAll };
+  return { add, broadcast, endAll, size: () => clients.size };
 }
 
 export type SseHub = {
@@ -159,9 +161,13 @@ export function createSseHub(store: Store): SseHub {
     // `data-backdrop` (ADR-008): those reload too, as ordinary `change`
     // events. The sidecar (`.meta.json`) never changes a rendering.
     if (event.category !== "screen" || !event.path.endsWith(".html")) return;
-    dependents.invalidate();
+    // Nobody to tell: skip the work, and let the map go — it would be stale by the next listener.
+    if (clients.size() === 0) {
+      dependents.reset();
+      return;
+    }
     void dependents
-      .of(name)
+      .update(name)
       .then((screens) => {
         for (const screen of screens) {
           const dependentEvent: ChangeSseEvent = { type: "change", kind: "screen", name: screen };

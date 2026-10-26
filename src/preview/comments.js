@@ -11,7 +11,6 @@
 // append-only, so resolution is an event, not a mutation).
 
 import { icon } from "./icons.js";
-import { inBackdrop, queryOutsideBackdrop } from "./backdrop.js";
 
 const COMMENT_SELECTED_STYLE = "outline: 2px solid #d97706; outline-offset: 1px; cursor: pointer;";
 const COMMENT_MARKER_STYLE = "outline: 2px dashed #d97706; outline-offset: 1px; cursor: pointer;";
@@ -105,13 +104,13 @@ export function applyCommentMode(doc, enabled, openIds, onSelect) {
   /** @param {Event} evt */
   function handleClick(evt) {
     const el = /** @type {HTMLElement} */ (evt.target).closest("[id]");
-    if (!el || inBackdrop(/** @type {Element} */ (evt.target))) return;
+    if (!el) return;
     evt.preventDefault();
     onSelect(el === root ? null : el.id);
   }
   doc.addEventListener("click", handleClick, true);
 
-  const markedElements = root ? queryOutsideBackdrop(doc, "[id]").filter((el) => openIds.has(el.id)) : [];
+  const markedElements = root ? Array.from(doc.querySelectorAll("[id]")).filter((el) => openIds.has(el.id)) : [];
   const originalStyles = markedElements.map((el) => el.getAttribute("style"));
   for (const el of markedElements) {
     const original = el.getAttribute("style");

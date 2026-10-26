@@ -20,6 +20,14 @@ body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; 
   outline-offset: -2px;
   min-height: 8px;
 }
+/* A marker inside a backdrop layer belongs to the backdrop screen and is diagnosed there. */
+[data-backdrop-layer] [data-unresolved-component], [data-backdrop-layer] [data-invalid-component],
+[data-backdrop-layer] [data-recursive-component], [data-backdrop-layer] [data-empty-component],
+[data-backdrop-layer] [data-unresolved-token], [data-backdrop-layer] [data-unresolved-icon-font],
+[data-backdrop-layer] [data-unresolved-backdrop] {
+  outline: none;
+  min-height: revert;
+}
 .icon {
   font-family: "Material Symbols Rounded";
   font-weight: normal;

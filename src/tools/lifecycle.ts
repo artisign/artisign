@@ -688,7 +688,7 @@ async function deleteScreenEntity(store: Store, name: string, cascade: boolean, 
     target: r.from,
     message: `flow from "${r.from}" still targets deleted screen "${r.to.split(".")[0]}"`,
   }));
-  warnings.push(...(await danglingBackdropWarnings(store, await loadRegistry(store), deleted)));
+  warnings.push(...(await danglingBackdropWarnings(store, deleted)));
 
   return {
     kind: "screen",

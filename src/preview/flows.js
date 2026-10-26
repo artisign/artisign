@@ -4,8 +4,6 @@
 // value containing "." is a node ref ("screen.nodeId"); we only support
 // screen-level navigation in v1, so we jump to its screen part.
 
-import { inBackdrop, queryOutsideBackdrop } from "./backdrop.js";
-
 const FLOW_OUTLINE_STYLE = "outline: 2px solid #2a3edb; outline-offset: 1px; cursor: pointer;";
 
 /** @param {string} flowTarget @returns {string} the screen id to navigate to */
@@ -25,13 +23,13 @@ function targetScreen(flowTarget) {
  * @returns {() => void} cleanup, removes listeners and outlines
  */
 export function applyFlowMode(doc, enabled, onNavigate) {
-  const elements = queryOutsideBackdrop(doc, "[data-flow-target]");
+  const elements = Array.from(doc.querySelectorAll("[data-flow-target]"));
   if (!enabled) return () => {};
 
   /** @param {Event} evt */
   function handleClick(evt) {
     const el = /** @type {HTMLElement} */ (evt.target).closest("[data-flow-target]");
-    if (!el || inBackdrop(/** @type {Element} */ (evt.target))) return;
+    if (!el) return;
     const trigger = el.getAttribute("data-flow-trigger") ?? "tap";
     if (trigger !== "tap") return;
     evt.preventDefault();

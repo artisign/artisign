@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { readdir, rm, writeFile } from "node:fs/promises";
+import { rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setupProject, setupArtisignHome, type ProjectFixture, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
 import { startDaemon, type DaemonHandle } from "../daemon/start.js";
@@ -20,31 +20,75 @@ describe("createBackdropDependents", () => {
     await fx.store.writeScreen("a", root("b"));
     await fx.store.writeScreen("b2", root("c"));
     const deps = createBackdropDependents(fx.store);
-    expect(await deps.of("c")).toEqual(["b", "b2", "a"]);
-    expect(await deps.of("b")).toEqual(["a"]);
-    expect(await deps.of("a")).toEqual([]);
+    expect(await deps.update("c")).toEqual(["b", "b2", "a"]);
+    expect(await deps.update("b")).toEqual(["a"]);
+    expect(await deps.update("a")).toEqual([]);
   });
 
   it("terminates on a cycle on disk and never lists the source", async () => {
     await fx.store.writeScreen("a", root("b"));
     await fx.store.writeScreen("b", root("a"));
-    expect(await createBackdropDependents(fx.store).of("a")).toEqual(["b"]);
+    expect(await createBackdropDependents(fx.store).update("a")).toEqual(["b"]);
   });
 
   it("finds dependents of a target that no longer exists", async () => {
     await fx.store.writeScreen("b", root("gone"));
-    expect(await createBackdropDependents(fx.store).of("gone")).toEqual(["b"]);
+    expect(await createBackdropDependents(fx.store).update("gone")).toEqual(["b"]);
   });
 
-  it("rebuilds from source after invalidate and persists nothing", async () => {
+  it("updates one screen at a time: a new edge, a changed edge, a removed edge, a deleted file", async () => {
+    await fx.store.writeScreen("c", root());
+    await fx.store.writeScreen("d", root());
+    const deps = createBackdropDependents(fx.store);
+    expect(await deps.update("c")).toEqual([]);
+
+    await fx.store.writeScreen("b", root("c"));
+    expect(await deps.update("b")).toEqual([]);
+    expect(await deps.update("c")).toEqual(["b"]);
+
+    await fx.store.writeScreen("b", root("d"));
+    await deps.update("b");
+    expect(await deps.update("c")).toEqual([]);
+    expect(await deps.update("d")).toEqual(["b"]);
+
+    await fx.store.writeScreen("b", root());
+    await deps.update("b");
+    expect(await deps.update("d")).toEqual([]);
+
+    await fx.store.writeScreen("b", root("d"));
+    await deps.update("b");
+    await fx.store.deleteScreen("b");
+    await deps.update("b");
+    expect(await deps.update("d")).toEqual([]);
+  });
+
+  it("re-reads only the changed screen: other edits stay unseen until reset", async () => {
     await fx.store.writeScreen("c", root());
     const deps = createBackdropDependents(fx.store);
-    expect(await deps.of("c")).toEqual([]);
+    await deps.update("c");
     await fx.store.writeScreen("b", root("c"));
-    expect(await deps.of("c")).toEqual([]); // still the cached index
-    deps.invalidate();
-    expect(await deps.of("c")).toEqual(["b"]);
-    expect(await readdir(join(fx.dir, ".artisign")).catch(() => [])).not.toContain("backdrops.json");
+    expect(await deps.update("c")).toEqual([]);
+    deps.reset();
+    expect(await deps.update("c")).toEqual(["b"]);
+  });
+
+  it("is independent of tokens.json and components", async () => {
+    await fx.store.writeScreen("c", root());
+    await fx.store.writeScreen("b", root("c"));
+    await writeFile(join(fx.dir, "design-system", "tokens.json"), "{ not json");
+    expect(await createBackdropDependents(fx.store).update("c")).toEqual(["b"]);
+  });
+
+  it("answers a burst in call order", async () => {
+    await fx.store.writeScreen("c", root());
+    await fx.store.writeScreen("b", root());
+    const deps = createBackdropDependents(fx.store);
+    await deps.update("c");
+    await fx.store.writeScreen("b", root("c"));
+    const first = deps.update("b");
+    const second = deps.update("c");
+    expect(await first).toEqual([]);
+    expect(await second).toEqual(["b"]);
   });
 });
 
@@ -119,6 +163,31 @@ describe("SSE fan-out to backdrop dependents", () => {
     await settle(800);
     await sse.stop();
     expect(sse.names()).toEqual(["c", "b", "a"]);
+  });
+
+  it("keeps fanning out with a broken tokens.json", async () => {
+    await writeFile(join(fx.dir, "design-system", "tokens.json"), "{ not json");
+    const sse = await collectChanges(daemon.port);
+    await writeFile(join(fx.dir, "screens", "c.html"), `<div id="r"><p id="x">edited</p></div>`);
+    await settle(800);
+    await sse.stop();
+    expect(sse.names()).toEqual(["c", "b", "a"]);
+  });
+
+  it("catches up after edits made while nobody was listening", async () => {
+    const first = await collectChanges(daemon.port);
+    await writeFile(join(fx.dir, "screens", "c.html"), `<div id="r"><i id="y"></i></div>`);
+    await settle(600);
+    await first.stop();
+    await settle(200);
+    // no client: this edge is not seen by any index
+    await writeFile(join(fx.dir, "screens", "d.html"), `<div id="r" data-backdrop="c"></div>`);
+    await settle(600);
+    const sse = await collectChanges(daemon.port);
+    await writeFile(join(fx.dir, "screens", "c.html"), `<div id="r"><b id="z"></b></div>`);
+    await settle(800);
+    await sse.stop();
+    expect(sse.names()).toEqual(["c", "b", "d", "a"]);
   });
 
   it("a sidecar change does not fan out", async () => {

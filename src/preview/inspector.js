@@ -24,7 +24,6 @@
 // inspector-data.js) is unit-tested on its own.
 
 import { icon } from "./icons.js";
-import { inBackdrop } from "./backdrop.js";
 import { formatTokenRef, isRefUnresolved } from "./token-ref-format.js";
 import { relativeRect, resolveModelId, parseUnresolvedPaths, rgbToHex, formatPosition, formatTypography, formatSpacing } from "./inspector-data.js";
 
@@ -413,7 +412,6 @@ export function applyInspectMode(doc, enabled, { getModelIds, onSelect, onDesele
 
   function handleClick(evt) {
     const el = /** @type {HTMLElement} */ (evt.target).closest("[id]");
-    if (inBackdrop(/** @type {Element} */ (evt.target))) return;
     if (!el || el === root) {
       onDeselect();
       return;

@@ -1,22 +1,20 @@
 // @vitest-environment jsdom
 //
-// CHR-940: nothing inside the inert backdrop layer is hit-testable, pickable, commentable or a flow source. jsdom has no layout, so a "point covered only by the backdrop" is modelled as a click whose target sits inside `[data-backdrop-layer]` (what elementFromPoint would return without pointer-events:none).
+// CHR-940: the inert backdrop layer contributes no selectable, commentable or flow targets. The fixture has the shape the renderer emits (render.ts): the layer is anonymous — no `id`, no `data-flow-*` — but keeps the other screen's `data-unresolved-*` markers. Being `inert` + `pointer-events:none`, a click on the backdrop area lands on the overlay root, which is what these tests click.
 import { describe, it, expect, vi } from "vitest";
 import { applyFlowMode } from "./flows.js";
 import { applyCommentMode } from "./comments.js";
 import { applyInspectMode } from "./inspector.js";
 import { findDiagnostics } from "./warnings.js";
-import { inBackdrop } from "./backdrop.js";
 
-function makeDoc() {
+function makeDoc(rootAttrs = "") {
   const doc = document.implementation.createHTMLDocument("t");
   doc.body.innerHTML = `
-    <div id="sheet-root" data-backdrop="checkout">
-      <div data-backdrop-layer inert>
+    <div id="sheet-root" data-backdrop="checkout" ${rootAttrs}>
+      <div data-backdrop-layer inert style="position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:-1">
         <div data-backdrop="nested">
-          <button id="bd-btn" data-flow-target="elsewhere">Backdrop</button>
-          <span id="bd-text" data-unresolved-token="color.x">x</span>
-          <p class="bd-plain">plain</p>
+          <button class="bd-btn">Backdrop</button>
+          <span data-unresolved-token="color.x">x</span>
         </div>
       </div>
       <div id="scrim" data-flow-target="checkout"></div>
@@ -25,61 +23,48 @@ function makeDoc() {
   return doc;
 }
 
-const click = (doc, el) => el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+const click = (el) => el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
 
 describe("backdrop layer", () => {
-  it("inBackdrop is true only inside the layer", () => {
-    const doc = makeDoc();
-    expect(inBackdrop(doc.getElementById("bd-btn"))).toBe(true);
-    expect(inBackdrop(doc.querySelector(".bd-plain"))).toBe(true);
-    expect(inBackdrop(doc.getElementById("own-btn"))).toBe(false);
-    expect(inBackdrop(doc.getElementById("sheet-root"))).toBe(false);
-  });
-
-  it("flow mode: clicking the backdrop does nothing, an own scrim still navigates", () => {
+  it("flow mode: the layer adds no flow sources, an own scrim still navigates, a backdrop-area click does nothing", () => {
     const doc = makeDoc();
     const onNavigate = vi.fn();
     const cleanup = applyFlowMode(doc, true, onNavigate);
-    click(doc, doc.getElementById("bd-btn"));
-    click(doc, doc.querySelector(".bd-plain"));
+    click(doc.getElementById("sheet-root")); // where a click on the backdrop area lands
     expect(onNavigate).not.toHaveBeenCalled();
-    expect(doc.getElementById("bd-btn").getAttribute("style")).toBeNull(); // no flow outline
-    click(doc, doc.getElementById("scrim"));
+    expect(doc.querySelector(".bd-btn").getAttribute("style")).toBeNull();
+    click(doc.getElementById("scrim"));
     expect(onNavigate).toHaveBeenCalledWith("checkout");
     cleanup();
   });
 
-  it("comment mode: backdrop clicks select nothing, own nodes and the root still do", () => {
+  it("comment mode: the layer has nothing to anchor to or mark, own nodes and the root do", () => {
     const doc = makeDoc();
     const onSelect = vi.fn();
-    const cleanup = applyCommentMode(doc, true, new Set(["bd-btn", "own-btn"]), onSelect);
-    click(doc, doc.getElementById("bd-btn"));
-    click(doc, doc.querySelector(".bd-plain"));
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(doc.getElementById("bd-btn").getAttribute("style")).toBeNull(); // no open-thread marker
+    const cleanup = applyCommentMode(doc, true, new Set(["own-btn"]), onSelect);
     expect(doc.getElementById("own-btn").getAttribute("style")).toContain("outline");
-    click(doc, doc.getElementById("own-btn"));
+    expect(doc.querySelector("[data-backdrop-layer]").querySelector("[style*=outline]")).toBeNull();
+    click(doc.getElementById("own-btn"));
     expect(onSelect).toHaveBeenLastCalledWith("own-btn");
-    click(doc, doc.getElementById("sheet-root"));
+    click(doc.getElementById("sheet-root"));
     expect(onSelect).toHaveBeenLastCalledWith(null);
     cleanup();
   });
 
-  it("inspect mode: backdrop clicks neither select nor deselect, own nodes stay selectable", () => {
+  it("inspect mode: own nodes stay selectable, the backdrop area behaves like the empty root", () => {
     const doc = makeDoc();
     const handlers = { getModelIds: () => new Set(["own-btn"]), onSelect: vi.fn(), onDeselect: vi.fn(), onScroll: vi.fn() };
     const cleanup = applyInspectMode(doc, true, handlers);
-    click(doc, doc.getElementById("bd-btn"));
-    click(doc, doc.querySelector(".bd-plain"));
+    click(doc.getElementById("sheet-root"));
     expect(handlers.onSelect).not.toHaveBeenCalled();
-    expect(handlers.onDeselect).not.toHaveBeenCalled();
-    click(doc, doc.getElementById("own-btn"));
+    expect(handlers.onDeselect).toHaveBeenCalledOnce();
+    click(doc.getElementById("own-btn"));
     expect(handlers.onSelect).toHaveBeenCalledWith("own-btn", "own-btn");
     cleanup();
   });
 
-  it("diagnostic cycling skips markers inside the backdrop", () => {
-    const doc = makeDoc();
-    expect(findDiagnostics(doc).map((el) => el.id)).toEqual(["own-bad"]);
+  it("diagnostics: markers inside the layer are skipped, a dangling backdrop on the root is counted", () => {
+    expect(findDiagnostics(makeDoc()).map((el) => el.id)).toEqual(["own-bad"]);
+    expect(findDiagnostics(makeDoc("data-unresolved-backdrop")).map((el) => el.id)).toEqual(["sheet-root", "own-bad"]);
   });
 });

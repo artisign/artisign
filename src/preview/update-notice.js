@@ -65,5 +65,4 @@ export function pinBelowTopBars(regionEl, mainEl, barEls) {
     for (const bar of barEls) observer.observe(bar);
   }
   place();
-  return place;
 }

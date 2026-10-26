@@ -90,7 +90,7 @@ export async function inspectNode(store: Store, input: InspectNodeInput): Promis
   const nodeId = ref.nodeId;
 
   const { doc, documentHtml, viewport } =
-    ref.kind === "screen" ? await renderScreenForBrowser(store, ref.screen) : await renderDefinitionForBrowser(store, ref);
+    ref.kind === "screen" ? await renderScreenForBrowser(store, ref.screen, nodeId) : await renderDefinitionForBrowser(store, ref);
   // Validated against the parsed model before touching the browser at all —
   // an unknown node never pays the render cost. A slot-fill node is not in the
   // flat map but renders under its authored id (CHR-746), so it is measurable.

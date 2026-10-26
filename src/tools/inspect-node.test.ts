@@ -34,6 +34,14 @@ describe("inspectNode — validation (no browser needed)", () => {
     });
   });
 
+  it("an unknown screen that names a component hints the definition ref with the requested node id (CHR-930)", async () => {
+    await fx.store.writeComponent("eyebrow", `<span id="e"><b id="label">x</b></span>`);
+    const err = await inspectNode(fx.store, { node: "eyebrow.label" }).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: "not_found" });
+    expect((err as Error).message).toContain('address it by its own node ref: "component:eyebrow#default.label"');
+    expect((err as Error).message).not.toMatch(/without screen/);
+  });
+
   it("rejects an unknown node id without needing the browser", async () => {
     await expect(inspectNode(fx.store, { node: "home.does-not-exist" })).rejects.toMatchObject({
       code: "not_found",

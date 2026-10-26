@@ -225,14 +225,14 @@ describe("getScreenshot — node/screen validation (no browser needed)", () => {
   // is touched; the not_found names the exact node ref to send instead.
   it("screen not_found for a component name hints the default variant's root node ref", async () => {
     await fx.store.writeComponent("eyebrow", `<span id="e">x</span><template data-variant="muted"><span id="m">x</span></template>`);
-    const hint = 'use node: "component:eyebrow#default.e" without screen';
-    for (const screen of ["eyebrow", "component:eyebrow", "component:eyebrow#default"]) {
+    const hint = 'address it by its own node ref: "component:eyebrow#default.e"';
+    for (const screen of ["eyebrow", "component:eyebrow", "component:eyebrow#", "component:eyebrow#default"]) {
       const err = await getScreenshot(fx.store, { screen }).catch((e: unknown) => e);
       expect(err, screen).toMatchObject({ code: "not_found" });
       expect((err as Error).message, screen).toContain(hint);
     }
     const muted = await getScreenshot(fx.store, { screen: "component:eyebrow#muted" }).catch((e: unknown) => e);
-    expect((muted as Error).message).toContain('use node: "component:eyebrow#muted.m"');
+    expect((muted as Error).message).toContain('"component:eyebrow#muted.m"');
   });
 
   it("screen not_found for a pattern name hints the pattern's root node ref", async () => {
@@ -240,8 +240,32 @@ describe("getScreenshot — node/screen validation (no browser needed)", () => {
     for (const screen of ["card", "pattern:card"]) {
       const err = await getScreenshot(fx.store, { screen }).catch((e: unknown) => e);
       expect(err, screen).toMatchObject({ code: "not_found" });
-      expect((err as Error).message, screen).toContain('use node: "pattern:card.card-root" without screen');
+      expect((err as Error).message, screen).toContain('address it by its own node ref: "pattern:card.card-root"');
     }
+  });
+
+  // CHR-930 — no default variant, a named node, an empty variant body.
+  it("screen not_found hints the defaultVariant the renderer falls back to when there is no default variant", async () => {
+    await fx.store.writeComponent(
+      "chip",
+      `<template data-variant="solid"><span id="s">x</span></template><template data-variant="ghost"><span id="g">x</span></template>`,
+    );
+    for (const screen of ["chip", "component:chip"]) {
+      const err = await getScreenshot(fx.store, { screen }).catch((e: unknown) => e);
+      expect((err as Error).message, screen).toContain('"component:chip#solid.s"');
+    }
+  });
+
+  it("screen not_found with a node carries that node id, not the root id", async () => {
+    await fx.store.writeComponent("eyebrow", `<span id="e"><b id="label">x</b></span>`);
+    const err = await getScreenshot(fx.store, { screen: "eyebrow", node: "eyebrow.label" }).catch((e: unknown) => e);
+    expect((err as Error).message).toContain('"component:eyebrow#default.label"');
+  });
+
+  it("screen not_found carries no hint when the variant has no root node", async () => {
+    await fx.store.writeComponent("blank", `<span id="b">x</span><template data-variant="empty"></template>`);
+    const err = await getScreenshot(fx.store, { screen: "component:blank#empty" }).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: "not_found", message: 'screen "component:blank#empty" was not found' });
   });
 
   it("screen not_found without a matching definition carries no hint", async () => {

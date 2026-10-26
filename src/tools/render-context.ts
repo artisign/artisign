@@ -185,15 +185,16 @@ export type RenderedScreenForBrowser = RenderedScreenDocument & { rootNode: Inte
  * into a `not_found` ToolError, and resolve the root's viewport. What each
  * tool does with a live browser page after this point differs enough
  * (full vs. node-clipped screenshot vs. a single `page.evaluate` geometry
- * read) that it isn't folded in here too.
+ * read) that it isn't folded in here too. `nodeId` only feeds the
+ * not_found hint (`definitionHint`).
  */
-export async function renderScreenForBrowser(store: Store, screen: string): Promise<RenderedScreenForBrowser> {
+export async function renderScreenForBrowser(store: Store, screen: string, nodeId?: string): Promise<RenderedScreenForBrowser> {
   let rendered: RenderedScreenDocument;
   try {
     rendered = await renderScreenDocument(store, screen, { fontMode: "inline" });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new ToolError("not_found", `screen "${screen}" was not found${await definitionHint(store, screen)}`);
+      throw new ToolError("not_found", `screen "${screen}" was not found${await definitionHint(store, screen, nodeId)}`);
     }
     throw err;
   }
@@ -207,25 +208,34 @@ export async function renderScreenForBrowser(store: Store, screen: string): Prom
  * When a missing `screen` names a component or pattern (bare `"eyebrow"`, or
  * `"component:eyebrow#default"` / `"pattern:card"`), the hint gives the exact
  * `node` ref to send instead — definitions are rendered via `node`, and the
- * agent also needs the variant's root id (CHR-776). Empty string otherwise.
+ * agent also needs a node id: the one the call named, else the variant's
+ * root (CHR-776, CHR-930). Without a variant, the component's
+ * `defaultVariant` is used, the one rendering falls back to. Empty string
+ * otherwise.
  */
-async function definitionHint(store: Store, screen: string): Promise<string> {
+async function definitionHint(store: Store, screen: string, nodeId: string | undefined): Promise<string> {
   let candidates: string[];
   if (screen.startsWith("component:")) {
-    const [name, variant = "default"] = screen.slice("component:".length).split("#");
-    candidates = [`component:${name}#${variant}`];
+    const [name = "", variant] = screen.slice("component:".length).split("#");
+    candidates = [variant ? `component:${name}#${variant}` : await defaultVariantAddress(store, name)];
   } else if (screen.startsWith("pattern:")) {
     candidates = [screen];
   } else {
-    candidates = [`component:${screen}#default`, `pattern:${screen}`];
+    candidates = [await defaultVariantAddress(store, screen), `pattern:${screen}`];
   }
 
   const { docs } = await loadAllDocuments(store, await loadRegistry(store), { screens: [] });
   for (const address of candidates) {
     const source = docs.find((d) => d.address === address);
-    if (source) return ` — "${source.name}" is a ${source.kind}; use node: "${formatNodeRef(address, source.doc.rootNodeId)}" without screen`;
+    const id = nodeId ?? source?.doc.rootNodeId;
+    if (source && id) return ` — "${source.name}" is a ${source.kind}; address it by its own node ref: "${formatNodeRef(address, id)}"`;
   }
   return "";
+}
+
+async function defaultVariantAddress(store: Store, name: string): Promise<string> {
+  if (!(await store.listComponents()).includes(name)) return `component:${name}#default`;
+  return `component:${name}#${parseComponentDefinition(name, await store.readComponent(name)).defaultVariant}`;
 }
 
 export type RenderedDefinitionForBrowser = { doc: ScreenDocument; documentHtml: string; viewport: Viewport };

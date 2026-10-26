@@ -253,8 +253,8 @@ export async function postComment(input, project) {
 
 /**
  * The Board's shared filter/pinned state (CHR-624/ADR-005) — for initial
- * paint and resync. Doesn't include `shown_screens` (only the write route
- * echoes that, and only to whichever tab made the write) — every OTHER
+ * paint and resync. Doesn't include the shown set (set_board_state returns only a
+ * `shown_screens` list on request, to whoever made the write) — every OTHER
  * caller (this one, and every tab's SSE `board_state` handler) derives the
  * visible set itself from `filter`+`pinned`+the already-loaded screen list,
  * via board.js's `computeBoardVisibility`.

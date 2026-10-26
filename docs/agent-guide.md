@@ -371,6 +371,13 @@ main screen when it is a different destination.
 - `step` — a stage in a sequence that starts at the parent (wizard step,
   onboarding page).
 
+Recurring cases:
+
+- A snackbar or toast over a view — `overlay` of that view.
+- A picker or date sheet stacked on another sheet — `overlay` of that sheet,
+  not of the screen below it.
+- A confirmation that replaces the sheet it came from — `step` of that sheet.
+
 In the variants of one screen, give structural nodes stable, descriptive `id`s
 (`card-list`, `empty-state`): the preview's compare view matches nodes across
 screens by authored id only, so generated ids (`n12`) and text fold into their
@@ -378,7 +385,8 @@ nearest authored ancestor.
 
 `get_project` at `view: "tree"` carries `variant_of`/`variant_kind` on variant
 screens; `get_screen` at `view: "full"` adds `variants` (direct children) and
-`reached_from` (screens with a flow into this one).
+`reached_from` (screens with a flow into this one). Narrow it with `fields:
+["variants", "reached_from"]` to skip the markup.
 
 Deleting a screen that still has variants fails with `has_variants` (subtree
 size and example names; nothing changes). Delete the variants first, or pass

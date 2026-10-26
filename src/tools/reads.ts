@@ -30,14 +30,6 @@ import { variantLinks, variantFields } from "./variants.js";
 import { isValidTagName } from "./name-validation.js";
 import { ToolError, type View, type Predicate, type PublicComment } from "./types.js";
 
-// mtime/since are approximated for now. Neither is
-// covered by the acceptance criteria, and a real implementation needs a
-// Store-level stat/diff primitive that isn't justified by anything using it
-// yet.
-function now(): string {
-  return new Date().toISOString();
-}
-
 function refCount(node: InternalNode): number {
   return Object.keys(node.refs.tokens).length + (node.refs.component ? 1 : 0);
 }
@@ -143,7 +135,7 @@ const PROJECT_OPTIONAL = ["screens", "design_system", "flows", "mockups", "tag_n
 export async function getProject(store: Store, input: GetProjectInput): Promise<Record<string, unknown>> {
   const view = input.view ?? "summary";
 
-  const [config, screenNames, tokens, componentNames, mockupNames, flowRecords, commentRecords, head] = await Promise.all([
+  const [config, screenNames, tokens, componentNames, mockupNames, flowRecords, commentRecords, head, lastWriteAt] = await Promise.all([
     store.readArtisignConfig(),
     store.listScreens(),
     store.readTokens(),
@@ -152,6 +144,7 @@ export async function getProject(store: Store, input: GetProjectInput): Promise<
     store.readFlows(),
     readCommentRecords(store),
     store.headCommit(),
+    store.lastWriteAt(),
   ]);
 
   const openThreads = groupThreads(commentRecords).filter((t) => threadStatus(t) === "open");
@@ -172,7 +165,7 @@ export async function getProject(store: Store, input: GetProjectInput): Promise<
     open_comment_count: openCommentCount,
     head: head.sha,
     ...(head.head_reason !== undefined ? { head_reason: head.head_reason } : {}),
-    last_write_at: now(),
+    ...(lastWriteAt !== undefined ? { last_write_at: lastWriteAt } : {}),
   };
 
   // Tag notes ride along with a tags query, at every tier — tree/full inherit
@@ -300,11 +293,16 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
   const view = input.view ?? "summary";
   const { doc } = await loadScreen(store, input.screen);
   const nodes = nodesInDocumentOrder(doc);
-  const [screenFlows, commentRecords, lastCommit, meta] = await Promise.all([
+  const [screenFlows, commentRecords, lastCommit, meta, mtime] = await Promise.all([
     readScreenFlows(store, input.screen),
     readCommentRecords(store),
     store.headCommit(),
     store.readScreenMeta(input.screen),
+    store.screenMtime(input.screen).catch((err: NodeJS.ErrnoException) => {
+      // Deleted after loadScreen read it — same answer as the read path gives.
+      if (err.code === "ENOENT") throw new ToolError("not_found", `screen "${input.screen}" was not found`);
+      throw err;
+    }),
   ]);
   const openCommentCount = groupThreads(commentRecords).filter(
     (t) => t.root.screen === input.screen && threadStatus(t) === "open",
@@ -318,7 +316,7 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
     flow_count: screenFlows.length,
     open_comment_count: openCommentCount,
     last_commit: lastCommit.sha,
-    mtime: now(),
+    mtime,
     tags: meta.tags,
   };
   if (view === "summary") return selectFields(summary, SCREEN_ALWAYS, SCREEN_OPTIONAL, input.fields);

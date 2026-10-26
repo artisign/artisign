@@ -14,26 +14,30 @@ describe("set_meta — screen target", () => {
 
   it("sets notes and tags on a fresh screen", async () => {
     const res = await setMeta(fx.store, { target: { kind: "screen", screen: "home" }, notes: "check contrast", tags: ["checkout", "wip"] });
-    expect(res.meta).toEqual({ notes: "check contrast", tags: ["checkout", "wip"] });
+    expect(res.updated).toEqual(["notes", "tags"]);
+    expect(res).not.toHaveProperty("meta");
     expect(await fx.store.readScreenMeta("home")).toEqual({ notes: "check contrast", tags: ["checkout", "wip"] });
   });
 
   it("setting notes keeps existing tags (merge, not replace)", async () => {
     await setMeta(fx.store, { target: { kind: "screen", screen: "home" }, tags: ["a", "b"] });
     const res = await setMeta(fx.store, { target: { kind: "screen", screen: "home" }, notes: "new note" });
-    expect(res.meta).toEqual({ notes: "new note", tags: ["a", "b"] });
+    expect(res.updated).toEqual(["notes"]);
+    expect(await fx.store.readScreenMeta("home")).toEqual({ notes: "new note", tags: ["a", "b"] });
   });
 
   it("setting tags keeps the existing notes", async () => {
     await setMeta(fx.store, { target: { kind: "screen", screen: "home" }, notes: "keep me" });
     const res = await setMeta(fx.store, { target: { kind: "screen", screen: "home" }, tags: ["x"] });
-    expect(res.meta).toEqual({ notes: "keep me", tags: ["x"] });
+    expect(res.updated).toEqual(["tags"]);
+    expect(await fx.store.readScreenMeta("home")).toEqual({ notes: "keep me", tags: ["x"] });
   });
 
   it("tags is a full replace, not a merge of arrays", async () => {
     await setMeta(fx.store, { target: { kind: "screen", screen: "home" }, tags: ["a", "b"] });
     const res = await setMeta(fx.store, { target: { kind: "screen", screen: "home" }, tags: ["c"] });
-    expect(res.meta).toEqual({ notes: "", tags: ["c"] });
+    expect(res.updated).toEqual(["tags"]);
+    expect(await fx.store.readScreenMeta("home")).toEqual({ notes: "", tags: ["c"] });
   });
 
   it("throws not_found for a screen that doesn't exist", async () => {
@@ -72,25 +76,28 @@ describe("set_meta — mockup target", () => {
 
   it("sets tags on a mockup", async () => {
     const res = await setMeta(fx.store, { target: { kind: "mockup", mockup: "hero-options" }, tags: ["checkout", "wip"] });
-    expect(res.meta).toEqual({ tags: ["checkout", "wip"] });
+    expect(res.updated).toEqual(["tags"]);
     expect((await fx.store.readMockupMeta("hero-options")).tags).toEqual(["checkout", "wip"]);
   });
 
   it("sets title and description on a mockup", async () => {
     const res = await setMeta(fx.store, { target: { kind: "mockup", mockup: "hero-options" }, title: "Hero options", description: "three directions" });
-    expect(res.meta).toEqual({ tags: [], title: "Hero options", description: "three directions" });
+    expect(res.updated).toEqual(["title", "description"]);
+    expect(await fx.store.readMockupMeta("hero-options")).toMatchObject({ title: "Hero options", description: "three directions" });
   });
 
   it("setting tags keeps existing title/description (merge, not replace)", async () => {
     await setMeta(fx.store, { target: { kind: "mockup", mockup: "hero-options" }, title: "Hero options" });
     const res = await setMeta(fx.store, { target: { kind: "mockup", mockup: "hero-options" }, tags: ["a"] });
-    expect(res.meta).toEqual({ tags: ["a"], title: "Hero options" });
+    expect(res.updated).toEqual(["tags"]);
+    expect(await fx.store.readMockupMeta("hero-options")).toMatchObject({ tags: ["a"], title: "Hero options" });
   });
 
   it("tags is a full replace, not a merge of arrays", async () => {
     await setMeta(fx.store, { target: { kind: "mockup", mockup: "hero-options" }, tags: ["a", "b"] });
     const res = await setMeta(fx.store, { target: { kind: "mockup", mockup: "hero-options" }, tags: ["c"] });
-    expect(res.meta).toEqual({ tags: ["c"] });
+    expect(res.updated).toEqual(["tags"]);
+    expect((await fx.store.readMockupMeta("hero-options")).tags).toEqual(["c"]);
   });
 
   it("does not disturb existing variants", async () => {
@@ -132,7 +139,8 @@ describe("set_meta — design_system target", () => {
 
   it("sets idea", async () => {
     const res = await setMeta(fx.store, { target: { kind: "design_system" }, idea: "consistent, calm checkout" });
-    expect(res.meta).toEqual({ idea: "consistent, calm checkout", decisions: [] });
+    expect(res.updated).toEqual(["idea"]);
+    expect(await fx.store.readDesignSystemMeta()).toMatchObject({ idea: "consistent, calm checkout", decisions: [] });
   });
 
   it("decision defaults: date to today (ISO), status to active", async () => {
@@ -141,10 +149,19 @@ describe("set_meta — design_system target", () => {
       target: { kind: "design_system" },
       decisions: [{ id: "d1", title: "single page checkout", body: "fewer steps" }],
     });
-    expect(res.meta).toEqual({
-      idea: "",
-      decisions: [{ id: "d1", date: today, title: "single page checkout", body: "fewer steps", status: "active" }],
-    });
+    expect(res.updated).toEqual(["decisions"]);
+    expect(res).not.toHaveProperty("meta");
+    expect((await fx.store.readDesignSystemMeta()).decisions).toEqual([
+      { id: "d1", date: today, title: "single page checkout", body: "fewer steps", status: "active" },
+    ]);
+  });
+
+  it("a decisions write returns decision_ids (all stored ids, in order, no text); an idea-only write does not", async () => {
+    await setMeta(fx.store, { target: { kind: "design_system" }, decisions: [{ id: "d1", title: "a", body: "secret body" }, { id: "d2", title: "b", body: "b" }] });
+    const res = await setMeta(fx.store, { target: { kind: "design_system" }, decisions: [{ id: "d3", title: "c", body: "c" }] });
+    expect(res.decision_ids).toEqual(["d3"]);
+    expect(JSON.stringify(res)).not.toContain("secret body");
+    expect(await setMeta(fx.store, { target: { kind: "design_system" }, idea: "x" })).not.toHaveProperty("decision_ids");
   });
 
   it("honors an explicit date and status", async () => {
@@ -152,22 +169,20 @@ describe("set_meta — design_system target", () => {
       target: { kind: "design_system" },
       decisions: [{ id: "d1", date: "2025-01-01", title: "old approach", body: "superseded now", status: "superseded" }],
     });
-    const decisions = res.meta as { decisions: Array<{ date: string; status: string }> };
-    expect(decisions.decisions[0]).toMatchObject({ date: "2025-01-01", status: "superseded" });
+    expect(res.updated).toEqual(["decisions"]);
+    expect((await fx.store.readDesignSystemMeta()).decisions[0]).toMatchObject({ date: "2025-01-01", status: "superseded" });
   });
 
   it("decisions is a full replace, not an append", async () => {
     await setMeta(fx.store, { target: { kind: "design_system" }, decisions: [{ id: "d1", title: "a", body: "a" }] });
-    const res = await setMeta(fx.store, { target: { kind: "design_system" }, decisions: [{ id: "d2", title: "b", body: "b" }] });
-    const decisions = res.meta as { decisions: Array<{ id: string }> };
-    expect(decisions.decisions.map((d) => d.id)).toEqual(["d2"]);
+    await setMeta(fx.store, { target: { kind: "design_system" }, decisions: [{ id: "d2", title: "b", body: "b" }] });
+    expect((await fx.store.readDesignSystemMeta()).decisions.map((d) => d.id)).toEqual(["d2"]);
   });
 
   it("setting idea keeps existing decisions", async () => {
     await setMeta(fx.store, { target: { kind: "design_system" }, decisions: [{ id: "d1", title: "a", body: "a" }] });
-    const res = await setMeta(fx.store, { target: { kind: "design_system" }, idea: "new idea" });
-    const decisions = res.meta as { decisions: Array<{ id: string }> };
-    expect(decisions.decisions.map((d) => d.id)).toEqual(["d1"]);
+    await setMeta(fx.store, { target: { kind: "design_system" }, idea: "new idea" });
+    expect((await fx.store.readDesignSystemMeta()).decisions.map((d) => d.id)).toEqual(["d1"]);
   });
 
   it("throws validation_failed when a screen/component/pattern/mockup field is set on a design_system target", async () => {
@@ -193,14 +208,16 @@ describe("set_meta — tag target", () => {
 
   it("sets notes on a tag no screen carries yet — deliberately no not_found check", async () => {
     const res = await setMeta(fx.store, { target: { kind: "tag", tag: "chr-244" }, notes: "spec lives here" });
-    expect(res.meta).toEqual({ notes: "spec lives here" });
+    expect(res.updated).toEqual(["notes"]);
+    expect(res).not.toHaveProperty("meta");
     expect(await fx.store.readTagMeta("chr-244")).toEqual({ notes: "spec lives here" });
   });
 
   it("notes is a full replace, not an append", async () => {
     await setMeta(fx.store, { target: { kind: "tag", tag: "chr-244" }, notes: "first draft" });
     const res = await setMeta(fx.store, { target: { kind: "tag", tag: "chr-244" }, notes: "revised" });
-    expect(res.meta).toEqual({ notes: "revised" });
+    expect(res.updated).toEqual(["notes"]);
+    expect(await fx.store.readTagMeta("chr-244")).toEqual({ notes: "revised" });
   });
 
   it("lowercases the tag name on disk (CHR-244 and chr-244 are the same document)", async () => {
@@ -245,13 +262,14 @@ describe("set_meta — component/pattern target", () => {
 
   it("sets usage on a component", async () => {
     const res = await setMeta(fx.store, { target: { kind: "component", name: "btn-primary" }, usage: "primary CTAs only" });
-    expect(res.meta).toEqual({ usage: "primary CTAs only" });
+    expect(res.updated).toEqual(["usage"]);
+    expect(res).not.toHaveProperty("meta");
     expect((await fx.store.readDesignSystemMeta()).component_usage).toEqual({ "btn-primary": "primary CTAs only" });
   });
 
   it("sets usage on a pattern", async () => {
     const res = await setMeta(fx.store, { target: { kind: "pattern", name: "card-grid" }, usage: "gallery/listing layouts" });
-    expect(res.meta).toEqual({ usage: "gallery/listing layouts" });
+    expect(res.updated).toEqual(["usage"]);
     expect((await fx.store.readDesignSystemMeta()).pattern_usage).toEqual({ "card-grid": "gallery/listing layouts" });
   });
 
@@ -316,9 +334,9 @@ describe("set_meta — screen variants (ADR-006)", () => {
     vi.restoreAllMocks();
   }
 
-  it("sets both fields and echoes them", async () => {
+  it("sets both fields and reports their names", async () => {
     const res = await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
-    expect(res.meta).toEqual({ notes: "", tags: [], variant_of: "main", variant_kind: "state" });
+    expect(res.updated).toEqual(["variant_of", "variant_kind"]);
     expect(await fx.store.readScreenMeta("child")).toEqual({ notes: "", tags: [], variant_of: "main", variant_kind: "state" });
   });
 
@@ -336,7 +354,8 @@ describe("set_meta — screen variants (ADR-006)", () => {
     await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
     await fx.store.deleteScreen("main");
     const res = await setMeta(fx.store, { target: target("child"), notes: "x" });
-    expect(res.meta).toMatchObject({ notes: "x" });
+    expect(res.updated).toEqual(["notes"]);
+    expect((await fx.store.readScreenMeta("child")).notes).toBe("x");
   });
 
   it("rejects a self-reference", async () => {
@@ -373,27 +392,29 @@ describe("set_meta — screen variants (ADR-006)", () => {
   it("allows changing only the kind of an existing variant", async () => {
     await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
     const res = await setMeta(fx.store, { target: target("child"), variant_kind: "overlay" });
-    expect(res.meta).toEqual({ notes: "", tags: [], variant_of: "main", variant_kind: "overlay" });
+    expect(res.updated).toEqual(["variant_kind"]);
+    expect(await fx.store.readScreenMeta("child")).toEqual({ notes: "", tags: [], variant_of: "main", variant_kind: "overlay" });
   });
 
   it("allows re-parenting to a non-descendant", async () => {
     await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
     const res = await setMeta(fx.store, { target: target("child"), variant_of: "other" });
-    expect(res.meta).toMatchObject({ variant_of: "other", variant_kind: "state" });
+    expect(res.updated).toEqual(["variant_of"]);
+    expect(await fx.store.readScreenMeta("child")).toMatchObject({ variant_of: "other", variant_kind: "state" });
   });
 
-  it("clearing variant_of removes both fields from the sidecar and the response", async () => {
+  it("clearing variant_of removes both fields from the sidecar and reports both", async () => {
     await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "state" });
     const res = await setMeta(fx.store, { target: target("child"), variant_of: null });
-    expect(res.meta).toEqual({ notes: "", tags: [] });
+    expect(res.updated).toEqual(["variant_of", "variant_kind"]);
     expect(await fx.store.readScreenMeta("child")).toEqual({ notes: "", tags: [] });
   });
 
   it("setting notes/tags on a variant keeps both fields", async () => {
     await setMeta(fx.store, { target: target("child"), variant_of: "main", variant_kind: "step" });
     await setMeta(fx.store, { target: target("child"), notes: "n" });
-    const res = await setMeta(fx.store, { target: target("child"), tags: ["t"] });
-    expect(res.meta).toEqual({ notes: "n", tags: ["t"], variant_of: "main", variant_kind: "step" });
+    await setMeta(fx.store, { target: target("child"), tags: ["t"] });
+    expect(await fx.store.readScreenMeta("child")).toEqual({ notes: "n", tags: ["t"], variant_of: "main", variant_kind: "step" });
   });
 
   it("rejects variant fields on a non-screen target", async () => {

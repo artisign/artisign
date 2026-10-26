@@ -37,6 +37,12 @@ class FakeStore implements Store {
   async deleteScreen(name: string): Promise<void> {
     this.screens.delete(name);
   }
+  async screenMtime(): Promise<string> {
+    return new Date(0).toISOString();
+  }
+  async lastWriteAt(): Promise<string | undefined> {
+    return undefined;
+  }
   async readScreenMeta(): Promise<ScreenMeta> {
     return { notes: "", tags: [] };
   }

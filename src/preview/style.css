@@ -4971,6 +4971,11 @@ button.mcp-client-row:focus-visible {
   pointer-events: none;
 }
 
+/* Same anchor as the settings menu: the toast steps aside while the menu is open (CHR-929, design note). */
+body:has(#settings-menu:not([hidden])) #update-notice {
+  visibility: hidden;
+}
+
 .update-toast {
   display: flex;
   align-items: flex-start;

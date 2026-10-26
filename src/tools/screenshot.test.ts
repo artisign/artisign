@@ -220,6 +220,34 @@ describe("getScreenshot — node/screen validation (no browser needed)", () => {
       code: "not_found",
     });
   });
+
+  // CHR-776 — a component/pattern passed as screen fails before the browser
+  // is touched; the not_found names the exact node ref to send instead.
+  it("screen not_found for a component name hints the default variant's root node ref", async () => {
+    await fx.store.writeComponent("eyebrow", `<span id="e">x</span><template data-variant="muted"><span id="m">x</span></template>`);
+    const hint = 'use node: "component:eyebrow#default.e" without screen';
+    for (const screen of ["eyebrow", "component:eyebrow", "component:eyebrow#default"]) {
+      const err = await getScreenshot(fx.store, { screen }).catch((e: unknown) => e);
+      expect(err, screen).toMatchObject({ code: "not_found" });
+      expect((err as Error).message, screen).toContain(hint);
+    }
+    const muted = await getScreenshot(fx.store, { screen: "component:eyebrow#muted" }).catch((e: unknown) => e);
+    expect((muted as Error).message).toContain('use node: "component:eyebrow#muted.m"');
+  });
+
+  it("screen not_found for a pattern name hints the pattern's root node ref", async () => {
+    await fx.store.writePattern("card", `<div id="card-root"></div>`);
+    for (const screen of ["card", "pattern:card"]) {
+      const err = await getScreenshot(fx.store, { screen }).catch((e: unknown) => e);
+      expect(err, screen).toMatchObject({ code: "not_found" });
+      expect((err as Error).message, screen).toContain('use node: "pattern:card.card-root" without screen');
+    }
+  });
+
+  it("screen not_found without a matching definition carries no hint", async () => {
+    const err = await getScreenshot(fx.store, { screen: "nope" }).catch((e: unknown) => e);
+    expect(err).toMatchObject({ code: "not_found", message: 'screen "nope" was not found' });
+  });
 });
 
 describe("getScreenshot — no usable browser", () => {

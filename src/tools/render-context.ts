@@ -19,8 +19,8 @@ import {
   type TokenRef,
 } from "../model/index.js";
 import { ToolError } from "./types.js";
-import { loadDefinitionSource } from "./definitions.js";
-import type { DefinitionNodeRef } from "./node-ref.js";
+import { loadAllDocuments, loadDefinitionSource } from "./definitions.js";
+import { formatNodeRef, type DefinitionNodeRef } from "./node-ref.js";
 
 /**
  * Ensures the project's webfonts (from typography tokens, plus Material
@@ -193,7 +193,7 @@ export async function renderScreenForBrowser(store: Store, screen: string): Prom
     rendered = await renderScreenDocument(store, screen, { fontMode: "inline" });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new ToolError("not_found", `screen "${screen}" was not found`);
+      throw new ToolError("not_found", `screen "${screen}" was not found${await definitionHint(store, screen)}`);
     }
     throw err;
   }
@@ -201,6 +201,31 @@ export async function renderScreenForBrowser(store: Store, screen: string): Prom
   if (!rootNode) throw new ToolError("not_found", `screen "${screen}" has no root node`);
 
   return { ...rendered, rootNode, viewport: resolveViewport(rootNode, rendered.ctx.tokens) };
+}
+
+/**
+ * When a missing `screen` names a component or pattern (bare `"eyebrow"`, or
+ * `"component:eyebrow#default"` / `"pattern:card"`), the hint gives the exact
+ * `node` ref to send instead — definitions are rendered via `node`, and the
+ * agent also needs the variant's root id (CHR-776). Empty string otherwise.
+ */
+async function definitionHint(store: Store, screen: string): Promise<string> {
+  let candidates: string[];
+  if (screen.startsWith("component:")) {
+    const [name, variant = "default"] = screen.slice("component:".length).split("#");
+    candidates = [`component:${name}#${variant}`];
+  } else if (screen.startsWith("pattern:")) {
+    candidates = [screen];
+  } else {
+    candidates = [`component:${screen}#default`, `pattern:${screen}`];
+  }
+
+  const { docs } = await loadAllDocuments(store, await loadRegistry(store), { screens: [] });
+  for (const address of candidates) {
+    const source = docs.find((d) => d.address === address);
+    if (source) return ` — "${source.name}" is a ${source.kind}; use node: "${formatNodeRef(address, source.doc.rootNodeId)}" without screen`;
+  }
+  return "";
 }
 
 export type RenderedDefinitionForBrowser = { doc: ScreenDocument; documentHtml: string; viewport: Viewport };

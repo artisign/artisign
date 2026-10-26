@@ -253,6 +253,12 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
     expect(tools.find((t) => t.name === "write_html")!.description).toMatch(/never style the data-slot element/);
     expect(tools.find((t) => t.name === "patch_html")!.description).toMatch(/never style the slot element/);
   });
+
+  it("states the write_html title rule in the advertised description (CHR-776)", () => {
+    expect(tools.find((t) => t.name === "write_html")!.description).toMatch(
+      /title: required to create a screen, rejected for a component\/pattern/,
+    );
+  });
 });
 
 describe("MCP server — slot-styling rule on the tool surface", () => {

@@ -1,5 +1,5 @@
 {
-  "notes": "**Status: pending approval by Christian.** CHR-925 / CHR-906. Dark state of `shell-settings-menu` — identical structure; only the root binds the `chrome-dark` token group and the theme segmented control selects Dark (`chrome-segmented` variant `dark`). Selected segment keeps a visible `chrome-border-strong` ring on `chrome-raised` (the plain fill alone does not separate from the field in dark). Switch knob stays white; on-track = dark `chrome-accent`.",
+  "notes": "**Status: approved by Christian on 2026-10-26.** CHR-925 / CHR-906. Dark state of `shell-settings-menu` — identical structure; only the root binds the `chrome-dark` token group and the theme segmented control selects Dark (`chrome-segmented` variant `dark`). Selected segment keeps a visible `chrome-border-strong` ring on `chrome-raised` (the plain fill alone does not separate from the field in dark). Switch knob stays white; on-track = dark `chrome-accent`.",
   "tags": [
     "CHR-925",
     "CHR-906"

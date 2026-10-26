@@ -412,6 +412,31 @@ A longer chain (A names B, B names C) is fine; removing the attribute always
 succeeds. A broken backdrop already on disk (hand edit, git checkout) never
 makes a read fail.
 
+**Building an overlay with a backdrop.** The backdrop is usually the
+overlay's `variant_of` parent. The renderer puts the target's rendering under
+the overlay's root as an inert, id-less layer (no clicks, no flows from it),
+clipped to the overlay root's size, so you write only the sheet:
+
+```html
+<div id="sheet-root" data-backdrop="checkout" style="width: 390px; height: 844px">
+  <div id="scrim" style="position: absolute; inset: 0; background: rgba(0,0,0,.4)" data-flow-target="checkout"></div>
+  <div id="sheet" style="position: absolute; bottom: 0; ...">...</div>
+</div>
+```
+
+Paint order: the layer sits *above* the root's own `background`, so a scrim set
+as the root's background is hidden. Make the scrim a child of the root, as
+above. A chain renders nested (A over B over C). The backdrop's nodes are not
+the overlay's: `get_node`, `patch_html`, `inspect_node` and `get_screenshot
+{node}` address the target as `"<target>.<id>"`, and an unknown ref on an
+overlay says so in its `not_found` message. `get_screen` reports
+`backdrop: "<target>"`; its `rendered_html` and the drift/`repeated_pattern`
+checks cover the screen's own nodes only. A backdrop renders without ids, so its `<style>` rules and in-document id
+references (`url(#...)`, `<use href="#...">`) do not carry over cleanly — keep
+backdrop screens to inline styles and tokens. A target that is missing or a cycle
+that reached disk by hand edit renders without the layer and outlines the
+root in red (`data-unresolved-backdrop`).
+
 Two advisory warnings, never blocking: `backdrop_candidate` on
 `write_html`/`patch_html` when an `overlay` variant without `data-backdrop`
 has at least half of its own nodes (and at least 20) repeating its parent — add

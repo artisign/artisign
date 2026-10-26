@@ -27,7 +27,19 @@ export type RenderContext = {
   componentDefs: Map<string, ComponentDefinitionSummary>;
   /** Set by callers that know — `false` flags `.icon` usage with the unresolved-icon-font diagnostic. `undefined`/omitted renders no diagnostic, matching every existing call site that doesn't set it. */
   iconFontAvailable?: boolean;
+  /** Renders without `id` and `data-flow-*` — the inert backdrop layer (ADR-008) must not duplicate the overlay's ids or carry its own click routes. */
+  anonymous?: boolean;
 };
+
+/** What `renderScreen` needs to compose a backdrop under the root; the layer HTML is rendered by the caller (this module has no store). */
+export type BackdropRender = {
+  /** The target's rendered root (itself anonymous). Absent: no layer, nothing to show. */
+  layerHtml?: string;
+  /** Marks the root `data-unresolved-backdrop` (missing target, or a cycle on disk). */
+  unresolved?: boolean;
+};
+
+const BACKDROP_LAYER_STYLE = "position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:-1";
 
 type AttrSource = {
   attributes: Record<string, string>;
@@ -138,7 +150,8 @@ function hasIconClass(cls: string | undefined): boolean {
  * silently degrades to literal ligature text (e.g. "search") with no
  * visual signal at all.
  */
-function buildAttrs(source: AttrSource, tokens: TokensDocument, flow: Flow | undefined, iconFontAvailable: boolean | undefined): [string, string][] {
+function buildAttrs(source: AttrSource, ctx: RenderContext, flow: Flow | undefined): [string, string][] {
+  const { tokens, iconFontAvailable } = ctx;
   const isSvgDomain = source.kind === "svg" || source.kind === "svg_path";
   const attrs: [string, string][] = [];
   const unresolved: string[] = [];
@@ -151,7 +164,7 @@ function buildAttrs(source: AttrSource, tokens: TokensDocument, flow: Flow | und
 
   if (source.refs.variant) attrs.push(["data-variant", source.refs.variant]);
 
-  if (flow) {
+  if (flow && !ctx.anonymous) {
     attrs.push(["data-flow-target", flow.targetId]);
     if (flow.triggerEvent !== "tap") attrs.push(["data-flow-trigger", flow.triggerEvent]);
   }
@@ -173,10 +186,20 @@ function buildAttrs(source: AttrSource, tokens: TokensDocument, flow: Flow | und
 
   for (const [key, value] of Object.entries(source.attributes)) {
     if (key === "class" || key === "data-slot") continue;
+    if (ctx.anonymous && key.startsWith("data-flow-")) continue;
     attrs.push([key, value]);
   }
 
   return attrs;
+}
+
+/** `id` as an attribute pair, or nothing in an anonymous render. */
+function idAttr(ctx: RenderContext, id: string | undefined): [string, string][] {
+  return id === undefined || ctx.anonymous ? [] : [["id", id]];
+}
+
+function idAttrStr(ctx: RenderContext, id: string): string {
+  return ctx.anonymous ? "" : ` id="${escapeAttr(id)}"`;
 }
 
 function attrsToString(attrs: [string, string][]): string {
@@ -248,30 +271,57 @@ function renderSubtree(sub: NodeSubtree, ctx: RenderContext, origin: Origin, fil
 
   const authoredId = fillAuthoredId(sub, origin);
   const tag = sub.tag ?? "div";
-  const attrs: [string, string][] = [
-    ...(authoredId === undefined ? [] : [["id", authoredId] as [string, string]]),
-    ...buildAttrs(sub, ctx.tokens, undefined, ctx.iconFontAvailable),
-  ];
+  const attrs: [string, string][] = [...idAttr(ctx, authoredId), ...buildAttrs(sub, ctx, undefined)];
   const attrStr = attrsToString(attrs);
   if (VOID_ELEMENTS.has(tag)) return `<${tag}${attrStr ? ` ${attrStr}` : ""}>`;
   const inner = sub.children.map((child) => renderSubtree(child, ctx, origin, fillIds, sub)).join("");
   return `<${tag}${attrStr ? ` ${attrStr}` : ""}>${inner}</${tag}>`;
 }
 
-function renderNode(nodeId: string, doc: ScreenDocument, ctx: RenderContext, flowsByTrigger: Map<string, Flow>): string {
+function renderNode(
+  nodeId: string,
+  doc: ScreenDocument,
+  ctx: RenderContext,
+  flowsByTrigger: Map<string, Flow>,
+  backdrop?: BackdropRender,
+): string {
   const node = doc.nodes[nodeId];
   if (!node) return "";
   if (node.kind === "text") return escapeTextIn(doc.nodes[node.parentId ?? ""], node.text ?? "");
   if (node.kind === "component_instance") {
-    return renderComponentInstance(node, ctx, flowsByTrigger.get(node.id), SCREEN_ORIGIN, node.id);
+    return renderComponentInstance(node, ctx, flowsByTrigger.get(node.id), SCREEN_ORIGIN, node.id, backdrop);
   }
 
   const tag = node.tag ?? "div";
-  const attrs: [string, string][] = [["id", node.id], ...buildAttrs(node, ctx.tokens, flowsByTrigger.get(node.id), ctx.iconFontAvailable)];
+  const attrs: [string, string][] = [...idAttr(ctx, node.id), ...buildAttrs(node, ctx, flowsByTrigger.get(node.id))];
+  if (backdrop) applyBackdropAttrs(attrs, backdrop);
   const attrStr = attrsToString(attrs);
   if (VOID_ELEMENTS.has(tag)) return `<${tag}${attrStr ? ` ${attrStr}` : ""}>`;
-  const inner = node.childIds.map((childId) => renderNode(childId, doc, ctx, flowsByTrigger)).join("");
+  const inner = backdropLayer(backdrop) + node.childIds.map((childId) => renderNode(childId, doc, ctx, flowsByTrigger)).join("");
   return `<${tag}${attrStr ? ` ${attrStr}` : ""}>${inner}</${tag}>`;
+}
+
+function backdropLayer(backdrop: BackdropRender | undefined): string {
+  return backdrop?.layerHtml === undefined ? "" : `<div data-backdrop-layer inert style="${BACKDROP_LAYER_STYLE}">${backdrop.layerHtml}</div>`;
+}
+
+/**
+ * The overlay root's attributes for a backdrop: `isolation: isolate` so the
+ * layer's `z-index: -1` stays inside the root, `position: relative` unless the
+ * root declares a position (the layer is absolutely positioned against it),
+ * and the unresolved marker. The root's own background paints beneath the
+ * layer — a scrim has to be a child.
+ */
+function applyBackdropAttrs(attrs: [string, string][], backdrop: BackdropRender): void {
+  if (backdrop.unresolved) attrs.push(["data-unresolved-backdrop", ""]);
+  if (backdrop.layerHtml === undefined) return;
+  // Read off the rendered style, so tokens and an expanded component root count too; `static` is no position at all.
+  const position = /(?:^|;)\s*position\s*:\s*([^;]+)/i.exec(attrs.find(([key]) => key === "style")?.[1] ?? "")?.[1]?.trim().toLowerCase();
+  const declaresPosition = position !== undefined && position !== "static";
+  const extra = `isolation: isolate${declaresPosition ? "" : "; position: relative"}`;
+  const style = attrs.find(([key]) => key === "style");
+  if (style) style[1] = `${style[1]}; ${extra}`;
+  else attrs.push(["style", extra]);
 }
 
 /**
@@ -479,22 +529,23 @@ function renderComponentInstance(
   flow: Flow | undefined,
   origin: Origin,
   rootId: string,
+  backdrop?: BackdropRender,
 ): string {
   const componentName = instance.refs.component ?? "";
 
   if (origin.path.has(componentName)) {
-    return `<div id="${escapeAttr(rootId)}" data-recursive-component="${escapeAttr(componentName)}"></div>`;
+    return `<div${idAttrStr(ctx, rootId)} data-recursive-component="${escapeAttr(componentName)}"></div>`;
   }
 
   const def = ctx.componentDefs.get(componentName);
   if (!def) {
-    return `<div id="${escapeAttr(rootId)}" data-unresolved-component="${escapeAttr(componentName)}"></div>`;
+    return `<div${idAttrStr(ctx, rootId)} data-unresolved-component="${escapeAttr(componentName)}"></div>`;
   }
 
   const variantName = instance.refs.variant ?? def.defaultVariant;
   const variant = def.variants.find((v) => v.name === variantName) ?? def.variants[0];
   if (!variant) {
-    return `<div id="${escapeAttr(rootId)}" data-empty-component="${escapeAttr(def.name)}"></div>`;
+    return `<div${idAttrStr(ctx, rootId)} data-empty-component="${escapeAttr(def.name)}"></div>`;
   }
 
   const { doc: templateDoc, errors } = parseScreen(variant.htmlAug, "__component__", ctx.registry);
@@ -505,7 +556,7 @@ function renderComponentInstance(
   // unresolved token ref degrades to a `/* unresolved: $path */` comment at
   // screen level rather than blocking the whole render.
   if (errors.some((e) => e.code === "malformed_html")) {
-    return `<div id="${escapeAttr(rootId)}" data-invalid-component="${escapeAttr(def.name)}"></div>`;
+    return `<div${idAttrStr(ctx, rootId)} data-invalid-component="${escapeAttr(def.name)}"></div>`;
   }
 
   const substitutions = resolveSlotSubstitutions(templateDoc, instance);
@@ -513,13 +564,13 @@ function renderComponentInstance(
   nextPath.add(componentName);
   // No flow here: `renderTemplateNode` already applies it to the expanded
   // root, and `mergeInstanceAttrs` would otherwise emit it a second time.
-  const instanceAttrs = buildAttrs(instance, ctx.tokens, undefined, ctx.iconFontAvailable);
+  const instanceAttrs = buildAttrs(instance, ctx, undefined);
   // The slot fills were authored where the instance sits, not inside the
   // template they are substituted into — so they render under `origin`, the
   // instance's own authoring context, while the template renders under the
   // extended path. Id-less instances among them get ids under this root.
   const fillIds: FillIds = { base: rootId, count: 0 };
-  return renderTemplateNode(templateDoc.rootNodeId, templateDoc, ctx, rootId, variantName, flow, substitutions, nextPath, instanceAttrs, origin, fillIds);
+  return renderTemplateNode(templateDoc.rootNodeId, templateDoc, ctx, rootId, variantName, flow, substitutions, nextPath, instanceAttrs, origin, fillIds, backdrop);
 }
 
 function renderTemplateNode(
@@ -534,6 +585,7 @@ function renderTemplateNode(
   instanceAttrs: [string, string][],
   fillOrigin: Origin,
   fillIds: FillIds,
+  backdrop?: BackdropRender,
 ): string {
   const node = templateDoc.nodes[nodeId];
   if (!node) return "";
@@ -567,18 +619,20 @@ function renderTemplateNode(
 
   const tag = node.tag ?? "div";
 
-  const templateAttrs = buildAttrs(node, ctx.tokens, isRoot ? flow : undefined, ctx.iconFontAvailable);
+  const templateAttrs = buildAttrs(node, ctx, isRoot ? flow : undefined);
   const attrs: [string, string][] = [
-    ["id", renderedId],
+    ...idAttr(ctx, renderedId),
     ...(isRoot ? mergeInstanceAttrs(templateAttrs, instanceAttrs) : templateAttrs),
   ];
   // buildAttrs already emitted data-variant if the template's own root
   // happens to declare one — only add the selected variant's name if it didn't.
   if (isRoot && !node.refs.variant) attrs.push(["data-variant", variantName]);
+  // Only the expanded root of a screen's own instance gets a backdrop (the caller passes none for nested ones).
+  if (isRoot && backdrop) applyBackdropAttrs(attrs, backdrop);
   const attrStr = attrsToString(attrs);
   if (VOID_ELEMENTS.has(tag)) return `<${tag}${attrStr ? ` ${attrStr}` : ""}>`;
 
-  const inner = node.childIds
+  const inner = (isRoot ? backdropLayer(backdrop) : "") + node.childIds
     .map((childId) =>
       renderTemplateNode(childId, templateDoc, ctx, rootId, variantName, flow, substitutions, expansionPath, instanceAttrs, fillOrigin, fillIds),
     )
@@ -587,9 +641,9 @@ function renderTemplateNode(
   return `<${tag}${attrStr ? ` ${attrStr}` : ""}>${inner}</${tag}>`;
 }
 
-export function renderScreen(doc: ScreenDocument, ctx: RenderContext): string {
+export function renderScreen(doc: ScreenDocument, ctx: RenderContext, backdrop?: BackdropRender): string {
   const flowsByTrigger = new Map(doc.flows.map((flow) => [flow.triggerNodeId, flow]));
-  return renderNode(doc.rootNodeId, doc, ctx, flowsByTrigger);
+  return renderNode(doc.rootNodeId, doc, ctx, flowsByTrigger, backdrop);
 }
 
 export type SlotFillEntry = { slot: string; id: string | undefined; subtree: NodeSubtree };

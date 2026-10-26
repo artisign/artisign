@@ -808,3 +808,18 @@ describe("renderScreen — raw-text <style> content", () => {
     expect(renderScreen(doc, makeContext())).toBe(`<div id="n1">a &lt; b &amp; c</div>`);
   });
 });
+
+describe("renderScreen — anonymous render", () => {
+  it("drops ids and data-flow-* everywhere, including slot fills and expanded templates", () => {
+    const ctx = makeContext({ anonymous: true });
+    const { doc } = parseScreen(
+      `<div id="n1" data-flow-target="home"><button id="n2" class="$btn-primary" data-flow-target="home" data-flow-trigger="hover"><span data-slot="label" id="n3" data-flow-target="home">Go</span></button></div>`,
+      "s",
+      ctx.registry,
+    );
+    const html = renderScreen(doc, ctx);
+    expect(html).not.toMatch(/\sid=/);
+    expect(html).not.toContain("data-flow-");
+    expect(html).toContain("Go");
+  });
+});

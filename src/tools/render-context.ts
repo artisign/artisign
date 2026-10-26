@@ -5,6 +5,7 @@ import {
   parseComponentDefinition,
   parseScreen,
   renderScreen,
+  type BackdropRender,
   wrapRenderedHtml,
   extractFontFamilies,
   ensureFontsCached,
@@ -19,6 +20,7 @@ import {
   type TokenRef,
 } from "../model/index.js";
 import { ToolError } from "./types.js";
+import { rootBackdrop } from "./backdrop.js";
 import { loadAllDocuments, loadDefinitionSource } from "./definitions.js";
 import { formatNodeRef, type DefinitionNodeRef } from "./node-ref.js";
 
@@ -70,6 +72,31 @@ export type RenderedScreenDocument = {
 };
 
 /**
+ * Resolves `doc`'s backdrop chain into what `renderScreen` composes under its
+ * root (ADR-008): each target is read, parsed and rendered anonymously, with
+ * its own backdrop nested inside it. `visited` ends a cycle on disk at the
+ * first repeated screen, a missing or unreadable target ends the chain, and
+ * either way the root that named it is marked unresolved — never a throw.
+ */
+async function resolveBackdrop(store: Store, doc: ScreenDocument, ctx: RenderContext, visited: Set<string>): Promise<BackdropRender | undefined> {
+  const target = rootBackdrop(doc);
+  if (target === undefined) return undefined;
+  if (visited.has(target)) return { unresolved: true };
+  let targetDoc: ScreenDocument;
+  try {
+    const parsed = parseScreen(await store.readScreen(target), target, ctx.registry);
+    // The same rule an unparseable component template gets: no usable tree.
+    if (parsed.errors.some((e) => e.code === "malformed_html")) return { unresolved: true };
+    targetDoc = parsed.doc;
+  } catch {
+    return { unresolved: true };
+  }
+  visited.add(target);
+  const anonymous: RenderContext = { ...ctx, anonymous: true };
+  return { layerHtml: renderScreen(targetDoc, anonymous, await resolveBackdrop(store, targetDoc, anonymous, visited)) };
+}
+
+/**
  * Reads and renders a screen to a standalone HTML document: parse ->
  * resolve refs -> wrap with `@font-face` CSS -> resolve `assets/*`
  * references. Shared by `/api/render/*` (preview iframe) and
@@ -86,11 +113,15 @@ export type RenderedScreenDocument = {
  * two-mode treatment via `resolveAssetRefs` — `fontMode` doubles as the
  * asset mode, since both exist for the same reason (a `setContent` page has
  * no HTTP base URL).
+ *
+ * A root carrying `data-backdrop` renders the composite — the target's
+ * rendering as an inert layer under it, transitively. `backdrop: "omit"`
+ * renders the screen's own nodes only (`get_screen`'s `rendered_html`).
  */
 export async function renderScreenDocument(
   store: Store,
   screen: string,
-  options: { fontMode: "url" | "inline" },
+  options: { fontMode: "url" | "inline"; backdrop?: "omit" },
 ): Promise<RenderedScreenDocument> {
   const html = await store.readScreen(screen);
   const ctx = await buildRenderContext(store);
@@ -99,8 +130,9 @@ export async function renderScreenDocument(
   const fontFaceCss = await resolveFontFaceCss(store, ctx.tokens, options.fontMode);
   ctx.iconFontAvailable = isMaterialSymbolsAvailable(store.projectDir);
 
+  const backdrop = options.backdrop === "omit" ? undefined : await resolveBackdrop(store, doc, ctx, new Set([screen]));
   const documentHtml = await resolveAssetRefs(
-    wrapRenderedHtml(renderScreen(doc, ctx), { fontFaceCss }),
+    wrapRenderedHtml(renderScreen(doc, ctx, backdrop), { fontFaceCss }),
     store,
     options.fontMode,
   );

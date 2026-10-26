@@ -4,6 +4,7 @@
 // body, the real modules, a stubbed daemon (fetch + EventSource).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
+import { fakeSettings } from "./fake-settings.test-helper.js";
 
 const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
 
@@ -20,10 +21,15 @@ const storageStub = {
   getItem: (k) => memoryStorage.get(k) ?? null,
   setItem: (k, v) => void memoryStorage.set(k, String(v)),
   removeItem: (k) => void memoryStorage.delete(k),
+  get length() { return memoryStorage.size; },
+  key: (i) => [...memoryStorage.keys()][i] ?? null,
   clear: () => memoryStorage.clear(),
 };
 
+let settings;
+
 function stubDaemon() {
+  settings = fakeSettings();
   vi.stubGlobal("localStorage", storageStub);
   Object.defineProperty(window, "localStorage", { configurable: true, value: storageStub });
   calls = [];
@@ -43,6 +49,8 @@ function stubDaemon() {
   vi.stubGlobal("fetch", async (url, init) => {
     calls.push(String(url));
     const path = String(url).split("?")[0];
+    const settingsRes = settings.handle(path, init);
+    if (settingsRes) return settingsRes;
     const json = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => "" });
     if (path === "/api/projects") return json({ active: "/p", open: [{ root: "/p", name: "p" }], recent: [] });
     if (path === "/api/screens") return json({ screens });
@@ -279,7 +287,11 @@ describe("per-browser state", () => {
 
     vi.resetModules();
     document.body.innerHTML = bodyHtml;
+    // CHR-924: the daemon's settings carry the state over, not this browser's localStorage.
+    const daemonSettings = settings;
+    memoryStorage.clear();
     stubDaemon();
+    settings = daemonSettings;
     await import("./app.js");
     await flush();
     expect($("#compare-view").hidden).toBe(false);

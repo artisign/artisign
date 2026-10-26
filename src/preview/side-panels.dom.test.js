@@ -4,6 +4,7 @@
 // Screens expanded, Context and Elements collapsed; a stored pref always wins.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
+import { fakeSettings } from "./fake-settings.test-helper.js";
 
 const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
 
@@ -12,18 +13,25 @@ const storageStub = {
   getItem: (k) => memoryStorage.get(k) ?? null,
   setItem: (k, v) => void memoryStorage.set(k, String(v)),
   removeItem: (k) => void memoryStorage.delete(k),
+  get length() { return memoryStorage.size; },
+  key: (i) => [...memoryStorage.keys()][i] ?? null,
   clear: () => memoryStorage.clear(),
 };
 
+let settings;
+
 function stubDaemon() {
+  settings = fakeSettings();
   vi.stubGlobal("localStorage", storageStub);
   Object.defineProperty(window, "localStorage", { configurable: true, value: storageStub });
   vi.stubGlobal("EventSource", class { close() {} });
   vi.stubGlobal("requestAnimationFrame", (cb) => cb());
   vi.stubGlobal("CSS", { escape: (s) => s });
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
-  vi.stubGlobal("fetch", async (url) => {
+  vi.stubGlobal("fetch", async (url, init) => {
     const path = String(url).split("?")[0];
+    const settingsRes = settings.handle(path, init);
+    if (settingsRes) return settingsRes;
     const json = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => "" });
     if (path === "/api/projects") return json({ active: "/p", open: [{ root: "/p", name: "p" }], recent: [] });
     if (path === "/api/screens") return json({ screens: [] });
@@ -87,7 +95,8 @@ describe("side panel defaults", () => {
     await boot();
     document.getElementById("inspector-collapse").click();
     expect(state("inspector")).toBe("false");
-    expect(memoryStorage.get("artisign.inspector.collapsed")).toBe("false");
+    await flush();
+    expect(settings.prefs["artisign.inspector.collapsed"]).toBe("false");
   });
 
   it("comment mode opens Context, inspect mode opens Elements", async () => {
@@ -100,6 +109,7 @@ describe("side panel defaults", () => {
     expect([state("sidebar-context"), state("inspector")]).toEqual(["false", "true"]);
     inspect.click();
     expect(state("inspector")).toBe("false");
-    expect(memoryStorage.get("artisign.inspector.collapsed")).toBe("false");
+    await flush();
+    expect(settings.prefs["artisign.inspector.collapsed"]).toBe("false");
   });
 });

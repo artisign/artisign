@@ -9,6 +9,8 @@ import { handlePreviewRoutes } from "./preview-routes.js";
 import { handleCommentsRoutes } from "./comments-routes.js";
 import { handleProjectsApi } from "./projects-routes.js";
 import { handleFsApi } from "./fs-routes.js";
+import { handleAboutApi } from "./about-routes.js";
+import { handleSetupApi } from "./setup-routes.js";
 import { handleSseConnection } from "./sse.js";
 import { isAllowedOrigin, hasJsonContentType } from "./origin-guard.js";
 import { sendJson } from "./json.js";
@@ -234,7 +236,7 @@ export type HttpServer = {
  * The version this process started with. Read once: `npm install -g` overwrites package.json while an old daemon keeps
  * running its old code, and `/health` must not claim the new version for it (`update` and `setup` compare against it).
  */
-const STARTED_VERSION = readVersion();
+export const STARTED_VERSION = readVersion();
 
 /**
  * Routes every request. `/health`, `/api/projects*`, `/api/fs/dirs`, and the
@@ -264,9 +266,11 @@ export function createServer(registry: ProjectRegistry): HttpServer {
     const isCommentsApi = url.pathname === "/api/comments";
     const isProjectsApi = url.pathname === "/api/projects" || url.pathname.startsWith("/api/projects/");
     const isFsApi = (req.method === "GET" || req.method === "POST") && url.pathname === "/api/fs/dirs";
+    const isAboutApi = url.pathname === "/api/about";
+    const isSetupApi = url.pathname === "/api/setup";
     const isSse = req.method === "GET" && url.pathname === "/events";
     const isApiPath = url.pathname.startsWith("/api/");
-    const isPreviewApi = req.method === "GET" && isApiPath && !isToolsApi && !isCommentsApi && !isProjectsApi && !isFsApi;
+    const isPreviewApi = req.method === "GET" && isApiPath && !isToolsApi && !isCommentsApi && !isProjectsApi && !isFsApi && !isAboutApi && !isSetupApi;
 
     // A `handle*Routes` helper returns `false` when it recognized the path
     // prefix but not this exact method/pattern (e.g. DELETE /api/comments,
@@ -277,7 +281,7 @@ export function createServer(registry: ProjectRegistry): HttpServer {
       if (!handled) sendJson(res, 404, { code: "not_found", message: "unknown API route" });
     };
 
-    if (isMcp || isToolsApi || isCommentsApi || isProjectsApi || isFsApi || isSse || isPreviewApi) {
+    if (isMcp || isToolsApi || isCommentsApi || isProjectsApi || isFsApi || isAboutApi || isSetupApi || isSse || isPreviewApi) {
       if (!isAllowedOrigin(req) || (req.method === "POST" && !hasJsonContentType(req))) {
         rejectForbidden(res);
         return;
@@ -290,6 +294,16 @@ export function createServer(registry: ProjectRegistry): HttpServer {
 
       if (isFsApi) {
         handleFsApi(req, res).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
+        return;
+      }
+
+      if (isAboutApi) {
+        handleAboutApi(req, res, STARTED_VERSION).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
+        return;
+      }
+
+      if (isSetupApi) {
+        handleSetupApi(req, res, STARTED_VERSION).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
         return;
       }
 

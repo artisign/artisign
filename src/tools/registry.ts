@@ -175,7 +175,7 @@ export const TOOLS: ToolDefinition[] = [
   // Writes ----------------------------------------------------------------
   tool(
     "write_html",
-    "Create or fully replace a screen from augmented HTML (html_aug; grammar in the server instructions) with one root element. kind:\"component\"|\"pattern\" writes a design-system definition instead, named by screen: a default-variant root plus optional sibling <template data-variant=\"x\"> blocks, each the complete variant. In a definition, never style the data-slot element itself — an instance discards that style; style a wrapper.",
+    "Create or fully replace a screen from augmented HTML (html_aug; grammar in the server instructions) with one root element. title: required to create a screen, rejected for a component/pattern. kind:\"component\"|\"pattern\" writes a design-system definition instead, named by screen: a default-variant root plus optional sibling <template data-variant=\"x\"> blocks, each the complete variant. In a definition, never style the data-slot element itself — an instance discards that style; style a wrapper.",
     {
       screen: z.string(),
       mode: z.enum(["create", "replace"]),

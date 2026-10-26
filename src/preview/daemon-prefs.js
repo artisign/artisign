@@ -4,6 +4,10 @@ import { fetchSettings, saveSettings, importSettings } from "./api.js";
 
 const CURRENT_PREFIX = "artisign.";
 const LEGACY_PREFIX = "uxd.";
+// The daemon's limits (src/http/settings-routes.ts). The carry-over skips anything beyond them: one oversized value must not fail the import and leave the settings unmigrated on every boot.
+const MAX_KEYS = 500;
+const MAX_KEY_LENGTH = 200;
+const MAX_VALUE_LENGTH = 10_000;
 
 /**
  * A `Storage`-shaped adapter over an in-memory map. Writes are visible at once and flushed to `save` in a microtask, so a burst of changes becomes one request; flushes are chained so the daemon sees them in order. `save` is null for the offline fallback (nothing persisted).
@@ -64,6 +68,10 @@ export function collectLocalPrefs(local) {
       else if (key.startsWith(LEGACY_PREFIX)) legacy[CURRENT_PREFIX + key.slice(LEGACY_PREFIX.length)] = value;
     }
     for (const [key, value] of Object.entries(legacy)) if (!(key in out)) out[key] = value;
+    for (const [key, value] of Object.entries(out)) {
+      if (key.length > MAX_KEY_LENGTH || value.length > MAX_VALUE_LENGTH) delete out[key];
+    }
+    for (const key of Object.keys(out).slice(MAX_KEYS)) delete out[key];
   } catch {
     // ignore — a localStorage that throws simply has nothing to carry over
   }
@@ -71,7 +79,7 @@ export function collectLocalPrefs(local) {
 }
 
 /**
- * Loads the daemon settings and returns the storage the preview reads its prefs from. Unmigrated settings trigger the one-time carry-over of `local`'s prefs (localStorage itself is left untouched, so a downgrade still finds them). If the settings cannot be loaded the result is an in-memory storage with no persistence — defaults apply.
+ * Loads the daemon settings and returns the storage the preview reads its prefs from. Unmigrated settings trigger the one-time carry-over of `local`'s prefs (localStorage is left as it is — only the theme mirror is rewritten — so a downgrade still finds them). If the settings cannot be loaded the result is an in-memory storage with no persistence — defaults apply.
  *
  * @param {Storage | null} local
  * @returns {Promise<ReturnType<typeof createDaemonStorage>>}

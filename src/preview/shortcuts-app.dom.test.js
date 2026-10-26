@@ -3,6 +3,7 @@
 // CHR-916 — the keyboard shortcuts wired in app.js end to end: the real index.html body, the real modules, a stubbed daemon. The mapping and the guards are unit-tested in shortcuts.test.js; this checks that a key runs the same code path as the click and that the guards hold in the real DOM.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
+import { fakeSettings } from "./fake-settings.test-helper.js";
 
 const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
 
@@ -16,18 +17,25 @@ const storageStub = {
   getItem: (k) => memoryStorage.get(k) ?? null,
   setItem: (k, v) => void memoryStorage.set(k, String(v)),
   removeItem: (k) => void memoryStorage.delete(k),
+  get length() { return memoryStorage.size; },
+  key: (i) => [...memoryStorage.keys()][i] ?? null,
   clear: () => memoryStorage.clear(),
 };
 
+let settings;
+
 function stubDaemon() {
+  settings = fakeSettings();
   vi.stubGlobal("localStorage", storageStub);
   Object.defineProperty(window, "localStorage", { configurable: true, value: storageStub });
   vi.stubGlobal("EventSource", class { close() {} });
   vi.stubGlobal("requestAnimationFrame", (cb) => cb());
   vi.stubGlobal("CSS", { escape: (s) => s });
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
-  vi.stubGlobal("fetch", async (url) => {
+  vi.stubGlobal("fetch", async (url, init) => {
     const path = String(url).split("?")[0];
+    const settingsRes = settings.handle(path, init);
+    if (settingsRes) return settingsRes;
     const json = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => "" });
     if (path === "/api/projects") return json({ active: "/p", open: [{ root: "/p", name: "p" }], recent: [] });
     if (path === "/api/screens") return json({ screens: SCREENS });
@@ -191,7 +199,8 @@ describe("views, panels, filter, theme", () => {
     await boot();
     key("[");
     expect($("#sidebar-screens").dataset.collapsed).toBe("true");
-    expect(memoryStorage.get("artisign.sidebar-screens.collapsed")).toBe("true");
+    await flush();
+    expect(settings.prefs["artisign.sidebar-screens.collapsed"]).toBe("true");
     key("\\");
     expect($("#sidebar-context").dataset.collapsed).toBe("false");
     key("]");
@@ -457,7 +466,8 @@ describe("zoom steps", () => {
     flow.focus();
     shift("%", "Digit5");
     expect($("#zoom-label").textContent).toBe("50%");
-    expect(memoryStorage.get("artisign.zoom")).toBe("0.5");
+    await flush();
+    expect(settings.prefs["artisign.zoom"]).toBe("0.5");
     expect(document.activeElement).toBe(flow);
   });
 });

@@ -29,6 +29,7 @@
     "dist",
     "src/preview",
     "!src/preview/*.test.js",
+    "!src/preview/*.test-helper.js",
     "assets",
     "CHANGELOG.md",
     "docs/agent-guide.md",

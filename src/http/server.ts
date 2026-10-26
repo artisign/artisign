@@ -11,6 +11,7 @@ import { handleProjectsApi } from "./projects-routes.js";
 import { handleFsApi } from "./fs-routes.js";
 import { handleWhatsNewApi } from "./whats-new-routes.js";
 import { readChangelog } from "../changelog.js";
+import { handleSettingsApi } from "./settings-routes.js";
 import { handleSseConnection } from "./sse.js";
 import { isAllowedOrigin, hasJsonContentType } from "./origin-guard.js";
 import { sendJson } from "./json.js";
@@ -269,9 +270,10 @@ export function createServer(registry: ProjectRegistry): HttpServer {
     const isProjectsApi = url.pathname === "/api/projects" || url.pathname.startsWith("/api/projects/");
     const isFsApi = (req.method === "GET" || req.method === "POST") && url.pathname === "/api/fs/dirs";
     const isWhatsNewApi = url.pathname === "/api/whats-new";
+    const isSettingsApi = url.pathname === "/api/settings" || url.pathname.startsWith("/api/settings/");
     const isSse = req.method === "GET" && url.pathname === "/events";
     const isApiPath = url.pathname.startsWith("/api/");
-    const isPreviewApi = req.method === "GET" && isApiPath && !isToolsApi && !isCommentsApi && !isProjectsApi && !isFsApi && !isWhatsNewApi;
+    const isPreviewApi = req.method === "GET" && isApiPath && !isToolsApi && !isCommentsApi && !isProjectsApi && !isFsApi && !isWhatsNewApi && !isSettingsApi;
 
     // A `handle*Routes` helper returns `false` when it recognized the path
     // prefix but not this exact method/pattern (e.g. DELETE /api/comments,
@@ -282,7 +284,7 @@ export function createServer(registry: ProjectRegistry): HttpServer {
       if (!handled) sendJson(res, 404, { code: "not_found", message: "unknown API route" });
     };
 
-    if (isMcp || isToolsApi || isCommentsApi || isProjectsApi || isFsApi || isWhatsNewApi || isSse || isPreviewApi) {
+    if (isMcp || isToolsApi || isCommentsApi || isProjectsApi || isFsApi || isWhatsNewApi || isSettingsApi || isSse || isPreviewApi) {
       if (!isAllowedOrigin(req) || (req.method === "POST" && !hasJsonContentType(req))) {
         rejectForbidden(res);
         return;
@@ -300,6 +302,11 @@ export function createServer(registry: ProjectRegistry): HttpServer {
 
       if (isWhatsNewApi) {
         handleWhatsNewApi(req, res, STARTED_VERSION, STARTED_CHANGELOG).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
+        return;
+      }
+
+      if (isSettingsApi) {
+        handleSettingsApi(req, res).then(respondUnhandled).catch((err: unknown) => failSafe(res, err));
         return;
       }
 

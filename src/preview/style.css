@@ -4962,11 +4962,11 @@ button.mcp-client-row:focus-visible {
   color: var(--chrome-text-tertiary);
 }
 
-/* Update notice (CHR-927, `shell-update-notice`): a toast over the bottom-right of the canvas area. The region is out of the layout (absolute inside #main); dialogs and menus sit above it. */
+/* Update notice (CHR-927, `shell-update-notice`): a toast in the upper right corner, right below the settings trigger and aligned to it like the settings menu — over the side panels if they are open (CHR-929). Fixed, so it never moves the layout; the settings menu and dialogs sit above it. */
 #update-notice {
-  position: absolute;
-  right: var(--space-xl);
-  bottom: var(--space-xl);
+  position: fixed;
+  top: calc(var(--size-bar-main) + var(--space-xs));
+  right: var(--space-lg);
   z-index: 10;
   pointer-events: none;
 }

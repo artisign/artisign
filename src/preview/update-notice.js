@@ -1,4 +1,4 @@
-// Update notice (CHR-927, `shell-update-notice`): a toast bottom-right of the canvas area when the daemon reports a newer release. Closing it hides that version for the rest of the local calendar day; the pref (`<day>|<version>`) is daemon-stored, so it holds in every browser, and a newer release shows again at once. Copy only — updating is `artisign update` in a terminal.
+// Update notice (CHR-927, `shell-update-notice`): a toast in the upper right corner, right below the settings trigger (CHR-929) when the daemon reports a newer release. Closing it hides that version for the rest of the local calendar day; the pref (`<day>|<version>`) is daemon-stored, so it holds in every browser, and a newer release shows again at once. Copy only — updating is `artisign update` in a terminal.
 
 import { readStringPref, writeStringPref } from "./prefs.js";
 import { createCopyChip } from "./clipboard.js";
@@ -42,3 +42,4 @@ export function createUpdateNotice({ toastEl, titleEl, commandEl, closeEl, stora
 
   return { render };
 }
+

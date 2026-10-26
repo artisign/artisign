@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { mkdtemp, rm, cp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setupProject, estimateTokens, type ProjectFixture } from "./test-fixtures.js";
 import { inspectNode } from "./inspect-node.js";
 import { NO_BROWSER_MESSAGE, BROWSER_ENV, discoverBrowsers, selectBrowser } from "./browser.js";
-import { __setBrowserForTests, __resetBrowserForTests } from "./browser.js";
+import { __setBrowserForTests, __resetBrowserForTests, getBrowser } from "./browser.js";
 import { FsStore } from "../store/index.js";
 import { ToolError } from "./types.js";
 
@@ -76,6 +76,10 @@ describe("inspectNode — no usable browser", () => {
 describe.skipIf(!isBrowserAvailable())("inspectNode — e2e (installed browser)", () => {
   let dir: string;
   let store: FsStore;
+
+  // The first launch reads the browser from a cold disk (CHR-885) — give it its
+  // own budget, so the tests' 30 s cover rendering only.
+  beforeAll(() => getBrowser(), 90_000);
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "artisign-inspect-node-e2e-"));

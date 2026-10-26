@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { patchHtml } from "./writes.js";
 import { inspectNode } from "./inspect-node.js";
 import { getNode } from "./reads.js";
-import { __resetBrowserForTests, BROWSER_ENV, discoverBrowsers } from "./browser.js";
+import { __resetBrowserForTests, BROWSER_ENV, discoverBrowsers, getBrowser } from "./browser.js";
 
 function isBrowserAvailable(): boolean {
   return Boolean(process.env[BROWSER_ENV]) || discoverBrowsers().length > 0;
@@ -200,6 +200,10 @@ describe("patch_html — nodes inside a slot fill (CHR-746)", () => {
 
 describe.skipIf(!isBrowserAvailable())("inspect_node — nodes inside a slot fill (CHR-746)", () => {
   let fx: ProjectFixture;
+
+  // The first launch reads the browser from a cold disk (CHR-885) — give it its
+  // own budget, so the tests' 30 s cover rendering only.
+  beforeAll(() => getBrowser(), 90_000);
   beforeEach(async () => {
     fx = await setupProject();
     await setup(fx);

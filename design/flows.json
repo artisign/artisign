@@ -226,5 +226,29 @@
     "event": "tap",
     "to": "open-project-dialog-new-folder",
     "to_kind": "screen"
+  },
+  {
+    "from": "shell-settings-menu.item-mcp",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-settings-menu.item-whats-new",
+    "event": "tap",
+    "to": "shell-whats-new",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog.dlg-done",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-whats-new.wn-close",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
   }
 ]

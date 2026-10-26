@@ -151,3 +151,20 @@ describe("What's New from the settings menu", () => {
     expect(document.activeElement).toBe($("#settings-whats-new"));
   });
 });
+
+describe("What's New robustness", () => {
+  it("does not record the version when the release notes cannot be loaded", async () => {
+    stubDaemon({ "artisign.whatsNewSeen": "2.1.0" });
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (url, init) => (String(url).startsWith("/api/whats-new") ? { ok: false, status: 500, json: async () => ({}) } : realFetch(url, init)));
+    await import("./app.js");
+    await flush();
+    expect(dialogOpen()).toBe(false);
+    expect(settings.prefs["artisign.whatsNewSeen"]).toBe("2.1.0");
+  });
+
+  it("sends a stored prerelease as its release part", async () => {
+    await boot({ "artisign.whatsNewSeen": "2.1.0-beta.1" });
+    expect(whatsNewQueries).toEqual(["2.1.0"]);
+  });
+});

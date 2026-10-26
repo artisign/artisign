@@ -65,7 +65,11 @@ export function createWhatsNewDialog({ scrimEl, bodyEl, summaryEl, closeEl, done
   const isOpen = () => !scrimEl.hidden;
 
   function show(releases, onClose) {
-    if (isOpen()) return;
+    if (isOpen()) {
+      // Already open (from the menu): closing it still has to record what the boot check wanted recorded.
+      if (onClose) onCloseOnce = onClose;
+      return;
+    }
     bodyEl.replaceChildren(...(releases.length ? releases.map(releaseSection) : [el("p", "whats-new-empty", "No release notes are available for this version.")]));
     summaryEl.textContent = releases.length ? `Showing ${releases.length} release${releases.length === 1 ? "" : "s"} · full history in CHANGELOG.md` : "";
     bodyEl.scrollTop = 0;

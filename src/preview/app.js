@@ -2412,8 +2412,14 @@ async function showWhatsNewAfterUpdate() {
   const action = whatsNewAction(seen, about.version);
   if (action === "none") return;
   const record = () => writeStringPref(prefsStorage, WHATS_NEW_SEEN_KEY, about.version);
-  const notes = action === "show" ? await fetchWhatsNew(seen) : null;
-  if (!notes || notes.releases.length === 0) {
+  if (action === "record") {
+    record();
+    return;
+  }
+  // The server reads `since` as plain x.y.z; a stored prerelease is compared by its release part.
+  const notes = await fetchWhatsNew(seen?.split("-")[0]);
+  if (!notes) return; // a failed request leaves the version unseen, so the next start tries again
+  if (notes.releases.length === 0) {
     record();
     return;
   }
@@ -2559,6 +2565,7 @@ function closeOverlaysOnFramePress(evt) {
  * the single /events connection everything else reacts to.
  */
 async function boot() {
+  void showWhatsNewAfterUpdate(); // project-independent; started first so a What's New opened from the menu cannot beat it
   const state = await fetchProjects();
   activeProjectRoot = state.active;
   renderProjects(state);
@@ -2570,7 +2577,6 @@ async function boot() {
     if (persistedView !== currentView) setView(persistedView);
     restoreCompare();
   }
-  void showWhatsNewAfterUpdate();
 }
 
 boot();

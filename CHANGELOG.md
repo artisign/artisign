@@ -27,8 +27,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Changed behaviour for agents: `set_meta` no longer echoes the merged metadata (a screen's full notes, a decisions list,
-  usage text). It answers with `updated`, the names of the fields the call set, plus the commit. Read the values back with
-  `get_screen` or `get_design_system` if needed. (CHR-931)
+  usage text). It answers with `updated`, the names of the fields the call set, plus the commit. A call that sets
+  `decisions` also returns `decision_ids`, the ids now stored, so a full replace that wipes entries stays visible. Read
+  the values back with `get_screen` or `get_design_system` if needed. (CHR-931)
 - Changed behaviour for agents: `set_board_state` answers with `shown_count` instead of the full `shown_screens` list.
   Pass `fields: ["shown_screens"]` to get the list. (CHR-931)
 - The tool descriptions of `set_meta` (a target's fields combine in one call), `get_screen` (`fields` narrows any view)

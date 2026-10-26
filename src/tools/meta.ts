@@ -142,8 +142,9 @@ export async function setMeta(store: Store, input: SetMetaInput): Promise<Record
     const meta: ScreenMeta = { notes: input.notes ?? current.notes, tags: input.tags ?? current.tags, ...variant };
     await store.writeScreenMeta(target.screen, meta);
     const commitResult = await store.commit(`set_meta: ${describeTarget(target)}`);
+    const updated = updatedFields(input, ["notes", "tags", "variant_of", "variant_kind"]);
     // `variant_of: null` clears the kind with it, so it reports both.
-    const updated = [...updatedFields(input, ["notes", "tags"]), ...(input.variant_of !== undefined ? ["variant_of"] : []), ...(input.variant_kind !== undefined || input.variant_of === null ? ["variant_kind"] : [])];
+    if (input.variant_of === null && !updated.includes("variant_kind")) updated.push("variant_kind");
     return { target, updated, ...commitFields(commitResult) };
   }
 
@@ -195,7 +196,13 @@ export async function setMeta(store: Store, input: SetMetaInput): Promise<Record
     };
     await store.writeDesignSystemMeta(meta);
     const commitResult = await store.commit(`set_meta: ${describeTarget(target)}`);
-    return { target, updated: updatedFields(input, ["idea", "decisions"]), ...commitFields(commitResult) };
+    // Decisions are a full replace: the ids (no text) make an accidental wipe visible.
+    return {
+      target,
+      updated: updatedFields(input, ["idea", "decisions"]),
+      ...(input.decisions !== undefined ? { decision_ids: meta.decisions.map((d) => d.id) } : {}),
+      ...commitFields(commitResult),
+    };
   }
 
   if (target.kind === "component" || target.kind === "pattern") {

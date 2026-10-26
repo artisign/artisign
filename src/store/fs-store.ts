@@ -1,4 +1,4 @@
-import { readFile, readdir, appendFile, rm, stat } from "node:fs/promises";
+import { readFile, readdir, appendFile, rm, stat, lstat } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import { resolve, basename, extname, sep } from "node:path";
 import type { ArtisignConfig } from "../init/artisign-config.js";
@@ -213,22 +213,24 @@ export class FsStore implements Store {
   }
 
   async screenMtime(name: string): Promise<string> {
-    return (await stat(this.path("screens", `${name}.html`))).mtime.toISOString();
+    const html = (await stat(this.path("screens", `${name}.html`))).mtimeMs;
+    // The sidecar is optional; its tags/notes/variant fields are part of what get_screen reports.
+    const sidecar = await stat(this.path("screens", `${name}.meta.json`)).then((info) => info.mtimeMs, () => 0);
+    return new Date(Math.max(html, sidecar)).toISOString();
   }
 
   async lastWriteAt(): Promise<string | undefined> {
     let newest = 0;
     const visit = async (full: string): Promise<void> => {
-      let info;
       try {
-        info = await stat(full);
+        // lstat: a symlink counts by its own mtime and is never followed, so a link loop cannot recurse.
+        const info = await lstat(full);
+        // A directory's own mtime counts too: deleting a screen or mockup only touches its directory.
+        newest = Math.max(newest, info.mtimeMs);
+        if (info.isDirectory()) await Promise.all((await readdir(full)).map((entry) => visit(resolve(full, entry))));
       } catch (err) {
-        if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
-        throw err;
+        if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
       }
-      // A directory's own mtime counts too: deleting a screen or mockup only touches its directory.
-      newest = Math.max(newest, info.mtimeMs);
-      if (info.isDirectory()) for (const entry of await readdir(full)) await visit(resolve(full, entry));
     };
     for (const source of LAST_WRITE_SOURCES) await visit(this.path(source));
     return newest > 0 ? new Date(newest).toISOString() : undefined;

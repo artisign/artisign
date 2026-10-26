@@ -298,7 +298,11 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
     readCommentRecords(store),
     store.headCommit(),
     store.readScreenMeta(input.screen),
-    store.screenMtime(input.screen),
+    store.screenMtime(input.screen).catch((err: NodeJS.ErrnoException) => {
+      // Deleted after loadScreen read it — same answer as the read path gives.
+      if (err.code === "ENOENT") throw new ToolError("not_found", `screen "${input.screen}" was not found`);
+      throw err;
+    }),
   ]);
   const openCommentCount = groupThreads(commentRecords).filter(
     (t) => t.root.screen === input.screen && threadStatus(t) === "open",

@@ -79,6 +79,10 @@ export async function setBoardState(store: Store, input: SetBoardStateInput, ctx
     throw new ToolError("invalid_state", "set_board_state needs the daemon's board state — not available without a running daemon");
   }
 
+  for (const field of input.fields ?? []) {
+    if (field !== "shown_screens") throw new ToolError("validation_failed", `unknown field "${field}"`);
+  }
+
   const screenNames = await store.listScreens();
   const knownScreens = new Set(screenNames);
   const warnings: Warning[] = [];

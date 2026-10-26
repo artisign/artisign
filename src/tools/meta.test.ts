@@ -156,6 +156,14 @@ describe("set_meta — design_system target", () => {
     ]);
   });
 
+  it("a decisions write returns decision_ids (all stored ids, in order, no text); an idea-only write does not", async () => {
+    await setMeta(fx.store, { target: { kind: "design_system" }, decisions: [{ id: "d1", title: "a", body: "secret body" }, { id: "d2", title: "b", body: "b" }] });
+    const res = await setMeta(fx.store, { target: { kind: "design_system" }, decisions: [{ id: "d3", title: "c", body: "c" }] });
+    expect(res.decision_ids).toEqual(["d3"]);
+    expect(JSON.stringify(res)).not.toContain("secret body");
+    expect(await setMeta(fx.store, { target: { kind: "design_system" }, idea: "x" })).not.toHaveProperty("decision_ids");
+  });
+
   it("honors an explicit date and status", async () => {
     const res = await setMeta(fx.store, {
       target: { kind: "design_system" },

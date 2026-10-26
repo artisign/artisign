@@ -93,7 +93,7 @@ export interface Store {
   readScreen(name: string): Promise<string>;
   writeScreen(name: string, html: string): Promise<void>;
   deleteScreen(name: string): Promise<void>;
-  /** ISO 8601 modification time of the screen's HTML file; propagates `ENOENT` for a missing screen. */
+  /** ISO 8601 modification time of the screen: the newer of its HTML file and its optional sidecar; propagates `ENOENT` for a missing screen. */
   screenMtime(name: string): Promise<string>;
   /**
    * ISO 8601 time of the newest write to any project source (config, screens,

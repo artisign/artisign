@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, cp, stat, utimes, readdir } from "node:fs/promises";
+import { mkdtemp, rm, cp, stat, utimes, readdir, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setupProject, estimateTokens, type ProjectFixture } from "./test-fixtures.js";
+import { setMeta } from "./meta.js";
 import { getProject, getScreen, getNode, getDesignSystem, findNodes, listComments } from "./reads.js";
 import { renderScreenDocument } from "./render-context.js";
 import { FsStore } from "../store/index.js";
@@ -490,6 +491,20 @@ describe("real timestamps (CHR-931)", () => {
 
     await fx.store.deleteScreen("gone");
     expect((await getProject(fx.store, {})).last_write_at).not.toBe(past.toISOString());
+  });
+
+  it("get_screen mtime moves when the sidecar changes (set_meta), not only the HTML", async () => {
+    const html = join(fx.dir, "screens", "home.html");
+    await utimes(html, past, past);
+    expect((await getScreen(fx.store, { screen: "home" })).mtime).toBe(past.toISOString());
+    await setMeta(fx.store, { target: { kind: "screen", screen: "home" }, notes: "n" });
+    const after = (await getScreen(fx.store, { screen: "home" })).mtime as string;
+    expect(after > past.toISOString()).toBe(true);
+  });
+
+  it("lastWriteAt does not follow symlinks, so a link loop terminates", async () => {
+    await symlink(join(fx.dir, "screens"), join(fx.dir, "screens", "loop"));
+    expect(await fx.store.lastWriteAt()).toBeDefined();
   });
 
   it("ignores .artisign/ and omits last_write_at when no source exists", async () => {

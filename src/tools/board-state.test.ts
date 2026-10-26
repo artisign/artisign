@@ -104,6 +104,11 @@ describe("set_board_state", () => {
     expect(res).not.toHaveProperty("shown_screens");
   });
 
+  it("rejects an unknown fields entry with validation_failed", async () => {
+    const { ctx } = fakeViewState();
+    await expect(setBoardState(fx.store, { fields: ["bogus"] }, ctx)).rejects.toMatchObject({ code: "validation_failed" });
+  });
+
   it("clearing the filter (null) shows every screen again", async () => {
     const { ctx } = fakeViewState();
     await setBoardState(fx.store, { filter: "checkout" }, ctx);

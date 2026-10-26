@@ -19,7 +19,10 @@ import {
   initProject,
   fetchBoardState,
   setBoardState,
+  fetchAbout,
+  fetchWhatsNew,
 } from "./api.js";
+import { createWhatsNewDialog, whatsNewAction, WHATS_NEW_SEEN_KEY } from "./whats-new.js";
 import { THEME_PREFS, THEME_PREF_KEY, DEFAULT_THEME_PREF, applyTheme, nextThemePref, prefersDarkQuery, watchSystemTheme } from "./theme.js";
 import { initTooltips } from "./tooltip.js";
 import { applyShortcutHints, isMacPlatform, isTypingTarget, nextZoomLevel, resolveShortcut, shortcutById } from "./shortcuts.js";
@@ -2386,6 +2389,43 @@ const mcpDialog = createMcpDialog({
   doneEl: document.getElementById("mcp-done"),
   fallbackFocusEl: projectPickerTrigger,
 });
+const whatsNewDialog = createWhatsNewDialog({
+  scrimEl: document.getElementById("whats-new-scrim"),
+  bodyEl: document.getElementById("whats-new-body"),
+  summaryEl: document.getElementById("whats-new-summary"),
+  closeEl: document.getElementById("whats-new-close"),
+  doneEl: document.getElementById("whats-new-done"),
+  fallbackFocusEl: projectPickerTrigger,
+});
+
+/** Every released section, from the settings menu (CHR-928). */
+async function openWhatsNew() {
+  const notes = await fetchWhatsNew();
+  if (notes) whatsNewDialog.show(notes.releases);
+}
+
+/** Once after an update: the releases since the last seen version; closing records the running one. Nothing stored yet → only record it (CHR-928). */
+async function showWhatsNewAfterUpdate() {
+  const about = await fetchAbout();
+  if (!about) return;
+  const seen = readStringPref(prefsStorage, WHATS_NEW_SEEN_KEY, null);
+  const action = whatsNewAction(seen, about.version);
+  if (action === "none") return;
+  const record = () => writeStringPref(prefsStorage, WHATS_NEW_SEEN_KEY, about.version);
+  if (action === "record") {
+    record();
+    return;
+  }
+  // The server reads `since` as plain x.y.z; a stored prerelease is compared by its release part.
+  const notes = await fetchWhatsNew(seen?.split("-")[0]);
+  if (!notes) return; // a failed request leaves the version unseen, so the next start tries again
+  if (notes.releases.length === 0) {
+    record();
+    return;
+  }
+  whatsNewDialog.show(notes.releases, record);
+}
+
 const settingsMenu = createSettingsMenu({
   controlsEl: document.getElementById("settings-controls"),
   triggerEl: document.getElementById("settings-trigger"),
@@ -2412,6 +2452,7 @@ const settingsMenu = createSettingsMenu({
     "sidebar-tags": { get: () => showSidebarTags, set: setSidebarTags },
   },
   onOpenMcp: () => mcpDialog.show(),
+  onOpenWhatsNew: () => void openWhatsNew(),
 });
 const topbarEl = document.getElementById("topbar");
 const dialogScrimEl = document.getElementById("dialog-scrim");
@@ -2426,7 +2467,7 @@ function pressControl(el) {
 
 /** The open menu / dialog / popover, if any — while one is open only its own keys act. */
 function openOverlay() {
-  if (!dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen()) return "other";
+  if (!dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen() || whatsNewDialog.isOpen()) return "other";
   if (!projectMenuEl.hidden) return "project-menu";
   if (!zoomMenu.hidden) return "zoom-menu";
   return document.querySelector(".chrome-menu:not([hidden])") ? "other" : null;
@@ -2513,7 +2554,7 @@ document.addEventListener("keydown", onShortcutKeydown);
 /** A press inside the screen frame never reaches the top document, where the open menus and popovers listen for "outside" clicks: replay it on the body so they close like for any outside click. Dialogs are modal and stay. */
 function closeOverlaysOnFramePress(evt) {
   const overlay = openOverlay();
-  if (!overlay || !dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen()) return;
+  if (!overlay || !dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen() || whatsNewDialog.isOpen()) return;
   document.body.dispatchEvent(new (evt.type === "click" ? MouseEvent : Event)(evt.type, { bubbles: true }));
 }
 
@@ -2524,6 +2565,7 @@ function closeOverlaysOnFramePress(evt) {
  * the single /events connection everything else reacts to.
  */
 async function boot() {
+  void showWhatsNewAfterUpdate(); // project-independent; started first so a What's New opened from the menu cannot beat it
   const state = await fetchProjects();
   activeProjectRoot = state.active;
   renderProjects(state);

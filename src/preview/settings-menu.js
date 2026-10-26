@@ -12,16 +12,18 @@ import { setRovingTabindex, wireMenu } from "./menu-keys.js";
  *   setTheme: (pref: string) => void,
  *   toggles: Record<string, { get: () => boolean, set: (on: boolean) => void }>,
  *   onOpenMcp: () => void,
+ *   onOpenWhatsNew: () => void,
  * }} options `toggles` is keyed by the `data-setting` of the rows; `onOpenMcp` runs after the menu closed and focus is back on the trigger
  * @returns {{ open: () => void, close: () => void, isOpen: () => boolean, sync: () => void }}
  */
-export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, setTheme, toggles, onOpenMcp }) {
+export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, setTheme, toggles, onOpenMcp, onOpenWhatsNew }) {
   const segButtons = /** @type {HTMLElement[]} */ ([...menuEl.querySelectorAll(".settings-seg-button")]);
   const toggleRows = /** @type {HTMLElement[]} */ ([...menuEl.querySelectorAll(".settings-toggle-row")]);
   const mcpItem = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-mcp"));
   const mcpSub = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-mcp-sub"));
   const aboutEl = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-about"));
   const versionEl = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-version"));
+  const whatsNewItem = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-whats-new"));
 
   let aboutLoaded = false;
   let setupToken = 0;
@@ -30,7 +32,8 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
 
   /** The theme control is one row for the arrow keys: the segment that has focus, else the checked one. */
   const segRow = () => segButtons.find((b) => b === document.activeElement) ?? segButtons.find((b) => b.getAttribute("aria-checked") === "true") ?? segButtons[0];
-  const rows = () => [segRow(), ...toggleRows, mcpItem];
+  // What's New sits in the About group, shown once the version is known.
+  const rows = () => [segRow(), ...toggleRows, mcpItem, ...(aboutEl.hidden ? [] : [whatsNewItem])];
 
   function sync() {
     const theme = getTheme();
@@ -136,6 +139,12 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
     close();
     triggerEl.focus();
     onOpenMcp();
+  });
+
+  whatsNewItem.addEventListener("click", () => {
+    close();
+    triggerEl.focus();
+    onOpenWhatsNew();
   });
 
   return { open, close, isOpen, sync };

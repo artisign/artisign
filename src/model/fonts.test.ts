@@ -199,6 +199,21 @@ describe("ensureFontsCached / buildFontFaceCss", () => {
     expect(calls).toBe(callsAfterFirst);
   });
 
+  it("keeps every family in the manifest when calls for the same project overlap", async () => {
+    const base = mockFetch();
+    // The first call's family resolves last, so an unserialized first call
+    // would write back its stale manifest last and drop the second's entry.
+    __setFetchForTests((async (input: string | URL | Request) => {
+      if (/Barlow(\+|%20)Condensed/.test(String(input))) await new Promise((r) => setTimeout(r, 30));
+      return base(input as string);
+    }) as typeof fetch);
+
+    await Promise.all([ensureFontsCached(store, ["Barlow Condensed"]), ensureFontsCached(store, ["Barlow"])]);
+
+    const manifest = JSON.parse(await readFile(join(fontsDir(dir), "manifest.json"), "utf-8")) as Record<string, unknown>;
+    expect(Object.keys(manifest).sort()).toEqual(["Barlow", "Barlow Condensed", "Material Symbols Rounded"]);
+  });
+
   /** Records every css2 request URL; `rejectAxes` makes weighted requests answer 400 like Google does for a missing weight. */
   function recordingFetch(urls: string[], rejectAxes = false): typeof fetch {
     const base = mockFetch();

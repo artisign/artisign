@@ -80,5 +80,7 @@ RENDER ENVIRONMENT (guaranteed, no re-declare needed): border-box sizing,
 zero body margin — declared widths/heights render exactly as given. A screen
 renders at its root's declared width/height; undeclared = 390x844, a phone
 — a desktop product needs a desktop root width. Fonts
-named in tokens.json typography values are auto-loaded. Icons are Material
-Symbols ligatures: <span class="icon">close</span> — never a Unicode glyph.`;
+named in tokens.json typography values are auto-loaded. Icons: bundled
+Material Symbols Rounded, outline only (no FILL), predefined .icon class
+(never declare your own or load another family): <span class="icon">close</span>,
+size via font-size. A full-<html> mockup gets none of this baseline.`;

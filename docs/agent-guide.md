@@ -131,6 +131,18 @@ Before moving on you MUST:
 3. A second screen with inline values is a bug — from screen two onward,
    refs only.
 
+## Icons
+
+Icons are the bundled **Material Symbols Rounded** font (outline only — the
+file is static, no FILL axis, so there are no filled variants), predefined as
+the `.icon` class on screens, components and fragment mockups:
+`<span class="icon">close</span>`. Size it with `font-size` on the span. Never
+declare your own `.icon` font rule or load another Material Symbols family —
+a different family (e.g. Outlined) blanks every icon. Never use a Unicode
+glyph. Exception: a mockup variant that is a full `<html>` document is
+rendered verbatim, without the baseline — there `.icon` and the font do not
+exist, so it must load its own.
+
 ## Exploring options with mockups
 
 Exploration mode above covers *one* draft screen you promote before moving

@@ -39,3 +39,12 @@ describe("INSTRUCTIONS worked example", () => {
     expect(doc.flows[0]).toMatchObject({ targetKind: "screen", targetId: "dashboard", triggerEvent: "tap" });
   });
 });
+
+describe("INSTRUCTIONS icon font (CHR-957)", () => {
+  it("names the bundled family, the predefined .icon class, and the FILL limit", () => {
+    expect(INSTRUCTIONS).toContain("Material Symbols Rounded");
+    expect(INSTRUCTIONS).toMatch(/outline only/);
+    expect(INSTRUCTIONS).toMatch(/never declare your own/);
+    expect(INSTRUCTIONS).toMatch(/full-<html> mockup gets none/);
+  });
+});

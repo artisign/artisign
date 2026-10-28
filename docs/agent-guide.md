@@ -143,6 +143,16 @@ glyph. Exception: a mockup variant that is a full `<html>` document is
 rendered verbatim, without the baseline — there `.icon` and the font do not
 exist, so it must load its own.
 
+## Images and other assets
+
+Image files live in the `assets/` folder of the Artisign project — the folder
+holding `artisign.json` — and are referenced as `src="assets/hero.png"` or
+`url(assets/hero.png)`. No other local path is served: a path outside
+`assets/`, or a file elsewhere in the repo, does not load. Copy such a file
+into `assets/` first. (Remote `https://` URLs and `data:` URIs are not
+blocked.) This holds for screens, components and mockups alike, a full `<html>`
+mockup included.
+
 ## Exploring options with mockups
 
 Exploration mode above covers *one* draft screen you promote before moving

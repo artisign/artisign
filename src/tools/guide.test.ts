@@ -36,3 +36,11 @@ describe("get_guide — icons (CHR-957)", () => {
     expect(guide).toMatch(/no FILL axis/);
   });
 });
+
+describe("get_guide — assets (CHR-959)", () => {
+  it("says image assets live in the project's assets/ folder", async () => {
+    const { guide } = await getGuide();
+    expect(guide).toContain("## Images and other assets");
+    expect(guide).toMatch(/Copy such a file\s+into `assets\/`/);
+  });
+});

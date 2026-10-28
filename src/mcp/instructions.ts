@@ -83,4 +83,6 @@ renders at its root's declared width/height; undeclared = 390x844, a phone
 named in tokens.json typography values are auto-loaded. Icons: bundled
 Material Symbols Rounded, outline only (no FILL), predefined .icon class
 (never declare your own or load another family): <span class="icon">close</span>,
-size via font-size. A full-<html> mockup gets none of this baseline.`;
+size via font-size. A full-<html> mockup gets none of this baseline.
+Local images: src="assets/x.png" / url(assets/x.png), from the project's
+assets/ folder only — copy local files in.`;

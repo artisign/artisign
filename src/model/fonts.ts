@@ -148,9 +148,9 @@ export function __resetFontMemoForTests(): void {
   memo.clear();
 }
 
-/** Composite key so two projects fetching the same family don't share a fetched/failed status. `variants` keys the requested weight set, so a changed token weight misses the memo and refetches. */
-function memoKey(projectRoot: string, family: string, variants: string[] = []): string {
-  return `${projectRoot}\0${family}\0${variants.join(";")}`;
+/** Composite key so two projects fetching the same family don't share a fetched/failed status. */
+function memoKey(projectRoot: string, family: string): string {
+  return `${projectRoot}\0${family}`;
 }
 
 /** Drops every memoized family status for `projectRoot` — call when a project closes, so a stale "failed" status (e.g. from a transient offline fetch) doesn't leak into a later reopen. */
@@ -313,11 +313,13 @@ type FamilyStatus = "ok" | "failed";
 // Keyed by (projectRoot, family) — the daemon now holds several projects
 // open at once, and a family fetched/failed for one project must
 // not leak its status into another's.
-const memo = new Map<string, FamilyStatus>();
+// `variants` is the weight set the status was resolved for — a different
+// requested set is a miss, since the manifest only holds the latest fetch.
+const memo = new Map<string, { status: FamilyStatus; variants: string }>();
 
 /** Whether Material Symbols Rounded resolved (fetched live or from the bundled fallback) the last time `ensureFontsCached` ran for `projectRoot` — used to decide whether `.icon` usage needs the unresolved-icon-font render diagnostic. `undefined` before `ensureFontsCached` has run at all for this project this process. */
 export function isMaterialSymbolsAvailable(projectRoot: string): boolean | undefined {
-  const status = memo.get(memoKey(projectRoot, MATERIAL_SYMBOLS_FAMILY));
+  const status = memo.get(memoKey(projectRoot, MATERIAL_SYMBOLS_FAMILY))?.status;
   return status === undefined ? undefined : status === "ok";
 }
 
@@ -334,7 +336,9 @@ export function isMaterialSymbolsAvailable(projectRoot: string): boolean | undef
 export async function ensureFontsCached(store: Store, families: string[], variants: Map<string, string[]> = new Map()): Promise<void> {
   const wanted = new Set([...families, MATERIAL_SYMBOLS_FAMILY]);
   const variantsOf = (family: string) => (family === MATERIAL_SYMBOLS_FAMILY ? [] : (variants.get(family) ?? []));
-  const toFetch = [...wanted].filter((family) => !memo.has(memoKey(store.projectDir, family, variantsOf(family))));
+  const toFetch = [...wanted].filter(
+    (family) => memo.get(memoKey(store.projectDir, family))?.variants !== variantsOf(family).join(";"),
+  );
   if (toFetch.length === 0) return;
 
   // Font files land under CACHE_DIR before the manifest write below (and
@@ -350,10 +354,10 @@ export async function ensureFontsCached(store: Store, families: string[], varian
     const entry = await resolveFamily(store.projectDir, family, variantsOf(family));
     if (entry) {
       manifest[family] = entry;
-      memo.set(memoKey(store.projectDir, family, variantsOf(family)), "ok");
+      memo.set(memoKey(store.projectDir, family), { status: "ok", variants: variantsOf(family).join(";") });
       changed = true;
     } else {
-      memo.set(memoKey(store.projectDir, family, variantsOf(family)), "failed");
+      memo.set(memoKey(store.projectDir, family), { status: "failed", variants: variantsOf(family).join(";") });
     }
   }
 

@@ -229,6 +229,16 @@ describe("ensureFontsCached / buildFontFaceCss", () => {
     expect(manifest["IBM Plex Sans"].files.map((f: { weightRange: string }) => f.weightRange)).toEqual(["400", "600"]);
   });
 
+  it("refetches when a weight returns after an intermediate change (600 -> 400 -> 600)", async () => {
+    __setFetchForTests(recordingFetch([]));
+    await request(plex);
+    await request({ typography: { a: "400 22px 'IBM Plex Sans', sans-serif" } });
+    await request(plex);
+
+    const manifest = JSON.parse(await readFile(join(fontsDir(dir), "manifest.json"), "utf-8"));
+    expect(manifest["IBM Plex Sans"].files.map((f: { weightRange: string }) => f.weightRange)).toEqual(["400", "600"]);
+  });
+
   it("buildFontFaceCss returns an empty string when no manifest exists", async () => {
     expect(await buildFontFaceCss(dir, { mode: "url" })).toBe("");
   });

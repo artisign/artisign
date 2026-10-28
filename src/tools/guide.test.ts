@@ -41,6 +41,6 @@ describe("get_guide — assets (CHR-959)", () => {
   it("says image assets live in the project's assets/ folder", async () => {
     const { guide } = await getGuide();
     expect(guide).toContain("## Images and other assets");
-    expect(guide).toMatch(/Copy such a file into `assets\/`/);
+    expect(guide).toMatch(/Copy such a file\s+into `assets\/`/);
   });
 });

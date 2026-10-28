@@ -344,9 +344,19 @@ export function isMaterialSymbolsAvailable(projectRoot: string): boolean | undef
  * has no entry for it and the render falls back to system fonts (Material
  * Symbols Rounded excepted — see `bundledMaterialSymbolsEntry`). `variants`
  * (from `extractFontVariants`) names the weights/styles per family; a family
- * without an entry gets the plain 400 face.
+ * without an entry gets the plain 400 face. Calls for the same project run
+ * one after another: each reads and rewrites the whole manifest, so
+ * overlapping calls (parallel writes) would drop each other's entries.
  */
-export async function ensureFontsCached(store: Store, families: string[], variants: Map<string, string[]> = new Map()): Promise<void> {
+export function ensureFontsCached(store: Store, families: string[], variants: Map<string, string[]> = new Map()): Promise<void> {
+  const run = (queues.get(store.projectDir) ?? Promise.resolve()).then(() => ensureFontsCachedNow(store, families, variants));
+  queues.set(store.projectDir, run.catch(() => {}));
+  return run;
+}
+
+const queues = new Map<string, Promise<void>>();
+
+async function ensureFontsCachedNow(store: Store, families: string[], variants: Map<string, string[]>): Promise<void> {
   const wanted = new Set([...families, MATERIAL_SYMBOLS_FAMILY]);
   const variantsOf = (family: string) => (family === MATERIAL_SYMBOLS_FAMILY ? [] : (variants.get(family) ?? []));
   const toFetch = [...wanted].filter(

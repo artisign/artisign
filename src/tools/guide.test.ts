@@ -27,3 +27,12 @@ describe("get_guide — packaging", () => {
     expect(pkg.files).toContain("docs/design-workflow-tutorial.md");
   });
 });
+
+describe("get_guide — icons (CHR-957)", () => {
+  it("states the icon font precisely", async () => {
+    const { guide } = await getGuide();
+    expect(guide).toContain("## Icons");
+    expect(guide).toContain("Material Symbols Rounded");
+    expect(guide).toMatch(/no FILL axis/);
+  });
+});

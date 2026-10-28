@@ -74,6 +74,23 @@ describe("extractFontFamilies", () => {
     expect(families).toEqual(["Inter"]);
   });
 
+  it("treats a value without a size as a pure family list", () => {
+    const families = extractFontFamilies({
+      typography: {
+        font_sans: "'IBM Plex Sans', sans-serif",
+        font_label: "'IBM Plex Sans Condensed', sans-serif",
+      },
+    });
+    expect(families).toEqual(["IBM Plex Sans", "IBM Plex Sans Condensed"]);
+  });
+
+  it("yields nothing for generic-only family-only values", () => {
+    const families = extractFontFamilies({
+      typography: { a: "sans-serif", b: "system-ui, sans-serif" },
+    });
+    expect(families).toEqual([]);
+  });
+
   it("returns an empty array when there is no typography bucket", () => {
     expect(extractFontFamilies({})).toEqual([]);
   });
@@ -94,6 +111,20 @@ describe("extractFontVariants", () => {
     expect(variants.get("Inter")).toEqual(["0,400", "0,700"]);
     expect(variants.get("Newsreader")).toEqual(["0,400", "1,300"]);
     expect(variants.get("Lora")).toEqual(["0,400"]);
+  });
+
+  it("gives family-only values 0,400 and merges them with shorthand weights", () => {
+    const variants = extractFontVariants({
+      typography: {
+        font_sans: "'IBM Plex Sans', sans-serif",
+        heading: "600 18px 'IBM Plex Sans'",
+        font_label: "'IBM Plex Sans Condensed', sans-serif",
+        generic: "system-ui, sans-serif",
+      },
+    });
+    expect(variants.get("IBM Plex Sans")).toEqual(["0,400", "0,600"]);
+    expect(variants.get("IBM Plex Sans Condensed")).toEqual(["0,400"]);
+    expect([...variants.keys()]).toEqual(["IBM Plex Sans", "IBM Plex Sans Condensed"]);
   });
 });
 

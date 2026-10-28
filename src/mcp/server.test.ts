@@ -201,9 +201,11 @@ describe("MCP server — instructions budget", () => {
   // into the tool descriptions and added the NODE REFS block: tightened from
   // 995 to 975, measured at 956 (NODE REFS block included).
   // CHR-957 stated the icon font precisely (family, predefined .icon, outline
-  // only, full-document mockups): 975 to 995, measured at 992.
-  it("stays within the ~995 token cheat-sheet budget (chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(995);
+  // only, full-document mockups): 975 to 995, measured at 992. CHR-956 added
+  // the mockup: node ref form and the "small edits" line: 995 to 1040,
+  // measured at 1035.
+  it("stays within the ~1040 token cheat-sheet budget (chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(1040);
   });
 });
 

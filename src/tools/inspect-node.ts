@@ -7,14 +7,14 @@
 
 import type { Store } from "../store/index.js";
 import { backdropHint } from "./backdrop.js";
-import { renderScreenForBrowser, renderDefinitionForBrowser } from "./render-context.js";
+import { renderScreenForBrowser, renderDefinitionForBrowser, renderMockupDocument } from "./render-context.js";
 import { parseNodeRef } from "./node-ref.js";
 import { findFillById } from "./patch.js";
 import { ToolError } from "./types.js";
 import { getBrowser, type BrowserKind } from "./browser.js";
 
 export type InspectNodeInput = {
-  /** Node ref, `"<screen>.<node-id>"` — same addressing as every other tool. */
+  /** Node ref, `"<screen>.<node-id>"` — same addressing as every other tool; `"mockup:<name>#<variant>.<id>"` measures an authored id in a mockup variant. */
   node: string;
   /** Which installed browser measures the node (cross-browser check); default is the first one discovered. */
   browser?: BrowserKind;
@@ -90,13 +90,29 @@ export async function inspectNode(store: Store, input: InspectNodeInput): Promis
   const ref = parseNodeRef(input.node);
   const nodeId = ref.nodeId;
 
-  const { doc, documentHtml, viewport } =
-    ref.kind === "screen" ? await renderScreenForBrowser(store, ref.screen, nodeId) : await renderDefinitionForBrowser(store, ref);
-  // Validated against the parsed model before touching the browser at all —
-  // an unknown node never pays the render cost. A slot-fill node is not in the
-  // flat map but renders under its authored id (CHR-746), so it is measurable.
-  if (!doc.nodes[nodeId] && !findFillById(doc, nodeId)) {
-    throw new ToolError("not_found", `node "${input.node}" was not found${ref.kind === "screen" ? backdropHint(doc) : ""}`);
+  let documentHtml: string;
+  let viewport: { width: number; height: number };
+  if (ref.kind === "mockup") {
+    // A mockup has no ref model to validate the id against — the page lookup below is the existence check. Same 390x844 viewport as get_screenshot's mockup default.
+    try {
+      ({ documentHtml } = await renderMockupDocument(store, ref.name, ref.variant, { fontMode: "inline" }));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new ToolError("not_found", `mockup "${ref.name}" variant "${ref.variant}" was not found`);
+      }
+      throw err;
+    }
+    viewport = { width: 390, height: 844 };
+  } else {
+    const rendered = ref.kind === "screen" ? await renderScreenForBrowser(store, ref.screen, nodeId) : await renderDefinitionForBrowser(store, ref);
+    ({ documentHtml, viewport } = rendered);
+    const { doc } = rendered;
+    // Validated against the parsed model before touching the browser at all —
+    // an unknown node never pays the render cost. A slot-fill node is not in the
+    // flat map but renders under its authored id (CHR-746), so it is measurable.
+    if (!doc.nodes[nodeId] && !findFillById(doc, nodeId)) {
+      throw new ToolError("not_found", `node "${input.node}" was not found${ref.kind === "screen" ? backdropHint(doc) : ""}`);
+    }
   }
 
   const browser = await getBrowser(input.browser);

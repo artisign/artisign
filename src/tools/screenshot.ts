@@ -88,6 +88,9 @@ export async function getScreenshot(store: Store, input: GetScreenshotInput): Pr
   // A component/pattern node ref is self-addressing (its ref carries the
   // name/variant loadAllDocuments needs) — it stands alone instead of
   // pairing with `screen`, the way a screen node ref must.
+  if (ref?.kind === "mockup") {
+    throw new ToolError("validation_failed", "get_screenshot takes a mockup as mockup+variant, not a mockup node ref");
+  }
   if (ref !== undefined && ref.kind !== "screen") {
     if (hasScreen) throw new ToolError("validation_failed", `node "${input.node}" addresses a component/pattern definition, not screen "${input.screen}"`);
     if (hasMockup) throw new ToolError("validation_failed", "node addressing a component/pattern definition is not valid together with mockup");

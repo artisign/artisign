@@ -8,7 +8,9 @@ export type ComponentNodeRef = { kind: "component"; name: string; variant: strin
 export type PatternNodeRef = { kind: "pattern"; name: string; nodeId: string; address: string };
 /** A node inside a component or pattern definition — the union `loadAllDocuments`'s `SourceDoc.address` addresses (ADR-004). */
 export type DefinitionNodeRef = ComponentNodeRef | PatternNodeRef;
-export type NodeRef = ScreenNodeRef | DefinitionNodeRef;
+/** A node inside one variant of a `mockups/<name>/<variant>.html` file (CHR-956). Mockups stay outside the ref model: the address only locates the node. */
+export type MockupNodeRef = { kind: "mockup"; name: string; variant: string; nodeId: string; address: string };
+export type NodeRef = ScreenNodeRef | DefinitionNodeRef | MockupNodeRef;
 
 /**
  * Parses a node ref. Two forms, distinguished by a `component:`/`pattern:`
@@ -17,10 +19,12 @@ export type NodeRef = ScreenNodeRef | DefinitionNodeRef;
  *   - `"component:<name>#<variant>.<node-id>"` / `"pattern:<name>.<node-id>"`
  *     — a component/pattern definition, addressed the same way
  *     `loadAllDocuments` (`SourceDoc.address`) already addresses it.
+ *   - `"mockup:<name>#<variant>.<node-id>"` — a node in a mockup variant (CHR-956).
  */
 export function parseNodeRef(ref: string): NodeRef {
   if (ref.startsWith("component:")) return parseComponentRef(ref);
   if (ref.startsWith("pattern:")) return parsePatternRef(ref);
+  if (ref.startsWith("mockup:")) return parseMockupRef(ref);
 
   const dot = ref.indexOf(".");
   if (dot === -1 || dot === 0 || dot === ref.length - 1) {
@@ -43,6 +47,17 @@ function parseComponentRef(ref: string): ComponentNodeRef {
   const variant = afterHash.slice(0, dot);
   const nodeId = afterHash.slice(dot + 1);
   return { kind: "component", name, variant, nodeId, address: `component:${name}#${variant}` };
+}
+
+const MOCKUP_REF_RE = /^mockup:([\w-]+)#([\w-]+)\.(.+)$/;
+
+function parseMockupRef(ref: string): MockupNodeRef {
+  const match = MOCKUP_REF_RE.exec(ref);
+  if (!match) {
+    throw new ToolError("validation_failed", `malformed node ref "${ref}" — expected "mockup:<name>#<variant>.<node-id>"`);
+  }
+  const [, name, variant, nodeId] = match as unknown as [string, string, string, string];
+  return { kind: "mockup", name, variant, nodeId, address: `mockup:${name}#${variant}` };
 }
 
 function parsePatternRef(ref: string): PatternNodeRef {
@@ -69,7 +84,7 @@ export function formatNodeRef(address: string, nodeId: string): string {
  */
 export function requireScreenNodeRef(ref: NodeRef, toolName: string): ScreenNodeRef {
   if (ref.kind !== "screen") {
-    throw new ToolError("validation_failed", `${toolName} does not support component/pattern node refs yet`);
+    throw new ToolError("validation_failed", `${toolName} does not support component/pattern/mockup node refs yet`);
   }
   return ref;
 }

@@ -147,9 +147,10 @@ exist, so it must load its own.
 
 Image files live in the `assets/` folder of the Artisign project — the folder
 holding `artisign.json` — and are referenced as `src="assets/hero.png"` or
-`url(assets/hero.png)`. Nothing else is served: a path outside `assets/`, or a
-file elsewhere in the repo, does not load. Copy such a file into `assets/`
-first. This holds for screens, components and mockups alike, a full `<html>`
+`url(assets/hero.png)`. No other local path is served: a path outside
+`assets/`, or a file elsewhere in the repo, does not load. Copy such a file
+into `assets/` first. (Remote `https://` URLs and `data:` URIs are not
+blocked.) This holds for screens, components and mockups alike, a full `<html>`
 mockup included.
 
 ## Exploring options with mockups

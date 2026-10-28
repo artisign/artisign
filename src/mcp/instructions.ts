@@ -84,5 +84,5 @@ named in tokens.json typography values are auto-loaded. Icons: bundled
 Material Symbols Rounded, outline only (no FILL), predefined .icon class
 (never declare your own or load another family): <span class="icon">close</span>,
 size via font-size. A full-<html> mockup gets none of this baseline.
-Images: src="assets/x.png" / url(assets/x.png) load from the project's
-assets/ folder only — copy outside files in.`;
+Local images: src="assets/x.png" / url(assets/x.png), from the project's
+assets/ folder only — copy local files in.`;

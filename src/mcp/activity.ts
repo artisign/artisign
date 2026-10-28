@@ -68,6 +68,9 @@ function fromNodeRef(ref: string): { target: ActivityTarget; nodes: string[] } {
   try {
     const parsed = parseNodeRef(ref);
     if (parsed.kind === "screen") return { target: { kind: "screen", name: parsed.screen }, nodes: [ref] };
+    if (parsed.kind === "mockup") {
+      return { target: { kind: "mockup", name: parsed.name, variant: parsed.variant }, nodes: [ref] };
+    }
     if (parsed.kind === "component") {
       return { target: { kind: "component", name: parsed.name, variant: parsed.variant }, nodes: [ref] };
     }

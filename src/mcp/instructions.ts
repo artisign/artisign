@@ -39,7 +39,8 @@ NODE IDS:
   id="btn-login"  stable, human-chosen; generated if omitted — keep it
   stable across writes (patches and comments address nodes by id).
 NODE REFS: "<screen>.<node-id>"; a definition node is
-"component:<name>#<variant>.<node-id>" or "pattern:<name>.<node-id>". Taken by
+"component:<name>#<variant>.<node-id>" or "pattern:<name>.<node-id>"; a mockup
+node (patch_html, inspect_node only) "mockup:<name>#<variant>.<node-id>". Taken by
 get_node, update_refs, patch_html, inspect_node, get_screenshot; returned by
 find_nodes. A definition node without an explicit id keeps its ref for one call
 only (find_nodes: id_stability "derived"; writes warn missing_id). A node in a
@@ -73,6 +74,7 @@ write_mockup per variant -> get_screenshot {mockup, variant} in a loop ->
 promote_mockup {mockup, variant, screen} copies the chosen one into a real
 screen (the mockup stays as history; delete_entity it when done). Refs/drift
 discipline applies to that screen from then on.
+Small edits: patch_html on mockup:<name>#<variant>.<id> — never edit the files directly.
 
 RENDER ENVIRONMENT (guaranteed, no re-declare needed): border-box sizing,
 zero body margin — declared widths/heights render exactly as given. A screen

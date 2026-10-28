@@ -26,7 +26,7 @@ import { isBlockingIssue, issueToWarning } from "./issue-filter.js";
 import { slotStylingWarnings } from "./definition-checks.js";
 import { checkNewTokenMembers, checkNewComponentName } from "./name-collision.js";
 import { assertValidEntityName, assertValidVariantName } from "./name-validation.js";
-import { patchDefinitionHtml, updateRefsDefinition } from "./definition-patch.js";
+import { patchDefinitionHtml, patchMockupHtml, updateRefsDefinition } from "./definition-patch.js";
 import {
   ToolError,
   commitFields,
@@ -301,6 +301,7 @@ export type PatchHtmlInput = {
 export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Record<string, unknown>> {
   const responseMode = input.response_mode ?? "summary";
   const nodeRef = input.target.kind === "node" ? parseNodeRef(input.target.node) : null;
+  if (nodeRef?.kind === "mockup") return patchMockupHtml(store, nodeRef, input);
   if (nodeRef && nodeRef.kind !== "screen") return patchDefinitionHtml(store, nodeRef, input);
 
   const targetNodeRef = nodeRef ? requireScreenNodeRef(nodeRef, "patch_html") : null;
@@ -482,6 +483,7 @@ export type UpdateRefsInput = {
 
 export async function updateRefs(store: Store, input: UpdateRefsInput): Promise<Record<string, unknown>> {
   const parsedRef = parseNodeRef(input.node);
+  if (parsedRef.kind === "mockup") throw new ToolError("validation_failed", "update_refs does not support mockup node refs");
   if (parsedRef.kind !== "screen") return updateRefsDefinition(store, parsedRef, input);
 
   const { screen, nodeId } = parsedRef;

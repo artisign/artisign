@@ -438,6 +438,7 @@ async function loadOneComponentDef(store: Store, name: string | undefined): Prom
 export async function getNode(store: Store, input: GetNodeInput): Promise<Record<string, unknown>> {
   const view = input.view ?? "summary";
   const ref = parseNodeRef(input.node);
+  if (ref.kind === "mockup") throw new ToolError("validation_failed", "get_node does not support mockup node refs");
   const nodeId = ref.nodeId;
 
   let doc: ScreenDocument;

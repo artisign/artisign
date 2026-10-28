@@ -200,8 +200,10 @@ describe("MCP server — instructions budget", () => {
   // CHR-884 moved tool-local content (set_meta targets, delete_entity detail)
   // into the tool descriptions and added the NODE REFS block: tightened from
   // 995 to 975, measured at 956 (NODE REFS block included).
-  it("stays within the ~975 token cheat-sheet budget (chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(975);
+  // CHR-956 added the mockup: node ref form and the "small edits" line: 975
+  // to 1000, measured at 999.
+  it("stays within the ~1000 token cheat-sheet budget (chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(1000);
   });
 });
 

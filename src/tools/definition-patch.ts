@@ -9,7 +9,7 @@ import {
   type PatchDefinitionOperation,
 } from "../model/index.js";
 import { formatNodeRef } from "./node-ref.js";
-import type { DefinitionNodeRef } from "./node-ref.js";
+import type { DefinitionNodeRef, MockupNodeRef } from "./node-ref.js";
 import {
   ToolError,
   commitFields,
@@ -18,6 +18,7 @@ import {
   type ResponseMode,
   type Warning,
 } from "./types.js";
+import type { DesignSystemRegistry } from "../model/index.js";
 import type { PatchHtmlInput, UpdateRefsInput } from "./writes.js";
 
 /**
@@ -80,13 +81,16 @@ function missingIdWarning(html: string, variant: string | undefined, nodeRef: st
 // patch_html
 // ---------------------------------------------------------------------------
 
-function buildOperation(input: PatchHtmlInput): PatchDefinitionOperation {
+const MOCKUP_RESERVED_ATTRS = new Set(["id", "data-node-id"]);
+
+function buildOperation(input: PatchHtmlInput, mockup = false): PatchDefinitionOperation {
   switch (input.operation) {
     case "delete":
       return { op: "delete" };
     case "set_attr":
       if (!input.attr) throw new ToolError("validation_failed", 'attr is required for operation "set_attr"');
-      if (RESERVED_SET_ATTR_NAMES.has(input.attr.name)) {
+      // Mockups are raw HTML with no update_refs/set_flow to route ref-bearing attributes through — only the id stays protected.
+      if (mockup ? MOCKUP_RESERVED_ATTRS.has(input.attr.name) : RESERVED_SET_ATTR_NAMES.has(input.attr.name)) {
         throw new ToolError("validation_failed", reservedSetAttrMessage(input.attr.name));
       }
       return { op: "set_attr", name: input.attr.name, value: input.attr.value };
@@ -139,6 +143,54 @@ export async function patchDefinitionHtml(store: Store, ref: DefinitionNodeRef, 
   return {
     screen: ref.address,
     path,
+    ...commitFields(commitResult),
+    affected_nodes: [nodeRef],
+    warnings,
+  };
+}
+
+/** No component/token names: a mockup is raw HTML outside the ref model, so nothing in it resolves to a registry entry. */
+const EMPTY_REGISTRY: DesignSystemRegistry = { componentNames: new Set(), tokenPaths: new Set(), tokenFlatNames: new Set() };
+
+/**
+ * `patch_html` against a `mockup:<name>#<variant>.<node-id>` ref (CHR-956):
+ * the same byte-range splice a definition uses (`patchDefinitionNode`, whole
+ * file as one scope), so only the addressed node changes. No ref/drift
+ * validation — mockups stay lenient. A full-`<html>` variant works too:
+ * `parseFragment` flattens `<html>/<head>/<body>` but reports offsets into the
+ * original string, so the splice lands in the right place; the document shell
+ * is untouched. Derived ids (no authored `id`) are numbered over every
+ * top-level element incl. `<style>`/`<title>` of a full document, so author
+ * ids on nodes you want to patch (the `missing_id` warning says so).
+ */
+export async function patchMockupHtml(store: Store, ref: MockupNodeRef, input: PatchHtmlInput): Promise<Record<string, unknown>> {
+  requireSummaryResponseMode(input.response_mode ?? "summary", "patch_html");
+  const nodeRef = formatNodeRef(ref.address, ref.nodeId);
+
+  let html: string;
+  try {
+    html = await store.readMockupVariant(ref.name, ref.variant);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new ToolError("not_found", `mockup "${ref.name}" variant "${ref.variant}" was not found`);
+    }
+    throw err;
+  }
+
+  const result = patchDefinitionNode(html, EMPTY_REGISTRY, ref.nodeId, buildOperation(input, true));
+  if (!result.found) throw new ToolError("not_found", `node "${nodeRef}" was not found`);
+
+  const warnings: Warning[] = [];
+  const missingId = missingIdWarning(html, undefined, nodeRef, ref.nodeId);
+  if (missingId) warnings.push(missingId);
+
+  await store.writeMockupVariant(ref.name, ref.variant, result.html);
+  const commitResult = await store.commit(`patch_html: ${ref.address}`);
+
+  return {
+    mockup: ref.name,
+    variant: ref.variant,
+    path: `mockups/${ref.name}/${ref.variant}.html`,
     ...commitFields(commitResult),
     affected_nodes: [nodeRef],
     warnings,

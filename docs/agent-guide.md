@@ -145,6 +145,15 @@ screen. Mockups sit outside the design system on purpose — they never touch
 `screens/`, never resolve a `$ref`, and are never subject to promote
 discipline while they stay mockups.
 
+Small edits to a variant: `patch_html` with `target: {kind: "node", node:
+"mockup:<name>#<variant>.<node-id>"}` (same operations as on a screen; no ref
+or drift validation), and `inspect_node` takes the same ref — never edit the
+files in `design/mockups/` directly. The node needs an authored `id` in the
+variant (a derived id is only stable for one call, and the response warns
+`missing_id`). A variant that is a full `<html>` document is patched the same
+way; the rest of the document stays byte-for-byte unchanged. `class` and `style`
+can be set with `set_attr` on a mockup node, since mockups have no `update_refs`.
+
 Once a direction wins, `promote_mockup {mockup, variant, screen}` copies that
 one variant into a real screen via the normal `write_html` path — the mockup
 itself stays on disk as exploration history; delete it with `delete_entity`

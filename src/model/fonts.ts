@@ -94,6 +94,32 @@ export function extractFontFamilies(tokens: TokensDocument): string[] {
   return result;
 }
 
+/**
+ * Per family, the `ital,wght` tuples ("0,400", "1,600") its typography
+ * tokens use — the weight and `italic` of the `font` shorthand prefix. 400
+ * normal is always included. Keywords: `normal` = 400, `bold` = 700; other
+ * weight keywords (bolder, lighter) and non-100..900 numbers are ignored.
+ */
+export function extractFontVariants(tokens: TokensDocument): Map<string, string[]> {
+  const result = new Map<string, Set<string>>();
+  for (const value of Object.values(tokens.typography ?? {})) {
+    if (typeof value !== "string") continue;
+    const sizeMatch = SIZE_RE.exec(value);
+    if (!sizeMatch) continue;
+    const words = value.slice(0, sizeMatch.index).toLowerCase().split(/\s+/);
+    const italic = words.includes("italic") || words.includes("oblique") ? 1 : 0;
+    const weightWord = words.find((w) => /^(?:[1-9]00|normal|bold)$/.test(w));
+    const weight = weightWord === "bold" ? 700 : weightWord === undefined || weightWord === "normal" ? 400 : Number(weightWord);
+    for (const family of parseFamilyList(value.slice(sizeMatch.index + sizeMatch[0].length))) {
+      if (isGeneric(family)) continue;
+      const variants = result.get(family) ?? new Set(["0,400"]);
+      variants.add(`${italic},${weight}`);
+      result.set(family, variants);
+    }
+  }
+  return new Map([...result].map(([family, variants]) => [family, [...variants].sort()]));
+}
+
 type FontFile = {
   file: string;
   weightRange?: string;
@@ -122,9 +148,9 @@ export function __resetFontMemoForTests(): void {
   memo.clear();
 }
 
-/** Composite key so two projects fetching the same family don't share a fetched/failed status. */
-function memoKey(projectRoot: string, family: string): string {
-  return `${projectRoot}\0${family}`;
+/** Composite key so two projects fetching the same family don't share a fetched/failed status. `variants` keys the requested weight set, so a changed token weight misses the memo and refetches. */
+function memoKey(projectRoot: string, family: string, variants: string[] = []): string {
+  return `${projectRoot}\0${family}\0${variants.join(";")}`;
 }
 
 /** Drops every memoized family status for `projectRoot` — call when a project closes, so a stale "failed" status (e.g. from a transient offline fetch) doesn't leak into a later reopen. */
@@ -184,9 +210,22 @@ function familyParam(family: string): string {
     .join("+");
 }
 
-async function fetchGoogleFontsCss(family: string): Promise<string> {
-  const url = `https://fonts.googleapis.com/css2?family=${familyParam(family)}&display=swap`;
-  const res = await fetchImpl(url, { headers: { "user-agent": CHROME_USER_AGENT } });
+/** css2 axis syntax: `:wght@400;600`, or `:ital,wght@0,400;1,400` once any tuple is italic. Empty for a plain 400 request. */
+function axisParam(variants: string[]): string {
+  if (variants.length === 0 || (variants.length === 1 && variants[0] === "0,400")) return "";
+  if (variants.every((v) => v.startsWith("0,"))) return `:wght@${variants.map((v) => v.slice(2)).join(";")}`;
+  return `:ital,wght@${variants.join(";")}`;
+}
+
+async function fetchGoogleFontsCss(family: string, variants: string[]): Promise<string> {
+  const get = (axes: string) =>
+    fetchImpl(`https://fonts.googleapis.com/css2?family=${familyParam(family)}${axes}&display=swap`, {
+      headers: { "user-agent": CHROME_USER_AGENT },
+    });
+  const axes = axisParam(variants);
+  let res = await get(axes);
+  // css2 answers 400 when the family lacks a requested weight/style — settle for the plain 400 face.
+  if (!res.ok && axes) res = await get("");
   if (!res.ok) throw new Error(`Google Fonts CSS fetch failed for "${family}": ${res.status}`);
   return res.text();
 }
@@ -219,8 +258,8 @@ function parseFontFaceBlocks(css: string): ParsedFontFace[] {
   return blocks;
 }
 
-async function fetchFamily(projectRoot: string, family: string): Promise<FontManifestEntry> {
-  const css = await fetchGoogleFontsCss(family);
+async function fetchFamily(projectRoot: string, family: string, variants: string[]): Promise<FontManifestEntry> {
+  const css = await fetchGoogleFontsCss(family, variants);
   const blocks = parseFontFaceBlocks(css);
   if (blocks.length === 0) throw new Error(`no woff2 @font-face found for "${family}"`);
 
@@ -257,9 +296,9 @@ async function bundledMaterialSymbolsEntry(projectRoot: string): Promise<FontMan
   };
 }
 
-async function resolveFamily(projectRoot: string, family: string): Promise<FontManifestEntry | undefined> {
+async function resolveFamily(projectRoot: string, family: string, variants: string[]): Promise<FontManifestEntry | undefined> {
   try {
-    return await fetchFamily(projectRoot, family);
+    return await fetchFamily(projectRoot, family, variants);
   } catch {
     if (family !== MATERIAL_SYMBOLS_FAMILY) return undefined;
     // The one family this project can't silently do without — `.icon` usage
@@ -288,11 +327,14 @@ export function isMaterialSymbolsAvailable(projectRoot: string): boolean | undef
  * offline, unknown family, network error — are swallowed and remembered so
  * a family is never retried within the same process; the manifest simply
  * has no entry for it and the render falls back to system fonts (Material
- * Symbols Rounded excepted — see `bundledMaterialSymbolsEntry`).
+ * Symbols Rounded excepted — see `bundledMaterialSymbolsEntry`). `variants`
+ * (from `extractFontVariants`) names the weights/styles per family; a family
+ * without an entry gets the plain 400 face.
  */
-export async function ensureFontsCached(store: Store, families: string[]): Promise<void> {
+export async function ensureFontsCached(store: Store, families: string[], variants: Map<string, string[]> = new Map()): Promise<void> {
   const wanted = new Set([...families, MATERIAL_SYMBOLS_FAMILY]);
-  const toFetch = [...wanted].filter((family) => !memo.has(memoKey(store.projectDir, family)));
+  const variantsOf = (family: string) => (family === MATERIAL_SYMBOLS_FAMILY ? [] : (variants.get(family) ?? []));
+  const toFetch = [...wanted].filter((family) => !memo.has(memoKey(store.projectDir, family, variantsOf(family))));
   if (toFetch.length === 0) return;
 
   // Font files land under CACHE_DIR before the manifest write below (and
@@ -305,13 +347,13 @@ export async function ensureFontsCached(store: Store, families: string[]): Promi
   let changed = false;
 
   for (const family of toFetch) {
-    const entry = await resolveFamily(store.projectDir, family);
+    const entry = await resolveFamily(store.projectDir, family, variantsOf(family));
     if (entry) {
       manifest[family] = entry;
-      memo.set(memoKey(store.projectDir, family), "ok");
+      memo.set(memoKey(store.projectDir, family, variantsOf(family)), "ok");
       changed = true;
     } else {
-      memo.set(memoKey(store.projectDir, family), "failed");
+      memo.set(memoKey(store.projectDir, family, variantsOf(family)), "failed");
     }
   }
 

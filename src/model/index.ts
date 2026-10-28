@@ -60,6 +60,7 @@ export {
 export { wrapRenderedHtml, RENDER_BASELINE_CSS, type WrapRenderedHtmlOptions } from "./render-document.js";
 export {
   extractFontFamilies,
+  extractFontVariants,
   ensureFontsCached,
   buildFontFaceCss,
   isMaterialSymbolsAvailable,

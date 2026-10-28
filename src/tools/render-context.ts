@@ -8,6 +8,7 @@ import {
   type BackdropRender,
   wrapRenderedHtml,
   extractFontFamilies,
+  extractFontVariants,
   ensureFontsCached,
   buildFontFaceCss,
   isMaterialSymbolsAvailable,
@@ -40,7 +41,7 @@ import { formatNodeRef, type DefinitionNodeRef } from "./node-ref.js";
  */
 export async function resolveFontFaceCss(store: Store, tokens: TokensDocument, mode: "url" | "inline"): Promise<string> {
   try {
-    await ensureFontsCached(store, extractFontFamilies(tokens));
+    await ensureFontsCached(store, extractFontFamilies(tokens), extractFontVariants(tokens));
     return await buildFontFaceCss(store.projectDir, { mode });
   } catch {
     return "";

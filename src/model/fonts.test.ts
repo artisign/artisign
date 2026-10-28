@@ -6,6 +6,7 @@ import { initProject } from "../init/init-project.js";
 import { FsStore } from "../store/index.js";
 import {
   extractFontFamilies,
+  extractFontVariants,
   ensureFontsCached,
   buildFontFaceCss,
   isMaterialSymbolsAvailable,
@@ -78,6 +79,24 @@ describe("extractFontFamilies", () => {
   });
 });
 
+describe("extractFontVariants", () => {
+  it("collects every weight per family, 400 normal always included, keywords mapped", () => {
+    const variants = extractFontVariants({
+      typography: {
+        a: "600 22px/1.2 'IBM Plex Sans', sans-serif",
+        b: "bold 16px Inter, sans-serif",
+        c: "normal 16px Inter, sans-serif",
+        d: "italic 300 16px Newsreader, serif",
+        e: "16px Lora, serif",
+      },
+    });
+    expect(variants.get("IBM Plex Sans")).toEqual(["0,400", "0,600"]);
+    expect(variants.get("Inter")).toEqual(["0,400", "0,700"]);
+    expect(variants.get("Newsreader")).toEqual(["0,400", "1,300"]);
+    expect(variants.get("Lora")).toEqual(["0,400"]);
+  });
+});
+
 describe("ensureFontsCached / buildFontFaceCss", () => {
   let dir: string;
   let store: FsStore;
@@ -140,6 +159,84 @@ describe("ensureFontsCached / buildFontFaceCss", () => {
     const callsAfterFirst = calls;
     await ensureFontsCached(store, ["Inter"]);
     expect(calls).toBe(callsAfterFirst);
+  });
+
+  /** Records every css2 request URL; `rejectAxes` makes weighted requests answer 400 like Google does for a missing weight. */
+  function recordingFetch(urls: string[], rejectAxes = false): typeof fetch {
+    const base = mockFetch();
+    return (async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("googleapis.com")) {
+        urls.push(url);
+        if (rejectAxes && /family=[^&]*:/.test(url)) return new Response("bad", { status: 400 });
+        const weights = /wght@([^&]+)/.exec(url)?.[1]?.split(";").map((t) => t.split(",").pop()) ?? ["400"];
+        const family = decodeURIComponent(/family=([^:&]+)/.exec(url)![1]!.replace(/\+/g, " "));
+        return new Response(
+          weights
+            .map(
+              (w) =>
+                `@font-face {\n  font-family: '${family}';\n  font-style: normal;\n  font-weight: ${w};\n  src: url(https://fonts.gstatic.com/s/x/${w}.woff2) format('woff2');\n}`,
+            )
+            .join("\n"),
+        );
+      }
+      return base(input as string);
+    }) as typeof fetch;
+  }
+
+  const plex = { typography: { a: "600 22px/1.2 'IBM Plex Sans', sans-serif" } };
+  const request = (tokens: Parameters<typeof extractFontFamilies>[0]) =>
+    ensureFontsCached(store, extractFontFamilies(tokens), extractFontVariants(tokens));
+
+  it("requests every token weight and caches each face", async () => {
+    const urls: string[] = [];
+    __setFetchForTests(recordingFetch(urls));
+    await request(plex);
+
+    expect(urls.some((u) => u.includes("family=IBM+Plex+Sans:wght@400;600&"))).toBe(true);
+    const manifest = JSON.parse(await readFile(join(fontsDir(dir), "manifest.json"), "utf-8"));
+    expect(manifest["IBM Plex Sans"].files.map((f: { weightRange: string }) => f.weightRange)).toEqual(["400", "600"]);
+    expect(await buildFontFaceCss(dir, { mode: "url" })).toContain("font-weight: 600;");
+  });
+
+  it("requests the ital axis when a token is italic", async () => {
+    const urls: string[] = [];
+    __setFetchForTests(recordingFetch(urls));
+    await request({ typography: { a: "italic 400 16px Newsreader, serif" } });
+
+    expect(urls.some((u) => u.includes("family=Newsreader:ital,wght@0,400;1,400&"))).toBe(true);
+  });
+
+  it("falls back to the plain request when css2 rejects the weighted one, and still caches", async () => {
+    const urls: string[] = [];
+    __setFetchForTests(recordingFetch(urls, true));
+    await request(plex);
+
+    expect(urls).toHaveLength(2 + 1); // weighted + plain for Plex, plain for Material Symbols
+    expect(urls.some((u) => u.includes("family=IBM+Plex+Sans&display=swap"))).toBe(true);
+    const manifest = JSON.parse(await readFile(join(fontsDir(dir), "manifest.json"), "utf-8"));
+    expect(manifest["IBM Plex Sans"].files).toHaveLength(1);
+  });
+
+  it("refetches when a token weight changes instead of serving the stale entry", async () => {
+    const urls: string[] = [];
+    __setFetchForTests(recordingFetch(urls));
+    await request({ typography: { a: "400 22px 'IBM Plex Sans', sans-serif" } });
+    await request(plex);
+
+    expect(urls.some((u) => u.includes("family=IBM+Plex+Sans:wght@400;600&"))).toBe(true);
+    const manifest = JSON.parse(await readFile(join(fontsDir(dir), "manifest.json"), "utf-8"));
+    expect(manifest["IBM Plex Sans"].files.map((f: { weightRange: string }) => f.weightRange)).toEqual(["400", "600"]);
+  });
+
+  it("refetches when a weight returns after an intermediate change (600 -> 400 -> 600)", async () => {
+    __setFetchForTests(recordingFetch([]));
+    await request(plex);
+    await request({ typography: { a: "400 22px 'IBM Plex Sans', sans-serif" } });
+    await request(plex);
+
+    const manifest = JSON.parse(await readFile(join(fontsDir(dir), "manifest.json"), "utf-8"));
+    expect(manifest["IBM Plex Sans"].files.map((f: { weightRange: string }) => f.weightRange)).toEqual(["400", "600"]);
   });
 
   it("buildFontFaceCss returns an empty string when no manifest exists", async () => {

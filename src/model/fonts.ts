@@ -66,11 +66,16 @@ function parseFamilyList(familyListStr: string): string[] {
     .filter((family) => family.length > 0);
 }
 
+// In a size-less value, tokens like "1.4", "600" or "italic" are not families.
+const NON_FAMILY_RE = /^(?:[\d.+-]|(?:normal|bold|bolder|lighter|italic|oblique|inherit|initial|unset|revert)$)/i;
+
 // Splits a typography value into the shorthand prefix (style/weight words)
 // and its family list. A value without a size is a pure family list.
 function splitTypographyValue(value: string): { prefix: string; families: string[] } {
   const sizeMatch = SIZE_RE.exec(value);
-  if (!sizeMatch) return { prefix: "", families: parseFamilyList(value) };
+  if (!sizeMatch) {
+    return { prefix: "", families: parseFamilyList(value).filter((f) => !NON_FAMILY_RE.test(f)) };
+  }
   return {
     prefix: value.slice(0, sizeMatch.index),
     families: parseFamilyList(value.slice(sizeMatch.index + sizeMatch[0].length)),
@@ -105,8 +110,9 @@ export function extractFontFamilies(tokens: TokensDocument): string[] {
 /**
  * Per family, the `ital,wght` tuples ("0,400", "1,600") its typography
  * tokens use — the weight and `italic` of the `font` shorthand prefix (a
- * family-only value contributes just 400 normal). 400 normal is always included. Keywords: `normal` = 400, `bold` = 700; other
- * weight keywords (bolder, lighter) and non-100..900 numbers are ignored.
+ * family-only value contributes just 400 normal). 400 normal is always
+ * included. Keywords: `normal` = 400, `bold` = 700; other weight keywords
+ * (bolder, lighter) and non-100..900 numbers are ignored.
  */
 export function extractFontVariants(tokens: TokensDocument): Map<string, string[]> {
   const result = new Map<string, Set<string>>();

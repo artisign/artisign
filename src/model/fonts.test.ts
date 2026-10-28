@@ -84,6 +84,13 @@ describe("extractFontFamilies", () => {
     expect(families).toEqual(["IBM Plex Sans", "IBM Plex Sans Condensed"]);
   });
 
+  it("ignores non-family typography values", () => {
+    const families = extractFontFamilies({
+      typography: { lh: "1.4", w: "600", t: "normal", s: "italic", f: "'IBM Plex Sans', sans-serif" },
+    });
+    expect(families).toEqual(["IBM Plex Sans"]);
+  });
+
   it("yields nothing for generic-only family-only values", () => {
     const families = extractFontFamilies({
       typography: { a: "sans-serif", b: "system-ui, sans-serif" },

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Bugfixes
+
+- Auto-commits no longer fail on a machine where git has no `user.name`/`user.email`: Artisign's commits are
+  made as `Artisign <noreply@artisign.dev>` instead. An identity you have configured, in git config or the
+  environment, is used as before, and Artisign never writes to your git config.
+
 ## [2.2.0] - 2026-10-26
 
 A redesigned preview with light and dark themes, a settings menu, update notices and this What's New dialog.

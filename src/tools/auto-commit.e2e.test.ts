@@ -5,13 +5,14 @@ import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { initProject } from "../init/init-project.js";
-import { FsStore } from "../store/index.js";
+import { FsStore, FALLBACK_IDENTITY } from "../store/index.js";
 import { writeHtml, patchHtml, setTokens } from "./writes.js";
+import { setupGitConfig, type GitConfigFixture } from "./test-fixtures.js";
 
 const execFileAsync = promisify(execFile);
 
-async function gitLog(dir: string): Promise<string[]> {
-  const { stdout } = await execFileAsync("git", ["log", "--format=%s"], { cwd: dir });
+async function gitLog(dir: string, format = "%s"): Promise<string[]> {
+  const { stdout } = await execFileAsync("git", ["log", `--format=${format}`], { cwd: dir });
   return stdout.trim().split("\n").reverse(); // oldest first
 }
 
@@ -63,5 +64,40 @@ describe("git auto-commit", () => {
     // Every commit is a distinct, real commit — not the same SHA reused.
     const shas = new Set([write.commit, patch.commit, tokens.commit]);
     expect(shas.size).toBe(3);
+  });
+
+  describe("on a machine with no git identity", () => {
+    let gitConfig: GitConfigFixture;
+
+    beforeEach(async () => {
+      gitConfig = await setupGitConfig(null);
+    });
+
+    afterEach(async () => {
+      await gitConfig.cleanup();
+    });
+
+    it("still writes the audit log, as Artisign, and the tool result carries the sha", async () => {
+      const store = new FsStore(dir);
+
+      const write = await writeHtml(store, {
+        screen: "home",
+        mode: "create",
+        title: "Home",
+        html_aug: `<section id="n1" style="padding: 16px"><h1 id="n2">Hi</h1></section>`,
+      });
+      expect(write.commit).toMatch(/^[0-9a-f]{40}$/);
+      expect(write).not.toHaveProperty("commit_skipped_reason");
+
+      const tokens = await setTokens(store, {
+        tokens: { "color.primary": "#3366ff" },
+        mode: "patch",
+      });
+      expect(tokens.commit).toMatch(/^[0-9a-f]{40}$/);
+
+      expect(await gitLog(dir)).toEqual(["write_html: home", "set_tokens: color.primary"]);
+      const identity = `${FALLBACK_IDENTITY.name} <${FALLBACK_IDENTITY.email}>`;
+      expect(await gitLog(dir, "%an <%ae>")).toEqual([identity, identity]);
+    });
   });
 });

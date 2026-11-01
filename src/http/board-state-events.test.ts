@@ -320,7 +320,12 @@ describe("CHR-624 board_state SSE + routes", () => {
     await store.writeArtisignConfig(config);
     await execFileAsync("git", ["init"], { cwd: dirA });
     await execFileAsync("git", ["add", "-A"], { cwd: dirA });
-    await execFileAsync("git", ["commit", "-m", "initial"], { cwd: dirA });
+    // The test's own commit, not an auto-commit: it brings its own identity, the host may have none.
+    await execFileAsync(
+      "git",
+      ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "initial"],
+      { cwd: dirA },
+    );
     const before = await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: dirA });
 
     await postToolsApi(daemon.port, "set_board_state", { filter: "checkout", pins: { op: "add", screens: ["home"] } });

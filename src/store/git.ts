@@ -19,6 +19,26 @@ const execFileAsync = promisify(execFile);
 // Passed per invocation, so the user's own config is untouched.
 const NO_DETACHED_MAINTENANCE = ["-c", "gc.autoDetach=false", "-c", "maintenance.autoDetach=false"];
 
+/**
+ * The identity Artisign's own commits carry when git has none to offer. Git
+ * refuses to commit without `user.name`/`user.email` and, on a fresh machine,
+ * tries to derive them from the login and hostname — which fails on most VMs
+ * and containers ("unable to auto-detect email address"). The audit log is
+ * the product claim, so a project must not end up with design state and no
+ * history just because nobody ran `git config --global user.email` yet.
+ * Passed per invocation (`-c`), never written to any config, and only reached
+ * after git itself refused for want of an identity: one configured anywhere —
+ * global or repo config, `GIT_AUTHOR_*`/`GIT_COMMITTER_*` — made the first
+ * attempt succeed and is never replaced.
+ */
+export const FALLBACK_IDENTITY = { name: "Artisign", email: "noreply@artisign.dev" } as const;
+const FALLBACK_IDENTITY_FLAGS = [
+  "-c",
+  `user.name=${FALLBACK_IDENTITY.name}`,
+  "-c",
+  `user.email=${FALLBACK_IDENTITY.email}`,
+];
+
 async function git(projectDir: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync("git", [...NO_DETACHED_MAINTENANCE, ...args], { cwd: projectDir });
   return stdout.trim();
@@ -42,6 +62,12 @@ function errorFirstLine(err: unknown): string {
 /** `rev-parse HEAD` fails identically for "no commits yet" and other errors; only the message tells them apart. */
 function isEmptyRepoError(err: unknown): boolean {
   return errorFirstLine(err).includes("unknown revision");
+}
+
+/** Every "who are you" refusal — missing config, failed auto-detection, `user.useConfigOnly`, an empty `GIT_*_EMAIL` — opens with this line. */
+function isIdentityUnknownError(err: unknown): boolean {
+  const text = (err as { stderr?: string })?.stderr ?? "";
+  return /^(Author|Committer) identity unknown$/m.test(text);
 }
 
 /** `rev-parse --git-dir` also fails on a genuinely missing repo *and* a corrupted `.git`; only the message tells them apart. */
@@ -77,7 +103,8 @@ async function realOrSelf(path: string): Promise<string> {
  * git repo on first use. `sha` is `null` (with `skipped_reason`) if there
  * was nothing to commit, the commit could not be made, or the project dir
  * lives inside an outer repo — a failing auto-commit must never break the
- * write it follows.
+ * write it follows. A commit git refuses only for want of an identity is
+ * retried once as `FALLBACK_IDENTITY`.
  *
  * If `projectDir` turns out to live inside a git repo whose root is some
  * *other* directory (an agent running Artisign inside an existing user
@@ -103,7 +130,12 @@ export async function autoCommit(projectDir: string, message: string): Promise<C
     if (status === "") {
       return { sha: null, skipped_reason: "nothing_to_commit" };
     }
-    await git(projectDir, ["commit", "-m", message]);
+    try {
+      await git(projectDir, ["commit", "-m", message]);
+    } catch (err) {
+      if (!isIdentityUnknownError(err)) throw err;
+      await git(projectDir, [...FALLBACK_IDENTITY_FLAGS, "commit", "-m", message]);
+    }
     return { sha: await git(projectDir, ["rev-parse", "HEAD"]) };
   } catch (err) {
     return { sha: null, skipped_reason: `git_error: ${errorFirstLine(err)}` };

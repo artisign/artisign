@@ -10,6 +10,10 @@ PROJECT: start with list_projects. Every tool but list_projects/init_project/
 get_guide takes a required "project": a project name or an absolute path.
 init_project returns it.
 
+FILES: change the design (screens, design-system, mockups, tokens, flows,
+comments) only through these tools — never with shell, scripts or file-edit
+tools. Copying an image into assets/ is fine.
+
 WORKFLOW: tokens -> components -> screens; inline values only while exploring
 screen one of a direction, promoted before screen two; second occurrence of a
 value/pattern gets promoted, named by role. One write, one look
@@ -74,7 +78,7 @@ write_mockup per variant -> get_screenshot {mockup, variant} in a loop ->
 promote_mockup {mockup, variant, screen} copies the chosen one into a real
 screen (the mockup stays as history; delete_entity it when done). Refs/drift
 discipline applies to that screen from then on.
-Small edits: patch_html on mockup:<name>#<variant>.<id> — never edit the files directly.
+Small edits: patch_html on mockup:<name>#<variant>.<id>.
 
 RENDER ENVIRONMENT (guaranteed, no re-declare needed): border-box sizing,
 zero body margin — declared widths/heights render exactly as given. A screen

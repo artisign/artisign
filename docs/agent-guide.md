@@ -143,6 +143,14 @@ glyph. Exception: a mockup variant that is a full `<html>` document is
 rendered verbatim, without the baseline — there `.icon` and the font do not
 exist, so it must load its own.
 
+## Change the design only through the tools
+
+Screens, components, patterns, tokens, flows, mockups and comments change only
+through Artisign's tools — never with a shell, a script or a file-edit tool,
+even for a one-line fix. The tools keep node ids, refs, the index and the
+history consistent; a direct edit bypasses all of that. Copying an image file
+into `assets/` is the one exception.
+
 ## Images and other assets
 
 Image files live in the `assets/` folder of the Artisign project — the folder

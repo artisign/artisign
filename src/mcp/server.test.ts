@@ -204,9 +204,11 @@ describe("MCP server — instructions budget", () => {
   // only, full-document mockups): 975 to 995, measured at 992. CHR-956 added
   // the mockup: node ref form and the "small edits" line: 995 to 1040,
   // measured at 1035. CHR-959 said where image assets must live: 1040 to
-  // 1065, measured at 1064.
-  it("stays within the ~1065 token cheat-sheet budget (chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(1065);
+  // 1065, measured at 1064. CHR-987 made "change the design only through
+  // these tools" a general FILES rule (it was mockup-only; the demo recording
+  // had to pass it as an extra system prompt): 1065 to 1110, measured at 1105.
+  it("stays within the ~1110 token cheat-sheet budget (chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(1110);
   });
 });
 

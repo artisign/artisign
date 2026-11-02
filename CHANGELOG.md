@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Improvements
 
+- The MCP instructions and the agent guide tell agents to change the design only through Artisign's tools, never
+  with shell or file-edit tools (copying an image into `assets/` excepted); before, that rule covered mockups only.
 - `patch_html` and `inspect_node` accept mockup variant targets (`mockup:<name>#<variant>.<node-id>`).
 - The MCP instructions and the agent guide name the icon font precisely and say where image files must live
   (local paths only from the project's `assets/` folder).

@@ -80,12 +80,6 @@ function promoteInlineStyleInSubtree(subtree: NodeSubtree, value: string, path: 
   return changed;
 }
 
-async function fetchExternalHtml(url: string): Promise<string> {
-  const res = await fetch(url);
-  if (!res.ok) throw new ToolError("io_error", `failed to fetch ${url}: HTTP ${res.status}`);
-  return res.text();
-}
-
 function deriveScreenName(seedUrl: string, existing: string[]): string {
   const base = new URL(seedUrl).pathname.split("/").filter(Boolean).pop()?.replace(/\.\w+$/, "") || "imported";
   let name = base;
@@ -103,8 +97,7 @@ function deriveScreenName(seedUrl: string, existing: string[]): string {
 
 export type InitProjectSeed =
   | { kind: "empty" }
-  | { kind: "html"; html_aug: string; screen: string }
-  | { kind: "stitch_export"; url: string };
+  | { kind: "html"; html_aug: string; screen: string };
 
 export type InitProjectInput = {
   dir: string;
@@ -137,8 +130,8 @@ export async function initProjectTool(input: InitProjectInput, ctx?: ToolHandler
 
   const screens: string[] = [];
   if (input.seed.kind !== "empty") {
-    const html_aug = input.seed.kind === "html" ? input.seed.html_aug : await fetchExternalHtml(input.seed.url);
-    const screenName = input.seed.kind === "html" ? input.seed.screen : deriveScreenName(input.seed.url, []);
+    const html_aug = input.seed.html_aug;
+    const screenName = input.seed.screen;
     assertValidEntityName("screen", screenName);
     const registry = await loadRegistry(store);
     const { doc } = parseScreen(html_aug, screenName, registry);
@@ -176,7 +169,7 @@ export async function listProjects(ctx?: ToolHandlerContext): Promise<{ projects
 // L2 import_html
 // ---------------------------------------------------------------------------
 
-export type ImportSource = { kind: "html"; html_aug: string; screen?: string } | { kind: "stitch_export"; url: string };
+export type ImportSource = { kind: "html"; html_aug: string; screen?: string };
 
 export type ImportHtmlInput = {
   source: ImportSource;
@@ -185,11 +178,11 @@ export type ImportHtmlInput = {
 
 export async function importHtml(store: Store, input: ImportHtmlInput): Promise<Record<string, unknown>> {
   const dedupe = input.dedupe ?? true;
-  const html_aug = input.source.kind === "html" ? input.source.html_aug : await fetchExternalHtml(input.source.url);
+  const html_aug = input.source.html_aug;
 
   const existingNames = await store.listScreens();
   const screenName =
-    input.source.kind === "html" ? (input.source.screen ?? deriveScreenName(`https://x/${Date.now()}`, existingNames)) : deriveScreenName(input.source.url, existingNames);
+    input.source.screen ?? deriveScreenName(`https://x/${Date.now()}`, existingNames);
 
   assertValidEntityName("screen", screenName);
   const registry = await loadRegistry(store);

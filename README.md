@@ -47,7 +47,7 @@ artisign
 - **Each launch uses a fresh, throwaway profile** in `~/artisign-browser-profiles/`, removed when the browser closes. It lives under your home directory, not `/tmp`, because a Snap- or Flatpak-packaged Firefox cannot see `/tmp`.
 - **No browser installed** (a bare server or container): both tools fail with the fix in the error message; every other tool works without one. Installing `chromium` or `firefox-esr` from the distribution's packages is enough.
 
-**Privacy.** Artisign collects nothing — no telemetry, no account, no server beyond the local one it runs. These requests reach the network, none of them about you, and that is the complete list: the update check (at most once a day) asks `registry.npmjs.org` for the latest version and sends nothing else; `artisign update` runs `npm`, and the `npx` in your AI tool's entry fetches the pinned version from npm, both talking to the npm registry; `import_html` fetches whatever URL you hand it; and the first render of a project fetches the font families named in your tokens — plus the Material Symbols Rounded icon font, always (a copy shipped with the package is the fallback when that fails) — from Google Fonts, then caches them locally (see [Fonts & icons](#fonts--icons)). Everything else stays on `127.0.0.1`.
+**Privacy.** Artisign collects nothing — no telemetry, no account, no server beyond the local one it runs. These requests reach the network, none of them about you, and that is the complete list: the update check (at most once a day) asks `registry.npmjs.org` for the latest version and sends nothing else; `artisign update` runs `npm`, and the `npx` in your AI tool's entry fetches the pinned version from npm, both talking to the npm registry; and the first render of a project fetches the font families named in your tokens — plus the Material Symbols Rounded icon font, always (a copy shipped with the package is the fallback when that fails) — from Google Fonts, then caches them locally (see [Fonts & icons](#fonts--icons)). Everything else stays on `127.0.0.1`.
 
 ## Quickstart
 
@@ -126,7 +126,7 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 | Writes | `write_mockup` | Create or revise one variant of a mockup — raw HTML, outside the design system. |
 | Writes | `set_board_state` | Read or mutate the Board's shared filter, pinned screens and expanded variant clusters — daemon memory only. |
 | Lifecycle | `list_projects` | Every project the daemon has opened or created, as `{ name, root, open }`; works with no project open. |
-| Lifecycle | `init_project` | Scaffold a project directory: empty, from HTML, or from a Stitch export URL. Returns `project`, the name to pass in later calls. |
+| Lifecycle | `init_project` | Scaffold a project directory: empty or from HTML. Returns `project`, the name to pass in later calls. |
 | Lifecycle | `import_html` | Incremental HTML ingest into an existing project, with content-hash dedup. |
 | Lifecycle | `promote_to_system` | Lift an inline value or a repeated element into a token, component, or pattern. |
 | Lifecycle | `promote_mockup` | Copy a chosen mockup variant into a new, design-system-bound screen (the mockup stays). |

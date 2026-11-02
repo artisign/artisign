@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `import_html` and `init_project` no longer accept source kind `stitch_export`; Artisign no longer fetches
+  URLs. Pass the HTML as `{kind: "html"}` instead.
+
 ### Bugfixes
 
 - Screen, component and mockup HTML no longer runs scripts in the headless browser of `get_screenshot` and

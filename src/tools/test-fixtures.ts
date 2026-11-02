@@ -61,11 +61,13 @@ const GIT_IDENTITY_ENV = [
  * same thing on every machine. Call `cleanup()` in `afterEach`.
  */
 export async function setupGitConfig(
-  identity: { name: string; email: string } | null,
+  identity: { name?: string; email?: string } | null,
 ): Promise<GitConfigFixture> {
   const dir = await mkdtemp(join(tmpdir(), "artisign-gitconfig-"));
   const file = join(dir, "gitconfig");
-  const user = identity === null ? "" : `\tname = ${identity.name}\n\temail = ${identity.email}\n`;
+  const user =
+    (identity?.name === undefined ? "" : `\tname = ${identity.name}\n`) +
+    (identity?.email === undefined ? "" : `\temail = ${identity.email}\n`);
   await writeFile(file, `[user]\n\tuseConfigOnly = true\n${user}`);
 
   const saved = new Map<string, string | undefined>();

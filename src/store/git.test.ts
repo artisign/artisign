@@ -158,6 +158,16 @@ describe("autoCommit", () => {
       });
     });
 
+    it("fills in only the half of a configured identity that is missing", async () => {
+      gitConfig = await setupGitConfig({ email: "ada@example.com" });
+      await writeFile(join(dir, "screens.html"), '<div id="n1"></div>');
+
+      const result = await autoCommit(dir, "feat: add screen");
+      expect(result.sha).toMatch(/^[0-9a-f]{40}$/);
+      const expected = `${FALLBACK_IDENTITY.name} <ada@example.com>`;
+      expect(await headIdentity(dir)).toEqual({ author: expected, committer: expected });
+    });
+
     it("keeps an identity given through the environment", async () => {
       gitConfig = await setupGitConfig(null);
       process.env.GIT_AUTHOR_NAME = "Env Author";

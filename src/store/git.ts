@@ -29,19 +29,29 @@ const NO_DETACHED_MAINTENANCE = ["-c", "gc.autoDetach=false", "-c", "maintenance
  * Passed per invocation (`-c`), never written to any config, and only reached
  * after git itself refused for want of an identity: one configured anywhere —
  * global or repo config, `GIT_AUTHOR_*`/`GIT_COMMITTER_*` — made the first
- * attempt succeed and is never replaced.
+ * attempt succeed and is never replaced. Only the half git lacks is filled
+ * in, so a configured `user.email` without a `user.name` keeps that email.
  */
 export const FALLBACK_IDENTITY = { name: "Artisign", email: "noreply@artisign.dev" } as const;
-const FALLBACK_IDENTITY_FLAGS = [
-  "-c",
-  `user.name=${FALLBACK_IDENTITY.name}`,
-  "-c",
-  `user.email=${FALLBACK_IDENTITY.email}`,
-];
 
 async function git(projectDir: string, args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync("git", [...NO_DETACHED_MAINTENANCE, ...args], { cwd: projectDir });
+  // Git translates its messages on gettext builds (most Linux distributions,
+  // Homebrew), and the checks below recognise failures by their English text.
+  const { stdout } = await execFileAsync("git", [...NO_DETACHED_MAINTENANCE, ...args], {
+    cwd: projectDir,
+    env: { ...process.env, LC_ALL: "C" },
+  });
   return stdout.trim();
+}
+
+/** `-c` flags for the parts of `FALLBACK_IDENTITY` git has no value for; a configured one is kept. */
+async function fallbackIdentityFlags(projectDir: string): Promise<string[]> {
+  const flags: string[] = [];
+  for (const key of ["name", "email"] as const) {
+    const configured = await git(projectDir, ["config", `user.${key}`]).catch(() => "");
+    if (configured === "") flags.push("-c", `user.${key}=${FALLBACK_IDENTITY[key]}`);
+  }
+  return flags;
 }
 
 async function isGitRepo(projectDir: string): Promise<boolean> {
@@ -64,7 +74,7 @@ function isEmptyRepoError(err: unknown): boolean {
   return errorFirstLine(err).includes("unknown revision");
 }
 
-/** Every "who are you" refusal — missing config, failed auto-detection, `user.useConfigOnly`, an empty `GIT_*_EMAIL` — opens with this line. */
+/** Every "who are you" refusal — missing config, failed auto-detection, `user.useConfigOnly` — opens with this line. */
 function isIdentityUnknownError(err: unknown): boolean {
   const text = (err as { stderr?: string })?.stderr ?? "";
   return /^(Author|Committer) identity unknown$/m.test(text);
@@ -134,7 +144,7 @@ export async function autoCommit(projectDir: string, message: string): Promise<C
       await git(projectDir, ["commit", "-m", message]);
     } catch (err) {
       if (!isIdentityUnknownError(err)) throw err;
-      await git(projectDir, [...FALLBACK_IDENTITY_FLAGS, "commit", "-m", message]);
+      await git(projectDir, [...(await fallbackIdentityFlags(projectDir)), "commit", "-m", message]);
     }
     return { sha: await git(projectDir, ["rev-parse", "HEAD"]) };
   } catch (err) {

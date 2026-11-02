@@ -4,13 +4,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { autoCommit, getHeadCommit } from "./git.js";
+import { autoCommit, getHeadCommit, FALLBACK_IDENTITY } from "./git.js";
+import { setupGitConfig, type GitConfigFixture } from "../tools/test-fixtures.js";
 
 const execFileAsync = promisify(execFile);
 
 async function git(cwd: string, args: string[]): Promise<string> {
   const { stdout } = await execFileAsync("git", args, { cwd });
   return stdout.trim();
+}
+
+/** Author and committer of HEAD, as `Name <email>` each. */
+async function headIdentity(cwd: string): Promise<{ author: string; committer: string }> {
+  const [author, committer] = (
+    await git(cwd, ["log", "-1", "--format=%an <%ae>%n%cn <%ce>"])
+  ).split("\n");
+  return { author: author ?? "", committer: committer ?? "" };
 }
 
 describe("autoCommit", () => {
@@ -59,11 +68,20 @@ describe("autoCommit", () => {
   });
 
   it("does not stage or commit an outer repo when the project dir is nested inside one", async () => {
-    // Outer repo with its own tracked file.
+    // Outer repo with its own tracked file. The user's own commit, so it
+    // brings its own identity — the host may have none configured.
     await git(dir, ["init"]);
     await writeFile(join(dir, "outer.txt"), "outer content");
     await git(dir, ["add", "outer.txt"]);
-    await git(dir, ["commit", "-m", "outer: initial"]);
+    await git(dir, [
+      "-c",
+      "user.name=Outer",
+      "-c",
+      "user.email=outer@example.com",
+      "commit",
+      "-m",
+      "outer: initial",
+    ]);
 
     // An Artisign project living in a subdirectory of that outer repo,
     // simulating an agent running Artisign inside an existing user repo.
@@ -93,6 +111,78 @@ describe("autoCommit", () => {
     const second = await autoCommit(dir, "feat: add screen again");
     expect(second.sha).toBeNull();
     expect(second.skipped_reason).toBe("nothing_to_commit");
+  });
+
+  describe("identity", () => {
+    let gitConfig: GitConfigFixture | undefined;
+
+    afterEach(async () => {
+      await gitConfig?.cleanup();
+      gitConfig = undefined;
+    });
+
+    it("commits as the fallback identity when git has none, and reports the sha", async () => {
+      // A fresh machine: no user.name/user.email anywhere, auto-detection
+      // off — git on its own answers "Author identity unknown".
+      gitConfig = await setupGitConfig(null);
+      await writeFile(join(dir, "screens.html"), '<div id="n1"></div>');
+
+      const result = await autoCommit(dir, "feat: add screen");
+      expect(result.sha).toMatch(/^[0-9a-f]{40}$/);
+      expect(result.skipped_reason).toBeUndefined();
+
+      const expected = `${FALLBACK_IDENTITY.name} <${FALLBACK_IDENTITY.email}>`;
+      expect(await headIdentity(dir)).toEqual({ author: expected, committer: expected });
+    });
+
+    it("never touches the user's git config to get there", async () => {
+      gitConfig = await setupGitConfig(null);
+      await writeFile(join(dir, "screens.html"), '<div id="n1"></div>');
+      await autoCommit(dir, "feat: add screen");
+
+      // Neither the (isolated) global config nor the project repo's own
+      // config has gained an identity: the fallback is per invocation only.
+      await expect(git(dir, ["config", "--global", "--get", "user.email"])).rejects.toThrow();
+      await expect(git(dir, ["config", "--local", "--get", "user.email"])).rejects.toThrow();
+    });
+
+    it("keeps the identity the user configured", async () => {
+      gitConfig = await setupGitConfig({ name: "Ada Lovelace", email: "ada@example.com" });
+      await writeFile(join(dir, "screens.html"), '<div id="n1"></div>');
+
+      const result = await autoCommit(dir, "feat: add screen");
+      expect(result.sha).toMatch(/^[0-9a-f]{40}$/);
+      expect(await headIdentity(dir)).toEqual({
+        author: "Ada Lovelace <ada@example.com>",
+        committer: "Ada Lovelace <ada@example.com>",
+      });
+    });
+
+    it("fills in only the half of a configured identity that is missing", async () => {
+      gitConfig = await setupGitConfig({ email: "ada@example.com" });
+      await writeFile(join(dir, "screens.html"), '<div id="n1"></div>');
+
+      const result = await autoCommit(dir, "feat: add screen");
+      expect(result.sha).toMatch(/^[0-9a-f]{40}$/);
+      const expected = `${FALLBACK_IDENTITY.name} <ada@example.com>`;
+      expect(await headIdentity(dir)).toEqual({ author: expected, committer: expected });
+    });
+
+    it("keeps an identity given through the environment", async () => {
+      gitConfig = await setupGitConfig(null);
+      process.env.GIT_AUTHOR_NAME = "Env Author";
+      process.env.GIT_AUTHOR_EMAIL = "author@example.com";
+      process.env.GIT_COMMITTER_NAME = "Env Committer";
+      process.env.GIT_COMMITTER_EMAIL = "committer@example.com";
+      await writeFile(join(dir, "screens.html"), '<div id="n1"></div>');
+
+      const result = await autoCommit(dir, "feat: add screen");
+      expect(result.sha).toMatch(/^[0-9a-f]{40}$/);
+      expect(await headIdentity(dir)).toEqual({
+        author: "Env Author <author@example.com>",
+        committer: "Env Committer <committer@example.com>",
+      });
+    });
   });
 
   it("reports a first-line git_error instead of swallowing a broken git config", async () => {

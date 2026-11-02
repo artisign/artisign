@@ -18,5 +18,5 @@ export type {
 } from "./types.js";
 export { FsStore } from "./fs-store.js";
 export { atomicWrite, ensureCacheGitignore } from "./atomic-write.js";
-export { autoCommit, getHeadCommit } from "./git.js";
+export { autoCommit, getHeadCommit, FALLBACK_IDENTITY } from "./git.js";
 export { watchProject } from "./watcher.js";

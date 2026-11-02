@@ -297,14 +297,13 @@ export const TOOLS: ToolDefinition[] = [
   // Lifecycle ---------------------------------------------------------------
   tool(
     "init_project",
-    "Scaffold a project directory: empty, from HTML, or from a Stitch export URL. Returns project, the value for the project input of later calls. Ask the user for dir; never pick one yourself.",
+    "Scaffold a project directory: empty or from HTML. Returns project, the value for the project input of later calls. Ask the user for dir; never pick one yourself.",
     {
       dir: z.string(),
       name: z.string().optional(),
       seed: z.union([
         z.object({ kind: z.literal("empty") }),
         z.object({ kind: z.literal("html"), html_aug: z.string(), screen: z.string() }),
-        z.object({ kind: z.literal("stitch_export"), url: z.string() }),
       ]),
       git: z.boolean().optional(),
     },
@@ -317,7 +316,6 @@ export const TOOLS: ToolDefinition[] = [
     {
       source: z.union([
         z.object({ kind: z.literal("html"), html_aug: z.string(), screen: z.string().optional() }),
-        z.object({ kind: z.literal("stitch_export"), url: z.string() }),
       ]),
       dedupe: z.boolean().optional(),
     },

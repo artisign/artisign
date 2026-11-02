@@ -57,7 +57,7 @@ export {
   type RenderContext,
   type SlotFillEntry,
 } from "./render.js";
-export { wrapRenderedHtml, RENDER_BASELINE_CSS, type WrapRenderedHtmlOptions } from "./render-document.js";
+export { wrapRenderedHtml, forbidScripts, RENDER_BASELINE_CSS, type WrapRenderedHtmlOptions } from "./render-document.js";
 export {
   extractFontFamilies,
   extractFontVariants,

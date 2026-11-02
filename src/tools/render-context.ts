@@ -7,6 +7,7 @@ import {
   renderScreen,
   type BackdropRender,
   wrapRenderedHtml,
+  forbidScripts,
   extractFontFamilies,
   extractFontVariants,
   ensureFontsCached,
@@ -146,7 +147,8 @@ export type RenderedMockupDocument = { documentHtml: string };
  * Reads and renders a mockup variant to a standalone HTML document. Unlike
  * `renderScreenDocument`, there is no ref model to resolve — mockups are raw
  * HTML, never re-serialized (ADR-003). A variant that already is a full
- * document (`<html ...>`) is returned verbatim; a fragment is wrapped with
+ * document (`<html ...>`) is returned verbatim except for the script ban
+ * (`forbidScripts`, CHR-982); a fragment is wrapped with
  * the same deterministic baseline (`wrapRenderedHtml`) screens use, so
  * mockups get the same baseline CSS/icons/fonts. Propagates
  * `store.readMockupVariant`'s ENOENT for the caller to translate into its
@@ -162,7 +164,7 @@ export async function renderMockupDocument(
 ): Promise<RenderedMockupDocument> {
   const html = await store.readMockupVariant(name, variantId);
   if (FULL_DOCUMENT_RE.test(html)) {
-    return { documentHtml: await resolveAssetRefs(html, store, options.fontMode) };
+    return { documentHtml: await resolveAssetRefs(forbidScripts(html), store, options.fontMode) };
   }
   let tokens: TokensDocument = {};
   try {

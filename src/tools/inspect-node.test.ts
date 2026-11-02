@@ -104,6 +104,26 @@ describe.skipIf(!isBrowserAvailable())("inspectNode — e2e (installed browser)"
   });
 
   it(
+    "never runs a screen's <script> or inline event handlers in the headless render (CHR-982)",
+    async () => {
+      await store.writeScreen(
+        "scripted",
+        `<div id="root" style="width: 200px; height: 100px">` +
+          `<p id="target" style="color: rgb(0, 0, 0); display: block">x</p>` +
+          `<img id="broken" src="data:," onerror="document.getElementById('target').style.display='none'">` +
+          `<script>document.getElementById('target').style.color='rgb(255, 0, 0)'</script>` +
+          `</div>`,
+      );
+
+      const result = await inspectNode(store, { node: "scripted.target" });
+
+      expect(result.styles.color).toBe("rgb(0, 0, 0)");
+      expect(result.styles.display).toBe("block");
+    },
+    30_000,
+  );
+
+  it(
     "returns a bounding box and the curated computed styles for a styled node",
     async () => {
       const result = await inspectNode(store, { node: "welcome.n4" });

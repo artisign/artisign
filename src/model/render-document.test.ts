@@ -12,6 +12,12 @@ describe("wrapRenderedHtml", () => {
     expect(html).toContain("box-sizing: border-box");
   });
 
+  it("forbids every script with a CSP before any content, so screen HTML never runs code (CHR-982)", () => {
+    const html = wrapRenderedHtml(`<div onclick="x()"></div><script>x()</script>`);
+    const csp = `<meta http-equiv="Content-Security-Policy" content="script-src 'none'">`;
+    expect(html).toContain(`<head><meta charset="utf-8">${csp}<style>`);
+  });
+
   it("omits the font-face style block when no fontFaceCss is passed", () => {
     const html = wrapRenderedHtml("<div></div>");
     expect(html).not.toContain("@font-face");

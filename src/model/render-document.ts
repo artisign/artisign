@@ -49,11 +49,29 @@ export type WrapRenderedHtmlOptions = {
 };
 
 /**
+ * Screen HTML is stored as written (scripts and `on*` handlers included), so
+ * the document itself forbids running any of it — in the headless browser of
+ * get_screenshot/inspect_node as in the sandboxed preview iframe (CHR-982).
+ * The tools' own `evaluate` calls come from the browser protocol, not the page.
+ */
+const NO_SCRIPTS_CSP = `<meta http-equiv="Content-Security-Policy" content="script-src 'none'">`;
+
+/**
+ * The same script ban for a full `<html>` document that is rendered verbatim
+ * (a full-document mockup). Inserted right after the `<html>` start tag, the
+ * meta lands in the head before any authored content; an authored `<head>`
+ * tag that follows is merged into it, so the render is otherwise unchanged.
+ */
+export function forbidScripts(fullDocumentHtml: string): string {
+  return fullDocumentHtml.replace(/<html(?:\s[^>]*)?>/i, (tag) => `${tag}${NO_SCRIPTS_CSP}`);
+}
+
+/**
  * Wrap a rendered screen/variant fragment in the full deterministic
  * document. The screen root stays the first element child of `<body>`
  * with its id preserved — preview scripts rely on that contract.
  */
 export function wrapRenderedHtml(bodyHtml: string, options: WrapRenderedHtmlOptions = {}): string {
   const fontStyle = options.fontFaceCss ? `<style>${options.fontFaceCss}</style>` : "";
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${RENDER_BASELINE_CSS}</style>${fontStyle}</head><body>${bodyHtml}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8">${NO_SCRIPTS_CSP}<style>${RENDER_BASELINE_CSS}</style>${fontStyle}</head><body>${bodyHtml}</body></html>`;
 }

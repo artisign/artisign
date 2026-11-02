@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { RENDER_BASELINE_CSS, wrapRenderedHtml } from "./render-document.js";
+import { RENDER_BASELINE_CSS, forbidScripts, wrapRenderedHtml } from "./render-document.js";
 
 describe("wrapRenderedHtml", () => {
   it("wraps the fragment in a full document containing the baseline exactly once", () => {
@@ -10,6 +10,22 @@ describe("wrapRenderedHtml", () => {
     expect(html).toContain(fragment);
     expect(html.split(RENDER_BASELINE_CSS)).toHaveLength(2); // present exactly once
     expect(html).toContain("box-sizing: border-box");
+  });
+
+  it("forbids every script with a CSP before any content, so screen HTML never runs code (CHR-982)", () => {
+    const html = wrapRenderedHtml(`<div onclick="x()"></div><script>x()</script>`);
+    const csp = `<meta http-equiv="Content-Security-Policy" content="script-src 'none'">`;
+    expect(html).toContain(`<head><meta charset="utf-8">${csp}<style>`);
+  });
+
+  it("forbidScripts puts the CSP after the real end of the <html> start tag, even with > inside a quoted attribute (CHR-982)", () => {
+    const csp = `<meta http-equiv="Content-Security-Policy" content="script-src 'none'">`;
+    expect(forbidScripts(`<!doctype html><HTML lang="en"><head></head><body></body></HTML>`)).toBe(
+      `<!doctype html><HTML lang="en">${csp}<head></head><body></body></HTML>`,
+    );
+    expect(forbidScripts(`<html data-x="a>b" data-y='c>d'><body></body></html>`)).toBe(
+      `<html data-x="a>b" data-y='c>d'>${csp}<body></body></html>`,
+    );
   });
 
   it("omits the font-face style block when no fontFaceCss is passed", () => {

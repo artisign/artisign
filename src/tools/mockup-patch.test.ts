@@ -127,4 +127,21 @@ describe("inspect_node on a mockup variant (CHR-956)", () => {
   it("unknown node -> not_found", async () => {
     await expect(inspectNode(fx.store, { node: "mockup:hero#a.nope" })).rejects.toMatchObject({ code: "not_found" });
   }, 60_000);
+
+  it("a full-<html> mockup's <script> and inline handlers never run (CHR-982)", async () => {
+    await writeMockup(fx.store, {
+      mockup: "hero",
+      variant: "b",
+      mode: "create",
+      html:
+        `<!doctype html><html lang="en" data-note="a>b"><head><meta charset="utf-8"></head><body>` +
+        `<p id="target" style="color: rgb(0, 0, 0); display: block">x</p>` +
+        `<img src="data:," onerror="document.getElementById('target').style.display='none'">` +
+        `<script>document.getElementById('target').style.color='rgb(255, 0, 0)'</script>` +
+        `</body></html>`,
+    });
+    const res = await inspectNode(fx.store, { node: "mockup:hero#b.target" });
+    expect(res.styles.color).toBe("rgb(0, 0, 0)");
+    expect(res.styles.display).toBe("block");
+  }, 60_000);
 });

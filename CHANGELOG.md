@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Bugfixes
 
+- Screen, component and mockup HTML no longer runs scripts in the headless browser of `get_screenshot` and
+  `inspect_node`: every rendered document carries a `script-src 'none'` Content Security Policy, a full-`<html>`
+  mockup included. `<script>`, `on*` handlers and `javascript:` URLs stay in the file but never execute — as
+  in the preview, which was already sandboxed.
 - Auto-commits no longer fail on a machine where git has no `user.name`/`user.email`: Artisign's commits are
   made as `Artisign <noreply@artisign.dev>` instead. An identity you have configured, in git config or the
   environment, is used as before, and Artisign never writes to your git config.

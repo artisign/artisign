@@ -329,14 +329,16 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
     expect(html).toContain("<div>toggle</div>");
   });
 
-  it("GET /api/render/mockup/<name>/<variant> serves a full HTML document verbatim", async () => {
+  it("GET /api/render/mockup/<name>/<variant> serves a full HTML document verbatim, plus only the script ban (CHR-982)", async () => {
     await store.writeMockupMeta("assign-caregiver", { variants: [{ id: "full", title: "Full", description: "" }] });
     const fullDoc = "<html><head><title>x</title></head><body><p>full doc</p></body></html>";
     await store.writeMockupVariant("assign-caregiver", "full", fullDoc);
 
     const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/mockup/assign-caregiver/full`);
     expect(res.status).toBe(200);
-    expect(await res.text()).toBe(fullDoc);
+    expect(await res.text()).toBe(
+      `<html><meta http-equiv="Content-Security-Policy" content="script-src 'none'"><head><title>x</title></head><body><p>full doc</p></body></html>`,
+    );
   });
 
   it("GET /api/render/mockup/<unknown>/<variant> returns a 404 JSON error", async () => {

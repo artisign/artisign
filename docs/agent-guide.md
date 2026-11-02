@@ -153,6 +153,13 @@ into `assets/` first. (Remote `https://` URLs and `data:` URIs are not
 blocked.) This holds for screens, components and mockups alike, a full `<html>`
 mockup included.
 
+## No scripts
+
+Scripts never run — not in the preview, not in `get_screenshot` or
+`inspect_node`. `<script>` elements, `on*` handler attributes and
+`javascript:` URLs are kept in the file but do nothing; this holds for full
+`<html>` mockups too. Show states as separate screens or variants instead.
+
 ## Exploring options with mockups
 
 Exploration mode above covers *one* draft screen you promote before moving

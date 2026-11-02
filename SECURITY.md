@@ -38,12 +38,14 @@ Do **not** open a public issue for a vulnerability.
 
 Artisign is a local tool: the daemon binds only to `127.0.0.1`, keeps no
 accounts, and sends no telemetry. Its own outbound requests are the update
-check (at most once a day, `registry.npmjs.org`, nothing sent), `artisign
-update` and the `npx` entry in your AI tool talking to the npm registry, and
-Google Fonts: on the first render of a project the daemon fetches every font
-family named in its tokens plus the Material Symbols Rounded icon font, which
-is requested unconditionally (a bundled copy is used only if that request
-fails), and caches them locally. Artisign does not fetch URLs on an agent's
+check (at most once a day, `registry.npmjs.org`, nothing sent; off with
+`ARTISIGN_NO_UPDATE_CHECK=1`), `artisign update` and the `npx` entry in your
+AI tool talking to the npm registry, and Google Fonts: on the first render of
+a project in each daemon run, and again when its typography tokens change,
+the daemon fetches every font family named in its tokens plus the Material
+Symbols Rounded icon font, which is requested unconditionally (a bundled copy
+is used only if that request fails), and stores them in the project's
+`.artisign/` cache. Artisign does not fetch URLs on an agent's
 behalf. A remote `https://` URL written into a screen's own HTML (an image, a
 stylesheet) is loaded by the browser that renders it, like any web page.
 

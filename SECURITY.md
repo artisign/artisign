@@ -2,10 +2,13 @@
 
 ## Supported versions
 
-| Version | Supported |
-| ------- | --------- |
-| 0.9.x   | ✅        |
-| < 0.9   | ❌        |
+Only the latest release on npm gets security fixes; update with
+`artisign update`.
+
+| Version         | Supported |
+| --------------- | --------- |
+| Latest release  | ✅        |
+| Older releases  | ❌        |
 
 ## Reporting a vulnerability
 
@@ -34,11 +37,22 @@ Do **not** open a public issue for a vulnerability.
 ## Scope notes
 
 Artisign is a local tool: the daemon binds only to `127.0.0.1`, keeps no
-accounts, and sends no telemetry. The only outbound requests are the
-`import_html` tool fetching a URL the agent supplies, and Google Fonts: on the
-first render of a project the daemon fetches every font family named in its
-tokens plus the Material Symbols Rounded icon font, which is requested
-unconditionally (a bundled copy is used only if that request fails), and
-caches them locally. Reports about behaviour that
+accounts, and sends no telemetry. Its own outbound requests are the update
+check (at most once a day, `registry.npmjs.org`, nothing sent), `artisign
+update` and the `npx` entry in your AI tool talking to the npm registry, and
+Google Fonts: on the first render of a project the daemon fetches every font
+family named in its tokens plus the Material Symbols Rounded icon font, which
+is requested unconditionally (a bundled copy is used only if that request
+fails), and caches them locally. Artisign does not fetch URLs on an agent's
+behalf. A remote `https://` URL written into a screen's own HTML (an image, a
+stylesheet) is loaded by the browser that renders it, like any web page.
+
+Screen, component and mockup HTML never runs scripts: the preview iframe is
+sandboxed without `allow-scripts`, and every rendered document, including the
+headless render of `get_screenshot` and `inspect_node`, carries a
+`script-src 'none'` Content Security Policy. `<script>`, `on*` handlers and
+`javascript:` URLs stay in the file but do not execute.
+
+Reports about behaviour that
 requires an attacker to already control the local machine or the MCP client
 are still welcome, but they are prioritised accordingly.

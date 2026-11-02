@@ -11,8 +11,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `import_html` and `init_project` no longer accept source kind `stitch_export`; Artisign no longer fetches
   URLs. Pass the HTML as `{kind: "html"}` instead.
 
+### Improvements
+
+- `patch_html` and `inspect_node` accept mockup variant targets (`mockup:<name>#<variant>.<node-id>`).
+- The MCP instructions and the agent guide name the icon font precisely and say where image files must live
+  (local paths only from the project's `assets/` folder).
+
 ### Bugfixes
 
+- Fonts render in every weight a token uses, not only 400, and a font named in a family-only typography token is
+  fetched too.
+- Parallel writes no longer drop each other's entries from the font cache.
 - Screen, component and mockup HTML no longer runs scripts in the headless browser of `get_screenshot` and
   `inspect_node`: every rendered document carries a `script-src 'none'` Content Security Policy, a full-`<html>`
   mockup included. `<script>`, `on*` handlers and `javascript:` URLs stay in the file but never execute — as
@@ -118,7 +127,7 @@ AI tools itself, and every tool call names its project.
 - The project dialogs in the preview can create a new folder, and the empty state offers a ready-made prompt for your AI
   tool ("Create an Artisign project in ~/work/acme"). (CHR-834)
 
-## [2.0.0] - 2026-10-13
+## [2.0.0] - 2026-10-14
 
 ### Changed
 

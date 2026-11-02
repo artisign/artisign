@@ -134,7 +134,7 @@ describe("inspect_node on a mockup variant (CHR-956)", () => {
       variant: "b",
       mode: "create",
       html:
-        `<!doctype html><html><head><meta charset="utf-8"></head><body>` +
+        `<!doctype html><html lang="en" data-note="a>b"><head><meta charset="utf-8"></head><body>` +
         `<p id="target" style="color: rgb(0, 0, 0); display: block">x</p>` +
         `<img src="data:," onerror="document.getElementById('target').style.display='none'">` +
         `<script>document.getElementById('target').style.color='rgb(255, 0, 0)'</script>` +

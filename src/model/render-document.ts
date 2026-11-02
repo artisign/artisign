@@ -63,7 +63,8 @@ const NO_SCRIPTS_CSP = `<meta http-equiv="Content-Security-Policy" content="scri
  * tag that follows is merged into it, so the render is otherwise unchanged.
  */
 export function forbidScripts(fullDocumentHtml: string): string {
-  return fullDocumentHtml.replace(/<html(?:\s[^>]*)?>/i, (tag) => `${tag}${NO_SCRIPTS_CSP}`);
+  // Quoted attribute values may contain ">", so they are matched whole.
+  return fullDocumentHtml.replace(/<html(?:\s(?:"[^"]*"|'[^']*'|[^>"'])*)?>/i, (tag) => `${tag}${NO_SCRIPTS_CSP}`);
 }
 
 /**

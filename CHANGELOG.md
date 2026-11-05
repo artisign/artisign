@@ -8,13 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Breaking changes
 
-- `import_html` and `init_project` no longer accept source kind `stitch_export`; Artisign no longer fetches
+- `import_html` and `init_project` no longer accept source kind `stitch_export`; artisign no longer fetches
   URLs. Pass the HTML as `{kind: "html"}` instead.
 
 ### Improvements
 
-- The MCP instructions and the agent guide tell agents to change the design only through Artisign's tools, never
+- The MCP instructions and the agent guide tell agents to change the design only through artisign's tools, never
   with shell or file-edit tools (copying an image into `assets/` excepted); before, that rule covered mockups only.
+- The product name is now written in lowercase, artisign, in the CLI, the browser preview, the MCP instructions,
+  the docs and the package metadata.
 - `patch_html` and `inspect_node` accept mockup variant targets (`mockup:<name>#<variant>.<node-id>`).
 - The MCP instructions and the agent guide name the icon font precisely and say where image files must live
   (local paths only from the project's `assets/` folder).
@@ -28,9 +30,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `inspect_node`: every rendered document carries a `script-src 'none'` Content Security Policy, a full-`<html>`
   mockup included. `<script>`, `on*` handlers and `javascript:` URLs stay in the file but never execute — as
   in the preview, which was already sandboxed.
-- Auto-commits no longer fail on a machine where git has no `user.name`/`user.email`: Artisign's commits are
+- Auto-commits no longer fail on a machine where git has no `user.name`/`user.email`: artisign's commits are
   made as `Artisign <noreply@artisign.dev>` instead. An identity you have configured, in git config or the
-  environment, is used as before, and Artisign never writes to your git config.
+  environment, is used as before, and artisign never writes to your git config.
 
 ## [2.2.0] - 2026-10-26
 

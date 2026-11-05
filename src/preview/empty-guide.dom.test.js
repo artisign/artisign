@@ -72,7 +72,7 @@ describe("empty-project guide", () => {
     expect($("#canvas").contains($("#empty-guide"))).toBe(true);
     expect($("#screen-holder").contains($("#empty-guide"))).toBe(false); // not zoomed with the frame
     expect($("#screen-holder").hidden).toBe(true);
-    expect($("#empty-guide-prompt").textContent).toBe("Design a login screen in my Artisign project delete-me");
+    expect($("#empty-guide-prompt").textContent).toBe("Design a login screen in my artisign project delete-me");
   });
 
   it("switches live: first screen hides the guide, deleting the last brings it back", async () => {
@@ -117,7 +117,7 @@ describe("empty-project guide", () => {
     await flush();
     $("#empty-guide-copy").click();
     await flush();
-    expect(writeText).toHaveBeenCalledWith("Design a login screen in my Artisign project delete-me");
+    expect(writeText).toHaveBeenCalledWith("Design a login screen in my artisign project delete-me");
     expect($("#empty-guide-copy").textContent).toBe("Copied");
   });
 });

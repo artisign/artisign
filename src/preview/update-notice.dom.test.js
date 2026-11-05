@@ -100,7 +100,7 @@ describe("update toast", () => {
   it("shows for an available update, with the version and the copyable command", async () => {
     await boot();
     expect(toast().hidden).toBe(false);
-    expect($("#update-toast-title").textContent).toBe("Artisign 2.2.0 is available");
+    expect($("#update-toast-title").textContent).toBe("artisign 2.2.0 is available");
     const chip = $("#update-toast-command button");
     expect(chip.textContent.replace("content_copy", "")).toBe("artisign update");
     chip.click();
@@ -240,7 +240,7 @@ describe("hourly re-read", () => {
     vi.advanceTimersByTime(HOUR);
     await flush();
     expect(toast().hidden).toBe(false);
-    expect($("#update-toast-title").textContent).toBe("Artisign 2.3.0 is available");
+    expect($("#update-toast-title").textContent).toBe("artisign 2.3.0 is available");
   });
 
   it("brings a notice dismissed yesterday back after midnight", async () => {
@@ -284,7 +284,7 @@ describe("About status in the settings menu", () => {
     about = { version: "2.1.1", updateCheck: "on", latest: "2.1.1", updateAvailable: false };
     await boot();
     await openMenu();
-    expect($("#settings-version").textContent).toBe("Artisign 2.1.1");
+    expect($("#settings-version").textContent).toBe("artisign 2.1.1");
     expect(status().hidden).toBe(false);
     expect($("#settings-update-icon").textContent).toBe("check_circle");
     expect($("#settings-update-text").textContent).toBe("Up to date");
@@ -342,7 +342,7 @@ describe("About status in the settings menu", () => {
     about = { version: "2.1.1", updateCheck: "on", updateAvailable: false };
     await boot();
     await openMenu();
-    expect($("#settings-version").textContent).toBe("Artisign 2.1.1");
+    expect($("#settings-version").textContent).toBe("artisign 2.1.1");
     expect(status().hidden).toBe(true);
   });
 

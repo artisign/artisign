@@ -53,7 +53,7 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
    */
   function renderAbout(about) {
     if (!about) return;
-    versionEl.textContent = `Artisign ${about.version}`;
+    versionEl.textContent = `artisign ${about.version}`;
     aboutEl.hidden = false;
     /** @type {{ state: string, icon: string, text: string } | null} */
     let status = null;

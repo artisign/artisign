@@ -58,7 +58,7 @@ export async function offerSetup(
   const detected = await detectClients(deps.env, deps.clients);
   if (detected.length === 0 || detected.some((d) => d.hasEntry)) return;
   const answer = await deps.ask(
-    `Connect Artisign to ${names(detected.map((d) => d.client.name))} now? [Y/n] `,
+    `Connect artisign to ${names(detected.map((d) => d.client.name))} now? [Y/n] `,
   );
   if (/^n/i.test(answer.trim())) await deps.rememberDecline();
   else await deps.runSetup(cliEntry);

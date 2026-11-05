@@ -432,8 +432,8 @@ async function validateProjectRoot(root: string): Promise<ArtisignConfig> {
     return await new FsStore(root).readArtisignConfig();
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(`not an Artisign project: ${CONFIG_FILENAME} not found at ${configPath}`);
+      throw new Error(`not an artisign project: ${CONFIG_FILENAME} not found at ${configPath}`);
     }
-    throw new Error(`not an Artisign project: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(`not an artisign project: ${err instanceof Error ? err.message : String(err)}`);
   }
 }

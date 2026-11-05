@@ -1,4 +1,4 @@
-# Artisign
+# artisign
 
 An artificial artisan for UI design: agents build screens, a design system keeps them consistent.
 
@@ -6,7 +6,7 @@ Local-first UX design tool for AI agents. Agents design through MCP, the human r
 
 One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
-**Status:** Stable (`2.2.0`) — CLI, store, parser/model, the 25-tool MCP surface, browser preview with live reload/flows/comments, screen variants with side-by-side compare, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. Artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
+**Status:** Stable (`2.2.0`) — CLI, store, parser/model, the 25-tool MCP surface, browser preview with live reload/flows/comments, screen variants with side-by-side compare, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
 
 ## Why
 
@@ -25,14 +25,14 @@ artisign
 ```
 
 1. `npm install -g artisign` — once.
-2. `artisign` — starts Artisign's background process (the *daemon*), opens the preview in your browser and, on first run, offers to connect your AI tool. After connecting, quit and reopen the AI tool so it picks up the new entry.
-3. Ask your AI tool to create or open a project: *"Create an Artisign project in ~/work/acme"*. The project folder (and any missing parent folders) is created for you; the AI tool passes an absolute path, since Artisign does not expand `~` itself. Writes are committed to git automatically (`autoCommit`, on by default) — Artisign runs `git init` in the project on the first write, needs `git` installed for that, and skips the commit rather than fail when it is missing or the folder sits inside another repo. No git identity is required: on a machine where git has no `user.name`/`user.email`, Artisign's commits are made as `Artisign <noreply@artisign.dev>`; an identity you have configured (git config, or `GIT_AUTHOR_*`/`GIT_COMMITTER_*` in the environment) is used as it is, and Artisign never writes to your git config.
+2. `artisign` — starts artisign's background process (the *daemon*), opens the preview in your browser and, on first run, offers to connect your AI tool. After connecting, quit and reopen the AI tool so it picks up the new entry.
+3. Ask your AI tool to create or open a project: *"Create an artisign project in ~/work/acme"*. The project folder (and any missing parent folders) is created for you; the AI tool passes an absolute path, since artisign does not expand `~` itself. Writes are committed to git automatically (`autoCommit`, on by default) — artisign runs `git init` in the project on the first write, needs `git` installed for that, and skips the commit rather than fail when it is missing or the folder sits inside another repo. No git identity is required: on a machine where git has no `user.name`/`user.email`, artisign's commits are made as `Artisign <noreply@artisign.dev>`; an identity you have configured (git config, or `GIT_AUTHOR_*`/`GIT_COMMITTER_*` in the environment) is used as it is, and artisign never writes to your git config.
 
-**Check it works.** Ask your AI tool *"List my Artisign projects"* — it calls `list_projects` and the project you just created appears, and in the preview's project picker too.
+**Check it works.** Ask your AI tool *"List my artisign projects"* — it calls `list_projects` and the project you just created appears, and in the preview's project picker too.
 
 **Two copies, one version.** The global install is the `artisign` command you type. Your AI tool's entry runs the same version, pinned, through `npx` (downloaded once on its first launch) as a small stdio bridge; `artisign update` keeps the two in step. Whichever starts first — you with `artisign`, or the bridge when your AI tool connects — starts the daemon; both use the same `~/.artisign` and port, so there is only ever one. The daemon inherits the environment of the process that started it: to make a variable such as `ARTISIGN_BROWSER` stick, run `artisign` from your shell before your AI tool does (`artisign stop` first if it is already running); putting it in the entry's `env` also works, but `artisign setup` rewrites entries, so add it again after an update.
 
-**Updating.** Run `artisign update` (also `artisign --update`). It installs the latest version with `npm install -g artisign@latest`, re-pins the `artisign` entries in your AI tools to it and restarts a running Artisign of an older version with its open projects. Then quit and reopen your AI tool, so it launches the re-pinned entry. It does nothing when you are already on the latest version, and never uses `sudo`. Nothing is updated automatically: `artisign` checks the npm registry for a newer release at most once a day and prints one line (`New version x.y.z — run artisign update`) when there is one. Set `ARTISIGN_NO_UPDATE_CHECK=1` to turn that off.
+**Updating.** Run `artisign update` (also `artisign --update`). It installs the latest version with `npm install -g artisign@latest`, re-pins the `artisign` entries in your AI tools to it and restarts a running artisign of an older version with its open projects. Then quit and reopen your AI tool, so it launches the re-pinned entry. It does nothing when you are already on the latest version, and never uses `sudo`. Nothing is updated automatically: `artisign` checks the npm registry for a newer release at most once a day and prints one line (`New version x.y.z — run artisign update`) when there is one. Set `ARTISIGN_NO_UPDATE_CHECK=1` to turn that off.
 
 **Troubleshooting.**
 
@@ -40,14 +40,14 @@ artisign
 - **nvm** — a global install belongs to one Node version. After switching versions, run `npm install -g artisign` and `artisign setup` again.
 - **pnpm, bun or yarn** — install with `pnpm add -g artisign`, `bun add -g artisign` or `yarn global add artisign`; update with the same command and `@latest` (`artisign update` only *prints* that command for these installs, it does not run it). Then run `artisign setup` to connect your AI tool and re-pin its entries.
 
-**Screenshots.** `get_screenshot` and `inspect_node` render in a real browser — one that is already on your machine. Artisign finds Chrome, Edge, Brave, Chromium or Firefox by itself (in that order) and drives it headless through the browser's own remote protocol: the Chrome DevTools Protocol for the Chromium family, WebDriver BiDi for Firefox. Nothing to install, no Playwright, no browser download.
+**Screenshots.** `get_screenshot` and `inspect_node` render in a real browser — one that is already on your machine. artisign finds Chrome, Edge, Brave, Chromium or Firefox by itself (in that order) and drives it headless through the browser's own remote protocol: the Chrome DevTools Protocol for the Chromium family, WebDriver BiDi for Firefox. Nothing to install, no Playwright, no browser download.
 
 - **Pick a browser explicitly** with `ARTISIGN_BROWSER=/path/to/browser` in the environment of the process that runs the daemon. The name decides the protocol: a path containing `firefox` is driven over BiDi, anything else over CDP.
 - **Cross-browser check.** Both tools take an optional `browser` input (`"chrome"`, `"edge"`, `"brave"`, `"chromium"`, `"firefox"`), and every result names the browser and version that rendered it — so an agent can check the same screen in a second installed browser before calling it done.
 - **Each launch uses a fresh, throwaway profile** in `~/artisign-browser-profiles/`, removed when the browser closes. It lives under your home directory, not `/tmp`, because a Snap- or Flatpak-packaged Firefox cannot see `/tmp`.
 - **No browser installed** (a bare server or container): both tools fail with the fix in the error message; every other tool works without one. Installing `chromium` or `firefox-esr` from the distribution's packages is enough.
 
-**Privacy.** Artisign collects nothing — no telemetry, no account, no server beyond the local one it runs. These requests reach the network, none of them about you, and that is the complete list: the update check (at most once a day) asks `registry.npmjs.org` for the latest version and sends nothing else; `artisign update` runs `npm`, and the `npx` in your AI tool's entry fetches the pinned version from npm, both talking to the npm registry; and the first render of a project in each Artisign run (and again when its typography tokens change) fetches the font families named in your tokens — plus the Material Symbols Rounded icon font, always (a copy shipped with the package is the fallback when that fails) — from Google Fonts, then caches them locally (see [Fonts & icons](#fonts--icons)). A remote `https://` URL that a screen's own HTML references (an image, a stylesheet) is loaded by the browser that renders it, like any web page. Everything else stays on `127.0.0.1`.
+**Privacy.** artisign collects nothing — no telemetry, no account, no server beyond the local one it runs. These requests reach the network, none of them about you, and that is the complete list: the update check (at most once a day) asks `registry.npmjs.org` for the latest version and sends nothing else; `artisign update` runs `npm`, and the `npx` in your AI tool's entry fetches the pinned version from npm, both talking to the npm registry; and the first render of a project in each artisign run (and again when its typography tokens change) fetches the font families named in your tokens — plus the Material Symbols Rounded icon font, always (a copy shipped with the package is the fallback when that fails) — from Google Fonts, then caches them locally (see [Fonts & icons](#fonts--icons)). A remote `https://` URL that a screen's own HTML references (an image, a stylesheet) is loaded by the browser that renders it, like any web page. Everything else stays on `127.0.0.1`.
 
 ## Quickstart
 
@@ -69,7 +69,7 @@ artisign stop                 # stop the background process
 artisign help [command]       # also: artisign <command> --help
 ```
 
-Artisign is **multi-project**: one process on `127.0.0.1:4711` holds several projects open at once. Open or create projects from the browser UI (project picker in the topbar), or let agents address any project by name or path in the `project` input of each tool call — `list_projects` shows the names. No restart when you switch.
+artisign is **multi-project**: one process on `127.0.0.1:4711` holds several projects open at once. Open or create projects from the browser UI (project picker in the topbar), or let agents address any project by name or path in the `project` input of each tool call — `list_projects` shows the names. No restart when you switch.
 
 ## Advanced
 
@@ -143,7 +143,7 @@ It renders in a browser already installed on the machine, and the result names w
 
 `scale` (default `1`) is the screenshot's device scale factor — `1x` is enough for most visual review; go higher only when pixel-level detail matters, since a larger image costs more tokens once it reaches a model.
 
-## An Artisign project on disk
+## An artisign project on disk
 
 ```
 <project>/
@@ -186,7 +186,7 @@ Everything is human-readable and diffable. With `autoCommit` on (the `init` defa
 
 Served at `http://127.0.0.1:<port>` once the daemon is running — plain ES modules, no build step:
 
-- **Project picker** — switch between open projects in the topbar; open an existing folder or create a new project through an in-app folder browser, which can also make a new folder (no restart needed). With nothing open, an empty state offers both actions, recent projects, and a ready-made prompt for your AI tool ("Create an Artisign project in ~/work/acme").
+- **Project picker** — switch between open projects in the topbar; open an existing folder or create a new project through an in-app folder browser, which can also make a new folder (no restart needed). With nothing open, an empty state offers both actions, recent projects, and a ready-made prompt for your AI tool ("Create an artisign project in ~/work/acme").
 - **Screens** — sidebar screen tree, rendered source (preview = output, by construction). Variants nest under their parent with a kind icon (state, overlay, step) and tag chips; expand state is kept per browser, and pinning a group row pins its whole subtree
 - **Variant context** — a screen that is a variant, or has variants, shows a breadcrumb above the canvas and a variant tree map beside it; the inspector lists the flow sources a screen is "Also reached from"
 - **Compare** — `Single | Compare · N` in the screen view puts the family's main screen (the locked reference) and 1–3 of its variants side by side in 2–4 columns, with a diff overlay marking nodes added, changed and removed against the reference. Nodes are matched by authored `id` only; below 25 % shared authored ids that column shows no diff, only a banner saying the diff is unavailable
@@ -245,7 +245,7 @@ scripts/             one-off dev tooling, not shipped in the npm package
 
 ## Designed with itself
 
-Artisign's own browser preview is designed in Artisign. [`design/`](design/) is a real
+artisign's own browser preview is designed in artisign. [`design/`](design/) is a real
 project in the on-disk format described above — tokens, components, screens, flows — and
 it is the source the interface you see at `127.0.0.1:4711` was designed from.
 
@@ -273,7 +273,7 @@ npm run lint         # eslint
 npm test             # vitest run
 npm run build        # compile src/ to dist/
 npm run dev -- serve ./my-project   # run the CLI from source via tsx
-./artisign-dev.sh start [dir...]     # build, stop the running Artisign, start this checkout in the background
+./artisign-dev.sh start [dir...]     # build, stop the running artisign, start this checkout in the background
 ./artisign-dev.sh stop               # stop it (also: status)
 ```
 
@@ -299,11 +299,11 @@ accepted; [`CONTRIBUTING.md`](CONTRIBUTING.md) explains why and what is welcome.
 
 Copyright (C) 2026 Christian Körbs
 
-Artisign is free software: you can redistribute it and/or modify it under the
+artisign is free software: you can redistribute it and/or modify it under the
 terms of the GNU Affero General Public License as published by the Free Software
 Foundation, version 3.
 
-Artisign is distributed in the hope that it will be useful, but WITHOUT ANY
+artisign is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
 
@@ -313,8 +313,8 @@ in [`LICENSE`](LICENSE).
 
 Two things the license does not cover:
 
-- **Your designs are yours.** The AGPL covers Artisign's own source code, not the
-  screens, components, tokens or projects you create with it. Files Artisign
+- **Your designs are yours.** The AGPL covers artisign's own source code, not the
+  screens, components, tokens or projects you create with it. Files artisign
   writes into your project folder belong entirely to you.
-- **The name is not licensed.** "Artisign", its logo and its domains are not part
+- **The name is not licensed.** "artisign", its logo and its domains are not part
   of the AGPL grant. Forks may use the code but need their own name.

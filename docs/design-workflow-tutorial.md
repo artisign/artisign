@@ -1,6 +1,6 @@
-# The Artisign Design Workflow — Tutorial
+# The artisign Design Workflow — Tutorial
 
-This tutorial walks through designing a small product with Artisign the way
+This tutorial walks through designing a small product with artisign the way
 the tool wants to be used: design-system-first, refs everywhere, reviewed after
 every step. It is the long-form companion to the compact
 [Agent Guide](./agent-guide.md), which agents load on demand via the
@@ -10,7 +10,7 @@ rules.
 
 Who this is for:
 
-- **Humans** setting up Artisign for their agents and wanting to understand
+- **Humans** setting up artisign for their agents and wanting to understand
   the intended workflow before writing prompts or skills.
 - **Skill authors** who want to distill project-specific instructions for their
   design agents — copy freely, this document is meant to be quarried.
@@ -28,7 +28,7 @@ npm install -g artisign
 artisign
 ```
 
-Then ask your AI tool to create or open a project — *"Create an Artisign project
+Then ask your AI tool to create or open a project — *"Create an artisign project
 in ~/work/acme"*. The first `artisign` run offers to connect your AI tool; update
 later with `artisign update`. Install details, troubleshooting and manual MCP
 setup are in the [README](../README.md#install).
@@ -37,7 +37,7 @@ setup are in the [README](../README.md#install).
 
 ## 1. Why design-system-first
 
-Artisign stores screens as augmented HTML in plain files. Nothing stops you
+artisign stores screens as augmented HTML in plain files. Nothing stops you
 from writing three screens of raw HTML with inline styles — they will render
 fine. But you would be using a fraction of the tool, and the most expensive
 fraction at that.
@@ -332,7 +332,7 @@ values are promoted and swept.
 
 ## 7. Comments, metadata, and handoff
 
-Artisign is a two-party loop: agents design, the human reviews in the
+artisign is a two-party loop: agents design, the human reviews in the
 browser and comments on specific nodes.
 
 If the human turns on **Follow mode** (the topbar toggle, off by default),
@@ -387,7 +387,7 @@ reliably produces vague metadata, because the reasoning is gone.
 
 ## 9. Building skills from this workflow
 
-If you run your own agents against Artisign, the recommended split:
+If you run your own agents against artisign, the recommended split:
 
 - **Let the tool teach mechanics.** The MCP server instructions and the
   `get_guide` Agent Guide already cover grammar, tools, and workflow. Do not

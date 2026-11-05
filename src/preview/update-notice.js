@@ -31,7 +31,7 @@ export function createUpdateNotice({ toastEl, titleEl, commandEl, closeEl, stora
     current = about;
     const dismissed = Boolean(about?.latest) && readStringPref(storage, UPDATE_DISMISSED_KEY, null) === `${localDay()}|${about.latest}`;
     const show = Boolean(about?.updateAvailable && about.latest) && !dismissed;
-    if (show) titleEl.textContent = `Artisign ${about.latest} is available`;
+    if (show) titleEl.textContent = `artisign ${about.latest} is available`;
     toastEl.hidden = !show;
   }
 

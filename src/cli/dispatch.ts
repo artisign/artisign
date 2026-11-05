@@ -12,11 +12,11 @@ import { offerSetup } from "./offer-setup.js";
 import { readVersion } from "../version.js";
 
 export const USAGE = [
-  "Artisign: a local design tool your AI tool drives and you review in the browser.",
+  "artisign: a local design tool your AI tool drives and you review in the browser.",
   "",
   "Get started:",
   "  1. Install once:   npm install -g artisign",
-  "  2. Run `artisign`  (starts Artisign and, on first run, connects your AI tool)",
+  "  2. Run `artisign`  (starts artisign and, on first run, connects your AI tool)",
   "  3. Ask your AI tool to create or open a project",
   "",
   "Update: `artisign update`",
@@ -29,9 +29,9 @@ export const USAGE = [
   "  stop                                    stop the background process",
   "  serve [--port N] [dir...]               run in the foreground",
   "  init [dir]                              scaffold a new project",
-  "  setup [--yes] [--remove]                connect your AI tools to Artisign (or disconnect them)",
+  "  setup [--yes] [--remove]                connect your AI tools to artisign (or disconnect them)",
   "  update                                  install the latest version and re-pin your AI tool entries",
-  "  mcp                                     stdio connection for AI tools; starts Artisign if needed",
+  "  mcp                                     stdio connection for AI tools; starts artisign if needed",
   "  help [command]                          show this help, or the help of one command",
   "",
   "Options:",
@@ -47,7 +47,7 @@ export const COMMAND_HELP: Record<string, string> = {
   start: [
     "Usage: artisign start [--port N] [--no-open] [dir...]",
     "",
-    "Start Artisign in the background and open the preview in the browser. This is what a bare",
+    "Start artisign in the background and open the preview in the browser. This is what a bare",
     "`artisign` does. Each dir is a project to open; without one, the preview opens with the project list.",
     "",
     "Options:",
@@ -60,7 +60,7 @@ export const COMMAND_HELP: Record<string, string> = {
   serve: [
     "Usage: artisign serve [--port N] [dir...]",
     "",
-    "Run Artisign in the foreground, logging to the terminal. Stop it with Ctrl+C.",
+    "Run artisign in the foreground, logging to the terminal. Stop it with Ctrl+C.",
     "",
     "Options:",
     "  --port N     listen on this port (default: the port from the config, else 4711)",
@@ -80,7 +80,7 @@ export const COMMAND_HELP: Record<string, string> = {
     "Usage: artisign mcp",
     "",
     "Stdio connection for AI tools such as Claude Desktop and Claude Code. It forwards every MCP message to",
-    "the running Artisign and starts it if it is not running. Your AI tool launches this; you rarely run it.",
+    "the running artisign and starts it if it is not running. Your AI tool launches this; you rarely run it.",
     "It takes no project directory: the project is named per tool call.",
     "",
     "Example:",
@@ -89,7 +89,7 @@ export const COMMAND_HELP: Record<string, string> = {
   setup: [
     "Usage: artisign setup [--yes] [--remove]",
     "",
-    "Connect your AI tools to Artisign (Claude Code, Claude Desktop, Cursor, Codex CLI, VS Code, opencode). For each one found, asks, then writes a user-level",
+    "Connect your AI tools to artisign (Claude Code, Claude Desktop, Cursor, Codex CLI, VS Code, opencode). For each one found, asks, then writes a user-level",
     "entry named `artisign` that runs `npx -y artisign@<version> mcp`, pinned to the version running setup.",
     "Run it again after an update to re-pin. Other entries and settings are left untouched.",
     "",
@@ -104,7 +104,7 @@ export const COMMAND_HELP: Record<string, string> = {
     "Usage: artisign update",
     "",
     "Install the latest artisign globally (`npm install -g artisign@latest`), then re-pin the `artisign` entries",
-    "in your AI tools to it and restart a running Artisign. Does nothing when you are already on the latest version.",
+    "in your AI tools to it and restart a running artisign. Does nothing when you are already on the latest version.",
     "Also available as `artisign --update`. Installed with pnpm, bun or yarn, it prints the matching command instead.",
     "",
     "Example:",
@@ -243,7 +243,7 @@ async function run(
   switch (command) {
     case "init":
       await deps.initProject(rest[0] ?? ".");
-      deps.log(`Initialized Artisign project in ${rest[0] ?? "."}`);
+      deps.log(`Initialized artisign project in ${rest[0] ?? "."}`);
       return 0;
     case "serve": {
       const { port, projects } = parseStartArgs(rest);

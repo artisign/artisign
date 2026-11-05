@@ -41,7 +41,7 @@ describe("offerSetup", () => {
     await installDesktop();
     const d = make();
     await offerSetup("e", d);
-    expect(d.ask).toHaveBeenCalledWith("Connect Artisign to Claude Desktop now? [Y/n] ");
+    expect(d.ask).toHaveBeenCalledWith("Connect artisign to Claude Desktop now? [Y/n] ");
     expect(d.runSetup).toHaveBeenCalledWith("e");
   });
 

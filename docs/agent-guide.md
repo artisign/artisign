@@ -1,6 +1,6 @@
-# Designing with Artisign — Agent Guide
+# Designing with artisign — Agent Guide
 
-This guide is the design methodology for agents working through the Artisign
+This guide is the design methodology for agents working through the artisign
 MCP tools. The server instructions cover tool *mechanics* (augmentation grammar,
 tool shapes); this guide covers *how to design well*. Load it when you need the
 methodology.
@@ -36,7 +36,7 @@ Do not read full screens upfront. Load detail lazily with tiered reads.
 **A screen renders at its root element's declared `width`/`height`.** That
 size is the screen's frame in `get_screenshot` and `inspect_node`. A root
 without a px width (plain or via a `$token`) falls back to **390×844, a
-phone**. Nothing about Artisign is mobile-only; the default is just a
+phone**. Nothing about artisign is mobile-only; the default is just a
 default. Declare it on the screen's own root element — a width inside a
 component definition the root instantiates (`class="$app-shell"`) does not
 count.
@@ -146,14 +146,14 @@ exist, so it must load its own.
 ## Change the design only through the tools
 
 Screens, components, patterns, tokens, flows, mockups and comments change only
-through Artisign's tools — never with a shell, a script or a file-edit tool,
+through artisign's tools — never with a shell, a script or a file-edit tool,
 even for a one-line fix. The tools keep node ids, refs, the index and the
 history consistent; a direct edit bypasses all of that. Copying an image file
 into `assets/` is the one exception.
 
 ## Images and other assets
 
-Image files live in the `assets/` folder of the Artisign project — the folder
+Image files live in the `assets/` folder of the artisign project — the folder
 holding `artisign.json` — and are referenced as `src="assets/hero.png"` or
 `url(assets/hero.png)`. No other local path is served: a path outside
 `assets/`, or a file elsewhere in the repo, does not load. Copy such a file

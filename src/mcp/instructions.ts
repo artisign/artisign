@@ -4,7 +4,7 @@
  * write screens, before it ever calls a tool. Kept to a single copy: tool
  * descriptions point back here instead of repeating the grammar.
  */
-export const INSTRUCTIONS = `Artisign — augmentation grammar for screen HTML (html_aug).
+export const INSTRUCTIONS = `artisign — augmentation grammar for screen HTML (html_aug).
 
 PROJECT: start with list_projects. Every tool but list_projects/init_project/
 get_guide takes a required "project": a project name or an absolute path.

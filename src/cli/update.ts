@@ -80,12 +80,12 @@ export async function runUpdate(deps: UpdateDeps = defaultDeps()): Promise<numbe
       "Running through npx: npx always fetches the version pinned in the AI tool's entry, so there is nothing to update here.",
     );
     deps.error(
-      "Install Artisign globally with `npm install -g artisign`, then run `artisign setup`.",
+      "Install artisign globally with `npm install -g artisign`, then run `artisign setup`.",
     );
     return 1;
   }
   if (other) {
-    deps.log(`Artisign was installed with ${other.name}. Update it with:`);
+    deps.log(`artisign was installed with ${other.name}. Update it with:`);
     deps.log(`  ${other.command}`);
     deps.log("then run `artisign setup` to re-pin your AI tool entries.");
     return 0;
@@ -155,9 +155,9 @@ export async function runRepin(
   }
   // Unconditional: the install replaced the code on disk, whatever the running daemon reports about itself.
   const restart = await deps.restart(cliEntry);
-  if (restart === "restarted") deps.log("Restarted the running Artisign.");
+  if (restart === "restarted") deps.log("Restarted the running artisign.");
   if (restart === "failed") {
-    deps.error("The running Artisign could not be stopped. Run `artisign stop`, then `artisign`.");
+    deps.error("The running artisign could not be stopped. Run `artisign stop`, then `artisign`.");
     return 1;
   }
   return failed ? 1 : 0;

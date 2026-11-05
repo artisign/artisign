@@ -143,9 +143,9 @@ export async function runSetup(opts: SetupOptions, deps: SetupDeps = defaultDeps
   let restartFailed = false;
   if (results.some((r) => r.status === "done")) {
     const restart = await deps.restartDaemon(opts.cliEntry, deps.version);
-    if (restart === "restarted") log("Restarted the running Artisign so it matches this version.");
+    if (restart === "restarted") log("Restarted the running artisign so it matches this version.");
     if (restart === "failed") {
-      error("The running Artisign is older than this version and could not be stopped. Run `artisign stop`, then `artisign`.");
+      error("The running artisign is older than this version and could not be stopped. Run `artisign stop`, then `artisign`.");
       restartFailed = true;
     }
   }

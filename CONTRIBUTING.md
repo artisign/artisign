@@ -1,9 +1,9 @@
 # Contributing
 
-Thanks for the interest — but right now Artisign does not accept external code
+Thanks for the interest — but right now artisign does not accept external code
 contributions. Pull requests are closed without review.
 
-The reason is licensing, not gatekeeping. Artisign is AGPL-3.0-only, and the
+The reason is licensing, not gatekeeping. artisign is AGPL-3.0-only, and the
 author is currently its sole copyright holder. Accepting outside patches would
 split that ownership and remove the option to license the code differently
 later. Until that is settled properly (via a DCO or CLA), the door stays shut.
@@ -25,7 +25,7 @@ issue that stays open has not been dismissed — it has not been scheduled.
 
 ## Developer setup
 
-For working on Artisign itself (the maintainer, or a fork):
+For working on artisign itself (the maintainer, or a fork):
 
 ```bash
 npm ci
@@ -33,7 +33,7 @@ npm test
 ```
 
 To use the checkout instead of a globally installed `artisign`, run
-`./artisign-dev.sh start [dir...]`: it builds, stops the Artisign running from
+`./artisign-dev.sh start [dir...]`: it builds, stops the artisign running from
 the same `ARTISIGN_HOME` (by default both use `~/.artisign/` and port 4711), and
 starts this build in the background. If an AI tool connected to the installed
 version restarts it in between, the script says so instead of reporting
@@ -67,5 +67,5 @@ For the maintainer, cutting a release:
 
 The AGPL gives you every right it promises: fork it, modify it, run it, offer it
 as a network service — as long as you publish your modified source under the
-AGPL too (see §13). One limit outside the license: "Artisign", its logo and its
+AGPL too (see §13). One limit outside the license: "artisign", its logo and its
 domains are not part of the grant. Give your fork its own name.

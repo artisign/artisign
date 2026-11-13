@@ -29,7 +29,7 @@ const defaultDeps: OfferSetupDeps = {
       rl.close();
     }
   },
-  runSetup: (cliEntry) => runSetup({ yes: true, cliEntry }),
+  runSetup: (cliEntry) => runSetup({ yes: true, askSkill: true, cliEntry }),
   isDeclined: async () => (await readGlobalConfig()).setupDeclined === true,
   rememberDecline: async () =>
     writeGlobalConfig({ ...(await readGlobalConfig()), setupDeclined: true }),

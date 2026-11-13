@@ -135,10 +135,10 @@ describe("Agent skill tab", () => {
     expect($("#skill-card").textContent).toContain("artisign skill");
     expect($("#skill-card").textContent).toContain("Read SKILL.md");
     expect($("#skill-command .mcp-code-text").textContent).toBe("artisign setup --skill");
-    expect(rows().map((r) => r.querySelector(".mcp-client-name").textContent)).toEqual(["Claude Code", "Claude Desktop", "Cursor", "Codex CLI", "VS Code", "opencode"]);
+    expect(rows().map((r) => r.querySelector(".mcp-client-name").textContent)).toEqual(["Claude Code", "Cursor", "Codex CLI", "VS Code", "opencode"]);
     // "Not found" (MCP part) wins over the skill status; M = found tools with a skills folder.
-    expect(chipTexts()).toEqual(["Installed", null, "Outdated", "Not installed", "Installed", "Not found"]);
-    expect(rows()[5].classList.contains("mcp-client--not-found")).toBe(true);
+    expect(chipTexts()).toEqual(["Installed", "Outdated", "Not installed", "Installed", "Not found"]);
+    expect(rows()[4].classList.contains("mcp-client--not-found")).toBe(true);
     expect($("#skill-summary").textContent).toBe("2 of 4 tools have the current skill");
     expect($("#skill-caption")).toBeNull();
     expect($("#skill-command .mcp-hint").textContent).toBe("Run in a terminal — it asks before installing into each tool; answer r to read SKILL.md first.");
@@ -153,15 +153,11 @@ describe("Agent skill tab", () => {
     expect($("#skill-summary").textContent).toBe("All 4 tools have the current skill");
   });
 
-  it("Claude Desktop has no chip and no buttons, only a muted note with a title; it stays out of M", async () => {
+  it("Claude Desktop (status unsupported) gets no row, no note and no title; it stays out of M", async () => {
     await open();
     gotoSkill();
-    const desktop = rows()[1];
-    expect(desktop.querySelector(".mcp-status")).toBeNull();
-    expect(desktop.querySelector("button")).toBeNull();
-    const note = desktop.querySelector(".mcp-row-note");
-    expect(note.textContent).toBe("Not supported yet");
-    expect(note.title).toBe("Claude Desktop accepts skills only as a ZIP upload.");
+    expect(rows().some((r) => r.textContent.includes("Claude Desktop"))).toBe(false);
+    expect($("#skill-clients").textContent).not.toContain("Not supported yet");
     expect($("#skill-summary").textContent).toBe("2 of 4 tools have the current skill");
   });
 

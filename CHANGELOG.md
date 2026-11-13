@@ -13,12 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Improvements
 
-- The first-run "Connect artisign" offer now asks per tool before installing the artisign skill (`[Y/n/r]`) instead of installing it silently; the tutorial points to the shipped skill.
-
-- `artisign setup` offers to install the artisign skill (`SKILL.md`: how to design well with artisign) into each
-  AI tool that has a user-level skills folder (Claude Code, Codex CLI, Cursor, opencode, VS Code), after the
-  connection step. `r` prints it first, `--yes` installs without asking, `artisign setup --skill` runs only this
-  step and `artisign skill` prints the text. `artisign update` refreshes skills that are already installed,
+- `artisign setup` and the first-run connect offer ask per tool whether to install the artisign skill (`SKILL.md`:
+  how to design well with artisign) into each AI tool that has a user-level skills folder (Claude Code, Codex CLI,
+  Cursor, opencode, VS Code), after the connection step. `r` prints it first, `--yes` installs without asking,
+  `artisign setup --skill` runs only this step and `artisign skill` prints the text. `artisign update` refreshes skills that are already installed,
   `artisign setup --remove` removes the `artisign` skill folder, and `GET /api/setup` reports each tool's skill status.
 - The browser preview's Connect AI tools dialog has an Agent skill tab: read SKILL.md before installing, copy the
   `artisign setup --skill` command, and see each tool's skill status.

@@ -1,5 +1,5 @@
 {
-  "notes": "CHR-1047. Agent skill tab when every tool that has a skills folder carries the current skill. All found tools show Installed; opencode stays Not found (not on this machine); Claude Desktop keeps Copy / Download. Footer: \"All M tools have the current skill\" — M as in the footer formula (tools found on the machine that have a skills folder; here 4). The command and the reader stay available (the user may reinstall or reread). Spec: tag note `chr-1047`.",
+  "notes": "CHR-1047, updated by the CHR-1048 design sync. Agent skill tab when every tool that has a skills folder carries the current skill. All found tools show Installed; opencode stays Not found (not on this machine); Claude Desktop reads \"Not supported yet\" (text, not a chip). Footer: \"All M tools have the current skill\" — M as in the footer formula (tools found on the machine that have a skills folder; here 4). With M = 1: \"The tool has the current skill\". The command and the reader stay available (the user may reinstall or reread). Spec: tag note `chr-1047`.",
   "tags": [
     "chr-1047",
     "settings",

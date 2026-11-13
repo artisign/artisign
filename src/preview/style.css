@@ -4659,7 +4659,6 @@ li.has-compare > .screen-item {
 #settings-mcp-sub[hidden],
 #mcp-scrim[hidden],
 .mcp-view[hidden],
-.mcp-caption[hidden],
 .mcp-manual[hidden] {
   display: none;
 }
@@ -5049,14 +5048,9 @@ button.mcp-client-row:focus-visible {
   color: var(--chrome-text-secondary);
 }
 
-.mcp-row-actions {
-  display: flex;
-  gap: var(--space-md);
-}
-
-.mcp-caption {
+.mcp-row-note {
   font-size: var(--ui-xs);
-  color: var(--chrome-text-secondary);
+  color: var(--chrome-text-tertiary);
 }
 
 .mcp-note-box {

@@ -50,16 +50,6 @@ describe("renderMarkdown", () => {
     expect([...items].map((li) => li.textContent)).toEqual(["first", "second"]);
   });
 
-  it("keeps an item's wrapped lines in the item and the numbering going (CHR-1048)", () => {
-    const div = render("1. one\n2. two\n   wraps here\n3. three with `a\n   b` code");
-    const items = [...div.querySelectorAll("ol > li")];
-    expect(items.map((li) => li.textContent)).toEqual(["one", "two wraps here", "three with a b code"]);
-    expect(items[2].querySelector("code").textContent).toBe("a b");
-    expect(div.querySelectorAll("ol")).toHaveLength(1);
-    const nested = render("- a\n  - a1\n    wraps\n- b");
-    expect(nested.querySelector("ul ul > li").textContent).toBe("a1 wraps");
-  });
-
   it("renders a GFM table with header, body and alignment class", () => {
     const div = render("| a | b | c |\n|---|:-:|--:|\n| 1 | 2 | 3 |");
     const table = div.querySelector("table");

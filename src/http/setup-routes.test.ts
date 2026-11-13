@@ -69,6 +69,22 @@ describe("handleSetupApi / handleAboutApi (injected env)", () => {
     expect(cursor?.error).toMatch(/EISDIR/);
   });
 
+  it("an error that names the skill path shows it with ~ and never the home directory", async () => {
+    const file = join(root, "home", ".cursor", "skills", "artisign", "SKILL.md");
+    await mkdir(join(root, "home", ".cursor", "skills", "artisign"), { recursive: true });
+    await writeFile(file, "x");
+    await chmod(file, 0o000);
+    try {
+      const body = (await (await fetch(`${base}/api/setup`)).json()) as { skill: { clients: { name: string; status: string; error?: string }[] } };
+      const cursor = body.skill.clients.find((c) => c.name === "Cursor");
+      if (cursor?.status !== "unreadable") return; // running as root: the file is readable anyway
+      expect(cursor.error).toContain("~/.cursor/skills/artisign/SKILL.md");
+      expect(cursor.error).not.toContain(join(root, "home"));
+    } finally {
+      await chmod(file, 0o644);
+    }
+  });
+
   it("GET /api/about returns the given version and the update status", async () => {
     expect(await (await fetch(`${base}/api/about`)).json()).toEqual({
       version: "7.1.0",

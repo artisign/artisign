@@ -282,30 +282,14 @@ function consumeList(lines, start) {
   const list = document.createElement(top.ordered ? "ol" : "ul");
   let currentLi = null;
   let nestedList = null;
-  // CHR-1048: an item's text may wrap onto indented lines (SKILL.md does); they belong to the item, joined by a space before the inline pass so a code span can span them.
-  /** @type {{ li: HTMLElement, text: string } | null} */
-  let open = null;
-  const closeItem = () => {
-    if (open) appendInline(open.li, open.text);
-    open = null;
-  };
   let i = start;
   while (i < lines.length) {
     const item = matchListItem(lines[i]);
-    if (!item) {
-      if (open && /^\s+\S/.test(lines[i]) && blockType(lines[i], lines[i + 1]) === "paragraph") {
-        open.text += ` ${lines[i].trim()}`;
-        i++;
-        continue;
-      }
-      break;
-    }
-    if (item.indent < baseIndent) break;
-    closeItem();
+    if (!item || item.indent < baseIndent) break;
     if (item.indent === baseIndent) {
       currentLi = document.createElement("li");
+      appendInline(currentLi, item.content);
       list.appendChild(currentLi);
-      open = { li: currentLi, text: item.content };
       nestedList = null;
     } else if (currentLi) {
       if (!nestedList) {
@@ -313,14 +297,13 @@ function consumeList(lines, start) {
         currentLi.appendChild(nestedList);
       }
       const li = document.createElement("li");
+      appendInline(li, item.content);
       nestedList.appendChild(li);
-      open = { li, text: item.content };
     } else {
       break;
     }
     i++;
   }
-  closeItem();
   return { element: list, next: i };
 }
 

@@ -69,17 +69,6 @@ export function stripFrontmatter(content) {
   return content.replace(/^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/, "").replace(/^\s+/, "");
 }
 
-/** Shows the home directory in an error message as `~`, using the tool's own `~/…` path as the anchor (the browser does not know the home directory). @param {string} error @param {string | undefined} path */
-function tildifyError(error, path) {
-  if (!path?.startsWith("~/")) return error;
-  const tail = path.slice(1);
-  const at = error.indexOf(tail);
-  if (at === -1) return error;
-  let start = at;
-  while (start > 0 && !/[\s'"`(]/.test(error[start - 1])) start--;
-  return `${error.slice(0, start)}~${error.slice(at)}`;
-}
-
 /** Saves `text` as `name` through a temporary Blob link; nothing leaves the browser. @param {string} name @param {string} text */
 function downloadText(name, text) {
   const url = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
@@ -90,7 +79,7 @@ function downloadText(name, text) {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /**
@@ -106,7 +95,6 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
   const skillCardEl = $("#skill-card");
   const skillCommandEl = $("#skill-command");
   const skillClientsEl = $("#skill-clients");
-  const skillCaptionEl = $("#skill-caption");
   const skillSummaryEl = $("#skill-summary");
   const tabs = [
     { key: "mcp", tab: $("#mcp-tab-mcp"), panel: $("#mcp-panel-mcp") },
@@ -199,6 +187,13 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
     return wrap;
   }
 
+  /** Names the key to type (`r`) in the code font, as the design does. */
+  function skillHint() {
+    const hint = el("div", "mcp-hint mcp-hint--base");
+    hint.append("Run in a terminal — it asks before installing into each tool; answer ", el("span", "mcp-path", "r"), " to read SKILL.md first.");
+    return hint;
+  }
+
   /** @param {string} text */
   function noteBox(text) {
     return el("div", "mcp-note", text);
@@ -218,10 +213,9 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
     skillCardEl.replaceChildren(head, el("div", "mcp-card-desc", "Teaches your AI tools artisign's conventions: tag every screen, use screen variants, design system first."));
     skillCommandEl.replaceChildren(
       codeField(skill?.command ?? FALLBACK_SKILL_COMMAND, "line", `Copy ${skill?.command ?? FALLBACK_SKILL_COMMAND}`),
-      el("div", "mcp-hint mcp-hint--base", "Run in a terminal — it shows SKILL.md and asks before installing into each tool."),
+      skillHint(),
     );
     skillSummaryEl.textContent = "";
-    skillCaptionEl.hidden = true;
     if (setup === undefined) {
       skillClientsEl.replaceChildren(noteBox("Checking installed tools…"));
       return;
@@ -240,7 +234,6 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
     const list = el("div", "mcp-clients");
     let found = 0;
     let installed = 0;
-    let hasDesktop = false;
     skill.clients.forEach((client, index) => {
       // "Not found" comes from the MCP part of the response and wins over the skill status.
       const notFound = setup.clients.find((c) => c.name === client.name)?.found === false;
@@ -250,10 +243,8 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
         if (client.status === "installed") installed++;
       }
       list.appendChild(skillRow(client, notFound, unsupported, skill.content, index));
-      if (unsupported && !notFound) hasDesktop = true;
     });
     skillClientsEl.replaceChildren(list);
-    skillCaptionEl.hidden = !hasDesktop;
     if (found > 0) {
       skillSummaryEl.textContent = installed === found ? (found === 1 ? "The tool has the current skill" : `All ${found} tools have the current skill`) : `${installed} of ${found} tool${found === 1 ? "" : "s"} ${found === 1 ? "has" : "have"} the current skill`;
     }
@@ -267,14 +258,10 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
     row.append(icon(CLIENT_ICONS[client.name] ?? "terminal"), el("span", "mcp-client-name", client.name), el("span", "mcp-client-spacer"));
     wrap.appendChild(row);
     if (unsupported && !notFound) {
-      const actions = el("span", "mcp-row-actions");
-      actions.append(
-        compactButton("Copy SKILL.md", function () {
-          void copyWithLabel(content, /** @type {HTMLElement} */ (this));
-        }),
-        compactButton("Download", () => downloadText(SKILL_FILE_NAME, content)),
-      );
-      row.appendChild(actions);
+      // Claude Desktop has no skills folder and takes skills only as a ZIP upload: not a status of the skill, so plain text, not a chip.
+      const note = el("span", "mcp-row-note", "Not supported yet");
+      note.title = "Claude Desktop accepts skills only as a ZIP upload.";
+      row.appendChild(note);
       return wrap;
     }
     const chipSpec = SKILL_CHIPS[key] ?? SKILL_CHIPS["skill-missing"];
@@ -283,7 +270,7 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
     chip.append(chipSpec.label);
     if (key === "unreadable" && client.error) {
       // The error text is reachable by keyboard: the chip is focusable and described by a visually hidden copy; hover shows the title.
-      const message = tildifyError(client.error, client.path);
+      const message = client.error;
       const describedBy = `mcp-skill-error-${index}`;
       const hidden = el("span", "mcp-visually-hidden", message);
       hidden.id = describedBy;

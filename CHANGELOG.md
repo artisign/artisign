@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   step and `artisign skill` prints the text. `artisign update` refreshes skills that are already installed,
   `artisign setup --remove` removes the `artisign` skill folder, and `GET /api/setup` reports each tool's skill status.
 - The browser preview's Connect AI tools dialog has an Agent skill tab: read SKILL.md before installing, copy the
-  `artisign setup --skill` command, see each tool's skill status, and copy or download SKILL.md for Claude Desktop.
+  `artisign setup --skill` command, and see each tool's skill status.
   A tool that is not on the machine now reads "Not found" in the MCP server tab too (was "Not installed").
 - The MCP instructions and the agent guide tell agents to change the design only through artisign's tools, never
   with shell or file-edit tools (copying an image into `assets/` excepted); before, that rule covered mockups only.

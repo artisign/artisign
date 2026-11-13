@@ -140,8 +140,9 @@ describe("Agent skill tab", () => {
     expect(chipTexts()).toEqual(["Installed", null, "Outdated", "Not installed", "Installed", "Not found"]);
     expect(rows()[5].classList.contains("mcp-client--not-found")).toBe(true);
     expect($("#skill-summary").textContent).toBe("2 of 4 tools have the current skill");
-    expect($("#skill-caption").hidden).toBe(false);
-    expect($("#skill-caption").textContent).toContain("Claude Desktop has no skills folder");
+    expect($("#skill-caption")).toBeNull();
+    expect($("#skill-command .mcp-hint").textContent).toBe("Run in a terminal — it asks before installing into each tool; answer r to read SKILL.md first.");
+    expect($("#skill-command .mcp-hint .mcp-path").textContent).toBe("r");
   });
 
   it("says All M tools when every tool has the current skill", async () => {
@@ -152,17 +153,22 @@ describe("Agent skill tab", () => {
     expect($("#skill-summary").textContent).toBe("All 4 tools have the current skill");
   });
 
-  it("Claude Desktop gets Copy SKILL.md (full file, with frontmatter) and Download instead of a chip", async () => {
+  it("Claude Desktop has no chip and no buttons, only a muted note with a title; it stays out of M", async () => {
     await open();
     gotoSkill();
     const desktop = rows()[1];
     expect(desktop.querySelector(".mcp-status")).toBeNull();
-    const [copy, download] = [...desktop.querySelectorAll("button")];
-    expect([copy.textContent, download.textContent]).toEqual(["Copy SKILL.md", "Download"]);
-    copy.click();
-    await flush();
-    expect(writeText).toHaveBeenLastCalledWith(SKILL_TEXT);
-    expect(copy.textContent).toBe("Copied");
+    expect(desktop.querySelector("button")).toBeNull();
+    const note = desktop.querySelector(".mcp-row-note");
+    expect(note.textContent).toBe("Not supported yet");
+    expect(note.title).toBe("Claude Desktop accepts skills only as a ZIP upload.");
+    expect($("#skill-summary").textContent).toBe("2 of 4 tools have the current skill");
+  });
+
+  it("the reader's Download saves SKILL.md as a Blob and does not revoke the URL at once", async () => {
+    await open();
+    gotoSkill();
+    $("#skill-card button").click();
     const createObjectURL = vi.fn(() => "blob:x");
     const revokeObjectURL = vi.fn();
     Object.assign(URL, { createObjectURL, revokeObjectURL });
@@ -170,9 +176,10 @@ describe("Agent skill tab", () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function () {
       saved = this.download;
     });
-    download.click();
+    $("#mcp-reader-download").click();
     expect(saved).toBe("SKILL.md");
     expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).not.toHaveBeenCalled(); // revoked only after a delay
     const text = await new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
@@ -190,9 +197,9 @@ describe("Agent skill tab", () => {
     expect(writeText).toHaveBeenLastCalledWith("artisign setup --skill");
   });
 
-  it("an unreadable skill is a warning chip whose error is reachable by keyboard, with the home path as ~", async () => {
+  it("an unreadable skill is a warning chip whose error is reachable by keyboard, as the server sends it", async () => {
     const bad = structuredClone(SETUP);
-    bad.skill.clients[0] = { name: "Claude Code", status: "unreadable", path: "~/.claude/skills/artisign/SKILL.md", error: "EACCES: permission denied, open '/Users/example/.claude/skills/artisign/SKILL.md'" };
+    bad.skill.clients[0] = { name: "Claude Code", status: "unreadable", path: "~/.claude/skills/artisign/SKILL.md", error: "EACCES: permission denied, open '~/.claude/skills/artisign/SKILL.md'" };
     await open(bad);
     gotoSkill();
     const chip = rows()[0].querySelector(".mcp-status--unreadable");

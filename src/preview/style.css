@@ -5048,11 +5048,6 @@ button.mcp-client-row:focus-visible {
   color: var(--chrome-text-secondary);
 }
 
-.mcp-row-note {
-  font-size: var(--ui-xs);
-  color: var(--chrome-text-tertiary);
-}
-
 .mcp-note-box {
   display: flex;
   align-items: flex-start;

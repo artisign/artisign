@@ -1,5 +1,5 @@
 // "Connect AI tools" dialog (CHR-926): the `artisign setup` command, and per AI tool its status plus what to copy to connect it by hand. Statuses are read from GET /api/setup each time the dialog opens (the daemon looks at the disk then); nothing here writes a config. Same modal conventions as the shortcut reference: Escape, scrim click, the close and Done buttons close it, Tab is trapped, focus goes back to the opener.
-// CHR-1048: a second tab, "Agent skill", shows the artisign skill from the `skill` part of the same response: SKILL.md readable before installing (a reader step that swaps in for the tabs), the command that installs it, a status per tool, and copy / download of SKILL.md for Claude Desktop. Still copy-only: the download is a client-side Blob.
+// CHR-1048: a second tab, "Agent skill", shows the artisign skill from the `skill` part of the same response: SKILL.md readable before installing (a reader step that swaps in for the tabs), the command that installs it, a status per tool, and copy / download of SKILL.md. Still copy-only: the download is a client-side Blob.
 
 import { fetchSetup } from "./api.js";
 import { isShown, trapFocus } from "./menu-keys.js";
@@ -237,12 +237,13 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
     skill.clients.forEach((client, index) => {
       // "Not found" comes from the MCP part of the response and wins over the skill status.
       const notFound = setup.clients.find((c) => c.name === client.name)?.found === false;
-      const unsupported = client.status === "unsupported";
-      if (!notFound && !unsupported) {
+      // A tool without a skills folder (status "unsupported", Claude Desktop) gets no row.
+      if (client.status === "unsupported") return;
+      if (!notFound) {
         found++;
         if (client.status === "installed") installed++;
       }
-      list.appendChild(skillRow(client, notFound, unsupported, skill.content, index));
+      list.appendChild(skillRow(client, notFound, skill.content, index));
     });
     skillClientsEl.replaceChildren(list);
     if (found > 0) {
@@ -250,20 +251,13 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
     }
   }
 
-  /** @param {import("./api.js").SkillClient} client @param {boolean} notFound @param {boolean} unsupported @param {string} content @param {number} index */
-  function skillRow(client, notFound, unsupported, content, index) {
+  /** @param {import("./api.js").SkillClient} client @param {boolean} notFound @param {string} content @param {number} index */
+  function skillRow(client, notFound, content, index) {
     const key = notFound ? "not-found" : client.status === "missing" ? "skill-missing" : client.status;
     const wrap = el("div", `mcp-client${notFound ? " mcp-client--not-found" : ""}`);
     const row = el("div", "mcp-client-row");
     row.append(icon(CLIENT_ICONS[client.name] ?? "terminal"), el("span", "mcp-client-name", client.name), el("span", "mcp-client-spacer"));
     wrap.appendChild(row);
-    if (unsupported && !notFound) {
-      // Claude Desktop has no skills folder and takes skills only as a ZIP upload: not a status of the skill, so plain text, not a chip.
-      const note = el("span", "mcp-row-note", "Not supported yet");
-      note.title = "Claude Desktop accepts skills only as a ZIP upload.";
-      row.appendChild(note);
-      return wrap;
-    }
     const chipSpec = SKILL_CHIPS[key] ?? SKILL_CHIPS["skill-missing"];
     const chip = el("span", `mcp-status mcp-status--${key}`);
     if (chipSpec.icon) chip.appendChild(icon(chipSpec.icon));

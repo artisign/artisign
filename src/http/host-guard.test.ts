@@ -13,10 +13,13 @@ function rawGet(port: number, path: string, host: string | null, method = "GET")
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = {};
     if (host !== null) headers.host = host;
-    const req = request({ host: "127.0.0.1", port, path, method, headers, setHost: false }, (res) => {
-      res.destroy();
-      resolve(res.statusCode ?? 0);
-    });
+    const req = request(
+      { host: "127.0.0.1", port, path, method, headers, setHost: false },
+      (res) => {
+        res.destroy();
+        resolve(res.statusCode ?? 0);
+      },
+    );
     req.on("error", reject);
     req.end();
   });
@@ -63,14 +66,20 @@ describe("Host header guard (DNS rebinding)", () => {
     expect(await rawGet(daemon.port, "/api/projects", null)).toBe(400);
   });
 
-  it("rejects a Host without a port", async () => {
+  it("rejects a Host without a port (default port 80) when the daemon listens elsewhere", async () => {
     expect(await rawGet(daemon.port, "/api/projects", "127.0.0.1")).toBe(403);
   });
 
   it("answers with the host-specific JSON message", async () => {
     const body = await new Promise<string>((resolve, reject) => {
       const req = request(
-        { host: "127.0.0.1", port: daemon.port, path: "/api/projects", headers: { host: "attacker.example:1" }, setHost: false },
+        {
+          host: "127.0.0.1",
+          port: daemon.port,
+          path: "/api/projects",
+          headers: { host: "attacker.example:1" },
+          setHost: false,
+        },
         (res: IncomingMessage) => {
           let data = "";
           res.on("data", (c) => (data += c));
@@ -80,7 +89,10 @@ describe("Host header guard (DNS rebinding)", () => {
       req.on("error", reject);
       req.end();
     });
-    expect(JSON.parse(body)).toEqual({ code: "validation_failed", message: "forbidden: host not allowed" });
+    expect(JSON.parse(body)).toEqual({
+      code: "validation_failed",
+      message: "forbidden: host not allowed",
+    });
   });
 
   for (const hostname of ["127.0.0.1", "localhost", "[::1]", "LOCALHOST"]) {
@@ -97,7 +109,10 @@ describe("Host header guard (DNS rebinding)", () => {
 
 describe("isAllowedHost", () => {
   const fake = (host: string | undefined, localPort: number | undefined) =>
-    ({ headers: host === undefined ? {} : { host }, socket: { localPort } }) as unknown as IncomingMessage;
+    ({
+      headers: host === undefined ? {} : { host },
+      socket: { localPort },
+    }) as unknown as IncomingMessage;
 
   it("accepts loopback hosts on the socket's port", () => {
     expect(isAllowedHost(fake("127.0.0.1:4711", 4711))).toBe(true);
@@ -125,6 +140,15 @@ describe("isAllowedHost", () => {
     expect(isAllowedHost(fake("127.0.0.1:", 4711))).toBe(false);
     expect(isAllowedHost(fake("127.0.0.1:47x1", 4711))).toBe(false);
     expect(isAllowedHost(fake("::1:4711", 4711))).toBe(false);
+  });
+
+  it("treats a Host without a port as port 80", () => {
+    expect(isAllowedHost(fake("127.0.0.1", 80))).toBe(true);
+    expect(isAllowedHost(fake("localhost", 80))).toBe(true);
+    expect(isAllowedHost(fake("[::1]", 80))).toBe(true);
+    expect(isAllowedHost(fake("127.0.0.1", 4711))).toBe(false);
+    expect(isAllowedHost(fake("attacker.example", 80))).toBe(false);
+    expect(isAllowedHost(fake("127.0.0.1:80", 4711))).toBe(false);
   });
 
   it("rejects a missing, empty or malformed Host and an unknown socket port", () => {

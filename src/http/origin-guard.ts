@@ -59,9 +59,9 @@ export function isAllowedHost(req: IncomingMessage): boolean {
 }
 
 function parseHostHeader(host: string): { hostname: string; port: string } | null {
-  const match = /^(?:\[([0-9a-fA-F:]+)\]|([^:[\]/\s]+)):(\d{1,5})$/.exec(host);
+  const match = /^(?:\[([0-9a-fA-F:]+)\]|([^:[\]/\s]+))(?::(\d{1,5}))?$/.exec(host);
   if (!match) return null;
-  return { hostname: (match[1] ?? match[2]!).toLowerCase(), port: match[3]! };
+  return { hostname: (match[1] ?? match[2]!).toLowerCase(), port: match[3] ?? "80" };
 }
 
 /** `application/json`, ignoring any `; charset=...` suffix. */

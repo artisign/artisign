@@ -80,7 +80,8 @@ describe("setup: fresh install", () => {
     await installDesktop({ globalShortcut: "Cmd+L", mcpServers: { other: { command: "x" } } });
     const { d, out } = deps();
     expect(await runSetup({ cliEntry: "e" }, d)).toBe(0);
-    expect(d.ask).toHaveBeenCalledTimes(2);
+    // Two MCP questions and one skill question (Claude Desktop has no skills folder).
+    expect(d.ask).toHaveBeenCalledTimes(3);
     expect(await claudeCalls()).toEqual([
       "mcp remove artisign --scope user",
       "mcp add --scope user --transport stdio artisign -- npx -y artisign@9.9.9 mcp",

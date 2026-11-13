@@ -10,6 +10,7 @@ function fakeDeps() {
     runServe: vi.fn(async () => {}),
     runMcp: vi.fn(async () => {}),
     runSetup: vi.fn(async () => 0),
+    runSkill: vi.fn(async () => 0),
     runUpdate: vi.fn(async () => 0),
     runRepin: vi.fn(async () => 0),
     offerSetup: vi.fn(async () => {}),
@@ -214,9 +215,20 @@ describe("dispatch: setup", () => {
     const { deps } = fakeDeps();
     vi.mocked(deps.runSetup).mockResolvedValueOnce(1);
     expect(await dispatch(["setup", "--yes", "--remove"], ENTRY, deps)).toBe(1);
-    expect(deps.runSetup).toHaveBeenCalledWith({ yes: true, remove: true, cliEntry: ENTRY });
+    expect(deps.runSetup).toHaveBeenCalledWith({ yes: true, remove: true, skill: false, cliEntry: ENTRY });
     await dispatch(["setup"], ENTRY, deps);
-    expect(deps.runSetup).toHaveBeenLastCalledWith({ yes: false, remove: false, cliEntry: ENTRY });
+    expect(deps.runSetup).toHaveBeenLastCalledWith({ yes: false, remove: false, skill: false, cliEntry: ENTRY });
+  });
+
+  it("passes --skill through and runs `skill` without touching setup", async () => {
+    const { deps } = fakeDeps();
+    await dispatch(["setup", "--skill"], ENTRY, deps);
+    expect(deps.runSetup).toHaveBeenCalledWith({ yes: false, remove: false, skill: true, cliEntry: ENTRY });
+    expect(await dispatch(["skill"], ENTRY, deps)).toBe(0);
+    expect(deps.runSkill).toHaveBeenCalledTimes(1);
+    expect(deps.runSetup).toHaveBeenCalledTimes(1);
+    expect(await dispatch(["skill", "--x"], ENTRY, deps)).toBe(1);
+    expect(deps.runSkill).toHaveBeenCalledTimes(1);
   });
 
   it("rejects anything else with the one-line error", async () => {

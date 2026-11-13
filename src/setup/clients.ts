@@ -48,6 +48,8 @@ export type Client = {
   manual: (env: ClientEnv, version: string) => Promise<Manual>;
   /** Removes the `artisign` entry and nothing else. */
   remove: (env: ClientEnv) => Promise<void>;
+  /** The user-level folder the tool loads skills from (`<dir>/<name>/SKILL.md`); absent where the tool has none. */
+  skillsDir?: (env: ClientEnv) => string;
 };
 
 const NAME = "artisign";
@@ -183,6 +185,8 @@ export const claudeCode: Client = {
     if (claude === undefined) await editServers(join(env.home, ".claude.json"), undefined);
     else if (!(await env.run(claude, ["mcp", "remove", NAME, "--scope", "user"]))) throw new Error("`claude mcp remove` failed");
   },
+  // https://code.claude.com/docs/en/skills (personal skills)
+  skillsDir: (env) => join(env.home, ".claude", "skills"),
 };
 
 /** Directories Claude Desktop keeps `claude_desktop_config.json` in. Anthropic documents macOS only; the Linux ones are community builds. */
@@ -274,6 +278,8 @@ export const cursor: Client = {
     const path = join(env.home, ".cursor", "mcp.json");
     if (await exists(path)) await editServers(path, undefined);
   },
+  // https://cursor.com/docs/context/skills (user-level skills)
+  skillsDir: (env) => join(env.home, ".cursor", "skills"),
 };
 
 // Codex CLI keeps its servers in TOML tables. With the `codex` CLI on PATH it is driven (it owns the file). Without it
@@ -405,6 +411,8 @@ export const codex: Client = {
       await editCodexConfig(codexConfig(env), undefined);
     }
   },
+  // https://developers.openai.com/codex/skills — the documented user location is `$HOME/.agents/skills`, not `$CODEX_HOME`.
+  skillsDir: (env) => join(env.home, ".agents", "skills"),
 };
 
 /** VS Code's user-profile data directory. The docs name `mcp.json` in the user profile but not its path; these are VS Code's standard locations. */
@@ -436,6 +444,8 @@ export const vscode: Client = {
     const dir = vscodeUserDir(env);
     if (dir !== undefined && (await exists(join(dir, "mcp.json")))) await editServers(join(dir, "mcp.json"), undefined, "servers");
   },
+  // https://code.visualstudio.com/docs/copilot/customization/agent-skills (personal Copilot skills)
+  skillsDir: (env) => join(env.home, ".copilot", "skills"),
 };
 
 /** opencode keeps its global config in `opencode.json`, or `opencode.jsonc` when only that exists. */
@@ -464,6 +474,8 @@ export const opencode: Client = {
     const path = await opencodeConfigPath(env);
     if (await exists(path)) await editServers(path, undefined, "mcp");
   },
+  // https://opencode.ai/docs/skills (global skills)
+  skillsDir: (env) => join(env.home, ".config", "opencode", "skills"),
 };
 
 export const CLIENTS: Client[] = [claudeCode, claudeDesktop, cursor, codex, vscode, opencode];

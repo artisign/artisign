@@ -2,6 +2,8 @@ import { spawn } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { connectClients } from "../setup/connect.js";
+import { refreshSkills } from "../setup/skill.js";
+import { defaultClientEnv } from "../setup/clients.js";
 import { isNewer, readVersion } from "../version.js";
 import { restartDaemon } from "./setup.js";
 
@@ -128,6 +130,8 @@ export async function runUpdate(deps: UpdateDeps = defaultDeps()): Promise<numbe
 
 type RepinDeps = {
   connect: typeof connectClients;
+  /** Rewrites already installed, outdated skills; installs none. */
+  refreshSkills: () => ReturnType<typeof refreshSkills>;
   restart: typeof restartDaemon;
   version: string;
   log: (line: string) => void;
@@ -139,6 +143,7 @@ export async function runRepin(
   cliEntry: string,
   deps: RepinDeps = {
     connect: connectClients,
+    refreshSkills: () => refreshSkills(defaultClientEnv()),
     restart: restartDaemon,
     version: readVersion(),
     log: console.log,
@@ -149,6 +154,13 @@ export async function runRepin(
   for (const r of await deps.connect({ version: deps.version, onlyExisting: true })) {
     if (r.status === "done") deps.log(`Re-pinned ${r.name} to artisign@${deps.version}.`);
     else if (r.status === "failed") {
+      deps.error(`${r.name}: ${r.error}`);
+      failed = true;
+    }
+  }
+  for (const r of await deps.refreshSkills()) {
+    if (r.status === "done") deps.log(`Updated the artisign skill in ${r.name}.`);
+    else {
       deps.error(`${r.name}: ${r.error}`);
       failed = true;
     }

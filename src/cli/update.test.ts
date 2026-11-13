@@ -128,6 +128,7 @@ describe("repin", () => {
     restart: "unchanged" | "restarted" | "failed",
   ) => ({
     connect: vi.fn(async () => results),
+    refreshSkills: vi.fn(async (): Promise<{ name: string; status: "done" | "failed"; error?: string }[]> => []),
     restart: vi.fn(async () => restart),
     version: "3.0.0",
     log: vi.fn(),
@@ -151,6 +152,16 @@ describe("repin", () => {
     expect(await runRepin("e", d)).toBe(1);
     expect(d.error).toHaveBeenCalledWith("Cursor: boom");
     expect(d.restart).toHaveBeenCalled();
+  });
+
+  it("reports refreshed skills and fails on a failed refresh", async () => {
+    const d = make([], "unchanged");
+    d.refreshSkills.mockResolvedValueOnce([{ name: "Cursor", status: "done" }]);
+    expect(await runRepin("e", d)).toBe(0);
+    expect(d.log).toHaveBeenCalledWith("Updated the artisign skill in Cursor.");
+    d.refreshSkills.mockResolvedValueOnce([{ name: "Cursor", status: "failed", error: "boom" }]);
+    expect(await runRepin("e", d)).toBe(1);
+    expect(d.error).toHaveBeenCalledWith("Cursor: boom");
   });
 
   it("restarts the daemon without asking its version", async () => {

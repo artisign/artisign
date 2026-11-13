@@ -1,0 +1,10 @@
+{
+  "notes": "CHR-1047. Agent skill tab when the status cannot be shown: `GET /api/setup` failed, or it has no `skill` field (older daemon). Spec: tag note `chr-1047`.\n\n- The tool list is replaced by a note box (`chrome-field` fill, hairline, radius.sm, `info` icon, `role=status`): \"Could not read the skill status.\" / \"The command above still works. To read SKILL.md first, run `artisign skill` in a terminal.\"\n- No SKILL.md content is available, so the skill card has **no Read button** (head keeps its 26px height) and Claude Desktop's Copy / Download are not shown. The command field stays.\n- Footer: no summary, only Done.\n- **Loading** (not drawn separately): same layout; the note box shows only \"Checking installed tools…\" without the icon, the same wording as the MCP tab. It lasts as long as the request; no spinner.",
+  "tags": [
+    "chr-1047",
+    "settings",
+    "dialog"
+  ],
+  "variant_of": "shell-mcp-setup-dialog-skill",
+  "variant_kind": "state"
+}

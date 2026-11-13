@@ -1,0 +1,10 @@
+{
+  "notes": "Dark theme of `shell-mcp-setup-dialog-skill-reader`. Same layout and content; the root binds `chrome-dark.*`. Back (arrow and button) returns to `shell-mcp-setup-dialog-skill-dark`. Spec: tag note `chr-1047`.",
+  "tags": [
+    "chr-1047",
+    "settings",
+    "dialog"
+  ],
+  "variant_of": "shell-mcp-setup-dialog-skill-reader",
+  "variant_kind": "state"
+}

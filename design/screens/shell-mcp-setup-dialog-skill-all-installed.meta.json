@@ -1,0 +1,10 @@
+{
+  "notes": "CHR-1047. Agent skill tab when every tool that has a skills folder carries the current skill. All found tools show Installed; opencode stays Not found (not on this machine); Claude Desktop keeps Copy / Download. Footer: \"All N tools have the current skill\". The command and the reader stay available (the user may reinstall or reread). Spec: tag note `chr-1047`.",
+  "tags": [
+    "chr-1047",
+    "settings",
+    "dialog"
+  ],
+  "variant_of": "shell-mcp-setup-dialog-skill",
+  "variant_kind": "state"
+}

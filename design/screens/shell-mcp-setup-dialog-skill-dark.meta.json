@@ -1,0 +1,10 @@
+{
+  "notes": "Dark theme of `shell-mcp-setup-dialog-skill`. Same layout, copy and statuses; the root binds `chrome-dark.*`. Read SKILL.md goes to `shell-mcp-setup-dialog-skill-reader-dark`, Done to `shell-settings-menu-dark`. The MCP server tab flows to the light `shell-mcp-setup-dialog` because that screen has no dark variant (the theme follows the app setting in the build). Spec: tag note `chr-1047`.",
+  "tags": [
+    "chr-1047",
+    "settings",
+    "dialog"
+  ],
+  "variant_of": "shell-mcp-setup-dialog-skill",
+  "variant_kind": "state"
+}

@@ -1,0 +1,10 @@
+{
+  "notes": "Dark theme of `shell-mcp-setup-dialog-skill-all-installed`. Same layout and copy; the root binds `chrome-dark.*`. Done returns to `shell-settings-menu-dark`. Spec: tag note `chr-1047`.",
+  "tags": [
+    "chr-1047",
+    "settings",
+    "dialog"
+  ],
+  "variant_of": "shell-mcp-setup-dialog-skill-all-installed",
+  "variant_kind": "state"
+}

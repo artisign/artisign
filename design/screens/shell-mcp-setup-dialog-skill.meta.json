@@ -1,0 +1,10 @@
+{
+  "notes": "CHR-1047. The **Agent skill** tab of the Connect AI tools dialog, with mixed statuses. Cross-screen spec: tag note `chr-1047`.\n\n**Order, top to bottom** (dialog unchanged: 560px, padding 20, gap 12):\n1. Tabs (`chrome-tab`, Agent skill `active`).\n2. Skill card (bordered, radius.sm, padding 12): `description` icon, \"artisign skill\" (medium), `chrome-btn` `secondary-compact` \"Read SKILL.md\" → reader step. Under it, indented 26px to the name, 12px secondary: \"Teaches your AI tools artisign's conventions: tag every screen, use screen variants, design system first.\"\n3. `chrome-code-field` `artisign setup --skill` (copy) + hint \"Run in a terminal — it shows SKILL.md and asks before installing into each tool.\"\n4. Label \"Status per tool\", bordered list, 40px rows in the MCP tab's order (Claude Code, Claude Desktop, Cursor, Codex CLI, VS Code, opencode). No chevron column: no row expands.\n5. Caption (11.5px tertiary): \"Claude Desktop has no skills folder. Copy or download SKILL.md and upload it in its settings.\"\n6. Footer: summary \"N of M tools have the current skill\" (M = tools with status installed/outdated/missing; N = installed) + primary Done.\n\n**Statuses drawn:** Claude Code Installed, Cursor Outdated, Codex CLI Not installed, VS Code Installed, opencode Not found (tool not on this machine: row icon and name tertiary). Claude Desktop: two `secondary-compact` buttons \"Copy SKILL.md\" / \"Download\" instead of a chip.",
+  "tags": [
+    "chr-1047",
+    "settings",
+    "dialog"
+  ],
+  "variant_of": "shell-mcp-setup-dialog",
+  "variant_kind": "state"
+}

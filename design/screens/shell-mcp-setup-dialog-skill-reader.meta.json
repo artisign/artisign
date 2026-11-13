@@ -1,0 +1,10 @@
+{
+  "notes": "CHR-1047. Step from the Agent skill tab: the dialog content swaps to a SKILL.md reader (same modal, no second scrim). Spec: tag note `chr-1047`.\n\n- Dialog widens to **640px** for reading; position stays centred.\n- Head: `chrome-icon-btn` sm `arrow_back` (aria-label \"Back to Agent skill\"), title \"SKILL.md\", close. Under it (11.5px secondary): \"This is the file `artisign setup --skill` puts into each tool's skills folder.\"\n- Reader frame: bordered, radius.sm, **fixed height 560px**, body scrolls (`overflow-y: auto`, `tabindex=0` so the keyboard can scroll it, native scrollbar). A 48px fade to `chrome-raised` at the bottom shows there is more. Content padding 16/20, 13px, line-height 1.55, secondary text.\n- Content = `skill.content` from `GET /api/setup`, rendered with `src/preview/markdown.js` and the existing `.md` styles (H1 → h3 1.15em medium, H2 → h4 1.05em, inline code on `chrome-field`, tables with hairline cells). The YAML frontmatter is not shown. The text drawn here is an excerpt of the draft; the shipped SKILL.md is what renders.\n- Footer: secondary \"Copy SKILL.md\" and \"Download\" (saves `SKILL.md`), primary \"Back\". Esc closes the whole dialog as everywhere; Back and the arrow return to the tab.",
+  "tags": [
+    "chr-1047",
+    "settings",
+    "dialog"
+  ],
+  "variant_of": "shell-mcp-setup-dialog-skill",
+  "variant_kind": "step"
+}

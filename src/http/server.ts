@@ -15,7 +15,7 @@ import { handleAboutApi } from "./about-routes.js";
 import { handleSetupApi } from "./setup-routes.js";
 import { handleSettingsApi } from "./settings-routes.js";
 import { handleSseConnection } from "./sse.js";
-import { isAllowedOrigin, hasJsonContentType } from "./origin-guard.js";
+import { isAllowedHost, isAllowedOrigin, hasJsonContentType } from "./origin-guard.js";
 import { sendJson } from "./json.js";
 import type { ProjectRegistry, ProjectHandle } from "../daemon/project-registry.js";
 import { ToolError, type ViewState, type BoardStatePatch, type ToolHandlerContext } from "../tools/index.js";
@@ -104,9 +104,9 @@ function failSafe(res: ServerResponse, err: unknown): void {
   res.end(JSON.stringify({ code: "io_error", message: "internal server error" }));
 }
 
-function rejectForbidden(res: ServerResponse): void {
+function rejectForbidden(res: ServerResponse, message = "forbidden: cross-origin request"): void {
   res.writeHead(403, { "content-type": "application/json" });
-  res.end(JSON.stringify({ code: "validation_failed", message: "forbidden: cross-origin request" }));
+  res.end(JSON.stringify({ code: "validation_failed", message }));
 }
 
 /** A bare 500 mid-MCP-request looks like a server bug to a JSON-RPC client; this is a well-formed (if id-less, since the request body was never parsed) JSON-RPC error instead — used only for project resolution failures that happen before a transport is even created. -32602 is JSON-RPC 2.0's standard "Invalid params" code, an apt fit for a request carrying the removed `?project=` parameter. */
@@ -262,6 +262,11 @@ const STARTED_CHANGELOG = readChangelog();
  */
 export function createServer(registry: ProjectRegistry, updateChecker: UpdateChecker = createUpdateChecker()): HttpServer {
   const server = createHttpServer((req, res) => {
+    // First check, before /health and routing: blocks DNS rebinding (see isAllowedHost).
+    if (!isAllowedHost(req)) {
+      rejectForbidden(res, "forbidden: host not allowed");
+      return;
+    }
     if (req.method === "GET" && req.url === "/health") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ status: "ok", version: STARTED_VERSION }));

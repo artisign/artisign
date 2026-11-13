@@ -34,6 +34,36 @@ export function isAllowedOrigin(req: IncomingMessage): boolean {
   return originUrl.port === hostPort;
 }
 
+/**
+ * Rejects requests whose `Host` header is not a loopback host on the port the
+ * request arrived on. This closes the DNS-rebinding read path: after an
+ * attacker domain is rebound to 127.0.0.1, the victim's browser issues
+ * same-origin GETs to `http://attacker.example:<port>/...`. Such requests
+ * carry no `Origin` header, so `isAllowedOrigin` lets them through, yet the
+ * page can read the responses (project paths, designs, `/events`). The
+ * browser always sends the attacker's hostname in `Host`, and a script cannot
+ * override it, so checking it before any routing blocks the attack.
+ *
+ * The port is compared with `req.socket.localPort` (the port the connection
+ * really came in on), not with anything the client claims. A missing or
+ * unparseable `Host` is rejected. IPv6 hosts arrive bracketed (`[::1]:4711`).
+ */
+export function isAllowedHost(req: IncomingMessage): boolean {
+  const host = req.headers.host;
+  if (!host) return false;
+  const parsed = parseHostHeader(host);
+  if (!parsed) return false;
+  if (!ALLOWED_HOSTNAMES.has(parsed.hostname)) return false;
+  const localPort = req.socket.localPort;
+  return localPort !== undefined && parsed.port === String(localPort);
+}
+
+function parseHostHeader(host: string): { hostname: string; port: string } | null {
+  const match = /^(?:\[([0-9a-fA-F:]+)\]|([^:[\]/\s]+))(?::(\d{1,5}))?$/.exec(host);
+  if (!match) return null;
+  return { hostname: (match[1] ?? match[2]!).toLowerCase(), port: match[3] ?? "80" };
+}
+
 /** `application/json`, ignoring any `; charset=...` suffix. */
 export function hasJsonContentType(req: IncomingMessage): boolean {
   const contentType = req.headers["content-type"];

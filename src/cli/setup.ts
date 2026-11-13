@@ -10,6 +10,8 @@ import { runStop } from "./stop.js";
 export type SetupOptions = {
   /** Accept every detected client without asking. */
   yes?: boolean;
+  /** With `yes`: still ask before installing the artisign skill (the first-run offer; `yes` alone is an explicit opt-in). */
+  askSkill?: boolean;
   /** Remove the `artisign` entries (and skills) instead of writing them. */
   remove?: boolean;
   /** Run only the skill step: with `remove`, remove only the skills. */
@@ -185,7 +187,7 @@ async function installSkills(opts: SetupOptions, deps: SetupDeps, detected: Dete
         log(`The artisign skill in ${client.name} is up to date.`);
         continue;
       }
-      let yes = opts.yes === true;
+      let yes = opts.yes === true && opts.askSkill !== true;
       while (!yes) {
         const question =
           status === "outdated"

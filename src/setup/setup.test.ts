@@ -115,6 +115,45 @@ describe("setup: fresh install", () => {
   });
 });
 
+describe("setup: first-run offer (yes + askSkill)", () => {
+  const skillPath = (): string => join(home, ".claude", "skills", "artisign", "SKILL.md");
+  const run = async (answers: string[]) => {
+    await installFakeClaude();
+    const queue = [...answers];
+    const { d, out } = deps({ ask: vi.fn(async () => queue.shift() ?? "n") });
+    await runSetup({ cliEntry: "e", yes: true, askSkill: true }, d);
+    return { d, out };
+  };
+
+  it("connects without asking, then installs the skill only on a yes", async () => {
+    const { d } = await run(["y"]);
+    expect(d.ask).toHaveBeenCalledTimes(1);
+    expect((await claudeCalls()).length).toBe(2);
+    expect((await readFile(skillPath(), "utf8")).length).toBeGreaterThan(0);
+  });
+
+  it("r prints the skill and asks again", async () => {
+    const { d, out } = await run(["r", "y"]);
+    expect(d.ask).toHaveBeenCalledTimes(2);
+    expect(out.join("\n")).toMatch(/name: artisign/);
+    expect((await stat(skillPath())).isFile()).toBe(true);
+  });
+
+  it("n installs no skill but still connects", async () => {
+    await run(["n"]);
+    expect(await stat(skillPath()).catch(() => null)).toBeNull();
+    expect((await claudeCalls()).length).toBe(2);
+  });
+
+  it("plain --yes still installs without asking", async () => {
+    await installFakeClaude();
+    const { d } = deps();
+    await runSetup({ cliEntry: "e", yes: true }, d);
+    expect(d.ask).not.toHaveBeenCalled();
+    expect((await stat(skillPath())).isFile()).toBe(true);
+  });
+});
+
 describe("setup: the npx Claude Desktop runs", () => {
   const entryOf = async (): Promise<{ command: string; env: { PATH: string } }> =>
     ((await readDesktop()).mcpServers as Record<string, { command: string; env: { PATH: string } }>)

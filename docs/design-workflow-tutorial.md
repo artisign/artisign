@@ -389,6 +389,9 @@ reliably produces vague metadata, because the reasoning is gone.
 
 If you run your own agents against artisign, the recommended split:
 
+- **Start from the skill artisign ships.** `artisign setup --skill` installs it
+  into your AI tools; `artisign skill` prints it so you can read it first. Your
+  own skill only adds project specifics on top and does not repeat it.
 - **Let the tool teach mechanics.** The MCP server instructions and the
   `get_guide` Agent Guide already cover grammar, tools, and workflow. Do not
   duplicate them into your skill — duplicated instructions drift.

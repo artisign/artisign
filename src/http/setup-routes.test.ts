@@ -41,6 +41,19 @@ describe("handleSetupApi / handleAboutApi (injected env)", () => {
     await rm(root, { recursive: true, force: true });
   });
 
+  it("GET /api/setup carries the skill: command, content and per-tool status, read-only", async () => {
+    const before = await readdir(join(root, "home", ".cursor"));
+    const body = (await (await fetch(`${base}/api/setup`)).json()) as {
+      skill: { command: string; content: string; clients: { name: string; status: string; path?: string }[] };
+    };
+    expect(body.skill.command).toBe("artisign setup --skill");
+    expect(body.skill.content).toMatch(/^---\nname: artisign\n/);
+    const byName = Object.fromEntries(body.skill.clients.map((c) => [c.name, c]));
+    expect(byName["Claude Desktop"]).toEqual({ name: "Claude Desktop", status: "unsupported" });
+    expect(byName.Cursor).toEqual({ name: "Cursor", status: "missing", path: "~/.cursor/skills/artisign/SKILL.md" });
+    expect(await readdir(join(root, "home", ".cursor"))).toEqual(before);
+  });
+
   it("GET /api/about returns the given version and the update status", async () => {
     expect(await (await fetch(`${base}/api/about`)).json()).toEqual({
       version: "7.1.0",

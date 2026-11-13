@@ -5,6 +5,10 @@ MCP tools. The server instructions cover tool *mechanics* (augmentation grammar,
 tool shapes); this guide covers *how to design well*. Load it when you need the
 methodology.
 
+A short version of this guide ships as an agent skill (`artisign setup` installs it into your AI tool's
+skills folder; `artisign skill` prints it). It holds the rules to follow on every task and points back here for
+the details.
+
 ## Core principle
 
 **The design system is the product. Screens are assemblies of refs.**

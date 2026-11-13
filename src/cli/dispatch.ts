@@ -8,6 +8,7 @@ import { runStatus } from "./status.js";
 import { parseStartArgs } from "./args.js";
 import { runSetup, type SetupOptions } from "./setup.js";
 import { runUpdate, runRepin } from "./update.js";
+import { runSkill } from "./skill.js";
 import { offerSetup } from "./offer-setup.js";
 import { readVersion } from "../version.js";
 
@@ -29,7 +30,8 @@ export const USAGE = [
   "  stop                                    stop the background process",
   "  serve [--port N] [dir...]               run in the foreground",
   "  init [dir]                              scaffold a new project",
-  "  setup [--yes] [--remove]                connect your AI tools to artisign (or disconnect them)",
+  "  setup [--yes] [--skill] [--remove]      connect your AI tools to artisign and install its skill (or undo that)",
+  "  skill                                   print the artisign skill (SKILL.md) to read it",
   "  update                                  install the latest version and re-pin your AI tool entries",
   "  mcp                                     stdio connection for AI tools; starts artisign if needed",
   "  help [command]                          show this help, or the help of one command",
@@ -87,15 +89,19 @@ export const COMMAND_HELP: Record<string, string> = {
     "  npx -y artisign@<version> mcp   (the entry `artisign setup` writes into your AI tool's config)",
   ].join("\n"),
   setup: [
-    "Usage: artisign setup [--yes] [--remove]",
+    "Usage: artisign setup [--yes] [--skill] [--remove]",
     "",
     "Connect your AI tools to artisign (Claude Code, Claude Desktop, Cursor, Codex CLI, VS Code, opencode). For each one found, asks, then writes a user-level",
     "entry named `artisign` that runs `npx -y artisign@<version> mcp`, pinned to the version running setup.",
     "Run it again after an update to re-pin. Other entries and settings are left untouched.",
     "",
+    "Afterwards it offers to install the artisign skill (how to design well with artisign) into each tool that has a",
+    "skills folder: `<skills folder>/artisign/SKILL.md`, nothing else. Answer r to read it first (or run `artisign skill`).",
+    "",
     "Options:",
-    "  --yes      connect every tool found without asking (needed without a terminal)",
-    "  --remove   remove the `artisign` entries instead",
+    "  --yes      connect every tool found and install the skill without asking (needed without a terminal)",
+    "  --skill    run only the skill step",
+    "  --remove   remove the `artisign` entries and skills instead (with --skill: only the skills)",
     "",
     "Example:",
     "  artisign setup",
@@ -109,6 +115,14 @@ export const COMMAND_HELP: Record<string, string> = {
     "",
     "Example:",
     "  artisign update",
+  ].join("\n"),
+  skill: [
+    "Usage: artisign skill",
+    "",
+    "Print the artisign skill (SKILL.md) to stdout, so you can read it before `artisign setup` installs it.",
+    "",
+    "Example:",
+    "  artisign skill",
   ].join("\n"),
   status: [
     "Usage: artisign status",
@@ -135,6 +149,7 @@ export type CliDeps = {
   runServe: typeof runServe;
   runMcp: (cliEntry: string) => Promise<void>;
   runSetup: (opts: SetupOptions) => Promise<number>;
+  runSkill: () => Promise<number>;
   runUpdate: () => Promise<number>;
   runRepin: (cliEntry: string) => Promise<number>;
   /** First-run offer to connect an AI tool; asks at most once, only on `start` / bare `artisign`. */
@@ -152,6 +167,7 @@ export const defaultCliDeps: CliDeps = {
   runServe,
   runMcp,
   runSetup,
+  runSkill,
   runUpdate,
   runRepin,
   offerSetup,
@@ -259,14 +275,16 @@ async function run(
       await deps.runMcp(cliEntry);
       return 0;
     case "setup": {
-      const unexpected = rest.find((arg) => arg !== "--yes" && arg !== "--remove");
+      const unexpected = rest.find((arg) => arg !== "--yes" && arg !== "--remove" && arg !== "--skill");
       if (unexpected !== undefined) {
         deps.error(`Unknown option: ${unexpected}`);
         deps.error(HINT);
         return 1;
       }
-      return deps.runSetup({ yes: rest.includes("--yes"), remove: rest.includes("--remove"), cliEntry });
+      return deps.runSetup({ yes: rest.includes("--yes"), remove: rest.includes("--remove"), skill: rest.includes("--skill"), cliEntry });
     }
+    case "skill":
+      return deps.runSkill();
     case "update":
       if (rest.length > 0) {
         deps.error(`Unknown option: ${rest[0]}`);

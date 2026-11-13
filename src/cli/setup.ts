@@ -1,6 +1,7 @@
 import { createInterface } from "node:readline/promises";
 import { CLIENTS, defaultClientEnv, type Client, type ClientEnv } from "../setup/clients.js";
 import { connectClients, detectClients, disconnectClients, runningDaemonInfo } from "../setup/connect.js";
+import { installSkill, readSkill, removeSkills, skillClients, skillFile, skillStatus } from "../setup/skill.js";
 import { findRunningDaemon } from "../daemon/lock.js";
 import { isNewer, readVersion } from "../version.js";
 import { runStart } from "./start.js";
@@ -9,8 +10,10 @@ import { runStop } from "./stop.js";
 export type SetupOptions = {
   /** Accept every detected client without asking. */
   yes?: boolean;
-  /** Remove the `artisign` entries instead of writing them. */
+  /** Remove the `artisign` entries (and skills) instead of writing them. */
   remove?: boolean;
+  /** Run only the skill step: with `remove`, remove only the skills. */
+  skill?: boolean;
   cliEntry: string;
 };
 
@@ -104,13 +107,18 @@ export async function runSetup(opts: SetupOptions, deps: SetupDeps = defaultDeps
   const { log, error } = deps;
 
   if (opts.remove) {
-    const results = await disconnectClients(deps.env, deps.clients);
-    if (results.length === 0) log("No artisign entry found in a supported AI tool; nothing to remove.");
+    const results = opts.skill ? [] : await disconnectClients(deps.env, deps.clients);
+    const skills = await removeSkills(deps.env, deps.clients);
+    if (results.length === 0 && skills.length === 0) log("No artisign entry or skill found in a supported AI tool; nothing to remove.");
     for (const r of results) {
       if (r.status === "done") log(`Removed the artisign entry from ${r.name}.`);
       else error(`${r.name}: ${r.error}`);
     }
-    return results.some((r) => r.status === "failed") ? 1 : 0;
+    for (const r of skills) {
+      if (r.status === "done") log(`Removed the artisign skill from ${r.name}.`);
+      else error(`${r.name}: ${r.error}`);
+    }
+    return [...results, ...skills].some((r) => r.status === "failed") ? 1 : 0;
   }
 
   const detected = await detectClients(deps.env, deps.clients);
@@ -126,19 +134,23 @@ export async function runSetup(opts: SetupOptions, deps: SetupDeps = defaultDeps
     return 1;
   }
 
-  const results = await connectClients({
-    version: deps.version,
-    env: deps.env,
-    clients: deps.clients,
-    confirm: opts.yes
-      ? undefined
-      : async (client) => !/^n/i.test((await deps.ask(`Connect ${client.name}? [Y/n] `)).trim()),
-  });
+  const results = opts.skill
+    ? []
+    : await connectClients({
+        version: deps.version,
+        env: deps.env,
+        clients: deps.clients,
+        confirm: opts.yes
+          ? undefined
+          : async (client) => !/^n/i.test((await deps.ask(`Connect ${client.name}? [Y/n] `)).trim()),
+      });
   for (const r of results) {
     if (r.status === "done") log(`Connected ${r.name} (artisign@${deps.version}).`);
     else if (r.status === "skipped") log(`Skipped ${r.name}.`);
     else error(`${r.name}: ${r.error}`);
   }
+
+  const skills = await installSkills(opts, deps);
 
   let restartFailed = false;
   if (results.some((r) => r.status === "done")) {
@@ -149,7 +161,46 @@ export async function runSetup(opts: SetupOptions, deps: SetupDeps = defaultDeps
       restartFailed = true;
     }
   }
-  if (restartFailed || results.some((r) => r.status === "failed")) return 1;
-  if (results.some((r) => r.status === "done")) for (const line of NEXT_STEPS) log(line);
+  if (restartFailed || [...results, ...skills].some((r) => r.status === "failed")) return 1;
+  if ([...results, ...skills].some((r) => r.status === "done")) for (const line of NEXT_STEPS) log(line);
   return 0;
+}
+
+type SkillStepResult = { name: string; status: "done" | "skipped" | "failed" };
+
+/** The skill step: for each detected tool with a skills folder, offers to install (or refresh) the artisign skill. `r` reads it first. */
+async function installSkills(opts: SetupOptions, deps: SetupDeps): Promise<SkillStepResult[]> {
+  const { log, error } = deps;
+  const clients = await skillClients(deps.env, deps.clients);
+  if (clients.length === 0) return [];
+  const content = await readSkill();
+  const results: SkillStepResult[] = [];
+  for (const client of clients) {
+    try {
+      const { status, path } = await skillStatus(client, deps.env, content);
+      if (status === "installed") {
+        log(`The artisign skill in ${client.name} is up to date.`);
+        continue;
+      }
+      let yes = opts.yes === true;
+      while (!yes) {
+        const answer = (await deps.ask(`Install the artisign skill for ${client.name}? [Y/n/r] `)).trim();
+        if (/^r/i.test(answer)) log(content.replace(/\n$/, ""));
+        else if (/^n/i.test(answer)) break;
+        else yes = true;
+      }
+      if (!yes) {
+        log(`Skipped the artisign skill for ${client.name}.`);
+        results.push({ name: client.name, status: "skipped" });
+        continue;
+      }
+      await installSkill(client, deps.env, content);
+      log(`${status === "outdated" ? "Updated" : "Installed"} the artisign skill for ${client.name} (${path ?? skillFile(client, deps.env)}).`);
+      results.push({ name: client.name, status: "done" });
+    } catch (err) {
+      error(`${client.name}: ${err instanceof Error ? err.message : String(err)}`);
+      results.push({ name: client.name, status: "failed" });
+    }
+  }
+  return results;
 }

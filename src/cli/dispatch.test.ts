@@ -227,6 +227,8 @@ describe("dispatch: setup", () => {
     expect(await dispatch(["skill"], ENTRY, deps)).toBe(0);
     expect(deps.runSkill).toHaveBeenCalledTimes(1);
     expect(deps.runSetup).toHaveBeenCalledTimes(1);
+    expect(await dispatch(["skill", "--x"], ENTRY, deps)).toBe(1);
+    expect(deps.runSkill).toHaveBeenCalledTimes(1);
   });
 
   it("rejects anything else with the one-line error", async () => {

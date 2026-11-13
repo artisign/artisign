@@ -79,6 +79,22 @@ describe("refreshSkills / removeSkills", () => {
     await expect(stat(join(home, ".claude", "skills"))).rejects.toThrow();
   });
 
+  it("a missing shipped SKILL.md is one failed result, not a throw", async () => {
+    vi.resetModules();
+    vi.doMock("node:fs/promises", async (orig) => ({
+      ...(await orig<typeof import("node:fs/promises")>()),
+      readFile: async () => {
+        throw Object.assign(new Error("ENOENT: SKILL.md"), { code: "ENOENT" });
+      },
+    }));
+    const fresh = await import("./skill.js");
+    const results = await fresh.refreshSkills(env(), CLIENTS);
+    vi.doUnmock("node:fs/promises");
+    vi.resetModules();
+    expect(results).toHaveLength(1);
+    expect(results[0]?.status).toBe("failed");
+  });
+
   it("removeSkills reports the tools that had one", async () => {
     await installSkill(cursor, env(), skill);
     expect(await removeSkills(env(), CLIENTS)).toEqual([{ name: "Cursor", status: "done" }]);
@@ -124,6 +140,24 @@ describe("setup: the skill step", () => {
     expect(again.d.ask).not.toHaveBeenCalledWith(expect.stringContaining("skill"));
     expect(again.out.join("\n")).toContain("skill in Cursor is up to date");
     expect(out.join("\n")).toContain("Installed the artisign skill for Cursor");
+  });
+
+  it("an outdated copy gets an update prompt that names the path; a fresh install prints no next steps without an MCP connection", async () => {
+    await installSkill(cursor, env(), "old\n");
+    const { d, out } = make();
+    await runSetup({ cliEntry: "e", skill: true }, d);
+    expect(d.ask).toHaveBeenCalledWith(`Update the artisign skill for Cursor? It replaces the changed copy at ${skillMd(cursor)}. [Y/n/r] `);
+    expect(await readFile(skillMd(cursor), "utf8")).toBe(skill);
+    expect(out.join("\n")).not.toContain("Next: open your AI tool");
+  });
+
+  it("--skill with tools found but none having a skills folder says so and exits 0", async () => {
+    const dir = join(home, "Library", "Application Support", "Claude");
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, "claude_desktop_config.json"), "{}");
+    const { d, out } = make({ clients: [claudeDesktop] });
+    expect(await runSetup({ cliEntry: "e", skill: true }, d)).toBe(0);
+    expect(out.join("\n")).toContain("None of the AI tools found has a skills folder");
   });
 
   it("r prints SKILL.md and asks again; n skips", async () => {

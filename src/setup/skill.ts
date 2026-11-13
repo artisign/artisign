@@ -2,7 +2,6 @@ import { access, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { atomicWrite } from "../store/atomic-write.js";
 import { CLIENTS, type Client, type ClientEnv } from "./clients.js";
-import { detectClients } from "./connect.js";
 
 const SKILL_NAME = "artisign";
 
@@ -58,8 +57,13 @@ export type SkillResult = { name: string; status: "done" | "failed"; error?: str
 
 /** `update`: rewrites the skill where it is already installed and outdated; installs it nowhere new. */
 export async function refreshSkills(env: ClientEnv, clients: Client[] = CLIENTS): Promise<SkillResult[]> {
-  const content = await readSkill();
   const results: SkillResult[] = [];
+  let content: string;
+  try {
+    content = await readSkill();
+  } catch (err) {
+    return [{ name: "artisign skill", status: "failed", error: err instanceof Error ? err.message : String(err) }];
+  }
   for (const client of clients) {
     try {
       if ((await skillStatus(client, env, content)).status !== "outdated") continue;
@@ -83,9 +87,4 @@ export async function removeSkills(env: ClientEnv, clients: Client[] = CLIENTS):
     }
   }
   return results;
-}
-
-/** The detected clients that have a skills folder. */
-export async function skillClients(env: ClientEnv, clients: Client[] = CLIENTS): Promise<Client[]> {
-  return (await detectClients(env, clients)).map((d) => d.client).filter((c) => c.skillsDir !== undefined);
 }

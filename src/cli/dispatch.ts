@@ -284,6 +284,11 @@ async function run(
       return deps.runSetup({ yes: rest.includes("--yes"), remove: rest.includes("--remove"), skill: rest.includes("--skill"), cliEntry });
     }
     case "skill":
+      if (rest.length > 0) {
+        deps.error(`Unknown option: ${rest[0]}`);
+        deps.error(HINT);
+        return 1;
+      }
       return deps.runSkill();
     case "update":
       if (rest.length > 0) {

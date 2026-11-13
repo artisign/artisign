@@ -26,10 +26,11 @@ are in the full guide (`get_guide`).
 Tags are how humans and coding agents find your work. A screen without tags is
 lost work.
 
-- **Ticket tag** — the id of the ticket or issue you work on, **lowercase**:
-  `chr-585`, `proj-12`, `gh-301`. Every screen and mockup you create or change
-  for that ticket gets it. No ticket named? Ask the user for one before you
-  design; never invent one.
+- **Ticket tag** — when you work from a ticket or issue, its id in
+  **lowercase**: `chr-585`, `proj-12`, `gh-301`. Every screen and mockup you
+  create or change for it gets that tag. No ticket named? Ask once per task
+  whether there is one; if there is none, the domain tag is enough. Never
+  invent a ticket id.
 - **Domain tag** — the product area, lowercase, kebab-case: `onboarding`,
   `checkout`, `settings`, `dashboard`. Reuse the domain tags the project already
   has (see step 1.2); add a new one only for a genuinely new area.
@@ -102,8 +103,8 @@ unresolved refs: fix them before you move on.
 
 Before you report a screen as done, every answer is yes:
 
-- [ ] It carries the ticket tag and a domain tag (lowercase), and no existing tag was dropped.
-- [ ] The ticket tag has `notes` with the cross-screen spec.
+- [ ] It carries a domain tag and, when there is a ticket, the ticket tag (both lowercase); no existing tag was dropped.
+- [ ] When there is a ticket, its tag has `notes` with the cross-screen spec.
 - [ ] Every state, overlay and step of a page is a variant with `variant_of` + `variant_kind`.
 - [ ] No inline value duplicates a token; repeated structure is a component or pattern.
 - [ ] The last screenshot shows no red outlines.

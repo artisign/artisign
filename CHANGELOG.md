@@ -31,7 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   mockup included. `<script>`, `on*` handlers and `javascript:` URLs stay in the file but never execute — as
   in the preview, which was already sandboxed.
 - Auto-commits no longer fail on a machine where git has no `user.name`/`user.email`: artisign's commits are
-  made as `Artisign <noreply@artisign.dev>` instead. An identity you have configured, in git config or the
+  made as `artisign <noreply@artisign.dev>` instead. An identity you have configured, in git config or the
   environment, is used as before, and artisign never writes to your git config.
 
 ## [2.2.0] - 2026-10-26

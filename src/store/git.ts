@@ -32,7 +32,7 @@ const NO_DETACHED_MAINTENANCE = ["-c", "gc.autoDetach=false", "-c", "maintenance
  * attempt succeed and is never replaced. Only the half git lacks is filled
  * in, so a configured `user.email` without a `user.name` keeps that email.
  */
-export const FALLBACK_IDENTITY = { name: "Artisign", email: "noreply@artisign.dev" } as const;
+export const FALLBACK_IDENTITY = { name: "artisign", email: "noreply@artisign.dev" } as const;
 
 async function git(projectDir: string, args: string[]): Promise<string> {
   // Git translates its messages on gettext builds (most Linux distributions,

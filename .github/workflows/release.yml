@@ -28,7 +28,7 @@ jobs:
       # fail with `sha: null`.
       - name: Give git a committer identity
         run: |
-          git config --global user.name "Artisign CI"
+          git config --global user.name "artisign CI"
           git config --global user.email "ci@artisign.dev"
 
       # npm trusted publishing (OIDC, no stored token) needs npm >= 11.5.1;
@@ -104,7 +104,7 @@ jobs:
         run: |
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && exit 0
           gh release create "$GITHUB_REF_NAME" \
-            --title "Artisign v${{ steps.version.outputs.version }}" \
+            --title "artisign v${{ steps.version.outputs.version }}" \
             --notes-file "$RUNNER_TEMP/release-notes.md"
 
       - name: Publish to npm

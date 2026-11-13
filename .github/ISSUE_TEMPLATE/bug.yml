@@ -9,7 +9,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Artisign version
+      label: artisign version
       description: "`npm ls -g artisign` (global install) or `npm ls artisign` (project install). For plain `npx artisign` runs: `npm view artisign version` shows what npx fetched today."
       placeholder: "0.9.0"
     validations:

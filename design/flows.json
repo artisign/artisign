@@ -282,6 +282,30 @@
     "to_kind": "screen"
   },
   {
+    "from": "shell-mcp-setup-dialog-skill-status-unavailable.tab-mcp",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-status-unavailable.dlg-done",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-status-unavailable-dark.tab-mcp",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-status-unavailable-dark.dlg-done",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
     "from": "shell-mcp-setup-dialog-skill.tab-mcp",
     "event": "tap",
     "to": "shell-mcp-setup-dialog",
@@ -349,30 +373,6 @@
   },
   {
     "from": "shell-mcp-setup-dialog-skill-all-installed-dark.dlg-done",
-    "event": "tap",
-    "to": "shell-settings-menu-dark",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-status-unavailable.tab-mcp",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-status-unavailable.dlg-done",
-    "event": "tap",
-    "to": "shell-settings-menu",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-status-unavailable-dark.tab-mcp",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-status-unavailable-dark.dlg-done",
     "event": "tap",
     "to": "shell-settings-menu-dark",
     "to_kind": "screen"

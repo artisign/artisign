@@ -1,5 +1,5 @@
 name: Question
-description: Something about using Artisign that the docs did not answer.
+description: Something about using artisign that the docs did not answer.
 labels: ["question"]
 body:
   - type: markdown

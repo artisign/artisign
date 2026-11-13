@@ -32,7 +32,7 @@ jobs:
       # fail with `sha: null`.
       - name: Give git a committer identity
         run: |
-          git config --global user.name "Artisign CI"
+          git config --global user.name "artisign CI"
           git config --global user.email "ci@artisign.dev"
 
       - run: npm ci

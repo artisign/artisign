@@ -47,7 +47,7 @@ describe("startDaemon", () => {
     const res = await fetch(`http://127.0.0.1:${daemon.port}/`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
-    expect(await res.text()).toContain("Artisign");
+    expect(await res.text()).toContain("<title>artisign</title>");
   });
 
   it("starts with no project open: health + static preview OK, project-dependent routes 503", async () => {

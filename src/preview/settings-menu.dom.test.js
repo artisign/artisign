@@ -325,7 +325,7 @@ describe("MCP setup row and About", () => {
     expect($("#settings-mcp-sub").hidden).toBe(false);
     expect($("#settings-mcp-sub").textContent).toBe("1 of 4 connected");
     expect($("#settings-about").hidden).toBe(false);
-    expect($("#settings-version").textContent).toBe("Artisign 9.9.9");
+    expect($("#settings-version").textContent).toBe("artisign 9.9.9");
   });
 
   it("leaves the subline off while loading and when the status fails", async () => {

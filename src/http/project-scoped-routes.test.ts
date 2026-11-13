@@ -354,7 +354,7 @@ describe("project-scoped /mcp and UI routes", () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
-    expect(await res.text()).toContain("Artisign");
+    expect(await res.text()).toContain("<title>artisign</title>");
   });
 
   it("a client connected to /events receives project-switched when the daemon's default project changes", async () => {

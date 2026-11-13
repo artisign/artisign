@@ -18,7 +18,7 @@ case "${1:-}" in
     # daemon between stop and start; `start` then just reports it as running.
     pid=$(node "$cli" status | sed -n 's/.*(pid \([0-9]*\),.*/\1/p')
     if ! ps -o command= -p "$pid" | grep -qF "$cli"; then
-      echo "the running Artisign is not this checkout's build — close the AI tools connected to the installed one, then retry" >&2
+      echo "the running artisign is not this checkout's build — close the AI tools connected to the installed one, then retry" >&2
       exit 1
     fi
     ;;

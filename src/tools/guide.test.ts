@@ -16,7 +16,7 @@ describe("get_guide", () => {
   it("is non-empty and opens with the guide's heading", async () => {
     const res = await getGuide();
     expect(res.guide.length).toBeGreaterThan(0);
-    expect(res.guide).toContain("# Designing with Artisign — Agent Guide");
+    expect(res.guide).toContain("# Designing with artisign — Agent Guide");
   });
 });
 

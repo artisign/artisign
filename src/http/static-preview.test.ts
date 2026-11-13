@@ -31,7 +31,7 @@ describe("static preview assets (/, *.js, *.css)", () => {
     const res = await fetch(`http://127.0.0.1:${daemon.port}/`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
-    expect(await res.text()).toContain("<title>Artisign</title>");
+    expect(await res.text()).toContain("<title>artisign</title>");
   });
 
   it("GET /app.js serves the entry module with a JS content type", async () => {

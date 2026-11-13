@@ -1674,7 +1674,7 @@ async function loadScreens() {
 
 /** CHR-890 — names the active project (as the picker shows it) in the guide's prompt. */
 function syncGuidePrompt() {
-  emptyGuidePromptEl.textContent = `Design a login screen in my Artisign project ${projectPickerName.textContent}`;
+  emptyGuidePromptEl.textContent = `Design a login screen in my artisign project ${projectPickerName.textContent}`;
 }
 
 let guideCopyTimer;

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+
+- The daemon rejects every HTTP request whose `Host` header is not `127.0.0.1`, `localhost` or `[::1]` on the port
+  it listens on (403, before routing, `/health` included). This closes a DNS-rebinding read path: a website could
+  rebind its domain to 127.0.0.1 and read project paths, designs and `/events` through same-origin GETs, which
+  carry no `Origin` header. Writes were already blocked by the Origin check.
+
 ### Breaking changes
 
 - `import_html` and `init_project` no longer accept source kind `stitch_export`; artisign no longer fetches

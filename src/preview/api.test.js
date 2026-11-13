@@ -24,6 +24,7 @@ import {
   openProject,
   initProject,
   fetchFsDirs,
+  fetchSetup,
 } from "./api.js";
 
 const PROJECT = "/Users/example/my-project";
@@ -146,5 +147,26 @@ describe("api.js project scoping (CHR-651)", () => {
     globalThis.fetch = vi.fn(async () => okJson({ path: "/", parent: null, entries: [], home: "/" }));
     await fetchFsDirs();
     expect(globalThis.fetch).toHaveBeenCalledWith("/api/fs/dirs");
+  });
+});
+
+describe("fetchSetup (CHR-1048)", () => {
+  const client = { name: "Cursor", found: true, connected: false, manual: { kind: "command", text: "x" } };
+
+  it("returns the skill part and keeps only well-formed tool entries", async () => {
+    const skill = { command: "artisign setup --skill", content: "# T", clients: [{ name: "Cursor", status: "outdated", path: "~/a" }, { name: "Odd", status: "bogus" }, { status: "installed" }] };
+    globalThis.fetch = vi.fn(async () => okJson({ command: "artisign setup", clients: [client], skill }));
+    const setup = await fetchSetup();
+    expect(setup.skill.command).toBe("artisign setup --skill");
+    expect(setup.skill.clients).toEqual([{ name: "Cursor", status: "outdated", path: "~/a", error: undefined }]);
+  });
+
+  it("skill is null for an older daemon or a malformed skill, and the rest still loads", async () => {
+    globalThis.fetch = vi.fn(async () => okJson({ command: "artisign setup", clients: [client] }));
+    expect((await fetchSetup()).skill).toBeNull();
+    globalThis.fetch = vi.fn(async () => okJson({ command: "artisign setup", clients: [client], skill: { command: 1 } }));
+    const setup = await fetchSetup();
+    expect(setup.skill).toBeNull();
+    expect(setup.clients).toHaveLength(1);
   });
 });

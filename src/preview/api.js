@@ -387,8 +387,9 @@ export async function fetchAbout() {
 }
 
 /**
- * Which AI tools are installed / connected and what to copy to connect each by hand (CHR-926, GET /api/setup — the daemon reads the disk on every call). Copy-only: nothing is written. `null` on any failure or a malformed body.
- * @returns {Promise<{ command: string, clients: { name: string, found: boolean, connected: boolean, manual: { kind: "command", text: string } | { kind: "config", path?: string, text: string } }[] } | null>}
+ * Which AI tools are installed / connected and what to copy to connect each by hand (CHR-926, GET /api/setup — the daemon reads the disk on every call). Copy-only: nothing is written. `skill` (CHR-1048) is the artisign agent skill: the command that installs it, its text and each tool's status; `null` when an older daemon sends none or a malformed one. `null` on any failure or a malformed body.
+ * @typedef {{ name: string, status: "installed" | "outdated" | "missing" | "unsupported" | "unreadable", path?: string, error?: string }} SkillClient
+ * @returns {Promise<{ command: string, clients: { name: string, found: boolean, connected: boolean, manual: { kind: "command", text: string } | { kind: "config", path?: string, text: string } }[], skill: { command: string, content: string, clients: SkillClient[] } | null } | null>}
  */
 export async function fetchSetup() {
   try {
@@ -399,10 +400,21 @@ export async function fetchSetup() {
     const clients = body.clients.filter(
       (c) => typeof c?.name === "string" && typeof c.manual?.text === "string" && (c.manual.kind === "command" || c.manual.kind === "config"),
     );
-    return { command: body.command, clients };
+    return { command: body.command, clients, skill: parseSkill(body.skill) };
   } catch {
     return null;
   }
+}
+
+const SKILL_STATUSES = ["installed", "outdated", "missing", "unsupported", "unreadable"];
+
+/** The `skill` part of GET /api/setup, or `null` when it is missing (older daemon) or malformed. @param {any} skill */
+function parseSkill(skill) {
+  if (typeof skill?.command !== "string" || typeof skill.content !== "string" || !Array.isArray(skill.clients)) return null;
+  const clients = skill.clients
+    .filter((c) => typeof c?.name === "string" && SKILL_STATUSES.includes(c.status))
+    .map((c) => ({ name: c.name, status: c.status, path: typeof c.path === "string" ? c.path : undefined, error: typeof c.error === "string" ? c.error : undefined }));
+  return { command: skill.command, content: skill.content, clients };
 }
 
 /**

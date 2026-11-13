@@ -22,6 +22,25 @@ export async function copyWithFeedback(text, iconEl) {
 }
 
 /**
+ * Writes `text` to the clipboard and, on success, switches the label of `button` to "Copied" for a moment (CHR-1048). A clipboard that is missing or refuses is tolerated.
+ *
+ * @param {string} text
+ * @param {HTMLElement} button a button whose text is its label
+ */
+export async function copyWithLabel(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    return;
+  }
+  button.dataset.label ??= button.textContent ?? "";
+  button.textContent = "Copied";
+  setTimeout(() => {
+    button.textContent = button.dataset.label ?? "";
+  }, COPIED_MS);
+}
+
+/**
  * A compact chip showing a command with a copy icon — the whole chip is one button that copies the command.
  *
  * @param {string} command

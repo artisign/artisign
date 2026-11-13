@@ -454,21 +454,60 @@
         <div id="shortcuts-columns"></div>
       </section>
     </div>
-    <!-- CHR-926: Connect AI tools — which tools are connected and what to copy to connect the rest (copy only). Content built by mcp-dialog.js from GET /api/setup. -->
+    <!-- CHR-926: Connect AI tools — which tools are connected and what to copy to connect the rest (copy only). CHR-1048: a second tab shows the artisign agent skill (SKILL.md: read, copy, download; per-tool status), and a reader step swaps in for the tabs. Content built by mcp-dialog.js from GET /api/setup. -->
     <div id="mcp-scrim" class="chrome-scrim" hidden>
       <section id="mcp-dialog" class="chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="mcp-title" tabindex="-1">
-        <div class="dialog-head">
-          <h1 id="mcp-title" class="dialog-title">Connect AI tools</h1>
-          <button type="button" id="mcp-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
+        <div id="mcp-main" class="mcp-view">
+          <div class="dialog-head">
+            <h1 id="mcp-title" class="dialog-title">Connect AI tools</h1>
+            <button type="button" id="mcp-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
+          </div>
+          <div class="mcp-tabs" role="tablist" aria-label="Connect AI tools">
+            <button type="button" id="mcp-tab-mcp" class="chrome-tab" role="tab" aria-selected="true" aria-controls="mcp-panel-mcp">MCP server</button>
+            <button type="button" id="mcp-tab-skill" class="chrome-tab" role="tab" aria-selected="false" aria-controls="mcp-panel-skill" tabindex="-1">Agent skill</button>
+          </div>
+          <div id="mcp-panel-mcp" class="mcp-view" role="tabpanel" aria-labelledby="mcp-tab-mcp">
+            <div id="mcp-command" class="mcp-group"></div>
+            <div class="mcp-group">
+              <div class="mcp-list-label">Or add it by hand, per tool</div>
+              <div id="mcp-clients" class="mcp-clients"></div>
+            </div>
+            <div class="mcp-actions">
+              <span id="mcp-summary" class="mcp-summary"></span>
+              <button type="button" id="mcp-done" class="chrome-btn chrome-btn--primary">Done</button>
+            </div>
+          </div>
+          <div id="mcp-panel-skill" class="mcp-view" role="tabpanel" aria-labelledby="mcp-tab-skill" hidden>
+            <div id="skill-card" class="mcp-card"></div>
+            <div id="skill-command" class="mcp-group"></div>
+            <div class="mcp-group">
+              <div class="mcp-list-label">Status per tool</div>
+              <div id="skill-clients"></div>
+              <div id="skill-caption" class="mcp-caption" hidden>Claude Desktop has no skills folder. Copy or download SKILL.md and upload it in its settings.</div>
+            </div>
+            <div class="mcp-actions">
+              <span id="skill-summary" class="mcp-summary"></span>
+              <button type="button" id="skill-done" class="chrome-btn chrome-btn--primary">Done</button>
+            </div>
+          </div>
         </div>
-        <div id="mcp-command" class="mcp-group"></div>
-        <div class="mcp-group">
-          <div class="mcp-list-label">Or add it by hand, per tool</div>
-          <div id="mcp-clients" class="mcp-clients"></div>
-        </div>
-        <div class="mcp-actions">
-          <span id="mcp-summary" class="mcp-summary"></span>
-          <button type="button" id="mcp-done" class="chrome-btn chrome-btn--primary">Done</button>
+        <div id="mcp-reader" class="mcp-view" hidden>
+          <div class="dialog-head mcp-reader-head">
+            <button type="button" id="mcp-reader-back" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Back to Agent skill" data-tooltip="Back"><span class="icon" aria-hidden="true">arrow_back</span></button>
+            <h1 id="mcp-reader-title" class="dialog-title mcp-reader-title">SKILL.md</h1>
+            <button type="button" id="mcp-reader-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
+          </div>
+          <div class="mcp-reader-meta">This is the file <span class="mcp-path">artisign setup --skill</span> puts into each tool's skills folder.</div>
+          <div class="mcp-reader-frame">
+            <div id="mcp-reader-body" class="md mcp-reader-body" tabindex="0" role="region" aria-label="SKILL.md"></div>
+            <div class="mcp-reader-fade" aria-hidden="true"></div>
+          </div>
+          <div class="mcp-actions">
+            <button type="button" id="mcp-reader-copy" class="chrome-btn">Copy SKILL.md</button>
+            <button type="button" id="mcp-reader-download" class="chrome-btn">Download</button>
+            <span class="mcp-actions-spacer"></span>
+            <button type="button" id="mcp-reader-done" class="chrome-btn chrome-btn--primary">Back</button>
+          </div>
         </div>
       </section>
     </div>

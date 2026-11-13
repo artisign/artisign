@@ -372,7 +372,7 @@ describe("Connect AI tools dialog", () => {
     await openDialog();
     expect($("#mcp-command .mcp-code-text").textContent).toBe("artisign setup");
     expect($$(".mcp-client-name").map((n) => n.textContent)).toEqual(["Claude Code", "Claude Desktop", "Cursor", "opencode"]);
-    expect($$(".mcp-status").map((c) => c.textContent.replace("check", ""))).toEqual(["Not connected", "Connected", "Not connected", "Not installed"]);
+    expect($$(".mcp-status").map((c) => c.textContent.replace("check", ""))).toEqual(["Not connected", "Connected", "Not connected", "Not found"]);
     expect($("#mcp-summary").textContent).toBe("1 of 4 connected");
   });
 
@@ -389,7 +389,7 @@ describe("Connect AI tools dialog", () => {
     expect(cursor.querySelector(".mcp-code-text").textContent).toBe('{"mcpServers":{}}');
   });
 
-  it("a connected tool has nothing to expand; a tool that is not installed is collapsed but can be opened", async () => {
+  it("a connected tool has nothing to expand; a tool that is not found is collapsed but can be opened", async () => {
     await openDialog();
     const desktop = clientRow("Claude Desktop");
     expect(desktop.querySelector("button.mcp-client-row")).toBeNull();

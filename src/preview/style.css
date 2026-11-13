@@ -4658,6 +4658,7 @@ li.has-compare > .screen-item {
 #settings-about[hidden],
 #settings-mcp-sub[hidden],
 #mcp-scrim[hidden],
+.mcp-view[hidden],
 .mcp-manual[hidden] {
   display: none;
 }
@@ -4773,11 +4774,41 @@ li.has-compare > .screen-item {
 }
 
 /* Connect AI tools dialog (CHR-926, `shell-mcp-setup-dialog`). */
+/* Anchored at a fixed top offset (about where the tallest view, the reader, is centred) instead of re-centring on content, so the title and the tabs stay put when the tab, the reader or the loading state changes (CHR-1048). */
+#mcp-scrim {
+  --mcp-top: max(var(--space-2xl), calc(50vh - 360px));
+  align-items: flex-start;
+  padding-top: var(--mcp-top);
+}
+
 #mcp-dialog {
   width: 560px;
   max-width: calc(100vw - 2 * var(--space-2xl));
-  max-height: calc(100vh - 2 * var(--space-2xl));
+  max-height: calc(100vh - var(--mcp-top) - var(--space-2xl));
   overflow-y: auto;
+}
+
+#mcp-dialog.mcp-dialog--reader {
+  width: 640px;
+}
+
+.mcp-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.mcp-tabs {
+  display: flex;
+  align-items: stretch;
+  height: var(--size-row-section);
+  margin-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.mcp-tabs .chrome-tab {
+  margin-bottom: -1px;
+  white-space: nowrap;
 }
 
 .mcp-group {
@@ -4789,6 +4820,10 @@ li.has-compare > .screen-item {
 .mcp-hint {
   font-size: var(--ui-sm);
   color: var(--chrome-text-secondary);
+}
+
+.mcp-hint--base {
+  font-size: var(--ui-base);
 }
 
 .mcp-hint--small {
@@ -4897,8 +4932,8 @@ button.mcp-client-row:focus-visible {
   flex: 1;
 }
 
-.mcp-client--not-installed .mcp-client-name,
-.mcp-client--not-installed .mcp-client-row > .icon:first-child {
+.mcp-client--not-found .mcp-client-name,
+.mcp-client--not-found .mcp-client-row > .icon:first-child {
   color: var(--chrome-text-tertiary);
 }
 
@@ -4922,23 +4957,41 @@ button.mcp-client-row:focus-visible {
   white-space: nowrap;
 }
 
-.mcp-status--connected {
+.mcp-status--connected,
+.mcp-status--installed {
   padding-left: var(--space-sm);
   background: color-mix(in srgb, var(--chrome-ok) 14%, transparent);
   color: var(--chrome-ok);
   font-weight: 500;
 }
 
-.mcp-status--connected .icon {
+.mcp-status--connected .icon,
+.mcp-status--installed .icon,
+.mcp-status--outdated .icon,
+.mcp-status--unreadable .icon {
   font-size: var(--size-icon-xs);
 }
 
-.mcp-status--not-connected {
+.mcp-status--outdated,
+.mcp-status--unreadable {
+  padding-left: var(--space-sm);
+  background: var(--chrome-warning-subtle);
+  color: var(--chrome-warning);
+  font-weight: 500;
+}
+
+.mcp-status--unreadable:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+.mcp-status--not-connected,
+.mcp-status--skill-missing {
   border: 1px solid var(--chrome-border-strong);
   color: var(--chrome-text-secondary);
 }
 
-.mcp-status--not-installed {
+.mcp-status--not-found {
   background: var(--chrome-field);
   color: var(--chrome-text-tertiary);
 }
@@ -4955,6 +5008,134 @@ button.mcp-client-row:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
+}
+
+.mcp-actions-spacer {
+  flex: 1;
+}
+
+/* Agent skill tab (CHR-1048, `shell-mcp-setup-dialog-skill`). */
+.mcp-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+}
+
+.mcp-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: var(--size-control-compact);
+}
+
+.mcp-card-head > .icon {
+  font-size: var(--size-icon);
+  color: var(--chrome-text-secondary);
+}
+
+.mcp-card-name {
+  flex: 1;
+  font-size: var(--ui-base);
+  font-weight: 500;
+}
+
+.mcp-card-desc {
+  padding-left: 26px;
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.mcp-row-note {
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.mcp-note-box {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-field);
+  font-size: var(--ui-base);
+}
+
+.mcp-note-box > .icon {
+  font-size: var(--size-icon);
+  color: var(--chrome-text-secondary);
+}
+
+.mcp-note-box-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.mcp-note-box-sub {
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.mcp-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* SKILL.md reader step: 640px, a fixed-height frame that scrolls, a fade at the bottom edge. */
+.mcp-reader-head {
+  justify-content: flex-start;
+}
+
+.mcp-reader-title {
+  flex: 1;
+}
+
+.mcp-reader-meta {
+  margin-top: calc(-1 * var(--space-sm));
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
+}
+
+.mcp-reader-frame {
+  position: relative;
+  height: min(560px, calc(100vh - 230px));
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.mcp-reader-body {
+  height: 100%;
+  padding: var(--space-xl) var(--space-3xl);
+  overflow-y: auto;
+  font-size: var(--ui-base);
+  line-height: 1.55;
+  color: var(--chrome-text-secondary);
+}
+
+.mcp-reader-body:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
+.mcp-reader-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 48px;
+  background: linear-gradient(to bottom, transparent, var(--chrome-raised));
+  pointer-events: none;
 }
 
 .mcp-summary {

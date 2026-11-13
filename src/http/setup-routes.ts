@@ -49,7 +49,9 @@ export async function handleSetupApi(
     } catch (err) {
       // An unreadable copy (EISDIR, EACCES, ...) is reported as that tool's problem; it never fails the route.
       const path = skillFile(client, env);
-      skillClients.push({ name: client.name, status: "unreadable", error: (err as Error).message, ...(path === undefined ? {} : { path: tildify(path, env.home) }) });
+      // The message can name the path under the home directory; show it as `~/…` like `path`.
+      const error = (err as Error).message.replaceAll(env.home + sep, "~" + sep);
+      skillClients.push({ name: client.name, status: "unreadable", error, ...(path === undefined ? {} : { path: tildify(path, env.home) }) });
     }
   }
   sendJson(res, 200, { command: "artisign setup", clients, skill: { command: "artisign setup --skill", content, clients: skillClients } });

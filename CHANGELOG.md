@@ -6,34 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Security
+## [2.2.1] - 2026-11-14
 
-- The daemon rejects every HTTP request whose `Host` header is not `127.0.0.1`, `localhost` or `[::1]` on the port
-  it listens on (403, before routing, `/health` included). This closes a DNS-rebinding read path: a website could
-  rebind its domain to 127.0.0.1 and read project paths, designs and `/events` through same-origin GETs, which
-  carry no `Origin` header. Writes were already blocked by the Origin check. Tunnels and port forwards must keep the local port equal to the
-  daemon port, otherwise requests get 403 "host not allowed".
+An artisign agent skill that teaches AI tools to design well, mockup variants in `patch_html` and `inspect_node`, a
+DNS-rebinding fix, and one breaking change: `import_html` and `init_project` no longer accept source kind
+`stitch_export`, pass HTML as `{kind: "html"}` instead.
 
-### Breaking changes
+### Features
 
-- `import_html` and `init_project` no longer accept source kind `stitch_export`; artisign no longer fetches
-  URLs. Pass the HTML as `{kind: "html"}` instead.
+- **artisign skill:** artisign ships a skill (`SKILL.md`: how to design well with artisign). `artisign setup` and
+  the first-run connect offer ask per tool whether to install it into each AI tool that has a user-level skills
+  folder (Claude Code, Codex CLI, Cursor, opencode, VS Code), after the connection step. `r` prints it first,
+  `--yes` installs without asking, `artisign setup --skill` runs only this step and `artisign skill` prints the text.
+  `artisign update` refreshes skills that are already installed, `artisign setup --remove` removes the `artisign`
+  skill folder, and `GET /api/setup` reports each tool's skill status.
+- **Agent skill tab:** the browser preview's Connect AI tools dialog has an Agent skill tab: read SKILL.md before
+  installing, copy the `artisign setup --skill` command, and see each tool's skill status. A tool that is not on the
+  machine now reads "Not found" in the MCP server tab too (was "Not installed").
+- **Mockup variants as targets:** `patch_html` and `inspect_node` accept mockup variant targets
+  (`mockup:<name>#<variant>.<node-id>`).
 
 ### Improvements
 
-- `artisign setup` and the first-run connect offer ask per tool whether to install the artisign skill (`SKILL.md`:
-  how to design well with artisign) into each AI tool that has a user-level skills folder (Claude Code, Codex CLI,
-  Cursor, opencode, VS Code), after the connection step. `r` prints it first, `--yes` installs without asking,
-  `artisign setup --skill` runs only this step and `artisign skill` prints the text. `artisign update` refreshes skills that are already installed,
-  `artisign setup --remove` removes the `artisign` skill folder, and `GET /api/setup` reports each tool's skill status.
-- The browser preview's Connect AI tools dialog has an Agent skill tab: read SKILL.md before installing, copy the
-  `artisign setup --skill` command, and see each tool's skill status.
-  A tool that is not on the machine now reads "Not found" in the MCP server tab too (was "Not installed").
 - The MCP instructions and the agent guide tell agents to change the design only through artisign's tools, never
   with shell or file-edit tools (copying an image into `assets/` excepted); before, that rule covered mockups only.
 - The product name is now written in lowercase, artisign, in the CLI, the browser preview, the MCP instructions,
   the docs and the package metadata.
-- `patch_html` and `inspect_node` accept mockup variant targets (`mockup:<name>#<variant>.<node-id>`).
 - The MCP instructions and the agent guide name the icon font precisely and say where image files must live
   (local paths only from the project's `assets/` folder).
 
@@ -49,6 +47,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Auto-commits no longer fail on a machine where git has no `user.name`/`user.email`: artisign's commits are
   made as `artisign <noreply@artisign.dev>` instead. An identity you have configured, in git config or the
   environment, is used as before, and artisign never writes to your git config.
+
+### Security
+
+- The daemon rejects every HTTP request whose `Host` header is not `127.0.0.1`, `localhost` or `[::1]` on the port
+  it listens on (403, before routing, `/health` included). This closes a DNS-rebinding read path: a website could
+  rebind its domain to 127.0.0.1 and read project paths, designs and `/events` through same-origin GETs, which
+  carry no `Origin` header. Writes were already blocked by the Origin check. Tunnels and port forwards must keep the local port equal to the
+  daemon port, otherwise requests get 403 "host not allowed".
+
+### Breaking changes
+
+- `import_html` and `init_project` no longer accept source kind `stitch_export`; artisign no longer fetches
+  URLs. Pass the HTML as `{kind: "html"}` instead.
 
 ## [2.2.0] - 2026-10-26
 

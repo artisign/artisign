@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [2.2.1] - 2026-11-14
 
 An agent skill on how to design with artisign, mockup variants in `patch_html` and `inspect_node`, a
-DNS-rebinding fix, and one breaking change: `import_html` and `init_project` no longer accept source kind
+two security fixes, and one breaking change: `import_html` and `init_project` no longer accept source kind
 `stitch_export`, so they no longer fetch a URL. Pass HTML as `{kind: "html"}` instead.
 
 ### Features

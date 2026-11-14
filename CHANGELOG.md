@@ -14,7 +14,7 @@ DNS-rebinding fix, and one breaking change: `import_html` and `init_project` no 
 
 ### Features
 
-- **artisign skill:** artisign ships a skill (`SKILL.md`: how to design well with artisign). `artisign setup` and
+- **artisign skill:** artisign ships a skill (`SKILL.md`: how to design with artisign). `artisign setup` and
   the first-run connect offer ask per tool whether to install it into each AI tool that has a user-level skills
   folder (Claude Code, Codex CLI, Cursor, opencode, VS Code), after the connection step. `r` prints it first,
   `--yes` installs without asking, `artisign setup --skill` runs only this step and `artisign skill` prints the text.

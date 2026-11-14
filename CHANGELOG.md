@@ -8,9 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [2.2.1] - 2026-11-14
 
-An artisign agent skill that teaches AI tools to design well, mockup variants in `patch_html` and `inspect_node`, a
+An agent skill on how to design with artisign, mockup variants in `patch_html` and `inspect_node`, a
 DNS-rebinding fix, and one breaking change: `import_html` and `init_project` no longer accept source kind
-`stitch_export`, pass HTML as `{kind: "html"}` instead.
+`stitch_export`, so they no longer fetch a URL. Pass HTML as `{kind: "html"}` instead.
 
 ### Features
 
@@ -21,8 +21,7 @@ DNS-rebinding fix, and one breaking change: `import_html` and `init_project` no 
   `artisign update` refreshes skills that are already installed, `artisign setup --remove` removes the `artisign`
   skill folder, and `GET /api/setup` reports each tool's skill status.
 - **Agent skill tab:** the browser preview's Connect AI tools dialog has an Agent skill tab: read SKILL.md before
-  installing, copy the `artisign setup --skill` command, and see each tool's skill status. A tool that is not on the
-  machine now reads "Not found" in the MCP server tab too (was "Not installed").
+  installing, copy the `artisign setup --skill` command, and see each tool's skill status.
 - **Mockup variants as targets:** `patch_html` and `inspect_node` accept mockup variant targets
   (`mockup:<name>#<variant>.<node-id>`).
 
@@ -34,32 +33,35 @@ DNS-rebinding fix, and one breaking change: `import_html` and `init_project` no 
   the docs and the package metadata.
 - The MCP instructions and the agent guide name the icon font precisely and say where image files must live
   (local paths only from the project's `assets/` folder).
+- A tool that is not on the machine now reads "Not found" in the MCP server tab of the Connect AI tools dialog
+  (was "Not installed").
 
 ### Bugfixes
 
 - Fonts render in every weight a token uses, not only 400, and a font named in a family-only typography token is
   fetched too.
 - Parallel writes no longer drop each other's entries from the font cache.
-- Screen, component and mockup HTML no longer runs scripts in the headless browser of `get_screenshot` and
-  `inspect_node`: every rendered document carries a `script-src 'none'` Content Security Policy, a full-`<html>`
-  mockup included. `<script>`, `on*` handlers and `javascript:` URLs stay in the file but never execute — as
-  in the preview, which was already sandboxed.
 - Auto-commits no longer fail on a machine where git has no `user.name`/`user.email`: artisign's commits are
   made as `artisign <noreply@artisign.dev>` instead. An identity you have configured, in git config or the
   environment, is used as before, and artisign never writes to your git config.
 
 ### Security
 
+- Screen, component and mockup HTML no longer runs scripts in the headless browser of `get_screenshot` and
+  `inspect_node`: every rendered document carries a `script-src 'none'` Content Security Policy, a full-`<html>`
+  mockup included. `<script>`, `on*` handlers and `javascript:` URLs stay in the file but never execute — as
+  in the preview, which was already sandboxed.
 - The daemon rejects every HTTP request whose `Host` header is not `127.0.0.1`, `localhost` or `[::1]` on the port
   it listens on (403, before routing, `/health` included). This closes a DNS-rebinding read path: a website could
   rebind its domain to 127.0.0.1 and read project paths, designs and `/events` through same-origin GETs, which
-  carry no `Origin` header. Writes were already blocked by the Origin check. Tunnels and port forwards must keep the local port equal to the
-  daemon port, otherwise requests get 403 "host not allowed".
+  carry no `Origin` header. Writes were already blocked by the Origin check. Local use needs no action beyond updating. A tunnel or port forward needs
+  both the hostname `127.0.0.1`, `localhost` or `[::1]` and the same port as the daemon; one that sends its own hostname
+  or a different port gets 403 "host not allowed".
 
 ### Breaking changes
 
-- `import_html` and `init_project` no longer accept source kind `stitch_export`; artisign no longer fetches
-  URLs. Pass the HTML as `{kind: "html"}` instead.
+- `import_html` and `init_project` no longer accept source kind `stitch_export` and no longer fetch a URL. If you
+  imported a Stitch export by URL, download its HTML and pass it as `{kind: "html"}`.
 
 ## [2.2.0] - 2026-10-26
 

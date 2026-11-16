@@ -6,7 +6,7 @@
 /** Spec maturity only (ADR-010): there is no priority and no "implemented". */
 export const STATUSES = ["draft", "ready"];
 export const STATUS_LABELS = { draft: "Draft", ready: "Ready" };
-/** What get_use_cases can sort by (no "recently changed": the case files carry no timestamp the tool reports). */
+/** What list_use_cases can sort by (no "recently changed": the case files carry no timestamp the tool reports). */
 export const SORTS = [
   { id: "group", label: "Group A–Z" },
   { id: "title", label: "Title" },
@@ -94,7 +94,7 @@ export function indexById(list) {
 
 export const EMPTY_FILTERS = Object.freeze({ query: "", persona: "", status: "", tag: "", screen: "", hasVariants: false });
 
-/** The get_use_cases input for a filter state: only what is set, so an untouched list sends nothing but paging. */
+/** The list_use_cases input for a filter state: only what is set, so an untouched list sends nothing but paging. */
 export function buildQuery(filters, extra = {}) {
   const input = {};
   if (filters.query?.trim()) input.query = filters.query.trim();
@@ -161,7 +161,7 @@ export const ROW_HEIGHT = { group: 28, ungrouped: 28, case: 46, more: 26, loadin
 export const GROUP_FIRST_PAGE = 4;
 export const GROUP_PAGE = 25;
 export const FLAT_PAGE = 100;
-/** Largest single request the list makes (the most get_use_cases returns). */
+/** Largest single request the list makes (the most list_use_cases returns). */
 export const PAGE_MAX = 100;
 
 /**

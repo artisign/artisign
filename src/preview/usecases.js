@@ -171,7 +171,7 @@ export function createUseCasesView(options) {
 
   async function loadPool() {
     const forProject = project;
-    const res = await api.getUseCases(forProject, { limit: 1, include: ["personas", "dimensions", "data_objects"] });
+    const res = await api.listUseCases(forProject, { limit: 1, include: ["personas", "dimensions", "data_objects"] });
     if (forProject !== project) return;
     if (!res.ok) {
       showToast(errorMessage(res), []);
@@ -214,7 +214,7 @@ export function createUseCasesView(options) {
     list.loading = true;
     list.error = "";
     const stale = () => req !== list.req || forProject !== project;
-    const first = await api.getUseCases(forProject, { ...query, sort, limit: sort === "group" ? 1 : FLAT_PAGE });
+    const first = await api.listUseCases(forProject, { ...query, sort, limit: sort === "group" ? 1 : FLAT_PAGE });
     if (stale()) return;
     list.loading = false;
     if (!first.ok) {
@@ -253,7 +253,7 @@ export function createUseCasesView(options) {
       list.tree = null;
       list.flat = { items: [], cursor: null, loading: false, error: "" };
       if (sort === "group") {
-        const page = await api.getUseCases(forProject, { ...query, sort, limit: FLAT_PAGE });
+        const page = await api.listUseCases(forProject, { ...query, sort, limit: FLAT_PAGE });
         if (stale()) return;
         if (page.ok) {
           list.flat.items = page.data.use_cases ?? [];
@@ -274,7 +274,7 @@ export function createUseCasesView(options) {
     const rows = [];
     let cursor = startCursor;
     while (rows.length < want) {
-      const res = await api.getUseCases(project, { ...query, limit: Math.min(PAGE_MAX, want - rows.length), ...(cursor !== undefined ? { cursor } : {}) });
+      const res = await api.listUseCases(project, { ...query, limit: Math.min(PAGE_MAX, want - rows.length), ...(cursor !== undefined ? { cursor } : {}) });
       if (!res.ok) return { ok: false, rows, cursor };
       rows.push(...(res.data.use_cases ?? []).filter(keep));
       cursor = res.data.next_cursor;
@@ -328,7 +328,7 @@ export function createUseCasesView(options) {
       list.flat.loading = true;
       list.flat.error = "";
       renderList();
-      const res = await api.getUseCases(project, { ...buildQuery(filters), sort, limit: FLAT_PAGE, cursor: list.flat.cursor });
+      const res = await api.listUseCases(project, { ...buildQuery(filters), sort, limit: FLAT_PAGE, cursor: list.flat.cursor });
       if (req !== list.req) return;
       list.flat.loading = false;
       if (res.ok) {
@@ -429,7 +429,7 @@ export function createUseCasesView(options) {
     // Counts inside the current filters, except this one: with it applied the facet would show only the picked value.
     let facets = list.facets ?? {};
     if (filters[kind]) {
-      const res = await api.getUseCases(project, { ...buildQuery({ ...filters, [kind]: "" }), limit: 1 });
+      const res = await api.listUseCases(project, { ...buildQuery({ ...filters, [kind]: "" }), limit: 1 });
       if (res.ok) facets = res.data.facets ?? facets;
     }
     const counts = facets[kind] ?? {};
@@ -857,7 +857,7 @@ export function createUseCasesView(options) {
     async forScreen(screen) {
       const forProject = options.getProject();
       if (!forProject) return { total: 0, items: [] };
-      const res = await api.getUseCases(forProject, { screen, limit: 5, sort: "title" });
+      const res = await api.listUseCases(forProject, { screen, limit: 5, sort: "title" });
       return res.ok ? { total: res.data.total ?? 0, items: res.data.use_cases ?? [] } : { total: 0, items: [] };
     },
     /** Reverse entry: the whole list filtered to a screen. */

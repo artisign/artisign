@@ -66,6 +66,7 @@ function parseIo(list, sideKey, label, errors) {
     .map((row, index) => {
       const parsed = parseOrKeep(row.example, row.orig);
       if (!parsed.ok) errors.push(`${label} ${index + 1}: ${parsed.error}`);
+      else if (Object.keys(parsed.value).length === 0) errors.push(`${label} ${index + 1}: the example needs at least one key.`);
       return { object: row.object, ...(row.side.trim() ? { [sideKey]: row.side.trim() } : {}), example: parsed.ok ? parsed.value : {} };
     });
 }
@@ -80,8 +81,8 @@ export function buildPayload({ id, draft, source }) {
   if (!isValidId(id)) errors.push("The id must be lowercase kebab-case (a-z, 0-9, -).");
   const inputs = parseIo(draft.inputs, "source", "Input", errors);
   const outputs = parseIo(draft.outputs, "target", "Output", errors);
-  if (!inputs.some((i) => Object.keys(i.example).length > 0)) errors.push("Add at least one input with an example.");
-  if (!outputs.some((o) => Object.keys(o.example).length > 0)) errors.push("Add at least one output with an example.");
+  if (inputs.length === 0) errors.push("Add at least one input with an example.");
+  if (outputs.length === 0) errors.push("Add at least one output with an example.");
 
   // Generated ids must not collide with ANY id the case already has: every step, every variant, and the steps variants add.
   const variantStepIds = draft.variants.flatMap((variant) => {

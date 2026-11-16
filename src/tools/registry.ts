@@ -19,7 +19,7 @@ import { setMeta } from "./meta.js";
 import { getGuide } from "./guide.js";
 import { writeMockup, getMockup, promoteMockup } from "./mockups.js";
 import { setBoardState } from "./board-state.js";
-import { getUseCases, getUseCase, setUseCases, generatePersonas, suggestVariants } from "./usecases.js";
+import { listUseCases, getUseCase, setUseCases, generatePersonas, suggestVariants } from "./usecases.js";
 import { SORT_KEYS, USE_CASE_STATUSES } from "../usecases/index.js";
 
 // Repeated on every node-ref input; INSTRUCTIONS (NODE REFS) has the full rule, but some clients drop instructions.
@@ -175,8 +175,8 @@ export const TOOLS: ToolDefinition[] = [
   ),
 
   tool(
-    "get_use_cases",
-    "Use cases, filtered, sorted and paged (group is a path prefix, query is text). Returns summaries, total and, on the first page, facet counts; include adds the pools. Empty without a usecases/ folder.",
+    "list_use_cases",
+    "Use cases, filtered, sorted, paged (group is a path prefix, query is text). Returns summaries, total and, on the first page, facet counts; include adds the pools. Empty without a usecases/ folder.",
     {
       group: z.string().optional(),
       persona: z.string().optional(),
@@ -188,10 +188,10 @@ export const TOOLS: ToolDefinition[] = [
       has_variants: z.boolean().optional(),
       sort: z.enum(SORT_KEYS).optional(),
       cursor: z.string().optional(),
-      limit: z.number().int().positive().max(500).optional(),
+      limit: z.number().int().positive().max(100).optional(),
       include: z.array(z.enum(["personas", "dimensions", "data_objects"])).optional(),
     },
-    (store, input) => getUseCases(store, input as never),
+    (store, input) => listUseCases(store, input as never),
   ),
   tool(
     "get_use_case",

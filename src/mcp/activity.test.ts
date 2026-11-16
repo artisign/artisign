@@ -18,7 +18,7 @@ describe("deriveActivityEvent", () => {
   });
 
   it("classifies the use-case reads, a dry-run generate_personas as read, and the use-case writes as write, all without a target", () => {
-    for (const tool of ["get_use_cases", "get_use_case", "suggest_use_case_variants"]) {
+    for (const tool of ["list_use_cases", "get_use_case", "suggest_use_case_variants"]) {
       expect(deriveActivityEvent(tool, { id: "x" }, true, {})).toMatchObject({ kind: "read", target: null, nodes: [] });
     }
     expect(deriveActivityEvent("generate_personas", { dry_run: true }, true, {}).kind).toBe("read");

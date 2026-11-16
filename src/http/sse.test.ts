@@ -193,8 +193,8 @@ describe("GET /events (SSE)", () => {
       title: "Assign",
       status: "draft",
       personas: [],
-      inputs: [{ object: "loan", example: {} }],
-      outputs: [{ object: "loan", example: {} }],
+      inputs: [{ object: "loan", example: { id: 1 } }],
+      outputs: [{ object: "loan", example: { id: 1 } }],
       steps: [],
     });
     // The folders are created live too, so directory events (named "usecases"/"cases") may come first.
@@ -208,7 +208,7 @@ describe("GET /events (SSE)", () => {
     const store = new FsStore(dir);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    await store.writeUseCase({ id: "personas", title: "P", status: "draft", personas: [], inputs: [{ object: "o", example: {} }], outputs: [{ object: "o", example: {} }], steps: [] });
+    await store.writeUseCase({ id: "personas", title: "P", status: "draft", personas: [], inputs: [{ object: "o", example: { id: 1 } }], outputs: [{ object: "o", example: { id: 1 } }], steps: [] });
     expect(await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "cases/personas", 4000)).toEqual({ type: "change", kind: "usecases", name: "cases/personas" });
   });
 

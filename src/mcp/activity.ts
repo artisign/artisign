@@ -45,7 +45,7 @@ const READ_TOOLS = new Set([
   "get_mockup",
   "get_screenshot",
   "inspect_node",
-  "get_use_cases",
+  "list_use_cases",
   "get_use_case",
   "suggest_use_case_variants",
 ]);

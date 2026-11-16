@@ -461,4 +461,19 @@ describe("review fixes", () => {
     expect(removeStepTarget(source, "missing", "v")).toEqual({ changed: false });
     expect(removeStepTarget({ steps: [{ id: "n", actor: "x", action: "N" }] }, "n", null)).toEqual({ changed: false });
   });
+
+  it("removeStepTarget edits the op that produces the effective step: an append followed by a replace of the same step changes the replace", () => {
+    const step = (action, screen) => ({ id: "t", actor: "x", action, target: { screen } });
+    const source = {
+      steps: [],
+      variants: [{ id: "v", title: "V", when: {}, steps: [{ op: "append", step: step("first", "s1") }, { op: "replace", step_id: "t", step: step("second", "s2") }] }],
+    };
+    const result = removeStepTarget(source, "t", "v");
+    expect(result).toMatchObject({ changed: true, where: "variant" });
+    expect(result.patch.variants[0].steps[0].step.target).toEqual({ screen: "s1" });
+    expect(result.patch.variants[0].steps[1].step.target).toBeUndefined();
+    // the effective step has no target: nothing to change, and the earlier op is not touched
+    const bare = { ...source, variants: [{ ...source.variants[0], steps: [source.variants[0].steps[0], { op: "replace", step_id: "t", step: { id: "t", actor: "x", action: "second" } }] }] };
+    expect(removeStepTarget(bare, "t", "v")).toEqual({ changed: false });
+  });
 });

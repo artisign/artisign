@@ -89,8 +89,8 @@ export function overlapPercent(member) {
 export function modeToggleStates({ view, showMockup, comparing }) {
   const unavailable = "Not available while comparing variants";
   return {
-    flow: { disabled: showMockup, title: comparing ? "Leaves Compare and follows flows in Single" : "" },
-    comment: { disabled: view === "board" || showMockup || comparing, title: comparing ? unavailable : "" },
-    inspect: { disabled: view === "board" || showMockup || comparing, title: comparing ? unavailable : null },
+    flow: { disabled: showMockup || view === "usecases", title: comparing ? "Leaves Compare and follows flows in Single" : "" },
+    comment: { disabled: view === "board" || view === "usecases" || showMockup || comparing, title: comparing ? unavailable : "" },
+    inspect: { disabled: view === "board" || view === "usecases" || showMockup || comparing, title: comparing ? unavailable : null },
   };
 }

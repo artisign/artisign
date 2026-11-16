@@ -64,6 +64,8 @@ import { connectEvents } from "./sse.js";
 import { applyCanvas } from "./canvas.js";
 import { updateWarningBadge } from "./warnings.js";
 import { createBoardView } from "./board-view.js";
+import { createUseCasesView } from "./usecases.js";
+import { renderScreenUseCases } from "./usecases-screen-link.js";
 import {
   MIN_BOARD_ZOOM,
   MAX_BOARD_ZOOM,
@@ -170,6 +172,8 @@ const emptyGuideCopyBtn = document.getElementById("empty-guide-copy");
 const screensViewEl = document.getElementById("screens-view");
 const designSystemViewEl = document.getElementById("design-system-view");
 const boardViewEl = document.getElementById("board-view");
+const usecasesViewEl = document.getElementById("usecases-view");
+const screenUseCasesEl = document.getElementById("screen-usecases");
 const boardSurfaceEl = document.getElementById("board-surface");
 const boardCanvasEl = document.getElementById("board-canvas");
 const boardCanvasInnerEl = document.getElementById("board-canvas-inner");
@@ -456,6 +460,22 @@ const board = createBoardView({
   onTogglePin: (screen) => toggleScreenPin(screen),
 });
 board.mount();
+
+// Use Cases tab (experiment): nothing is fetched until the tab is first shown. Opening a mapped screen leaves the tab for Screens.
+const useCases = createUseCasesView({
+  rootEl: usecasesViewEl,
+  getProject: () => activeProjectRoot,
+  getProjectName: () => projectPickerName.textContent ?? "",
+  getScreens: () => screens,
+  onDataChanged: () => updateScreenUseCases(), // the reverse entry follows `usecases` events
+  fetchRender,
+  fetchScreenNodes,
+  openScreen: async (screen) => {
+    pauseFollow();
+    setView("screens");
+    if (screen !== currentScreen || currentMockup !== null) await selectScreen(screen);
+  },
+});
 
 /**
  * Pin/unpin one screen (CHR-624) — shared by the sidebar's pin button and
@@ -777,6 +797,9 @@ function resetProjectState() {
   inspectModeToggle.setAttribute("aria-pressed", "false");
   screenFrame.srcdoc = "";
   board.setScreens([], [], activeProjectRoot);
+  useCases.reset();
+  screenUseCasesRequest++; // an answer still on its way belongs to the project we just left
+  screenUseCasesEl.hidden = true;
   iframeRenderedScreen = null;
   pendingRenderScreen = null;
   inspectorRequestId++; // discards any in-flight fetch from the project we just left — see loadInspectorEntries
@@ -957,6 +980,7 @@ async function resyncCurrentProject() {
   }
   if (currentView === "design-system") loadDesignSystem();
   if (boardBuilt) loadBoard();
+  useCases.resync();
 }
 
 /** Falls back from a currentMockup selection that no longer exists (deleted on disk) to the first available screen — same as boot's "nothing persisted" path — or, if the project has no screens either, just refreshes the sidebar/main state around the now-empty selection. Shared by the SSE mockup handler and resyncCurrentProject. */
@@ -1034,6 +1058,8 @@ async function handleChangeEvent(event) {
       await loadInspectorEntries();
     }
     if (currentView === "design-system") await loadDesignSystem();
+  } else if (event.kind === "usecases") {
+    useCases.onChange(event); // personas, data-objects, cases/<id>: the tab reloads what it shows (nothing happens while it is closed)
   } else if (event.kind === "design_system_meta") {
     if (currentView === "design-system") await loadDesignSystem();
   } else if (event.kind === "mockup") {
@@ -1710,6 +1736,34 @@ async function selectScreen(screen) {
   refreshSidebar();
   applyMainVisibility();
   await Promise.all([loadCurrentScreen(), loadComments(), loadInspectorEntries()]);
+  updateScreenUseCases();
+}
+
+let screenUseCasesRequest = 0;
+
+/** Reverse entry (Use Cases experiment): the use cases whose steps map to the screen shown. Does nothing — and asks nothing — until the Use Cases tab has loaded some. */
+async function updateScreenUseCases() {
+  const request = ++screenUseCasesRequest;
+  screenUseCasesEl.hidden = true;
+  if (!currentScreen || currentMockup !== null || !useCases.hasUseCases()) return; // no screen shown (a mockup, another project): nothing to list
+  const screen = currentScreen;
+  const { total, items } = await useCases.forScreen(screen);
+  if (request !== screenUseCasesRequest || screen !== currentScreen) return;
+  renderScreenUseCases(screenUseCasesEl, {
+    total,
+    items,
+    screen,
+    onOpen: (id) => {
+      pauseFollow();
+      setView("usecases");
+      useCases.showCase(id);
+    },
+    onShowAll: () => {
+      pauseFollow();
+      setView("usecases");
+      useCases.showScreen(screen);
+    },
+  });
 }
 
 /**
@@ -1740,6 +1794,7 @@ async function selectMockup(name) {
   inspectorRequestId++;
   refreshSidebar();
   applyMainVisibility();
+  updateScreenUseCases(); // a mockup has no use cases of its own: hides the reverse entry
   await Promise.all([loadCurrentMockup(), loadComments()]); // loadComments() clears the panel to the previous screen's threads otherwise
 }
 
@@ -2295,6 +2350,10 @@ function applyMainVisibility() {
   mockupViewEl.hidden = !showMockup;
   designSystemViewEl.hidden = currentView !== "design-system";
   boardViewEl.hidden = currentView !== "board";
+  usecasesViewEl.hidden = currentView !== "usecases";
+  // The Use Cases tab brings its own list panel: the Screens and Context sidebars make way for it.
+  sidebarScreensEl.hidden = currentView === "usecases";
+  sidebarContextEl.hidden = currentView === "usecases";
   // The zoom group stays visible over the mockup view too — it
   // scales the whole comparison row instead of the screen canvas. Only the
   // Status bar toggle, which has no mockup-view counterpart, hides with it.
@@ -2350,7 +2409,12 @@ function setView(view) {
   // clicking its own toggle.
   if (view === "board" && activeMode === "comment") setMode("comment");
   if (view === "board" && activeMode === "inspect") setMode("inspect");
+  // None of the three modes has a Use Cases counterpart either.
+  if (view === "usecases" && activeMode !== "none") setMode(activeMode);
   if (view === "design-system") loadDesignSystem();
+  if (view === "usecases") useCases.show();
+  else useCases.hide();
+  if (view === "screens") updateScreenUseCases(); // the reverse entry may have use cases to show now
   if (view === "board" && !boardBuilt) loadBoard();
   // CHR-623 review finding 5: an already-built board was `hidden` (clientWidth
   // 0) while another tab showed, so any relayout that ran while hidden used
@@ -2534,6 +2598,7 @@ function runShortcut(id) {
       stepZoom(id === "zoom-in" ? 1 : -1);
       return true;
     case "filter":
+      if (currentView === "usecases") return useCases.focusSearch(); // the same key searches the use cases
       if (sidebarScreensEl.dataset.collapsed === "true") pressControl(sidebarScreensCollapseBtn);
       screenFilterInput.focus();
       screenFilterInput.select();

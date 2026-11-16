@@ -900,6 +900,42 @@
     "to_kind": "screen"
   },
   {
+    "from": "usecases-edit-dialog.dlg-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.dlg-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.dlg-save",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-persona.pd-close",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-persona.pd-cancel",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-persona.pd-save",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
     "from": "usecases-list-sort-menu.sub-personas",
     "event": "tap",
     "to": "usecases-personas",
@@ -993,42 +1029,6 @@
     "from": "usecases-list-sort-menu.so-status",
     "event": "tap",
     "to": "usecases-list",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.dlg-close",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.dlg-cancel",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.dlg-save",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-persona.pd-close",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-persona.pd-cancel",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-persona.pd-save",
-    "event": "tap",
-    "to": "usecases-personas",
     "to_kind": "screen"
   }
 ]

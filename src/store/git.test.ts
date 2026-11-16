@@ -313,6 +313,26 @@ describe("unfinished git operations", () => {
     expect(await snapshot(dir)).toEqual(before);
   });
 
+  it("a multi-commit cherry-pick keeps skipping after a resolved step was committed (sequencer)", async () => {
+    await run(dir, "checkout", "-q", "side");
+    await writeFile(join(dir, "s2.txt"), "s2\n");
+    await run(dir, "add", "s2.txt");
+    await run(dir, "commit", "-q", "-m", "side two");
+    await run(dir, "checkout", "-q", "main");
+    expect(await fails(dir, "cherry-pick", "main..side")).toBe(true);
+    await writeFile(join(dir, "a.txt"), "resolved\n");
+    await run(dir, "add", "a.txt");
+    await run(dir, "commit", "-q", "-m", "resolved step");
+    expect(await fails(dir, "rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD")).toBe(true);
+    const before = await snapshot(dir);
+    await writeFile(join(dir, "screen.html"), "<div></div>");
+
+    const result = await autoCommit(dir, "write_html: screen");
+
+    expect(result).toEqual({ sha: null, skipped_reason: "operation_in_progress" });
+    expect(await snapshot(dir)).toEqual(before);
+  });
+
   it("a preview write during a cherry-pick returns operation_in_progress", async () => {
     expect(await fails(dir, "cherry-pick", "side")).toBe(true);
     const before = await snapshot(dir);

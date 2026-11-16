@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { access, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import type { CommitResult, HeadCommitResult } from "./types.js";
+import type { CommitResult, CommitSkippedReason, HeadCommitResult } from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -182,33 +182,42 @@ async function isKnownToGit(projectDir: string, path: string): Promise<{ inHead:
   return { inHead, inIndex };
 }
 
+type OperationReason = Extract<CommitSkippedReason, "merge_in_progress" | "operation_in_progress">;
+
+// Merge keeps its own reason and cherry-pick, revert, rebase, am share another.
+// Collapsing them into one value is a two-line change: point MERGE_REASON at
+// "operation_in_progress" and drop `merge_in_progress` from `CommitSkippedReason`.
+const MERGE_REASON: OperationReason = "merge_in_progress";
+const OPERATION_REASON: OperationReason = "operation_in_progress";
+
 /**
  * The marker git leaves behind while a history-rewriting operation is
- * unfinished, and the reason it is reported under. Merge keeps its own,
- * already shipped `merge_in_progress`; cherry-pick, revert and rebase share
- * `operation_in_progress`.
+ * unfinished, and the reason it is reported under. `sequencer` outlives a
+ * resolved step of a multi-commit cherry-pick or revert; `rebase-apply` is
+ * also what `git am` uses.
  */
-const OPERATION_MARKERS: { marker: string; reason: "merge_in_progress" | "operation_in_progress" }[] = [
-  { marker: "MERGE_HEAD", reason: "merge_in_progress" },
-  { marker: "CHERRY_PICK_HEAD", reason: "operation_in_progress" },
-  { marker: "REVERT_HEAD", reason: "operation_in_progress" },
-  { marker: "rebase-merge", reason: "operation_in_progress" },
-  { marker: "rebase-apply", reason: "operation_in_progress" },
+const OPERATION_MARKERS: { marker: string; reason: OperationReason }[] = [
+  { marker: "MERGE_HEAD", reason: MERGE_REASON },
+  { marker: "CHERRY_PICK_HEAD", reason: OPERATION_REASON },
+  { marker: "REVERT_HEAD", reason: OPERATION_REASON },
+  { marker: "sequencer", reason: OPERATION_REASON },
+  { marker: "rebase-merge", reason: OPERATION_REASON },
+  { marker: "rebase-apply", reason: OPERATION_REASON },
 ];
 
 /**
  * The reason to skip the commit while the user has a merge, cherry-pick,
- * revert or rebase unfinished, else `undefined`. Committing then would finish
- * that operation under an Artisign message, or record conflict markers that
- * `git add` just marked as resolved. `--git-path` resolves each marker to the
- * real git dir, so a worktree or a repo whose `.git` is a file is covered.
+ * revert, rebase or `git am` unfinished, else `undefined`. Committing then
+ * would finish that operation under an Artisign message, or record conflict
+ * markers that `git add` just marked as resolved. `--git-path` resolves each
+ * marker to the real git dir, so a worktree or a repo whose `.git` is a file
+ * is covered; one call resolves all markers.
  */
-async function operationInProgress(
-  projectDir: string,
-): Promise<"merge_in_progress" | "operation_in_progress" | undefined> {
-  for (const { marker, reason } of OPERATION_MARKERS) {
-    const path = await git(projectDir, ["rev-parse", "--git-path", marker]);
-    if (await pathExists(resolve(projectDir, path))) return reason;
+async function operationInProgress(projectDir: string): Promise<OperationReason | undefined> {
+  const args = OPERATION_MARKERS.flatMap(({ marker }) => ["--git-path", marker]);
+  const paths = (await git(projectDir, ["rev-parse", ...args])).split("\n");
+  for (const [i, path] of paths.entries()) {
+    if (await pathExists(resolve(projectDir, path))) return OPERATION_MARKERS[i]!.reason;
   }
   return undefined;
 }

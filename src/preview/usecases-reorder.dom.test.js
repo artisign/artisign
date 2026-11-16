@@ -10,9 +10,6 @@ import { makePool, rawUseCase } from "./usecases.test-helper.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-const flush = async () => {
-  for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
-};
 const actions = () => $$(".uc-step-edit input[aria-label$='action']").map((i) => i.value);
 const key = (el, k) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
 const live = () => $(".uc-reorder-live").textContent;
@@ -146,7 +143,6 @@ describe("step reordering", () => {
     await open();
     const list = $(".uc-steps-edit");
     const rows = () => $$(".uc-step-edit");
-    const mid = [40, 140, 240];
     rows().forEach((row, i) => {
       Object.defineProperty(row, "offsetTop", { configurable: true, get: () => i * 100 });
       Object.defineProperty(row, "offsetHeight", { configurable: true, get: () => 80 });

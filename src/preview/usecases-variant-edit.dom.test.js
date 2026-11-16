@@ -479,6 +479,50 @@ describe("review fixes", () => {
     expect($(".uc-override-row[data-key='outputs'] .uc-override-cell > .chrome-btn", variantCard(0))).toBeNull();
   });
 
+  it("an unfinished swap row blocks Save with a hint on the row; finishing it clears the error", async () => {
+    await open();
+    const card = variantCard(1);
+    addSwap(card);
+    const [from, to] = $$(".uc-swap-row select", card);
+    type(from, "dana");
+    expect(to.getAttribute("aria-invalid")).toBe("true");
+    expect(document.getElementById(to.getAttribute("aria-describedby")).textContent).toBe("Pick both actors.");
+    expect($(".uc-foot-msg").textContent).toBe('Variant "Large project", swap 1: pick both actors.');
+    expect(button("Save use case").disabled).toBe(true);
+    type(to, "dex");
+    expect(button("Save use case").disabled).toBe(false);
+  });
+
+  it("removing the last swap and the last change of a stored variant removes their keys", async () => {
+    const source = { ...rawUseCase, variants: [{ id: "v", title: "V", when: { size: ["large"] }, actors: { dana: "dex" }, steps: [{ op: "remove", step_id: "tap" }] }] };
+    const { opts, closed } = await open({ source });
+    $("button[aria-label='Remove actor swap 1 of variant 1']").click();
+    $("button[aria-label='Remove change 1 of variant 1']").click();
+    button("Save use case").click();
+    await closed;
+    const saved = opts.save.mock.calls[0][0].variants[0];
+    expect("actors" in saved).toBe(false);
+    expect("steps" in saved).toBe(false);
+  });
+
+  it("switching a prefilled Replace to Insert after / Append swaps the copied base id for a fresh one", async () => {
+    await open();
+    const card = variantCard(1);
+    addChange(card);
+    type(stepSel(card, 2, 1), "pick");
+    expect($("input[aria-label='Variant 2 change 1 step id']", card).value).toBe("pick");
+    type($("select[aria-label='Variant 2 change 1 operation']", card), "insert_after");
+    const id = $("input[aria-label='Variant 2 change 1 step id']", card);
+    expect(id.value).toBe("new-step");
+    expect(id.getAttribute("aria-invalid")).toBe("false");
+    expect(button("Save use case").disabled).toBe(false);
+    // an id the user edited is kept
+    type(id, "my-step");
+    type($("select[aria-label='Variant 2 change 1 operation']", card), "replace");
+    type($("select[aria-label='Variant 2 change 1 operation']", card), "append");
+    expect($("input[aria-label='Variant 2 change 1 step id']", card).value).toBe("my-step");
+  });
+
   it("the step list is not rebuilt when the select gets focus (an open native select must not change under the user)", async () => {
     await open();
     const select = stepSel(variantCard(0), 1, 1);

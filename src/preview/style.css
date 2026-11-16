@@ -7808,6 +7808,7 @@ button.uc-target:hover {
 
 .uc-foot-msg[data-tone="error"]:not(:empty)::before {
   content: "error";
+  content: "error" / "";
   font-family: "Material Symbols Rounded";
   font-size: var(--size-icon-sm);
   line-height: 1;
@@ -8220,6 +8221,7 @@ button.uc-target:hover {
 .uc-field-error::before,
 .uc-variants-edit .uc-field-warn::before {
   content: "error";
+  content: "error" / "";
   font-family: "Material Symbols Rounded";
   font-size: var(--size-icon-xs);
   line-height: 1;
@@ -8227,6 +8229,7 @@ button.uc-target:hover {
 
 .uc-variants-edit .uc-field-warn::before {
   content: "warning";
+  content: "warning" / "";
 }
 
 .uc-variants-edit .uc-field-warn[hidden] {

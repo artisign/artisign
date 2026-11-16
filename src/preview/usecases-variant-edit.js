@@ -63,6 +63,7 @@ export function blankVariant() {
 export function variantDraft(variant) {
   const overrides = {};
   for (const [key] of TEXT_OVERRIDES) if (variant[key] !== undefined) overrides[key] = variant[key];
+  const origOverrides = { ...overrides };
   if (variant.personas !== undefined) overrides.personas = [...variant.personas];
   if (variant.inputs !== undefined) overrides.inputs = ioDraft(variant.inputs, "source");
   if (variant.outputs !== undefined) overrides.outputs = ioDraft(variant.outputs, "target");
@@ -73,10 +74,11 @@ export function variantDraft(variant) {
     description: variant.description ?? "",
     origDescription: variant.description ?? "",
     when: { ...variant.when },
-    // A stored empty `steps: []` stays (a file is saved exactly as it was when nothing changed).
-    hadSteps: variant.steps !== undefined,
-    hadActors: variant.actors !== undefined,
+    // A key stored empty (`steps: []`, `actors: {}`) stays empty while it is empty; one the user emptied is removed.
+    hadSteps: variant.steps !== undefined && variant.steps.length === 0,
+    hadActors: variant.actors !== undefined && Object.keys(variant.actors).length === 0,
     overrides,
+    origOverrides, // the stored override texts: an untouched one is written back as it is, an edited one is trimmed
     swaps: Object.entries(variant.actors ?? {}).map(([from, to]) => ({ from, to })),
     ops: (variant.steps ?? []).map((op) => ({ op: op.op, stepId: op.step_id ?? "", step: op.step ? stepDraft(op.step) : null })),
   };
@@ -203,7 +205,7 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
   // A stored value is written back exactly as it is (no trimming); an override that is empty is an error, not a silent removal.
   for (const [key, label] of TEXT_OVERRIDES) {
     if (overrides[key] === undefined) continue;
-    out[key] = overrides[key];
+    out[key] = written(overrides[key], variant.origOverrides?.[key]);
     if (overrides[key].trim() === "") {
       errors.push(`Variant "${name}": the ${label.toLowerCase()} override is empty.`);
       fieldErrors.push({ path: `variant.${index}.override.${key}`, message: `The ${label.toLowerCase()} override is empty. Enter text or use the base.` });
@@ -214,7 +216,10 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
   // A stored empty `actors: {}` stays, like `steps: []`.
   if (Object.keys(actors).length > 0 || variant.hadActors) out.actors = actors;
   variant.swaps.forEach((swap, j) => {
-    if (swap.from !== "" && swap.from === swap.to) {
+    if (swap.from === "" || swap.to === "") {
+      errors.push(`Variant "${name}", swap ${j + 1}: pick both actors.`);
+      fieldErrors.push({ path: `variant.${index}.swap.${j}`, message: "Pick both actors." });
+    } else if (swap.from === swap.to) {
       errors.push(`Variant "${name}", swap ${j + 1}: pick two different actors.`);
       fieldErrors.push({ path: `variant.${index}.swap.${j}`, message: "Pick two different actors." });
     }
@@ -656,7 +661,7 @@ export function createVariantEditor(env) {
     /** The flow entry a replace starts from: its whole step, carrying the actor the swaps give it. */
     const prefill = (op, i) => {
       const entry = flowBefore(baseSteps(), variant, i).find((e) => e.id === op.stepId);
-      return entry ? { ...cloneStep(entry.step), actor: entry.actor } : null;
+      return entry ? { ...cloneStep(entry.step), actor: entry.actor, prefilledId: entry.id } : null;
     };
     function pickStep(op, i, value) {
       op.stepId = value;
@@ -669,7 +674,14 @@ export function createVariantEditor(env) {
       op.op = value;
       if (value === "replace") {
         if (!op.step || isUntouched(op.step)) op.step = op.stepId !== "" ? prefill(op, i) : null;
-      } else if ((value === "insert_after" || value === "append") && !op.step) op.step = newBody(i);
+      } else if (value === "insert_after" || value === "append") {
+        if (!op.step) op.step = newBody(i);
+        else if (op.step.prefilledId !== undefined && op.step.id === op.step.prefilledId) {
+          // The id is still the one the Replace copied from the base: an added step with it would duplicate that step.
+          op.step.id = freshId(i);
+          delete op.step.prefilledId;
+        }
+      }
       markDirty();
       drawOps({ index: i });
     }

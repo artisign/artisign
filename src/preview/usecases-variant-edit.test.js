@@ -34,14 +34,14 @@ describe("variant draft <-> payload", () => {
     expect(JSON.stringify(out)).not.toContain("null");
   });
 
-  it("an override is sent exactly as typed (a stored value is never normalised), examples are parsed", () => {
+  it("an override is trimmed when the user wrote it and left exactly as stored when untouched; examples are parsed", () => {
     const draft = blankVariant();
     Object.assign(draft, { title: "Quick", when: { size: ["small"] } });
     draft.overrides.trigger = "  The user is in a hurry ";
     draft.overrides.inputs = [{ object: "mapping", side: "list", example: "status: draft" }];
     const { out, errors } = build(draft);
     expect(errors).toEqual([]);
-    expect(out).toMatchObject({ trigger: "  The user is in a hurry ", inputs: [{ object: "mapping", source: "list", example: { status: "draft" } }] });
+    expect(out).toMatchObject({ trigger: "The user is in a hurry", inputs: [{ object: "mapping", source: "list", example: { status: "draft" } }] });
   });
 
   it("an overridden inputs or outputs list follows the base rules: at least one row, each with an example", () => {
@@ -87,6 +87,40 @@ describe("variant draft <-> payload", () => {
     draft.overrides.outputs[0].side = " in ";
     const out = build(draft).out;
     expect([out.title, out.description, out.steps[0].step.action, out.outputs[0].target]).toEqual(["New title", "e", "Does more", "in"]);
+  });
+
+  it("an edited text override is trimmed, an untouched stored one is not", () => {
+    const stored = { id: "v", title: "V", when: { size: ["small"] }, trigger: " keep me ", goal: " edit me " };
+    const draft = variantDraft(stored);
+    draft.overrides.goal = "  edited  ";
+    expect(build(draft).out).toMatchObject({ trigger: " keep me ", goal: "edited" });
+  });
+
+  it("an incomplete swap row (one actor, or none) blocks Save with a field error instead of being dropped", () => {
+    const draft = variantDraft({ id: "v", title: "V", when: { size: ["small"] }, actors: { dana: "dex" } });
+    draft.swaps.push({ from: "system", to: "" }, { from: "", to: "" });
+    const built = build(draft);
+    expect(built.errors).toEqual(['Variant "V", swap 2: pick both actors.', 'Variant "V", swap 3: pick both actors.']);
+    expect(built.fieldErrors.map((e) => e.path)).toEqual(["variant.0.swap.1", "variant.0.swap.2"]);
+  });
+
+  it("a key the user emptied is removed; a key stored empty stays while it is empty", () => {
+    const stored = { id: "v", title: "V", when: { size: ["small"] }, actors: { dana: "dex" }, steps: [{ op: "remove", step_id: "tap" }] };
+    const emptied = variantDraft(stored);
+    emptied.swaps = [];
+    emptied.ops = [];
+    const out = build(emptied).out;
+    expect("actors" in out).toBe(false);
+    expect("steps" in out).toBe(false);
+    const keptEmpty = build(variantDraft({ ...stored, actors: {}, steps: [] })).out;
+    expect(keptEmpty).toMatchObject({ actors: {}, steps: [] });
+  });
+
+  it("the icon of a hint and of the footer message is decoration: the style sheet gives its content an empty alternative text", async () => {
+    const { readFileSync } = await import("node:fs");
+    const css = readFileSync(new URL("./style.css", import.meta.url), "utf8");
+    for (const icon of ["error", "warning"]) expect(css).toContain(`content: "${icon}" / "";`);
+    expect(css.match(/content: "error" \/ "";/g)).toHaveLength(2); // field error + footer error
   });
 
   it("an empty text override blocks Save with a field error; use base is the way out", () => {

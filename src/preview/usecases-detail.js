@@ -54,7 +54,8 @@ export function renderDetail(root, ctx) {
   main.append(header(ctx, useCase));
   main.append(variantBar(ctx, variants, source, matrix));
   if (variantInfo) main.append(variantPanel(ctx, variantInfo, sourceVariant));
-  main.append(people(ctx, useCase));
+  const peopleRow = people(ctx, useCase);
+  if (peopleRow) main.append(peopleRow); // Node.append(null) would add the text "null"
   // The matrix is a full-width section of the detail column (not a narrow side panel): twelve columns need the room.
   if (showCoverage) main.append(coveragePanel(ctx, matrix));
   main.append(story(useCase, baseCase, sourceVariant));

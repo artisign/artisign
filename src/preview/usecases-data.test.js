@@ -209,6 +209,19 @@ describe("tree keyboard", () => {
     expect(treeKeyNav(rows, "c:x", "ArrowLeft").activeKey).toBe("g:a/b");
   });
 
+  it("Left from a case under \"No group\" moves to the No group row, not to an unrelated root group", () => {
+    const withUngrouped = [
+      { kind: "group", key: "g:a", path: "a", depth: 0, open: true },
+      { kind: "case", key: "c:y", u: { id: "y" }, depth: 1 },
+      { kind: "ungrouped", key: "g:", path: "", name: "No group", depth: 0, open: true },
+      { kind: "case", key: "c:z", u: { id: "z" }, depth: 1 },
+      { kind: "more", key: "m:", path: "", depth: 1 },
+    ];
+    expect(treeKeyNav(withUngrouped, "c:z", "ArrowLeft").activeKey).toBe("g:");
+    expect(treeKeyNav(withUngrouped, "m:", "ArrowLeft").activeKey).toBe("g:");
+    expect(treeKeyNav(withUngrouped, "c:y", "ArrowLeft").activeKey).toBe("g:a");
+  });
+
   it("Enter opens a case, toggles a group, loads more", () => {
     expect(treeKeyNav(rows, "c:x", "Enter").action).toEqual({ type: "open", id: "x" });
     expect(treeKeyNav(rows, "g:a/b", "Enter").action).toEqual({ type: "toggle", path: "a/b" });

@@ -260,7 +260,8 @@ export function treeKeyNav(rows, activeKey, key) {
   if (key === "ArrowRight" && isGroup) return current.open ? to(index + 1) : { activeKey: current.key, action: { type: "toggle", path: current.path } };
   if (key === "ArrowLeft") {
     if (isGroup && current.open) return { activeKey: current.key, action: { type: "toggle", path: current.path } };
-    for (let i = index - 1; i >= 0; i--) if (rows[i].kind === "group" && rows[i].depth < current.depth) return to(i);
+    // The parent is the nearest row above that is a group or the "No group" row and sits one level up.
+    for (let i = index - 1; i >= 0; i--) if ((rows[i].kind === "group" || rows[i].kind === "ungrouped") && rows[i].depth < current.depth) return to(i);
     return { activeKey: current.key, action: null };
   }
   if (key === "Enter" || key === " ") {

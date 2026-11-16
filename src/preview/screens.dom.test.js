@@ -107,10 +107,10 @@ describe("renderScreenList — variant tree", () => {
     ...(variant_of ? { variant_of, variant_kind } : {}),
   });
   const tree = [
-    v("family", undefined, undefined, ["a", "b", "c", "d"]),
-    v("family-sheet", "family", "overlay"),
-    v("family-sheet-confirm", "family-sheet", "step"),
-    v("family-sheet-confirm-error", "family-sheet-confirm", "state"),
+    v("cart", undefined, undefined, ["a", "b", "c", "d"]),
+    v("cart-sheet", "cart", "overlay"),
+    v("cart-sheet-confirm", "cart-sheet", "step"),
+    v("cart-sheet-confirm-error", "cart-sheet-confirm", "state"),
     v("solo"),
   ];
   const render = (opts = {}, { active = null, filter = "" } = {}) => {
@@ -143,8 +143,8 @@ describe("renderScreenList — variant tree", () => {
 
   it("shows only roots collapsed, with the subtree count badge", () => {
     const listEl = render();
-    expect(rowNames(listEl)).toEqual(["family", "solo"]);
-    expect(listEl.querySelector('[data-screen="family"] .screen-item-total').textContent).toBe("3");
+    expect(rowNames(listEl)).toEqual(["cart", "solo"]);
+    expect(listEl.querySelector('[data-screen="cart"] .screen-item-total').textContent).toBe("3");
     expect(listEl.querySelector('[data-screen="solo"] .screen-item-toggle')).toBeNull();
   });
 
@@ -155,56 +155,56 @@ describe("renderScreenList — variant tree", () => {
     renderScreenList(listEl, tree, null, (n) => selected.push(n), "", {
       onToggleExpand: (n) => toggled.push(n),
     });
-    const toggle = listEl.querySelector('[data-screen="family"] .screen-item-toggle');
+    const toggle = listEl.querySelector('[data-screen="cart"] .screen-item-toggle');
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     toggle.click();
-    expect(toggled).toEqual(["family"]);
+    expect(toggled).toEqual(["cart"]);
     expect(selected).toEqual([]);
   });
 
   it("the disclosure toggle is a chevron icon that follows the expanded state", () => {
     const collapsed = render();
-    expect(collapsed.querySelector('[data-screen="family"] .screen-item-toggle .icon').textContent).toBe("chevron_right");
-    const open = render({ expanded: new Set(["family"]) });
-    expect(open.querySelector('[data-screen="family"] .screen-item-toggle .icon').textContent).toBe("expand_more");
+    expect(collapsed.querySelector('[data-screen="cart"] .screen-item-toggle .icon').textContent).toBe("chevron_right");
+    const open = render({ expanded: new Set(["cart"]) });
+    expect(open.querySelector('[data-screen="cart"] .screen-item-toggle .icon').textContent).toBe("expand_more");
   });
 
   it("nests expanded variants with depth, kind icons, suffix names and a hover title", () => {
     const listEl = render({
-      expanded: new Set(["family", "family-sheet", "family-sheet-confirm"]),
+      expanded: new Set(["cart", "cart-sheet", "cart-sheet-confirm"]),
     });
     expect(rowNames(listEl)).toEqual([
-      "family",
-      "family-sheet",
-      "family-sheet-confirm",
-      "family-sheet-confirm-error",
+      "cart",
+      "cart-sheet",
+      "cart-sheet-confirm",
+      "cart-sheet-confirm-error",
       "solo",
     ]);
     const row = (n) => listEl.querySelector(`[data-screen="${n}"]`);
-    expect(row("family-sheet").dataset.depth).toBe("1");
-    expect(row("family-sheet-confirm-error").dataset.depth).toBe("3");
-    expect(row("family-sheet").querySelector(".kind-icon").dataset.kind).toBe("overlay");
-    expect(row("family-sheet-confirm").querySelector(".kind-icon").textContent).toBe("subdirectory_arrow_right");
-    expect(row("family").querySelector(".kind-icon").dataset.kind).toBe("main");
-    expect(row("family-sheet-confirm").querySelector(".screen-item-text").textContent).toBe(
+    expect(row("cart-sheet").dataset.depth).toBe("1");
+    expect(row("cart-sheet-confirm-error").dataset.depth).toBe("3");
+    expect(row("cart-sheet").querySelector(".kind-icon").dataset.kind).toBe("overlay");
+    expect(row("cart-sheet-confirm").querySelector(".kind-icon").textContent).toBe("subdirectory_arrow_right");
+    expect(row("cart").querySelector(".kind-icon").dataset.kind).toBe("main");
+    expect(row("cart-sheet-confirm").querySelector(".screen-item-text").textContent).toBe(
       "…-confirm",
     );
-    expect(row("family-sheet-confirm").querySelector(".screen-item").title).toBe(
-      "family-sheet-confirm\nfamily › family-sheet › family-sheet-confirm",
+    expect(row("cart-sheet-confirm").querySelector(".screen-item").title).toBe(
+      "cart-sheet-confirm\ncart › cart-sheet › cart-sheet-confirm",
     );
-    expect(row("family").querySelector(".screen-item").title).toBe("");
+    expect(row("cart").querySelector(".screen-item").title).toBe("");
   });
 
   it("shows the first two tags plus a +N chip whose title lists every tag", () => {
     const listEl = render();
-    const chips = [...listEl.querySelectorAll('[data-screen="family"] .tag-chip')];
+    const chips = [...listEl.querySelectorAll('[data-screen="cart"] .tag-chip')];
     expect(chips.map((c) => c.textContent)).toEqual(["a", "b", "+2"]);
     expect(chips[2].title).toBe("a, b, c, d");
   });
 
   it("gives every tag chip its full name as title (a long tag is truncated by CSS)", () => {
     const listEl = render();
-    const chips = [...listEl.querySelectorAll('[data-screen="family"] .tag-chip:not(.tag-more)')];
+    const chips = [...listEl.querySelectorAll('[data-screen="cart"] .tag-chip:not(.tag-more)')];
     expect(chips.map((c) => c.title)).toEqual(["a", "b"]);
   });
 
@@ -215,14 +215,14 @@ describe("renderScreenList — variant tree", () => {
   it("while filtering: grey context rows, highlighted match, hidden line", () => {
     const listEl = render({}, { filter: "error" });
     expect(rowNames(listEl)).toEqual([
-      "family",
-      "family-sheet",
-      "family-sheet-confirm",
-      "family-sheet-confirm-error",
+      "cart",
+      "cart-sheet",
+      "cart-sheet-confirm",
+      "cart-sheet-confirm-error",
     ]);
-    expect(listEl.querySelector('[data-screen="family"]').classList.contains("context")).toBe(true);
+    expect(listEl.querySelector('[data-screen="cart"]').classList.contains("context")).toBe(true);
     expect(
-      listEl.querySelector('[data-screen="family-sheet-confirm-error"] mark').textContent,
+      listEl.querySelector('[data-screen="cart-sheet-confirm-error"] mark').textContent,
     ).toBe("error");
     const withSibling = render({}, { filter: "sheet-confirm-error" });
     expect(withSibling.querySelector(".screen-hidden-row")).toBeNull();
@@ -230,19 +230,19 @@ describe("renderScreenList — variant tree", () => {
 
   it("while filtering: the toggle of a row held open by a match below is disabled", () => {
     const listEl = render({}, { filter: "error" });
-    expect(listEl.querySelector('[data-screen="family"] .screen-item-toggle').disabled).toBe(true);
-    expect(render().querySelector('[data-screen="family"] .screen-item-toggle').disabled).toBe(false);
+    expect(listEl.querySelector('[data-screen="cart"] .screen-item-toggle').disabled).toBe(true);
+    expect(render().querySelector('[data-screen="cart"] .screen-item-toggle').disabled).toBe(false);
   });
 
   it("puts the disclosure toggle before the select button in DOM (tab) order", () => {
-    const li = render().querySelector('[data-screen="family"]');
+    const li = render().querySelector('[data-screen="cart"]');
     const controls = [...li.children].filter((el) => el.tagName === "BUTTON").map((el) => el.className.split(" ")[0]);
     expect(controls.indexOf("screen-item-toggle")).toBeLessThan(controls.indexOf("screen-item"));
   });
 
   it("while filtering: a matching tag chip is promoted and highlighted", () => {
     const listEl = render({}, { filter: "d" });
-    const chips = [...listEl.querySelectorAll('[data-screen="family"] .tag-chip')];
+    const chips = [...listEl.querySelectorAll('[data-screen="cart"] .tag-chip')];
     expect(chips[0].textContent).toBe("d");
     expect(chips[0].classList.contains("match")).toBe(true);
   });
@@ -250,28 +250,28 @@ describe("renderScreenList — variant tree", () => {
   it("pinning a nested leaf row pins only itself", () => {
     const onTogglePin = vi.fn();
     const listEl = render({
-      expanded: new Set(["family", "family-sheet", "family-sheet-confirm"]),
+      expanded: new Set(["cart", "cart-sheet", "cart-sheet-confirm"]),
       pinned: new Set(),
       onTogglePin,
     });
-    listEl.querySelector('[data-screen="family-sheet-confirm-error"] .screen-item-pin').click();
-    expect(onTogglePin).toHaveBeenCalledWith("family-sheet-confirm-error", [
-      "family-sheet-confirm-error",
+    listEl.querySelector('[data-screen="cart-sheet-confirm-error"] .screen-item-pin').click();
+    expect(onTogglePin).toHaveBeenCalledWith("cart-sheet-confirm-error", [
+      "cart-sheet-confirm-error",
     ]);
   });
 
   it("pinning a group row passes the screen and its whole subtree; pressed only when all are pinned", () => {
     const onTogglePin = vi.fn();
-    const all = ["family", "family-sheet", "family-sheet-confirm", "family-sheet-confirm-error"];
-    const partial = render({ pinned: new Set(["family"]), onTogglePin });
+    const all = ["cart", "cart-sheet", "cart-sheet-confirm", "cart-sheet-confirm-error"];
+    const partial = render({ pinned: new Set(["cart"]), onTogglePin });
     expect(
-      partial.querySelector('[data-screen="family"] .screen-item-pin').getAttribute("aria-pressed"),
+      partial.querySelector('[data-screen="cart"] .screen-item-pin').getAttribute("aria-pressed"),
     ).toBe("false");
-    partial.querySelector('[data-screen="family"] .screen-item-pin').click();
-    expect(onTogglePin).toHaveBeenCalledWith("family", all);
+    partial.querySelector('[data-screen="cart"] .screen-item-pin').click();
+    expect(onTogglePin).toHaveBeenCalledWith("cart", all);
     const full = render({ pinned: new Set(all), onTogglePin });
     expect(
-      full.querySelector('[data-screen="family"] .screen-item-pin').getAttribute("aria-pressed"),
+      full.querySelector('[data-screen="cart"] .screen-item-pin').getAttribute("aria-pressed"),
     ).toBe("true");
   });
 });
@@ -279,15 +279,15 @@ describe("renderScreenList — variant tree", () => {
 describe("renderScreenList compare checkboxes (CHR-738)", () => {
   const screens = [
     { name: "plain", tags: [] },
-    { name: "family", tags: [] },
-    { name: "a", tags: [], variant_of: "family", variant_kind: "state" },
+    { name: "cart", tags: [] },
+    { name: "a", tags: [], variant_of: "cart", variant_kind: "state" },
     { name: "a1", tags: [], variant_of: "a", variant_kind: "step" },
-    { name: "b", tags: [], variant_of: "family", variant_kind: "state" },
+    { name: "b", tags: [], variant_of: "cart", variant_kind: "state" },
   ];
   const render = (compare) => {
     const listEl = document.createElement("ul");
     document.body.replaceChildren(listEl); // jsdom fires a checkbox's change only while it is connected
-    renderScreenList(listEl, screens, "a", () => {}, "", { expanded: new Set(["family", "a"]), compare });
+    renderScreenList(listEl, screens, "a", () => {}, "", { expanded: new Set(["cart", "a"]), compare });
     return listEl;
   };
   const boxes = (listEl) => Object.fromEntries([...listEl.querySelectorAll("li")].map((li) => [li.dataset.screen, li.querySelector(".screen-item-compare")]));
@@ -297,9 +297,9 @@ describe("renderScreenList compare checkboxes (CHR-738)", () => {
   });
 
   it("puts one on each row of the family only: reference ticked and locked, members by selection", () => {
-    const found = boxes(render({ reference: "family", family: ["family", "a", "a1", "b"], selected: ["a1"], cap: 3, onToggle: () => {} }));
+    const found = boxes(render({ reference: "cart", family: ["cart", "a", "a1", "b"], selected: ["a1"], cap: 3, onToggle: () => {} }));
     expect(found.plain).toBeNull();
-    expect([found.family.checked, found.family.disabled]).toEqual([true, true]);
+    expect([found.cart.checked, found.cart.disabled]).toEqual([true, true]);
     expect([found.a.checked, found.a.disabled]).toEqual([false, false]);
     expect([found.a1.checked, found.a1.disabled]).toEqual([true, false]);
     expect([found.b.checked, found.b.disabled]).toEqual([false, false]);
@@ -307,13 +307,13 @@ describe("renderScreenList compare checkboxes (CHR-738)", () => {
 
   it("toggles through onToggle and disables the unticked boxes once the cap is reached", () => {
     const toggled = [];
-    const listEl = render({ reference: "family", family: ["family", "a", "a1", "b"], selected: ["a", "a1", "b"], cap: 3, onToggle: (n) => toggled.push(n) });
+    const listEl = render({ reference: "cart", family: ["cart", "a", "a1", "b"], selected: ["a", "a1", "b"], cap: 3, onToggle: (n) => toggled.push(n) });
     const found = boxes(listEl);
     expect([found.a.disabled, found.a1.disabled, found.b.disabled]).toEqual([false, false, false]);
     found.a1.click();
     expect(toggled).toEqual(["a1"]);
 
-    const full = boxes(render({ reference: "family", family: ["family", "a", "a1", "b"], selected: ["a"], cap: 1, onToggle: () => {} }));
+    const full = boxes(render({ reference: "cart", family: ["cart", "a", "a1", "b"], selected: ["a"], cap: 1, onToggle: () => {} }));
     expect([full.a.disabled, full.a1.disabled, full.b.disabled]).toEqual([false, true, true]);
   });
 });

@@ -282,7 +282,7 @@ describe("unfinished git operations", () => {
 
     const result = await autoCommit(dir, "write_html: screen");
 
-    expect(result).toEqual({ sha: null, skipped_reason: "merge_in_progress" });
+    expect(result).toEqual({ sha: null, skipped_reason: "operation_in_progress" });
     expect(await snapshot(dir)).toEqual(before);
     expect(await run(dir, "status", "--porcelain")).toContain("?? screen.html");
   });
@@ -293,7 +293,7 @@ describe("unfinished git operations", () => {
 
     const result = await autoCommit(dir, "write_html: screen");
 
-    expect(result.skipped_reason).toBe("merge_in_progress");
+    expect(result.skipped_reason).toBe("operation_in_progress");
     expect(await snapshot(dir)).toEqual(before);
     expect(await run(dir, "diff", "--name-only", "--diff-filter=U")).toBe("a.txt");
   });

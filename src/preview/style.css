@@ -8026,6 +8026,175 @@ button.uc-target:hover {
   gap: var(--space-md);
 }
 
+/* CHR-1109 — the structured variant editor: sections, override grid, actor swaps, step changes */
+.uc-var-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--chrome-border);
+}
+
+.uc-var-h {
+  margin: 0;
+  font-size: var(--ui-sm);
+  font-weight: 500;
+}
+
+.uc-var-empty {
+  margin: 0;
+}
+
+.uc-override-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.uc-override-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-md);
+}
+
+.uc-override-row > .uc-label {
+  padding-top: var(--space-md);
+}
+
+.uc-override-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.uc-override-cell > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.uc-override-cell > .chrome-btn {
+  flex: none;
+}
+
+.uc-inherited {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: var(--size-control);
+  min-width: 0;
+}
+
+.uc-inherited-from {
+  flex: none;
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-secondary);
+}
+
+.uc-inherited-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.uc-swaps-edit,
+.uc-ops-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.uc-swap-row {
+  display: grid;
+  grid-template-columns: minmax(0, 200px) auto minmax(0, 200px) auto;
+  justify-content: start;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.uc-swap-row .uc-field-warn {
+  grid-column: 1 / -1;
+}
+
+.uc-step-op {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--chrome-border);
+  border-left: 3px solid var(--chrome-warning);
+  background: var(--chrome-raised);
+}
+
+.uc-step-op[data-op="insert_after"],
+.uc-step-op[data-op="append"] {
+  border-left-color: var(--chrome-ok);
+}
+
+.uc-step-op[data-op="remove"] {
+  border-style: dashed;
+  border-color: var(--chrome-danger);
+  border-left-style: solid;
+}
+
+.uc-op-top {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.uc-op-after-last {
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.uc-op-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.uc-op-fields {
+  display: grid;
+  grid-template-columns: 130px 150px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.uc-op-removed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-tertiary);
+}
+
+.uc-op-struck {
+  text-decoration: line-through;
+}
+
+.uc-op-body .uc-target-edit,
+.uc-op-body .uc-step-data-edit {
+  padding-left: 0;
+}
+
+.uc-field-error {
+  margin: 0;
+  font-size: var(--ui-xs);
+  color: var(--chrome-error);
+}
+
+.uc-field-error[hidden] {
+  display: none;
+}
+
 .uc-when-edit {
   display: flex;
   flex-direction: column;

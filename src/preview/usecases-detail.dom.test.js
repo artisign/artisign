@@ -72,6 +72,14 @@ describe("base flow", () => {
     expect($$("tr.is-highlight td:first-child", cards[1]).map((c) => c.textContent)).toEqual(["status", "owner"]);
   });
 
+  it("a variant whose only difference is an actor swap shows its change on the chip (spec §4), not '0 changes'", () => {
+    const source = { ...rawUseCase, variants: [{ id: "swap", title: "Dex runs it", when: { actor: ["agent"] }, actors: { dana: "dex", nobody: "dex" } }] };
+    const bundle = { ...baseBundle, variants: [{ id: "swap", title: "Dex runs it", when: { actor: ["agent"] } }] };
+    render({ bundle, base: bundle, source });
+    // dana is the actor of two base steps and counts once; "nobody" is no base step's actor and changes nothing
+    expect($$(".uc-variant-chip").map((c) => c.textContent)).toEqual(["Base3 steps", "Dex runs it1 change", "addVariant"]);
+  });
+
   it("variant chips switch the variant; the add chip asks for a new one; the id chip copies", () => {
     const { handlers } = render();
     const chips = $$(".uc-variant-chip");

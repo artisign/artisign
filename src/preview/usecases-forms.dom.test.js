@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { draftFromSource, buildPayload, draftWarnings, openUseCaseDialog } from "./usecases-forms.js";
 import { buildPersonaPayload, buildDimensionPayload, buildObjectPayload, openPersonaDialog, openDimensionDialog, openObjectDialog, openGenerateDialog } from "./usecases-forms-pool.js";
+import { blankVariant } from "./usecases-variant-edit.js";
 import { makePool, rawUseCase } from "./usecases.test-helper.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -48,7 +49,7 @@ describe("draft and payload", () => {
     expect(Object.keys(made).sort()).toEqual(["id", "inputs", "outputs", "personas", "status", "steps", "title"]);
   });
 
-  it("the only hard requirements: a title, a valid id, an input and an output with examples, parseable examples, valid JSON", () => {
+  it("the only hard requirements: a title, a valid id, an input and an output with examples, parseable examples, a variant title and condition", () => {
     const empty = draftFromSource(null);
     expect(buildPayload({ id: "x", draft: empty, source: null }).errors).toEqual(["A title is required.", "Add at least one input with an example.", "Add at least one output with an example."]);
     const draft = draftFromSource(rawUseCase);
@@ -59,9 +60,6 @@ describe("draft and payload", () => {
     blank.inputs[0].example = "";
     blank.inputs[0].orig = undefined;
     expect(buildPayload({ id: "map-step", draft: blank, source: rawUseCase }).errors).toEqual(["Input 1: the example needs at least one key."]);
-    const jsonDraft = draftFromSource(rawUseCase);
-    jsonDraft.variants[0].rest = "{ nope";
-    expect(buildPayload({ id: "map-step", draft: jsonDraft, source: rawUseCase }).errors.join(" ")).toContain("not a JSON object");
     const noWhen = draftFromSource(rawUseCase);
     noWhen.variants[0].when = {};
     expect(buildPayload({ id: "map-step", draft: noWhen, source: rawUseCase }).errors.join(" ")).toContain("needs a condition");
@@ -116,7 +114,7 @@ describe("review fixes", () => {
     const source = { ...rawUseCase };
     const draft = draftFromSource(source);
     draft.steps.push({ id: "", actor: "dana", action: "Time", kind: "none", screen: "", node: "", data: [] }); // "time" is the id of a step a variant adds
-    draft.variants.push({ id: "", title: "Agent", when: { actor: ["human"] }, description: "", rest: "" }); // "agent" exists
+    draft.variants.push({ ...blankVariant(), title: "Agent", when: { actor: ["human"] } }); // "agent" exists
     const { payload } = buildPayload({ id: "map-step", draft, source });
     expect(payload.steps.at(-1).id).toBe("time-2");
     expect(payload.variants.at(-1).id).toBe("agent-2");
@@ -349,18 +347,19 @@ describe("use case dialog", () => {
 
   it("opens straight on a fresh variant when asked, and the persona picker adds and removes chips", async () => {
     const draft = draftFromSource(rawUseCase);
-    draft.variants.push({ id: "", title: "", description: "", when: {}, rest: "" });
+    draft.variants.push(blankVariant());
     openUseCaseDialog(options({ initialDraft: draft, focus: { variants: true } }));
     await flush();
     expect($$(".uc-variant-edit")).toHaveLength(3);
     expect(document.activeElement.getAttribute("aria-label")).toBe("Variant 3 title");
+    const baseChips = () => $$(".uc-person-chip").filter((chip) => !chip.closest(".uc-variant-edit"));
     $("button[aria-label='Remove Dana']").click();
-    expect($$(".uc-person-chip")).toHaveLength(0);
+    expect(baseChips()).toHaveLength(0);
     $(".uc-chip-row .uc-link-btn").click();
     const labels = $$(".uc-menu .uc-menu-item").map((i) => i.querySelector(".uc-menu-label").textContent);
     expect(labels).toContain("Dana");
     $$(".uc-menu .uc-menu-item")[labels.indexOf("Dana")].click();
-    expect($$(".uc-person-chip")).toHaveLength(1);
+    expect(baseChips()).toHaveLength(1);
   });
 });
 

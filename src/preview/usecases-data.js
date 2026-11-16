@@ -507,9 +507,14 @@ function stepWas(base, step) {
   return was;
 }
 
-/** Number of differences a variant carries, for the chip meta ("4 changes"): its step ops plus replaced inputs / outputs. */
-export function variantChangeCount(variant) {
-  return (variant?.steps?.length ?? 0) + (variant?.outputs ? 1 : 0) + (variant?.inputs ? 1 : 0);
+/**
+ * Number of differences a variant carries, for the chip meta ("4 changes"): its step ops, replaced inputs / outputs and each
+ * actor swap that changes at least one inherited base step (spec §4: an entry whose key equals its value, or whose key no base
+ * step has, changes nothing). `baseSteps` are the base case's steps; without them no swap can be counted.
+ */
+export function variantChangeCount(variant, baseSteps = []) {
+  const swaps = Object.entries(variant?.actors ?? {}).filter(([from, to]) => from !== to && baseSteps.some((step) => step.actor === from)).length;
+  return (variant?.steps?.length ?? 0) + (variant?.outputs ? 1 : 0) + (variant?.inputs ? 1 : 0) + swaps;
 }
 
 /** A `when` condition as readable entries: [{ dimension, label, values: [{ id, label }] }]. */

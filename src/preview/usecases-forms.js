@@ -282,7 +282,7 @@ export async function openUseCaseDialog(options) {
     const rows = [...draft.inputs.map((row, index) => ({ row, index, kind: "inputs" })), ...draft.outputs.map((row, index) => ({ row, index, kind: "outputs" }))];
     for (const { row, index, kind } of rows) {
       const sideLabel = kind === "inputs" ? "From" : "To";
-      const exampleInput = textInput({ value: row.example, mono: true, placeholder: "screen: usecases-detail, node: btn-mapping", ariaLabel: `${kind === "inputs" ? "Input" : "Output"} ${index + 1} example`, onInput: (value) => { row.example = value; markDirty(); } });
+      const exampleInput = textInput({ value: row.example, mono: true, placeholder: "status: ready", ariaLabel: `${kind === "inputs" ? "Input" : "Output"} ${index + 1} example`, onInput: (value) => { row.example = value; markDirty(); } });
       exampleInput.dataset.path = `${kind === "inputs" ? "input" : "output"}.${index}`;
       const warn = h("p", { class: "uc-field-warn", id: nextId("uc-warn"), hidden: true, dataset: { path: `${kind === "inputs" ? "input" : "output"}.${index}` } });
       exampleInput.setAttribute("aria-describedby", warn.id);
@@ -358,9 +358,9 @@ export async function openUseCaseDialog(options) {
               "div",
               { class: "uc-data-edit" },
               selectInput({ options: objectOptions(), value: d.object, ariaLabel: "Data object", onChange: (value) => { d.object = value; markDirty(); } }),
-              textInput({ value: d.before, mono: true, placeholder: "scope: screen", ariaLabel: `Step ${index + 1} data ${j + 1} before`, onInput: (value) => { d.before = value; markDirty(); } }),
+              textInput({ value: d.before, mono: true, placeholder: "status: draft", ariaLabel: `Step ${index + 1} data ${j + 1} before`, onInput: (value) => { d.before = value; markDirty(); } }),
               icon("arrow_forward", "uc-data-arrow"),
-              textInput({ value: d.after, mono: true, placeholder: "node: btn-mapping, scope: element", ariaLabel: `Step ${index + 1} data ${j + 1} after`, onInput: (value) => { d.after = value; markDirty(); } }),
+              textInput({ value: d.after, mono: true, placeholder: "status: ready", ariaLabel: `Step ${index + 1} data ${j + 1} after`, onInput: (value) => { d.after = value; markDirty(); } }),
               removeButton("Remove data change", () => { step.data.splice(j, 1); markDirty(); drawData(); }),
               beforeWarn,
               warn,

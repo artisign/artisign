@@ -164,6 +164,23 @@ describe("use case dialog", () => {
     };
   }
 
+  it("placeholders show the shape of a data value, never a step target", async () => {
+    openUseCaseDialog(options());
+    await flush();
+    const add = (label) => $$("dialog button").find((b) => b.textContent.includes(label));
+    add("Input").click();
+    add("Output").click();
+    add("Data change").click();
+    await flush();
+    const byLabel = (re) => $$("dialog input").filter((i) => re.test(i.getAttribute("aria-label") ?? ""));
+    const examples = byLabel(/^(Input|Output) \d+ example$/);
+    expect(examples.length).toBeGreaterThan(0);
+    for (const input of examples) expect(input.placeholder).toBe("status: ready");
+    expect(byLabel(/data \d+ before$/)[0].placeholder).toBe("status: draft");
+    expect(byLabel(/data \d+ after$/)[0].placeholder).toBe("status: ready");
+    expect([...$$("dialog input")].some((i) => /btn-mapping|usecases-detail|scope:/.test(i.placeholder))).toBe(false);
+  });
+
   it("has a two-option status (draft, ready) and no priority control, and saves no priority", async () => {
     const opts = options({ source: { ...rawUseCase, priority: "must" } });
     const closed = openUseCaseDialog(opts);

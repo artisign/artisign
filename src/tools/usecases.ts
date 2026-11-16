@@ -375,8 +375,9 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
     try {
       existingCases.set(item.id, await store.readUseCase(item.id));
     } catch (err) {
-      // A missing case is a create; one that no longer validates is replaced by the (complete) incoming one.
-      if (!isEnoent(err) && !(err instanceof InvalidFileError)) throw err;
+      // A missing case is a create. An invalid stored case is never overwritten: the guard maps it to invalid_state
+      // (hand repair, or delete_entity then set_use_cases), and nothing of this call is written.
+      if (!isEnoent(err)) throw err;
     }
   }
 

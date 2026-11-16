@@ -196,6 +196,40 @@ describe("use case tools", () => {
       expect(await readFile(join(fx.dir, "usecases", "cases", "borrow-book.json"), "utf-8")).toMatch(/\n$/);
     });
 
+    describe("a named case whose stored file is invalid", () => {
+      const caseFile = (): string => join(fx.dir, "usecases", "cases", "borrow-book.json");
+      const BROKEN = `{ "id": "borrow-book" }`;
+
+      beforeEach(async () => {
+        await setUseCases(fx.store, { dimensions: DIMENSIONS, personas: PERSONAS, data_objects: DATA_OBJECTS, use_cases: [borrowCase()] });
+        await writeFile(caseFile(), BROKEN);
+      });
+
+      it("fails a partial patch with invalid_state naming the file and leaves it byte-identical", async () => {
+        const err = await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", status: "ready" }] }).catch((e: unknown) => e);
+        expect(err).toMatchObject({ code: "invalid_state", message: expect.stringContaining("usecases/cases/borrow-book.json") });
+        expect(await readFile(caseFile(), "utf-8")).toBe(BROKEN);
+      });
+
+      it("fails a complete valid replacement too and writes nothing, not even another entity of the same call", async () => {
+        const before = await readFile(join(fx.dir, "usecases", "personas.json"), "utf-8");
+        const err = await setUseCases(fx.store, {
+          personas: [{ id: "guest-kim", name: "Kim" }],
+          use_cases: [borrowCase(), borrowCase({ id: "second-case" })],
+        }).catch((e: unknown) => e);
+        expect(err).toMatchObject({ code: "invalid_state", message: expect.stringContaining("usecases/cases/borrow-book.json") });
+        expect(await readFile(caseFile(), "utf-8")).toBe(BROKEN);
+        expect(await readFile(join(fx.dir, "usecases", "personas.json"), "utf-8")).toBe(before);
+        expect(await fx.store.listUseCaseIds()).toEqual(["borrow-book"]);
+      });
+
+      it("is repaired by delete_entity followed by set_use_cases with the full case", async () => {
+        await deleteEntity(fx.store, { kind: "use_case", name: "borrow-book" });
+        const res = await setUseCases(fx.store, { use_cases: [borrowCase()] });
+        expect(res).toMatchObject({ use_cases: { created: 1, updated: 0 } });
+      });
+    });
+
     it("merges into an existing entity at top level: given keys replace, null removes, the rest stays", async () => {
       await setUseCases(fx.store, { use_cases: [borrowCase()] });
       const res = await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", status: "ready", group: null }] });

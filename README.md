@@ -105,7 +105,7 @@ Replace `/opt/homebrew/bin` with the directory `which npx` shows. Quit and reope
 
 **Just trying it.** `npx artisign` runs it once without installing.
 
-## The 30 tools
+## The 25 tools
 
 Every tool except `list_projects`, `init_project` and `get_guide` takes a required `project` input: a known project's name (as `list_projects` returns it) or an absolute path to a project folder. There is no implicit "current project" for agents.
 
@@ -119,17 +119,12 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 | Reads | `find_nodes` | Where-query across screens (style ref, component ref, variant, comments, text, flow). |
 | Reads | `list_comments` | Open/resolved comments, filtered by screen or node. |
 | Reads | `get_mockup` | A mockup's variants — raw HTML, outside the ref model. |
-| Reads | `get_use_cases` | Optional `usecases/`: use cases filtered by group prefix, persona, screen, node, tag, status, text or variants; sorted, paged, with facet counts. `include` adds the personas, dimensions and data objects. |
-| Reads | `get_use_case` | One-call bundle for a coding agent: the (variant-resolved) use case, its personas, data objects and the mapped screens with their nodes. |
-| Reads | `suggest_use_case_variants` | For one use case, the persona-pool trait values no variant covers yet, with variant skeletons to fill in. |
 | Writes | `write_html` | Create or fully replace a screen from augmented HTML. |
 | Writes | `patch_html` | Surgical patch by node ref or CSS selector: replace, insert, delete, set attr. |
 | Writes | `update_refs` | Change a node's token/component/variant bindings without a full HTML parse. |
 | Writes | `set_tokens` | Design-system token mutation — one call re-resolves every bound screen. |
 | Writes | `set_flow` | Mutate a flow edge in `flows.json` without touching any screen file. |
 | Writes | `set_meta` | Screen notes/tags and `variant_of`/`variant_kind`, design-system idea/decisions, component/pattern usage, a tag's own notes — the handoff contract. |
-| Writes | `set_use_cases` | Bulk upsert of dimensions, personas, data objects and use cases; one commit per call, reference problems are warnings. |
-| Writes | `generate_personas` | Deterministic generic personas from the dimensions (`pairwise` or `all`), skipping combinations already covered; `dry_run` previews. |
 | Writes | `write_mockup` | Create or revise one variant of a mockup — raw HTML, outside the design system. |
 | Writes | `set_board_state` | Read or mutate the Board's shared filter, pinned screens and expanded variant clusters — daemon memory only. |
 | Lifecycle | `list_projects` | Every project the daemon has opened or created, as `{ name, root, open }`; works with no project open. |
@@ -137,10 +132,23 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 | Lifecycle | `import_html` | Incremental HTML ingest into an existing project, with content-hash dedup. |
 | Lifecycle | `promote_to_system` | Lift an inline value or a repeated element into a token, component, or pattern. |
 | Lifecycle | `promote_mockup` | Copy a chosen mockup variant into a new, design-system-bound screen (the mockup stays). |
-| Lifecycle | `delete_entity` | Delete a screen, component, pattern, or mockup (or a persona, data object, use case or dimension, warning about dangling references); refuses a component still referenced by a screen, and a screen that still has variants (`has_variants`) unless `cascade: true` deletes the whole subtree. |
+| Lifecycle | `delete_entity` | Delete a screen, component, pattern, or mockup; refuses a component still referenced by a screen, and a screen that still has variants (`has_variants`) unless `cascade: true` deletes the whole subtree. |
 | Comments | `reply_comment` | Answer a comment and optionally resolve it. |
 | Visual review | `get_screenshot` | Screenshots a rendered screen (or one node), or one mockup variant, as a PNG — the write → screenshot → adjust loop. |
 | Visual review | `inspect_node` | Computed box and styles of one node as text — cheaper than vision for geometry questions. |
+
+### Unreleased — on `main`, not part of 2.2.1
+
+Specs that coding agents write and read: an optional `usecases/` folder with personas, data objects and use cases whose steps map onto screens and elements. A project without it behaves exactly as before. These five tools and four extra `delete_entity` kinds are merged but not yet in a release, so the tool count above is unchanged until one ships.
+
+| Bucket | Tool | Does |
+|---|---|---|
+| Reads | `get_use_cases` | Use cases filtered by group prefix, persona, screen, node, tag, status, text or variants; sorted, paged, with facet counts. `include` adds the personas, dimensions and data objects. |
+| Reads | `get_use_case` | One-call bundle for a coding agent: the (variant-resolved) use case, its personas, data objects and the mapped screens with their nodes. |
+| Reads | `suggest_use_case_variants` | For one use case, the persona-pool trait values no variant covers yet, with variant skeletons to fill in. |
+| Writes | `set_use_cases` | Bulk upsert of dimensions, personas, data objects and use cases; one commit per call, reference problems are warnings. |
+| Writes | `generate_personas` | Deterministic generic personas from the dimensions (`pairwise` or `all`), skipping combinations already covered; `dry_run` previews. |
+| Lifecycle | `delete_entity` | Also takes the kinds `persona`, `dimension`, `data_object` and `use_case`, warning about dangling references. |
 
 ### The write → screenshot → adjust loop
 
@@ -242,7 +250,7 @@ src/daemon/          daemon lifecycle — project registry, global config/lock (
 src/init/            project scaffolding (init) and artisign.json
 src/store/           Store interface, FsStore, watcher, atomic writes, git auto-commit
 src/model/           HTML parser, canonical ref model, index
-src/tools/           the 30 tools (reads, writes, lifecycle, comments, visual review, use cases)
+src/tools/           the 25 tools (reads, writes, lifecycle, comments, visual review)
 src/mcp/             MCP server (streamable HTTP) and the stdio bridge to it
 src/http/            internal JSON API + SSE, consumed by the preview
 src/preview/         browser preview — plain ES modules, no build step

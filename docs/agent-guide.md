@@ -499,8 +499,9 @@ Write metadata when the decision is fresh, not as a cleanup pass.
 ## Use cases (optional)
 
 A project may hold **personas**, reusable **data objects** and **use cases**
-next to its screens, in `usecases/`. Use them when the user wants spec-driven
-work: what the product must do, for whom, with which data, on which screen. A
+next to its screens, in `usecases/`: specs that coding agents write and read —
+what the product must do, for whom, with which data, on which screen. Use them
+when the user wants spec-driven work. A
 project without `usecases/` is unaffected — nothing here applies and nothing is
 created until the first `set_use_cases`.
 

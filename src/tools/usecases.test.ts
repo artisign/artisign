@@ -9,7 +9,7 @@ import { setupGitConfig, setupProject, type GitConfigFixture, type ProjectFixtur
 import { getProject, getScreen, getDesignSystem, findNodes, listComments } from "./reads.js";
 import { writeHtml } from "./writes.js";
 import { deleteEntity } from "./lifecycle.js";
-import { getUseCases, getUseCase, setUseCases, generatePersonas, suggestVariants } from "./usecases.js";
+import { listUseCases, getUseCase, setUseCases, generatePersonas, suggestVariants } from "./usecases.js";
 import { z } from "zod";
 import { TOOLS } from "./registry.js";
 import type { Warning } from "./types.js";
@@ -107,7 +107,7 @@ describe("use case tools", () => {
         ]);
       const before = await existing();
 
-      const list = await getUseCases(fx.store, { include: ["personas", "dimensions", "data_objects"] });
+      const list = await listUseCases(fx.store, { include: ["personas", "dimensions", "data_objects"] });
       expect(list).toMatchObject({ total: 0, use_cases: [], counts: { use_cases: 0, personas: 0, dimensions: 0, data_objects: 0 }, personas: [], dimensions: [], data_objects: [] });
       await expect(getUseCase(fx.store, { id: "nope" })).rejects.toMatchObject({ code: "not_found" });
       await expect(suggestVariants(fx.store, { id: "nope" })).rejects.toMatchObject({ code: "not_found" });
@@ -160,7 +160,7 @@ describe("use case tools", () => {
   describe("palette", () => {
     it("registers the five use-case tools next to the existing ones", () => {
       const names = TOOLS.map((t) => t.name);
-      for (const name of ["get_use_cases", "get_use_case", "set_use_cases", "generate_personas", "suggest_use_case_variants"]) expect(names).toContain(name);
+      for (const name of ["list_use_cases", "get_use_case", "set_use_cases", "generate_personas", "suggest_use_case_variants"]) expect(names).toContain(name);
       expect(names).toHaveLength(30);
     });
   });
@@ -180,12 +180,16 @@ describe("use case tools", () => {
     it("creates the files lazily, reports created/updated and writes one file per case", async () => {
       const res = await setUseCases(fx.store, { dimensions: DIMENSIONS, personas: PERSONAS, data_objects: DATA_OBJECTS, use_cases: [borrowCase()] });
       expect(res).toMatchObject({
-        dimensions: { created: 2, updated: 0, created_ids: ["membership", "branch-access"] },
+        dimensions: { created: 2, updated: 0 },
         personas: { created: 2, updated: 0 },
         data_objects: { created: 2, updated: 0 },
-        use_cases: { created: 1, updated: 0, created_ids: ["borrow-book"] },
+        use_cases: { created: 1, updated: 0 },
         commit: null,
       });
+      for (const kind of ["dimensions", "personas", "data_objects", "use_cases"] as const) {
+        expect(res[kind]).not.toHaveProperty("created_ids");
+        expect(res[kind]).not.toHaveProperty("updated_ids");
+      }
       expect(JSON.parse(await readFile(join(fx.dir, "usecases", "personas.json"), "utf-8"))).toMatchObject({ dimensions: [{ id: "membership" }, { id: "branch-access" }], personas: [{ id: "member-ana" }, { id: "staff-lee" }] });
       expect(JSON.parse(await readFile(join(fx.dir, "usecases", "data-objects.json"), "utf-8"))).toMatchObject({ objects: [{ id: "loan" }, { id: "member" }] });
       expect(JSON.parse(await readFile(join(fx.dir, "usecases", "cases", "borrow-book.json"), "utf-8"))).toMatchObject({ id: "borrow-book", status: "draft" });
@@ -195,7 +199,8 @@ describe("use case tools", () => {
     it("merges into an existing entity at top level: given keys replace, null removes, the rest stays", async () => {
       await setUseCases(fx.store, { use_cases: [borrowCase()] });
       const res = await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", status: "ready", group: null }] });
-      expect(res.use_cases).toMatchObject({ created: 0, updated: 1, updated_ids: ["borrow-book"] });
+      expect(res.use_cases).toMatchObject({ created: 0, updated: 1 });
+      expect(res.use_cases).not.toHaveProperty("updated_ids");
       const stored = await fx.store.readUseCase("borrow-book");
       expect(stored).toMatchObject({ status: "ready", title: "Borrow a book", tags: ["loans"] });
       expect(stored.group).toBeUndefined();
@@ -218,6 +223,22 @@ describe("use case tools", () => {
         message: expect.stringMatching(/nothing written.*use_cases\[1\] \(second\)\.outputs/),
       });
       await expect(stat(join(fx.dir, "usecases"))).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("requires a non-empty example on inputs and outputs (base and variant), allows empty step data, writes nothing on refusal", async () => {
+      const variant = (patch: Record<string, unknown>): Record<string, unknown> => ({ id: "late", title: "Late", when: { membership: ["student"] }, ...patch });
+      const refused: [string, Record<string, unknown>, RegExp][] = [
+        ["base input", borrowCase({ inputs: [{ object: "loan", example: {} }] }), /\.inputs\.0\.example: example must be/],
+        ["base output", borrowCase({ outputs: [{ object: "loan", example: {} }] }), /\.outputs\.0\.example: example must be/],
+        ["variant input", borrowCase({ variants: [variant({ inputs: [{ object: "loan", example: {} }] })] }), /variants\.0\.inputs\.0\.example: example must be/],
+        ["variant output", borrowCase({ variants: [variant({ outputs: [{ object: "loan", example: {} }] })] }), /variants\.0\.outputs\.0\.example: example must be/],
+      ];
+      for (const [label, useCase, path] of refused) {
+        await expect(setUseCases(fx.store, { use_cases: [useCase] }), label).rejects.toMatchObject({ code: "validation_failed", message: expect.stringMatching(path) });
+      }
+      await expect(stat(join(fx.dir, "usecases"))).rejects.toMatchObject({ code: "ENOENT" });
+      const emptyStepData = borrowCase({ steps: [{ id: "pick", actor: "member-ana", action: "Picks", data: [{ object: "loan", before: {}, after: {} }] }] });
+      await expect(setUseCases(fx.store, { use_cases: [emptyStepData] })).resolves.toMatchObject({ use_cases: { created: 1 } });
     });
 
     it("rejects missing ids, repeated ids, bad ids, unknown keys and empty calls", async () => {
@@ -366,14 +387,17 @@ describe("use case tools", () => {
 
     it("has no priority sort, facet, filter or summary field and no priority in any tool description", async () => {
       await setUseCases(fx.store, { personas: PERSONAS, use_cases: [borrowCase()] });
-      await expect(getUseCases(fx.store, { sort: "priority" as never })).rejects.toMatchObject({ code: "validation_failed" });
-      const res = (await getUseCases(fx.store, {})) as ListRes;
+      await expect(listUseCases(fx.store, { sort: "priority" as never })).rejects.toMatchObject({ code: "validation_failed" });
+      const res = (await listUseCases(fx.store, {})) as ListRes;
       expect(Object.keys(res.facets).sort()).toEqual(["group", "persona", "status", "tag"]);
       expect(res.use_cases[0]).not.toHaveProperty("priority");
       const useCaseTools = TOOLS.filter((t) => /use_case|personas/.test(t.name));
       expect(useCaseTools).toHaveLength(5);
       for (const tool of useCaseTools) expect(`${tool.description} ${Object.keys(tool.inputShape).join(" ")}`).not.toMatch(/priority|implemented/i);
-      expect(z.object(TOOLS.find((t) => t.name === "get_use_cases")!.inputShape).safeParse({ status: "implemented" }).success).toBe(false);
+      expect(z.object(TOOLS.find((t) => t.name === "list_use_cases")!.inputShape).safeParse({ status: "implemented" }).success).toBe(false);
+      const limitShape = z.object(TOOLS.find((t) => t.name === "list_use_cases")!.inputShape);
+      expect(limitShape.safeParse({ limit: 100 }).success).toBe(true);
+      expect(limitShape.safeParse({ limit: 101 }).success).toBe(false);
     });
 
     it("leaves a stored status of an old file as invalid_state instead of coercing it", async () => {
@@ -382,9 +406,20 @@ describe("use case tools", () => {
       await writeFile(file, JSON.stringify({ ...JSON.parse(await readFile(file, "utf-8")), status: "implemented" }));
       await expect(getUseCase(fx.store, { id: "borrow-book" })).rejects.toMatchObject({ code: "invalid_state" });
     });
+
+    it("treats an old file with an empty input example as invalid: list skips it with invalid_file, get_use_case says invalid_state", async () => {
+      await setUseCases(fx.store, { use_cases: [borrowCase(), borrowCase({ id: "other-case" })] });
+      const file = join(fx.dir, "usecases", "cases", "borrow-book.json");
+      const stored = JSON.parse(await readFile(file, "utf-8"));
+      await writeFile(file, JSON.stringify({ ...stored, inputs: [{ object: "loan", example: {} }] })); // written past the schema
+      const res = (await listUseCases(fx.store, {})) as ListRes & { warnings?: unknown[] };
+      expect(res.use_cases.map((u) => u.id)).toEqual(["other-case"]);
+      expect(res.warnings).toEqual([expect.objectContaining({ kind: "invalid_file", target: "use_case:borrow-book" })]);
+      await expect(getUseCase(fx.store, { id: "borrow-book" })).rejects.toMatchObject({ code: "invalid_state" });
+    });
   });
 
-  describe("get_use_cases", () => {
+  describe("list_use_cases", () => {
     beforeEach(async () => {
       await setUseCases(fx.store, {
         personas: PERSONAS,
@@ -397,7 +432,7 @@ describe("use case tools", () => {
     });
 
     it("lists summaries sorted by group then title, with total, counts and facets", async () => {
-      const res = (await getUseCases(fx.store, {})) as ListRes;
+      const res = (await listUseCases(fx.store, {})) as ListRes;
       expect(res.total).toBe(3);
       expect(res.use_cases.map((u) => u.id)).toEqual(["c-2", "c-1", "c-3"]);
       expect(res.use_cases[0]).toEqual({ id: "c-2", title: "Alpha", group: "catalog/loans", status: "ready", personas: ["member-ana"], tags: ["loans"], steps: 3, screens: ["sheet", "shelf"] });
@@ -408,38 +443,38 @@ describe("use case tools", () => {
     });
 
     it("filters and reports facets over the filtered set", async () => {
-      expect(((await getUseCases(fx.store, { group: "catalog" })) as ListRes).total).toBe(2);
-      expect(((await getUseCases(fx.store, { persona: "staff-lee" })) as ListRes).use_cases.map((u) => u.id)).toEqual(["c-3"]);
-      expect(((await getUseCases(fx.store, { screen: "profile" })) as ListRes).total).toBe(1);
-      expect(((await getUseCases(fx.store, { screen: "shelf", node: "book-14", status: "ready" })) as ListRes).use_cases.map((u) => u.id)).toEqual(["c-2"]);
-      const filtered = (await getUseCases(fx.store, { query: "profile" })) as ListRes;
+      expect(((await listUseCases(fx.store, { group: "catalog" })) as ListRes).total).toBe(2);
+      expect(((await listUseCases(fx.store, { persona: "staff-lee" })) as ListRes).use_cases.map((u) => u.id)).toEqual(["c-3"]);
+      expect(((await listUseCases(fx.store, { screen: "profile" })) as ListRes).total).toBe(1);
+      expect(((await listUseCases(fx.store, { screen: "shelf", node: "book-14", status: "ready" })) as ListRes).use_cases.map((u) => u.id)).toEqual(["c-2"]);
+      const filtered = (await listUseCases(fx.store, { query: "profile" })) as ListRes;
       expect(filtered.total).toBe(1);
       expect(filtered.facets.tag).toEqual({ profile: 1 });
     });
 
     it("treats an empty-string filter as no filter, like an empty query", async () => {
-      const all = ((await getUseCases(fx.store, {})) as ListRes).total;
+      const all = ((await listUseCases(fx.store, {})) as ListRes).total;
       for (const empty of [{ group: "" }, { group: "/" }, { persona: "" }, { tag: "" }, { screen: "" }, { node: "" }, { query: "" }, { group: "  " }]) {
-        expect(((await getUseCases(fx.store, empty)) as ListRes).total, JSON.stringify(empty)).toBe(all);
+        expect(((await listUseCases(fx.store, empty)) as ListRes).total, JSON.stringify(empty)).toBe(all);
       }
       // A real value next to an empty one still filters.
-      expect(((await getUseCases(fx.store, { group: "", persona: "staff-lee" })) as ListRes).use_cases.map((u) => u.id)).toEqual(["c-3"]);
+      expect(((await listUseCases(fx.store, { group: "", persona: "staff-lee" })) as ListRes).use_cases.map((u) => u.id)).toEqual(["c-3"]);
     });
 
     it("pages with a cursor, repeating neither counts nor facets", async () => {
-      const first = (await getUseCases(fx.store, { limit: 2, sort: "id" })) as ListRes;
+      const first = (await listUseCases(fx.store, { limit: 2, sort: "id" })) as ListRes;
       expect(first.use_cases.map((u) => u.id)).toEqual(["c-1", "c-2"]);
       expect(first.next_cursor).toBe("2");
-      const second = (await getUseCases(fx.store, { limit: 2, sort: "id", cursor: first.next_cursor })) as ListRes;
+      const second = (await listUseCases(fx.store, { limit: 2, sort: "id", cursor: first.next_cursor })) as ListRes;
       expect(second.use_cases.map((u) => u.id)).toEqual(["c-3"]);
       expect(second).not.toHaveProperty("next_cursor");
       expect(second).not.toHaveProperty("facets");
       expect(second).not.toHaveProperty("counts");
-      await expect(getUseCases(fx.store, { cursor: "abc" })).rejects.toMatchObject({ code: "validation_failed" });
+      await expect(listUseCases(fx.store, { cursor: "abc" })).rejects.toMatchObject({ code: "validation_failed" });
     });
 
     it("include returns the requested pools", async () => {
-      const res = (await getUseCases(fx.store, { include: ["personas"], limit: 1 })) as ListRes;
+      const res = (await listUseCases(fx.store, { include: ["personas"], limit: 1 })) as ListRes;
       expect(res.personas!.map((p) => p.id)).toEqual(["member-ana", "staff-lee"]);
       expect(res).not.toHaveProperty("dimensions");
     });
@@ -447,7 +482,7 @@ describe("use case tools", () => {
     it("reports a case file that no longer validates instead of failing the list", async () => {
       await writeFile(join(fx.dir, "usecases", "cases", "broken.json"), `{ "id": "broken", "title": 3 }`);
       await writeFile(join(fx.dir, "usecases", "cases", "garbage.json"), `not json`);
-      const res = (await getUseCases(fx.store, {})) as ListRes;
+      const res = (await listUseCases(fx.store, {})) as ListRes;
       expect(res.total).toBe(3);
       expect(res.warnings).toEqual([
         expect.objectContaining({ kind: "invalid_file", target: "use_case:broken" }),
@@ -456,11 +491,11 @@ describe("use case tools", () => {
     });
 
     it("sees an edit made outside the tools (the read cache follows the file)", async () => {
-      await getUseCases(fx.store, {});
+      await listUseCases(fx.store, {});
       const path = join(fx.dir, "usecases", "cases", "c-1.json");
       const edited = { ...(JSON.parse(await readFile(path, "utf-8")) as Record<string, unknown>), title: "Renamed by hand" };
       await writeFile(path, JSON.stringify(edited));
-      const res = (await getUseCases(fx.store, { query: "renamed by hand" })) as ListRes;
+      const res = (await listUseCases(fx.store, { query: "renamed by hand" })) as ListRes;
       expect(res.use_cases.map((u) => u.id)).toEqual(["c-1"]);
     });
   });
@@ -497,6 +532,20 @@ describe("use case tools", () => {
       const subset = (await generatePersonas(fx.store, { dimensions: ["membership"], dry_run: true })) as GenRes;
       expect(subset.personas.map((p) => p.traits)).toEqual([{ membership: "student" }, { membership: "staff" }]);
       await expect(generatePersonas(fx.store, { dimensions: ["nope"] })).rejects.toMatchObject({ code: "not_found" });
+    });
+
+    it("dry_run lists at most 50 personas, keeps the full would_create and flags the cut", async () => {
+      const dims = Array.from({ length: 2 }, (_, d) => ({ id: `d${d}`, label: `D${d}`, values: Array.from({ length: 8 }, (_, v) => ({ id: `v${v}`, label: `V${v}` })) }));
+      await setUseCases(fx.store, { dimensions: dims });
+      const big = (await generatePersonas(fx.store, { strategy: "all", dimensions: ["d0", "d1"], dry_run: true })) as GenRes & { personas_truncated?: boolean };
+      expect(big.would_create).toBe(64);
+      expect(big.personas).toHaveLength(50);
+      expect(big.personas_truncated).toBe(true);
+      const small = (await generatePersonas(fx.store, { strategy: "all", dimensions: ["d0", "d1"], limit: 50, dry_run: true })) as GenRes;
+      expect(small.would_create).toBe(50);
+      expect(small.personas).toHaveLength(50);
+      expect(small).not.toHaveProperty("personas_truncated");
+      expect((await fx.store.readPersonaPool()).personas).toEqual([]);
     });
 
     it("refuses an all-strategy explosion", async () => {
@@ -572,7 +621,7 @@ describe("use case tools", () => {
     it("skips a case file with a non-kebab name and reports it; delete_entity keeps working", async () => {
       await setUseCases(fx.store, { personas: PERSONAS, use_cases: [borrowCase()] });
       await writeFile(join(fx.dir, "usecases", "cases", "Bad Name.json"), "{}");
-      const res = (await getUseCases(fx.store, {})) as ListRes;
+      const res = (await listUseCases(fx.store, {})) as ListRes;
       expect(res.total).toBe(1);
       expect(res.warnings).toEqual([expect.objectContaining({ kind: "invalid_file", target: "use_case:Bad Name", message: expect.stringContaining("not a valid use case id") })]);
       await expect(deleteEntity(fx.store, { kind: "persona", name: "staff-lee" })).resolves.toMatchObject({ kind: "persona" });
@@ -649,7 +698,7 @@ describe("use case tools", () => {
       await expect(deleteEntity(fx.store, { kind: "use_case", name: "borrow-book" })).resolves.toMatchObject({ kind: "use_case" });
 
       await writeFile(join(fx.dir, "usecases", "personas.json"), `{ "personas": [{ "id": "BAD" }] }`);
-      for (const run of [() => setUseCases(fx.store, { personas: [{ id: "ok", name: "Ok" }] }), () => getUseCases(fx.store, {}), () => generatePersonas(fx.store, {})]) {
+      for (const run of [() => setUseCases(fx.store, { personas: [{ id: "ok", name: "Ok" }] }), () => listUseCases(fx.store, {}), () => generatePersonas(fx.store, {})]) {
         await expect(run()).rejects.toMatchObject({ code: "invalid_state", message: expect.stringContaining("usecases/personas.json") });
       }
     });
@@ -726,7 +775,7 @@ describe("use case tools", () => {
       // A new store has no read cache: this is the cold path.
       const cold = new FsStore(fx.dir);
       let t = performance.now();
-      const first = (await getUseCases(cold, { group: "catalog", status: "ready", sort: "title", limit: 25 })) as ListRes;
+      const first = (await listUseCases(cold, { group: "catalog", status: "ready", sort: "title", limit: 25 })) as ListRes;
       const coldMs = performance.now() - t;
       expect(first.use_cases).toHaveLength(25);
       expect(first.counts.use_cases).toBe(2500);
@@ -735,7 +784,7 @@ describe("use case tools", () => {
       expect(first.total).toBe(expected);
 
       t = performance.now();
-      const warm = (await getUseCases(cold, { persona: "staff-lee", query: "case 1", sort: "title", cursor: "50", limit: 50 })) as ListRes;
+      const warm = (await listUseCases(cold, { persona: "staff-lee", query: "case 1", sort: "title", cursor: "50", limit: 50 })) as ListRes;
       const warmMs = performance.now() - t;
       expect(warm.use_cases).toHaveLength(50);
       expect(warm.use_cases.every((u) => (u.personas as string[]).includes("staff-lee"))).toBe(true);
@@ -746,7 +795,7 @@ describe("use case tools", () => {
 
       // One file change re-parses just that file.
       await setUseCases(cold, { use_cases: [{ id: "case-0000", title: "Edited" }] });
-      expect(((await getUseCases(cold, { query: "edited" })) as ListRes).total).toBe(1);
+      expect(((await listUseCases(cold, { query: "edited" })) as ListRes).total).toBe(1);
     }, 30_000);
   });
 });

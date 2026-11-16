@@ -30,16 +30,16 @@ describe("use case schema", () => {
     const parsed = useCaseSchema.parse({
       id: "x",
       title: "X",
-      inputs: [{ object: "o", example: {} }],
-      outputs: [{ object: "o", example: {} }],
+      inputs: [{ object: "o", example: { id: 1 } }],
+      outputs: [{ object: "o", example: { id: 1 } }],
     });
     expect(parsed).toMatchObject({ status: "draft", personas: [], steps: [] });
-    expect(useCaseSchema.safeParse({ id: "x", title: "X", inputs: [], outputs: [{ object: "o", example: {} }] }).success).toBe(false);
-    expect(useCaseSchema.safeParse({ id: "x", title: "X", inputs: [{ object: "o", example: {} }] }).success).toBe(false);
+    expect(useCaseSchema.safeParse({ id: "x", title: "X", inputs: [], outputs: [{ object: "o", example: { id: 1 } }] }).success).toBe(false);
+    expect(useCaseSchema.safeParse({ id: "x", title: "X", inputs: [{ object: "o", example: { id: 1 } }] }).success).toBe(false);
   });
 
   it("rejects ids that are not lowercase kebab-case, unknown keys and duplicate step ids", () => {
-    const base = { title: "X", inputs: [{ object: "o", example: {} }], outputs: [{ object: "o", example: {} }] };
+    const base = { title: "X", inputs: [{ object: "o", example: { id: 1 } }], outputs: [{ object: "o", example: { id: 1 } }] };
     expect(useCaseSchema.safeParse({ ...base, id: "../evil" }).success).toBe(false);
     expect(useCaseSchema.safeParse({ ...base, id: "Upper" }).success).toBe(false);
     expect(useCaseSchema.safeParse({ ...base, id: "ok", persona: ["typo"] }).success).toBe(false);

@@ -55,6 +55,10 @@ describe("draft and payload", () => {
     expect(buildPayload({ id: "Not Valid", draft, source: rawUseCase }).errors[0]).toContain("kebab-case");
     draft.inputs[0].example = "status draft";
     expect(buildPayload({ id: "map-step", draft, source: rawUseCase }).errors.join(" ")).toContain("is not key: value");
+    const blank = draftFromSource(rawUseCase);
+    blank.inputs[0].example = "";
+    blank.inputs[0].orig = undefined;
+    expect(buildPayload({ id: "map-step", draft: blank, source: rawUseCase }).errors).toEqual(["Input 1: the example needs at least one key."]);
     const jsonDraft = draftFromSource(rawUseCase);
     jsonDraft.variants[0].rest = "{ nope";
     expect(buildPayload({ id: "map-step", draft: jsonDraft, source: rawUseCase }).errors.join(" ")).toContain("not a JSON object");
@@ -159,6 +163,14 @@ describe("use case dialog", () => {
     await flush();
     expect(Object.keys(opts.save.mock.calls[0][0])).not.toContain("priority");
     await closed;
+  });
+
+  it("a blank example is reported under the row's position in the full list, even when an earlier row has no data object", async () => {
+    const source = { ...rawUseCase, inputs: [{ object: "", example: { a: 1 } }, { object: "mapping", example: {} }] };
+    openUseCaseDialog(options({ source }));
+    await flush();
+    expect($(".uc-foot-msg").textContent).toBe("Input 2: the example needs at least one key.");
+    expect(button("Save use case").disabled).toBe(true);
   });
 
   it("opens as a labelled dialog and shows the warnings count live, saving stays enabled", async () => {
@@ -469,7 +481,7 @@ describe("generate personas: partial result", () => {
   it("the dry run says when the result is only a prefix (partial_result), and the preview counts from would_create", async () => {
     const warning = { kind: "partial_result", message: "generation stopped at its work budget" };
     const personas = Array.from({ length: 50 }, (_, i) => ({ id: "p" + i, name: "P " + i, traits: {} }));
-    const generate = vi.fn(async () => ({ ok: true, data: { dry_run: true, strategy: "pairwise", total: 900, skipped_covered: 0, would_create: 80, partial: true, warnings: [warning], personas } }));
+    const generate = vi.fn(async () => ({ ok: true, data: { dry_run: true, strategy: "pairwise", total: 900, skipped_covered: 0, would_create: 80, personas_truncated: true, partial: true, warnings: [warning], personas } }));
     openGenerateDialog({ pool: () => makePool(), generate });
     await flush();
     $$("dialog button").find((b) => b.textContent.includes("Preview")).click();

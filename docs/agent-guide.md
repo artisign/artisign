@@ -515,7 +515,9 @@ Workflow, in this order:
    deterministically (`pairwise` by default: every value pair of two
    dimensions at least once; `all`: the full product) — preview with
    `dry_run: true`, cap with `limit`. It skips combinations an existing
-   persona already covers. `truncated: true` means `limit` was reached. A call
+   persona already covers. `truncated: true` means `limit` was reached. A dry run
+   lists at most 50 `personas`; `would_create` stays the full count and
+   `personas_truncated: true` says the list was cut. A call
    has a work budget: when it runs out the response carries `partial: true` and
    a `partial_result` warning, the personas written are a prefix of the full
    result, and calling again continues because covered combinations are
@@ -532,7 +534,8 @@ Workflow, in this order:
      your ticket tracker. Link a ticket with a tag such as `proj-123`.
    - **`inputs` and `outputs` are mandatory** — at least one each, every entry
      `{object, example}` (`source` on an input, `target` on an output): what
-     the case consumes and produces, with concrete example values.
+     the case consumes and produces, with concrete example values. An
+     `example` is an object with at least one key; `{}` is refused.
    - **`steps`** — the flow: `{id, actor, action, target?, data?}`. `actor` is
      a persona id or `"system"`. `data` lists the state change of a step:
      `{object, before, after}`.
@@ -558,9 +561,9 @@ Workflow, in this order:
    its personas, dimensions, data objects and the mapped screens with their
    nodes. `variant: "<id>"` returns that variant resolved into a full use case:
    steps carry `change: "changed" | "added"`, deleted steps come as
-   `removed_steps`. Browse with `get_use_cases` (filters `group` prefix,
+   `removed_steps`. Browse with `list_use_cases` (filters `group` prefix,
    `persona`, `screen`, `node`, `tag`, `status`, `query`, `has_variants`;
-   `sort`, `cursor`, `limit`; facet counts on the first page; `include:
+   `sort`, `cursor`, `limit` (at most 100, default 50); facet counts on the first page; `include:
    ["personas", "dimensions", "data_objects"]` adds the pools).
 
 Writing: `set_use_cases` takes `{dimensions?, personas?, data_objects?,
@@ -569,7 +572,8 @@ chosen by you, stable — a use case id is its filename). It upserts by id; an
 existing entity is merged at top level (given keys replace, arrays whole,
 `null` removes a key), so a status change is `{id, status: "ready"}`. The whole
 call is validated before anything is written; unknown personas, data objects,
-dimensions, example fields or screens only come back as warnings. Delete with
+dimensions, example fields or screens only come back as warnings. The
+response gives `created` and `updated` counts per kind, not the ids. Delete with
 `delete_entity` kinds `persona`, `data_object`, `use_case`, `dimension` — it
 warns about references left dangling and does not repair them. Like design
 files, `usecases/` changes only through these tools. The one exception: a file

@@ -22,14 +22,14 @@ afterEach(() => vi.unstubAllGlobals());
 describe("usecases-api", () => {
   it("exports exactly the fixed wrappers, and callTool stays private", () => {
     expect(Object.keys(api).sort()).toEqual(
-      ["deleteDataObject", "deleteDimension", "deletePersona", "deleteUseCase", "fetchUseCaseSource", "generatePersonas", "getUseCase", "getUseCases", "setUseCases", "suggestUseCaseVariants"].sort(),
+      ["deleteDataObject", "deleteDimension", "deletePersona", "deleteUseCase", "fetchUseCaseSource", "generatePersonas", "getUseCase", "listUseCases", "setUseCases", "suggestUseCaseVariants"].sort(),
     );
     expect(api.callTool).toBeUndefined();
   });
 
   it("sends only the six tool names, with the four delete kinds", async () => {
     const sent = stubFetch();
-    await api.getUseCases("/p", { limit: 1 });
+    await api.listUseCases("/p", { limit: 1 });
     await api.getUseCase("/p", "a");
     await api.suggestUseCaseVariants("/p", "a", 1);
     await api.setUseCases("/p", { personas: [] });
@@ -39,7 +39,7 @@ describe("usecases-api", () => {
     await api.deleteDataObject("/p", "x");
     await api.deleteUseCase("/p", "x");
     const tools = sent.map((s) => /\/api\/tools\/([a-z_]+)\?project=/.exec(s.url)?.[1]);
-    expect([...new Set(tools)].sort()).toEqual(["delete_entity", "generate_personas", "get_use_case", "get_use_cases", "set_use_cases", "suggest_use_case_variants"]);
+    expect([...new Set(tools)].sort()).toEqual(["delete_entity", "generate_personas", "get_use_case", "list_use_cases", "set_use_cases", "suggest_use_case_variants"]);
     expect(sent.every((s) => s.method === "POST" && s.url.includes("project=%2Fp"))).toBe(true);
     expect(sent.filter((s) => s.url.includes("/delete_entity")).map((s) => s.body)).toEqual([
       { kind: "persona", name: "x" },

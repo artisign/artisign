@@ -11,9 +11,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Use cases:** specs that coding agents write and read. An optional `usecases/` folder holds personas, reusable
   data objects and one file per use case; a use case has inputs and outputs with example values, a flow of steps
   that can be mapped to screens and elements, and variants stored as differences. Five new tools
-  (`get_use_cases`, `get_use_case`, `set_use_cases`, `generate_personas`, `suggest_use_case_variants`) and four new
+  (`list_use_cases`, `get_use_case`, `set_use_cases`, `generate_personas`, `suggest_use_case_variants`) and four new
   `delete_entity` kinds (`persona`, `dimension`, `data_object`, `use_case`) read and write them. A stale or
   unstable step mapping is reported, never rewritten. A project without `usecases/` behaves exactly as before.
+  `list_use_cases` pages at most 100 per call, a `generate_personas` dry run lists at most 50 personas (`would_create` is
+  the full count, `personas_truncated` marks the cut), `set_use_cases` returns counts instead of id lists, and an
+  input or output `example` must hold at least one key.
 - **Use Cases tab in the preview:** a fourth tab with a grouped, searchable and filterable list (tested with 2,400 use cases),
   the detail with personas, flow and before/after data, variants shown as a difference with a coverage matrix, a mapping view that
   places each step on the live screen, the persona, dimension and data-object pools, and dialogs to create, edit and delete them. The Screens

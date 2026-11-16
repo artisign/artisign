@@ -137,7 +137,7 @@ describe("MCP server — protocol-level", () => {
         },
       ],
     });
-    await call("get_use_cases", {});
+    await call("list_use_cases", {});
     await call("get_use_case", { id: "borrow-book" });
     await call("suggest_use_case_variants", { id: "borrow-book" });
     await call("generate_personas", { dry_run: true });
@@ -231,7 +231,7 @@ describe("MCP server — instructions budget", () => {
   // had to pass it as an extra system prompt): 1065 to 1110, measured at 1105.
   // CHR-1065: a two-line USE CASES pointer and use cases named in the FILES
   // rule: 1110 to 1148, measured at 1147.75 (ADR-010 caps this at 1150; the
-  // limit may only go down from here).
+  // limit may only go down from here). CHR-1070 left it unchanged: still 1147.75.
   it("stays within the ~1148 token cheat-sheet budget (chars/4 heuristic)", () => {
     expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(1148);
   });
@@ -259,10 +259,12 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   });
 
   // 21,500 before the five use-case tools (CHR-1065: ~3,600 chars together, with
-  // `priority` gone); measured at 24,001. ADR-010 caps this at 24,500 and the
-  // limit may only go down from here.
-  it("keeps the whole tools/list within 24,001 chars (~6,000 tokens)", () => {
-    expect(JSON.stringify(tools).length).toBeLessThanOrEqual(24_001);
+  // `priority` gone); measured at 24,001. CHR-1070: rename +1 char, offset by a
+  // one-word trim (list_use_cases description lost "and"): 24,001 to 23,999,
+  // measured at 23,999. ADR-010 caps this at 24,500 and the limit may only go
+  // down from here.
+  it("keeps the whole tools/list within 23,999 chars (~6,000 tokens)", () => {
+    expect(JSON.stringify(tools).length).toBeLessThanOrEqual(23_999);
   });
 
   it("keeps every advertised tool entry within 2,000 chars", () => {

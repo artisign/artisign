@@ -77,7 +77,9 @@ export const dataObjectSchema = z.strictObject({
 
 // --- Use cases ----------------------------------------------------------------
 
-const example = z.record(z.string(), z.unknown());
+/** A step's before/after may be empty (nothing there yet); an input/output example must show at least one field. */
+const stepExample = z.record(z.string(), z.unknown());
+const example = stepExample.refine((value) => Object.keys(value).length > 0, { message: "example must be an object with at least one key" });
 
 const inputSchema = z.strictObject({ object: z.string(), source: z.string().optional(), example });
 const outputSchema = z.strictObject({ object: z.string(), target: z.string().optional(), example });
@@ -87,7 +89,7 @@ const stepSchema = z.strictObject({
   actor: z.string(),
   action: z.string(),
   target: z.strictObject({ screen: z.string(), node: z.string().optional() }).optional(),
-  data: z.array(z.strictObject({ object: z.string(), before: example.optional(), after: example.optional() })).optional(),
+  data: z.array(z.strictObject({ object: z.string(), before: stepExample.optional(), after: stepExample.optional() })).optional(),
   note: z.string().optional(),
 });
 

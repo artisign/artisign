@@ -90,8 +90,8 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
       title: "Assign",
       status: "draft" as const,
       personas: [],
-      inputs: [{ object: "o", example: {} }],
-      outputs: [{ object: "o", example: {} }],
+      inputs: [{ object: "o", example: { id: 1 } }],
+      outputs: [{ object: "o", example: { id: 1 } }],
       steps: [],
       variants: [{ id: "v1", title: "V", when: { dim: ["a"] }, steps: [{ op: "remove" as const, step_id: "x" }] }],
     };

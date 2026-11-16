@@ -45,6 +45,8 @@ import type { CommitResult } from "../store/index.js";
 import { ToolError, commitFields, type ToolHandlerContext, type Warning } from "./types.js";
 
 const WARNING_CAP = 50;
+/** Most personas a generate_personas dry run lists; would_create keeps the full count. */
+const DRY_RUN_PERSONA_CAP = 50;
 
 /** De-duplicated and capped: a bulk write over thousands of cases must not answer with thousands of lines. */
 function reportWarnings(warnings: Warning[]): { warnings: Warning[]; warning_count?: number } {
@@ -127,17 +129,17 @@ async function loadUseCase(store: Store, id: string): Promise<UseCase> {
 }
 
 // ---------------------------------------------------------------------------
-// get_use_cases
+// list_use_cases
 // ---------------------------------------------------------------------------
 
-export type GetUseCasesInput = UseCaseFilter & {
+export type ListUseCasesInput = UseCaseFilter & {
   sort?: SortKey;
   cursor?: string;
   limit?: number;
   include?: ("personas" | "dimensions" | "data_objects")[];
 };
 
-async function getUseCasesInner(store: Store, input: GetUseCasesInput): Promise<Record<string, unknown>> {
+async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promise<Record<string, unknown>> {
   const limit = input.limit ?? 50;
   let offset = 0;
   if (input.cursor !== undefined) {
@@ -431,8 +433,6 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
     counts[kind] = {
       created: created.length,
       updated: updated.length,
-      ...(created.length > 0 && created.length <= WARNING_CAP ? { created_ids: created } : {}),
-      ...(updated.length > 0 && updated.length <= WARNING_CAP ? { updated_ids: updated } : {}),
     };
     summary.push(`${changes.length} ${kind}`);
   }
@@ -488,7 +488,13 @@ async function generatePersonasInner(store: Store, input: GeneratePersonasInput,
       : {}),
   };
   if (input.dry_run === true) {
-    return { dry_run: true, ...base, would_create: created.length, personas: created.map((p) => ({ id: p.id, name: p.name, traits: p.traits })) };
+    return {
+      dry_run: true,
+      ...base,
+      would_create: created.length,
+      personas: created.slice(0, DRY_RUN_PERSONA_CAP).map((p) => ({ id: p.id, name: p.name, traits: p.traits })),
+      ...(created.length > DRY_RUN_PERSONA_CAP ? { personas_truncated: true } : {}),
+    };
   }
   if (created.length === 0) return { ...base, created: 0 };
 
@@ -589,7 +595,7 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
 
 // Public entry points: invalid files become invalid_state; every writer runs one at a time per store.
 
-export const getUseCases = (store: Store, input: GetUseCasesInput): Promise<Record<string, unknown>> => guarded(() => getUseCasesInner(store, input));
+export const listUseCases = (store: Store, input: ListUseCasesInput): Promise<Record<string, unknown>> => guarded(() => listUseCasesInner(store, input));
 export const getUseCase = (store: Store, input: GetUseCaseInput): Promise<Record<string, unknown>> => guarded(() => getUseCaseInner(store, input));
 export const suggestVariants = (store: Store, input: SuggestVariantsInput): Promise<Record<string, unknown>> => guarded(() => suggestVariantsInner(store, input));
 export const setUseCases = (store: Store, input: SetUseCasesInput, ctx?: ToolHandlerContext): Promise<Record<string, unknown>> =>

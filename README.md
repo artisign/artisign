@@ -143,7 +143,7 @@ Specs that coding agents write and read: an optional `usecases/` folder with per
 
 | Bucket | Tool | Does |
 |---|---|---|
-| Reads | `get_use_cases` | Use cases filtered by group prefix, persona, screen, node, tag, status, text or variants; sorted, paged, with facet counts. `include` adds the personas, dimensions and data objects. |
+| Reads | `list_use_cases` | Use cases filtered by group prefix, persona, screen, node, tag, status, text or variants; sorted, paged, with facet counts. `include` adds the personas, dimensions and data objects. |
 | Reads | `get_use_case` | One-call bundle for a coding agent: the (variant-resolved) use case, its personas, data objects and the mapped screens with their nodes. |
 | Reads | `suggest_use_case_variants` | For one use case, the persona-pool trait values no variant covers yet, with variant skeletons to fill in. |
 | Writes | `set_use_cases` | Bulk upsert of dimensions, personas, data objects and use cases; one commit per call, reference problems are warnings. |

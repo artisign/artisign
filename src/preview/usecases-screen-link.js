@@ -1,4 +1,4 @@
-// Use Cases tab — the reverse entry: on a screen in the Screens view, the use cases whose steps map to it (get_use_cases
+// Use Cases tab — the reverse entry: on a screen in the Screens view, the use cases whose steps map to it (list_use_cases
 // {screen}). Drawn into the Context panel; only ever shown for a project that has use cases and after the Use Cases tab
 // has loaded them once, so a project without them never pays for it.
 

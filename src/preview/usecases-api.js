@@ -28,7 +28,7 @@ async function callTool(project, tool, input = {}) {
 }
 
 /** One page of use-case summaries (`limit` at most 100) with facets and counts on the first page; empty filters mean "no filter". */
-export const getUseCases = (project, input) => callTool(project, "get_use_cases", input);
+export const listUseCases = (project, input) => callTool(project, "list_use_cases", input);
 
 export const getUseCase = (project, id, variant) => callTool(project, "get_use_case", variant ? { id, variant } : { id });
 

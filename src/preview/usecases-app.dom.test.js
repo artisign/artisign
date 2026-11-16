@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
 // The Use Cases tab inside the whole app (index.html + app.js against a fake daemon): optional by construction.
-// A project without usecases/ gets the empty guide, opening the tab only ever reads (get_use_cases / get_use_case /
+// A project without usecases/ gets the empty guide, opening the tab only ever reads (list_use_cases / get_use_case /
 // GET /api/use-case), every other view is untouched, the list is paged from the server, and SSE `usecases` events
 // reload what is shown.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -31,8 +31,8 @@ function summarize(u) {
   return { id: u.id, title: u.title, ...(u.group ? { group: u.group } : {}), status: u.status, steps: u.steps.length, ...(u.variants?.length ? { variants: u.variants.length } : {}) };
 }
 
-/** A small stand-in for get_use_cases: group prefix, status, query, limit/cursor, include, counts and facets on the first page. */
-function getUseCases(input) {
+/** A small stand-in for list_use_cases: group prefix, status, query, limit/cursor, include, counts and facets on the first page. */
+function listUseCases(input) {
   if (store?.failCursor && input.cursor !== undefined) return { __fail: true };
   if (store?.failInclude && input.include) return { __fail: true, status: 422, code: "invalid_state", message: "invalid usecases/personas.json: not valid JSON" };
   const all = store?.cases ?? [];
@@ -79,8 +79,8 @@ function stubDaemon() {
     if (path === "/api/comments") return json({ comments: [] });
     if (path === "/api/tools/get_screen") return json({ nodes: [] });
     if (path.startsWith("/api/render/")) return { ok: true, status: 200, text: async () => `<main id="m"><div id="btn-map">x</div></main>` };
-    if (path === "/api/tools/get_use_cases") {
-      const answer = getUseCases(body ?? {});
+    if (path === "/api/tools/list_use_cases") {
+      const answer = listUseCases(body ?? {});
       if (answer.__fail) return { ok: false, status: answer.status ?? 500, json: async () => ({ code: answer.code ?? "io_error", message: answer.message ?? "disk on fire" }) };
       return json(answer);
     }
@@ -123,9 +123,9 @@ describe("optionality", () => {
     await flush();
     expect($$(".view-tab").map((t) => t.textContent)).toEqual(["Screens", "Design System", "Board", "Use Cases"]);
     expect($("#usecases-view").hidden).toBe(true);
-    // The only read is the Screens tab's reverse entry (get_use_cases scoped to the open screen); the Use Cases tab fetches nothing itself.
-    expect(useCaseCalls().every((c) => c.tool === "get_use_cases" && c.body.screen === "editor")).toBe(true);
-    expect(calls.some((c) => c.tool === "get_use_cases" && c.body.include)).toBe(false);
+    // The only read is the Screens tab's reverse entry (list_use_cases scoped to the open screen); the Use Cases tab fetches nothing itself.
+    expect(useCaseCalls().every((c) => c.tool === "list_use_cases" && c.body.screen === "editor")).toBe(true);
+    expect(calls.some((c) => c.tool === "list_use_cases" && c.body.include)).toBe(false);
     expect($(".uc-guide")).toBeNull(); // nothing is rendered either, not even the empty guide
   });
 
@@ -140,7 +140,7 @@ describe("optionality", () => {
     expect($(".uc-list-status").textContent).toBe("0 use cases · 0 personas");
     const tools = useCaseCalls().map((c) => c.tool ?? c.path);
     expect(tools.length).toBeGreaterThan(0);
-    expect(tools.every((t) => t === "get_use_cases")).toBe(true); // reads only
+    expect(tools.every((t) => t === "list_use_cases")).toBe(true); // reads only
     expect(calls.some((c) => c.method !== "GET" && /set_use_cases|generate_personas|delete_entity/.test(c.tool ?? ""))).toBe(false);
   });
 
@@ -211,7 +211,7 @@ describe("with use cases", () => {
     input.dispatchEvent(new Event("input"));
     await new Promise((r) => setTimeout(r, 400));
     await flush();
-    const query = calls.filter((c) => c.tool === "get_use_cases").map((c) => c.body);
+    const query = calls.filter((c) => c.tool === "list_use_cases").map((c) => c.body);
     expect(query.length).toBeGreaterThan(0);
     expect(query.every((b) => b.query === "Case 3")).toBe(true);
     expect($(".uc-result-text").textContent).toBe("1 of 3 use cases");
@@ -249,7 +249,7 @@ describe("with use cases", () => {
     let release;
     const gate = new Promise((r) => (release = r));
     vi.stubGlobal("fetch", async (url, init) => {
-      if (String(url).includes("get_use_cases")) await gate;
+      if (String(url).includes("list_use_cases")) await gate;
       return real(url, init);
     });
     emit({ type: "change", kind: "usecases", name: "cases/uc-1" });
@@ -294,7 +294,7 @@ describe("with use cases", () => {
       await new Promise((r) => setTimeout(r, 300));
       await flush();
       expect($(".uc-result-text").textContent).toBe(`${store.cases.length} use cases`);
-      expect(calls.some((c) => c.tool === "get_use_cases")).toBe(true);
+      expect(calls.some((c) => c.tool === "list_use_cases")).toBe(true);
     }
   });
 
@@ -306,7 +306,7 @@ describe("reverse entry", () => {
     await import("./app.js");
     await flush();
     expect($("#screen-usecases").hidden).toBe(false); // straight into Screens, the Use Cases tab never opened
-    expect(calls.some((c) => c.tool === "get_use_cases" && c.body.include)).toBe(false);
+    expect(calls.some((c) => c.tool === "list_use_cases" && c.body.include)).toBe(false);
     expect($(".screen-usecases-sub").textContent).toBe("Steps that map to editor");
     expect($$(".screen-usecases-row").map((r) => r.textContent)).toEqual(["Case 1", "Case 2"]);
     calls.length = 0;
@@ -413,7 +413,7 @@ describe("review fixes", () => {
     calls.length = 0;
     $(".uc-more-row").click();
     await flush();
-    const more = calls.filter((c) => c.tool === "get_use_cases").map((c) => c.body);
+    const more = calls.filter((c) => c.tool === "list_use_cases").map((c) => c.body);
     expect(more).toHaveLength(1);
     expect(more[0]).toMatchObject({ group: "big", limit: 25 });
     expect(more[0].cursor).toBe("4");
@@ -422,7 +422,7 @@ describe("review fixes", () => {
     emit({ type: "change", kind: "usecases", name: "cases/uc-1" });
     await new Promise((r) => setTimeout(r, 300));
     await flush();
-    expect(Math.max(...calls.filter((c) => c.tool === "get_use_cases").map((c) => c.body.limit ?? 50))).toBeLessThanOrEqual(100);
+    expect(Math.max(...calls.filter((c) => c.tool === "list_use_cases").map((c) => c.body.limit ?? 50))).toBeLessThanOrEqual(100);
     expect($(".uc-tree-spacer").style.height).toBe(`${28 + 29 * 46 + 26}px`); // the 29 loaded rows survive the refresh
   });
 
@@ -435,7 +435,7 @@ describe("review fixes", () => {
     $(".uc-tree").scrollTop = 99999; // the end of the 100 loaded rows: the list asks for the next page
     $(".uc-tree").dispatchEvent(new Event("scroll"));
     await flush();
-    const failing = () => calls.filter((c) => c.tool === "get_use_cases" && c.body.cursor !== undefined).length;
+    const failing = () => calls.filter((c) => c.tool === "list_use_cases" && c.body.cursor !== undefined).length;
     expect($(".uc-error-row").textContent).toContain("disk on fire");
     const afterFirst = failing();
     expect(afterFirst).toBe(1);
@@ -472,9 +472,9 @@ describe("scale", () => {
     expect($(".uc-result-text").textContent).toBe("2,500 use cases");
     expect($$("#usecases-view .uc-tree-window > *").length).toBeLessThan(40);
     expect($$("#usecases-view *").length).toBeLessThan(900); // the whole tab, detail included
-    const requested = calls.filter((c) => c.tool === "get_use_cases").map((c) => c.body.limit ?? 50);
+    const requested = calls.filter((c) => c.tool === "list_use_cases").map((c) => c.body.limit ?? 50);
     expect(Math.max(...requested)).toBeLessThanOrEqual(100);
-    const rowsFetched = calls.filter((c) => c.tool === "get_use_cases").reduce((sum, c) => sum + (c.body.limit ?? 50), 0);
+    const rowsFetched = calls.filter((c) => c.tool === "list_use_cases").reduce((sum, c) => sum + (c.body.limit ?? 50), 0);
     expect(rowsFetched).toBeLessThan(200);
   });
 });

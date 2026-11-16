@@ -86,101 +86,182 @@ function expandAll(dimensions: Dimension[], existing: Persona[], limit: number, 
   return { combinations, total, skipped_covered: skipped, truncated, ...(partial ? { partial: true as const } : {}) };
 }
 
-function pairKey(da: string, va: string, db: string, vb: string): string {
-  return `${da}=${va}|${db}=${vb}`;
-}
-
 /**
  * Greedy all-pairs cover: every value pair of two different dimensions ends up
  * in at least one combination. Deterministic — the first uncovered pair (in
  * declared dimension/value order) seeds each row, the remaining dimensions take
  * the value that covers the most new pairs, ties to the first declared value.
  * A single dimension degenerates to one combination per value.
+ *
+ * A pair (a = x, b = y) counts as already covered when some persona with at
+ * least one trait on the expanded dimensions has x or no trait on `a`, and y or
+ * no trait on `b` — the any-value rule `all` follows (a persona without such a
+ * trait covers nothing). Every step counts against `budget`: one pair weighed,
+ * one persona trait indexed, one persona visited per dimension pair, one value
+ * weighed while a row is built. If the budget runs out before coverage is
+ * known, nothing is generated.
  */
 function expandPairwise(dimensions: Dimension[], existing: Persona[], limit: number, budget: number): GeneratedCombinations {
+  let work = 0;
   if (dimensions.length === 1) {
     const only = dimensions[0]!;
     const all = only.values.map((v): Combination => ({ [only.id]: v.id }));
-    const open = all.filter((c) => !existing.some((p) => personaCovers(p, c)));
+    const open: Combination[] = [];
+    for (const c of all) {
+      work++;
+      let covered = false;
+      for (const p of existing) {
+        work++;
+        if (personaCovers(p, c)) {
+          covered = true;
+          break;
+        }
+      }
+      if (work > budget) return { combinations: [], total: all.length, skipped_covered: 0, truncated: false, partial: true };
+      if (!covered) open.push(c);
+    }
     return { combinations: open.slice(0, limit), total: all.length, skipped_covered: all.length - open.length, truncated: open.length > limit };
   }
 
-  const uncovered = new Set<string>();
-  const ordered: { da: string; va: string; db: string; vb: string }[] = [];
-  for (let i = 0; i < dimensions.length; i++) {
-    for (let j = i + 1; j < dimensions.length; j++) {
-      for (const a of dimensions[i]!.values) {
-        for (const b of dimensions[j]!.values) {
-          uncovered.add(pairKey(dimensions[i]!.id, a.id, dimensions[j]!.id, b.id));
-          ordered.push({ da: dimensions[i]!.id, va: a.id, db: dimensions[j]!.id, vb: b.id });
+  const count = dimensions.length;
+  const dimIndex = new Map(dimensions.map((d, i) => [d.id, i]));
+  const valueIndex = dimensions.map((d) => new Map(d.values.map((v, i) => [v.id, i])));
+  const size = dimensions.map((d) => d.values.length);
+  const total = pairSpace(dimensions);
+  const nothingYet = (): GeneratedCombinations => ({ combinations: [], total, skipped_covered: 0, truncated: false, partial: true });
+
+  // A value pair is one slot: its number is the offset of its dimension pair plus x * size[j] + y, in declared order.
+  const offset = new Int32Array(count * count);
+  let next = 0;
+  for (let i = 0; i < count; i++) {
+    for (let j = i + 1; j < count; j++) {
+      offset[i * count + j] = next;
+      next += size[i]! * size[j]!;
+    }
+  }
+
+  // Index the personas that count: per dimension, persona position -> pinned value index. A persona with a trait
+  // that is not a value of its dimension allows no combination, so it is not indexed and covers nothing (as in `all`).
+  const pinned = dimensions.map(() => new Map<number, number>());
+  let relevant = 0;
+  for (const persona of existing) {
+    const entries = Object.entries(persona.traits);
+    work += 1 + entries.length;
+    const pins: [number, number][] = [];
+    let stale = false;
+    for (const [dim, value] of entries) {
+      const i = dimIndex.get(dim);
+      if (i === undefined) continue;
+      const v = valueIndex[i]!.get(value);
+      if (v === undefined) {
+        stale = true;
+        break;
+      }
+      pins.push([i, v]);
+    }
+    if (stale || pins.length === 0) continue;
+    for (const [i, v] of pins) pinned[i]!.set(relevant, v);
+    relevant++;
+  }
+  if (work > budget) return nothingYet();
+
+  // 1 = still to cover. A pair is weighed once here.
+  const uncovered = new Uint8Array(total).fill(1);
+  let open = total;
+  for (let i = 0; i < count; i++) {
+    for (let j = i + 1; j < count; j++) {
+      const pi = pinned[i]!;
+      const pj = pinned[j]!;
+      work += 1 + size[i]! * size[j]! + pi.size + pj.size;
+      if (work > budget) return nothingYet();
+      // Personas pinning neither dimension leave both open: they cover every pair of this dimension pair.
+      let union = pi.size;
+      const aOnly = new Set<number>();
+      const bOnly = new Set<number>();
+      const both = new Set<number>();
+      for (const [who, x] of pi) {
+        const y = pj.get(who);
+        if (y === undefined) aOnly.add(x);
+        else both.add(x * size[j]! + y);
+      }
+      for (const [who, y] of pj) {
+        if (pi.has(who)) continue;
+        union++;
+        bOnly.add(y);
+      }
+      const everything = relevant > union;
+      const base = offset[i * count + j]!;
+      for (let x = 0; x < size[i]!; x++) {
+        for (let y = 0; y < size[j]!; y++) {
+          if (everything || aOnly.has(x) || bOnly.has(y) || both.has(x * size[j]! + y)) {
+            uncovered[base + x * size[j]! + y] = 0;
+            open--;
+          }
         }
       }
     }
   }
-  const total = uncovered.size;
-
-  // Pairs an existing persona already stands for are not generated again.
-  const cover = (combination: Combination): number => {
-    let covered = 0;
-    for (let i = 0; i < dimensions.length; i++) {
-      for (let j = i + 1; j < dimensions.length; j++) {
-        const key = pairKey(dimensions[i]!.id, combination[dimensions[i]!.id]!, dimensions[j]!.id, combination[dimensions[j]!.id]!);
-        if (uncovered.delete(key)) covered++;
-      }
-    }
-    return covered;
-  };
-  for (const persona of existing) {
-    const traits = dimensions.filter((d) => ownValue(persona.traits, d.id) !== undefined);
-    for (let i = 0; i < traits.length; i++) {
-      for (let j = i + 1; j < traits.length; j++) {
-        uncovered.delete(pairKey(traits[i]!.id, persona.traits[traits[i]!.id]!, traits[j]!.id, persona.traits[traits[j]!.id]!));
-      }
-    }
-  }
-  const skipped = total - uncovered.size;
+  const skipped = total - open;
 
   const combinations: Combination[] = [];
   let truncated = false;
   let partial = false;
-  let work = 0;
-  const valueCount = dimensions.reduce((n, d) => n + d.values.length, 0);
-  for (const seed of ordered) {
-    if (!uncovered.has(pairKey(seed.da, seed.va, seed.db, seed.vb))) continue;
-    // Building one row weighs every value of every other dimension against the row so far.
-    work += 1 + valueCount * dimensions.length;
-    if (work > budget) {
-      partial = true;
-      break;
-    }
-    if (combinations.length >= limit) {
-      truncated = true;
-      break;
-    }
-    const combination: Combination = { [seed.da]: seed.va, [seed.db]: seed.vb };
-    for (const dimension of dimensions) {
-      if (combination[dimension.id] !== undefined) continue;
-      let best = dimension.values[0]!.id;
-      let bestGain = -1;
-      for (const value of dimension.values) {
-        let gain = 0;
-        for (const [otherId, otherValue] of Object.entries(combination)) {
-          const order = dimensions.findIndex((d) => d.id === otherId) < dimensions.findIndex((d) => d.id === dimension.id);
-          const key = order ? pairKey(otherId, otherValue, dimension.id, value.id) : pairKey(dimension.id, value.id, otherId, otherValue);
-          if (uncovered.has(key)) gain++;
-        }
-        if (gain > bestGain) {
-          bestGain = gain;
-          best = value.id;
+  let slot = 0;
+  scan: for (let i = 0; i < count; i++) {
+    for (let j = i + 1; j < count; j++) {
+      for (let x = 0; x < size[i]!; x++) {
+        for (let y = 0; y < size[j]!; y++, slot++) {
+          if (!uncovered[slot]) continue;
+          if (combinations.length >= limit) {
+            truncated = true;
+            break scan;
+          }
+          // The seed pair fixes two dimensions; every other one takes the value that covers the most open pairs.
+          const chosen = new Array<number>(count).fill(-1);
+          chosen[i] = x;
+          chosen[j] = y;
+          for (let k = 0; k < count; k++) {
+            if (chosen[k]! >= 0) continue;
+            let best = 0;
+            let bestGain = -1;
+            for (let v = 0; v < size[k]!; v++) {
+              let gain = 0;
+              for (let m = 0; m < count; m++) {
+                const other = chosen[m]!;
+                if (other < 0) continue;
+                const at = m < k ? offset[m * count + k]! + other * size[k]! + v : offset[k * count + m]! + v * size[m]! + other;
+                gain += uncovered[at]!;
+              }
+              if (gain > bestGain) {
+                bestGain = gain;
+                best = v;
+              }
+            }
+            work += size[k]! * (count - 1);
+            if (work > budget) {
+              partial = true;
+              break scan;
+            }
+            chosen[k] = best;
+          }
+          // Marking the row's pairs covered walks every dimension pair once.
+          work += (count * (count - 1)) / 2;
+          if (work > budget) {
+            partial = true;
+            break scan;
+          }
+          for (let a = 0; a < count; a++) {
+            for (let b = a + 1; b < count; b++) uncovered[offset[a * count + b]! + chosen[a]! * size[b]! + chosen[b]!] = 0;
+          }
+          // Rows follow the declared dimension order.
+          const row: Combination = {};
+          dimensions.forEach((d, k) => {
+            row[d.id] = d.values[chosen[k]!]!.id;
+          });
+          combinations.push(row);
         }
       }
-      combination[dimension.id] = best;
     }
-    // Rows follow the declared dimension order, not the seeding order.
-    const row: Combination = {};
-    for (const dimension of dimensions) row[dimension.id] = combination[dimension.id]!;
-    cover(row);
-    combinations.push(row);
   }
   return { combinations, total, skipped_covered: skipped, truncated, ...(partial ? { partial: true as const } : {}) };
 }

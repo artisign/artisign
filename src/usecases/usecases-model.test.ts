@@ -160,6 +160,45 @@ describe("expandCombinations", () => {
     expect(none.skipped_covered).toBe(16);
   });
 
+  it("pairwise applies the any-value rule: a persona with one trait covers every pair that trait leaves open", () => {
+    const staff = [persona("staff", { membership: "staff" })];
+    const pairwise = expandCombinations(d, "pairwise", staff, 100);
+    expect(pairwise.total).toBe(16);
+    expect(pairwise.skipped_covered).toBe(11); // (staff, limit) 3 + (staff, access) 2 + (limit, access) 6
+    expect(expandCombinations(d, "all", staff, 100).skipped_covered).toBe(6); // all stays at 6 of 12
+    // Only the five pairs involving the student value remain.
+    const seen = new Set<string>();
+    for (const row of pairwise.combinations) {
+      for (const [a, b] of [["membership", "limit"], ["membership", "access"], ["limit", "access"]] as const) seen.add(`${a}=${row[a]}|${b}=${row[b]}`);
+    }
+    for (const limit of ["1", "2", "3"]) expect(seen).toContain(`membership=student|limit=${limit}`);
+    for (const access of ["single", "all"]) expect(seen).toContain(`membership=student|access=${access}`);
+  });
+
+  it("pairwise: a persona without traits on the expanded dimensions covers nothing, also when it has others", () => {
+    const outside = [persona("none"), persona("other", { region: "north" })];
+    const result = expandCombinations(d, "pairwise", outside, 100);
+    expect(result.skipped_covered).toBe(0);
+    expect(result).toEqual(expandCombinations(d, "pairwise", [], 100));
+  });
+
+  it("pairwise: a persona with a value that is not in its dimension covers nothing, as in all", () => {
+    const two = dims(["a", ["v0", "v1"]], ["b", ["v0", "v1"]]);
+    const mixed = expandCombinations(two, "pairwise", [persona("m", { a: "v1", b: "stale" })], 100);
+    expect(mixed.skipped_covered).toBe(0);
+    expect(mixed.combinations).toContainEqual({ a: "v0", b: "v1" });
+    expect(expandCombinations(two, "all", [persona("m", { a: "v1", b: "stale" })], 100).skipped_covered).toBe(0);
+    const three = dims(["a", ["v0", "v1"]], ["b", ["v0", "v1"]], ["c", ["v0", "v1"]]);
+    expect(expandCombinations(three, "pairwise", [persona("c", { c: "stale" })], 100).skipped_covered).toBe(0);
+    expect(expandCombinations(three, "all", [persona("c", { c: "stale" })], 100).skipped_covered).toBe(0);
+    expect(expandCombinations(three, "pairwise", [persona("k", { a: "v0", c: "stale" })], 100).skipped_covered).toBe(0);
+  });
+
+  it("pairwise: a pool that covers every combination covers every pair", () => {
+    const pool = expandCombinations(d, "all", [], 100).combinations.map((row, i) => persona(`p${i}`, row));
+    expect(expandCombinations(d, "pairwise", pool, 100).skipped_covered).toBe(16);
+  });
+
   it("limit truncates and says so", () => {
     const result = expandCombinations(d, "all", [], 5);
     expect(result.combinations).toHaveLength(5);
@@ -275,6 +314,50 @@ describe("expansion work budget", () => {
     expect(cut.partial).toBe(true);
     expect(cut.combinations.length).toBeGreaterThan(0);
     expect(cut.combinations.length).toBeLessThan(expandCombinations(dims, "pairwise", [], 100).combinations.length);
+  });
+});
+
+describe("pairwise coverage work budget", () => {
+  const dim = (id: string, count: number): Dimension => ({ id, label: id, values: Array.from({ length: count }, (_, i) => ({ id: `v${i}`, label: `V${i}` })) });
+
+  it("returns partial with nothing generated when the budget runs out before coverage is known", () => {
+    const dims = [dim("a", 5), dim("b", 5), dim("c", 5)];
+    const pool = Array.from({ length: 40 }, (_, i) => persona(`p${i}`, { a: "v0" }));
+    const full = expandCombinations(dims, "pairwise", pool, 100);
+    expect(full.partial).toBeUndefined();
+    expect(full.skipped_covered).toBe(35); // (a = v0, b) 5 + (a = v0, c) 5 + every (b, c) pair 25
+    const cut = expandCombinations(dims, "pairwise", pool, 100, 100);
+    expect(cut).toEqual({ combinations: [], total: 75, skipped_covered: 0, truncated: false, partial: true });
+  });
+
+  it("counts every persona check against a pair, not just the pairs", () => {
+    const dims = [dim("a", 2), dim("b", 2)];
+    const few = Array.from({ length: 2 }, (_, i) => persona(`f${i}`, { a: "v0" }));
+    const many = Array.from({ length: 200 }, (_, i) => persona(`m${i}`, { a: "v0" }));
+    expect(expandCombinations(dims, "pairwise", few, 10, 100).partial).toBeUndefined();
+    expect(expandCombinations(dims, "pairwise", many, 10, 100).partial).toBe(true);
+  });
+
+  it("a single dimension counts its persona checks too", () => {
+    const only = [dim("a", 10)];
+    const many = Array.from({ length: 50 }, (_, i) => persona(`m${i}`, { a: "v9" }));
+    expect(expandCombinations(only, "pairwise", many, 100).partial).toBeUndefined();
+    expect(expandCombinations(only, "pairwise", many, 100, 100).partial).toBe(true);
+  });
+
+  it("stays fast on contrived inputs with many dimensions, also when the budget runs out", () => {
+    const wide = Array.from({ length: 700 }, (_, i) => dim(`d${i}`, 2)); // 978,600 value pairs, just under the refusal limit
+    const mixed = Array.from({ length: 120 }, (_, i) => dim(`d${i}`, 3));
+    const dims40 = Array.from({ length: 40 }, (_, i) => dim(`d${i}`, 3));
+    const pool = Array.from({ length: 300 }, (_, i) => persona(`p${i}`, { [`d${i % 120}`]: "v1", [`d${(i * 7) % 120}`]: "v2" }));
+    for (const [dims, existing] of [[wide, []], [mixed, pool], [dims40, []]] as const) {
+      const started = performance.now();
+      const result = expandCombinations([...dims], "pairwise", [...existing], 5000);
+      const elapsed = performance.now() - started;
+      expect(elapsed).toBeLessThan(500);
+      expect(result.total).toBe(pairSpace([...dims]));
+      expect(result.partial).toBe(dims === wide ? true : undefined);
+    }
   });
 });
 

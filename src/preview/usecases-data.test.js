@@ -345,6 +345,10 @@ describe("flow rows", () => {
     expect(variantChangeCount({ actors: { dana: "dana" } }, base)).toBe(0);
     // added to the other differences
     expect(variantChangeCount({ actors: { dana: "dex" }, steps: [{}], inputs: [{}], outputs: [{}] }, base)).toBe(4);
+    // a swap counts only for base steps the ops leave alone: removed or replaced steps are taken as written
+    const removing = { actors: { dana: "dex" }, steps: [{ op: "remove", step_id: "a" }, { op: "replace", step_id: "b" }] };
+    expect(variantChangeCount(removing, [{ id: "a", actor: "dana" }, { id: "b", actor: "dana" }])).toBe(2);
+    expect(variantChangeCount(removing, [{ id: "a", actor: "dana" }, { id: "b", actor: "dana" }, { id: "c", actor: "dana" }])).toBe(3);
     // an actor-swap-only variant is not "0 changes"; without base steps nothing can be counted
     expect(variantChangeCount({ actors: { dana: "dex" } })).toBe(0);
   });

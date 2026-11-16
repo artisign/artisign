@@ -178,7 +178,13 @@ export async function openUseCaseDialog(options) {
     return request;
   };
 
+  let variantEditor = null;
+  // The variant editor reads the base (its "From base" values, the step lists), so a base edit tells it to re-read.
   const markDirty = () => {
+    touch();
+    variantEditor?.syncBase();
+  };
+  const touch = () => {
     dialog.setDirty(true);
     refreshWarnings();
   };
@@ -334,7 +340,7 @@ export async function openUseCaseDialog(options) {
   };
 
   // --- Variants (usecases-variant-edit.js) -----------------------------------------------------------------------
-  const variantEditor = createVariantEditor({ draft, pool: options.pool, screens: options.screens, ensureNodes, objectOptions, actorOptions, markDirty });
+  variantEditor = createVariantEditor({ draft, pool: options.pool, screens: options.screens, ensureNodes, objectOptions, actorOptions, markDirty: touch, refresh: refreshWarnings });
   const variantsBox = variantEditor.el;
 
   // --- Footer: warnings, the one hard requirement, Save ---------------------------------------------------------

@@ -348,3 +348,122 @@ describe("saving", () => {
     expect(opts.save.mock.calls[0][0].variants).toBeUndefined();
   });
 });
+
+describe("review fixes", () => {
+  const stepSel = (card, n, c) => $(`select[aria-label='Variant ${n} change ${c} step']`, card);
+
+  it("a redraw keeps the hints: remove change 1 and the duplicate id of the change below keeps its error and aria-invalid", async () => {
+    await open();
+    const card = variantCard(1);
+    addChange(card);
+    addChange(card);
+    type($("select[aria-label='Variant 2 change 2 operation']", card), "insert_after");
+    type(stepSel(card, 2, 2), "tap");
+    type($("input[aria-label='Variant 2 change 2 action']", card), "Opens");
+    type($("input[aria-label='Variant 2 change 2 step id']", card), "pick");
+    $("button[aria-label='Remove change 1 of variant 2']", card).click();
+    const id = $("input[aria-label='Variant 2 change 1 step id']", card);
+    expect(id.getAttribute("aria-invalid")).toBe("true");
+    expect(id.classList.contains("is-error")).toBe(true);
+    expect(document.getElementById(id.getAttribute("aria-describedby")).hidden).toBe(false);
+    expect(button("Save use case").disabled).toBe(true);
+  });
+
+  it("a redraw keeps the warning of a change that names a missing step (removing a swap redraws the rows)", async () => {
+    const source = { ...rawUseCase, variants: [{ id: "v", title: "V", when: { size: ["large"] }, actors: { dana: "dex" }, steps: [{ op: "remove", step_id: "gone" }] }] };
+    await open({ source });
+    $("button[aria-label='Remove actor swap 1 of variant 1']").click();
+    const select = stepSel(document, 1, 1);
+    expect(select.classList.contains("is-warning")).toBe(true);
+    expect(select.hasAttribute("aria-describedby")).toBe(true);
+  });
+
+  it("editing the base updates what the variant shows: From base values, the base step count, the struck line, the step lists", async () => {
+    await open();
+    const card = variantCard(0);
+    type($$("textarea")[0], "A new base trigger"); // base Trigger
+    expect($(".uc-inherited-value", row(variantCard(1), "trigger")).textContent).toBe("A new base trigger");
+    type($("input[aria-label='Step 3 action']"), "Dex gets a text");
+    expect($(".uc-op-removed", $$(".uc-step-op", card)[1]).textContent).toContain("Dex gets a text");
+    expect($$("select[aria-label='Variant 1 change 1 step'] option", card).map((o) => o.textContent)).toContain("3 · Dex gets a text");
+    $("button[aria-label='Remove step 3']").click();
+    expect($(".uc-ops-edit", variantCard(1)).textContent).toContain("None. This variant runs the 2 base steps as they are.");
+  });
+
+  it("an empty text override blocks Save with its own hint; Use base clears it", async () => {
+    await open();
+    const card = variantCard(1);
+    byText(row(card, "goal"), "button", "Override").click();
+    const area = $("textarea", row(card, "goal"));
+    type(area, "");
+    expect(area.getAttribute("aria-invalid")).toBe("true");
+    expect(document.getElementById(area.getAttribute("aria-describedby")).textContent).toBe("The goal override is empty. Enter text or use the base.");
+    expect(button("Save use case").disabled).toBe(true);
+    byText(row(card, "goal"), "button", "Use base").click();
+    expect(button("Save use case").disabled).toBe(false);
+  });
+
+  it("a swap cannot become a→a: the options are disabled in both directions", async () => {
+    await open();
+    const card = variantCard(1);
+    addSwap(card);
+    const [from, to] = $$(".uc-swap-row select", card);
+    type(from, "dana");
+    type(to, "dex");
+    expect($$("option", from).find((o) => o.value === "dex").disabled).toBe(true); // from can no longer take the current "to"
+    expect($$("option", to).find((o) => o.value === "dana").disabled).toBe(true);
+  });
+
+  it("a stored a→a swap is a field error on its row and blocks Save", async () => {
+    const source = { ...rawUseCase, variants: [{ id: "v", title: "V", when: { size: ["large"] }, actors: { dana: "dana" } }] };
+    await open({ source });
+    const same = $(".uc-swap-row select[aria-label='Variant 1 swap 1 to']");
+    expect(same.getAttribute("aria-invalid")).toBe("true");
+    expect($(".uc-foot-msg").textContent).toBe('Variant "V", swap 1: pick two different actors.');
+    expect(button("Save use case").disabled).toBe(true);
+  });
+
+  it("an inserted step starts with a generated id, prefilled and editable, and a change below can target it", async () => {
+    const { opts, closed } = await open();
+    const card = variantCard(1);
+    addChange(card);
+    type($("select[aria-label='Variant 2 change 1 operation']", card), "insert_after");
+    type(stepSel(card, 2, 1), "tap");
+    expect($("input[aria-label='Variant 2 change 1 step id']", card).value).toBe("new-step");
+    type($("input[aria-label='Variant 2 change 1 action']", card), "Checks the hours");
+    addChange(card);
+    expect($$("option", stepSel(card, 2, 2)).map((o) => o.textContent)).toContain("2 · Checks the hours");
+    type(stepSel(card, 2, 2), "new-step");
+    type($("input[aria-label='Variant 2 change 2 action']", card), "Greets");
+    addChange(card);
+    type($("select[aria-label='Variant 2 change 3 operation']", card), "append");
+    expect($("input[aria-label='Variant 2 change 3 step id']", card).value).toBe("new-step-2");
+    type($("input[aria-label='Variant 2 change 3 action']", card), "Ends");
+    button("Save use case").click();
+    await closed;
+    expect(opts.save.mock.calls[0][0].variants[1].steps.map((op) => [op.op, op.step_id ?? null, op.step.id])).toEqual([["insert_after", "tap", "new-step"], ["replace", "new-step", "new-step"], ["append", null, "new-step-2"]]);
+  });
+
+  it("switching to Replace prefills from the target step while the body is untouched, and keeps typed text", async () => {
+    await open();
+    const card = variantCard(1);
+    addChange(card);
+    type($("select[aria-label='Variant 2 change 1 operation']", card), "insert_after");
+    type(stepSel(card, 2, 1), "pick");
+    type($("select[aria-label='Variant 2 change 1 operation']", card), "replace");
+    expect($("input[aria-label='Variant 2 change 1 action']", card).value).toBe("Picks Pablo");
+    expect($("input[aria-label='Variant 2 change 1 step id']", card).value).toBe("pick");
+    type($("input[aria-label='Variant 2 change 1 action']", card), "Typed");
+    type($("select[aria-label='Variant 2 change 1 operation']", card), "insert_after");
+    type($("select[aria-label='Variant 2 change 1 operation']", card), "replace");
+    expect($("input[aria-label='Variant 2 change 1 action']", card).value).toBe("Typed");
+  });
+
+  it("the step list is not rebuilt when the select gets focus (an open native select must not change under the user)", async () => {
+    await open();
+    const select = stepSel(variantCard(0), 1, 1);
+    const before = [...select.options];
+    select.dispatchEvent(new Event("focus"));
+    expect([...select.options].every((o, i) => o === before[i])).toBe(true);
+  });
+});

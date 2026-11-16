@@ -34,14 +34,14 @@ describe("variant draft <-> payload", () => {
     expect(JSON.stringify(out)).not.toContain("null");
   });
 
-  it("an override starts from the base and is sent as typed (text trimmed, examples parsed)", () => {
+  it("an override is sent exactly as typed (a stored value is never normalised), examples are parsed", () => {
     const draft = blankVariant();
     Object.assign(draft, { title: "Quick", when: { size: ["small"] } });
     draft.overrides.trigger = "  The user is in a hurry ";
     draft.overrides.inputs = [{ object: "mapping", side: "list", example: "status: draft" }];
     const { out, errors } = build(draft);
     expect(errors).toEqual([]);
-    expect(out).toMatchObject({ trigger: "The user is in a hurry", inputs: [{ object: "mapping", source: "list", example: { status: "draft" } }] });
+    expect(out).toMatchObject({ trigger: "  The user is in a hurry ", inputs: [{ object: "mapping", source: "list", example: { status: "draft" } }] });
   });
 
   it("an overridden inputs or outputs list follows the base rules: at least one row, each with an example", () => {
@@ -62,8 +62,37 @@ describe("variant draft <-> payload", () => {
     const draft = variantDraft({ id: "v", title: "V", when: { size: ["small"] }, actors: { dana: "dex" } });
     draft.swaps.push({ from: "system", to: "" });
     expect(build(draft).out.actors).toEqual({ dana: "dex" });
-    draft.swaps = [];
-    expect("actors" in build(draft).out).toBe(false);
+    const fresh = Object.assign(blankVariant(), { title: "V", when: { size: ["small"] } });
+    expect("actors" in build(fresh).out).toBe(false);
+  });
+
+  it("an untouched variant re-serialises byte-equal: stored whitespace, an empty actors map and an empty steps list stay", () => {
+    const stored = { id: "v", title: "V", when: { size: ["small"] }, goal: " spaced  goal ", actors: {}, steps: [] };
+    const { out, errors } = build(variantDraft(stored));
+    expect(errors).toEqual([]);
+    expect(JSON.stringify(out)).toBe(JSON.stringify(stored));
+    // the stored empty map goes once the user adds a swap, and comes back as {} only while it was stored
+    const draft = variantDraft(stored);
+    draft.swaps.push({ from: "dana", to: "dex" });
+    expect(build(draft).out.actors).toEqual({ dana: "dex" });
+  });
+
+  it("an empty text override blocks Save with a field error; use base is the way out", () => {
+    const draft = variantDraft({ id: "v", title: "V", when: { size: ["small"] }, trigger: "x" });
+    draft.overrides.trigger = "  ";
+    const built = build(draft);
+    expect(built.errors).toEqual(['Variant "V": the trigger override is empty.']);
+    expect(built.fieldErrors).toEqual([{ path: "variant.0.override.trigger", message: "The trigger override is empty. Enter text or use the base." }]);
+    delete draft.overrides.trigger;
+    expect(build(draft).errors).toEqual([]);
+  });
+
+  it("a swap whose actors are the same blocks Save as a field error on the row", () => {
+    const draft = variantDraft({ id: "v", title: "V", when: { size: ["small"] }, actors: { dana: "dex" } });
+    draft.swaps[0].to = "dana";
+    const built = build(draft);
+    expect(built.errors).toEqual(['Variant "V", swap 1: pick two different actors.']);
+    expect(built.fieldErrors).toEqual([{ path: "variant.0.swap.0", message: "Pick two different actors." }]);
   });
 });
 

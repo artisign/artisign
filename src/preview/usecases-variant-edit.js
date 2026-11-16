@@ -41,6 +41,11 @@ export function emptyStep(actor = "system") {
   return { id: "", actor, action: "", kind: "screen", screen: "", node: "", data: [] };
 }
 
+/** A step body nothing was typed into yet (what Insert after / Append start with). */
+export function isUntouched(step) {
+  return step.action.trim() === "" && step.data.length === 0 && step.screen.trim() === "" && step.node.trim() === "" && !step.note;
+}
+
 function cloneStep(step) {
   return { ...step, data: step.data.map((d) => ({ ...d })) };
 }
@@ -64,6 +69,7 @@ export function variantDraft(variant) {
     when: { ...variant.when },
     // A stored empty `steps: []` stays (a file is saved exactly as it was when nothing changed).
     hadSteps: variant.steps !== undefined,
+    hadActors: variant.actors !== undefined,
     overrides,
     swaps: Object.entries(variant.actors ?? {}).map(([from, to]) => ({ from, to })),
     ops: (variant.steps ?? []).map((op) => ({ op: op.op, stepId: op.step_id ?? "", step: op.step ? stepDraft(op.step) : null })),
@@ -188,10 +194,25 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
   const out = { id: vid, title: variant.title.trim(), ...(variant.description.trim() ? { description: variant.description.trim() } : {}), when: variant.when };
 
   const { overrides } = variant;
-  for (const [key] of TEXT_OVERRIDES) if (overrides[key] !== undefined) out[key] = overrides[key].trim();
+  // A stored value is written back exactly as it is (no trimming); an override that is empty is an error, not a silent removal.
+  for (const [key, label] of TEXT_OVERRIDES) {
+    if (overrides[key] === undefined) continue;
+    out[key] = overrides[key];
+    if (overrides[key].trim() === "") {
+      errors.push(`Variant "${name}": the ${label.toLowerCase()} override is empty.`);
+      fieldErrors.push({ path: `variant.${index}.override.${key}`, message: `The ${label.toLowerCase()} override is empty. Enter text or use the base.` });
+    }
+  }
   if (overrides.personas !== undefined) out.personas = [...overrides.personas];
   const actors = actorsMap(variant.swaps);
-  if (Object.keys(actors).length > 0) out.actors = actors;
+  // A stored empty `actors: {}` stays, like `steps: []`.
+  if (Object.keys(actors).length > 0 || variant.hadActors) out.actors = actors;
+  variant.swaps.forEach((swap, j) => {
+    if (swap.from !== "" && swap.from === swap.to) {
+      errors.push(`Variant "${name}", swap ${j + 1}: pick two different actors.`);
+      fieldErrors.push({ path: `variant.${index}.swap.${j}`, message: "Pick two different actors." });
+    }
+  });
   for (const [key, sideKey, label] of [["inputs", "source", "input"], ["outputs", "target", "output"]]) {
     if (overrides[key] === undefined) continue;
     const rows = parseIo(overrides[key], sideKey, `Variant "${name}" ${label}`, errors);
@@ -294,18 +315,21 @@ const OP_LABELS = { replace: "Replace", insert_after: "Insert after", remove: "R
  *   objectOptions: () => { value: string, label: string }[],
  *   actorOptions: (current: string) => { value: string, label: string }[],
  *   markDirty: () => void,
+ *   refresh: () => void, // re-runs the dialog's warning / error pass; called after every redraw, because a redrawn field starts without its hint
  * }} env `draft` is the dialog's draft: the editor reads the base fields from it live and edits `draft.variants` in place.
  * @returns {{ el: HTMLElement, draw: (focusIndex?: number | null) => void, cards: () => HTMLElement[] }}
  */
 export function createVariantEditor(env) {
   const { draft, markDirty } = env;
   const box = h("div", { class: "uc-variants-edit" });
+  // One per drawn variant: re-reads the base (a base edit changes "From base" values, the step lists and the struck line).
+  let syncers = [];
 
   const baseSteps = () => draft.steps;
   const objectName = (id) => env.pool().objectsById.get(id)?.name ?? id;
 
   /** A step's own fields: id, actor, action, target, data changes. Used by the three change kinds that carry a step. */
-  function stepBody(step, variantIndex, opIndex) {
+  function stepBody(step, variantIndex, opIndex, onEdit) {
     const path = `variant.${variantIndex}.op.${opIndex}`;
     const label = `Variant ${variantIndex + 1} change ${opIndex + 1}`;
     const screenListId = nextId("uc-screens");
@@ -313,10 +337,10 @@ export function createVariantEditor(env) {
     const nodeList = h("datalist", { id: nodeListId });
     const fillNodes = (screen) => env.ensureNodes(screen)?.then((list) => nodeList.replaceChildren(...(list ?? []).slice(0, 400).map((n) => h("option", { value: n }, n))));
     const idHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `${path}.id` } });
-    const idInput = textInput({ value: step.id, mono: true, placeholder: "from the action", ariaLabel: `${label} step id`, onInput: (value) => { step.id = value; markDirty(); } });
+    const idInput = textInput({ value: step.id, mono: true, placeholder: "from the action", ariaLabel: `${label} step id`, onInput: (value) => { step.id = value; markDirty(); onEdit(); } });
     idInput.dataset.errorPath = `${path}.id`;
     idInput.dataset.hint = idHint.id;
-    const actionInput = textInput({ value: step.action, placeholder: "What happens", ariaLabel: `${label} action`, onInput: (value) => { step.action = value; markDirty(); } });
+    const actionInput = textInput({ value: step.action, placeholder: "What happens", ariaLabel: `${label} action`, onInput: (value) => { step.action = value; markDirty(); onEdit(); } });
     const screenInput = textInput({ value: step.screen, list: screenListId, placeholder: "screen", mono: true, ariaLabel: `${label} screen`, onInput: (value) => { step.screen = value; markDirty(); if (env.screens().includes(value.trim())) fillNodes(value.trim()); } });
     const nodeInput = textInput({ value: step.node, list: nodeListId, placeholder: "element id", mono: true, ariaLabel: `${label} element`, onInput: (value) => { step.node = value; markDirty(); } });
     const targetRow = h("div", { class: "uc-target-edit" });
@@ -362,9 +386,11 @@ export function createVariantEditor(env) {
 
   function draw(focusIndex = null) {
     box.replaceChildren();
+    syncers = [];
     draft.variants.forEach((variant, index) => box.append(drawVariant(variant, index)));
     box.append(h("button", { type: "button", class: "uc-link-btn", onClick: () => { draft.variants.push(blankVariant()); markDirty(); draw(draft.variants.length - 1); } }, icon("add"), "Variant"));
     if (focusIndex !== null) box.querySelectorAll(".uc-variant-edit")[focusIndex]?.querySelector("input")?.focus();
+    env.refresh();
   }
 
   function drawVariant(variant, index) {
@@ -469,8 +495,11 @@ export function createVariantEditor(env) {
 
     function editorFor(spec) {
       if (TEXT_OVERRIDES.some(([key]) => key === spec.key)) {
+        const hint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `variant.${index}.override.${spec.key}` } });
         const area = textArea({ value: variant.overrides[spec.key], rows: 2, ariaLabel: `Variant ${n} ${spec.label.toLowerCase()}`, onInput: (value) => { variant.overrides[spec.key] = value; markDirty(); } });
-        return area;
+        area.dataset.errorPath = `variant.${index}.override.${spec.key}`;
+        area.dataset.hint = hint.id;
+        return h("div", { class: "uc-override-edit" }, area, hint);
       }
       if (spec.key === "personas") return personaEditor();
       return ioEditor(spec.key, spec.key === "inputs" ? "source" : "target");
@@ -500,6 +529,7 @@ export function createVariantEditor(env) {
       rows[key] = fresh;
       if (focus === "editor") fresh.querySelector("textarea, select, .uc-link-btn")?.focus();
       else if (focus === "override") fresh.querySelector(".uc-inherited button")?.focus();
+      if (row) env.refresh();
       return fresh;
     }
     for (const spec of ROWS) overrideGrid.append(drawRow(spec.key));
@@ -511,7 +541,8 @@ export function createVariantEditor(env) {
       swapBox.querySelectorAll(".uc-swap-row").forEach((rowEl, j) => {
         const swap = variant.swaps[j];
         const [fromSel, toSel] = rowEl.querySelectorAll("select");
-        for (const option of fromSel.options) option.disabled = option.value !== "" && option.value !== swap.from && taken.has(option.value);
+        // Both ways: a from-value appears once and is never the row's own "to"; a "to" is never the row's own "from".
+        for (const option of fromSel.options) option.disabled = option.value !== "" && option.value !== swap.from && (taken.has(option.value) || option.value === swap.to);
         for (const option of toSel.options) option.disabled = option.value !== "" && option.value === swap.from;
       });
     };
@@ -521,11 +552,14 @@ export function createVariantEditor(env) {
         variant.swaps.length === 0 ? h("p", { class: "uc-muted uc-var-empty" }, "None. Every inherited step keeps its base actor.") : null,
         ...variant.swaps.map((swap, j) => {
           const warn = (side) => h("p", { class: "uc-field-warn", hidden: true, dataset: { path: `variant.${index}.swap.${j}.${side}` } });
+          const same = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `variant.${index}.swap.${j}` } });
           const onSwap = (side) => (value) => { swap[side] = value; markDirty(); syncSwaps(); drawRow("personas"); };
           const fromSel = selectInput({ options: actorChoices(swap.from), value: swap.from, ariaLabel: `Variant ${n} swap ${j + 1} from`, onChange: onSwap("from") });
           const toSel = selectInput({ options: actorChoices(swap.to), value: swap.to, ariaLabel: `Variant ${n} swap ${j + 1} to`, onChange: onSwap("to") });
           fromSel.dataset.path = `variant.${index}.swap.${j}.from`;
           toSel.dataset.path = `variant.${index}.swap.${j}.to`;
+          toSel.dataset.errorPath = `variant.${index}.swap.${j}`;
+          toSel.dataset.hint = same.id;
           return h(
             "div",
             { class: "uc-swap-row" },
@@ -535,12 +569,14 @@ export function createVariantEditor(env) {
             removeButton(`Remove actor swap ${j + 1} of variant ${n}`, () => { variant.swaps.splice(j, 1); markDirty(); drawSwaps(); drawRow("personas"); }),
             warn("from"),
             warn("to"),
+            same,
           );
         }),
         h("button", { type: "button", class: "uc-link-btn", onClick: () => { variant.swaps.push({ from: "", to: "" }); markDirty(); drawSwaps(true); } }, icon("add"), "Actor swap"),
       );
       syncSwaps();
       if (focusLast) [...swapBox.querySelectorAll(".uc-swap-row")].at(-1)?.querySelector("select")?.focus();
+      env.refresh();
     };
     drawSwaps();
 
@@ -553,7 +589,11 @@ export function createVariantEditor(env) {
       select.replaceChildren(...options.map((o) => h("option", { value: o.value }, o.label)));
       select.value = op.stepId;
     };
+    let stepSelects = [];
+    /** Re-lists the flow in every change's step select. Called when the changes or the base change, never on focus (that would rewrite an open select). */
+    const refreshOptions = () => stepSelects.forEach(({ select, op, i }) => fillStepOptions(select, op, i));
     const drawOps = (focus = null) => {
+      stepSelects = [];
       fill(opsBox,
         variant.ops.length === 0 ? h("p", { class: "uc-muted uc-var-empty" }, `None. This variant runs the ${baseSteps().length} base steps as they are.`) : null,
         ...variant.ops.map((op, i) => {
@@ -564,8 +604,7 @@ export function createVariantEditor(env) {
           else {
             stepControl = h("select", { class: "chrome-field uc-select", "aria-label": `${label} step`, dataset: { path: `variant.${index}.op.${i}.step`, role: "step" } });
             fillStepOptions(stepControl, op, i);
-            // Earlier edits (a renamed base step, an id typed in a change above) change what this select lists: refresh when it is reached.
-            stepControl.addEventListener("focus", () => fillStepOptions(stepControl, op, i));
+            stepSelects.push({ select: stepControl, op, i });
             stepControl.addEventListener("change", () => pickStep(op, i, stepControl.value));
           }
           const warn = h("p", { class: "uc-field-warn", id: nextId("uc-warn"), hidden: true, dataset: { path: `variant.${index}.op.${i}.step` } });
@@ -579,7 +618,7 @@ export function createVariantEditor(env) {
               diffBadge("removed"),
               entry ? h("span", { class: "uc-op-struck" }, [actorName(entry.baseActor, pool.personasById), entry.action, entry.step.screen].filter(Boolean).join(" · ")) : h("span", { class: "uc-muted" }, "Pick the step to remove."),
             );
-          } else if (op.step) body = stepBody(op.step, index, i);
+          } else if (op.step) body = stepBody(op.step, index, i, refreshOptions);
           return h(
             "div",
             { class: "uc-step-op", dataset: { op: op.op, index: String(i) } },
@@ -591,7 +630,14 @@ export function createVariantEditor(env) {
         h("button", { type: "button", class: "uc-link-btn", onClick: () => { variant.ops.push({ op: "replace", stepId: "", step: null }); markDirty(); drawOps({ index: variant.ops.length - 1 }); } }, icon("add"), "Step change"),
       );
       if (focus) opsBox.querySelectorAll(".uc-step-op")[focus.index]?.querySelector(focus.part === "step" ? "[data-role=step]" : "select")?.focus();
+      env.refresh();
     };
+    /** A new id for a step a change adds: unique in the flow at that point and among every id the case already has. */
+    const freshId = (i) => {
+      const taken = new Set([...flowBefore(baseSteps(), variant, i).map((e) => e.id), ...baseSteps().map((s) => s.id), ...variantStepIds(draft.variants)].filter(Boolean));
+      return uniqueId("new-step", taken);
+    };
+    const newBody = (i) => ({ ...emptyStep(draft.personas[0] ?? "system"), id: freshId(i) });
     /** The flow entry a replace starts from: its whole step, carrying the actor the swaps give it. */
     const prefill = (op, i) => {
       const entry = flowBefore(baseSteps(), variant, i).find((e) => e.id === op.stepId);
@@ -599,19 +645,24 @@ export function createVariantEditor(env) {
     };
     function pickStep(op, i, value) {
       op.stepId = value;
-      // The first pick fills the body from that step; later picks keep what was typed.
-      if (op.op === "replace" && !op.step) op.step = prefill(op, i);
+      // A pick fills the body from that step while nothing was typed into it; later picks keep what was typed.
+      if (op.op === "replace" && (!op.step || isUntouched(op.step))) op.step = prefill(op, i);
       markDirty();
       drawOps({ index: i, part: "step" });
     }
     function changeKind(op, i, value) {
       op.op = value;
-      if (value === "replace" && !op.step && op.stepId !== "") op.step = prefill(op, i);
-      else if ((value === "insert_after" || value === "append") && !op.step) op.step = emptyStep(draft.personas[0] ?? "system");
+      if (value === "replace") {
+        if (!op.step || isUntouched(op.step)) op.step = op.stepId !== "" ? prefill(op, i) : null;
+      } else if ((value === "insert_after" || value === "append") && !op.step) op.step = newBody(i);
       markDirty();
       drawOps({ index: i });
     }
     drawOps();
+    syncers.push(() => {
+      for (const spec of ROWS) if (variant.overrides[spec.key] === undefined) drawRow(spec.key);
+      drawOps();
+    });
 
     const section = (title, hint, ...children) => h("section", { class: "uc-var-section" }, h("h3", { class: "uc-var-h" }, title, h("span", { class: "uc-label-hint" }, ` · ${hint}`)), ...children);
 
@@ -628,5 +679,5 @@ export function createVariantEditor(env) {
     );
   }
 
-  return { el: box, draw, cards: () => [...box.querySelectorAll(".uc-variant-edit")] };
+  return { el: box, draw, syncBase: () => syncers.forEach((sync) => sync()), cards: () => [...box.querySelectorAll(".uc-variant-edit")] };
 }

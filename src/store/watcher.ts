@@ -88,8 +88,16 @@ export function watchProject(
       }
     }
   };
+  // chokidar emits `unlink` only for entries it tracks itself, so files that
+  // only the scan reported would stay in `known` after their folder is
+  // removed and a recreated folder would never report them again.
+  const forgetUnder = (dir: string): void => {
+    const prefix = dir + sep;
+    for (const path of known) if (path.startsWith(prefix)) known.delete(path);
+  };
   const rescans = new Set<NodeJS.Timeout>();
   const onNewDir = (dir: string): void => {
+    forgetUnder(dir); // a (re)created folder starts empty
     void scanNewDir(dir);
     const timer = setTimeout(() => {
       rescans.delete(timer);
@@ -99,6 +107,7 @@ export function watchProject(
   };
 
   watcher.on("add", (path) => {
+    if (known.has(path)) return; // already reported by the scan
     known.add(path);
     emit("add", path);
   });
@@ -115,6 +124,7 @@ export function watchProject(
     emit("add", path);
     onNewDir(path);
   });
+  watcher.on("unlinkDir", (path) => forgetUnder(path));
   watcher.on("change", (path) => emit("change", path));
   watcher.on("unlink", (path) => {
     known.delete(path);

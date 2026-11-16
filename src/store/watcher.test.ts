@@ -201,4 +201,29 @@ describe("watchProject", () => {
     await waitFor(events, (e) => e.path.includes("home.html"), 500);
     expect(events.some((e) => e.path.startsWith(".artisign"))).toBe(false);
   });
+
+  it("reports a file again after its folder was deleted and recreated the same way", async () => {
+    const events: ProjectChangeEvent[] = [];
+    const stop = watchProject(dir, (event) => events.push(event));
+    unwatch = stop;
+    await stop.ready;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const write = async (): Promise<void> => {
+      await mkdir(join(dir, "usecases"), { recursive: true });
+      await writeFile(join(dir, "usecases", "personas.json.tmp"), "{}");
+      await rename(join(dir, "usecases", "personas.json.tmp"), join(dir, "usecases", "personas.json"));
+    };
+    const adds = (): number => events.filter((e) => e.path === "usecases/personas.json" && e.type === "add").length;
+
+    await write();
+    await waitFor(events, (e) => e.path === "usecases/personas.json", 3000);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await rm(join(dir, "usecases"), { recursive: true, force: true });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await write();
+
+    const start = Date.now();
+    while (adds() < 2 && Date.now() - start < 3000) await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(adds()).toBe(2);
+  });
 });

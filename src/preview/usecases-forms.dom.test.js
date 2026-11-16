@@ -381,6 +381,34 @@ describe("persona dialog", () => {
     expect(save2.mock.calls[0][0].avatar.color).not.toBe("teal");
   });
 
+  it("a persona stored without a colour stays without one on save, until a swatch is clicked", async () => {
+    const source = { ...makePool().personas[2], avatar: { emoji: "🧑" } };
+    const save = vi.fn(async () => ({ ok: true, data: {} }));
+    const kept = openPersonaDialog({ mode: "edit", source, pool: () => makePool(), takenIds: () => new Set(), save, remove: vi.fn() });
+    await flush();
+    type($("dialog input[autofocus]"), "Renamed");
+    button("Save persona").click();
+    await kept;
+    expect(save.mock.calls[0][0].avatar).toEqual({ emoji: "🧑" });
+    const save2 = vi.fn(async () => ({ ok: true, data: {} }));
+    const picked = openPersonaDialog({ mode: "edit", source, pool: () => makePool(), takenIds: () => new Set(), save: save2, remove: vi.fn() });
+    await flush();
+    $$("dialog .uc-swatch-btn")[0].click();
+    button("Save persona").click();
+    await picked;
+    expect(save2.mock.calls[0][0].avatar.color).toBeTruthy();
+  });
+
+  it("a new persona still gets the default palette colour", async () => {
+    const save = vi.fn(async () => ({ ok: true, data: {} }));
+    const closed = openPersonaDialog({ mode: "new", source: null, pool: () => makePool(), takenIds: () => new Set(), save, remove: vi.fn() });
+    await flush();
+    type($("dialog input[autofocus]"), "Sol");
+    button("Create persona").click();
+    await closed;
+    expect(save.mock.calls[0][0].avatar.color).toMatch(/^#/);
+  });
+
   it("edit mode keeps the id, marks a generated persona and deletes after a confirmation line", async () => {
     const remove = vi.fn(async () => ({ ok: true, data: { warnings: [{ kind: "dangling_reference", message: "used by assign" }] } }));
     const closed = openPersonaDialog({ mode: "edit", source: makePool().personas[2], pool: () => makePool(), takenIds: () => new Set(), save: vi.fn(), remove });

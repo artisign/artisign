@@ -18,10 +18,12 @@ export function buildPersonaPayload({ id, draft, source }) {
   if (errors.length > 0) return { errors };
   const goals = draft.goals.split("\n").map((g) => g.trim()).filter(Boolean);
   const traits = Object.fromEntries(Object.entries(draft.traits).filter(([, value]) => value !== ""));
+  // A colour is sent only when there is one: a persona stored without a colour stays without one until a swatch is clicked.
+  const avatar = { ...(draft.emoji ? { emoji: draft.emoji } : {}), ...(draft.color ? { color: draft.color } : {}) };
   const payload = {
     id,
     name: draft.name.trim(),
-    avatar: { ...(draft.emoji ? { emoji: draft.emoji } : {}), color: draft.color },
+    ...(Object.keys(avatar).length > 0 || source?.avatar !== undefined ? { avatar } : {}),
     traits,
     ...(draft.role.trim() !== "" ? { role: draft.role.trim() } : source?.role !== undefined ? { role: null } : {}),
     ...(goals.length > 0 ? { goals } : source?.goals !== undefined ? { goals: null } : {}),
@@ -118,8 +120,8 @@ export async function openPersonaDialog(options) {
     name: source?.name ?? "",
     role: source?.role ?? "",
     emoji: source?.avatar?.emoji ?? (mode === "new" ? "🧑" : ""),
-    // A stored colour stays as stored, even one safeColor rejects (a named colour): it only changes when a swatch is clicked.
-    color: source?.avatar?.color || AVATAR_COLORS[pool.personas.length % AVATAR_COLORS.length],
+    // Edit mode keeps the stored colour as stored (a named colour included, "" when there is none); only a swatch click changes it.
+    color: mode === "edit" ? source?.avatar?.color ?? "" : source?.avatar?.color || AVATAR_COLORS[pool.personas.length % AVATAR_COLORS.length],
     traits: { ...(source?.traits ?? {}) },
     description: source?.description ?? "",
     goals: (source?.goals ?? []).join("\n"),

@@ -80,6 +80,19 @@ describe("draft and payload", () => {
     expect(payload.steps.slice(3).map((s) => s.id)).toEqual(["same-action", "same-action-2"]);
   });
 
+  it("keeps an empty before/after of a step's data through open and save", () => {
+    const source = { ...rawUseCase, steps: [{ id: "s1", actor: "dana", action: "Check", data: [{ object: "mapping", before: {}, after: {} }, { object: "mapping", before: {}, after: { status: "ready" } }] }] };
+    const draft = draftFromSource(source);
+    expect(buildPayload({ id: "map-step", draft, source }).payload.steps).toEqual(source.steps);
+    draft.steps[0].data[1].after = ""; // a cleared non-empty value is still dropped
+    expect(buildPayload({ id: "map-step", draft, source }).payload.steps[0].data[1]).toEqual({ object: "mapping", before: {} });
+  });
+
+  it("does not count reordered keys alone as a variant change", () => {
+    const reordered = { ...rawUseCase, variants: rawUseCase.variants.map((v) => Object.fromEntries(Object.entries(v).reverse())) };
+    expect(buildPayload({ id: "map-step", draft: draftFromSource(reordered), source: rawUseCase }).payload.variants).toBeUndefined();
+  });
+
   it("sends the variants when they changed, and null when they were all removed", () => {
     const edited = draftFromSource(rawUseCase);
     edited.variants[0].title = "Renamed";

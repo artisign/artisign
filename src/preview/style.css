@@ -8177,7 +8177,34 @@ button.uc-target:hover {
 }
 
 /* The id hint spans the row; the target toggle and "+ Data change" sit under the actor (column 2). */
-.uc-op-body > .uc-field-error,
+.uc-op-body > .uc-field-error {
+  grid-column: 1 / -1;
+}
+
+.uc-op-body > .uc-target-edit,
+.uc-op-body > .uc-step-data-edit {
+  grid-column: 2 / -1;
+  padding-left: 0;
+}
+
+/* A hint under the step select lines up with the select, not with the operation. */
+.uc-step-op > .uc-op-hint {
+  padding-left: calc(130px + var(--space-md));
+}
+
+.uc-op-removed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-tertiary);
+}
+
+.uc-op-struck {
+  text-decoration: line-through;
+}
+
+.uc-field-error,
 .uc-variants-edit .uc-field-warn {
   display: flex;
   align-items: center;

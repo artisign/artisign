@@ -134,9 +134,9 @@ describe("watchProject", () => {
     await rename(join(dir, "usecases", "personas.json.tmp"), join(dir, "usecases", "personas.json"));
 
     await waitFor(events, (e) => e.path === "usecases/personas.json", 3000);
-    // Reported once, not once per scan.
+    // Reported once (as add or, when chokidar's own change folds in, change), not once per scan.
     await new Promise((resolve) => setTimeout(resolve, 600));
-    expect(events.filter((e) => e.path === "usecases/personas.json" && e.type === "add")).toHaveLength(1);
+    expect(events.filter((e) => e.path === "usecases/personas.json" && e.type !== "unlink")).toHaveLength(1);
   });
 
   it("categorizes assets/<path> as \"asset\"", async () => {
@@ -213,7 +213,7 @@ describe("watchProject", () => {
       await writeFile(join(dir, "usecases", "personas.json.tmp"), "{}");
       await rename(join(dir, "usecases", "personas.json.tmp"), join(dir, "usecases", "personas.json"));
     };
-    const adds = (): number => events.filter((e) => e.path === "usecases/personas.json" && e.type === "add").length;
+    const adds = (): number => events.filter((e) => e.path === "usecases/personas.json" && e.type !== "unlink").length;
 
     await write();
     await waitFor(events, (e) => e.path === "usecases/personas.json", 3000);

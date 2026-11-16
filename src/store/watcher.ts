@@ -13,6 +13,7 @@ function categorize(relativePath: string): ChangeCategory {
   if (segments[0] === "design-system" && segments[1] === "patterns") return "pattern";
   if (segments[0] === "assets") return "asset";
   if (segments[0] === "tags") return "tag_meta";
+  if (segments[0] === "usecases") return "usecases";
   if (relativePath === "design-system/tokens.json") return "tokens";
   if (relativePath === "design-system/meta.json") return "design_system_meta";
   if (relativePath === "flows.json") return "flows";

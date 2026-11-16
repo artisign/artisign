@@ -496,6 +496,87 @@ names a deleted screen as its backdrop (the attribute is left as written).
 
 Write metadata when the decision is fresh, not as a cleanup pass.
 
+## Use cases (optional)
+
+A project may hold **personas**, reusable **data objects** and **use cases**
+next to its screens, in `usecases/`: specs that coding agents write and read —
+what the product must do, for whom, with which data, on which screen. Use them
+when the user wants spec-driven work. A
+project without `usecases/` is unaffected — nothing here applies and nothing is
+created until the first `set_use_cases`.
+
+Workflow, in this order:
+
+1. **Dimensions and personas.** A dimension is an axis along which users differ
+   (`membership` with values `student`, `staff`; `branch-access`; ...).
+   Define the dimensions first, then personas with `traits` (`{dimension:
+   value}`). A missing trait means "any value", so one generic persona can
+   stand for a homogeneous group. `generate_personas` expands the dimensions
+   deterministically (`pairwise` by default: every value pair of two
+   dimensions at least once; `all`: the full product) — preview with
+   `dry_run: true`, cap with `limit`. It skips combinations an existing
+   persona already covers. `truncated: true` means `limit` was reached. A call
+   has a work budget: when it runs out the response carries `partial: true` and
+   a `partial_result` warning, the personas written are a prefix of the full
+   result, and calling again continues because covered combinations are
+   skipped. `pairwise` is rejected above 1,000,000 value pairs, like `all`
+   above 1,000,000 combinations — narrow `dimensions`.
+2. **Data objects.** The reusable things the product handles (`loan`,
+   `member`): `fields` with `name`, `type` (`string | number | boolean |
+   date | datetime | enum | ref | list | object`), `values` for an enum, `ref`
+   for a reference to another object, an `example`.
+3. **Use cases** — `title`, `group` (a path like `catalog/loans`), `tags`,
+   `status` (`draft | ready`: how mature the spec is, not whether it is built),
+   `personas`, `trigger`, `goal`, `outcome`, and:
+   - Work state, priority and assignee are not use-case fields — they live in
+     your ticket tracker. Link a ticket with a tag such as `proj-123`.
+   - **`inputs` and `outputs` are mandatory** — at least one each, every entry
+     `{object, example}` (`source` on an input, `target` on an output): what
+     the case consumes and produces, with concrete example values.
+   - **`steps`** — the flow: `{id, actor, action, target?, data?}`. `actor` is
+     a persona id or `"system"`. `data` lists the state change of a step:
+     `{object, before, after}`.
+4. **Variants.** Where a persona group behaves differently, add a variant, not
+   a copy of the case: `{id, title, when, ...}`. `when` selects trait values
+   (`{"branch-access": ["all-branches"]}`: any-of per dimension, all dimensions
+   must match). A variant may override `personas`, `trigger`, `goal`,
+   `outcome`, replace `inputs`/`outputs` wholesale, and change the flow with
+   `steps` ops: `replace` / `insert_after` / `remove` (each by `step_id`) and
+   `append`. `suggest_use_case_variants {id}` names the trait values of the persona pool
+   that neither the case's personas nor an existing variant cover, with
+   skeletons to fill in. Write variants back with `set_use_cases` — `variants`
+   is replaced as a whole, so read the existing ones first.
+5. **Map steps to the design.** `step.target = {screen, node?}`. With `node`
+   the step touches one element, without it the whole screen — the scope is
+   derived. Use ids from `get_screen`/`find_nodes`, and **give a node an
+   authored id before mapping a step to it**: a generated id (`n17`) is a
+   position, not an identity, and after the screen is rewritten it can silently
+   point at another element (`mapping_unstable` warns). Mappings are never
+   rewritten for you, so a mapping to a regenerated screen or a removed node is
+   reported as `mapping_stale` on read.
+6. **Coding agents read `get_use_case {id}`** — one call returns the use case,
+   its personas, dimensions, data objects and the mapped screens with their
+   nodes. `variant: "<id>"` returns that variant resolved into a full use case:
+   steps carry `change: "changed" | "added"`, deleted steps come as
+   `removed_steps`. Browse with `get_use_cases` (filters `group` prefix,
+   `persona`, `screen`, `node`, `tag`, `status`, `query`, `has_variants`;
+   `sort`, `cursor`, `limit`; facet counts on the first page; `include:
+   ["personas", "dimensions", "data_objects"]` adds the pools).
+
+Writing: `set_use_cases` takes `{dimensions?, personas?, data_objects?,
+use_cases?}`, each a list of entities with an `id` (lowercase kebab-case,
+chosen by you, stable — a use case id is its filename). It upserts by id; an
+existing entity is merged at top level (given keys replace, arrays whole,
+`null` removes a key), so a status change is `{id, status: "ready"}`. The whole
+call is validated before anything is written; unknown personas, data objects,
+dimensions, example fields or screens only come back as warnings. Delete with
+`delete_entity` kinds `persona`, `data_object`, `use_case`, `dimension` — it
+warns about references left dangling and does not repair them. Like design
+files, `usecases/` changes only through these tools. The one exception: a file
+under `usecases/` that no longer validates (hand edit, merge conflict, a newer
+version's key) makes the tools fail with `invalid_state` naming it; then you may
+repair that file by hand, or remove a case with a valid id via `delete_entity`.
+
 ## Anti-pattern checklist
 
 Before calling a screen done, verify none of these apply:

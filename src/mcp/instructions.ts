@@ -11,7 +11,7 @@ get_guide takes a required "project": a project name or an absolute path.
 init_project returns it.
 
 FILES: change the design (screens, design-system, mockups, tokens, flows,
-comments) only through these tools — never with shell, scripts or file-edit
+comments, use cases) only through these tools — never with shell, scripts or file-edit
 tools. Copying an image into assets/ is fine.
 
 WORKFLOW: tokens -> components -> screens; inline values only while exploring
@@ -71,6 +71,9 @@ render as Markdown in the preview.
 LIFECYCLE: write_html kind:"component"|"pattern" writes a definition (default
 variant + <template data-variant> siblings); delete_entity removes a
 screen/component/pattern/mockup.
+
+USE CASES (optional): personas, data objects, use cases with steps mapped to
+screens/nodes — get_use_case reads one, set_use_cases writes. Shapes: get_guide.
 
 MOCKUPS: several options of one screen, or early directions before a design
 system exists — raw HTML, outside the ref model, no drift warnings.

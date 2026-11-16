@@ -137,6 +137,19 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 | Visual review | `get_screenshot` | Screenshots a rendered screen (or one node), or one mockup variant, as a PNG — the write → screenshot → adjust loop. |
 | Visual review | `inspect_node` | Computed box and styles of one node as text — cheaper than vision for geometry questions. |
 
+### Unreleased — on `main`, not part of 2.2.1
+
+Specs that coding agents write and read: an optional `usecases/` folder with personas, data objects and use cases whose steps map onto screens and elements. A project without it behaves exactly as before. These five tools and four extra `delete_entity` kinds are merged but not yet in a release, so the tool count above is unchanged until one ships.
+
+| Bucket | Tool | Does |
+|---|---|---|
+| Reads | `get_use_cases` | Use cases filtered by group prefix, persona, screen, node, tag, status, text or variants; sorted, paged, with facet counts. `include` adds the personas, dimensions and data objects. |
+| Reads | `get_use_case` | One-call bundle for a coding agent: the (variant-resolved) use case, its personas, data objects and the mapped screens with their nodes. |
+| Reads | `suggest_use_case_variants` | For one use case, the persona-pool trait values no variant covers yet, with variant skeletons to fill in. |
+| Writes | `set_use_cases` | Bulk upsert of dimensions, personas, data objects and use cases; one commit per call, reference problems are warnings. |
+| Writes | `generate_personas` | Deterministic generic personas from the dimensions (`pairwise` or `all`), skipping combinations already covered; `dry_run` previews. |
+| Lifecycle | `delete_entity` | Also takes the kinds `persona`, `dimension`, `data_object` and `use_case`, warning about dangling references. |
+
 ### The write → screenshot → adjust loop
 
 `get_screenshot` renders a screen (or, given `node`, crops to one element) exactly the way the browser preview does — same parse, same `renderScreen` — and returns a PNG, so an agent can see what a write actually produced instead of only inspecting markup. Typical use: `write_html`/`patch_html`, then `get_screenshot` to review, then adjust.
@@ -237,7 +250,7 @@ src/daemon/          daemon lifecycle — project registry, global config/lock (
 src/init/            project scaffolding (init) and artisign.json
 src/store/           Store interface, FsStore, watcher, atomic writes, git auto-commit
 src/model/           HTML parser, canonical ref model, index
-src/tools/           the 25 tools (reads, writes, lifecycle, comments, visual review)
+src/tools/           the tools (reads, writes, lifecycle, comments, visual review, use cases)
 src/mcp/             MCP server (streamable HTTP) and the stdio bridge to it
 src/http/            internal JSON API + SSE, consumed by the preview
 src/preview/         browser preview — plain ES modules, no build step

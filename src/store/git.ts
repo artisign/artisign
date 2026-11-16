@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { realpath } from "node:fs/promises";
+import { access, realpath } from "node:fs/promises";
+import { join } from "node:path";
 import type { CommitResult, HeadCommitResult } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -99,6 +100,15 @@ export async function getHeadCommit(projectDir: string): Promise<HeadCommitResul
   }
 }
 
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Resolves symlinks so it compares on equal footing with `git rev-parse --show-toplevel`. */
 async function realOrSelf(path: string): Promise<string> {
   try {
@@ -123,29 +133,82 @@ async function realOrSelf(path: string): Promise<string> {
  */
 export async function autoCommit(projectDir: string, message: string): Promise<CommitResult> {
   try {
-    if (!(await isGitRepo(projectDir))) {
-      await git(projectDir, ["init"]);
-    }
-
-    const [toplevel, real] = await Promise.all([
-      git(projectDir, ["rev-parse", "--show-toplevel"]),
-      realOrSelf(projectDir),
-    ]);
-    if (toplevel !== real) {
-      return { sha: null, skipped_reason: "nested_repo" };
-    }
+    const nested = await prepareRepo(projectDir);
+    if (nested) return nested;
 
     await git(projectDir, ["add", "-A", "--", "."]);
     const status = await git(projectDir, ["status", "--porcelain"]);
     if (status === "") {
       return { sha: null, skipped_reason: "nothing_to_commit" };
     }
-    try {
-      await git(projectDir, ["commit", "-m", message]);
-    } catch (err) {
-      if (!isIdentityUnknownError(err)) throw err;
-      await git(projectDir, [...(await fallbackIdentityFlags(projectDir)), "commit", "-m", message]);
+    await commitWith(projectDir, ["commit", "-m", message]);
+    return { sha: await git(projectDir, ["rev-parse", "HEAD"]) };
+  } catch (err) {
+    return { sha: null, skipped_reason: `git_error: ${errorFirstLine(err)}` };
+  }
+}
+
+/** Initializes a repo on first use; a project dir that lives inside some other repo is reported as skipped instead. */
+async function prepareRepo(projectDir: string): Promise<CommitResult | undefined> {
+  if (!(await isGitRepo(projectDir))) {
+    await git(projectDir, ["init"]);
+  }
+  const [toplevel, real] = await Promise.all([
+    git(projectDir, ["rev-parse", "--show-toplevel"]),
+    realOrSelf(projectDir),
+  ]);
+  return toplevel !== real ? { sha: null, skipped_reason: "nested_repo" } : undefined;
+}
+
+/** Runs a git commit, retried once with `FALLBACK_IDENTITY` when git refused only for want of an identity. */
+async function commitWith(projectDir: string, args: string[]): Promise<void> {
+  try {
+    await git(projectDir, args);
+  } catch (err) {
+    if (!isIdentityUnknownError(err)) throw err;
+    await git(projectDir, [...(await fallbackIdentityFlags(projectDir)), ...args]);
+  }
+}
+
+/** True when `path` is in HEAD or in the index — i.e. git has something to record when the file is gone. */
+async function isKnownToGit(projectDir: string, path: string): Promise<{ inHead: boolean; inIndex: boolean }> {
+  const inHead = (await git(projectDir, ["ls-tree", "--name-only", "HEAD", "--", path]).catch(() => "")) !== "";
+  const inIndex = (await git(projectDir, ["ls-files", "--cached", "--", path])) !== "";
+  return { inHead, inIndex };
+}
+
+/**
+ * Commits exactly `paths` (project-relative) and nothing else: `git add -- <paths>`
+ * then `git commit --only -- <paths>`. Anything else that is modified or staged
+ * stays out of the commit and goes into the next one. A path that is gone from
+ * disk and was never committed (a file created and deleted before any commit)
+ * cannot be part of a pathspec and is dropped; if no path remains, or none has
+ * a change, nothing is committed (`nothing_to_commit`). Same repo rules as
+ * `autoCommit`: initialized on first use, skipped inside an outer repo.
+ */
+export async function autoCommitPaths(projectDir: string, message: string, paths: string[]): Promise<CommitResult> {
+  try {
+    const nested = await prepareRepo(projectDir);
+    if (nested) return nested;
+
+    const specs: string[] = [];
+    for (const path of [...new Set(paths)]) {
+      if (await pathExists(join(projectDir, path))) {
+        specs.push(path);
+        continue;
+      }
+      const known = await isKnownToGit(projectDir, path);
+      if (known.inHead) specs.push(path);
+      // Staged earlier, deleted since, never committed: forget the index entry so it cannot leak into a later commit.
+      else if (known.inIndex) await git(projectDir, ["rm", "--cached", "--quiet", "--", path]);
     }
+    if (specs.length === 0) return { sha: null, skipped_reason: "nothing_to_commit" };
+
+    await git(projectDir, ["add", "--", ...specs]);
+    if ((await git(projectDir, ["status", "--porcelain", "--", ...specs])) === "") {
+      return { sha: null, skipped_reason: "nothing_to_commit" };
+    }
+    await commitWith(projectDir, ["commit", "--only", "-m", message, "--", ...specs]);
     return { sha: await git(projectDir, ["rev-parse", "HEAD"]) };
   } catch (err) {
     return { sha: null, skipped_reason: `git_error: ${errorFirstLine(err)}` };

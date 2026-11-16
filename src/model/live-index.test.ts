@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { FsStore } from "../store/fs-store.js";
 import type { Store, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, TagMeta, MockupMeta, DesignSystemMeta, CommitResult, HeadCommitResult } from "../store/index.js";
 import { initProject } from "../init/init-project.js";
+import type { DataObject, PersonaPool, UseCase } from "../usecases/schema.js";
 import { watchAndReindex } from "./live-index.js";
 import type { ProjectIndex } from "./index-builder.js";
 
@@ -47,6 +48,25 @@ class FakeStore implements Store {
     return { notes: "", tags: [] };
   }
   async writeScreenMeta() {}
+  async readPersonaPool(): Promise<PersonaPool> {
+    return { dimensions: [], personas: [] };
+  }
+  async writePersonaPool() {}
+  async readDataObjects(): Promise<DataObject[]> {
+    return [];
+  }
+  async writeDataObjects() {}
+  async listUseCaseIds(): Promise<string[]> {
+    return [];
+  }
+  async readUseCase(): Promise<UseCase> {
+    throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+  }
+  async readUseCases() {
+    return { useCases: [], invalid: [] };
+  }
+  async writeUseCase() {}
+  async deleteUseCase() {}
   async listTagMetas(): Promise<string[]> {
     return [];
   }
@@ -119,6 +139,9 @@ class FakeStore implements Store {
     };
   }
   async commit(): Promise<CommitResult> {
+    return { sha: null, skipped_reason: "disabled" };
+  }
+  async commitPaths(): Promise<CommitResult> {
     return { sha: null, skipped_reason: "disabled" };
   }
   async headCommit(): Promise<HeadCommitResult> {

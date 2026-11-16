@@ -44,3 +44,14 @@ describe("get_guide — assets (CHR-959)", () => {
     expect(guide).toMatch(/Copy such a file\s+into `assets\/`/);
   });
 });
+
+describe("get_guide — use cases", () => {
+  it("teaches the use-case workflow and every tool involved", async () => {
+    const { guide } = await getGuide();
+    expect(guide).toContain("## Use cases (optional)");
+    for (const name of ["set_use_cases", "generate_personas", "suggest_use_case_variants", "get_use_case", "get_use_cases", "mapping_stale"]) {
+      expect(guide, name).toContain(name);
+    }
+    expect(guide).toMatch(/inputs` and `outputs` are mandatory/);
+  });
+});

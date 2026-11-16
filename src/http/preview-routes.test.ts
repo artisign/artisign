@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { initProject } from "../init/init-project.js";
@@ -81,6 +81,42 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
         { name: "home-empty", tags: [], notes: "", variant_of: "home", variant_kind: "state" },
         { name: "orphan", tags: [], notes: "" },
       ],
+    });
+  });
+
+  describe("GET /api/use-case", () => {
+    const useCase = {
+      id: "assign",
+      title: "Assign",
+      status: "draft" as const,
+      personas: [],
+      inputs: [{ object: "o", example: {} }],
+      outputs: [{ object: "o", example: {} }],
+      steps: [],
+      variants: [{ id: "v1", title: "V", when: { dim: ["a"] }, steps: [{ op: "remove" as const, step_id: "x" }] }],
+    };
+
+    it("returns the stored case with its variant definitions", async () => {
+      await store.writeUseCase(useCase);
+      const { status, json } = await getJson("/api/use-case?id=assign");
+      expect(status).toBe(200);
+      expect(json).toEqual({ use_case: useCase });
+    });
+
+    it("answers 404 for an unknown id, 400 for a malformed one, 422 for a file that no longer validates", async () => {
+      expect((await getJson("/api/use-case?id=missing")).status).toBe(404);
+      expect((await getJson("/api/use-case?id=Not_Valid")).status).toBe(400);
+      expect((await getJson("/api/use-case")).status).toBe(400);
+      await store.writeUseCase(useCase);
+      await writeFile(join(dir, "usecases", "cases", "assign.json"), "{ not json");
+      const bad = await getJson("/api/use-case?id=assign");
+      expect(bad.status).toBe(422);
+      expect(bad.json.code).toBe("invalid_state");
+    });
+
+    it("creates nothing for a project without usecases/", async () => {
+      await getJson("/api/use-case?id=missing");
+      await expect(stat(join(dir, "usecases"))).rejects.toMatchObject({ code: "ENOENT" });
     });
   });
 

@@ -1,4 +1,5 @@
 import type { ArtisignConfig } from "../init/artisign-config.js";
+import type { DataObject, PersonaPool, UseCase } from "../usecases/schema.js";
 
 export type TokensDocument = Record<string, Record<string, unknown>>;
 
@@ -49,6 +50,7 @@ export type ChangeCategory =
   | "mockup"
   | "asset"
   | "tag_meta"
+  | "usecases"
   | "other";
 
 export type ProjectChangeEvent = {
@@ -77,6 +79,9 @@ export type HeadCommitResult = {
   sha: string | null;
   head_reason?: HeadReason;
 };
+
+/** A case file that failed to parse or validate — reported, never thrown, so one bad file cannot hide the rest. */
+export type UseCaseFileIssue = { id: string; error: string };
 
 /**
  * The single boundary for all filesystem access. Every part of the codebase
@@ -172,6 +177,29 @@ export interface Store {
    */
   readAsset(relPath: string): Promise<Buffer>;
 
+  /**
+   * Use cases live under `usecases/` and are optional:
+   * nothing is created until the first write, and every read of a project
+   * without the folder yields empty results. The two pool files are rewritten
+   * whole (`personas.json`, `data-objects.json`); each case is its own file
+   * (`cases/<id>.json`) so thousands stay cheap and diffs stay small. A pool
+   * file that no longer validates throws (naming the file) rather than being
+   * coerced — a hand edit must not be silently dropped by the next write.
+   */
+  readPersonaPool(): Promise<PersonaPool>;
+  writePersonaPool(pool: PersonaPool): Promise<void>;
+  readDataObjects(): Promise<DataObject[]>;
+  writeDataObjects(objects: DataObject[]): Promise<void>;
+  /** Sorted ids of the case files; `[]` without a `usecases/cases/` folder. */
+  listUseCaseIds(): Promise<string[]>;
+  /** Propagates `ENOENT` for a missing case; throws naming the file when it does not validate. */
+  readUseCase(id: string): Promise<UseCase>;
+  /** Every case, sorted by id; files that do not validate are listed in `invalid` instead. Unchanged files are not re-parsed. */
+  readUseCases(): Promise<{ useCases: UseCase[]; invalid: UseCaseFileIssue[] }>;
+  writeUseCase(useCase: UseCase): Promise<void>;
+  /** No-op if the case does not exist. */
+  deleteUseCase(id: string): Promise<void>;
+
   /** Derived cache under `.artisign/`. `undefined` when no cache exists yet. */
   readCacheIndex(): Promise<unknown | undefined>;
   writeCacheIndex(index: unknown): Promise<void>;
@@ -189,6 +217,14 @@ export interface Store {
    * failed — `skipped_reason` says which (failures never break the write).
    */
   commit(message: string): Promise<CommitResult>;
+
+  /**
+   * Same as `commit`, but records only `paths` (project-relative) — what one
+   * call itself wrote or deleted — and leaves every other change uncommitted.
+   * A deleted path that was never committed is dropped; with nothing left the
+   * result is `nothing_to_commit`. Used for writes that arrive from the preview.
+   */
+  commitPaths(message: string, paths: string[]): Promise<CommitResult>;
 
   /** Current HEAD commit sha, or `null` (with `head_reason`) when there is no repo, no commits yet, or a git error. */
   headCommit(): Promise<HeadCommitResult>;

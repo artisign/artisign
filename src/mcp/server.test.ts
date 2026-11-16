@@ -46,13 +46,13 @@ describe("MCP server — protocol-level", () => {
     expect(client.getServerVersion()).toMatchObject({ name: "artisign", version });
   });
 
-  it("lists all 25 tools", async () => {
+  it("lists all 30 tools", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(TOOLS.map((t) => t.name).sort());
-    expect(tools).toHaveLength(25);
+    expect(tools).toHaveLength(30);
   });
 
-  it("successfully calls every one of the 21 tools that don't need a browser or daemon board-state context (get_screenshot/inspect_node/set_board_state excluded)", async () => {
+  it("successfully calls every one of the 26 tools that don't need a browser or daemon board-state context (get_screenshot/inspect_node/set_board_state excluded)", async () => {
     async function call(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
       const result = await client.callTool({ name, arguments: args });
       expect(result.isError, `${name} returned an error: ${JSON.stringify(result.content)}`).not.toBe(true);
@@ -120,6 +120,28 @@ describe("MCP server — protocol-level", () => {
     await call("find_nodes", { where: [{ kind: "has_flow" }] });
     await call("list_comments", { status: "any" });
     await call("get_guide", {});
+
+    // Use cases: the five new tools, plus the delete_entity kinds.
+    await call("set_use_cases", {
+      dimensions: [{ id: "membership", label: "Membership", values: [{ id: "student", label: "Student" }, { id: "staff", label: "Staff" }] }],
+      personas: [{ id: "member-ana", name: "Ana", traits: { membership: "student" } }],
+      data_objects: [{ id: "loan", name: "Loan", fields: [{ name: "status", type: "string" }] }],
+      use_cases: [
+        {
+          id: "borrow-book",
+          title: "Borrow a book",
+          personas: ["member-ana"],
+          inputs: [{ object: "loan", example: { status: "available" } }],
+          outputs: [{ object: "loan", example: { status: "on-loan" } }],
+          steps: [{ id: "tap", actor: "member-ana", action: "Taps the book", target: { screen: "home", node: "n2" } }],
+        },
+      ],
+    });
+    await call("get_use_cases", {});
+    await call("get_use_case", { id: "borrow-book" });
+    await call("suggest_use_case_variants", { id: "borrow-book" });
+    await call("generate_personas", { dry_run: true });
+    await call("delete_entity", { kind: "use_case", name: "borrow-book" });
 
     // A second mockup for the get_mockup smoke call (the first was already
     // deleted above by the delete_entity smoke call).
@@ -207,8 +229,11 @@ describe("MCP server — instructions budget", () => {
   // 1065, measured at 1064. CHR-987 made "change the design only through
   // these tools" a general FILES rule (it was mockup-only; the demo recording
   // had to pass it as an extra system prompt): 1065 to 1110, measured at 1105.
-  it("stays within the ~1110 token cheat-sheet budget (chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(1110);
+  // CHR-1065: a two-line USE CASES pointer and use cases named in the FILES
+  // rule: 1110 to 1148, measured at 1147.75 (ADR-010 caps this at 1150; the
+  // limit may only go down from here).
+  it("stays within the ~1148 token cheat-sheet budget (chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(1148);
   });
 });
 
@@ -233,8 +258,11 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
     await client.close();
   });
 
-  it("keeps the whole tools/list within 21,500 chars (~5,375 tokens)", () => {
-    expect(JSON.stringify(tools).length).toBeLessThanOrEqual(21_500);
+  // 21,500 before the five use-case tools (CHR-1065: ~3,600 chars together, with
+  // `priority` gone); measured at 24,001. ADR-010 caps this at 24,500 and the
+  // limit may only go down from here.
+  it("keeps the whole tools/list within 24,001 chars (~6,000 tokens)", () => {
+    expect(JSON.stringify(tools).length).toBeLessThanOrEqual(24_001);
   });
 
   it("keeps every advertised tool entry within 2,000 chars", () => {
@@ -250,7 +278,7 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   });
 
   it("advertises no $schema key on any inputSchema", () => {
-    expect(tools).toHaveLength(25);
+    expect(tools).toHaveLength(30);
     for (const tool of tools) {
       expect(tool.inputSchema, tool.name).not.toHaveProperty("$schema");
     }

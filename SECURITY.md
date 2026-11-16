@@ -20,9 +20,8 @@ vulnerability_, or go directly to
 
 The report is visible only to the maintainer until a fix is published.
 
-**There is no security mailbox.** Mail sent to any address at `artisign.dev`
-is not delivered, so do not try `security@artisign.dev` — it goes nowhere.
-Reporting requires a GitHub account.
+**There is no security mailbox**, and please do not send vulnerability details
+by mail. Reporting requires a GitHub account.
 
 Do **not** open a public issue for a vulnerability.
 

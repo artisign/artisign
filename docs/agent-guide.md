@@ -557,9 +557,9 @@ Workflow, in this order:
    point at another element (`mapping_unstable` warns). Mappings are never
    rewritten for you, so a mapping to a regenerated screen or a removed node is
    reported as `mapping_stale` on read.
-   A node inside a component instance's slot fill cannot be mapped yet (not yet
-   supported): such a mapping is stored but reported as `mapping_stale` on read,
-   so map the step to the instance or to the screen instead.
+   An element inside a component instance's slot fill is mapped by its authored
+   id, like any other node; a fill without an authored id, or an element of a
+   backdrop layer, cannot be mapped.
 6. **Coding agents read `get_use_case {id}`** — one call returns the use case,
    its personas, dimensions, data objects and the mapped screens with their
    nodes. `variant: "<id>"` returns that variant resolved into a full use case:

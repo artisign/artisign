@@ -240,9 +240,9 @@ describe("watchProject", () => {
     // never learns about the file, so only the folder scan reports it and no
     // `unlink` follows its deletion.
     const watcher = capturedWatcher!;
-    const realEmit = watcher.emit.bind(watcher);
+    const realEmit = watcher.emit.bind(watcher) as (event: string, ...args: unknown[]) => boolean;
     let blind = true;
-    watcher.emit = ((event: string, ...args: unknown[]) =>
+    watcher.emit = ((event: string, ...args: unknown[]): boolean =>
       blind && (event === "add" || event === "unlink") && String(args[0]).endsWith("borrow-book.json")
         ? false
         : realEmit(event, ...args)) as typeof watcher.emit;

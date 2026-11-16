@@ -406,6 +406,17 @@ describe("use case tools", () => {
       await writeFile(file, JSON.stringify({ ...JSON.parse(await readFile(file, "utf-8")), status: "implemented" }));
       await expect(getUseCase(fx.store, { id: "borrow-book" })).rejects.toMatchObject({ code: "invalid_state" });
     });
+
+    it("treats an old file with an empty input example as invalid: list skips it with invalid_file, get_use_case says invalid_state", async () => {
+      await setUseCases(fx.store, { use_cases: [borrowCase(), borrowCase({ id: "other-case" })] });
+      const file = join(fx.dir, "usecases", "cases", "borrow-book.json");
+      const stored = JSON.parse(await readFile(file, "utf-8"));
+      await writeFile(file, JSON.stringify({ ...stored, inputs: [{ object: "loan", example: {} }] })); // written past the schema
+      const res = (await listUseCases(fx.store, {})) as ListRes & { warnings?: unknown[] };
+      expect(res.use_cases.map((u) => u.id)).toEqual(["other-case"]);
+      expect(res.warnings).toEqual([expect.objectContaining({ kind: "invalid_file", target: "use_case:borrow-book" })]);
+      await expect(getUseCase(fx.store, { id: "borrow-book" })).rejects.toMatchObject({ code: "invalid_state" });
+    });
   });
 
   describe("list_use_cases", () => {

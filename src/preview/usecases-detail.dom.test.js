@@ -166,6 +166,16 @@ describe("variant as a difference", () => {
   });
 });
 
+describe("empty parts", () => {
+  it("shows no literal null text for a case without personas, actors, variants or description", () => {
+    const bare = { ...baseBundle, use_case: { ...baseBundle.use_case, personas: [], steps: [], description: null }, variants: [] };
+    const { root } = render({ bundle: bare, base: bare, source: { ...rawUseCase, personas: [], steps: [], variants: [] } });
+    expect($(".uc-variant-bar")).not.toBeNull();
+    expect(root.textContent).not.toContain("null");
+    expect($(".uc-people")).toBeNull();
+  });
+});
+
 describe("text safety", () => {
   it("authored text is shown as text, never as markup", () => {
     const evil = { ...baseBundle, use_case: { ...baseBundle.use_case, title: '<img src=x onerror="alert(1)">', trigger: "<b>bold</b>" } };

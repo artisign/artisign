@@ -92,6 +92,29 @@ describe("variant actors map", () => {
     expect(resolved.removed_steps).toEqual([expect.objectContaining({ id: "pick", change: "removed", after: "tap" })]);
   });
 
+  it("reports a removed step with its base actor when only the map changed it, and as written when an op wrote it", () => {
+    const mapOnly = withMap({ "member-ana": "staff-lee" }, { steps: [{ op: "remove", step_id: "pick" }] });
+    const a = resolveUseCase(mapOnly, mapOnly.variants![0]);
+    expect(a.removed_steps).toEqual([expect.objectContaining({ id: "pick", actor: "member-ana", change: "removed", after: "tap" })]);
+
+    const written = withMap(
+      { "member-ana": "staff-lee" },
+      { steps: [{ op: "replace", step_id: "pick", step: { id: "pick", actor: "member-ana", action: "Picks again" } }, { op: "remove", step_id: "pick" }] },
+    );
+    const b = resolveUseCase(written, written.variants![0]);
+    expect(b.removed_steps).toEqual([expect.objectContaining({ id: "pick", actor: "member-ana", action: "Picks again", change: "removed" })]);
+    const rewritten = withMap(
+      { "member-ana": "staff-lee" },
+      { steps: [{ op: "replace", step_id: "pick", step: { id: "pick", actor: "robot", action: "Picks again" } }, { op: "remove", step_id: "pick" }] },
+    );
+    expect(resolveUseCase(rewritten, rewritten.variants![0]).removed_steps[0]).toMatchObject({ actor: "robot" });
+  });
+
+  it("leaves the base personas untouched when every entry maps to itself", () => {
+    const base = withMap({ "member-ana": "member-ana" }, {}, { personas: ["a", "a", "b"] });
+    expect(resolveUseCase(base, base.variants![0]).use_case.personas).toEqual(["a", "a", "b"]);
+  });
+
   it("does not touch the base use case", () => {
     const base = withMap({ "member-ana": "staff-lee" });
     resolveUseCase(base, base.variants![0]);

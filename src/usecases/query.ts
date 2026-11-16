@@ -1,4 +1,4 @@
-import type { UseCase, UseCaseVariant } from "./schema.js";
+import { SYSTEM_ACTOR, type UseCase, type UseCaseVariant } from "./schema.js";
 
 export type UseCaseFilter = {
   group?: string;
@@ -43,7 +43,7 @@ export function screensOf(useCase: UseCase): string[] {
 
 /** The personas a variant's `actors` map names, keys and values, without `system`. */
 export function actorMapPersonas(variant: UseCaseVariant): string[] {
-  return Object.entries(variant.actors ?? {}).flat().filter((id) => id !== "system");
+  return Object.entries(variant.actors ?? {}).flat().filter((id) => id !== SYSTEM_ACTOR);
 }
 
 export function personasOf(useCase: UseCase): Set<string> {
@@ -52,7 +52,7 @@ export function personasOf(useCase: UseCase): Set<string> {
     for (const id of variant.personas ?? []) ids.add(id);
     for (const id of actorMapPersonas(variant)) ids.add(id);
   }
-  for (const step of allSteps(useCase)) if (step.actor !== "system") ids.add(step.actor);
+  for (const step of allSteps(useCase)) if (step.actor !== SYSTEM_ACTOR) ids.add(step.actor);
   return ids;
 }
 

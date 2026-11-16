@@ -57,6 +57,9 @@ export const personaSchema = z.strictObject({
 
 // --- Data objects -------------------------------------------------------------
 
+/** The actor of a step the product itself performs. Not a persona; never listed in `personas`. */
+export const SYSTEM_ACTOR = "system";
+
 export const FIELD_TYPES = ["string", "number", "boolean", "date", "datetime", "enum", "ref", "list", "object"] as const;
 
 const dataFieldSchema = z.strictObject({

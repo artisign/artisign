@@ -1,6 +1,4 @@
-import type { UseCase, UseCaseInput, UseCaseOutput, UseCaseStep, UseCaseVariant } from "./schema.js";
-
-const SYSTEM_ACTOR = "system";
+import { SYSTEM_ACTOR, type UseCase, type UseCaseInput, UseCaseOutput, UseCaseStep, UseCaseVariant } from "./schema.js";
 
 export type StepChange = "changed" | "added";
 
@@ -49,8 +47,15 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
   // The actors map runs once, before the ops, on the inherited steps only; it is never chained.
   const actors = variant.actors ?? {};
   const mapped = (actor: string): string => (Object.hasOwn(actors, actor) ? actors[actor]! : actor);
-  effective.steps = effective.steps.map((step) => (mapped(step.actor) === step.actor ? step : { ...step, actor: mapped(step.actor), change: "changed" }));
-  if (variant.personas === undefined && Object.keys(actors).length > 0) {
+  // A step only the map changed keeps its base form for the removed-steps report: the map is not an op.
+  const baseOf = new Map<EffectiveStep, UseCaseStep>();
+  effective.steps = effective.steps.map((step) => {
+    if (mapped(step.actor) === step.actor) return step;
+    const remapped: EffectiveStep = { ...step, actor: mapped(step.actor), change: "changed" };
+    baseOf.set(remapped, step);
+    return remapped;
+  });
+  if (variant.personas === undefined && Object.entries(actors).some(([key, value]) => key !== value)) {
     // The system is not a persona, so a value "system" drops the entry.
     effective.personas = [...new Set(base.personas.map(mapped).filter((id) => id !== SYSTEM_ACTOR))];
   }
@@ -86,7 +91,7 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
       steps.splice(index, 1);
       // Removing a step the variant itself added leaves no trace in the base flow.
       if (current.change !== "added") {
-        const plain: EffectiveStep = { ...current };
+        const plain: EffectiveStep = { ...(baseOf.get(current) ?? current) };
         delete plain.change;
         removed.push({ ...plain, change: "removed", after: index > 0 ? steps[index - 1]!.id : null });
       }

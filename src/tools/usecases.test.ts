@@ -457,6 +457,48 @@ describe("use case tools", () => {
       ]);
     });
 
+    describe("slot-fill elements (CHR-1101)", () => {
+      const mapTo = (screen: string, node: string) =>
+        setUseCases(fx.store, { use_cases: [borrowCase({ steps: [{ id: "a", actor: "system", action: "x", target: { screen, node } }] })] });
+
+      beforeEach(async () => {
+        await writeHtml(fx.store, { screen: "chip", mode: "create", kind: "component", html_aug: `<span id="chip-root"><span data-slot="label">x</span></span>` });
+        await writeHtml(fx.store, {
+          screen: "home",
+          mode: "create",
+          title: "Home",
+          html_aug: `<main id="home-root"><span id="c1" class="$chip"><b id="fill-label">Hello <i id="fill-inner">slot</i></b></span><span id="c2" class="$chip"><b>No id</b></span></main>`,
+        });
+      });
+
+      it("resolves a fill element by its authored id with tag and text, without a stale flag", async () => {
+        const res = await mapTo("home", "fill-label");
+        expect((res.warnings as Warning[]).filter((w) => w.kind === "mapping_stale")).toEqual([]);
+        const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as Bundle;
+        expect(bundle.screens[0]!.mappings).toEqual([{ step: "a", scope: "element", node: { id: "fill-label", tag: "b", text: "Hello slot" } }]);
+      });
+
+      it("resolves a nested fill element", async () => {
+        await mapTo("home", "fill-inner");
+        const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as Bundle;
+        expect(bundle.screens[0]!.mappings).toEqual([{ step: "a", scope: "element", node: { id: "fill-inner", tag: "i", text: "slot" } }]);
+      });
+
+      it("keeps a fill without an authored id unmappable (generated id is stale)", async () => {
+        const res = await mapTo("home", "n999");
+        expect((res.warnings as Warning[]).some((w) => w.kind === "mapping_stale")).toBe(true);
+        const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as Bundle;
+        expect(bundle.screens[0]!.mappings[0]).toMatchObject({ stale: true });
+      });
+
+      it("keeps backdrop-layer nodes unmappable on the overlay screen", async () => {
+        await writeHtml(fx.store, { screen: "base", mode: "create", title: "Base", html_aug: `<div id="base-root"><button id="base-btn">Go</button></div>` });
+        await writeHtml(fx.store, { screen: "sheet", mode: "create", title: "Sheet", html_aug: `<div id="sheet-root" data-backdrop="base"><p id="sheet-p">Hi</p></div>` });
+        const res = await mapTo("sheet", "base-btn");
+        expect((res.warnings as Warning[]).some((w) => w.kind === "mapping_stale")).toBe(true);
+      });
+    });
+
     it("does not follow a path-traversal id out of usecases/cases", async () => {
       await expect(getUseCase(fx.store, { id: "../personas" })).rejects.toMatchObject({ code: "not_found" });
     });

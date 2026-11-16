@@ -62,6 +62,7 @@ export class ScreenLookup {
       if (!current) return;
       if (current.kind === "text") own.push(current.text ?? "");
       current.childIds.forEach(collect);
+      Object.values(current.slotOverrides ?? {}).forEach(collectSubtree);
     };
     let id: string;
     let tag: string;

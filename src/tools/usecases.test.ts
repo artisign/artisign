@@ -478,13 +478,31 @@ describe("use case tools", () => {
         expect(bundle.screens[0]!.mappings).toEqual([{ step: "a", scope: "element", node: { id: "fill-label", tag: "b", text: "Hello slot" } }]);
       });
 
+      it("includes slot content of an instance inside a container's text", async () => {
+        await mapTo("home", "home-root");
+        const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as Bundle;
+        expect(bundle.screens[0]!.mappings).toEqual([{ step: "a", scope: "element", node: { id: "home-root", tag: "main", text: "Hello slot No id" } }]);
+      });
+
+      it("includes the slot content of an instance nested in a fill", async () => {
+        await writeHtml(fx.store, {
+          screen: "nest",
+          mode: "create",
+          title: "Nest",
+          html_aug: `<main id="nest-root"><span id="outer" class="$chip"><div data-slot="label"><i>A</i><span id="inner" class="$chip"><b>B</b></span></div></span></main>`,
+        });
+        await mapTo("nest", "outer");
+        const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as Bundle;
+        expect(bundle.screens[0]!.mappings).toEqual([{ step: "a", scope: "element", node: { id: "outer", tag: "span", text: "A B" } }]);
+      });
+
       it("resolves a nested fill element", async () => {
         await mapTo("home", "fill-inner");
         const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as Bundle;
         expect(bundle.screens[0]!.mappings).toEqual([{ step: "a", scope: "element", node: { id: "fill-inner", tag: "i", text: "slot" } }]);
       });
 
-      it("keeps a fill without an authored id unmappable (generated id is stale)", async () => {
+      it("keeps a fill without an authored id unmappable (an id that matches no node or authored fill id is stale)", async () => {
         const res = await mapTo("home", "n999");
         expect((res.warnings as Warning[]).some((w) => w.kind === "mapping_stale")).toBe(true);
         const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as Bundle;

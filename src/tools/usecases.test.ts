@@ -1068,7 +1068,7 @@ describe("preview commits (ctx.source: human)", () => {
     expect(await dirty()).toEqual(["stray.txt"]);
   });
 
-  it("reports merge_in_progress instead of git_error during an unfinished merge", async () => {
+  it("reports operation_in_progress instead of git_error during an unfinished merge", async () => {
     await git("checkout", "-q", "-b", "side");
     await writeFile(join(dir, "side.txt"), "side");
     await git("add", "side.txt");
@@ -1080,7 +1080,7 @@ describe("preview commits (ctx.source: human)", () => {
     await git("merge", "--no-commit", "--no-ff", "side");
     const head = await git("rev-parse", "HEAD");
     const res = await setUseCases(store, { use_cases: [borrowCase({ id: "renew-loan", title: "Renew a loan" })] }, human);
-    expect(res).toMatchObject({ commit: null, commit_skipped_reason: "merge_in_progress" });
+    expect(res).toMatchObject({ commit: null, commit_skipped_reason: "operation_in_progress" });
     expect(await git("rev-parse", "HEAD")).toBe(head);
   });
 

@@ -122,8 +122,8 @@ async function realOrSelf(path: string): Promise<string> {
  * Commits all current changes in `projectDir` with `message`, initializing a
  * git repo on first use. `sha` is `null` (with `skipped_reason`) if there
  * was nothing to commit, the commit could not be made, or the project dir
- * lives inside an outer repo, or a merge, cherry-pick, revert or rebase is
- * unfinished (`merge_in_progress` / `operation_in_progress`; nothing is staged
+ * lives inside an outer repo, or a merge, cherry-pick, revert, rebase or
+ * `git am` is unfinished (`operation_in_progress`; nothing is staged
  * then) — a failing auto-commit must never break the
  * write it follows. A commit git refuses only for want of an identity is
  * retried once as `FALLBACK_IDENTITY`.
@@ -182,28 +182,14 @@ async function isKnownToGit(projectDir: string, path: string): Promise<{ inHead:
   return { inHead, inIndex };
 }
 
-type OperationReason = Extract<CommitSkippedReason, "merge_in_progress" | "operation_in_progress">;
-
-// Merge keeps its own reason and cherry-pick, revert, rebase, am share another.
-// Collapsing them into one value is a two-line change: point MERGE_REASON at
-// "operation_in_progress" and drop `merge_in_progress` from `CommitSkippedReason`.
-const MERGE_REASON: OperationReason = "merge_in_progress";
-const OPERATION_REASON: OperationReason = "operation_in_progress";
+const OPERATION_REASON = "operation_in_progress" satisfies CommitSkippedReason;
 
 /**
- * The marker git leaves behind while a history-rewriting operation is
- * unfinished, and the reason it is reported under. `sequencer` outlives a
- * resolved step of a multi-commit cherry-pick or revert; `rebase-apply` is
- * also what `git am` uses.
+ * The markers git leaves behind while a history-rewriting operation is
+ * unfinished. `sequencer` outlives a resolved step of a multi-commit
+ * cherry-pick or revert; `rebase-apply` is also what `git am` uses.
  */
-const OPERATION_MARKERS: { marker: string; reason: OperationReason }[] = [
-  { marker: "MERGE_HEAD", reason: MERGE_REASON },
-  { marker: "CHERRY_PICK_HEAD", reason: OPERATION_REASON },
-  { marker: "REVERT_HEAD", reason: OPERATION_REASON },
-  { marker: "sequencer", reason: OPERATION_REASON },
-  { marker: "rebase-merge", reason: OPERATION_REASON },
-  { marker: "rebase-apply", reason: OPERATION_REASON },
-];
+const OPERATION_MARKERS = ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "sequencer", "rebase-merge", "rebase-apply"];
 
 /**
  * The reason to skip the commit while the user has a merge, cherry-pick,
@@ -213,11 +199,11 @@ const OPERATION_MARKERS: { marker: string; reason: OperationReason }[] = [
  * marker to the real git dir, so a worktree or a repo whose `.git` is a file
  * is covered; one call resolves all markers.
  */
-async function operationInProgress(projectDir: string): Promise<OperationReason | undefined> {
-  const args = OPERATION_MARKERS.flatMap(({ marker }) => ["--git-path", marker]);
+async function operationInProgress(projectDir: string): Promise<typeof OPERATION_REASON | undefined> {
+  const args = OPERATION_MARKERS.flatMap((marker) => ["--git-path", marker]);
   const paths = (await git(projectDir, ["rev-parse", ...args])).split("\n");
-  for (const [i, path] of paths.entries()) {
-    if (await pathExists(resolve(projectDir, path))) return OPERATION_MARKERS[i]!.reason;
+  for (const path of paths) {
+    if (await pathExists(resolve(projectDir, path))) return OPERATION_REASON;
   }
   return undefined;
 }
@@ -230,8 +216,8 @@ async function operationInProgress(projectDir: string): Promise<OperationReason 
  * cannot be part of a pathspec and is dropped; if no path remains, or none has
  * a change, nothing is committed (`nothing_to_commit`). A deletion that is
  * already staged is committed as it stands. During an unfinished merge,
- * cherry-pick, revert or rebase nothing is staged or committed
- * (`merge_in_progress` for a merge, `operation_in_progress` for the others).
+ * cherry-pick, revert, rebase or `git am` nothing is staged or committed
+ * (`operation_in_progress`).
  * Same repo rules as `autoCommit`: initialized on first use, skipped inside
  * an outer repo.
  */

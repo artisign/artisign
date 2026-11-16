@@ -65,7 +65,6 @@ export type CommitSkippedReason =
   | "disabled"
   | "nested_repo"
   | "nothing_to_commit"
-  | "merge_in_progress"
   | "operation_in_progress"
   | `git_error: ${string}`;
 
@@ -216,7 +215,7 @@ export interface Store {
    * Commits all current changes when `autoCommit` is enabled in `artisign.json`.
    * `sha` is `null` when auto-commit is disabled, there is nothing to
    * commit, the project dir is nested inside an outer repo, or the commit
-   * failed, or a merge (`merge_in_progress`) or a cherry-pick, revert or rebase (`operation_in_progress`) is unfinished — nothing is staged then — `skipped_reason` says which (failures never break the write).
+   * failed, or a merge, cherry-pick, revert, rebase or `git am` is unfinished (`operation_in_progress`) — nothing is staged then — `skipped_reason` says which (failures never break the write).
    */
   commit(message: string): Promise<CommitResult>;
 
@@ -225,9 +224,8 @@ export interface Store {
    * call itself wrote or deleted — and leaves every other change uncommitted.
    * A deleted path that was never committed is dropped; with nothing left the
    * result is `nothing_to_commit`. A deletion that is already staged is
-   * committed; during an unfinished merge, cherry-pick, revert or rebase nothing
-   * is staged or committed and the result is `merge_in_progress` /
-   * `operation_in_progress`. Used for writes that arrive from the preview.
+   * committed; during an unfinished merge, cherry-pick, revert, rebase or `git am`
+   * nothing is staged or committed and the result is `operation_in_progress`. Used for writes that arrive from the preview.
    */
   commitPaths(message: string, paths: string[]): Promise<CommitResult>;
 

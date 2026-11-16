@@ -77,13 +77,13 @@ describe("watchProject", () => {
   });
 
   it("categorizes mockups/<name>/mockup.json and mockups/<name>/<variant>.html as \"mockup\"", async () => {
-    await mkdir(join(dir, "mockups", "assign-caregiver"), { recursive: true });
+    await mkdir(join(dir, "mockups", "assign-item"), { recursive: true });
     const events: ProjectChangeEvent[] = [];
     unwatch = watchProject(dir, (event) => events.push(event));
     await new Promise((resolve) => setTimeout(resolve, 150));
 
-    await writeFile(join(dir, "mockups", "assign-caregiver", "mockup.json"), "{}");
-    await writeFile(join(dir, "mockups", "assign-caregiver", "a.html"), "<div></div>");
+    await writeFile(join(dir, "mockups", "assign-item", "mockup.json"), "{}");
+    await writeFile(join(dir, "mockups", "assign-item", "a.html"), "<div></div>");
 
     await waitFor(events, (e) => e.path.includes("mockup.json"), 500);
     await waitFor(events, (e) => e.path.includes("a.html"), 500);
@@ -96,10 +96,10 @@ describe("watchProject", () => {
     unwatch = watchProject(dir, (event) => events.push(event));
     await new Promise((resolve) => setTimeout(resolve, 150));
 
-    await mkdir(join(dir, "mockups", "assign-caregiver"), { recursive: true });
+    await mkdir(join(dir, "mockups", "assign-item"), { recursive: true });
 
-    await waitFor(events, (e) => e.path.includes("assign-caregiver"), 500);
-    expect(events.find((e) => e.path.includes("assign-caregiver"))?.category).toBe("mockup");
+    await waitFor(events, (e) => e.path.includes("assign-item"), 500);
+    expect(events.find((e) => e.path.includes("assign-item"))?.category).toBe("mockup");
   });
 
   it("categorizes usecases/personas.json and usecases/cases/<id>.json as \"usecases\", the folder being created live", async () => {

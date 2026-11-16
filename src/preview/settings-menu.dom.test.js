@@ -18,8 +18,8 @@ const storageStub = {
 };
 
 const SCREENS = [
-  { name: "family", tags: [] },
-  { name: "family-leave", tags: [], variant_of: "family", variant_kind: "overlay" },
+  { name: "cart", tags: [] },
+  { name: "cart-clear", tags: [], variant_of: "cart", variant_kind: "overlay" },
 ];
 
 const SETUP = {

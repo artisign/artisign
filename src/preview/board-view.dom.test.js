@@ -16,15 +16,15 @@ const v = (name, variant_of, variant_kind) => ({ name, tags: [], ...(variant_of 
 const screens = [
   v("dash"),
   v("dash-empty", "dash", "state"),
-  v("family"),
-  v("family-leave", "family", "overlay"),
-  v("family-leave-confirm", "family-leave", "step"),
+  v("cart"),
+  v("cart-clear", "cart", "overlay"),
+  v("cart-clear-confirm", "cart-clear", "step"),
   v("plain"),
 ];
 const names = screens.map((s) => s.name);
 const flows = [
   { from: "plain.go", event: "tap", to: "dash-empty", to_kind: "screen" },
-  { from: "family-leave-confirm.go", event: "tap", to: "plain", to_kind: "screen" },
+  { from: "cart-clear-confirm.go", event: "tap", to: "plain", to_kind: "screen" },
 ];
 
 function setup(extra = {}) {
@@ -58,43 +58,43 @@ describe("board clusters — DOM", () => {
   it("renders collapsed clusters as frames with the main tile, header text and thumbnails", async () => {
     const { board, tiles } = setup();
     await board.setScreens(names, flows, "p", { screens, expanded: [], clusters: true });
-    expect(frameRoots(tiles)).toEqual(["dash", "family"]);
-    expect(tileNames(tiles)).toEqual(["dash", "family", "plain"]);
-    const header = tiles.querySelector('[data-root="family"] .board-cluster-header');
-    expect(header.textContent).toContain("family");
+    expect(frameRoots(tiles)).toEqual(["dash", "cart"]);
+    expect(tileNames(tiles)).toEqual(["dash", "cart", "plain"]);
+    const header = tiles.querySelector('[data-root="cart"] .board-cluster-header');
+    expect(header.textContent).toContain("cart");
     expect(header.textContent).toContain("2 in subtree · depth 3");
-    expect(tiles.querySelectorAll('[data-root="family"] .board-cluster-thumb')).toHaveLength(2);
+    expect(tiles.querySelectorAll('[data-root="cart"] .board-cluster-thumb')).toHaveLength(2);
   });
 
   it("a header click reports the cluster; expand adds the main screen, collapse removes every member entry", async () => {
     const { board, tiles, toggled } = setup();
     await board.setScreens(names, flows, "p", { screens, expanded: [], clusters: true });
-    tiles.querySelector('[data-root="family"] .board-cluster-header').click();
-    expect(clusterToggleWrite(toggled[0], [])).toEqual({ op: "add", screens: ["family"] });
+    tiles.querySelector('[data-root="cart"] .board-cluster-header').click();
+    expect(clusterToggleWrite(toggled[0], [])).toEqual({ op: "add", screens: ["cart"] });
 
-    await board.setScreens(names, flows, "p", { screens, expanded: ["family", "family-leave-confirm"], clusters: true });
-    tiles.querySelector('[data-root="family"] .board-cluster-header').click();
-    expect(clusterToggleWrite(toggled[1], ["family", "family-leave-confirm"])).toEqual({
+    await board.setScreens(names, flows, "p", { screens, expanded: ["cart", "cart-clear-confirm"], clusters: true });
+    tiles.querySelector('[data-root="cart"] .board-cluster-header').click();
+    expect(clusterToggleWrite(toggled[1], ["cart", "cart-clear-confirm"])).toEqual({
       op: "remove",
-      screens: ["family", "family-leave-confirm"],
+      screens: ["cart", "cart-clear-confirm"],
     });
   });
 
   it("an expanded-only change adds the newly shown tiles and keeps every existing iframe (no reload)", async () => {
     const { board, tiles } = setup();
     await board.setScreens(names, flows, "p", { screens, expanded: [], clusters: true });
-    const before = tiles.querySelector('.board-tile[data-screen="family"] iframe');
+    const before = tiles.querySelector('.board-tile[data-screen="cart"] iframe');
     fetchRender.mockClear();
-    await board.setClusterState({ expanded: ["family"] });
-    expect(frameRoots(tiles)).toEqual(["dash", "family*"]);
-    expect(tileNames(tiles).sort()).toEqual(["dash", "family", "family-leave", "family-leave-confirm", "plain"]);
-    expect(tiles.querySelector('.board-tile[data-screen="family"] iframe')).toBe(before);
-    expect(fetchRender.mock.calls.map((c) => c[0]).sort()).toEqual(["family-leave", "family-leave-confirm"]);
+    await board.setClusterState({ expanded: ["cart"] });
+    expect(frameRoots(tiles)).toEqual(["dash", "cart*"]);
+    expect(tileNames(tiles).sort()).toEqual(["cart", "cart-clear", "cart-clear-confirm", "dash", "plain"]);
+    expect(tiles.querySelector('.board-tile[data-screen="cart"] iframe')).toBe(before);
+    expect(fetchRender.mock.calls.map((c) => c[0]).sort()).toEqual(["cart-clear", "cart-clear-confirm"]);
     expect(document.getElementById("edges").querySelectorAll(".board-connector")).toHaveLength(2);
 
     await board.setClusterState({ expanded: [] });
-    expect(frameRoots(tiles)).toEqual(["dash", "family"]);
-    expect(tileNames(tiles).sort()).toEqual(["dash", "family", "plain"]);
+    expect(frameRoots(tiles)).toEqual(["dash", "cart"]);
+    expect(tileNames(tiles).sort()).toEqual(["cart", "dash", "plain"]);
     expect(document.getElementById("edges").querySelectorAll(".board-connector")).toHaveLength(0);
   });
 
@@ -104,7 +104,7 @@ describe("board clusters — DOM", () => {
     const labels = [...edges.querySelectorAll(".board-edge-label")].map((g) => [g.getAttribute("class"), g.textContent]);
     expect(labels).toEqual([
       ["board-edge-label target", "dash-empty"],
-      ["board-edge-label source", "family-leave-confirm"],
+      ["board-edge-label source", "cart-clear-confirm"],
     ]);
     // The arrow is a drawn Material path (no icon font, no Unicode glyph), hidden from assistive tech; only the target end has one.
     expect(edges.querySelectorAll(".board-edge-label.target .board-edge-label-arrow")).toHaveLength(1);
@@ -124,7 +124,7 @@ describe("board clusters — DOM", () => {
 
   it("Clusters off is the flat board: no frames, every visible screen a tile in visible order, expanded ignored", async () => {
     const off = setup();
-    await off.board.setScreens(names, flows, "p", { screens, expanded: ["family"], clusters: false });
+    await off.board.setScreens(names, flows, "p", { screens, expanded: ["cart"], clusters: false });
     const offHtml = off.tiles.innerHTML.replace(/<div class="board-frames"><\/div>/, "");
     expect(off.tiles.querySelector(".board-cluster-frame")).toBeNull();
     expect(tileNames(off.tiles)).toEqual(names);
@@ -147,8 +147,8 @@ describe("board clusters — DOM", () => {
 
   it("dims ancestors of a shown variant as context", async () => {
     const { board, tiles } = setup();
-    await board.setScreens(["family-leave-confirm"], [], "p", { screens, expanded: ["family"], clusters: true });
-    expect([...tiles.querySelectorAll(".board-tile.context")].map((t) => t.dataset.screen).sort()).toEqual(["family", "family-leave"]);
-    expect(tiles.querySelector('.board-tile[data-screen="family-leave-confirm"]').classList.contains("context")).toBe(false);
+    await board.setScreens(["cart-clear-confirm"], [], "p", { screens, expanded: ["cart"], clusters: true });
+    expect([...tiles.querySelectorAll(".board-tile.context")].map((t) => t.dataset.screen).sort()).toEqual(["cart", "cart-clear"]);
+    expect(tiles.querySelector('.board-tile[data-screen="cart-clear-confirm"]').classList.contains("context")).toBe(false);
   });
 });

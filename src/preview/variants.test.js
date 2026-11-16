@@ -2,16 +2,16 @@ import { describe, it, expect } from "vitest";
 import { buildScreenTree } from "./screens.js";
 import { screenOfRef, variantContext, alsoReachedFrom, flowCounts } from "./variants.js";
 
-// family > leave (overlay) > confirm (step) > confirm-error (state); family > two-parents (state); family > name (overlay)
+// cart > clear (overlay) > confirm (step) > confirm-error (state); cart > two-items (state); cart > name (overlay)
 const v = (name, variant_of, variant_kind) => ({ name, tags: [], ...(variant_of ? { variant_of, variant_kind } : {}) });
 const screens = [
   v("plain"),
-  v("family"),
-  v("leave", "family", "overlay"),
-  v("confirm", "leave", "step"),
-  v("dissolve", "leave", "step"),
+  v("cart"),
+  v("clear", "cart", "overlay"),
+  v("confirm", "clear", "step"),
+  v("all", "clear", "step"),
   v("confirm-error", "confirm", "state"),
-  v("two-parents", "family", "state"),
+  v("two-items", "cart", "state"),
   v("orphan", "ghost", "state"),
 ];
 const tree = buildScreenTree(screens);
@@ -20,27 +20,27 @@ const names = (nodes) => nodes.map((n) => n.name);
 describe("variantContext", () => {
   it("returns the ancestor chain root-first with depth, kind, children and siblings", () => {
     const ctx = variantContext(tree, "confirm");
-    expect(names(ctx.chain)).toEqual(["family", "leave", "confirm"]);
-    expect(ctx.root.name).toBe("family");
-    expect(ctx.parent.name).toBe("leave");
+    expect(names(ctx.chain)).toEqual(["cart", "clear", "confirm"]);
+    expect(ctx.root.name).toBe("cart");
+    expect(ctx.parent.name).toBe("clear");
     expect(ctx.kind).toBe("step");
     expect(ctx.depth).toBe(3);
     expect(names(ctx.children)).toEqual(["confirm-error"]);
-    expect(names(ctx.siblings)).toEqual(["dissolve"]);
+    expect(names(ctx.siblings)).toEqual(["all"]);
   });
 
   it("handles a depth-4 leaf", () => {
     const ctx = variantContext(tree, "confirm-error");
-    expect(names(ctx.chain)).toEqual(["family", "leave", "confirm", "confirm-error"]);
+    expect(names(ctx.chain)).toEqual(["cart", "clear", "confirm", "confirm-error"]);
     expect(ctx.children).toEqual([]);
     expect(ctx.siblings).toEqual([]);
   });
 
   it("gives a cluster root its variants and no parent", () => {
-    const ctx = variantContext(tree, "family");
+    const ctx = variantContext(tree, "cart");
     expect(ctx.parent).toBeNull();
-    expect(names(ctx.chain)).toEqual(["family"]);
-    expect(names(ctx.children)).toEqual(["leave", "two-parents"]);
+    expect(names(ctx.chain)).toEqual(["cart"]);
+    expect(names(ctx.children)).toEqual(["clear", "two-items"]);
     expect(ctx.siblings).toEqual([]);
   });
 
@@ -69,25 +69,25 @@ describe("alsoReachedFrom", () => {
     const flows = [
       flow("feed.btn-a", "sheet"),
       flow("feed.btn-b", "sheet"),
-      flow("calendar.card", "sheet.header", "node"),
+      flow("menu-today.card", "sheet.header", "node"),
       flow("other.x", "elsewhere"),
     ];
-    expect(alsoReachedFrom(flows, "sheet", "family")).toEqual(["feed", "calendar"]);
+    expect(alsoReachedFrom(flows, "sheet", "cart")).toEqual(["feed", "menu-today"]);
   });
 
   it("excludes the variant_of parent and self-loops", () => {
-    const flows = [flow("family.open", "sheet"), flow("sheet.again", "sheet"), flow("feed.x", "sheet")];
-    expect(alsoReachedFrom(flows, "sheet", "family")).toEqual(["feed"]);
+    const flows = [flow("cart.open", "sheet"), flow("sheet.again", "sheet"), flow("feed.x", "sheet")];
+    expect(alsoReachedFrom(flows, "sheet", "cart")).toEqual(["feed"]);
   });
 
   it("includes cross-cluster sources and keeps variants of the parent", () => {
-    const flows = [flow("family-two-parents.b", "sheet"), flow("other-cluster-leaf.b", "sheet")];
-    expect(alsoReachedFrom(flows, "sheet", "family")).toEqual(["family-two-parents", "other-cluster-leaf"]);
+    const flows = [flow("cart-two-items.b", "sheet"), flow("other-cluster-leaf.b", "sheet")];
+    expect(alsoReachedFrom(flows, "sheet", "cart")).toEqual(["cart-two-items", "other-cluster-leaf"]);
   });
 
   it("is empty when nothing else reaches the screen", () => {
-    expect(alsoReachedFrom([flow("family.x", "sheet")], "sheet", "family")).toEqual([]);
-    expect(alsoReachedFrom([], "sheet", "family")).toEqual([]);
+    expect(alsoReachedFrom([flow("cart.x", "sheet")], "sheet", "cart")).toEqual([]);
+    expect(alsoReachedFrom([], "sheet", "cart")).toEqual([]);
   });
 });
 

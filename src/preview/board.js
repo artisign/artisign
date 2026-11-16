@@ -21,7 +21,7 @@ export const BASE_PADDING = 60;
 const FALLBACK_SIZE = { width: 390, height: 844 };
 
 // 5%, not the approved design's original 10% — CHR-623 review, decided from
-// the 186-screen Lückenzeit measurement: real screens are taller than the
+// the 186-screen measurement on a large real project: real screens are taller than the
 // design's 180px mock tiles, so a 10% floor still couldn't get everything
 // on screen at Fit all for a large project. 5% does (see computeFitAllZoom/
 // computeBoardColumns' call sites for the measured before/after).

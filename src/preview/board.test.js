@@ -674,16 +674,16 @@ import {
 } from "./board.js";
 
 const v = (name, variant_of, variant_kind) => ({ name, tags: [], ...(variant_of ? { variant_of, variant_kind } : {}) });
-// family > leave > (confirm, dissolve, no-transfer); family > two-parents; plus a plain screen and a second cluster
+// cart > clear > (confirm, all, no-save); cart > two-items; plus a plain screen and a second cluster
 const clusterScreens = [
   v("dashboard"),
   v("dashboard-empty", "dashboard", "state"),
-  v("family"),
-  v("family-leave", "family", "overlay"),
-  v("family-leave-confirm", "family-leave", "step"),
-  v("family-leave-dissolve", "family-leave", "step"),
-  v("family-leave-no-transfer", "family-leave", "step"),
-  v("family-two-parents", "family", "state"),
+  v("cart"),
+  v("cart-clear", "cart", "overlay"),
+  v("cart-clear-confirm", "cart-clear", "step"),
+  v("cart-clear-all", "cart-clear", "step"),
+  v("cart-clear-no-save", "cart-clear", "step"),
+  v("cart-two-items", "cart", "state"),
   v("plain"),
 ];
 const allNames = clusterScreens.map((s) => s.name);
@@ -692,24 +692,24 @@ const sizes = Object.fromEntries(allNames.map((n) => [n, { width: 100, height: 2
 describe("buildBoardModel", () => {
   it("turns main screens with variants into clusters and keeps plain screens as tiles", () => {
     const model = buildBoardModel(clusterScreens, allNames, []);
-    expect(model.items.map((i) => (i.type === "tile" ? i.screen : `cluster:${i.root}`))).toEqual(["cluster:dashboard", "cluster:family", "plain"]);
-    const family = model.clusters.find((c) => c.root === "family");
-    expect(family.size).toBe(5);
-    expect(family.depth).toBe(3);
-    expect(family.expanded).toBe(false);
+    expect(model.items.map((i) => (i.type === "tile" ? i.screen : `cluster:${i.root}`))).toEqual(["cluster:dashboard", "cluster:cart", "plain"]);
+    const cart = model.clusters.find((c) => c.root === "cart");
+    expect(cart.size).toBe(5);
+    expect(cart.depth).toBe(3);
+    expect(cart.expanded).toBe(false);
     // collapsed: only the main tile is a tile
-    expect(model.tileNames).toEqual(["dashboard", "family", "plain"]);
+    expect(model.tileNames).toEqual(["dashboard", "cart", "plain"]);
   });
 
   it("expands a cluster when the root OR any variant is in expanded, in depth levels", () => {
-    for (const entry of ["family", "family-leave-no-transfer"]) {
+    for (const entry of ["cart", "cart-clear-no-save"]) {
       const model = buildBoardModel(clusterScreens, allNames, [entry]);
-      const family = model.clusters.find((c) => c.root === "family");
-      expect(family.expanded).toBe(true);
-      expect(family.levels.map((l) => [l.depth, l.tiles.map((m) => m.screen)])).toEqual([
-        [0, ["family"]],
-        [1, ["family-leave", "family-two-parents"]],
-        [2, ["family-leave-confirm", "family-leave-dissolve", "family-leave-no-transfer"]],
+      const cart = model.clusters.find((c) => c.root === "cart");
+      expect(cart.expanded).toBe(true);
+      expect(cart.levels.map((l) => [l.depth, l.tiles.map((m) => m.screen)])).toEqual([
+        [0, ["cart"]],
+        [1, ["cart-clear", "cart-two-items"]],
+        [2, ["cart-clear-confirm", "cart-clear-all", "cart-clear-no-save"]],
       ]);
       expect(model.clusters.find((c) => c.root === "dashboard").expanded).toBe(false);
     }
@@ -729,13 +729,13 @@ describe("buildBoardModel", () => {
   });
 
   it("clusters off is exactly the visible set as plain tiles and ignores expanded", () => {
-    const model = buildBoardModel(clusterScreens, ["family-leave", "plain", "dashboard"], ["family"], { clusters: false });
+    const model = buildBoardModel(clusterScreens, ["cart-clear", "plain", "dashboard"], ["cart"], { clusters: false });
     expect(model.items).toEqual([
-      { type: "tile", screen: "family-leave" },
+      { type: "tile", screen: "cart-clear" },
       { type: "tile", screen: "plain" },
       { type: "tile", screen: "dashboard" },
     ]);
-    expect(model.tileNames).toEqual(["family-leave", "plain", "dashboard"]);
+    expect(model.tileNames).toEqual(["cart-clear", "plain", "dashboard"]);
     expect(model.clusters).toEqual([]);
   });
 
@@ -748,35 +748,35 @@ describe("buildBoardModel", () => {
 
   it("visibility stays per screen: a cluster appears for any shown member, unshown members are omitted, shown members' ancestors are dimmed context", () => {
     const visibility = computeBoardVisibility(clusterScreens.map((s) => ({ ...s, tags: s.name.includes("confirm") ? ["x"] : [] })), "x", ["dashboard-empty"]);
-    expect(visibility.visibleNames).toEqual(["dashboard-empty", "family-leave-confirm"]);
-    const model = buildBoardModel(clusterScreens, visibility.visibleNames, ["family"]);
-    const family = model.clusters.find((c) => c.root === "family");
-    expect(family.members.map((m) => [m.screen, m.context])).toEqual([
-      ["family", true],
-      ["family-leave", true],
-      ["family-leave-confirm", false],
+    expect(visibility.visibleNames).toEqual(["dashboard-empty", "cart-clear-confirm"]);
+    const model = buildBoardModel(clusterScreens, visibility.visibleNames, ["cart"]);
+    const cart = model.clusters.find((c) => c.root === "cart");
+    expect(cart.members.map((m) => [m.screen, m.context])).toEqual([
+      ["cart", true],
+      ["cart-clear", true],
+      ["cart-clear-confirm", false],
     ]);
-    expect(family.levels.flatMap((l) => l.tiles.map((m) => m.screen))).toEqual(["family", "family-leave", "family-leave-confirm"]);
-    expect([...model.contextNames].sort()).toEqual(["dashboard", "family", "family-leave"]);
-    expect(family.size).toBe(5); // header still counts the whole subtree
+    expect(cart.levels.flatMap((l) => l.tiles.map((m) => m.screen))).toEqual(["cart", "cart-clear", "cart-clear-confirm"]);
+    expect([...model.contextNames].sort()).toEqual(["cart", "cart-clear", "dashboard"]);
+    expect(cart.size).toBe(5); // header still counts the whole subtree
     // collapsed: the main tile shows (dimmed) even though only a variant matched
-    expect(buildBoardModel(clusterScreens, visibility.visibleNames, []).tileNames).toEqual(["dashboard", "family"]);
+    expect(buildBoardModel(clusterScreens, visibility.visibleNames, []).tileNames).toEqual(["dashboard", "cart"]);
   });
 });
 
 describe("clusterToggleWrite", () => {
-  const model = buildBoardModel(clusterScreens, allNames, ["family", "family-leave"]);
-  const family = model.clusters.find((c) => c.root === "family");
+  const model = buildBoardModel(clusterScreens, allNames, ["cart", "cart-clear"]);
+  const cart = model.clusters.find((c) => c.root === "cart");
   it("collapse removes every member currently in expanded", () => {
-    expect(clusterToggleWrite(family, ["family", "family-leave", "dashboard"])).toEqual({ op: "remove", screens: ["family", "family-leave"] });
+    expect(clusterToggleWrite(cart, ["cart", "cart-clear", "dashboard"])).toEqual({ op: "remove", screens: ["cart", "cart-clear"] });
   });
   it("collapse of a cluster expanded through a variant removes that variant", () => {
-    const via = buildBoardModel(clusterScreens, allNames, ["family-leave-dissolve"]).clusters.find((c) => c.root === "family");
-    expect(clusterToggleWrite(via, ["family-leave-dissolve"])).toEqual({ op: "remove", screens: ["family-leave-dissolve"] });
+    const via = buildBoardModel(clusterScreens, allNames, ["cart-clear-all"]).clusters.find((c) => c.root === "cart");
+    expect(clusterToggleWrite(via, ["cart-clear-all"])).toEqual({ op: "remove", screens: ["cart-clear-all"] });
   });
   it("expand adds the main screen", () => {
-    const collapsed = buildBoardModel(clusterScreens, allNames, []).clusters.find((c) => c.root === "family");
-    expect(clusterToggleWrite(collapsed, [])).toEqual({ op: "add", screens: ["family"] });
+    const collapsed = buildBoardModel(clusterScreens, allNames, []).clusters.find((c) => c.root === "cart");
+    expect(clusterToggleWrite(collapsed, [])).toEqual({ op: "add", screens: ["cart"] });
   });
 });
 
@@ -788,42 +788,42 @@ describe("computeClusterLayout", () => {
 
   it("a collapsed cluster is a frame around its main tile, with a thumbnail per variant", () => {
     const { layout } = layoutOf([]);
-    const frame = layout.frames.find((f) => f.root === "family");
-    const main = layout.tiles.find((t) => t.screen === "family");
+    const frame = layout.frames.find((f) => f.root === "cart");
+    const main = layout.tiles.find((t) => t.screen === "cart");
     expect(frame.expanded).toBe(false);
     expect(main.x).toBeGreaterThanOrEqual(frame.x);
     expect(main.x + main.width).toBeLessThanOrEqual(frame.x + frame.width);
     expect(main.y).toBeGreaterThanOrEqual(frame.y + frame.headerHeight);
     expect(frame.thumbs.map((t) => [t.screen, t.kind, t.deeper])).toEqual([
-      ["family-leave", "overlay", false],
-      ["family-leave-confirm", "step", true],
-      ["family-leave-dissolve", "step", true],
-      ["family-leave-no-transfer", "step", true],
-      ["family-two-parents", "state", false],
+      ["cart-clear", "overlay", false],
+      ["cart-clear-confirm", "step", true],
+      ["cart-clear-all", "step", true],
+      ["cart-clear-no-save", "step", true],
+      ["cart-two-items", "state", false],
     ]);
-    expect(layout.tiles.map((t) => t.screen)).toEqual(["dashboard", "family", "plain"]);
+    expect(layout.tiles.map((t) => t.screen)).toEqual(["dashboard", "cart", "plain"]);
   });
 
   it("an expanded cluster lays depth 0..2 out left to right inside its frame, with connectors", () => {
-    const { layout } = layoutOf(["family"]);
-    const frame = layout.frames.find((f) => f.root === "family");
+    const { layout } = layoutOf(["cart"]);
+    const frame = layout.frames.find((f) => f.root === "cart");
     const at = (name) => layout.tiles.find((t) => t.screen === name);
-    expect(at("family").x).toBeLessThan(at("family-leave").x);
-    expect(at("family-leave").x).toBeLessThan(at("family-leave-confirm").x);
-    expect(at("family-leave-confirm").x).toBe(at("family-leave-dissolve").x);
-    for (const name of ["family", "family-leave", "family-leave-no-transfer", "family-two-parents"]) {
+    expect(at("cart").x).toBeLessThan(at("cart-clear").x);
+    expect(at("cart-clear").x).toBeLessThan(at("cart-clear-confirm").x);
+    expect(at("cart-clear-confirm").x).toBe(at("cart-clear-all").x);
+    for (const name of ["cart", "cart-clear", "cart-clear-no-save", "cart-two-items"]) {
       const t = at(name);
       expect(t.x).toBeGreaterThanOrEqual(frame.x);
       expect(t.x + t.width).toBeLessThanOrEqual(frame.x + frame.width);
       expect(t.y + t.height).toBeLessThanOrEqual(frame.y + frame.height);
     }
-    expect(at("family").width).toBeLessThan(100); // shrunk cluster tiles
+    expect(at("cart").width).toBeLessThan(100); // shrunk cluster tiles
     expect(layout.connectors).toEqual([
-      { from: "family", to: "family-leave" },
-      { from: "family-leave", to: "family-leave-confirm" },
-      { from: "family-leave", to: "family-leave-dissolve" },
-      { from: "family-leave", to: "family-leave-no-transfer" },
-      { from: "family", to: "family-two-parents" },
+      { from: "cart", to: "cart-clear" },
+      { from: "cart-clear", to: "cart-clear-confirm" },
+      { from: "cart-clear", to: "cart-clear-all" },
+      { from: "cart-clear", to: "cart-clear-no-save" },
+      { from: "cart", to: "cart-two-items" },
     ]);
     expect(layout.mores).toEqual([]);
   });
@@ -880,7 +880,7 @@ describe("computeClusterLayout", () => {
     const scale = clusterTileScale(cluster, {});
     expect(scale).toBeLessThan(0.6);
     expect(scale).toBeGreaterThanOrEqual(0.2);
-    expect(clusterTileScale(buildBoardModel(clusterScreens, allNames, ["family"]).clusters.find((c) => c.root === "family"), sizes)).toBe(0.6);
+    expect(clusterTileScale(buildBoardModel(clusterScreens, allNames, ["cart"]).clusters.find((c) => c.root === "cart"), sizes)).toBe(0.6);
   });
 
   it("all-plain items lay out exactly like the flat grid", () => {
@@ -897,11 +897,11 @@ describe("edge endpoints on a cluster board", () => {
   };
 
   it("resolves to the exact tile for a visible screen (both directions)", () => {
-    const layout = build(["family"]);
-    const edge = resolveFlowEdge(layout, flow("family-leave-no-transfer.out", "dashboard.x"));
+    const layout = build(["cart"]);
+    const edge = resolveFlowEdge(layout, flow("cart-clear-no-save.out", "dashboard.x"));
     expect(edge.from.kind).toBe("tile");
     expect(edge.to.kind).toBe("tile");
-    expect(edge.from.screen).toBe("family-leave-no-transfer");
+    expect(edge.from.screen).toBe("cart-clear-no-save");
     expect(edge.sides).toBeDefined();
   });
 
@@ -911,11 +911,11 @@ describe("edge endpoints on a cluster board", () => {
     expect(into.to).toMatchObject({ kind: "frame", screen: "dashboard-empty" });
     expect(into.to.rect).toBe(layout.frames.find((f) => f.root === "dashboard"));
     expect(into.from.kind).toBe("tile");
-    const out = resolveFlowEdge(layout, flow("family-leave-confirm.go", "plain"));
-    expect(out.from).toMatchObject({ kind: "frame", screen: "family-leave-confirm" });
+    const out = resolveFlowEdge(layout, flow("cart-clear-confirm.go", "plain"));
+    expect(out.from).toMatchObject({ kind: "frame", screen: "cart-clear-confirm" });
     expect(out.to.kind).toBe("tile"); // true direction kept: variant -> plain
     // the main screen of a collapsed cluster is still an exact tile
-    expect(resolveEdgeEnd(layout, "family").kind).toBe("tile");
+    expect(resolveEdgeEnd(layout, "cart").kind).toBe("tile");
   });
 
   it("docks on the '+N more' tile for a variant hidden by the per-depth cap", () => {
@@ -930,8 +930,8 @@ describe("edge endpoints on a cluster board", () => {
 
   it("draws nothing for an edge that stays inside one docked cluster, or touches a screen that is not on the board", () => {
     const layout = build([]);
-    expect(resolveFlowEdge(layout, flow("family.x", "family-leave"))).toBeNull(); // main tile -> own variant (docked)
-    expect(resolveFlowEdge(layout, flow("family-leave.x", "family-two-parents"))).toBeNull(); // both docked in one frame
+    expect(resolveFlowEdge(layout, flow("cart.x", "cart-clear"))).toBeNull(); // main tile -> own variant (docked)
+    expect(resolveFlowEdge(layout, flow("cart-clear.x", "cart-two-items"))).toBeNull(); // both docked in one frame
     expect(resolveFlowEdge(build([], ["plain"]), flow("plain.x", "dashboard"))).toBeNull(); // dashboard hidden by the filter
   });
 
@@ -945,7 +945,7 @@ describe("edge endpoints on a cluster board", () => {
   });
 
   it("an edge between two exact tiles inside an expanded cluster is drawn", () => {
-    expect(resolveFlowEdge(build(["family"]), flow("family.x", "family-leave"))).not.toBeNull();
+    expect(resolveFlowEdge(build(["cart"]), flow("cart.x", "cart-clear"))).not.toBeNull();
   });
 });
 
@@ -953,7 +953,7 @@ describe("Fit all with clusters", () => {
   const options = { columns: 3, gapX: 20, gapY: 20, padding: 20 };
   it("accounts for cluster sizes: the fitted content is inside the viewport and expanding makes the zoom smaller", () => {
     const collapsed = buildBoardModel(clusterScreens, allNames, []).items;
-    const expanded = buildBoardModel(clusterScreens, allNames, ["family"]).items;
+    const expanded = buildBoardModel(clusterScreens, allNames, ["cart"]).items;
     const viewport = [1200, 800];
     const zoomCollapsed = computeFitAllZoom(collapsed, sizes, ...viewport, options, 1, 400);
     const zoomExpanded = computeFitAllZoom(expanded, sizes, ...viewport, options, 1, 400);
@@ -965,7 +965,7 @@ describe("Fit all with clusters", () => {
     }
   });
   it("still picks a column count for cluster items", () => {
-    const items = buildBoardModel(clusterScreens, allNames, ["family"]).items;
+    const items = buildBoardModel(clusterScreens, allNames, ["cart"]).items;
     const columns = computeBoardColumns(items, sizes, 1200, 800, options);
     expect(columns).toBeGreaterThanOrEqual(1);
     expect(columns).toBeLessThanOrEqual(items.length);
@@ -983,10 +983,10 @@ describe("label and badge room in cluster frames", () => {
   const top = (tile, badged) => tile.y - tileAboveExtent(badged.has(tile.screen));
 
   it("reserves the extent in the collapsed frame: a pinned-outside-filter root's badge stays below the header", () => {
-    const badged = new Set(["family"]);
+    const badged = new Set(["cart"]);
     const layout = layoutOf([], badged);
-    const frame = layout.frames.find((f) => f.root === "family");
-    const main = layout.tiles.find((t) => t.screen === "family");
+    const frame = layout.frames.find((f) => f.root === "cart");
+    const main = layout.tiles.find((t) => t.screen === "cart");
     expect(top(main, badged)).toBeGreaterThanOrEqual(frame.y + frame.headerHeight);
     expect(main.y + main.height).toBeLessThanOrEqual(frame.y + frame.height);
     // The unbadged cluster only reserves the label.
@@ -996,9 +996,9 @@ describe("label and badge room in cluster frames", () => {
   });
 
   it("an expanded frame clears the header for the first tile of every column and the tile above for the rest", () => {
-    const badged = new Set(["family", "family-leave", "family-leave-confirm", "family-leave-dissolve", "family-leave-no-transfer", "family-two-parents"]);
-    const layout = layoutOf(["family"], badged);
-    const frame = layout.frames.find((f) => f.root === "family");
+    const badged = new Set(["cart", "cart-clear", "cart-clear-confirm", "cart-clear-all", "cart-clear-no-save", "cart-two-items"]);
+    const layout = layoutOf(["cart"], badged);
+    const frame = layout.frames.find((f) => f.root === "cart");
     const inFrame = layout.tiles.filter((t) => frame.members.includes(t.screen));
     expect(inFrame.length).toBe(6);
     for (const tile of inFrame) {

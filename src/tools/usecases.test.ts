@@ -198,17 +198,22 @@ describe("use case tools", () => {
 
     describe("a named case whose stored file is invalid", () => {
       const caseFile = (): string => join(fx.dir, "usecases", "cases", "borrow-book.json");
-      const BROKEN = `{ "id": "borrow-book" }`;
+      const BROKEN = `{ "id": "borrow-book" }`; // schema-invalid
 
       beforeEach(async () => {
         await setUseCases(fx.store, { dimensions: DIMENSIONS, personas: PERSONAS, data_objects: DATA_OBJECTS, use_cases: [borrowCase()] });
         await writeFile(caseFile(), BROKEN);
       });
 
-      it("fails a partial patch with invalid_state naming the file and leaves it byte-identical", async () => {
+      it.each([
+        ["schema-invalid", BROKEN],
+        ["not valid JSON", "{ not json"],
+        ["an id that does not match the filename", JSON.stringify(borrowCase({ id: "other-id" }))],
+      ])("fails a partial patch with invalid_state naming the file and leaves it byte-identical (%s)", async (_cause, content) => {
+        await writeFile(caseFile(), content);
         const err = await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", status: "ready" }] }).catch((e: unknown) => e);
         expect(err).toMatchObject({ code: "invalid_state", message: expect.stringContaining("usecases/cases/borrow-book.json") });
-        expect(await readFile(caseFile(), "utf-8")).toBe(BROKEN);
+        expect(await readFile(caseFile(), "utf-8")).toBe(content);
       });
 
       it("fails a complete valid replacement too and writes nothing, not even another entity of the same call", async () => {

@@ -7,7 +7,8 @@
     "inspector",
     "chr-739",
     "CHR-905",
-    "CHR-909"
+    "CHR-909",
+    "chr-1068"
   ],
   "variant_of": "inspector-selected",
   "variant_kind": "state"

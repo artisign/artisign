@@ -8,7 +8,7 @@
     {
       "id": "b-overlay-focus-compare",
       "title": "B · Overlay / step compare, sheet-focused 4-up with lens",
-      "description": "Same Compare mode, tuned for overlays and step sequences. Picking is a one-click 'Compare siblings' action on a node in the sidebar tree (or on the breadcrumb popover 'Inside sheet-leave' header) that pre-selects the node plus its children/steps; individual rows can then be added or removed with shift-click. Side panels collapse to a rail so 4 members get ~300px each (4-up at ~50% of the phone is readable enough here because the scrim base is identical). Because the base behind a sheet is the same in every column, it is rendered once, ghosted at 25% opacity, and the diff runs only on the sheet subtree: changed text gets an amber wash, changed/added/removed buttons get the amber dashed outline. Nodes that only exist in some members show as ghost outlines in the others so the sheets stay aligned. Zoom: hovering a column shows a lens (200%) following the cursor, plus the shared Fit/100%/150% control; keyboard Z toggles the lens. The right panel is replaced by a diff summary strip under the columns. Easier: sequences (leave -> confirm -> dissolve) read as one story; base noise removed. Harder: two different code paths (state vs overlay diff scope) and the ghosting rule needs a definition of 'the sheet subtree' for the tool."
+      "description": "Same Compare mode, tuned for overlays and step sequences. Picking is a one-click 'Compare siblings' action on a node in the sidebar tree (or on the breadcrumb popover 'Inside sheet-clear' header) that pre-selects the node plus its children/steps; individual rows can then be added or removed with shift-click. Side panels collapse to a rail so 4 members get ~300px each (4-up at ~50% of the phone is readable enough here because the scrim base is identical). Because the base behind a sheet is the same in every column, it is rendered once, ghosted at 25% opacity, and the diff runs only on the sheet subtree: changed text gets an amber wash, changed/added/removed buttons get the amber dashed outline. Nodes that only exist in some members show as ghost outlines in the others so the sheets stay aligned. Zoom: hovering a column shows a lens (200%) following the cursor, plus the shared Fit/100%/150% control; keyboard Z toggles the lens. The right panel is replaced by a diff summary strip under the columns. Easier: sequences (clear -> confirm -> all) read as one story; base noise removed. Harder: two different code paths (state vs overlay diff scope) and the ghosting rule needs a definition of 'the sheet subtree' for the tool."
     }
   ],
   "title": "Side-by-side variant compare (CHR-734)",
@@ -16,6 +16,7 @@
   "tags": [
     "CHR-734",
     "chr-734",
-    "variants-exploration"
+    "variants-exploration",
+    "chr-1068"
   ]
 }

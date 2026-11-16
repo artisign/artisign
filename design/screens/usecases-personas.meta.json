@@ -1,0 +1,8 @@
+{
+  "notes": "Persona pool, sub-view \"Personas\" of the Use Cases tab. Data: dimensions + personas from `get_use_cases`; tools `set_use_cases` (personas, dimensions) and `generate_personas`. Full length 1440×1260.\n\n**Left panel:** search (\"Search personas, goals, traits…\"), \"11 personas · 4 dimensions\", list split into \"Written by people · 5\" and \"Generated from dimensions · 6\" (generated names ellipsize); selected = active fill, the main area scrolls to its card. `+` = new persona.\n\n**Main (56px side padding):**\n- Header \"User pool\" + one-paragraph explanation (a missing trait = any value). Actions: **Generate from dimensions** (secondary → `usecases-generate-dialog`) and **New persona** (primary → `usecases-edit-dialog-persona`).\n- Dimensions table: label + id (click → `usecases-dimension-dialog`), values as `uc-value-chip` with the count of personas holding the value; a value no persona has uses `uc-value-chip gap` + \"No persona has this value\". A note when personas leave a dimension open (\"6 personas leave it open (any value)\"). \"+ Dimension\" → `usecases-dimension-dialog` (new).\n- Persona cards (`uc-persona-card`), 3 columns: avatar, name, role · id, trait chips, goals, usage (\"In 5 use cases\"). `generated`: dashed border, sidebar fill, \"Generated\" marker, open dimension as dashed \"Role any\" chip, empty goals prompt.\n- Last grid cell: dashed \"New persona\" tile.",
+  "tags": [
+    "chr-1062"
+  ],
+  "variant_of": "usecases-list",
+  "variant_kind": "state"
+}

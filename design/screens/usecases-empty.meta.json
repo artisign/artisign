@@ -1,0 +1,9 @@
+{
+  "notes": "Use Cases tab of a project without a `usecases/` folder. The feature is optional: such a project behaves exactly as before apart from this empty tab.\n\nSame structure as `shell-empty-project`: guide on the bare canvas (no frame), 520px column, centred both ways. Title \"Describe what people do with your screens\", paragraph says it is optional and what it adds. Steps (a real sequence, hence numbers): 1 personas (New persona · Set up dimensions), 2 first use case (New use case), then a robot icon (not a number = alternative path): let the AI tool do both, with a copyable one-line prompt naming the open project (`chrome-code-field`; must match the project picker).\n\nLeft panel keeps the sub-nav and the search with \"0 use cases · 0 personas\"; no extra \"No use cases yet\" text. Nothing is written until the first save; the guide disappears live once the first persona or use case exists.\n\nFlows: New persona → `usecases-edit-dialog-persona`; Set up dimensions → `usecases-dimension-dialog`; New use case / + → `usecases-edit-dialog`.",
+  "tags": [
+    "chr-1062",
+    "empty-state"
+  ],
+  "variant_of": "usecases-list",
+  "variant_kind": "state"
+}

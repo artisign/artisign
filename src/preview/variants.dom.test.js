@@ -16,7 +16,7 @@ const screens = [
 const flows = [
   { from: "cart.open", event: "tap", to: "clear", to_kind: "screen" },
   { from: "feed.btn", event: "tap", to: "confirm", to_kind: "screen" },
-  { from: "calendar.card", event: "tap", to: "confirm.title", to_kind: "node" },
+  { from: "menu-today.card", event: "tap", to: "confirm.title", to_kind: "node" },
   { from: "confirm.ok", event: "tap", to: "plain", to_kind: "screen" },
 ];
 
@@ -175,9 +175,9 @@ describe("variant inspector section", () => {
     const card = insp.querySelector(".also-reached");
     expect(card.querySelector("h3").textContent).toBe("Also reached from · 2 flow sources");
     const links = [...card.querySelectorAll(".variant-link")];
-    expect(links.map((l) => l.textContent)).toEqual(["feed", "calendar"]);
+    expect(links.map((l) => l.textContent)).toEqual(["feed", "menu-today"]);
     links[1].click();
-    expect(selected).toEqual(["calendar"]);
+    expect(selected).toEqual(["menu-today"]);
   });
 
   it("omits 'Also reached from' when there is no other source", () => {

@@ -23,8 +23,8 @@ const storageStub = {
 };
 
 const SCREENS = [
-  { name: "family", tags: [] },
-  { name: "family-leave", tags: [], variant_of: "family", variant_kind: "overlay" },
+  { name: "cart", tags: [] },
+  { name: "cart-clear", tags: [], variant_of: "cart", variant_kind: "overlay" },
 ];
 
 let sources;
@@ -145,7 +145,7 @@ describe("Live chip", () => {
 
 describe("variant map toggle", () => {
   it("is shown on a variant screen, defaults to a visible map and persists the choice", async () => {
-    memoryStorage.set("artisign.lastSelection", JSON.stringify({ screen: "family-leave" }));
+    memoryStorage.set("artisign.lastSelection", JSON.stringify({ screen: "cart-clear" }));
     await boot();
     const toggle = $("#variant-bar .variant-map-toggle");
     expect(toggle).not.toBeNull();
@@ -166,7 +166,7 @@ describe("variant map toggle", () => {
 
   it("starts hidden when the stored pref says so", async () => {
     memoryStorage.set("artisign.variantMap", "false");
-    memoryStorage.set("artisign.lastSelection", JSON.stringify({ screen: "family-leave" }));
+    memoryStorage.set("artisign.lastSelection", JSON.stringify({ screen: "cart-clear" }));
     await boot();
     expect($("#variant-map").hidden).toBe(true);
   });
@@ -187,7 +187,7 @@ describe("frame caption", () => {
     expect($("#frame-caption").hidden).toBe(true); // nothing has rendered yet
     $("#screen-frame").dispatchEvent(new Event("load")); // jsdom does not run srcdoc documents
     expect($("#frame-caption").hidden).toBe(false);
-    expect($("#frame-caption").textContent).toBe("family \u00B7 390 \u00D7 844");
+    expect($("#frame-caption").textContent).toBe("cart \u00B7 390 \u00D7 844");
   });
 
   it("stays hidden when the render failed", async () => {

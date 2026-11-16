@@ -69,10 +69,10 @@ describe("alsoReachedFrom", () => {
     const flows = [
       flow("feed.btn-a", "sheet"),
       flow("feed.btn-b", "sheet"),
-      flow("calendar.card", "sheet.header", "node"),
+      flow("menu-today.card", "sheet.header", "node"),
       flow("other.x", "elsewhere"),
     ];
-    expect(alsoReachedFrom(flows, "sheet", "cart")).toEqual(["feed", "calendar"]);
+    expect(alsoReachedFrom(flows, "sheet", "cart")).toEqual(["feed", "menu-today"]);
   });
 
   it("excludes the variant_of parent and self-loops", () => {

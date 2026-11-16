@@ -18,9 +18,12 @@ const TEXT_OVERRIDES = [
   ["outcome", "Outcome"],
 ];
 
+/** A text as it is written: untouched since it was stored it stays byte-for-byte, a field the user edited is trimmed. `orig` is undefined for a new one. */
+const written = (value, orig) => (value === orig ? value : value.trim());
+
 /** The draft rows of an inputs / outputs list. `orig` keeps the stored example: one the user does not touch is saved exactly as it was. */
 export function ioDraft(list, sideKey) {
-  return (list ?? []).map((item) => ({ object: item.object, side: item[sideKey] ?? "", example: formatExample(item.example), orig: item.example }));
+  return (list ?? []).map((item) => ({ object: item.object, side: item[sideKey] ?? "", example: formatExample(item.example), orig: item.example, origSide: item[sideKey] ?? "" }));
 }
 
 /** The editable draft of a stored step: every field is text, ready to bind to an input. */
@@ -29,6 +32,7 @@ export function stepDraft(step) {
     id: step.id,
     actor: step.actor,
     action: step.action,
+    origAction: step.action,
     kind: step.target ? (step.target.node ? "element" : "screen") : "none",
     screen: step.target?.screen ?? "",
     node: step.target?.node ?? "",
@@ -65,7 +69,9 @@ export function variantDraft(variant) {
   return {
     id: variant.id,
     title: variant.title,
+    origTitle: variant.title,
     description: variant.description ?? "",
+    origDescription: variant.description ?? "",
     when: { ...variant.when },
     // A stored empty `steps: []` stays (a file is saved exactly as it was when nothing changed).
     hadSteps: variant.steps !== undefined,
@@ -85,13 +91,13 @@ export function parseIo(list, sideKey, label, errors) {
       const parsed = parseOrKeep(row.example, row.orig);
       if (!parsed.ok) errors.push(`${label} ${index + 1}: ${parsed.error}`);
       else if (Object.keys(parsed.value).length === 0) errors.push(`${label} ${index + 1}: the example needs at least one key.`);
-      return { object: row.object, ...(row.side.trim() ? { [sideKey]: row.side.trim() } : {}), example: parsed.ok ? parsed.value : {} };
+      return { object: row.object, ...(written(row.side, row.origSide) !== "" ? { [sideKey]: written(row.side, row.origSide) } : {}), example: parsed.ok ? parsed.value : {} };
     });
 }
 
 /** One step as a payload object (a base step or the step of a change); `label` prefixes problems with its data changes. */
 export function buildStepObject(step, id, label, errors) {
-  const out = { id, actor: step.actor || "system", action: step.action.trim() };
+  const out = { id, actor: step.actor || "system", action: written(step.action, step.origAction) };
   if (step.kind !== "none" && step.screen.trim() !== "") out.target = { screen: step.screen.trim(), ...(step.kind === "element" && step.node.trim() !== "" ? { node: step.node.trim() } : {}) };
   const data = step.data
     .filter((d) => d.object !== "")
@@ -191,7 +197,7 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
   const name = variant.title || vid;
   if (variant.title.trim() === "") errors.push(`Variant ${index + 1} needs a title.`);
   if (Object.keys(variant.when).length === 0) errors.push(`Variant "${name}" needs a condition (when).`);
-  const out = { id: vid, title: variant.title.trim(), ...(variant.description.trim() ? { description: variant.description.trim() } : {}), when: variant.when };
+  const out = { id: vid, title: written(variant.title, variant.origTitle), ...(written(variant.description, variant.origDescription) !== "" ? { description: written(variant.description, variant.origDescription) } : {}), when: variant.when };
 
   const { overrides } = variant;
   // A stored value is written back exactly as it is (no trimming); an override that is empty is an error, not a silent removal.

@@ -67,14 +67,26 @@ describe("variant draft <-> payload", () => {
   });
 
   it("an untouched variant re-serialises byte-equal: stored whitespace, an empty actors map and an empty steps list stay", () => {
-    const stored = { id: "v", title: "V", when: { size: ["small"] }, goal: " spaced  goal ", actors: {}, steps: [] };
+    const stored = { id: "v", title: " V ", description: "  d ", when: { size: ["small"] }, goal: " spaced  goal ", actors: {}, steps: [], outputs: [{ object: "mapping", target: " account ", example: { a: 1 } }] };
     const { out, errors } = build(variantDraft(stored));
     expect(errors).toEqual([]);
-    expect(JSON.stringify(out)).toBe(JSON.stringify(stored));
+    expect(out).toEqual(stored); // key order is not part of the contract (the dialog compares with sorted keys)
     // the stored empty map goes once the user adds a swap, and comes back as {} only while it was stored
     const draft = variantDraft(stored);
     draft.swaps.push({ from: "dana", to: "dex" });
     expect(build(draft).out.actors).toEqual({ dana: "dex" });
+  });
+
+  it("whitespace in an untouched title, description, side and step action is kept; a field the user edits is trimmed", () => {
+    const stored = { id: "v", title: " Spaced title ", description: " d ", when: { size: ["small"] }, steps: [{ op: "append", step: { id: "x", actor: "dana", action: " Does it " } }], outputs: [{ object: "mapping", target: " out ", example: { a: 1 } }] };
+    expect(build(variantDraft(stored)).out).toEqual(stored);
+    const draft = variantDraft(stored);
+    draft.title = " New title ";
+    draft.description = " e ";
+    draft.ops[0].step.action = " Does more ";
+    draft.overrides.outputs[0].side = " in ";
+    const out = build(draft).out;
+    expect([out.title, out.description, out.steps[0].step.action, out.outputs[0].target]).toEqual(["New title", "e", "Does more", "in"]);
   });
 
   it("an empty text override blocks Save with a field error; use base is the way out", () => {

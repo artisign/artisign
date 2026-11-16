@@ -76,6 +76,9 @@ export function createUseCasesView(options) {
   let selectedPersona = null;
   let selectedObject = null;
   let coverageOpen = false;
+  let selectedStep = null; // the mapping view's focused step: survives a reload while the step still exists
+  let shownInvalid = ""; // key of the set of unreadable files the toast last reported
+  let writeToast = false; // the visible toast is a write's confirmation
 
   const pool = emptyPool();
   const list = { req: 0, loading: false, error: "", total: 0, counts: null, facets: null, facetsTruncated: [], mode: "tree", tree: null, expanded: new Set(), groupState: new Map(), groupErrors: new Map(), ungrouped: { count: 0, rows: [], loading: false }, flat: { items: [], cursor: null, loading: false, error: "" }, activeKey: null };
@@ -159,7 +162,9 @@ export function createUseCasesView(options) {
       onOpenScreen: (screen, node) => options.openScreen(screen, node),
       onPickTarget: pickTarget,
       onUnmap: unmapStep,
-      onStep: () => {},
+      onStep: (stepId) => {
+        selectedStep = stepId;
+      },
     },
   });
 
@@ -211,6 +216,20 @@ export function createUseCasesView(options) {
     listPanel.update({ filters, sort, total: list.total, counts: list.counts, rows, selectedId: detail?.id ?? null, activeKey: list.activeKey, labels, loading: list.loading, error: list.error, empty, emptyText });
   }
 
+  /** The invalid-files toast shows when the set of unreadable files changes — not on every list load — and never replaces a write's confirmation. */
+  function reportInvalidFiles(data) {
+    const warnings = data.warnings ?? [];
+    const key = warnings.length ? JSON.stringify([data.invalid_file_count ?? warnings.length, warnings.map((w) => w.message ?? String(w))]) : "";
+    if (key === shownInvalid) return;
+    if (key === "") {
+      shownInvalid = "";
+      return;
+    }
+    if (writeToast && !toast.hidden) return; // shown with the next reload once the confirmation is gone
+    shownInvalid = key;
+    showToast("Some use case files could not be loaded.", warnings, 0, data.invalid_file_count);
+  }
+
   async function loadList() {
     const forProject = project;
     const req = ++list.req;
@@ -233,7 +252,7 @@ export function createUseCasesView(options) {
     list.facets = data.facets ?? {};
     list.facetsTruncated = data.facets_truncated ?? [];
     pool.counts = data.counts ?? pool.counts;
-    if (data.warnings?.length) showToast("Some use case files could not be loaded.", data.warnings, 0, data.invalid_file_count);
+    reportInvalidFiles(data);
     const groupComplete = !list.facetsTruncated.includes("group") && Object.keys(list.facets.group ?? {}).every(isCanonicalGroup);
 
     if (sort === "group" && groupComplete) {
@@ -304,6 +323,7 @@ export function createUseCasesView(options) {
     renderList();
     const result = await pageRows({ ...buildQuery(filters), group: path, sort: "group" }, want, undefined, (u) => u.group === path);
     if (req !== list.req) return;
+    if (!result.ok) list.groupErrors.set(path, result.message); // the error row offers Retry (loadMore continues at the cursor)
     list.groupState.set(path, { rows: result.rows, cursor: result.cursor, loading: false });
     renderList();
   }
@@ -317,6 +337,7 @@ export function createUseCasesView(options) {
     if (req !== list.req) return;
     list.ungrouped.rows = result.rows;
     list.ungrouped.loading = false;
+    if (!result.ok) list.groupErrors.set("", result.message);
     renderList();
   }
 
@@ -409,9 +430,8 @@ export function createUseCasesView(options) {
     clearTimeout(reloadTimer);
     reloadTimer = setTimeout(async () => {
       if (!project) return;
-      await loadPool();
+      await Promise.all([loadPool(), loadList()]);
       renderPools();
-      await loadList();
       if (detail?.id) await reloadDetail();
       options.onDataChanged?.();
     }, RELOAD_DEBOUNCE_MS);
@@ -519,12 +539,13 @@ export function createUseCasesView(options) {
     const { id, variantId } = detail;
     const hadMapping = mode === "mapping";
     await openCase(id, variantId, { keepMode: true });
-    if (hadMapping && detail?.view) showMapping(null);
+    if (hadMapping && detail?.view) showMapping(detail.view.use_case.steps?.some((s) => s.id === selectedStep) ? selectedStep : null);
   }
 
   function showMapping(stepId) {
     if (!detail?.view) return;
     mode = "mapping";
+    selectedStep = stepId;
     root.dataset.mode = "mapping";
     mapping.show({ project, bundle: detail.view, variantId: detail.variantId, variants: detail.base?.variants ?? [], pool, stepId });
   }
@@ -655,6 +676,7 @@ export function createUseCasesView(options) {
       h("button", { type: "button", class: "chrome-icon-btn chrome-icon-btn--sm", "aria-label": "Dismiss", onClick: () => { toast.hidden = true; } }, icon("close")),
     );
     toast.hidden = false;
+    writeToast = false;
     clearTimeout(showToast.timer);
     if (autoHideMs > 0) showToast.timer = setTimeout(() => { toast.hidden = true; }, autoHideMs);
   }
@@ -664,6 +686,7 @@ export function createUseCasesView(options) {
     const warnings = data.warnings ?? [];
     if (warnings.length > 0) showToast(`${label} ${warningSummary(warnings, data.warning_count)}`, warnings, 0, data.warning_count ?? warnings.length);
     else showToast(label, [], 1800);
+    writeToast = true;
   }
 
   // --- Writes ----------------------------------------------------------------------------------------------------
@@ -674,13 +697,6 @@ export function createUseCasesView(options) {
     if (kind === "dimension") return new Set(pool.dimensions.map((d) => d.id));
     return new Set(pool.objects.map((o) => o.id));
   };
-
-  async function refreshAfterWrite() {
-    await loadPool();
-    renderPools();
-    await loadList();
-    if (detail?.id) await reloadDetail();
-  }
 
   async function nodeIds(screen) {
     const res = await options.fetchScreenNodes(screen, project);
@@ -711,9 +727,7 @@ export function createUseCasesView(options) {
     if (!saved) return;
     reportWrite(saved.data, "Use case created.");
     setSection("cases");
-    await loadPool();
-    await loadList();
-    await openCase(saved.id);
+    await openCase(saved.id); // the list and pool follow with the write's own SSE event
   }
 
   async function editUseCase(id, focus = {}) {
@@ -725,9 +739,7 @@ export function createUseCasesView(options) {
     if (initialDraft) initialDraft.variants.push({ id: "", title: "", description: "", when: {}, rest: "" });
     const saved = await openUseCaseDialog(useCaseDialogOptions({ mode: "edit", source, focus, initialDraft }));
     if (!saved) return;
-    reportWrite(saved.data, "Use case saved.");
-    await refreshAfterWrite();
-    if (mode === "mapping") showMapping(null);
+    reportWrite(saved.data, "Use case saved."); // the SSE event reloads list, pool and detail (and keeps the mapping view)
   }
 
   async function unmapStep(stepId) {
@@ -739,7 +751,6 @@ export function createUseCasesView(options) {
     const res = await api.setUseCases(project, { use_cases: [{ id: detail.id, ...result.patch }] });
     if (!res.ok) return showToast(res.message, []);
     reportWrite(res.data, result.where === "variant" ? "Step left unmapped in this variant." : "Step left unmapped.");
-    await reloadDetail();
   }
 
   /** "Pick new target": a step a variant changed or added is edited in that variant's overrides, any other in the base steps. */
@@ -758,8 +769,7 @@ export function createUseCasesView(options) {
     detail = null;
     mode = "detail";
     autoSelected = false;
-    await loadPool();
-    await loadList();
+    renderAll();
   }
 
   async function editPersona(id) {
@@ -770,7 +780,6 @@ export function createUseCasesView(options) {
     reportWrite(saved.data, saved.deleted ? "Persona deleted." : "Persona saved.");
     if (saved.deleted) selectedPersona = null;
     else selectedPersona = saved.id;
-    await refreshAfterWrite();
   }
 
   async function editDimension(id) {
@@ -778,7 +787,6 @@ export function createUseCasesView(options) {
     const saved = await openDimensionDialog({ mode: id ? "edit" : "new", source, takenIds: takenIds("dimension"), save: (payload) => api.setUseCases(project, { dimensions: [payload] }), remove: (did) => api.deleteDimension(project, did) });
     if (!saved) return;
     reportWrite(saved.data, saved.deleted ? "Dimension deleted." : "Dimension saved.");
-    await refreshAfterWrite();
   }
 
   async function editObject(id) {
@@ -787,15 +795,12 @@ export function createUseCasesView(options) {
     if (!saved) return;
     reportWrite(saved.data, saved.deleted ? "Data object deleted." : "Data object saved.");
     if (!saved.deleted) selectedObject = saved.id;
-    await loadPool();
-    renderPools();
   }
 
   async function generate() {
     const saved = await openGenerateDialog({ pool: poolView, generate: (input) => api.generatePersonas(project, input) });
     if (!saved) return;
     reportWrite(saved.data, `${plural(saved.created, "persona")} generated.`);
-    await refreshAfterWrite();
   }
 
   function addForSection() {
@@ -822,6 +827,8 @@ export function createUseCasesView(options) {
     mode = "detail";
     list.expanded = new Set();
     list.groupState = new Map();
+    shownInvalid = "";
+    selectedStep = null;
     renderAll();
     await Promise.all([loadPool(), loadList()]);
     renderPools();
@@ -851,6 +858,8 @@ export function createUseCasesView(options) {
       project = options.getProject();
       loadedFor = null;
       detail = null;
+      shownInvalid = "";
+      selectedStep = null;
       filters = { ...EMPTY_FILTERS };
       Object.assign(pool, emptyPool());
       list.req++;

@@ -47,45 +47,45 @@ describe("filterScreens", () => {
   });
 });
 
-// CHR-731 — variant tree. `family` is a depth-3 chain plus siblings:
-//   family > family-sheet-leave (overlay) > family-sheet-leave-confirm (step) > confirm-error
-//   family > family-two-parents (state)
+// CHR-731 — variant tree. `cart` is a depth-3 chain plus siblings:
+//   cart > cart-sheet-clear (overlay) > cart-sheet-clear-confirm (step) > confirm-error
+//   cart > cart-two-items (state)
 const v = (name, variant_of, variant_kind, tags = []) => ({
   name,
   tags,
   ...(variant_of ? { variant_of, variant_kind } : {}),
 });
-const family = [
+const cart = [
   v("dashboard"),
-  v("family"),
-  v("family-sheet-leave", "family", "overlay", ["sheet"]),
-  v("family-sheet-leave-confirm", "family-sheet-leave", "step", ["sheet", "destructive"]),
-  v("confirm-error", "family-sheet-leave-confirm", "state"),
-  v("family-two-parents", "family", "state"),
-  v("family-sheet-name", "family", "overlay"),
+  v("cart"),
+  v("cart-sheet-clear", "cart", "overlay", ["sheet"]),
+  v("cart-sheet-clear-confirm", "cart-sheet-clear", "step", ["sheet", "destructive"]),
+  v("confirm-error", "cart-sheet-clear-confirm", "state"),
+  v("cart-two-items", "cart", "state"),
+  v("cart-sheet-name", "cart", "overlay"),
 ];
 const names = (rows) =>
   rows.map((r) => (r.type === "hidden" ? `${r.count} hidden` : `${r.node.name}:${r.state}`));
 
 describe("buildScreenTree", () => {
   it("nests variants at any depth and keeps input order among siblings", () => {
-    const tree = buildScreenTree(family);
-    expect(tree.roots.map((n) => n.name)).toEqual(["dashboard", "family"]);
-    const fam = tree.nodes.get("family");
+    const tree = buildScreenTree(cart);
+    expect(tree.roots.map((n) => n.name)).toEqual(["dashboard", "cart"]);
+    const fam = tree.nodes.get("cart");
     expect(fam.children.map((n) => n.name)).toEqual([
-      "family-sheet-leave",
-      "family-two-parents",
-      "family-sheet-name",
+      "cart-sheet-clear",
+      "cart-two-items",
+      "cart-sheet-name",
     ]);
     expect(tree.nodes.get("confirm-error").depth).toBe(3);
-    expect(tree.nodes.get("confirm-error").parent.name).toBe("family-sheet-leave-confirm");
+    expect(tree.nodes.get("confirm-error").parent.name).toBe("cart-sheet-clear-confirm");
   });
 
   it("counts the whole subtree, not just direct children", () => {
-    const tree = buildScreenTree(family);
-    expect(tree.nodes.get("family").total).toBe(5);
-    expect(tree.nodes.get("family-sheet-leave").total).toBe(2);
-    expect(tree.nodes.get("family-two-parents").total).toBe(0);
+    const tree = buildScreenTree(cart);
+    expect(tree.nodes.get("cart").total).toBe(5);
+    expect(tree.nodes.get("cart-sheet-clear").total).toBe(2);
+    expect(tree.nodes.get("cart-two-items").total).toBe(0);
     expect(tree.nodes.get("dashboard").total).toBe(0);
   });
 
@@ -112,33 +112,33 @@ describe("buildScreenTree", () => {
 });
 
 describe("displayName", () => {
-  const tree = buildScreenTree([...family, v("unrelated-name", "family", "overlay")]);
+  const tree = buildScreenTree([...cart, v("unrelated-name", "cart", "overlay")]);
   it("shows the suffix behind an ellipsis when the name starts with the parent's", () => {
-    expect(displayName(tree.nodes.get("family-two-parents"))).toBe("…-two-parents");
+    expect(displayName(tree.nodes.get("cart-two-items"))).toBe("…-two-items");
     expect(displayName(tree.nodes.get("confirm-error"))).toBe("confirm-error");
-    expect(displayName(tree.nodes.get("family-sheet-leave-confirm"))).toBe("…-confirm");
+    expect(displayName(tree.nodes.get("cart-sheet-clear-confirm"))).toBe("…-confirm");
   });
   it("shows the full name when it lacks the parent prefix, and for roots", () => {
     expect(displayName(tree.nodes.get("unrelated-name"))).toBe("unrelated-name");
-    expect(displayName(tree.nodes.get("family"))).toBe("family");
+    expect(displayName(tree.nodes.get("cart"))).toBe("cart");
   });
 });
 
 describe("ancestorNames / subtreeNames", () => {
-  const tree = buildScreenTree(family);
+  const tree = buildScreenTree(cart);
   it("lists ancestors root first", () => {
     expect(ancestorNames(tree, "confirm-error")).toEqual([
-      "family",
-      "family-sheet-leave",
-      "family-sheet-leave-confirm",
+      "cart",
+      "cart-sheet-clear",
+      "cart-sheet-clear-confirm",
     ]);
-    expect(ancestorNames(tree, "family")).toEqual([]);
+    expect(ancestorNames(tree, "cart")).toEqual([]);
     expect(ancestorNames(tree, "nope")).toEqual([]);
   });
   it("lists a node and all descendants", () => {
-    expect(subtreeNames(tree.nodes.get("family-sheet-leave"))).toEqual([
-      "family-sheet-leave",
-      "family-sheet-leave-confirm",
+    expect(subtreeNames(tree.nodes.get("cart-sheet-clear"))).toEqual([
+      "cart-sheet-clear",
+      "cart-sheet-clear-confirm",
       "confirm-error",
     ]);
   });
@@ -146,8 +146,8 @@ describe("ancestorNames / subtreeNames", () => {
 
 describe("highlightParts", () => {
   it("splits around the first case-insensitive match", () => {
-    expect(highlightParts("family-Empty-x", "empty")).toEqual([
-      { text: "family-", match: false },
+    expect(highlightParts("cart-Empty-x", "empty")).toEqual([
+      { text: "cart-", match: false },
       { text: "Empty", match: true },
       { text: "-x", match: false },
     ]);
@@ -159,21 +159,21 @@ describe("highlightParts", () => {
 });
 
 describe("flattenTree", () => {
-  const tree = buildScreenTree(family);
+  const tree = buildScreenTree(cart);
 
   it("shows only roots when nothing is expanded", () => {
-    expect(names(flattenTree(tree).rows)).toEqual(["dashboard:plain", "family:plain"]);
+    expect(names(flattenTree(tree).rows)).toEqual(["dashboard:plain", "cart:plain"]);
   });
 
   it("shows children of expanded nodes only, at their depth", () => {
-    const { rows } = flattenTree(tree, { expanded: new Set(["family", "family-sheet-leave"]) });
+    const { rows } = flattenTree(tree, { expanded: new Set(["cart", "cart-sheet-clear"]) });
     expect(names(rows)).toEqual([
       "dashboard:plain",
-      "family:plain",
-      "family-sheet-leave:plain",
-      "family-sheet-leave-confirm:plain",
-      "family-two-parents:plain",
-      "family-sheet-name:plain",
+      "cart:plain",
+      "cart-sheet-clear:plain",
+      "cart-sheet-clear-confirm:plain",
+      "cart-two-items:plain",
+      "cart-sheet-name:plain",
     ]);
     expect(rows.map((r) => r.depth)).toEqual([0, 0, 1, 2, 1, 1]);
   });
@@ -181,11 +181,11 @@ describe("flattenTree", () => {
   it("with a filter: a depth-3 match keeps its non-matching ancestors as context and folds siblings", () => {
     const { rows, matchCount, contextCount } = flattenTree(tree, { filter: "error" });
     expect(names(rows)).toEqual([
-      "family:context",
-      "family-sheet-leave:context",
-      "family-sheet-leave-confirm:context",
+      "cart:context",
+      "cart-sheet-clear:context",
+      "cart-sheet-clear-confirm:context",
       "confirm-error:match",
-      "2 hidden", // two-parents + sheet-name, the folded siblings of family-sheet-leave
+      "2 hidden", // two-items + sheet-name, the folded siblings of cart-sheet-clear
     ]);
     expect(matchCount).toBe(1);
     expect(contextCount).toBe(3);
@@ -194,29 +194,29 @@ describe("flattenTree", () => {
   it("with a filter: matches by tag and does not expand a match's own subtree", () => {
     const { rows } = flattenTree(tree, { filter: "destructive" });
     expect(names(rows)).toEqual([
-      "family:context",
-      "family-sheet-leave:context",
-      "family-sheet-leave-confirm:match",
+      "cart:context",
+      "cart-sheet-clear:context",
+      "cart-sheet-clear-confirm:match",
       "2 hidden",
     ]);
     expect(rows[2].expanded).toBe(false);
   });
 
   it("with a filter: a matching ancestor is a match row, not context", () => {
-    const { rows } = flattenTree(tree, { filter: "sheet-leave" });
+    const { rows } = flattenTree(tree, { filter: "sheet-clear" });
     expect(names(rows).slice(0, 3)).toEqual([
-      "family:context",
-      "family-sheet-leave:match",
-      "family-sheet-leave-confirm:match",
+      "cart:context",
+      "cart-sheet-clear:match",
+      "cart-sheet-clear-confirm:match",
     ]);
   });
 
   it("with a filter: a user-expanded match shows all its children; an expanded path node still folds", () => {
-    const { rows } = flattenTree(tree, { filter: "sheet-leave-confirm", expanded: new Set(["family", "family-sheet-leave-confirm"]) });
+    const { rows } = flattenTree(tree, { filter: "sheet-clear-confirm", expanded: new Set(["cart", "cart-sheet-clear-confirm"]) });
     expect(names(rows)).toEqual([
-      "family:context",
-      "family-sheet-leave:context",
-      "family-sheet-leave-confirm:match",
+      "cart:context",
+      "cart-sheet-clear:context",
+      "cart-sheet-clear-confirm:match",
       "confirm-error:plain",
       "2 hidden",
     ]);

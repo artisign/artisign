@@ -246,27 +246,27 @@ describe("FsStore", () => {
 
   describe("mockups", () => {
     it("round-trips mockup meta and variant HTML", async () => {
-      await store.writeMockupMeta("assign-caregiver", {
-        title: "Assign caregiver",
+      await store.writeMockupMeta("assign-item", {
+        title: "Assign item",
         description: "two interaction models",
         variants: [
           { id: "a", title: "Toggle", description: "single toggle" },
           { id: "b", title: "Radio group", description: "explicit choice" },
         ],
       });
-      await store.writeMockupVariant("assign-caregiver", "a", "<div>toggle</div>");
-      await store.writeMockupVariant("assign-caregiver", "b", "<div>radio</div>");
+      await store.writeMockupVariant("assign-item", "a", "<div>toggle</div>");
+      await store.writeMockupVariant("assign-item", "b", "<div>radio</div>");
 
-      expect(await store.readMockupMeta("assign-caregiver")).toEqual({
-        title: "Assign caregiver",
+      expect(await store.readMockupMeta("assign-item")).toEqual({
+        title: "Assign item",
         description: "two interaction models",
         variants: [
           { id: "a", title: "Toggle", description: "single toggle" },
           { id: "b", title: "Radio group", description: "explicit choice" },
         ],
       });
-      expect(await store.readMockupVariant("assign-caregiver", "a")).toBe("<div>toggle</div>");
-      expect(await store.readMockupVariant("assign-caregiver", "b")).toBe("<div>radio</div>");
+      expect(await store.readMockupVariant("assign-item", "a")).toBe("<div>toggle</div>");
+      expect(await store.readMockupVariant("assign-item", "b")).toBe("<div>radio</div>");
     });
 
     it("listMockups returns sorted directory names, [] when mockups/ is missing", async () => {
@@ -298,8 +298,8 @@ describe("FsStore", () => {
     });
 
     it("round-trips mockup tags", async () => {
-      await store.writeMockupMeta("assign-caregiver", { variants: [], tags: ["checkout", "wip"] });
-      expect(await store.readMockupMeta("assign-caregiver")).toEqual({ variants: [], tags: ["checkout", "wip"] });
+      await store.writeMockupMeta("assign-item", { variants: [], tags: ["checkout", "wip"] });
+      expect(await store.readMockupMeta("assign-item")).toEqual({ variants: [], tags: ["checkout", "wip"] });
     });
 
     it("readMockupMeta drops non-string tags entries instead of throwing (same leniency as sanitizeScreenMeta)", async () => {
@@ -309,8 +309,8 @@ describe("FsStore", () => {
     });
 
     it("readMockupMeta omits tags when the field is absent, rather than defaulting to []", async () => {
-      await store.writeMockupMeta("assign-caregiver", { variants: [] });
-      expect(await store.readMockupMeta("assign-caregiver")).toEqual({ variants: [] });
+      await store.writeMockupMeta("assign-item", { variants: [] });
+      expect(await store.readMockupMeta("assign-item")).toEqual({ variants: [] });
     });
 
     it("readMockupVariant propagates ENOENT for a missing variant", async () => {
@@ -318,11 +318,11 @@ describe("FsStore", () => {
     });
 
     it("deleteMockup removes the whole directory", async () => {
-      await store.writeMockupMeta("assign-caregiver", { variants: [{ id: "a", title: "a", description: "" }] });
-      await store.writeMockupVariant("assign-caregiver", "a", "<div></div>");
-      await store.deleteMockup("assign-caregiver");
+      await store.writeMockupMeta("assign-item", { variants: [{ id: "a", title: "a", description: "" }] });
+      await store.writeMockupVariant("assign-item", "a", "<div></div>");
+      await store.deleteMockup("assign-item");
       expect(await store.listMockups()).toEqual([]);
-      await expect(store.readMockupMeta("assign-caregiver")).rejects.toThrow();
+      await expect(store.readMockupMeta("assign-item")).rejects.toThrow();
     });
 
     it("deleteMockupVariant is a no-op when the variant is already missing", async () => {

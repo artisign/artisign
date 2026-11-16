@@ -281,20 +281,20 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
   });
 
   it("GET /api/mockups lists mockups with their variants", async () => {
-    await store.writeMockupMeta("assign-caregiver", {
-      title: "Assign caregiver",
+    await store.writeMockupMeta("assign-item", {
+      title: "Assign item",
       description: "two interaction models",
       variants: [{ id: "a", title: "Toggle", description: "single toggle" }],
     });
-    await store.writeMockupVariant("assign-caregiver", "a", "<div>toggle</div>");
+    await store.writeMockupVariant("assign-item", "a", "<div>toggle</div>");
 
     const { status, json } = await getJson("/api/mockups");
     expect(status).toBe(200);
     expect(json).toEqual({
       mockups: [
         {
-          name: "assign-caregiver",
-          title: "Assign caregiver",
+          name: "assign-item",
+          title: "Assign item",
           description: "two interaction models",
           tags: [],
           variants: [{ id: "a", title: "Toggle", description: "single toggle" }],
@@ -304,17 +304,17 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
   });
 
   it("GET /api/mockups reports tags set on a mockup", async () => {
-    await store.writeMockupMeta("assign-caregiver", { variants: [], tags: ["checkout"] });
+    await store.writeMockupMeta("assign-item", { variants: [], tags: ["checkout"] });
 
     const { status, json } = await getJson("/api/mockups");
     expect(status).toBe(200);
     expect(json).toEqual({
-      mockups: [{ name: "assign-caregiver", title: undefined, description: undefined, tags: ["checkout"], variants: [] }],
+      mockups: [{ name: "assign-item", title: undefined, description: undefined, tags: ["checkout"], variants: [] }],
     });
   });
 
   it("GET /api/mockups treats a mockup dir without mockup.json as {variants: []} instead of 500ing the whole listing", async () => {
-    await store.writeMockupMeta("assign-caregiver", { title: "Assign caregiver", variants: [] });
+    await store.writeMockupMeta("assign-item", { title: "Assign item", variants: [] });
     // A directory that exists (e.g. its first variant was written mid-write,
     // or mockup.json was deleted by hand) but has no mockup.json yet.
     await store.writeMockupVariant("no-meta-yet", "a", "<div></div>");
@@ -323,17 +323,17 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
     expect(status).toBe(200);
     expect(json).toEqual({
       mockups: [
-        { name: "assign-caregiver", title: "Assign caregiver", description: undefined, tags: [], variants: [] },
+        { name: "assign-item", title: "Assign item", description: undefined, tags: [], variants: [] },
         { name: "no-meta-yet", title: undefined, description: undefined, tags: [], variants: [] },
       ],
     });
   });
 
   it("GET /api/render/mockup/<name>/<variant> wraps a fragment with the deterministic baseline", async () => {
-    await store.writeMockupMeta("assign-caregiver", { variants: [{ id: "a", title: "Toggle", description: "" }] });
-    await store.writeMockupVariant("assign-caregiver", "a", "<div>toggle</div>");
+    await store.writeMockupMeta("assign-item", { variants: [{ id: "a", title: "Toggle", description: "" }] });
+    await store.writeMockupVariant("assign-item", "a", "<div>toggle</div>");
 
-    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/mockup/assign-caregiver/a`);
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/mockup/assign-item/a`);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
     const html = await res.text();
@@ -343,10 +343,10 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
   });
 
   it("GET /api/render/mockup/<name>/<variant> wraps a fragment that merely contains the literal text \"<html>\" (not at the document start)", async () => {
-    await store.writeMockupMeta("assign-caregiver", { variants: [{ id: "b", title: "B", description: "" }] });
-    await store.writeMockupVariant("assign-caregiver", "b", "<div>learn about &lt;html&gt; and <html> elements</div>");
+    await store.writeMockupMeta("assign-item", { variants: [{ id: "b", title: "B", description: "" }] });
+    await store.writeMockupVariant("assign-item", "b", "<div>learn about &lt;html&gt; and <html> elements</div>");
 
-    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/mockup/assign-caregiver/b`);
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/mockup/assign-item/b`);
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("<!doctype html>");
@@ -355,22 +355,22 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
   });
 
   it("GET /api/render/mockup/<name>/<variant> still renders (no fonts) when tokens.json is missing", async () => {
-    await store.writeMockupMeta("assign-caregiver", { variants: [{ id: "a", title: "A", description: "" }] });
-    await store.writeMockupVariant("assign-caregiver", "a", "<div>toggle</div>");
+    await store.writeMockupMeta("assign-item", { variants: [{ id: "a", title: "A", description: "" }] });
+    await store.writeMockupVariant("assign-item", "a", "<div>toggle</div>");
     await rm(join(dir, "design-system", "tokens.json"));
 
-    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/mockup/assign-caregiver/a`);
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/mockup/assign-item/a`);
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("<div>toggle</div>");
   });
 
   it("GET /api/render/mockup/<name>/<variant> serves a full HTML document verbatim, plus only the script ban (CHR-982)", async () => {
-    await store.writeMockupMeta("assign-caregiver", { variants: [{ id: "full", title: "Full", description: "" }] });
+    await store.writeMockupMeta("assign-item", { variants: [{ id: "full", title: "Full", description: "" }] });
     const fullDoc = "<html><head><title>x</title></head><body><p>full doc</p></body></html>";
-    await store.writeMockupVariant("assign-caregiver", "full", fullDoc);
+    await store.writeMockupVariant("assign-item", "full", fullDoc);
 
-    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/mockup/assign-caregiver/full`);
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/mockup/assign-item/full`);
     expect(res.status).toBe(200);
     expect(await res.text()).toBe(
       `<html><meta http-equiv="Content-Security-Policy" content="script-src 'none'"><head><title>x</title></head><body><p>full doc</p></body></html>`,
@@ -384,8 +384,8 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
   });
 
   it("GET /api/render/mockup/<name>/<unknown> returns a 404 JSON error", async () => {
-    await store.writeMockupMeta("assign-caregiver", { variants: [] });
-    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/mockup/assign-caregiver/does-not-exist`);
+    await store.writeMockupMeta("assign-item", { variants: [] });
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/api/render/mockup/assign-item/does-not-exist`);
     expect(res.status).toBe(404);
     expect(await res.json()).toMatchObject({ code: "not_found" });
   });

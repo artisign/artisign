@@ -137,9 +137,9 @@ describe("GET /events (SSE)", () => {
     const store = new FsStore(dir);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    await store.writeMockupVariant("assign-caregiver", "a", "<div></div>");
+    await store.writeMockupVariant("assign-item", "a", "<div></div>");
     const evt = await waitForSseEvent(res, (e) => e.kind === "mockup", 1000);
-    expect(evt).toEqual({ type: "change", kind: "mockup", name: "assign-caregiver" });
+    expect(evt).toEqual({ type: "change", kind: "mockup", name: "assign-item" });
   });
 
   it("broadcasts a mockup meta write under the mockup's directory name", async () => {
@@ -151,14 +151,14 @@ describe("GET /events (SSE)", () => {
     // (with ignoreInitial: true) silently swallows the add rather than
     // reporting it live.
     await new Promise((resolve) => setTimeout(resolve, 200));
-    await store.writeMockupVariant("assign-caregiver", "a", "<div></div>");
+    await store.writeMockupVariant("assign-item", "a", "<div></div>");
 
     const res = await fetch(`http://127.0.0.1:${daemon.port}/events`);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    await store.writeMockupMeta("assign-caregiver", { variants: [{ id: "a", title: "a", description: "" }] });
-    const evt = await waitForSseEvent(res, (e) => e.kind === "mockup" && e.name === "assign-caregiver", 1000);
-    expect(evt).toEqual({ type: "change", kind: "mockup", name: "assign-caregiver" });
+    await store.writeMockupMeta("assign-item", { variants: [{ id: "a", title: "a", description: "" }] });
+    const evt = await waitForSseEvent(res, (e) => e.kind === "mockup" && e.name === "assign-item", 1000);
+    expect(evt).toEqual({ type: "change", kind: "mockup", name: "assign-item" });
   });
 
   it("passes through the design_system_meta kind for design-system/meta.json", async () => {

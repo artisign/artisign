@@ -5,16 +5,16 @@ import { createVariantUI } from "./variants.js";
 const v = (name, variant_of, variant_kind) => ({ name, tags: [], ...(variant_of ? { variant_of, variant_kind } : {}) });
 const screens = [
   v("plain"),
-  v("family"),
-  v("leave", "family", "overlay"),
-  v("confirm", "leave", "step"),
-  v("dissolve", "leave", "step"),
+  v("cart"),
+  v("clear", "cart", "overlay"),
+  v("confirm", "clear", "step"),
+  v("all", "clear", "step"),
   v("confirm-error", "confirm", "state"),
-  v("two-parents", "family", "state"),
-  v("name-sheet", "family", "overlay"),
+  v("two-items", "cart", "state"),
+  v("name-sheet", "cart", "overlay"),
 ];
 const flows = [
-  { from: "family.open", event: "tap", to: "leave", to_kind: "screen" },
+  { from: "cart.open", event: "tap", to: "clear", to_kind: "screen" },
   { from: "feed.btn", event: "tap", to: "confirm", to_kind: "screen" },
   { from: "calendar.card", event: "tap", to: "confirm.title", to_kind: "node" },
   { from: "confirm.ok", event: "tap", to: "plain", to_kind: "screen" },
@@ -39,45 +39,45 @@ describe("variant breadcrumb", () => {
     const { bar, shown } = setup("confirm");
     expect(shown).toBe(true);
     expect(bar.hidden).toBe(false);
-    expect(crumbNames(bar)).toEqual(["family", "leave", "confirm"]);
+    expect(crumbNames(bar)).toEqual(["cart", "clear", "confirm"]);
     expect(bar.querySelector(".crumb-group.on").dataset.screen).toBe("confirm");
-    expect(bar.querySelector(".crumb-group[data-screen=leave] .kind-icon").dataset.kind).toBe("overlay");
+    expect(bar.querySelector(".crumb-group[data-screen=clear] .kind-icon").dataset.kind).toBe("overlay");
     expect(bar.querySelector(".crumb-group[data-screen=confirm] .kind-icon").dataset.kind).toBe("step");
     expect([...bar.querySelectorAll(".variant-chip")].map((c) => c.textContent)).toEqual(["depth 3", "step"]);
-    expect(bar.querySelector(".variant-back").textContent).toContain("Back to family");
+    expect(bar.querySelector(".variant-back").textContent).toContain("Back to cart");
   });
 
   it("clicking a crumb navigates to it", () => {
     const { bar, selected } = setup("confirm");
-    bar.querySelector(".crumb-group[data-screen=leave] .crumb").click();
-    expect(selected).toEqual(["leave"]);
+    bar.querySelector(".crumb-group[data-screen=clear] .crumb").click();
+    expect(selected).toEqual(["clear"]);
   });
 
   it("Back to root navigates to the cluster root", () => {
     const { bar, selected } = setup("confirm-error");
     bar.querySelector(".variant-back").click();
-    expect(selected).toEqual(["family"]);
+    expect(selected).toEqual(["cart"]);
   });
 
   it("the disclosure opens a popover with children, siblings, current and 'Open itself'", () => {
     const { bar, selected } = setup("confirm");
-    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle").click();
     const pop = bar.querySelector(".variant-pop");
     const headings = [...pop.querySelectorAll("h4")].map((h) => h.textContent);
-    expect(headings).toEqual(["Inside leave · 2", "Siblings in family · 2"]);
+    expect(headings).toEqual(["Inside clear · 2", "Siblings in cart · 2"]);
     const rows = [...pop.querySelectorAll(".variant-pop-row")].map((r) => r.querySelector(".variant-pop-name")?.textContent ?? r.textContent);
-    expect(rows).toEqual(["confirm", "dissolve", "two-parents", "name-sheet", "Open leave itself"]);
+    expect(rows).toEqual(["confirm", "all", "two-items", "name-sheet", "Open clear itself"]);
     expect(pop.querySelector(".variant-pop-row.current .variant-pop-current").textContent).toBe("current");
     pop.querySelector(".variant-pop-itself").click();
-    expect(selected).toEqual(["leave"]);
+    expect(selected).toEqual(["clear"]);
   });
 
   it("a popover row navigates and Escape or an outside click closes it", () => {
     const { bar, selected } = setup("confirm");
-    const open = () => bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    const open = () => bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle").click();
     open();
     bar.querySelectorAll(".variant-pop-row")[1].click();
-    expect(selected).toEqual(["dissolve"]);
+    expect(selected).toEqual(["all"]);
     open();
     expect(bar.querySelector(".variant-pop")).not.toBeNull();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
@@ -89,7 +89,7 @@ describe("variant breadcrumb", () => {
 
   it("keyboard focus: opening moves it into the popover, Escape returns it to the toggle and stops there", () => {
     const { bar } = setup("confirm");
-    const toggle = () => bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle");
+    const toggle = () => bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle");
     toggle().focus();
     toggle().click();
     expect(document.activeElement.classList.contains("variant-pop-row")).toBe(true);
@@ -107,7 +107,7 @@ describe("variant breadcrumb", () => {
 
   it("the popover is an ARIA menu: ↑/↓/Home/End move between the rows, one roving tab stop, Enter-style activation selects", () => {
     const { bar, selected } = setup("confirm");
-    const toggle = bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle");
+    const toggle = bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle");
     toggle.focus();
     toggle.click();
     const pop = bar.querySelector(".variant-pop");
@@ -134,14 +134,14 @@ describe("variant breadcrumb", () => {
 
   it("keyboard focus survives a re-render from outside (e.g. an SSE refresh)", () => {
     const { ui, bar } = setup("confirm");
-    bar.querySelector(".crumb-group[data-screen=leave] .crumb").focus();
+    bar.querySelector(".crumb-group[data-screen=clear] .crumb").focus();
     ui.update(screens, flows, "confirm");
-    expect(document.activeElement).toBe(bar.querySelector(".crumb-group[data-screen=leave] .crumb"));
+    expect(document.activeElement).toBe(bar.querySelector(".crumb-group[data-screen=clear] .crumb"));
   });
 
   it("a cluster root shows itself, its variant count and no back button", () => {
-    const { bar } = setup("family");
-    expect(crumbNames(bar)).toEqual(["family"]);
+    const { bar } = setup("cart");
+    expect(crumbNames(bar)).toEqual(["cart"]);
     expect(bar.querySelector(".variant-back")).toBeNull();
     expect(bar.querySelector(".variant-chip").textContent).toBe("6 variants");
   });
@@ -156,9 +156,9 @@ describe("variant breadcrumb", () => {
   });
 
   it("re-renders on a new current screen from the stored chain (not the arrival path)", () => {
-    const { ui, bar } = setup("family");
+    const { ui, bar } = setup("cart");
     ui.update(screens, flows, "confirm-error");
-    expect(crumbNames(bar)).toEqual(["family", "leave", "confirm", "confirm-error"]);
+    expect(crumbNames(bar)).toEqual(["cart", "clear", "confirm", "confirm-error"]);
   });
 });
 
@@ -167,7 +167,7 @@ describe("variant inspector section", () => {
     const { insp } = setup("confirm");
     expect(insp.hidden).toBe(false);
     const kv = Object.fromEntries([...insp.querySelectorAll(".variant-kv")].map((r) => [r.children[0].textContent, r.children[1].textContent]));
-    expect(kv).toEqual({ Path: "family › leave", Kind: "step", Depth: "3", Siblings: "1", "Flows in / out": "2 / 1" });
+    expect(kv).toEqual({ Path: "cart › clear", Kind: "step", Depth: "3", Siblings: "1", "Flows in / out": "2 / 1" });
   });
 
   it("lists 'Also reached from' sources as links that navigate, excluding the parent", () => {
@@ -181,13 +181,13 @@ describe("variant inspector section", () => {
   });
 
   it("omits 'Also reached from' when there is no other source", () => {
-    const { insp } = setup("leave");
+    const { insp } = setup("clear");
     expect(insp.querySelector(".also-reached")).toBeNull();
     expect(insp.querySelector(".variant-card")).not.toBeNull();
   });
 
   it("has no Variant section for a cluster root", () => {
-    const { insp } = setup("family");
+    const { insp } = setup("cart");
     expect(insp.hidden).toBe(true);
     expect(insp.children).toHaveLength(0);
   });
@@ -198,26 +198,26 @@ describe("variant tree map", () => {
 
   it("renders the cluster with the current path expanded and the current node highlighted", () => {
     const { map } = setup("confirm");
-    expect(map.querySelector("h3").textContent).toBe("Variant tree · family");
-    // family's children, leave's children, confirm's children; two-parents and name-sheet are leaves
-    expect(nodes(map)).toEqual(["family", "leave", "confirm", "confirm-error", "dissolve", "two-parents", "name-sheet"]);
+    expect(map.querySelector("h3").textContent).toBe("Variant tree · cart");
+    // cart's children, clear's children, confirm's children; two-items and name-sheet are leaves
+    expect(nodes(map)).toEqual(["cart", "clear", "confirm", "confirm-error", "all", "two-items", "name-sheet"]);
     expect(map.querySelector(".map-node.on").dataset.screen).toBe("confirm");
-    expect(map.querySelector('.map-node[data-screen="dissolve"]').classList.contains("dim")).toBe(true);
-    expect(map.querySelector('.map-node[data-screen="leave"]').classList.contains("dim")).toBe(false);
+    expect(map.querySelector('.map-node[data-screen="all"]').classList.contains("dim")).toBe(true);
+    expect(map.querySelector('.map-node[data-screen="clear"]').classList.contains("dim")).toBe(false);
   });
 
   it("keeps off-path subtrees collapsed with a count", () => {
-    const { map } = setup("two-parents");
-    expect(nodes(map)).toEqual(["family", "leave", "two-parents", "name-sheet"]);
-    const note = map.querySelector('.map-node[data-screen="leave"] .map-node-note');
+    const { map } = setup("two-items");
+    expect(nodes(map)).toEqual(["cart", "clear", "two-items", "name-sheet"]);
+    const note = map.querySelector('.map-node[data-screen="clear"] .map-node-note');
     expect(note.querySelector(".icon").textContent).toBe("chevron_right");
     expect(note.textContent).toBe("chevron_right3");
   });
 
   it("an entry click navigates", () => {
     const { map, selected } = setup("confirm");
-    map.querySelector('.map-node[data-screen="dissolve"]').click();
-    expect(selected).toEqual(["dissolve"]);
+    map.querySelector('.map-node[data-screen="all"]').click();
+    expect(selected).toEqual(["all"]);
   });
 
   it("is hidden for plain screens", () => {
@@ -257,7 +257,7 @@ describe("compare mode controls (CHR-738)", () => {
   });
 
   it("shows the column count on the pressed Compare button and Single leaves", () => {
-    const { bar, calls } = setupCompare("confirm", { on: true, selected: ["confirm", "dissolve"] });
+    const { bar, calls } = setupCompare("confirm", { on: true, selected: ["confirm", "all"] });
     expect(seg(bar).map((b) => [b.textContent, b.getAttribute("aria-pressed")])).toEqual([
       ["Single", "false"],
       ["Compare · 3", "true"],
@@ -282,12 +282,12 @@ describe("compare mode controls (CHR-738)", () => {
       return document.getElementById("bar");
     };
     expect(make({}).querySelector(".variant-map-toggle")).not.toBeNull();
-    expect(make({ on: true, selected: ["dissolve"] }).querySelector(".variant-map-toggle")).toBeNull();
+    expect(make({ on: true, selected: ["all"] }).querySelector(".variant-map-toggle")).toBeNull();
   });
 
   it("the compare checkboxes are part of the arrow order: each one, then its row, in DOM order", () => {
-    const { bar } = setupCompare("confirm", { on: true, selected: ["dissolve"] });
-    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    const { bar } = setupCompare("confirm", { on: true, selected: ["all"] });
+    bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle").click();
     const pop = bar.querySelector(".variant-pop");
     const entries = [...pop.querySelectorAll(".variant-pop-entry")];
     const [box0, row0] = [entries[0].querySelector(".variant-pop-check"), entries[0].querySelector(".variant-pop-row")];
@@ -311,7 +311,7 @@ describe("compare mode controls (CHR-738)", () => {
 
   it("a keyboard Tab out of the popover closes it; Tab onto its own checkboxes does not", async () => {
     const { bar } = setupCompare("confirm", { on: true, selected: [] });
-    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle").click();
     const pop = bar.querySelector(".variant-pop");
     const box = pop.querySelector(".variant-pop-check");
     pop.querySelector(".variant-pop-row").focus();
@@ -330,10 +330,10 @@ describe("compare mode controls (CHR-738)", () => {
 
   it("Shift+Tab from the first row ends on the crumb toggle, not on <body>", async () => {
     const { bar } = setupCompare("confirm", { on: false, selected: [] });
-    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle").click();
     document.activeElement.focus();
     tab(document.activeElement, { shiftKey: true });
-    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").focus();
+    bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle").focus();
     await later();
     expect(bar.querySelector(".variant-pop")).toBeNull();
     expect(document.activeElement.classList.contains("crumb-toggle")).toBe(true);
@@ -342,12 +342,12 @@ describe("compare mode controls (CHR-738)", () => {
 
   it("a pointer press elsewhere with the popover open does not rebuild the bar under the click: the first click navigates", async () => {
     for (const pick of [
-      (ui) => ui.bar.querySelector(".crumb-group[data-screen=family] .crumb"),
+      (ui) => ui.bar.querySelector(".crumb-group[data-screen=cart] .crumb"),
       (ui) => ui.bar.querySelector(".variant-back"),
       (ui) => ui.bar.querySelector(".compare-seg-button[data-mode=compare]"),
     ]) {
       const ui = setupCompare("confirm", { on: false, selected: [] });
-      ui.bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+      ui.bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle").click();
       const target = pick(ui);
       target.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); // Chrome moves focus on mousedown
       target.focus();
@@ -362,7 +362,7 @@ describe("compare mode controls (CHR-738)", () => {
 
   it("the roving tab stop starts on the current screen's row and a rebuild keeps focus on the row it was on", () => {
     const { bar } = setupCompare("confirm", { on: true, selected: [] });
-    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle").click();
     const stops = () => [...bar.querySelectorAll(".variant-pop-row")].filter((r) => r.tabIndex === 0);
     expect(stops()).toHaveLength(1);
     expect(stops()[0].classList.contains("current")).toBe(true);
@@ -382,16 +382,16 @@ describe("compare mode controls (CHR-738)", () => {
 
   it("puts a checkbox on every popover row while compare is on, and none while it is off", () => {
     const off = setupCompare("confirm", {});
-    off.bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    off.bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle").click();
     expect(off.bar.querySelectorAll(".variant-pop-check")).toHaveLength(0);
 
-    const { bar, calls } = setupCompare("confirm", { on: true, selected: ["dissolve"] });
-    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    const { bar, calls } = setupCompare("confirm", { on: true, selected: ["all"] });
+    bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle").click();
     const boxes = [...bar.querySelectorAll(".variant-pop-check")];
     expect(boxes.map((b) => [b.dataset.screen, b.checked])).toEqual([
       ["confirm", false],
-      ["dissolve", true],
-      ["two-parents", false],
+      ["all", true],
+      ["two-items", false],
       ["name-sheet", false],
     ]);
     boxes[0].click();
@@ -400,17 +400,17 @@ describe("compare mode controls (CHR-738)", () => {
   });
 
   it("disables unticked boxes once the cap is reached, keeping ticked ones usable", () => {
-    const { bar } = setupCompare("confirm", { on: true, selected: ["confirm", "dissolve", "two-parents"] });
-    bar.querySelector(".crumb-group[data-screen=leave] .crumb-toggle").click();
+    const { bar } = setupCompare("confirm", { on: true, selected: ["confirm", "all", "two-items"] });
+    bar.querySelector(".crumb-group[data-screen=clear] .crumb-toggle").click();
     const state = Object.fromEntries([...bar.querySelectorAll(".variant-pop-check")].map((b) => [b.dataset.screen, b.disabled]));
-    expect(state).toEqual({ confirm: false, dissolve: false, "two-parents": false, "name-sheet": true });
+    expect(state).toEqual({ confirm: false, all: false, "two-items": false, "name-sheet": true });
   });
 
   it("openPopover opens the popover of a crumb", () => {
     const { ui, bar } = setupCompare("confirm", { on: true });
-    ui.openPopover("leave");
-    expect(bar.querySelector(".crumb-group[data-screen=leave] .variant-pop")).not.toBeNull();
+    ui.openPopover("clear");
+    expect(bar.querySelector(".crumb-group[data-screen=clear] .variant-pop")).not.toBeNull();
     ui.openPopover("nope");
-    expect(bar.querySelector(".crumb-group[data-screen=leave] .variant-pop")).not.toBeNull();
+    expect(bar.querySelector(".crumb-group[data-screen=clear] .variant-pop")).not.toBeNull();
   });
 });

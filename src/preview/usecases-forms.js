@@ -400,11 +400,11 @@ export async function openUseCaseDialog(options) {
           "div",
           { class: "uc-step-edit", dataset: { index: String(index), step: step.id ?? "" } },
           h("div", { class: "uc-step-edit-top" }, reorder.handle(() => rowEl), h("span", { class: "uc-step-edit-no" }, String(index + 1)), selectInput({ options: actorOptions(step.actor), value: step.actor || "system", ariaLabel: `Step ${index + 1} actor`, onChange: (value) => { step.actor = value; markDirty(); } }), actionInput, h("span", { class: "uc-step-edit-tools" }, reorder.moreButton(() => rowEl), removeButton(`Remove step ${index + 1}`, () => { draft.steps.splice(draft.steps.indexOf(step), 1); markDirty(); drawSteps(); }))),
-          reorder.keyHint(),
           targetRow,
           warnScreen,
           warnNode,
           dataBox,
+          reorder.keyHint(),
         );
       stepsBox.append(rowEl);
       rowEl.querySelector("[aria-haspopup='menu']").relabel();

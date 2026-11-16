@@ -48,7 +48,6 @@ function scrollParent(el) {
 export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, onCommit, noun = "step" }) {
   const rows = () => [...list.querySelectorAll(`:scope > ${rowSelector}`)];
   const live = h("p", { class: "uc-reorder-live", role: "status" });
-  const keys = "Arrows to move · Space to drop · Esc to cancel";
   let announceTimer = 0;
   let drag = null; // a pointer drag in progress
   let grab = null; // a keyboard grab in progress
@@ -102,7 +101,6 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     handle.setAttribute("aria-pressed", on ? "true" : "false");
     const row = handle.closest(rowSelector);
     row.classList.toggle("is-grabbed", on);
-    row.querySelector(".uc-step-keys")?.toggleAttribute("hidden", !on);
   }
 
   function endGrab(handle, { cancel }) {
@@ -176,10 +174,12 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
   function update() {
     const { row, marker, from } = drag;
     const listTop = list.getBoundingClientRect().top;
-    const y = Math.min(Math.max(drag.y - listTop, 0), list.offsetHeight);
-    row.style.translate = `0 ${drag.y - listTop - drag.offset - row.offsetTop}px`;
+    const rowTop = Math.min(Math.max(drag.y - listTop - drag.offset, 0), Math.max(list.offsetHeight - row.offsetHeight, 0));
+    row.style.translate = `0 ${rowTop - row.offsetTop}px`;
+    // The landing slot is read at the lifted row's leading edge (top going up, bottom going down), so the marker sits at the edge, not across the row.
+    const leading = rowTop < row.offsetTop ? rowTop : rowTop + row.offsetHeight;
     const others = rows().filter((r) => r !== row);
-    drag.target = dropIndex(others.map((r) => r.offsetTop + r.offsetHeight / 2), y);
+    drag.target = dropIndex(others.map((r) => r.offsetTop + r.offsetHeight / 2), leading);
     if (drag.target === from) {
       marker.hidden = true;
       return;
@@ -289,9 +289,9 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     return button;
   }
 
-  /** The key hint shown while the row is grabbed (not read out: the handle's pressed state and the live region carry it). */
+  /** The key hint (shown by CSS while the handle has keyboard focus or the row is grabbed; not read out: the handle's pressed state and the live region carry it). */
   function keyHint() {
-    return h("span", { class: "uc-step-keys", "aria-hidden": "true", hidden: true }, icon("keyboard"), keys);
+    return h("span", { class: "uc-step-keys", "aria-hidden": "true" }, icon("keyboard"), h("span", { class: "uc-step-keys-rest" }, "Space to reorder"), h("span", { class: "uc-step-keys-grab" }, "Arrows to move · Space to drop · Esc to cancel"));
   }
 
   /** The ⋯ button with Move up / Move down: the pointer path that needs no dragging. */
@@ -305,6 +305,8 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
       const total = rows().length;
       openMenu({
         anchor: button,
+        align: "end",
+        width: 180,
         label: `Actions for ${noun} ${index + 1}`,
         items: [
           { value: "up", label: "Move up", command: true, icon: "arrow_upward", disabled: index === 0 },

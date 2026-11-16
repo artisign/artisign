@@ -64,6 +64,10 @@ describe("step reordering", () => {
       expect($("button[aria-haspopup=menu]", row)).not.toBeNull();
     }
     expect($("button[title='Move up']")).toBeNull();
+    // the key hint is the row's last line and carries both texts; CSS picks one by focus / grab state
+    const hint = rows[0].lastElementChild;
+    expect(hint.classList.contains("uc-step-keys")).toBe(true);
+    expect($(".uc-step-keys-rest", hint).textContent).toBe("Space to reorder");
     $(".uc-drag-handle").dispatchEvent(new Event("focus"));
     expect($(".uc-drag-handle").getAttribute("aria-label")).toMatch(/^Reorder step 1, /); // set on focus
   });
@@ -77,7 +81,8 @@ describe("step reordering", () => {
     const row = $$(".uc-step-edit")[0];
     key(handle(), " ");
     expect(handle().getAttribute("aria-pressed")).toBe("true");
-    expect($(".uc-step-keys:not([hidden])", row).textContent).toContain("Esc to cancel");
+    expect(row.classList.contains("is-grabbed")).toBe(true); // CSS shows the grabbed hint on this row
+    expect($(".uc-step-keys-grab", row).textContent).toBe("Arrows to move · Space to drop · Esc to cancel");
     key(handle(), "ArrowDown");
     expect(actions()).toEqual([first[1], first[0], first[2]]);
     expect($$(".uc-step-edit")[1]).toBe(row); // the same node, moved
@@ -161,6 +166,8 @@ describe("step reordering", () => {
     expect($(".uc-step-slot")).not.toBeNull();
     pointer("pointermove", 150);
     expect($(".uc-drop-marker").hidden).toBe(false);
+    // going down the marker is read at the lifted row's bottom edge: 150 - 40 + 80 = 190 passes one row midpoint (140)
+    expect($(".uc-drop-marker").style.top).toBe("186px"); // gap between rows 2 and 3 is 180..200, centre 190, minus half the 8px marker
     expect(list.dataset.drop).toBe("true");
     pointer("pointermove", 20);
     expect($(".uc-drop-marker").hidden).toBe(true); // own slot: no marker
@@ -180,6 +187,27 @@ describe("step reordering", () => {
     expect(rows().some((r) => r.classList.contains("is-lifted"))).toBe(false);
     vi.advanceTimersByTime(600);
     expect(live()).toBe(`${first[0]}, moved to step 2 of 3.`);
+  });
+});
+
+describe("openMenu align end", () => {
+  it("opens 180px wide with its right edge under the anchor, kept inside the dialog; default menus keep the left edge", () => {
+    const dialog = document.body.appendChild(document.createElement("dialog"));
+    dialog.getBoundingClientRect = () => ({ left: 100, right: 500, top: 0, bottom: 600, width: 400, height: 600 });
+    const anchor = dialog.appendChild(document.createElement("button"));
+    anchor.getBoundingClientRect = () => ({ left: 440, right: 470, top: 100, bottom: 128, width: 30, height: 28 });
+    openMenu({ anchor, label: "A", onPick: () => {}, align: "end", width: 180, items: [{ value: "x", label: "X", command: true }] });
+    const menu = $("[role=menu]");
+    expect(menu.style.width).toBe("180px");
+    expect(menu.style.left).toBe("290px"); // 470 - 180
+    closeMenu();
+    anchor.getBoundingClientRect = () => ({ left: 490, right: 520, top: 100, bottom: 128, width: 30, height: 28 });
+    openMenu({ anchor, label: "A", onPick: () => {}, align: "end", width: 180, items: [{ value: "x", label: "X", command: true }] });
+    expect($("[role=menu]").style.left).toBe("312px"); // right edge clamped to the dialog's 500 - 8
+    closeMenu();
+    openMenu({ anchor, label: "A", onPick: () => {}, items: [{ value: "x", label: "X" }] });
+    expect($("[role=menu]").style.width).toBe("");
+    expect($("[role=menu]").style.left).toBe("490px");
   });
 });
 

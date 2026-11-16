@@ -8399,6 +8399,16 @@ button.uc-target:hover {
   color: var(--chrome-text);
 }
 
+/* The focus ring is drawn on the whole row (below), not as an outline on the 20px button. */
+.uc-drag-handle:focus-visible {
+  outline: none;
+}
+
+.uc-step-edit:has(.uc-drag-handle:focus-visible) {
+  border-color: var(--chrome-accent);
+  box-shadow: 0 0 0 3px var(--chrome-focus-ring);
+}
+
 .uc-drag-handle[aria-pressed="true"] {
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
@@ -8450,7 +8460,7 @@ button.uc-target:hover {
   left: -4px;
   right: 0;
   height: 8px;
-  z-index: 3;
+  z-index: 1;
   pointer-events: none;
 }
 
@@ -8491,7 +8501,7 @@ button.uc-target:hover {
 }
 
 .uc-step-keys {
-  display: flex;
+  display: none;
   align-items: center;
   gap: var(--space-xs);
   padding-left: 48px;
@@ -8499,8 +8509,18 @@ button.uc-target:hover {
   color: var(--chrome-accent);
 }
 
-.uc-step-keys[hidden] {
+.uc-step-edit:has(.uc-drag-handle:focus-visible) .uc-step-keys,
+.uc-step-edit.is-grabbed .uc-step-keys {
+  display: flex;
+}
+
+.uc-step-keys-grab,
+.uc-step-edit.is-grabbed .uc-step-keys-rest {
   display: none;
+}
+
+.uc-step-edit.is-grabbed .uc-step-keys-grab {
+  display: inline;
 }
 
 .uc-step-keys .icon {

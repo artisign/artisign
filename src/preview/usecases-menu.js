@@ -22,6 +22,8 @@ export function closeMenu() {
  *   filterable?: boolean, // a text field narrows the items (long lists such as screens)
  *   emptyText?: string,
  *   limit?: number, // how many items to draw at once (the rest follow the filter text)
+ *   align?: "end", // opens with its right edge under the anchor (kept inside the dialog / window) instead of its left edge
+ *   width?: number, // px; with `align` also the minimum width
  *   allowCustom?: boolean, // the typed text can be picked as a value of its own (a list the facets could not hold completely)
  * }} spec
  */
@@ -146,8 +148,20 @@ export function openMenu(spec) {
   (anchor.closest("dialog") ?? document.body).append(menu);
   if (typeof menu.showPopover === "function") menu.showPopover();
   const rect = anchor.getBoundingClientRect();
-  menu.style.left = `${Math.max(8, Math.min(rect.left, (window.innerWidth || 1024) - 260))}px`;
-  menu.style.top = `${rect.bottom + 4}px`;
+  if (spec.align === "end") {
+    const bounds = (anchor.closest("dialog") ?? document.body).getBoundingClientRect();
+    const width = spec.width ?? 220;
+    const right = Math.min(rect.right, bounds.right > 0 ? bounds.right - 8 : Infinity);
+    menu.style.width = `${width}px`;
+    menu.style.minWidth = "0";
+    menu.style.left = `${Math.max(8, right - width)}px`;
+    menu.style.top = `${rect.bottom + 4}px`;
+    const height = menu.getBoundingClientRect().height;
+    if (height > 0 && rect.bottom + 4 + height > (window.innerHeight || 768) - 8) menu.style.top = `${Math.max(8, rect.top - height - 4)}px`; // no room below: open above
+  } else {
+    menu.style.left = `${Math.max(8, Math.min(rect.left, (window.innerWidth || 1024) - 260))}px`;
+    menu.style.top = `${rect.bottom + 4}px`;
+  }
   anchor.setAttribute("aria-expanded", "true");
   document.addEventListener("pointerdown", onOutside, true);
   document.addEventListener("keydown", onKey, true);

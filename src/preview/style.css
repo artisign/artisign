@@ -7800,7 +7800,17 @@ button.uc-target:hover {
 }
 
 .uc-foot-msg[data-tone="error"] {
-  color: var(--chrome-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--chrome-danger);
+}
+
+.uc-foot-msg[data-tone="error"]:not(:empty)::before {
+  content: "error";
+  font-family: "Material Symbols Rounded";
+  font-size: var(--size-icon-sm);
+  line-height: 1;
 }
 
 .uc-foot-actions {
@@ -8156,39 +8166,44 @@ button.uc-target:hover {
 }
 
 .uc-op-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.uc-op-fields {
   display: grid;
   grid-template-columns: 130px 150px minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--space-sm) var(--space-md);
 }
 
-.uc-op-removed {
+.uc-op-fields {
+  display: contents;
+}
+
+/* The id hint spans the row; the target toggle and "+ Data change" sit under the actor (column 2). */
+.uc-op-body > .uc-field-error,
+.uc-variants-edit .uc-field-warn {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
-  font-size: var(--ui-sm);
-  color: var(--chrome-text-tertiary);
-}
-
-.uc-op-struck {
-  text-decoration: line-through;
-}
-
-.uc-op-body .uc-target-edit,
-.uc-op-body .uc-step-data-edit {
-  padding-left: 0;
+  gap: var(--space-xs);
+  margin: 0;
+  font-size: var(--ui-2xs);
 }
 
 .uc-field-error {
-  margin: 0;
-  font-size: var(--ui-xs);
-  color: var(--chrome-error);
+  color: var(--chrome-danger);
+}
+
+.uc-field-error::before,
+.uc-variants-edit .uc-field-warn::before {
+  content: "error";
+  font-family: "Material Symbols Rounded";
+  font-size: var(--size-icon-xs);
+  line-height: 1;
+}
+
+.uc-variants-edit .uc-field-warn::before {
+  content: "warning";
+}
+
+.uc-variants-edit .uc-field-warn[hidden] {
+  display: none;
 }
 
 .uc-field-error[hidden] {

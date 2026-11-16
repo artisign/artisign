@@ -225,7 +225,10 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
   variant.ops.forEach((op, i) => {
     const where = `Variant "${name}", change ${i + 1}`;
     const path = `variant.${index}.op.${i}`;
-    if (op.op !== "append" && op.stepId === "") errors.push(`${where}: pick the step it changes.`);
+    if (op.op !== "append" && op.stepId === "") {
+      errors.push(`${where}: pick the step it changes.`);
+      fieldErrors.push({ path: `${path}.pick`, message: "Pick the step this change applies to." });
+    }
     if (op.op === "remove") {
       applyOp(flow, op);
       ops.push({ op: "remove", step_id: op.stepId });
@@ -337,7 +340,7 @@ export function createVariantEditor(env) {
     const nodeList = h("datalist", { id: nodeListId });
     const fillNodes = (screen) => env.ensureNodes(screen)?.then((list) => nodeList.replaceChildren(...(list ?? []).slice(0, 400).map((n) => h("option", { value: n }, n))));
     const idHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `${path}.id` } });
-    const idInput = textInput({ value: step.id, mono: true, placeholder: "from the action", ariaLabel: `${label} step id`, onInput: (value) => { step.id = value; markDirty(); onEdit(); } });
+    const idInput = textInput({ value: step.id, mono: true, placeholder: "step id", ariaLabel: `${label} step id`, onInput: (value) => { step.id = value; markDirty(); onEdit(); } });
     idInput.dataset.errorPath = `${path}.id`;
     idInput.dataset.hint = idHint.id;
     const actionInput = textInput({ value: step.action, placeholder: "What happens", ariaLabel: `${label} action`, onInput: (value) => { step.action = value; markDirty(); onEdit(); } });
@@ -461,7 +464,7 @@ export function createVariantEditor(env) {
       return chips;
     };
 
-    const ioEditor = (key, sideKey) => {
+    const ioEditor = (key, sideKey, useBaseButton) => {
       const kindLabel = key === "inputs" ? "Input" : "Output";
       const list = variant.overrides[key];
       const wrap = h("div", { class: "uc-io-edit" });
@@ -478,7 +481,7 @@ export function createVariantEditor(env) {
               removeButton(`Remove ${kindLabel.toLowerCase()} ${i + 1} of variant ${n}`, () => { list.splice(i, 1); markDirty(); drawIo(); }),
             ),
           ),
-          h("button", { type: "button", class: "uc-link-btn", onClick: () => { list.push({ object: "", side: "", example: "" }); markDirty(); drawIo(true); } }, icon("add"), kindLabel),
+          h("div", { class: "uc-io-add" }, h("button", { type: "button", class: "uc-link-btn", onClick: () => { list.push({ object: "", side: "", example: "" }); markDirty(); drawIo(true); } }, icon("add"), kindLabel), useBaseButton),
         );
         if (focusLast) [...wrap.querySelectorAll(".uc-io-row")].at(-1)?.querySelector("select")?.focus();
       };
@@ -502,7 +505,7 @@ export function createVariantEditor(env) {
         return h("div", { class: "uc-override-edit" }, area, hint);
       }
       if (spec.key === "personas") return personaEditor();
-      return ioEditor(spec.key, spec.key === "inputs" ? "source" : "target");
+      return ioEditor(spec.key, spec.key === "inputs" ? "source" : "target", useBase(spec.key, spec.label));
     }
 
     /** Copies what the base holds into the new override (an override starts as the base value), then shows its editor. */
@@ -520,7 +523,9 @@ export function createVariantEditor(env) {
       const cell = h("div", { class: "uc-override-cell" });
       if (overridden) {
         const editor = editorFor(spec);
-        cell.append(editor, useBase(key, spec.label));
+        // Inputs / outputs carry Use base next to "+ Input" / "+ Output"; the other editors have it beside them.
+        if (key === "inputs" || key === "outputs") cell.append(editor);
+        else cell.append(editor, useBase(key, spec.label));
       } else cell.append(inherited(spec.baseText(), key, spec.label));
       const labelEl = h("span", { class: "uc-label" }, spec.label);
       const row = rows[key];
@@ -605,10 +610,13 @@ export function createVariantEditor(env) {
             stepControl = h("select", { class: "chrome-field uc-select", "aria-label": `${label} step`, dataset: { path: `variant.${index}.op.${i}.step`, role: "step" } });
             fillStepOptions(stepControl, op, i);
             stepSelects.push({ select: stepControl, op, i });
+            stepControl.dataset.errorPath = `variant.${index}.op.${i}.pick`;
             stepControl.addEventListener("change", () => pickStep(op, i, stepControl.value));
           }
           const warn = h("p", { class: "uc-field-warn", id: nextId("uc-warn"), hidden: true, dataset: { path: `variant.${index}.op.${i}.step` } });
-          if (stepControl.tagName === "SELECT") stepControl.dataset.hint = warn.id;
+          const pickErr = h("p", { class: "uc-field-error uc-op-hint", id: nextId("uc-err"), hidden: true, dataset: { path: `variant.${index}.op.${i}.pick` } });
+          warn.classList.add("uc-op-hint");
+          if (stepControl.tagName === "SELECT") stepControl.dataset.hint = `${pickErr.id} ${warn.id}`;
           let body = null;
           if (op.op === "remove") {
             const entry = flowBefore(baseSteps(), variant, i).find((e) => e.id === op.stepId);
@@ -623,6 +631,7 @@ export function createVariantEditor(env) {
             "div",
             { class: "uc-step-op", dataset: { op: op.op, index: String(i) } },
             h("div", { class: "uc-op-top" }, kindSel, stepControl, removeButton(`Remove change ${i + 1} of variant ${n}`, () => { variant.ops.splice(i, 1); markDirty(); drawOps(); })),
+            pickErr,
             warn,
             body,
           );

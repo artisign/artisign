@@ -459,6 +459,26 @@ describe("review fixes", () => {
     expect($("input[aria-label='Variant 2 change 1 action']", card).value).toBe("Typed");
   });
 
+  it("a change with no step picked puts the error on its step select, not only in the footer", async () => {
+    await open();
+    const card = variantCard(1);
+    addChange(card);
+    const select = stepSel(card, 2, 1);
+    expect(select.getAttribute("aria-invalid")).toBe("true");
+    expect(select.classList.contains("is-error")).toBe(true);
+    expect(document.getElementById(select.getAttribute("aria-describedby")).textContent).toBe("Pick the step this change applies to.");
+    type(select, "tap");
+    expect(select.getAttribute("aria-invalid")).toBe("false");
+    expect(select.hasAttribute("aria-describedby")).toBe(false);
+  });
+
+  it("Use base of an inputs / outputs override sits next to + Input / + Output", async () => {
+    await open();
+    const add = $(".uc-override-row[data-key='outputs'] .uc-io-add", variantCard(0));
+    expect($$("button", add).map((b) => b.textContent)).toEqual(["addOutput", "Use base"]);
+    expect($(".uc-override-row[data-key='outputs'] .uc-override-cell > .chrome-btn", variantCard(0))).toBeNull();
+  });
+
   it("the step list is not rebuilt when the select gets focus (an open native select must not change under the user)", async () => {
     await open();
     const select = stepSel(variantCard(0), 1, 1);

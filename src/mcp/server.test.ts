@@ -232,8 +232,14 @@ describe("MCP server — instructions budget", () => {
   // CHR-1065: a two-line USE CASES pointer and use cases named in the FILES
   // rule: 1110 to 1148, measured at 1147.75 (ADR-010 caps this at 1150; the
   // limit may only go down from here). CHR-1070 left it unchanged: still 1147.75.
-  it("stays within the ~1148 token cheat-sheet budget (chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(1148);
+  // CHR-1105 named the four use-case kinds of delete_entity in LIFECYCLE and
+  // paid for them inside the text (the FILES assets sentence duplicated the
+  // Local images line; the USE CASES pointer got shorter): 1148 to 1147.25,
+  // measured at 1147.25. The USE CASES block still points to get_guide for
+  // shapes instead of naming more tools: each of the other use-case tools
+  // carries its own description.
+  it("stays within the ~1147 token cheat-sheet budget (chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(1147.25);
   });
 });
 

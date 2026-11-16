@@ -12,7 +12,7 @@ init_project returns it.
 
 FILES: change the design (screens, design-system, mockups, tokens, flows,
 comments, use cases) only through these tools — never with shell, scripts or file-edit
-tools. Copying an image into assets/ is fine.
+tools.
 
 WORKFLOW: tokens -> components -> screens; inline values only while exploring
 screen one of a direction, promoted before screen two; second occurrence of a
@@ -70,10 +70,10 @@ render as Markdown in the preview.
 
 LIFECYCLE: write_html kind:"component"|"pattern" writes a definition (default
 variant + <template data-variant> siblings); delete_entity removes a
-screen/component/pattern/mockup.
+screen/component/pattern/mockup, or a persona/dimension/data_object/use_case.
 
-USE CASES (optional): personas, data objects, use cases with steps mapped to
-screens/nodes — get_use_case reads one, set_use_cases writes. Shapes: get_guide.
+USE CASES (optional): personas, data objects, use cases (steps mapped to
+screens/nodes); get_use_case reads, set_use_cases writes; shapes: get_guide.
 
 MOCKUPS: several options of one screen, or early directions before a design
 system exists — raw HTML, outside the ref model, no drift warnings.

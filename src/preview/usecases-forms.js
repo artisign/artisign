@@ -60,6 +60,11 @@ export function draftFromSource(source) {
   };
 }
 
+/** JSON with object keys sorted, so two values that differ only in key order compare equal (array order still counts). */
+function canonical(value) {
+  return JSON.stringify(value, (_key, v) => (v !== null && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v));
+}
+
 function parseIo(list, sideKey, label, errors) {
   // The number is the row's position in the unfiltered list, the one aria-label and the remove button show.
   return list
@@ -109,7 +114,9 @@ export function buildPayload({ id, draft, source }) {
         const after = parseOrKeep(d.after, d.origAfter);
         if (!before.ok) errors.push(`Step ${index + 1} data (before): ${before.error}`);
         if (!after.ok) errors.push(`Step ${index + 1} data (after): ${after.error}`);
-        return { object: d.object, ...(d.before.trim() !== "" && before.ok ? { before: before.value } : {}), ...(d.after.trim() !== "" && after.ok ? { after: after.value } : {}) };
+        // An empty stored `{}` reads as empty text and stays `{}` (spec §3.4 allows it); text the user cleared is dropped.
+        const keeps = (text, orig) => text.trim() !== "" || (orig !== null && typeof orig === "object" && Object.keys(orig).length === 0);
+        return { object: d.object, ...(keeps(d.before, d.origBefore) && before.ok ? { before: before.value } : {}), ...(keeps(d.after, d.origAfter) && after.ok ? { after: after.value } : {}) };
       });
     if (data.length > 0) out.data = data;
     if (step.note) out.note = step.note;
@@ -155,8 +162,7 @@ export function buildPayload({ id, draft, source }) {
     ...optional("goal", text(draft.goal), source?.goal !== undefined),
     ...optional("outcome", text(draft.outcome), source?.outcome !== undefined),
   };
-  const before = JSON.stringify(source?.variants ?? []);
-  if (JSON.stringify(variants) !== before) {
+  if (canonical(variants) !== canonical(source?.variants ?? [])) {
     if (variants.length > 0) payload.variants = variants;
     else if (source?.variants !== undefined) payload.variants = null;
   }

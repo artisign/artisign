@@ -303,6 +303,9 @@ describe("problems", () => {
     type($("select[aria-label='Variant 2 change 1 step']", card), "tap");
     type($("input[aria-label='Variant 2 change 1 action']", card), "Opens");
     const id = $("input[aria-label='Variant 2 change 1 step id']", card);
+    // Not invalid yet: nothing is announced for the field (the hint is not referenced while it is hidden)
+    expect(id.getAttribute("aria-invalid")).toBe("false");
+    expect(id.hasAttribute("aria-describedby")).toBe(false);
     type(id, "pick");
     expect(id.classList.contains("is-error")).toBe(true);
     expect(id.getAttribute("aria-invalid")).toBe("true");
@@ -313,7 +316,8 @@ describe("problems", () => {
     expect($(".uc-foot-msg").dataset.tone).toBe("error");
     expect(button("Save use case").disabled).toBe(true);
     type(id, "opens-it");
-    expect(id.getAttribute("aria-invalid")).toBeNull();
+    expect(id.getAttribute("aria-invalid")).toBe("false");
+    expect(id.hasAttribute("aria-describedby")).toBe(false);
     expect(hint.hidden).toBe(true);
     expect(button("Save use case").disabled).toBe(false);
     expect(opts.save).not.toHaveBeenCalled();

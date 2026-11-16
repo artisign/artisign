@@ -254,18 +254,30 @@ export function variantWarnings({ variant, index, baseSteps, pool }) {
   return warnings;
 }
 
-/** Shows the field errors of the last build: the hint under the field, the red border and `aria-invalid` on the field. */
+/**
+ * Shows the field errors of the last build: the hint under the field, the red border, and `aria-invalid` on the field. A hint
+ * (`data-hint` on the field names its element) is listed in `aria-describedby` only while it is shown, because text a field
+ * points to is announced even when it is hidden (modern-web-guidance `accessible-error-announcement`). The dialog footer is the
+ * one polite live region (`role="status"`) that announces the first error.
+ */
 export function showFieldErrors(root, fieldErrors) {
   for (const hint of root.querySelectorAll(".uc-field-error")) {
     const found = fieldErrors.filter((e) => e.path === hint.dataset.path);
     hint.hidden = found.length === 0;
     hint.textContent = found.map((e) => e.message).join(" ");
   }
-  for (const el of root.querySelectorAll(".chrome-field[data-path]")) {
-    const bad = fieldErrors.some((e) => e.path === el.dataset.path);
+  for (const el of root.querySelectorAll("[data-error-path]")) {
+    const bad = fieldErrors.some((e) => e.path === el.dataset.errorPath);
     el.classList.toggle("is-error", bad);
-    if (bad) el.setAttribute("aria-invalid", "true");
-    else el.removeAttribute("aria-invalid");
+    el.setAttribute("aria-invalid", bad ? "true" : "false");
+  }
+  for (const el of root.querySelectorAll("[data-hint]")) {
+    const shown = el.dataset.hint.split(" ").filter((id) => {
+      const hint = root.querySelector(`[id="${id}"]`);
+      return hint && !hint.hidden;
+    });
+    if (shown.length > 0) el.setAttribute("aria-describedby", shown.join(" "));
+    else el.removeAttribute("aria-describedby");
   }
 }
 
@@ -302,8 +314,8 @@ export function createVariantEditor(env) {
     const fillNodes = (screen) => env.ensureNodes(screen)?.then((list) => nodeList.replaceChildren(...(list ?? []).slice(0, 400).map((n) => h("option", { value: n }, n))));
     const idHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `${path}.id` } });
     const idInput = textInput({ value: step.id, mono: true, placeholder: "from the action", ariaLabel: `${label} step id`, onInput: (value) => { step.id = value; markDirty(); } });
-    idInput.dataset.path = `${path}.id`;
-    idInput.setAttribute("aria-describedby", idHint.id);
+    idInput.dataset.errorPath = `${path}.id`;
+    idInput.dataset.hint = idHint.id;
     const actionInput = textInput({ value: step.action, placeholder: "What happens", ariaLabel: `${label} action`, onInput: (value) => { step.action = value; markDirty(); } });
     const screenInput = textInput({ value: step.screen, list: screenListId, placeholder: "screen", mono: true, ariaLabel: `${label} screen`, onInput: (value) => { step.screen = value; markDirty(); if (env.screens().includes(value.trim())) fillNodes(value.trim()); } });
     const nodeInput = textInput({ value: step.node, list: nodeListId, placeholder: "element id", mono: true, ariaLabel: `${label} element`, onInput: (value) => { step.node = value; markDirty(); } });
@@ -557,7 +569,7 @@ export function createVariantEditor(env) {
             stepControl.addEventListener("change", () => pickStep(op, i, stepControl.value));
           }
           const warn = h("p", { class: "uc-field-warn", id: nextId("uc-warn"), hidden: true, dataset: { path: `variant.${index}.op.${i}.step` } });
-          if (stepControl.tagName === "SELECT") stepControl.setAttribute("aria-describedby", warn.id);
+          if (stepControl.tagName === "SELECT") stepControl.dataset.hint = warn.id;
           let body = null;
           if (op.op === "remove") {
             const entry = flowBefore(baseSteps(), variant, i).find((e) => e.id === op.stepId);

@@ -85,7 +85,7 @@ function invalidFileAsToolError(err: unknown): never {
   const caseId = /^usecases\/cases\/(.+)\.json$/.exec(err.file)?.[1];
   const remedy =
     caseId !== undefined && isValidId(caseId)
-      ? `repair the file by hand (the one case where usecases/ may be edited directly) or remove the use case with delete_entity {kind: "use_case", name: "${caseId}"}`
+      ? `repair the file by hand (the one case where usecases/ may be edited directly) or remove the use case with delete_entity {kind: "use_case", name: "${caseId}"} and write it again with set_use_cases (the full case)`
       : "repair or remove the file by hand (the one case where usecases/ may be edited directly)";
   throw new ToolError("invalid_state", `${err.message} — ${remedy}`);
 }

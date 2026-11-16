@@ -579,7 +579,8 @@ warns about references left dangling and does not repair them. Like design
 files, `usecases/` changes only through these tools. The one exception: a file
 under `usecases/` that no longer validates (hand edit, merge conflict, a newer
 version's key) makes the tools fail with `invalid_state` naming it; then you may
-repair that file by hand, or remove a case with a valid id via `delete_entity`.
+repair that file by hand, or remove a case with a valid id via `delete_entity` and
+write it again with `set_use_cases` (the full case).
 
 ## Anti-pattern checklist
 

@@ -1,0 +1,10 @@
+{
+  "notes": "**Step actions menu** (CHR-1103): the single-pointer alternative to dragging that WCAG 2.2 SC 2.5.7 (Dragging Movements, AA) requires. Each base step and each variant step-change row has a `more_horiz` button (`chrome-icon-btn sm`, accessible name \"Actions for step N\") between its fields and remove (×). It opens a small menu with **Move up** (`arrow_upward`) and **Move down** (`arrow_downward`), using `chrome-menu-item action` on the `chrome-menu` surface, 180px wide. The drag handle and keyboard grab-move-drop stay as they are. Body scrolled to steps 3 to 5; step 4's menu is open.\n\nBuild it per the modern-web-guidance `menu` guide:\n- The trigger is a `<button type=\"button\" aria-haspopup=\"menu\" aria-expanded>` with `commandfor` + `command=\"toggle-popover\"`. The menu `<div popover=\"auto\">` sits directly after it, with an inner `<div focusgroup=\"menu nomemory\">` labelled by the trigger. Items are `<button type=\"button\">`.\n- Position: anchor positioning `position-area: block-end span-inline-start` (right edges aligned, opening downward), flipping with `position-try-fallbacks: flip-block, flip-inline`.\n- Keyboard: Enter/Space/ArrowDown open it and focus the first enabled item. ArrowUp/ArrowDown move between items, Esc closes and returns focus to the trigger, and Tab leaves.\n- **Move up** is disabled on the first row and **Move down** on the last (`disabled`, tertiary text). Activating an item moves the row one place (`moveBefore`, FLIP animation skipped under reduced motion), closes the menu and returns focus to that row's ⋯ button. The live region announces \"Clicks Save use case, moved to step 3 of 5.\"\n\nFlows: Move up / Move down → `usecases-edit-dialog`; close / Cancel / Save → `usecases-detail`.",
+  "tags": [
+    "chr-1062",
+    "dialog",
+    "chr-1103"
+  ],
+  "variant_of": "usecases-edit-dialog",
+  "variant_kind": "overlay"
+}

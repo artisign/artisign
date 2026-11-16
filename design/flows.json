@@ -1002,6 +1002,54 @@
     "to_kind": "screen"
   },
   {
+    "from": "usecases-edit-dialog-variant-empty.dv-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant-empty.dv-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.dlg-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.st1-handle",
+    "event": "tap",
+    "to": "usecases-edit-dialog-step-keyboard",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.st4-handle",
+    "event": "longpress",
+    "to": "usecases-edit-dialog-step-drag",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.st4-more",
+    "event": "tap",
+    "to": "usecases-edit-dialog-step-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.dlg-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.dlg-save",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
     "from": "usecases-edit-dialog-step-drag.dlg-close",
     "event": "tap",
     "to": "usecases-detail",
@@ -1038,60 +1086,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-variant-empty.dv-close",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-variant-empty.dv-cancel",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-variant-invalid.dv-close",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-variant-invalid.dv-cancel",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.dlg-close",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.st1-handle",
-    "event": "tap",
-    "to": "usecases-edit-dialog-step-keyboard",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.st4-handle",
-    "event": "longpress",
-    "to": "usecases-edit-dialog-step-drag",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.dlg-cancel",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.dlg-save",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
     "from": "usecases-edit-dialog-variant.dv-close",
     "event": "tap",
     "to": "usecases-detail",
@@ -1113,6 +1107,48 @@
     "from": "usecases-edit-dialog-variant.dv-save",
     "event": "tap",
     "to": "usecases-detail-variant",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant-invalid.dv-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant-invalid.dv-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-menu.dlg-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-menu.st-menu-up",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-menu.st-menu-down",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-menu.dlg-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-menu.dlg-save",
+    "event": "tap",
+    "to": "usecases-detail",
     "to_kind": "screen"
   }
 ]

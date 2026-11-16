@@ -185,19 +185,11 @@ async function isKnownToGit(projectDir: string, path: string): Promise<{ inHead:
 const OPERATION_REASON = "operation_in_progress" satisfies CommitSkippedReason;
 
 /**
- * The marker git leaves behind while a history-rewriting operation is
- * unfinished, and the reason it is reported under. `sequencer` outlives a
- * resolved step of a multi-commit cherry-pick or revert; `rebase-apply` is
- * also what `git am` uses.
+ * The markers git leaves behind while a history-rewriting operation is
+ * unfinished. `sequencer` outlives a resolved step of a multi-commit
+ * cherry-pick or revert; `rebase-apply` is also what `git am` uses.
  */
-const OPERATION_MARKERS: { marker: string; reason: typeof OPERATION_REASON }[] = [
-  { marker: "MERGE_HEAD", reason: OPERATION_REASON },
-  { marker: "CHERRY_PICK_HEAD", reason: OPERATION_REASON },
-  { marker: "REVERT_HEAD", reason: OPERATION_REASON },
-  { marker: "sequencer", reason: OPERATION_REASON },
-  { marker: "rebase-merge", reason: OPERATION_REASON },
-  { marker: "rebase-apply", reason: OPERATION_REASON },
-];
+const OPERATION_MARKERS = ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "sequencer", "rebase-merge", "rebase-apply"];
 
 /**
  * The reason to skip the commit while the user has a merge, cherry-pick,
@@ -208,10 +200,10 @@ const OPERATION_MARKERS: { marker: string; reason: typeof OPERATION_REASON }[] =
  * is covered; one call resolves all markers.
  */
 async function operationInProgress(projectDir: string): Promise<typeof OPERATION_REASON | undefined> {
-  const args = OPERATION_MARKERS.flatMap(({ marker }) => ["--git-path", marker]);
+  const args = OPERATION_MARKERS.flatMap((marker) => ["--git-path", marker]);
   const paths = (await git(projectDir, ["rev-parse", ...args])).split("\n");
-  for (const [i, path] of paths.entries()) {
-    if (await pathExists(resolve(projectDir, path))) return OPERATION_MARKERS[i]!.reason;
+  for (const path of paths) {
+    if (await pathExists(resolve(projectDir, path))) return OPERATION_REASON;
   }
   return undefined;
 }

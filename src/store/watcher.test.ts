@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FSWatcher } from "chokidar";
@@ -104,12 +104,13 @@ describe("watchProject", () => {
 
   it("categorizes usecases/personas.json and usecases/cases/<id>.json as \"usecases\", the folder being created live", async () => {
     const events: ProjectChangeEvent[] = [];
-    unwatch = watchProject(dir, (event) => events.push(event));
+    const stop = watchProject(dir, (event) => events.push(event));
+    unwatch = stop;
+    await stop.ready;
+    // macOS: the native watch only delivers events a moment after chokidar reports ready.
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     await mkdir(join(dir, "usecases", "cases"), { recursive: true });
-    // Files written into a directory chokidar has not started watching yet can be missed under load: wait for the folder event first.
-    await waitFor(events, (e) => e.path === "usecases/cases", 3000);
     await writeFile(join(dir, "usecases", "personas.json"), "{}");
     await writeFile(join(dir, "usecases", "cases", "borrow-book.json"), "{}");
 
@@ -117,6 +118,25 @@ describe("watchProject", () => {
     await waitFor(events, (e) => e.path.endsWith("borrow-book.json"), 3000);
     expect(events.find((e) => e.path.endsWith("personas.json"))?.category).toBe("usecases");
     expect(events.find((e) => e.path.endsWith("borrow-book.json"))?.category).toBe("usecases");
+  });
+
+  it("reports a file written into a folder right after the folder was created, with no wait in between", async () => {
+    const events: ProjectChangeEvent[] = [];
+    const stop = watchProject(dir, (event) => events.push(event));
+    unwatch = stop;
+    await stop.ready;
+    // macOS: the native watch only delivers events a moment after chokidar reports ready.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // Same sequence as atomicWrite: mkdir -p, then a temp file renamed into place.
+    await mkdir(join(dir, "usecases"), { recursive: true });
+    await writeFile(join(dir, "usecases", "personas.json.tmp"), "{}");
+    await rename(join(dir, "usecases", "personas.json.tmp"), join(dir, "usecases", "personas.json"));
+
+    await waitFor(events, (e) => e.path === "usecases/personas.json", 3000);
+    // Reported once, not once per scan.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(events.filter((e) => e.path === "usecases/personas.json" && e.type === "add")).toHaveLength(1);
   });
 
   it("categorizes assets/<path> as \"asset\"", async () => {

@@ -348,20 +348,21 @@ export async function openUseCaseDialog(options) {
   const drawSteps = (focusIndex = null) => {
     stepsBox.replaceChildren();
     draft.steps.forEach((step, index) => {
+      const at = () => draft.steps.indexOf(step); // the row may have been moved since it was drawn; inner parts drawn later ask for the current position
       const screenListId = nextId("uc-screens");
       const nodeListId = nextId("uc-nodes");
       const nodeList = h("datalist", { id: nodeListId });
       const fillNodes = (screen) => ensureNodes(screen)?.then((list) => nodeList.replaceChildren(...(list ?? []).slice(0, 400).map((n) => h("option", { value: n }, n))));
-      const warnScreen = h("p", { class: "uc-field-warn", hidden: true, dataset: { path: `step.${index}.screen` } });
-      const warnNode = h("p", { class: "uc-field-warn", hidden: true, dataset: { path: `step.${index}.node` } });
-      const screenInput = textInput({ value: step.screen, list: screenListId, placeholder: "screen", mono: true, ariaLabel: `Step ${index + 1} screen`, onInput: (value) => { step.screen = value; markDirty(); if (options.screens().includes(value.trim())) fillNodes(value.trim()); } });
-      const nodeInput = textInput({ value: step.node, list: nodeListId, placeholder: "element id", mono: true, ariaLabel: `Step ${index + 1} element`, onInput: (value) => { step.node = value; markDirty(); } });
-      screenInput.dataset.path = `step.${index}.screen`;
-      nodeInput.dataset.path = `step.${index}.node`;
+      const warnScreen = h("p", { class: "uc-field-warn", hidden: true, dataset: { path: `step.${at()}.screen` } });
+      const warnNode = h("p", { class: "uc-field-warn", hidden: true, dataset: { path: `step.${at()}.node` } });
+      const screenInput = textInput({ value: step.screen, list: screenListId, placeholder: "screen", mono: true, ariaLabel: `Step ${at() + 1} screen`, onInput: (value) => { step.screen = value; markDirty(); if (options.screens().includes(value.trim())) fillNodes(value.trim()); } });
+      const nodeInput = textInput({ value: step.node, list: nodeListId, placeholder: "element id", mono: true, ariaLabel: `Step ${at() + 1} element`, onInput: (value) => { step.node = value; markDirty(); } });
+      screenInput.dataset.path = `step.${at()}.screen`;
+      nodeInput.dataset.path = `step.${at()}.node`;
       const targetRow = h("div", { class: "uc-target-edit" });
       const drawTarget = () => {
         fill(targetRow,
-          segmented({ label: `Step ${index + 1} target`, name: `kind-${index}`, value: step.kind, options: [{ value: "screen", label: "Screen" }, { value: "element", label: "Element" }, { value: "none", label: "None" }], onChange: (value) => { step.kind = value; markDirty(); drawTarget(); } }),
+          segmented({ label: `Step ${at() + 1} target`, name: `kind-${at()}`, value: step.kind, options: [{ value: "screen", label: "Screen" }, { value: "element", label: "Element" }, { value: "none", label: "None" }], onChange: (value) => { step.kind = value; markDirty(); drawTarget(); } }),
           step.kind !== "none" ? screenInput : null,
           step.kind === "element" ? nodeInput : null,
           step.kind !== "none" ? h("datalist", { id: screenListId }, options.screens().map((s) => h("option", { value: s }))) : null,
@@ -375,15 +376,15 @@ export async function openUseCaseDialog(options) {
       const drawData = () => {
         dataBox.replaceChildren(
           ...step.data.map((d, j) => {
-            const warn = h("p", { class: "uc-field-warn", hidden: true, dataset: { path: `step.${index}.data.${j}.after` } });
-            const beforeWarn = h("p", { class: "uc-field-warn", hidden: true, dataset: { path: `step.${index}.data.${j}.before` } });
+            const warn = h("p", { class: "uc-field-warn", hidden: true, dataset: { path: `step.${at()}.data.${j}.after` } });
+            const beforeWarn = h("p", { class: "uc-field-warn", hidden: true, dataset: { path: `step.${at()}.data.${j}.before` } });
             return h(
               "div",
               { class: "uc-data-edit" },
               selectInput({ options: objectOptions(), value: d.object, ariaLabel: "Data object", onChange: (value) => { d.object = value; markDirty(); } }),
-              textInput({ value: d.before, mono: true, placeholder: "status: draft", ariaLabel: `Step ${index + 1} data ${j + 1} before`, onInput: (value) => { d.before = value; markDirty(); } }),
+              textInput({ value: d.before, mono: true, placeholder: "status: draft", ariaLabel: `Step ${at() + 1} data ${j + 1} before`, onInput: (value) => { d.before = value; markDirty(); } }),
               icon("arrow_forward", "uc-data-arrow"),
-              textInput({ value: d.after, mono: true, placeholder: "status: ready", ariaLabel: `Step ${index + 1} data ${j + 1} after`, onInput: (value) => { d.after = value; markDirty(); } }),
+              textInput({ value: d.after, mono: true, placeholder: "status: ready", ariaLabel: `Step ${at() + 1} data ${j + 1} after`, onInput: (value) => { d.after = value; markDirty(); } }),
               removeButton("Remove data change", () => { step.data.splice(j, 1); markDirty(); drawData(); }),
               beforeWarn,
               warn,
@@ -408,6 +409,7 @@ export async function openUseCaseDialog(options) {
         );
       stepsBox.append(rowEl);
       rowEl.querySelector("[aria-haspopup='menu']").relabel();
+      rowEl.querySelector(".uc-drag-handle").relabel();
     });
     stepsBox.append(h("button", { type: "button", class: "uc-link-btn", onClick: () => { draft.steps.push({ id: "", actor: draft.personas[0] ?? "system", action: "", kind: "screen", screen: "", node: "", data: [] }); markDirty(); drawSteps(draft.steps.length - 1); } }, icon("add"), "Step"));
     if (focusIndex !== null) stepsBox.querySelectorAll(".uc-step-edit")[focusIndex]?.querySelector("input")?.focus();

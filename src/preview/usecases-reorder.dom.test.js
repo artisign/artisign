@@ -190,6 +190,83 @@ describe("step reordering", () => {
   });
 });
 
+describe("review findings", () => {
+  it("a part drawn after a move (a new data change) uses the step's current position, not the one it was drawn at", async () => {
+    await open();
+    $$(".uc-step-edit")[0].querySelector("button[aria-haspopup=menu]").click();
+    $("[role=menuitem][data-value=down]").click(); // the first step is now second
+    const moved = $$(".uc-step-edit")[1];
+    expect($("input[aria-label$='action']", moved).value).toBe(actions()[1]);
+    $$("button", moved).find((b) => b.textContent.includes("Data change")).click();
+    expect($("input[aria-label='Step 2 data 1 before']", moved)).not.toBeNull();
+    expect($("[data-path='step.1.data.0.before']", moved)).not.toBeNull();
+    expect($("input[aria-label='Step 1 data 1 before']", moved)).toBeNull();
+    // and a target switch redraws with the new number too
+    $$(".uc-segmented button", moved).find((b) => b.textContent === "Element").click();
+    expect($("[aria-label='Step 2 element']", moved)).not.toBeNull();
+  });
+
+  it("a blur caused by the move itself does not end the keyboard grab", async () => {
+    await open();
+    const list = $(".uc-steps-edit");
+    const real = list.insertBefore.bind(list);
+    list.insertBefore = (node, ref) => {
+      node.querySelector(".uc-drag-handle").dispatchEvent(new Event("blur")); // what a browser without moveBefore does
+      return real(node, ref);
+    };
+    const handle = () => $$(".uc-step-edit")[0].querySelector(".uc-drag-handle");
+    const row = $$(".uc-step-edit")[0];
+    handle().focus();
+    key(handle(), " ");
+    key(handle(), "ArrowDown");
+    expect(row.classList.contains("is-grabbed")).toBe(true);
+    key($$(".uc-step-edit")[1].querySelector(".uc-drag-handle"), "ArrowDown");
+    expect($$(".uc-step-edit")[2]).toBe(row);
+    // a real blur (focus leaves the handle) still drops
+    $$(".uc-step-edit")[2].querySelector(".uc-drag-handle").dispatchEvent(new Event("blur"));
+    expect(row.classList.contains("is-grabbed")).toBe(false);
+  });
+
+  it("the handle and the ⋯ button have their names when drawn", async () => {
+    await open();
+    expect($$(".uc-drag-handle").map((b) => b.getAttribute("aria-label"))).toEqual(actions().map((a, i) => `Reorder step ${i + 1}, ${a}`));
+    expect($$(".uc-step-edit button[aria-haspopup=menu]").map((b) => b.getAttribute("aria-label"))).toEqual(["Actions for step 1", "Actions for step 2", "Actions for step 3"]);
+  });
+
+  it("the live region is cleared before it is set again, so the same text twice is announced twice", async () => {
+    await open();
+    const down = () => {
+      $$(".uc-step-edit")[0].querySelector("button[aria-haspopup=menu]").click();
+      $("[role=menuitem][data-value=down]").click();
+    };
+    const up = () => {
+      $$(".uc-step-edit")[1].querySelector("button[aria-haspopup=menu]").click();
+      $("[role=menuitem][data-value=up]").click();
+    };
+    down();
+    vi.advanceTimersByTime(600);
+    const first = live();
+    up();
+    expect(live()).toBe(""); // cleared right away, set on a later task
+    down();
+    expect(live()).toBe("");
+    vi.advanceTimersByTime(600);
+    expect(live()).toBe(first);
+  });
+
+  it("a pointer drag on another handle drops a grabbed row first", async () => {
+    await open();
+    const first = $$(".uc-step-edit")[0];
+    key(first.querySelector(".uc-drag-handle"), " ");
+    expect(first.classList.contains("is-grabbed")).toBe(true);
+    const other = $$(".uc-step-edit")[2].querySelector(".uc-drag-handle");
+    other.dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), { pointerId: 1, clientY: 10, button: 0, isPrimary: true }));
+    expect(first.classList.contains("is-grabbed")).toBe(false);
+    expect($$(".uc-step-edit")[2].classList.contains("is-lifted")).toBe(true);
+    document.dispatchEvent(Object.assign(new Event("pointercancel"), { pointerId: 1 }));
+  });
+});
+
 describe("openMenu align end", () => {
   it("opens 180px wide with its right edge under the anchor, kept inside the dialog; default menus keep the left edge", () => {
     const dialog = document.body.appendChild(document.createElement("dialog"));

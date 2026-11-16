@@ -47,18 +47,19 @@ function scrollParent(el) {
  */
 export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, onCommit, noun = "step" }) {
   const rows = () => [...list.querySelectorAll(`:scope > ${rowSelector}`)];
-  const live = h("p", { class: "uc-reorder-live", role: "status" });
+  const live = h("p", { class: "mcp-visually-hidden uc-reorder-live", role: "status" });
   let announceTimer = 0;
   let drag = null; // a pointer drag in progress
   let grab = null; // a keyboard grab in progress
+  let moving = false; // the DOM move in progress: a blur it causes must not end a grab
   const nativeMove = typeof list.moveBefore === "function";
 
   function announce(text) {
     clearTimeout(announceTimer);
     live.textContent = "";
-    // Without moveBefore the focused handle is re-inserted and the screen reader re-announces it: wait a moment.
-    if (nativeMove) live.textContent = text;
-    else announceTimer = setTimeout(() => { live.textContent = text; }, 500);
+    // Cleared now, set on a later task, so the same text twice in a row is announced twice. Without moveBefore the focused
+    // handle is re-inserted and the screen reader re-announces it: wait a moment longer.
+    announceTimer = setTimeout(() => { live.textContent = text; }, nativeMove ? 0 : 500);
   }
 
   function flip(before, overrides = new Map()) {
@@ -86,10 +87,15 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     const before = new Map(all.map((r) => [r, r.getBoundingClientRect().top]));
     const reference = to > from ? all[to].nextSibling : all[to];
     onReorder(from, to);
-    if (nativeMove) list.moveBefore(row, reference);
-    else list.insertBefore(row, reference);
+    moving = true;
+    try {
+      if (nativeMove) list.moveBefore(row, reference);
+      else list.insertBefore(row, reference);
+      if (hadFocus) handle.focus({ preventScroll: true });
+    } finally {
+      moving = false;
+    }
     onMoved();
-    if (hadFocus) handle.focus({ preventScroll: true });
     row.scrollIntoView?.({ block: "nearest" });
     flip(before, releasedTop === undefined ? new Map() : new Map([[row, releasedTop]]));
     if (!silent) announce(movedText(nameOf(row, to), to, all.length));
@@ -109,9 +115,7 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     const { origin } = grab;
     grab = null;
     if (cancel) {
-      grab = { handle, origin, restoring: true };
       moveRow(rows().indexOf(row), origin, { silent: true });
-      grab = null;
       announce(CANCELLED_TEXT);
     } else if (rows().indexOf(row) !== origin) onCommit?.();
     setGrabbed(handle, false);
@@ -142,20 +146,25 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
   // --- Pointer drag ----------------------------------------------------------------------------------------------
   function startDrag(event) {
     const handle = event.currentTarget;
-    if (event.button !== 0 || event.isPrimary === false || drag || grab) return;
+    if (event.button !== 0 || event.isPrimary === false || drag) return;
+    if (grab) endGrab(grab.handle, { cancel: false }); // dragging another handle drops the grabbed row where it is
     event.preventDefault();
     const row = handle.closest(rowSelector);
     const scroller = scrollParent(list);
     const slot = h("div", { class: "uc-step-slot", "aria-hidden": "true" });
     const marker = h("div", { class: "uc-drop-marker", "aria-hidden": "true" });
-    slot.style.top = `${row.offsetTop}px`;
-    slot.style.height = `${row.offsetHeight}px`;
+    const slotTop = row.offsetTop;
+    const rowHeight = row.offsetHeight;
+    slot.style.top = `${slotTop}px`;
+    slot.style.height = `${rowHeight}px`;
+    // Layout positions of the other rows do not change during a drag: measure them once, not on every pointermove.
+    const others = rows().filter((r) => r !== row).map((r) => ({ top: r.offsetTop, bottom: r.offsetTop + r.offsetHeight, mid: r.offsetTop + r.offsetHeight / 2 }));
     list.append(slot, marker);
     marker.hidden = true;
     row.classList.add("is-lifted");
     list.dataset.drop = "true";
     document.documentElement.classList.add("uc-dragging");
-    drag = { handle, row, scroller, slot, marker, pointerId: event.pointerId, offset: event.clientY - row.getBoundingClientRect().top, y: event.clientY, from: rows().indexOf(row), target: rows().indexOf(row), frame: 0, last: 0 };
+    drag = { handle, row, scroller, slot, marker, slotTop, rowHeight, others, listHeight: list.offsetHeight, listTop: list.getBoundingClientRect().top, scroll0: scroller?.scrollTop ?? 0, pointerId: event.pointerId, offset: event.clientY - row.getBoundingClientRect().top, y: event.clientY, from: rows().indexOf(row), target: rows().indexOf(row), frame: 0, last: 0 };
     try {
       handle.setPointerCapture(event.pointerId);
     } catch {
@@ -172,22 +181,19 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
 
   /** Position the lifted row under the pointer and find the landing slot from the other rows' layout midpoints. */
   function update() {
-    const { row, marker, from } = drag;
-    const listTop = list.getBoundingClientRect().top;
-    const rowTop = Math.min(Math.max(drag.y - listTop - drag.offset, 0), Math.max(list.offsetHeight - row.offsetHeight, 0));
-    row.style.translate = `0 ${rowTop - row.offsetTop}px`;
+    const { row, marker, from, others, slotTop, rowHeight } = drag;
+    const listTop = drag.listTop - ((drag.scroller?.scrollTop ?? 0) - drag.scroll0); // the list moves with its scroller
+    const rowTop = Math.min(Math.max(drag.y - listTop - drag.offset, 0), Math.max(drag.listHeight - rowHeight, 0));
+    row.style.translate = `0 ${rowTop - slotTop}px`;
     // The landing slot is read at the lifted row's leading edge (top going up, bottom going down), so the marker sits at the edge, not across the row.
-    const leading = rowTop < row.offsetTop ? rowTop : rowTop + row.offsetHeight;
-    const others = rows().filter((r) => r !== row);
-    drag.target = dropIndex(others.map((r) => r.offsetTop + r.offsetHeight / 2), leading);
+    const leading = rowTop < slotTop ? rowTop : rowTop + rowHeight;
+    drag.target = dropIndex(others.map((o) => o.mid), leading);
     if (drag.target === from) {
       marker.hidden = true;
       return;
     }
-    const prev = others[drag.target - 1];
-    const next = others[drag.target];
-    const top = prev ? prev.offsetTop + prev.offsetHeight : 0;
-    const bottom = next ? next.offsetTop : top + 8;
+    const top = others[drag.target - 1]?.bottom ?? 0;
+    const bottom = others[drag.target]?.top ?? top + 8;
     marker.style.top = `${(top + bottom) / 2 - 4}px`;
     marker.hidden = false;
   }
@@ -284,7 +290,7 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     button.addEventListener("focus", relabel);
     button.addEventListener("pointerenter", relabel);
     button.addEventListener("keyup", (event) => { if (event.key === " ") event.preventDefault(); });
-    button.addEventListener("blur", () => { if (grab?.handle === button) endGrab(button, { cancel: false }); });
+    button.addEventListener("blur", () => { if (!moving && grab?.handle === button) endGrab(button, { cancel: false }); });
     button.relabel = relabel;
     return button;
   }
@@ -322,5 +328,5 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     return button;
   }
 
-  return { live, handle, keyHint, moreButton, moveRow, isActive: () => drag !== null || grab !== null };
+  return { live, handle, keyHint, moreButton, moveRow };
 }

@@ -8528,16 +8528,6 @@ button.uc-target:hover {
   line-height: 1;
 }
 
-.uc-reorder-live {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 .chrome-menu-item[aria-disabled="true"] {
   color: var(--chrome-text-tertiary);
   cursor: default;
@@ -8545,11 +8535,4 @@ button.uc-target:hover {
 
 .chrome-menu-item[aria-disabled="true"]:hover {
   background: transparent;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .uc-step-edit.is-lifted,
-  .uc-step-edit.is-grabbed {
-    transition: none;
-  }
 }

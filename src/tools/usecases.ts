@@ -19,6 +19,7 @@ import {
   isValidId,
   ownValue,
   matchesFilter,
+  objectIdsOf,
   personasOf,
   personaSchema,
   dataObjectSchema,
@@ -45,6 +46,7 @@ import type { CommitResult } from "../store/index.js";
 import { ToolError, commitFields, type ToolHandlerContext, type Warning } from "./types.js";
 
 const WARNING_CAP = 50;
+const ERROR_LIMIT = 10;
 /** Most personas a generate_personas dry run lists; would_create keeps the full count. */
 const DRY_RUN_PERSONA_CAP = 50;
 
@@ -88,6 +90,17 @@ function invalidFileAsToolError(err: unknown): never {
       ? `repair the file by hand (the one case where usecases/ may be edited directly) or remove the use case with delete_entity {kind: "use_case", name: "${caseId}"} and write it again with set_use_cases (the full case)`
       : "repair or remove the file by hand (the one case where usecases/ may be edited directly)";
   throw new ToolError("invalid_state", `${err.message} — ${remedy}`);
+}
+
+/** Several invalid stored cases in one call: one error naming the first ERROR_LIMIT files and counting the rest, with the remedy of the single-file message once. */
+function invalidCasesAsToolError(errors: InvalidFileError[]): never {
+  if (errors.length === 1) return invalidFileAsToolError(errors[0]);
+  const more = errors.length > ERROR_LIMIT ? ` (+${errors.length - ERROR_LIMIT} more)` : "";
+  const named = errors.slice(0, ERROR_LIMIT).map((err) => err.message).join(" | ") + more;
+  throw new ToolError(
+    "invalid_state",
+    `${errors.length} stored use cases are invalid, nothing written — ${named} — repair each file by hand (the one case where usecases/ may be edited directly) or remove the use case with delete_entity {kind: "use_case", name: "<id>"} and write it again with set_use_cases (the full case)`,
+  );
 }
 
 async function guarded<T>(run: () => Promise<T>): Promise<T> {
@@ -201,25 +214,8 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
 
   // What a coding agent needs to implement this view of the case: with a variant selected only what that
   // variant touches, otherwise everything the case and its variants name (so the whole picture is one call).
-  const scope: UseCase[] = variant ? [] : [useCase];
-  const personaIds = new Set<string>([...effective.personas, ...effective.steps.map((s) => s.actor)]);
-  const objectIds = new Set<string>();
-  const addIo = (list: { object: string }[]): void => list.forEach((item) => objectIds.add(item.object));
-  addIo(effective.inputs);
-  addIo(effective.outputs);
-  for (const step of effective.steps) addIo(step.data ?? []);
-  for (const source of scope) {
-    for (const v of source.variants ?? []) {
-      (v.personas ?? []).forEach((id) => personaIds.add(id));
-      addIo(v.inputs ?? []);
-      addIo(v.outputs ?? []);
-      for (const op of v.steps ?? []) {
-        if (op.op === "remove") continue;
-        personaIds.add(op.step.actor);
-        addIo(op.step.data ?? []);
-      }
-    }
-  }
+  const personaIds = personasOf(variant ? effective : useCase);
+  const objectIds = objectIdsOf(variant ? effective : useCase);
   personaIds.delete("system");
   // Objects reached through `ref` fields travel along.
   for (const id of objectIds) {
@@ -298,7 +294,6 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
 // ---------------------------------------------------------------------------
 
 const ENTITY_LIMIT = 5000;
-const ERROR_LIMIT = 10;
 
 export type SetUseCasesInput = {
   dimensions?: Record<string, unknown>[];
@@ -358,6 +353,37 @@ function upsert<T extends { id: string }>(current: T[], changes: Parsed<T>[]): T
 
 const WRITE_BATCH = 32;
 
+/**
+ * The stored versions of the cases a call names, read in batches like the writes. A missing case is a create.
+ * An invalid stored case is never overwritten: every one the call names is collected and reported together as
+ * invalid_state (hand repair, or delete_entity then set_use_cases), and nothing of the call is written.
+ */
+async function readExistingCases(store: Store, items: Record<string, unknown>[] | undefined): Promise<Map<string, UseCase>> {
+  const ids = [...new Set((items ?? []).flatMap((item) => (typeof item.id === "string" && isValidId(item.id) ? [item.id] : [])))];
+  const existing = new Map<string, UseCase>();
+  const invalid: InvalidFileError[] = [];
+  for (let i = 0; i < ids.length; i += WRITE_BATCH) {
+    const batch = ids.slice(i, i + WRITE_BATCH);
+    const results = await Promise.all(
+      batch.map(async (id) => {
+        try {
+          return await store.readUseCase(id);
+        } catch (err) {
+          if (isEnoent(err)) return undefined;
+          if (err instanceof InvalidFileError) return err;
+          throw err;
+        }
+      }),
+    );
+    results.forEach((result, index) => {
+      if (result instanceof InvalidFileError) invalid.push(result);
+      else if (result !== undefined) existing.set(batch[index]!, result);
+    });
+  }
+  if (invalid.length > 0) invalidCasesAsToolError(invalid);
+  return existing;
+}
+
 async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: ToolHandlerContext | undefined): Promise<Record<string, unknown>> {
   for (const key of ["dimensions", "personas", "data_objects", "use_cases"] as const) {
     const items = input[key];
@@ -367,19 +393,8 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
     throw new ToolError("validation_failed", "at least one of dimensions, personas, data_objects, use_cases is required");
   }
 
-  const pool = await store.readPersonaPool();
-  const objects = await store.readDataObjects();
-  const existingCases = new Map<string, UseCase>();
-  for (const item of input.use_cases ?? []) {
-    if (typeof item.id !== "string" || !isValidId(item.id) || existingCases.has(item.id)) continue;
-    try {
-      existingCases.set(item.id, await store.readUseCase(item.id));
-    } catch (err) {
-      // A missing case is a create. An invalid stored case is never overwritten: the guard maps it to invalid_state
-      // (hand repair, or delete_entity then set_use_cases), and nothing of this call is written.
-      if (!isEnoent(err)) throw err;
-    }
-  }
+  const [pool, objects] = await Promise.all([store.readPersonaPool(), store.readDataObjects()]);
+  const existingCases = await readExistingCases(store, input.use_cases);
 
   const errors: string[] = [];
   const dimensions = parseEntities("dimensions", input.dimensions, new Map(pool.dimensions.map((d) => [d.id, d])), dimensionSchema, errors);
@@ -537,20 +552,6 @@ function dangling(kind: string, name: string, referrers: string[], by: string): 
   const shown = referrers.slice(0, EXAMPLE_IDS).join(", ");
   const more = referrers.length > EXAMPLE_IDS ? `, +${referrers.length - EXAMPLE_IDS} more` : "";
   return [{ kind: "dangling_reference", target: `${kind}:${name}`, message: `${kind} "${name}" is still referenced by ${referrers.length} ${by}: ${shown}${more}` }];
-}
-
-function objectIdsOf(useCase: UseCase): Set<string> {
-  const ids = new Set<string>();
-  const add = (list: { object: string }[] | undefined): void => list?.forEach((item) => ids.add(item.object));
-  add(useCase.inputs);
-  add(useCase.outputs);
-  for (const step of useCase.steps) add(step.data);
-  for (const variant of useCase.variants ?? []) {
-    add(variant.inputs);
-    add(variant.outputs);
-    for (const op of variant.steps ?? []) if (op.op !== "remove") add(op.step.data);
-  }
-  return ids;
 }
 
 async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, name: string, ctx: ToolHandlerContext | undefined): Promise<Record<string, unknown>> {

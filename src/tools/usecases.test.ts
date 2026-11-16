@@ -228,6 +228,53 @@ describe("use case tools", () => {
         expect(await fx.store.listUseCaseIds()).toEqual(["borrow-book"]);
       });
 
+      it("names every invalid stored case of the call in one invalid_state and writes nothing", async () => {
+        await setUseCases(fx.store, { use_cases: [borrowCase({ id: "second-case" }), borrowCase({ id: "third-case" })] });
+        const dir = join(fx.dir, "usecases", "cases");
+        await writeFile(join(dir, "second-case.json"), "{ not json");
+        const before = await readFile(join(fx.dir, "usecases", "personas.json"), "utf-8");
+        const err = await setUseCases(fx.store, {
+          personas: [{ id: "guest-kim", name: "Kim" }],
+          use_cases: [borrowCase(), borrowCase({ id: "second-case" }), borrowCase({ id: "third-case" }), borrowCase({ id: "fresh-case" })],
+        }).catch((e: unknown) => e);
+        expect(err).toMatchObject({ code: "invalid_state" });
+        const message = (err as Error).message;
+        expect(message).toContain("2 stored use cases are invalid");
+        expect(message).toContain("usecases/cases/borrow-book.json");
+        expect(message).toContain("usecases/cases/second-case.json");
+        expect(message).not.toContain("third-case.json");
+        expect(message).toContain('delete_entity {kind: "use_case"');
+        expect(await readFile(join(dir, "second-case.json"), "utf-8")).toBe("{ not json");
+        expect(await readFile(caseFile(), "utf-8")).toBe(BROKEN);
+        expect(await readFile(join(fx.dir, "usecases", "personas.json"), "utf-8")).toBe(before);
+        expect(await fx.store.listUseCaseIds()).not.toContain("fresh-case");
+      });
+
+      it("caps the named files of a multi-file invalid_state and counts the rest", async () => {
+        const ids = Array.from({ length: 14 }, (_, i) => `broken-${String(i).padStart(2, "0")}`);
+        await setUseCases(fx.store, { use_cases: ids.map((id) => borrowCase({ id })) });
+        for (const id of ids) await writeFile(join(fx.dir, "usecases", "cases", `${id}.json`), BROKEN);
+        const err = await setUseCases(fx.store, { use_cases: ids.map((id) => ({ id, status: "ready" })) }).catch((e: unknown) => e);
+        const message = (err as Error).message;
+        expect(err).toMatchObject({ code: "invalid_state" });
+        expect(message).toContain("14 stored use cases are invalid, nothing written");
+        expect(message).toContain("broken-09.json");
+        expect(message).not.toContain("broken-10.json");
+        expect(message).toContain("(+4 more)");
+        expect(message).toContain(" | ");
+      });
+
+      it("reads more existing cases than one batch holds and still finds the invalid ones", async () => {
+        const ids = Array.from({ length: 70 }, (_, i) => `bulk-${String(i).padStart(2, "0")}`);
+        await setUseCases(fx.store, { use_cases: ids.map((id) => borrowCase({ id })) });
+        await writeFile(join(fx.dir, "usecases", "cases", "bulk-03.json"), BROKEN);
+        await writeFile(join(fx.dir, "usecases", "cases", "bulk-66.json"), BROKEN);
+        const err = await setUseCases(fx.store, { use_cases: ids.map((id) => ({ id, status: "ready" })) }).catch((e: unknown) => e);
+        expect(err).toMatchObject({ code: "invalid_state", message: expect.stringContaining("bulk-03.json") });
+        expect((err as Error).message).toContain("bulk-66.json");
+        expect((err as Error).message).not.toContain("bulk-04.json");
+      });
+
       it("is repaired by delete_entity followed by set_use_cases with the full case", async () => {
         await deleteEntity(fx.store, { kind: "use_case", name: "borrow-book" });
         const res = await setUseCases(fx.store, { use_cases: [borrowCase()] });

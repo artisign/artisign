@@ -45,11 +45,16 @@ const READ_TOOLS = new Set([
   "get_mockup",
   "get_screenshot",
   "inspect_node",
+  "get_use_cases",
+  "get_use_case",
+  "suggest_use_case_variants",
 ]);
 
 function toolKind(tool: string, input: Record<string, unknown>): "read" | "write" {
   // set_board_state with no field is its own read form — there is no get_board_state.
   if (tool === "set_board_state" && input.filter === undefined && input.pins === undefined && input.expanded === undefined) return "read";
+  // generate_personas with dry_run only previews.
+  if (tool === "generate_personas" && input.dry_run === true) return "read";
   return READ_TOOLS.has(tool) ? "read" : "write";
 }
 

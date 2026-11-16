@@ -19,6 +19,8 @@ import { setMeta } from "./meta.js";
 import { getGuide } from "./guide.js";
 import { writeMockup, getMockup, promoteMockup } from "./mockups.js";
 import { setBoardState } from "./board-state.js";
+import { getUseCases, getUseCase, setUseCases, generatePersonas, suggestVariants } from "./usecases.js";
+import { SORT_KEYS, USE_CASE_STATUSES } from "../usecases/index.js";
 
 // Repeated on every node-ref input; INSTRUCTIONS (NODE REFS) has the full rule, but some clients drop instructions.
 const NODE_REF = "<screen>.<node-id>, or component:<name>#<variant>.<node-id> / pattern:<name>.<node-id>";
@@ -172,6 +174,32 @@ export const TOOLS: ToolDefinition[] = [
     (store, input) => getMockup(store, input as never),
   ),
 
+  tool(
+    "get_use_cases",
+    "Use cases, filtered, sorted and paged (group is a path prefix, query is text). Returns summaries, total and, on the first page, facet counts; include adds the pools. Empty without a usecases/ folder.",
+    {
+      group: z.string().optional(),
+      persona: z.string().optional(),
+      screen: z.string().optional(),
+      node: z.string().optional(),
+      tag: z.string().optional(),
+      status: z.enum(USE_CASE_STATUSES).optional(),
+      query: z.string().optional(),
+      has_variants: z.boolean().optional(),
+      sort: z.enum(SORT_KEYS).optional(),
+      cursor: z.string().optional(),
+      limit: z.number().int().positive().max(500).optional(),
+      include: z.array(z.enum(["personas", "dimensions", "data_objects"])).optional(),
+    },
+    (store, input) => getUseCases(store, input as never),
+  ),
+  tool(
+    "get_use_case",
+    "One-call bundle to implement a use case: it, its personas, dimensions, data objects and mapped screens with nodes (scope element|screen, stale when gone), plus warnings. variant resolves that variant (steps marked change changed|added, removed_steps); without it the base case plus its variants.",
+    { id: z.string(), variant: z.string().optional() },
+    (store, input) => getUseCase(store, input as never),
+  ),
+
   // Writes ----------------------------------------------------------------
   tool(
     "write_html",
@@ -246,6 +274,34 @@ export const TOOLS: ToolDefinition[] = [
       variant_kind: z.enum(["state", "overlay", "step"]).optional(),
     },
     (store, input) => setMeta(store, input as never),
+  ),
+  tool(
+    "set_use_cases",
+    "Bulk upsert by id of dimensions, personas, data_objects, use_cases (shapes: get_guide). An existing entity merges at top level: given keys replace (arrays whole), null removes a key. Validated before anything is written; unknown references only warn.",
+    {
+      dimensions: z.array(z.record(z.string(), z.unknown())).optional(),
+      personas: z.array(z.record(z.string(), z.unknown())).optional(),
+      data_objects: z.array(z.record(z.string(), z.unknown())).optional(),
+      use_cases: z.array(z.record(z.string(), z.unknown())).optional(),
+    },
+    (store, input, ctx) => setUseCases(store, input as never, ctx),
+  ),
+  tool(
+    "generate_personas",
+    "Generic personas from the dimensions: pairwise (default, every value pair once) or all (cartesian); dimensions subset, limit, dry_run previews. Skips combinations an existing persona covers; sets generated: true.",
+    {
+      strategy: z.enum(["all", "pairwise"]).optional(),
+      dimensions: z.array(z.string()).optional(),
+      limit: z.number().int().positive().max(5000).optional(),
+      dry_run: z.boolean().optional(),
+    },
+    (store, input, ctx) => generatePersonas(store, input as never, ctx),
+  ),
+  tool(
+    "suggest_use_case_variants",
+    "Trait values of the persona pool that neither a use case's personas nor its variants' when cover yet, with variant skeletons to complete and write back via set_use_cases (variants replaced whole).",
+    { id: z.string(), limit: z.number().int().positive().optional() },
+    (store, input) => suggestVariants(store, input as never),
   ),
   tool(
     "write_mockup",
@@ -340,8 +396,8 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "delete_entity",
-    "Delete a screen, component, pattern or mockup (or one mockup variant via variant). A screen takes its flow edges and meta with it; comments stay. Referenced components are refused (references listed), as are screens with variant screens unless cascade: true (screen only) deletes the subtree.",
-    { kind: z.enum(["screen", "component", "pattern", "mockup"]), name: z.string(), variant: z.string().optional(), cascade: z.boolean().optional() },
+    "Delete a screen, component, pattern or mockup (or one mockup variant via variant). A screen takes its flow edges and meta with it; comments stay. Referenced components are refused (references listed), as are screens with variant screens unless cascade: true (screen only) deletes the subtree. Use-case kinds persona, data_object, use_case, dimension delete by id and warn about dangling references.",
+    { kind: z.enum(["screen", "component", "pattern", "mockup", "persona", "data_object", "use_case", "dimension"]), name: z.string(), variant: z.string().optional(), cascade: z.boolean().optional() },
     // ctx threaded through the way init_project's is — deleteEntity uses
     // ctx.viewState.pruneScreen(name) to drop a deleted screen from the
     // Board's pinned set (CHR-624), a no-op when ctx/viewState is absent.

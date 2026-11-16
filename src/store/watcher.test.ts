@@ -102,6 +102,21 @@ describe("watchProject", () => {
     expect(events.find((e) => e.path.includes("assign-caregiver"))?.category).toBe("mockup");
   });
 
+  it("categorizes usecases/personas.json and usecases/cases/<id>.json as \"usecases\", the folder being created live", async () => {
+    const events: ProjectChangeEvent[] = [];
+    unwatch = watchProject(dir, (event) => events.push(event));
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    await mkdir(join(dir, "usecases", "cases"), { recursive: true });
+    await writeFile(join(dir, "usecases", "personas.json"), "{}");
+    await writeFile(join(dir, "usecases", "cases", "borrow-book.json"), "{}");
+
+    await waitFor(events, (e) => e.path.endsWith("personas.json"), 1000);
+    await waitFor(events, (e) => e.path.endsWith("borrow-book.json"), 1000);
+    expect(events.find((e) => e.path.endsWith("personas.json"))?.category).toBe("usecases");
+    expect(events.find((e) => e.path.endsWith("borrow-book.json"))?.category).toBe("usecases");
+  });
+
   it("categorizes assets/<path> as \"asset\"", async () => {
     await mkdir(join(dir, "assets"), { recursive: true });
     const events: ProjectChangeEvent[] = [];

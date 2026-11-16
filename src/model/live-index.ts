@@ -56,7 +56,8 @@ export function watchAndReindex(
   const stopWatching = store.watch((event) => {
     // Reindex first: the observer is a bystander, so a throwing `onChange`
     // must not be able to swallow the rebuild this event exists for.
-    chain = chain.then(runRebuild);
+    // Use cases are not part of the node index: a bulk write of thousands of case files must not rebuild it each time.
+    if (event.category !== "usecases") chain = chain.then(runRebuild);
     onChange?.(event);
   });
 

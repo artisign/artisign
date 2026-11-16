@@ -183,6 +183,44 @@ describe("GET /events (SSE)", () => {
     expect(evt).toEqual({ type: "change", kind: "tag_meta", name: "chr-244" });
   });
 
+  it("broadcasts a use case write as a \"usecases\" change named \"cases/<id>\"", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/events`);
+    const store = new FsStore(dir);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    await store.writeUseCase({
+      id: "borrow-book",
+      title: "Assign",
+      status: "draft",
+      personas: [],
+      inputs: [{ object: "loan", example: {} }],
+      outputs: [{ object: "loan", example: {} }],
+      steps: [],
+    });
+    // The folders are created live too, so directory events (named "usecases"/"cases") may come first.
+    const evt = await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "cases/borrow-book", 1500);
+    expect(evt).toEqual({ type: "change", kind: "usecases", name: "cases/borrow-book" });
+
+  });
+
+  it("keeps a case named like a pool file distinguishable: cases/personas", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/events`);
+    const store = new FsStore(dir);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    await store.writeUseCase({ id: "personas", title: "P", status: "draft", personas: [], inputs: [{ object: "o", example: {} }], outputs: [{ object: "o", example: {} }], steps: [] });
+    expect(await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "cases/personas", 1500)).toEqual({ type: "change", kind: "usecases", name: "cases/personas" });
+  });
+
+  it("broadcasts usecases/personas.json under its stem", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/events`);
+    const store = new FsStore(dir);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    await store.writePersonaPool({ dimensions: [], personas: [] });
+    expect(await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "personas", 1500)).toEqual({ type: "change", kind: "usecases", name: "personas" });
+  });
+
   it("rejects a cross-origin /events connection", async () => {
     const res = await fetch(`http://127.0.0.1:${daemon.port}/events`, {
       headers: { origin: "https://evil.example" },

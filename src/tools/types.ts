@@ -38,7 +38,25 @@ export type WarningKind =
   // An overlay variant with no `data-backdrop` repeats most of its parent's
   // content (CHR-938): it should name the parent as backdrop and keep only
   // the sheet. Advisory only, never blocks a write.
-  | "backdrop_candidate";
+  | "backdrop_candidate"
+  // Use cases: advisory only, never blocks a write.
+  // A reference to a persona / data object / dimension / dimension value that
+  // does not exist (yet), an example field the data object does not declare,
+  // a variant op whose step the flow does not have, a step mapped to a screen
+  // or node that no longer exists (mappings are never rewritten), a delete
+  // that leaves references behind, and a case file that failed to load.
+  | "unknown_persona"
+  | "unknown_data_object"
+  | "unknown_data_field"
+  | "unknown_dimension"
+  | "unknown_trait_value"
+  | "variant_step_missing"
+  | "mapping_stale"
+  // An element mapping onto a generated node id (n<counter>): a position, not an identity — it can silently point at another element after a rewrite.
+  | "mapping_unstable"
+  | "duplicate_step_id"
+  | "dangling_reference"
+  | "invalid_file";
 
 export type Warning = {
   kind: WarningKind;

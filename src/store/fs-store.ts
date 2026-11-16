@@ -1,12 +1,14 @@
 import { readFile, readdir, appendFile, rm, stat, lstat } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import { resolve, basename, extname, sep } from "node:path";
+import type { ZodError } from "zod";
 import type { ArtisignConfig } from "../init/artisign-config.js";
 import { CONFIG_FILENAME, CACHE_DIR } from "../init/artisign-config.js";
 import { atomicWrite, ensureCacheGitignore } from "./atomic-write.js";
-import { autoCommit, getHeadCommit } from "./git.js";
+import { autoCommit, autoCommitPaths, getHeadCommit } from "./git.js";
 import { watchProject } from "./watcher.js";
-import type { Store, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, VariantKind, TagMeta, DesignSystemMeta, DesignDecision, CommitResult, HeadCommitResult, MockupMeta, MockupVariantMeta } from "./types.js";
+import { InvalidFileError, dataObjectsDocSchema, describeIssues, isValidId, personaPoolSchema, useCaseSchema, type DataObject, type PersonaPool, type UseCase } from "../usecases/schema.js";
+import type { Store, UseCaseFileIssue, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, VariantKind, TagMeta, DesignSystemMeta, DesignDecision, CommitResult, HeadCommitResult, MockupMeta, MockupVariantMeta } from "./types.js";
 
 function emptyScreenMeta(): ScreenMeta {
   return { notes: "", tags: [] };
@@ -162,10 +164,17 @@ function listDirs(dir: string): Promise<string[]> {
 }
 
 /** Project sources `lastWriteAt` scans — deliberately not `.artisign/` (derived) or `.git/`. */
-const LAST_WRITE_SOURCES = [CONFIG_FILENAME, "screens", "design-system", "mockups", "tags", "flows.json", "comments.jsonl"];
+const LAST_WRITE_SOURCES = [CONFIG_FILENAME, "screens", "design-system", "mockups", "tags", "usecases", "flows.json", "comments.jsonl"];
+
+/** How many case files are read at once — enough to hide disk latency, few enough to stay clear of the fd limit. */
+const CASE_READ_CONCURRENCY = 64;
+
+type CachedCase = { signature: string; value: { useCase: UseCase } | { error: string } };
 
 export class FsStore implements Store {
   readonly projectDir: string;
+  /** Parsed case files by id, valid while the file's inode/mtime/size are unchanged (atomic writes always yield a new inode). */
+  private readonly caseCache = new Map<string, CachedCase>();
 
   constructor(projectDir: string) {
     this.projectDir = resolve(projectDir);
@@ -399,6 +408,131 @@ export class FsStore implements Store {
     return readFile(this.assetPath(relPath));
   }
 
+  /** Case ids become filenames, so a caller-supplied one is checked before it is joined onto a path. */
+  private casePath(id: string): string {
+    if (!isValidId(id)) throw new Error(`invalid use case id "${id}": must be lowercase kebab-case`);
+    return this.path("usecases", "cases", `${id}.json`);
+  }
+
+  /** Reads and validates a JSON document; a missing file yields `empty`, an invalid one throws naming `file`. */
+  private async readUseCaseDocument<T>(file: string, parse: (value: unknown) => { success: true; data: T } | { success: false; error: ZodError }, empty: T): Promise<T> {
+    let raw: string;
+    try {
+      raw = await readFile(this.path("usecases", file), "utf-8");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return empty;
+      throw err;
+    }
+    let json: unknown;
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      throw new InvalidFileError(`usecases/${file}`, "not valid JSON");
+    }
+    const result = parse(json);
+    if (!result.success) throw new InvalidFileError(`usecases/${file}`, describeIssues(result.error));
+    return result.data;
+  }
+
+  async readPersonaPool(): Promise<PersonaPool> {
+    return this.readUseCaseDocument("personas.json", (v) => personaPoolSchema.safeParse(v), { dimensions: [], personas: [] });
+  }
+
+  async writePersonaPool(pool: PersonaPool): Promise<void> {
+    // Never write a pool this store could not read back.
+    const checked = personaPoolSchema.safeParse({ dimensions: pool.dimensions, personas: pool.personas });
+    if (!checked.success) throw new InvalidFileError("usecases/personas.json", `refusing to write: ${describeIssues(checked.error)}`);
+    await atomicWrite(this.path("usecases", "personas.json"), `${JSON.stringify(checked.data, null, 2)}\n`);
+  }
+
+  async readDataObjects(): Promise<DataObject[]> {
+    return (await this.readUseCaseDocument("data-objects.json", (v) => dataObjectsDocSchema.safeParse(v), { objects: [] })).objects;
+  }
+
+  async writeDataObjects(objects: DataObject[]): Promise<void> {
+    const checked = dataObjectsDocSchema.safeParse({ objects });
+    if (!checked.success) throw new InvalidFileError("usecases/data-objects.json", `refusing to write: ${describeIssues(checked.error)}`);
+    await atomicWrite(this.path("usecases", "data-objects.json"), `${JSON.stringify(checked.data, null, 2)}\n`);
+  }
+
+  async listUseCaseIds(): Promise<string[]> {
+    return listEntries(this.path("usecases", "cases"), (entry) => (entry.isFile() && entry.name.endsWith(".json") ? entry.name.slice(0, -".json".length) : undefined));
+  }
+
+  private parseCase(id: string, raw: string): CachedCase["value"] {
+    let json: unknown;
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      return { error: "not valid JSON" };
+    }
+    const result = useCaseSchema.safeParse(json);
+    if (!result.success) return { error: describeIssues(result.error) };
+    if (result.data.id !== id) return { error: `id "${result.data.id}" does not match the filename` };
+    return { useCase: result.data };
+  }
+
+  async readUseCase(id: string): Promise<UseCase> {
+    const parsed = this.parseCase(id, await readFile(this.casePath(id), "utf-8"));
+    if ("error" in parsed) throw new InvalidFileError(`usecases/cases/${id}.json`, parsed.error);
+    return parsed.useCase;
+  }
+
+  async readUseCases(): Promise<{ useCases: UseCase[]; invalid: UseCaseFileIssue[] }> {
+    const ids = await this.listUseCaseIds();
+    const known = new Set(ids);
+    for (const cached of this.caseCache.keys()) if (!known.has(cached)) this.caseCache.delete(cached);
+
+    const results = new Array<CachedCase["value"] | undefined>(ids.length);
+    let next = 0;
+    const worker = async (): Promise<void> => {
+      for (let i = next++; i < ids.length; i = next++) {
+        const id = ids[i]!;
+        if (!isValidId(id)) {
+          // A hand-made or mis-named file: reported, never allowed to break the listing.
+          results[i] = { error: "the filename is not a valid use case id (lowercase kebab-case)" };
+          continue;
+        }
+        const path = this.casePath(id);
+        try {
+          const info = await stat(path);
+          const signature = `${info.ino}:${info.mtimeMs}:${info.size}`;
+          const cached = this.caseCache.get(id);
+          if (cached?.signature === signature) {
+            results[i] = cached.value;
+            continue;
+          }
+          const value = this.parseCase(id, await readFile(path, "utf-8"));
+          this.caseCache.set(id, { signature, value });
+          results[i] = value;
+        } catch (err) {
+          // Deleted between the directory listing and the read; anything else is the caller's problem.
+          if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(CASE_READ_CONCURRENCY, ids.length) }, worker));
+
+    const useCases: UseCase[] = [];
+    const invalid: UseCaseFileIssue[] = [];
+    ids.forEach((id, i) => {
+      const value = results[i];
+      if (value === undefined) return;
+      if ("error" in value) invalid.push({ id, error: value.error });
+      else useCases.push(value.useCase);
+    });
+    return { useCases, invalid };
+  }
+
+  async writeUseCase(useCase: UseCase): Promise<void> {
+    await atomicWrite(this.casePath(useCase.id), `${JSON.stringify(useCase, null, 2)}\n`);
+  }
+
+  async deleteUseCase(id: string): Promise<void> {
+    await rm(this.casePath(id), { force: true });
+    this.caseCache.delete(id);
+  }
+
   async readCacheIndex(): Promise<unknown | undefined> {
     try {
       const raw = await readFile(this.path(CACHE_DIR, "index.json"), "utf-8");
@@ -422,6 +556,12 @@ export class FsStore implements Store {
     const config = await this.readArtisignConfig();
     if (!config.settings.autoCommit) return { sha: null, skipped_reason: "disabled" };
     return autoCommit(this.projectDir, message);
+  }
+
+  async commitPaths(message: string, paths: string[]): Promise<CommitResult> {
+    const config = await this.readArtisignConfig();
+    if (!config.settings.autoCommit) return { sha: null, skipped_reason: "disabled" };
+    return autoCommitPaths(this.projectDir, message, paths);
   }
 
   async headCommit(): Promise<HeadCommitResult> {

@@ -1,0 +1,244 @@
+import { describe, it, expect } from "vitest";
+import { useCaseSchema, personaSchema, dimensionSchema, type Dimension, type Persona, type UseCase } from "./schema.js";
+import { resolveUseCase } from "./resolve.js";
+import { buildGeneratedPersona, expandCombinations, suggestVariantGaps } from "./generate.js";
+import { compareUseCases, facetCounts, matchesFilter, summarize } from "./query.js";
+
+function useCase(overrides: Record<string, unknown> = {}): UseCase {
+  return useCaseSchema.parse({
+    id: "assign",
+    title: "Borrow a book",
+    personas: ["member-ana"],
+    inputs: [{ object: "loan", example: { status: "available" } }],
+    outputs: [{ object: "loan", example: { status: "on-loan" } }],
+    steps: [
+      { id: "tap", actor: "member-ana", action: "Taps the book", target: { screen: "month", node: "book-14" } },
+      { id: "pick", actor: "member-ana", action: "Picks a copy", target: { screen: "sheet" } },
+      { id: "done", actor: "system", action: "Loan is recorded" },
+    ],
+    ...overrides,
+  });
+}
+
+const dims = (...specs: [string, string[]][]): Dimension[] =>
+  specs.map(([id, values]) => dimensionSchema.parse({ id, label: id.toUpperCase(), values: values.map((v) => ({ id: v, label: v.toUpperCase() })) }));
+
+const persona = (id: string, traits: Record<string, string> = {}): Persona => personaSchema.parse({ id, name: id, traits });
+
+describe("use case schema", () => {
+  it("defaults status, personas and steps, and requires inputs and outputs", () => {
+    const parsed = useCaseSchema.parse({
+      id: "x",
+      title: "X",
+      inputs: [{ object: "o", example: {} }],
+      outputs: [{ object: "o", example: {} }],
+    });
+    expect(parsed).toMatchObject({ status: "draft", personas: [], steps: [] });
+    expect(useCaseSchema.safeParse({ id: "x", title: "X", inputs: [], outputs: [{ object: "o", example: {} }] }).success).toBe(false);
+    expect(useCaseSchema.safeParse({ id: "x", title: "X", inputs: [{ object: "o", example: {} }] }).success).toBe(false);
+  });
+
+  it("rejects ids that are not lowercase kebab-case, unknown keys and duplicate step ids", () => {
+    const base = { title: "X", inputs: [{ object: "o", example: {} }], outputs: [{ object: "o", example: {} }] };
+    expect(useCaseSchema.safeParse({ ...base, id: "../evil" }).success).toBe(false);
+    expect(useCaseSchema.safeParse({ ...base, id: "Upper" }).success).toBe(false);
+    expect(useCaseSchema.safeParse({ ...base, id: "ok", persona: ["typo"] }).success).toBe(false);
+    const step = { id: "a", actor: "system", action: "x" };
+    expect(useCaseSchema.safeParse({ ...base, id: "ok", steps: [step, step] }).success).toBe(false);
+  });
+});
+
+describe("resolveUseCase", () => {
+  it("returns the base flow without a variant", () => {
+    const resolved = resolveUseCase(useCase());
+    expect(resolved.use_case.steps.map((s) => s.id)).toEqual(["tap", "pick", "done"]);
+    expect(resolved.use_case.steps.every((s) => s.change === undefined)).toBe(true);
+    expect(resolved.removed_steps).toEqual([]);
+    expect(resolved.use_case).not.toHaveProperty("variants");
+  });
+
+  it("applies replace / insert_after / append / remove and marks changed, added and removed", () => {
+    const base = useCase({
+      variants: [
+        {
+          id: "all-branches",
+          title: "No branch limit",
+          when: { "branch-access": ["all-branches"] },
+          personas: ["staff-lee"],
+          goal: "Borrow two books",
+          outputs: [{ object: "loan", example: { status: "on-loan", borrower: "member-ana" } }],
+          steps: [
+            { op: "replace", step_id: "pick", step: { id: "pick", actor: "staff-lee", action: "Picks a copy" } },
+            { op: "insert_after", step_id: "tap", step: { id: "confirm", actor: "staff-lee", action: "Confirms the cost" } },
+            { op: "append", step: { id: "receipt", actor: "system", action: "Sends a receipt" } },
+            { op: "remove", step_id: "done" },
+          ],
+        },
+      ],
+    });
+    const resolved = resolveUseCase(base, base.variants![0]);
+    expect(resolved.use_case.steps.map((s) => [s.id, s.change])).toEqual([
+      ["tap", undefined],
+      ["confirm", "added"],
+      ["pick", "changed"],
+      ["receipt", "added"],
+    ]);
+    expect(resolved.removed_steps).toEqual([expect.objectContaining({ id: "done", change: "removed", after: "pick" })]);
+    expect(resolved.use_case.personas).toEqual(["staff-lee"]);
+    expect(resolved.use_case.goal).toBe("Borrow two books");
+    expect(resolved.use_case.outputs[0]!.example).toEqual({ status: "on-loan", borrower: "member-ana" });
+    expect(resolved.use_case.inputs).toEqual(base.inputs); // not overridden
+    expect(resolved.issues).toEqual([]);
+  });
+
+  it("skips an op pointing at a missing step and reports it", () => {
+    const base = useCase({
+      variants: [{ id: "v", title: "V", when: {}, steps: [{ op: "remove", step_id: "ghost" }, { op: "replace", step_id: "ghost2", step: { id: "x", actor: "system", action: "x" } }] }],
+    });
+    const resolved = resolveUseCase(base, base.variants![0]);
+    expect(resolved.use_case.steps).toHaveLength(3);
+    expect(resolved.issues.map((i) => i.step_id)).toEqual(["ghost", "ghost2"]);
+  });
+
+  it("does not mutate the base use case", () => {
+    const base = useCase({ variants: [{ id: "v", title: "V", when: {}, steps: [{ op: "remove", step_id: "tap" }] }] });
+    const before = JSON.stringify(base);
+    resolveUseCase(base, base.variants![0]);
+    expect(JSON.stringify(base)).toBe(before);
+  });
+
+  it("drops a step the variant added and then removed without a trace", () => {
+    const base = useCase({
+      variants: [{ id: "v", title: "V", when: {}, steps: [{ op: "append", step: { id: "tmp", actor: "system", action: "x" } }, { op: "remove", step_id: "tmp" }] }],
+    });
+    const resolved = resolveUseCase(base, base.variants![0]);
+    expect(resolved.use_case.steps.map((s) => s.id)).toEqual(["tap", "pick", "done"]);
+    expect(resolved.removed_steps).toEqual([]);
+  });
+});
+
+describe("expandCombinations", () => {
+  const d = dims(["membership", ["student", "staff"]], ["limit", ["1", "2", "3"]], ["access", ["single", "all"]]);
+
+  it("all: cartesian product in declared order, deterministic", () => {
+    const result = expandCombinations(d, "all", [], 100);
+    expect(result.total).toBe(12);
+    expect(result.combinations).toHaveLength(12);
+    expect(result.combinations[0]).toEqual({ membership: "student", limit: "1", access: "single" });
+    expect(result.combinations[1]).toEqual({ membership: "student", limit: "1", access: "all" });
+    expect(expandCombinations(d, "all", [], 100)).toEqual(result);
+  });
+
+  it("pairwise: covers every value pair with fewer rows than the full product", () => {
+    const result = expandCombinations(d, "pairwise", [], 100);
+    expect(result.combinations.length).toBeLessThan(12);
+    expect(result.combinations.length).toBeGreaterThanOrEqual(6); // 3x2 pairs is the lower bound
+    const seen = new Set<string>();
+    for (const row of result.combinations) {
+      const ids = d.map((x) => `${x.id}=${row[x.id]}`);
+      for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) seen.add(`${ids[i]}|${ids[j]}`);
+    }
+    expect(seen.size).toBe(result.total); // 2*3 + 2*2 + 3*2 = 16
+    expect(result.total).toBe(16);
+    expect(expandCombinations(d, "pairwise", [], 100)).toEqual(result);
+  });
+
+  it("skips combinations an existing persona covers; a persona without traits covers nothing", () => {
+    const existing = [persona("any"), persona("ana", { membership: "student", limit: "1", access: "single" })];
+    const result = expandCombinations(d, "all", existing, 100);
+    expect(result.skipped_covered).toBe(1);
+    expect(result.combinations).toHaveLength(11);
+    const partial = expandCombinations(d, "all", [persona("sep", { membership: "staff" })], 100);
+    expect(partial.skipped_covered).toBe(6);
+  });
+
+  it("pairwise skips pairs an existing persona already stands for", () => {
+    const full = expandCombinations(d, "pairwise", [], 100).combinations;
+    const existing = full.map((row, i) => persona(`p${i}`, row));
+    const none = expandCombinations(d, "pairwise", existing, 100);
+    expect(none.combinations).toEqual([]);
+    expect(none.skipped_covered).toBe(16);
+  });
+
+  it("limit truncates and says so", () => {
+    const result = expandCombinations(d, "all", [], 5);
+    expect(result.combinations).toHaveLength(5);
+    expect(result.truncated).toBe(true);
+    expect(expandCombinations(d.slice(0, 1), "pairwise", [], 1).truncated).toBe(true);
+  });
+
+  it("a single dimension yields one combination per value", () => {
+    expect(expandCombinations(d.slice(0, 1), "pairwise", [], 10).combinations).toEqual([{ membership: "student" }, { membership: "staff" }]);
+  });
+
+  it("buildGeneratedPersona derives a valid, collision-free id and marks the persona generated", () => {
+    const taken = new Set<string>(["gen-student-1"]);
+    const built = buildGeneratedPersona({ membership: "student", limit: "1" }, d.slice(0, 2), taken, 0);
+    expect(built).toMatchObject({ id: "gen-student-1-2", generated: true, traits: { membership: "student", limit: "1" } });
+    expect(personaSchema.safeParse(built).success).toBe(true);
+  });
+});
+
+describe("suggestVariantGaps", () => {
+  const d = dims(["membership", ["student", "staff"]], ["access", ["single", "all"]]);
+  const pool = [persona("ana", { membership: "student", access: "single" }), persona("lee", { membership: "staff", access: "all" })];
+
+  it("reports values neither the case's personas nor a variant cover, with skeletons", () => {
+    const base = useCase({ personas: ["ana"] });
+    const { coverage, suggestions } = suggestVariantGaps(base, d, pool);
+    expect(coverage).toEqual([
+      { dimension: "membership", covered: ["student"], uncovered: ["staff"] },
+      { dimension: "access", covered: ["single"], uncovered: ["all"] },
+    ]);
+    expect(suggestions).toEqual([
+      { id: "membership-staff", title: "Borrow a book — MEMBERSHIP: STAFF", when: { membership: ["staff"] }, personas: ["lee"] },
+      { id: "access-all", title: "Borrow a book — ACCESS: ALL", when: { access: ["all"] }, personas: ["lee"] },
+    ]);
+  });
+
+  it("a variant's when closes the gap, a persona without the trait stands for any value", () => {
+    const withVariant = useCase({ personas: ["ana"], variants: [{ id: "branches", title: "All branches", when: { access: ["all"] } }] });
+    expect(suggestVariantGaps(withVariant, d, pool).suggestions.map((s) => s.id)).toEqual(["membership-staff"]);
+    const generic = useCase({ personas: ["anyone"] });
+    expect(suggestVariantGaps(generic, d, [...pool, persona("anyone")]).suggestions).toEqual([]);
+  });
+});
+
+describe("query helpers", () => {
+  const cases = [
+    useCase({ id: "a", title: "Beta", group: "catalog/loans", tags: ["loans"], steps: [] }),
+    useCase({ id: "b", title: "Alpha", group: "catalog", status: "ready", steps: [{ id: "s", actor: "staff-lee", action: "Opens the sheet", target: { screen: "sheet", node: "row" } }] }),
+    useCase({ id: "c", title: "Gamma", group: "catalog-x", steps: [], variants: [{ id: "v", title: "V", when: {}, personas: ["guest"] }] }),
+  ];
+
+  it("filters by path-prefix group, persona (base, step actor, variant), screen+node, tag, status, text and variants", () => {
+    const ids = (filter: Parameters<typeof matchesFilter>[1]): string[] => cases.filter((c) => matchesFilter(c, filter)).map((c) => c.id);
+    expect(ids({ group: "catalog" })).toEqual(["a", "b"]);
+    expect(ids({ group: "catalog/loans" })).toEqual(["a"]);
+    expect(ids({ persona: "staff-lee" })).toEqual(["b"]);
+    expect(ids({ persona: "guest" })).toEqual(["c"]);
+    expect(ids({ screen: "sheet" })).toEqual(["b"]);
+    expect(ids({ screen: "sheet", node: "row" })).toEqual(["b"]);
+    expect(ids({ node: "nope" })).toEqual([]);
+    expect(ids({ tag: "LOANS" })).toEqual(["a"]);
+    expect(ids({ status: "ready" })).toEqual(["b"]);
+    expect(ids({ query: "opens the SHEET" })).toEqual(["b"]);
+    expect(ids({ has_variants: true })).toEqual(["c"]);
+    expect(ids({ has_variants: false })).toEqual(["a", "b"]);
+  });
+
+  it("sorts by group by default, then by the chosen key with stable tie-breakers", () => {
+    expect([...cases].sort(compareUseCases("group")).map((c) => c.id)).toEqual(["b", "c", "a"]);
+    expect([...cases].sort(compareUseCases("title")).map((c) => c.id)).toEqual(["b", "a", "c"]);
+    expect([...cases].sort(compareUseCases("status")).map((c) => c.id)).toEqual(["c", "a", "b"]);
+  });
+
+  it("summarize omits empty fields and facets count over the given set", () => {
+    expect(summarize(cases[2]!)).toEqual({ id: "c", title: "Gamma", group: "catalog-x", status: "draft", personas: ["member-ana"], steps: 0, variants: 1 });
+    const { facets } = facetCounts(cases);
+    expect(facets.status).toEqual({ draft: 2, ready: 1 });
+    expect(facets.tag).toEqual({ loans: 1 });
+    expect(facets.persona["member-ana"]).toBe(3);
+    expect(facets.persona.guest).toBe(1);
+  });
+});

@@ -10,6 +10,7 @@ import { variantLinks, variantFields } from "../tools/variants.js";
 import { readAllFlows, toPublicFlowRecord } from "../tools/flows.js";
 import { compareScreens } from "../tools/compare.js";
 import { ToolError } from "../tools/types.js";
+import { InvalidFileError, isValidId } from "../usecases/index.js";
 import {
   parseScreen,
   renderScreen,
@@ -101,6 +102,23 @@ export async function handlePreviewRoutes(req: IncomingMessage, res: ServerRespo
         return true;
       }
       throw err;
+    }
+    return true;
+  }
+
+  if (url.pathname === "/api/use-case") {
+    // The stored use case exactly as written, variants and their step ops included — the edit form needs what get_use_case's resolved bundle does not return (the variant definitions). Read-only and not a tool: the palette stays as it is.
+    const id = url.searchParams.get("id") ?? "";
+    if (!isValidId(id)) {
+      sendJson(res, 400, { code: "validation_failed", message: "id must be a lowercase kebab-case use case id" });
+      return true;
+    }
+    try {
+      sendJson(res, 200, { use_case: await store.readUseCase(id) });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") sendJson(res, 404, { code: "not_found", message: `use case "${id}" was not found` });
+      else if (err instanceof InvalidFileError) sendJson(res, 422, { code: "invalid_state", message: err.message });
+      else throw err;
     }
     return true;
   }

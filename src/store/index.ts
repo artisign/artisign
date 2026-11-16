@@ -15,6 +15,7 @@ export type {
   CommitSkippedReason,
   HeadCommitResult,
   HeadReason,
+  UseCaseFileIssue,
 } from "./types.js";
 export { FsStore } from "./fs-store.js";
 export { atomicWrite, ensureCacheGitignore } from "./atomic-write.js";

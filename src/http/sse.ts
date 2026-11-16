@@ -46,6 +46,8 @@ const HEARTBEAT_MS = 25_000;
 function baseName(path: string): string {
   const segments = path.split("/");
   if (segments[0] === "mockups" && segments[1]) return segments[1];
+  // A case is named "cases/<id>" so a case with the id "personas" cannot be mistaken for the pool file.
+  if (segments[0] === "usecases" && segments[1] === "cases" && segments[2]) return `cases/${segments[2].replace(/\.json$/, "")}`;
   const stem = segments.pop() ?? path;
   if (stem.endsWith(".meta.json")) return stem.slice(0, -".meta.json".length);
   return stem.replace(/\.(html|json|jsonl)$/, "");

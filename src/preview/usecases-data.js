@@ -1,7 +1,7 @@
 // Use Cases tab — pure logic (no DOM, no fetch): list queries, the group tree and its flattening for the
 // virtual list, the variant difference against the base, the coverage matrix, example text round-trips and
 // the id helpers. Everything the DOM modules need to decide lives here so it is unit-testable; the shapes
-// are the ones documented in docs/usecases-spec.md.
+// are the ones documented in the use-case spec.
 
 /** Spec maturity only (ADR-010): there is no priority and no "implemented". */
 export const STATUSES = ["draft", "ready"];

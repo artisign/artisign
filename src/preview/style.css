@@ -5356,7 +5356,7 @@ body:has(#settings-menu:not([hidden])) #update-notice {
 }
 
 /* ==========================================================================================================
-   Use Cases tab (experiment: docs/usecases-spec.md). Everything here is scoped to #usecases-view or a uc-* class,
+   Use Cases tab (see the use-case spec). Everything here is scoped to #usecases-view or a uc-* class,
    built from the --chrome-* groups like every other shell view. The mapping view's overlays sit in the PARENT
    document next to the frame iframes (never inside them), so this stylesheet cannot leak into a screen.
    ========================================================================================================== */

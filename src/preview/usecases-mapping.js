@@ -101,6 +101,12 @@ export function createMappingView({ root, fetchRender, handlers }) {
     parts.box = box;
     const wrap = h("div", { class: "uc-frame" }, label, box);
     parts.wrap = wrap;
+    if (!frame.exists) {
+      box.style.width = `${FRAME_WIDTH}px`;
+      box.style.height = `${Math.round(FRAME_WIDTH * 1.6)}px`;
+      box.append(h("div", { class: "uc-frame-missing" }, icon("link_off"), h("strong", null, "Screen not found"), h("p", null, `${plural(frame.steps.length, "step")} point${frame.steps.length === 1 ? "s" : ""} at a screen that no longer exists in this project.`)));
+      return { wrap, parts }; // a frame for a missing screen is not a button: nothing to open
+    }
     wrap.addEventListener("click", () => handlers.onOpenScreen(frame.screen, frame.steps.find((s) => s.step.id === selected)?.step.target?.node ?? frame.steps.find((s) => s.step.target?.node)?.step.target.node ?? null));
     wrap.setAttribute("role", "button");
     wrap.tabIndex = 0;
@@ -111,12 +117,6 @@ export function createMappingView({ root, fetchRender, handlers }) {
         wrap.click();
       }
     });
-    if (!frame.exists) {
-      box.style.width = `${FRAME_WIDTH}px`;
-      box.style.height = `${Math.round(FRAME_WIDTH * 1.6)}px`;
-      box.append(h("div", { class: "uc-frame-missing" }, icon("link_off"), h("strong", null, "Screen not found"), h("p", null, `${plural(frame.steps.length, "step")} point${frame.steps.length === 1 ? "s" : ""} at a screen that no longer exists in this project.`)));
-      return { wrap, parts };
-    }
     box.style.width = `${FRAME_WIDTH}px`;
     box.style.height = `${Math.round(FRAME_WIDTH * 1.6)}px`;
     box.dataset.loading = "true";

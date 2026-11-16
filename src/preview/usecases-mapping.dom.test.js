@@ -127,6 +127,9 @@ describe("mapping view", () => {
     expect(missing.querySelector(".uc-frame-box").dataset.exists).toBe("false");
     expect(missing.textContent).toContain("Screen not found");
     expect(missing.querySelector("iframe")).toBeNull();
+    expect(missing.getAttribute("role")).toBeNull();
+    missing.click();
+    expect(handlers.onOpenScreen).not.toHaveBeenCalled(); // a missing screen is not clickable
     const stale = $(".uc-map-step[data-scope=stale]");
     expect(stale.querySelector(".uc-map-stale").textContent).toContain("never rewrites mappings");
     const [pick, leave] = $$(".uc-map-stale-actions button", stale);

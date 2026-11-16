@@ -95,7 +95,6 @@ function confirmDeleteInline(dialog, { name, remove, done }) {
     {
       label: `Delete ${name}`,
       danger: true,
-      primary: true,
       onClick: async () => {
         const response = await remove();
         if (!response.ok) return dialog.setMessage(response.message, "error");

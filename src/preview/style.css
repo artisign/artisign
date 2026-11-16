@@ -5490,10 +5490,6 @@ body:has(#settings-menu:not([hidden])) #update-notice {
   font-size: var(--size-icon-xs);
 }
 
-.uc-sort-prefix {
-  color: var(--chrome-text-tertiary);
-}
-
 .uc-list-status {
   margin: 0;
   padding: var(--space-xl) var(--space-lg);
@@ -7294,7 +7290,7 @@ button.uc-target:hover {
   border: none;
   border-radius: var(--radius-xs);
   background: transparent;
-  color: var(--chrome-accent);
+  color: var(--chrome-text-secondary);
   font: inherit;
   font-size: var(--ui-sm);
   cursor: pointer;
@@ -7302,6 +7298,7 @@ button.uc-target:hover {
 
 .uc-link-btn:hover {
   background: var(--chrome-hover);
+  color: var(--chrome-text);
 }
 
 .uc-link-btn .icon {
@@ -7595,7 +7592,7 @@ button.uc-target:hover {
   color: var(--chrome-text-secondary);
 }
 
-.uc-io-edit {
+.uc-io-pencil {
   margin-left: auto;
 }
 
@@ -7838,6 +7835,22 @@ button.uc-target:hover {
 
 .uc-form-row.is-three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.uc-field .uc-segmented {
+  align-self: flex-start;
+}
+
+.uc-field input[type="number"] {
+  width: 120px;
+}
+
+.uc-check input[type="checkbox"] {
+  accent-color: var(--chrome-accent);
+}
+
+.chrome-btn--primary .icon {
+  color: var(--chrome-primary-text);
 }
 
 .uc-field {
@@ -8320,32 +8333,19 @@ button.uc-target:hover {
   color: var(--chrome-text-secondary);
 }
 
-/* Contrast: small text in the Use Cases tab, its dialogs and menus never uses the pale tertiary or the plain warning colour
-   (both fall under 4.5:1 on the canvas and on white); these scoped values do not touch any other view. */
+/* Text on the accent fill (pins, selected chips) in the Use Cases tab. The chrome tokens themselves are used unchanged. */
 #usecases-view,
 #screen-usecases,
 .uc-dialog,
 .uc-menu {
-  --chrome-text-tertiary: #5c5954;
-  --chrome-warning: #9a4a00;
-  --chrome-accent: #0b6b61;
-  --chrome-ok: #166534;
-  --chrome-danger: #a8281b;
   --uc-on-accent: #ffffff;
-  --chrome-text-secondary: #57544f;
 }
 
 :root[data-theme="dark"] #usecases-view,
 :root[data-theme="dark"] #screen-usecases,
 :root[data-theme="dark"] .uc-dialog,
 :root[data-theme="dark"] .uc-menu {
-  --chrome-text-tertiary: #a9a6a0;
-  --chrome-warning: #f5a524;
-  --chrome-accent: #3fc4b4;
-  --chrome-ok: #34d399;
   --uc-on-accent: #0f1f1d;
-  --chrome-text-secondary: #bdbab4;
-  --chrome-danger: #fca5a5;
 }
 
 .uc-error-row {

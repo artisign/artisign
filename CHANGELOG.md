@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`get_use_cases`, `get_use_case`, `set_use_cases`, `generate_personas`, `suggest_use_case_variants`) and four new
   `delete_entity` kinds (`persona`, `dimension`, `data_object`, `use_case`) read and write them. A stale or
   unstable step mapping is reported, never rewritten. A project without `usecases/` behaves exactly as before.
-- **Use Cases tab in the preview:** a fourth tab with a grouped, searchable and filterable list (it stays responsive with thousands of use cases),
+- **Use Cases tab in the preview:** a fourth tab with a grouped, searchable and filterable list (tested with 2,400 use cases),
   the detail with personas, flow and before/after data, variants shown as a difference with a coverage matrix, a mapping view that
   places each step on the live screen, the persona, dimension and data-object pools, and dialogs to create, edit and delete them. The Screens
   tab lists the use cases that map onto the open screen. A project without `usecases/` shows an empty guide and nothing is written.

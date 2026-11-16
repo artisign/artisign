@@ -123,7 +123,7 @@ describe("data objects", () => {
     expect(card.textContent).toContain("Mapping");
     expect(card.textContent).toContain("ref → owner");
     expect($$("tbody tr", card).map((r) => r.lastChild.textContent)).toEqual(["ready", "—"]);
-    $(".uc-io-edit", card).click();
+    $(".uc-io-pencil", card).click();
     expect(handlers.onEdit).toHaveBeenCalledWith("mapping");
     $$(".uc-actions button", el)[0].click();
     expect(handlers.onNew).toHaveBeenCalled();

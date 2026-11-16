@@ -237,7 +237,7 @@ export async function openUseCaseDialog(options) {
   };
 
   // --- Basics -------------------------------------------------------------------------------------------------
-  const titleInput = textInput({ value: draft.title, autofocus: true, onInput: (value) => { draft.title = value; if (!idTouched) { id = uniqueId(slugify(value), options.takenIds()); idInput.value = id; } markDirty(); } });
+  const titleInput = textInput({ value: draft.title, autofocus: true, placeholder: "Map a step to a screen element", onInput: (value) => { draft.title = value; if (!idTouched) { id = uniqueId(slugify(value), options.takenIds()); idInput.value = id; } markDirty(); } });
   const groupListId = nextId("uc-groups");
   const groupInput = textInput({ value: draft.group, list: groupListId, placeholder: "mapping/elements", onInput: (value) => { draft.group = value; markDirty(); } });
   const groupList = h("datalist", { id: groupListId }, options.groups().map((g) => h("option", { value: g })));

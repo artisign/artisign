@@ -123,7 +123,7 @@ export function createListPanel(el, handlers) {
       const meta = [
         statusDot(u.status),
         h("span", null, STATUS_LABELS[u.status] ?? u.status),
-        u.variants ? h("span", null, plural(u.variants, "variant")) : null,
+        ...(u.variants ? [h("span", { "aria-hidden": "true" }, "·"), h("span", null, plural(u.variants, "variant"))] : []),
       ];
       return h(
         "div",
@@ -169,7 +169,7 @@ export function createListPanel(el, handlers) {
     const total = model.counts?.use_cases ?? model.total;
     result.replaceChildren(
       h("span", { class: "uc-result-text", role: "status" }, filtered ? `${formatCount(model.total)} of ${plural(total, "use case")}` : plural(model.total, "use case")),
-      h("button", { type: "button", class: "uc-sort", "aria-haspopup": "menu", "aria-expanded": "false", onClick: (e) => handlers.onSortMenu(e.currentTarget) }, h("span", { class: "uc-sort-prefix" }, "Sort"), sortLabel, icon("expand_more")),
+      h("button", { type: "button", class: "uc-sort", "aria-haspopup": "menu", "aria-expanded": "false", onClick: (e) => handlers.onSortMenu(e.currentTarget) }, icon("sort"), sortLabel, icon("expand_more")),
     );
   }
 

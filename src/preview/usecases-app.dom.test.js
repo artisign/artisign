@@ -64,6 +64,7 @@ function stubDaemon() {
   vi.stubGlobal("requestAnimationFrame", (cb) => cb());
   vi.stubGlobal("CSS", { escape: (s) => s });
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+  Element.prototype.scrollIntoView = () => {};
   vi.stubGlobal("fetch", async (url, init) => {
     const path = String(url).split("?")[0];
     const body = init?.body ? JSON.parse(init.body) : null;
@@ -122,7 +123,9 @@ describe("optionality", () => {
     await flush();
     expect($$(".view-tab").map((t) => t.textContent)).toEqual(["Screens", "Design System", "Board", "Use Cases"]);
     expect($("#usecases-view").hidden).toBe(true);
-    expect(useCaseCalls()).toEqual([]);
+    // The only read is the Screens tab's reverse entry (get_use_cases scoped to the open screen); the Use Cases tab fetches nothing itself.
+    expect(useCaseCalls().every((c) => c.tool === "get_use_cases" && c.body.screen === "editor")).toBe(true);
+    expect(calls.some((c) => c.tool === "get_use_cases" && c.body.include)).toBe(false);
     expect($(".uc-guide")).toBeNull(); // nothing is rendered either, not even the empty guide
   });
 
@@ -172,10 +175,11 @@ describe("optionality", () => {
     await import("./app.js");
     await flush();
     await openTab();
-    const before = useCaseCalls().length;
+    const tabCalls = () => useCaseCalls().filter((c) => !c.body?.screen).length; // the Screens tab's own reverse-entry reads are not the tab's
+    const before = tabCalls();
     $('[data-view="screens"]').click();
     await openTab();
-    expect(useCaseCalls().length).toBe(before);
+    expect(tabCalls()).toBe(before);
   });
 });
 
@@ -226,6 +230,37 @@ describe("with use cases", () => {
     expect(calls.some((c) => c.tool === "get_use_case")).toBe(true);
   });
 
+  it("a reload keeps the loaded rows of an expanded group and of No group, and never shrinks the list while it runs", async () => {
+    store.cases = [...Array.from({ length: 9 }, (_, i) => caseOf(i + 1, "alpha")), ...Array.from({ length: 10 }, (_, i) => caseOf(i + 20, undefined))];
+    await import("./app.js");
+    await flush();
+    await openTab();
+    const titles = () => $$(".uc-list-row .uc-list-title").map((n) => n.textContent);
+    $$(".uc-group-row").find((r) => r.textContent.includes("No group")).click();
+    await flush();
+    for (let i = 0; i < 2; i++) {
+      $$(".uc-more-row").at(-1)?.click();
+      await flush();
+    }
+    const before = titles().length;
+    expect(before).toBeGreaterThan(8);
+    // Hold the page requests back so the rows while the reload runs can be observed.
+    const real = globalThis.fetch;
+    let release;
+    const gate = new Promise((r) => (release = r));
+    vi.stubGlobal("fetch", async (url, init) => {
+      if (String(url).includes("get_use_cases")) await gate;
+      return real(url, init);
+    });
+    emit({ type: "change", kind: "usecases", name: "cases/uc-1" });
+    await new Promise((r) => setTimeout(r, 350));
+    expect(titles().length).toBe(before); // rows stay while the reload runs
+    release();
+    await new Promise((r) => setTimeout(r, 300));
+    await flush();
+    expect(titles().length).toBe(before); // and the same number is back afterwards
+  });
+
   it("unreadable case files show the toast with the first five and the real count, and the list still loads", async () => {
     const warnings = Array.from({ length: 5 }, (_, i) => ({ kind: "invalid_file", message: "usecases/cases/bad-" + i + ".json is not loaded" }));
     store.invalid = { warnings, invalid_file_count: 8 };
@@ -266,16 +301,12 @@ describe("with use cases", () => {
 });
 
 describe("reverse entry", () => {
-  it("a screen lists the use cases that map to it once the tab has loaded some; one click opens it in the tab", async () => {
+  it("a screen lists the use cases that map to it, on a cold load too; one click opens it in the tab", async () => {
     store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements", "ready"), caseOf(2, "personas")] };
     await import("./app.js");
     await flush();
-    expect($("#screen-usecases").hidden).toBe(true); // nothing asked, nothing shown before the tab loaded them
-    expect(useCaseCalls()).toEqual([]);
-    await openTab();
-    $('[data-view="screens"]').click();
-    await flush();
-    expect($("#screen-usecases").hidden).toBe(false);
+    expect($("#screen-usecases").hidden).toBe(false); // straight into Screens, the Use Cases tab never opened
+    expect(calls.some((c) => c.tool === "get_use_cases" && c.body.include)).toBe(false);
     expect($(".screen-usecases-sub").textContent).toBe("Steps that map to editor");
     expect($$(".screen-usecases-row").map((r) => r.textContent)).toEqual(["Case 1", "Case 2"]);
     calls.length = 0;
@@ -285,6 +316,14 @@ describe("reverse entry", () => {
     expect($(".uc-list-row.is-selected .uc-list-title").textContent).toBe("Case 2");
   });
 
+  it("stays hidden when nothing maps to the screen", async () => {
+    store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements")] };
+    screens = [{ name: "other", tags: [], notes: "" }];
+    await import("./app.js");
+    await flush();
+    expect($("#screen-usecases").hidden).toBe(true);
+  });
+
   it("stays out of the way for a project without use cases", async () => {
     await import("./app.js");
     await flush();
@@ -292,6 +331,26 @@ describe("reverse entry", () => {
     $('[data-view="screens"]').click();
     await flush();
     expect($("#screen-usecases").hidden).toBe(true);
+  });
+});
+
+describe("review round 1", () => {
+  it("global shortcuts do not fire behind an open use case dialog", async () => {
+    store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements")] };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    const dialog = document.createElement("dialog");
+    dialog.className = "uc-dialog";
+    document.body.append(dialog);
+    dialog.setAttribute("open", "");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true }));
+    await flush();
+    expect($("#usecases-view").hidden).toBe(false); // "1" would switch to Screens
+    dialog.removeAttribute("open");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "1", bubbles: true }));
+    await flush();
+    expect($("#usecases-view").hidden).toBe(true);
   });
 });
 

@@ -134,7 +134,7 @@ export function renderObjectPage(el, { pool, query, selectedId, handlers }) {
     h(
       "article",
       { class: `uc-io-card uc-object-card${object.id === selectedId ? " is-selected" : ""}`, dataset: { object: object.id } },
-      h("div", { class: "uc-io-head" }, h("span", { class: "uc-io-name" }, object.name), h("span", { class: "uc-io-id" }, object.id), h("button", { type: "button", class: "chrome-icon-btn chrome-icon-btn--sm uc-io-edit", "aria-label": `Edit ${object.name}`, title: "Edit data object", onClick: () => handlers.onEdit(object.id) }, icon("edit"))),
+      h("div", { class: "uc-io-head" }, h("span", { class: "uc-io-name" }, object.name), h("span", { class: "uc-io-id" }, object.id), h("button", { type: "button", class: "chrome-icon-btn chrome-icon-btn--sm uc-io-pencil", "aria-label": `Edit ${object.name}`, title: "Edit data object", onClick: () => handlers.onEdit(object.id) }, icon("edit"))),
       object.description ? h("p", { class: "uc-object-desc" }, object.description) : null,
       h(
         "table",

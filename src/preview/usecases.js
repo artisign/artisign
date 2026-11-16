@@ -37,7 +37,7 @@ import {
   errorMessage,
   actorName,
 } from "./usecases-data.js";
-import { avatar } from "./usecases-parts.js";
+import { avatar, statusDot } from "./usecases-parts.js";
 import { avatarOf } from "./usecases-data.js";
 
 const SECTIONS = [
@@ -238,11 +238,15 @@ export function createUseCasesView(options) {
       const keep = new Set([...list.expanded].filter((path) => path === "" || list.tree.byPath.has(path)));
       if (detail?.view?.use_case) for (const path of groupAncestors(detail.view.use_case.group)) if (list.tree.byPath.has(path)) keep.add(path);
       list.expanded = keep;
+      // A reload keeps the rows already loaded (so the list does not collapse and the scroll position stays) and
+      // refetches the same number of rows per expanded group and for "No group".
       const previous = list.groupState;
-      list.groupState = new Map();
-      list.ungrouped = { count: Math.max(0, list.total - grouped), rows: [], loading: false };
+      const previousUngrouped = list.ungrouped.rows;
+      const ungroupedCount = Math.max(0, list.total - grouped);
+      list.groupState = new Map([...previous].filter(([path]) => path !== "" && list.expanded.has(path)));
+      list.ungrouped = { count: ungroupedCount, rows: previousUngrouped.slice(0, ungroupedCount), loading: false };
       renderList();
-      await Promise.all([...list.expanded].map((path) => reloadGroup(path, previous.get(path)?.rows.length ?? 0, req)));
+      await Promise.all([...list.expanded].map((path) => reloadGroup(path, path === "" ? previousUngrouped.length : (previous.get(path)?.rows.length ?? 0), req)));
       if (stale()) return;
     } else {
       list.mode = "flat";
@@ -434,7 +438,7 @@ export function createUseCasesView(options) {
     // The facets stop at 50 values. Every persona is known client-side, so that menu lists them all; for tags the menu's text
     // field offers what was typed as the filter value (the server matches tags case-insensitively).
     if (kind === "persona" && truncated) entries = pool.personas.map((p) => [p.id, counts[p.id]]);
-    const items = entries.map(([value, count]) => ({ value, label: kind === "status" ? STATUS_LABELS[value] : kind === "persona" ? actorName(value, pool.personasById) : value, count, checked: filters[kind] === value, leading: kind === "persona" ? avatar(avatarOf(value, pool.personasById), "sm") : null }));
+    const items = entries.map(([value, count]) => ({ value, label: kind === "status" ? STATUS_LABELS[value] : kind === "persona" ? actorName(value, pool.personasById) : value, count, checked: filters[kind] === value, leading: kind === "persona" ? avatar(avatarOf(value, pool.personasById), "sm") : kind === "status" ? statusDot(value) : null }));
     openMenu({
       anchor,
       label: kind[0].toUpperCase() + kind.slice(1),
@@ -477,7 +481,11 @@ export function createUseCasesView(options) {
     renderList();
     const [view, base, source, suggest] = await Promise.all([api.getUseCase(forProject, id, variantId), variantId ? api.getUseCase(forProject, id) : Promise.resolve(null), api.fetchUseCaseSource(forProject, id), api.suggestUseCaseVariants(forProject, id, 1)]);
     if (forProject !== project || detail?.id !== id || detail.variantId !== variantId) return;
-    if (!view.ok) {
+    if (!view.ok && view.code === "not_found" && variantId && base?.ok) {
+      // The variant is gone, the case is not: show the base flow instead of a wrong "no longer exists".
+      detail = { id, variantId: null, loading: false, error: "", view: base.data, base: base.data, source: source.ok ? source.useCase : null, suggest: suggest.ok ? suggest.data : null };
+      showToast("That variant no longer exists. Showing the base flow.", [], 6000);
+    } else if (!view.ok) {
       detail = { id, variantId, loading: false, error: view.code === "not_found" ? "This use case no longer exists." : view.message };
     } else {
       detail = { id, variantId, loading: false, error: "", view: view.data, base: base?.ok ? base.data : view.data, source: source.ok ? source.useCase : null, suggest: suggest.ok ? suggest.data : null };
@@ -845,10 +853,11 @@ export function createUseCasesView(options) {
     resync() {
       if (project && loadedFor === project) scheduleReload();
     },
-    /** Reverse entry: a short list of the use cases that map to a screen (none unless the tab has loaded some). */
+    /** Reverse entry: a short list of the use cases that map to a screen. A plain read that needs no loaded tab: a project without usecases/ answers with zero. */
     async forScreen(screen) {
-      if (!project || !pool.loaded || (pool.counts?.use_cases ?? 0) === 0) return { total: 0, items: [] };
-      const res = await api.getUseCases(project, { screen, limit: 5, sort: "title" });
+      const forProject = options.getProject();
+      if (!forProject) return { total: 0, items: [] };
+      const res = await api.getUseCases(forProject, { screen, limit: 5, sort: "title" });
       return res.ok ? { total: res.data.total ?? 0, items: res.data.use_cases ?? [] } : { total: 0, items: [] };
     },
     /** Reverse entry: the whole list filtered to a screen. */

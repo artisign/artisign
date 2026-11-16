@@ -108,7 +108,7 @@ export function confirmDialog({ title, text, confirmLabel = "Delete" }) {
   let answer = false;
   dialog.setActions([
     { label: "Cancel", autofocus: true, onClick: () => dialog.close(false) }, // the safe action has the focus
-    { label: confirmLabel, danger: true, primary: true, onClick: () => { answer = true; dialog.close(true); } },
+    { label: confirmLabel, danger: true, onClick: () => { answer = true; dialog.close(true); } },
   ]);
   return dialog.open().then(() => answer);
 }

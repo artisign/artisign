@@ -470,10 +470,11 @@ const useCases = createUseCasesView({
   onDataChanged: () => updateScreenUseCases(), // the reverse entry follows `usecases` events
   fetchRender,
   fetchScreenNodes,
-  openScreen: async (screen) => {
+  openScreen: async (screen, node) => {
     pauseFollow();
     setView("screens");
     if (screen !== currentScreen || currentMockup !== null) await selectScreen(screen);
+    if (node) handleInspectSelect(node, node); // an element-mapped frame opens the screen with that element selected (Elements panel + canvas outline)
   },
 });
 
@@ -1741,11 +1742,11 @@ async function selectScreen(screen) {
 
 let screenUseCasesRequest = 0;
 
-/** Reverse entry (Use Cases experiment): the use cases whose steps map to the screen shown. Does nothing — and asks nothing — until the Use Cases tab has loaded some. */
+/** Reverse entry (Use Cases experiment): the use cases whose steps map to the screen shown. One read per screen, independent of the Use Cases tab; hidden when nothing maps to it or the project has no usecases/ folder. */
 async function updateScreenUseCases() {
   const request = ++screenUseCasesRequest;
   screenUseCasesEl.hidden = true;
-  if (!currentScreen || currentMockup !== null || !useCases.hasUseCases()) return; // no screen shown (a mockup, another project): nothing to list
+  if (!currentScreen || currentMockup !== null) return; // no screen shown (a mockup, another project): nothing to list
   const screen = currentScreen;
   const { total, items } = await useCases.forScreen(screen);
   if (request !== screenUseCasesRequest || screen !== currentScreen) return;
@@ -2556,7 +2557,7 @@ function pressControl(el) {
 
 /** The open menu / dialog / popover, if any — while one is open only its own keys act. */
 function openOverlay() {
-  if (!dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen() || whatsNewDialog.isOpen()) return "other";
+  if (!dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen() || whatsNewDialog.isOpen() || document.querySelector("dialog.uc-dialog[open]")) return "other";
   if (!projectMenuEl.hidden) return "project-menu";
   if (!zoomMenu.hidden) return "zoom-menu";
   return document.querySelector(".chrome-menu:not([hidden])") ? "other" : null;

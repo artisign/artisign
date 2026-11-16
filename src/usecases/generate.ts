@@ -108,6 +108,7 @@ function expandPairwise(dimensions: Dimension[], existing: Persona[], limit: num
     const all = only.values.map((v): Combination => ({ [only.id]: v.id }));
     const open: Combination[] = [];
     for (const c of all) {
+      work++;
       let covered = false;
       for (const p of existing) {
         work++;
@@ -139,20 +140,28 @@ function expandPairwise(dimensions: Dimension[], existing: Persona[], limit: num
     }
   }
 
-  // Index the personas that count: per dimension, persona position -> pinned value index (-1: not a value of the dimension).
+  // Index the personas that count: per dimension, persona position -> pinned value index. A persona with a trait
+  // that is not a value of its dimension allows no combination, so it is not indexed and covers nothing (as in `all`).
   const pinned = dimensions.map(() => new Map<number, number>());
   let relevant = 0;
   for (const persona of existing) {
     const entries = Object.entries(persona.traits);
     work += 1 + entries.length;
-    let traits = 0;
+    const pins: [number, number][] = [];
+    let stale = false;
     for (const [dim, value] of entries) {
       const i = dimIndex.get(dim);
       if (i === undefined) continue;
-      pinned[i]!.set(relevant, valueIndex[i]!.get(value) ?? -1);
-      traits++;
+      const v = valueIndex[i]!.get(value);
+      if (v === undefined) {
+        stale = true;
+        break;
+      }
+      pins.push([i, v]);
     }
-    if (traits > 0) relevant++;
+    if (stale || pins.length === 0) continue;
+    for (const [i, v] of pins) pinned[i]!.set(relevant, v);
+    relevant++;
   }
   if (work > budget) return nothingYet();
 

@@ -182,6 +182,18 @@ describe("expandCombinations", () => {
     expect(result).toEqual(expandCombinations(d, "pairwise", [], 100));
   });
 
+  it("pairwise: a persona with a value that is not in its dimension covers nothing, as in all", () => {
+    const two = dims(["a", ["v0", "v1"]], ["b", ["v0", "v1"]]);
+    const mixed = expandCombinations(two, "pairwise", [persona("m", { a: "v1", b: "stale" })], 100);
+    expect(mixed.skipped_covered).toBe(0);
+    expect(mixed.combinations).toContainEqual({ a: "v0", b: "v1" });
+    expect(expandCombinations(two, "all", [persona("m", { a: "v1", b: "stale" })], 100).skipped_covered).toBe(0);
+    const three = dims(["a", ["v0", "v1"]], ["b", ["v0", "v1"]], ["c", ["v0", "v1"]]);
+    expect(expandCombinations(three, "pairwise", [persona("c", { c: "stale" })], 100).skipped_covered).toBe(0);
+    expect(expandCombinations(three, "all", [persona("c", { c: "stale" })], 100).skipped_covered).toBe(0);
+    expect(expandCombinations(three, "pairwise", [persona("k", { a: "v0", c: "stale" })], 100).skipped_covered).toBe(0);
+  });
+
   it("pairwise: a pool that covers every combination covers every pair", () => {
     const pool = expandCombinations(d, "all", [], 100).combinations.map((row, i) => persona(`p${i}`, row));
     expect(expandCombinations(d, "pairwise", pool, 100).skipped_covered).toBe(16);
@@ -344,6 +356,7 @@ describe("pairwise coverage work budget", () => {
       const elapsed = performance.now() - started;
       expect(elapsed).toBeLessThan(500);
       expect(result.total).toBe(pairSpace([...dims]));
+      expect(result.partial).toBe(dims === wide ? true : undefined);
     }
   });
 });

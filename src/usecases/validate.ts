@@ -1,6 +1,7 @@
 import type { Warning } from "../tools/types.js";
-import type { DataObject, Dimension, Persona, UseCase, UseCaseStep } from "./schema.js";
+import { SYSTEM_ACTOR, type DataObject, type Dimension, type Persona, type UseCase, type UseCaseStep } from "./schema.js";
 import { isGeneratedId } from "../model/node-id.js";
+import { actorMapPersonas } from "./query.js";
 import { resolveUseCase } from "./resolve.js";
 import type { ScreenLookup } from "./screens.js";
 
@@ -18,8 +19,6 @@ export function buildPools(dimensions: Dimension[], personas: Persona[], objects
     objects: new Map(objects.map((o) => [o.id, o])),
   };
 }
-
-export const SYSTEM_ACTOR = "system";
 
 /** Trait problems of one persona: a dimension or a value the pool does not define. */
 export function validatePersona(persona: Persona, pools: ValidationPools): Warning[] {
@@ -106,6 +105,7 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
 
   for (const variant of useCase.variants ?? []) {
     for (const id of variant.personas ?? []) checkPersona(id, at(variant.id));
+    for (const id of actorMapPersonas(variant)) checkPersona(id, at(variant.id));
     checkIo(variant.inputs ?? [], at(variant.id));
     checkIo(variant.outputs ?? [], at(variant.id));
     for (const [dimId, valueIds] of Object.entries(variant.when)) {

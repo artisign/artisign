@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { isValidId, useCaseSchema, personaSchema, dimensionSchema, type Dimension, type Persona, type UseCase } from "./schema.js";
 import { resolveUseCase } from "./resolve.js";
 import { buildGeneratedPersona, expandCombinations, pairSpace, suggestVariantGaps, WORK_BUDGET } from "./generate.js";
-import { compareUseCases, facetCounts, matchesFilter, summarize } from "./query.js";
+import { compareUseCases, facetCounts, matchesFilter, personasOf, summarize } from "./query.js";
 
 function useCase(overrides: Record<string, unknown> = {}): UseCase {
   return useCaseSchema.parse({
@@ -24,6 +24,117 @@ const dims = (...specs: [string, string[]][]): Dimension[] =>
   specs.map(([id, values]) => dimensionSchema.parse({ id, label: id.toUpperCase(), values: values.map((v) => ({ id: v, label: v.toUpperCase() })) }));
 
 const persona = (id: string, traits: Record<string, string> = {}): Persona => personaSchema.parse({ id, name: id, traits });
+
+describe("variant actors map", () => {
+  const withMap = (actors: Record<string, string>, extra: Record<string, unknown> = {}, base: Record<string, unknown> = {}): UseCase =>
+    useCase({ variants: [{ id: "v", title: "V", when: {}, actors, ...extra }], ...base });
+  const actors = (base: UseCase): [string, string, string | undefined][] =>
+    resolveUseCase(base, base.variants![0]).use_case.steps.map((s) => [s.id, s.actor, s.change]);
+
+  it("is optional: a variant without it resolves exactly as before", () => {
+    const base = useCase({ variants: [{ id: "v", title: "V", when: {}, steps: [{ op: "remove", step_id: "done" }] }] });
+    const resolved = resolveUseCase(base, base.variants![0]);
+    expect(resolved.use_case.steps.map((s) => [s.id, s.actor, s.change])).toEqual([["tap", "member-ana", undefined], ["pick", "member-ana", undefined]]);
+    expect(resolved.use_case.personas).toEqual(["member-ana"]);
+  });
+
+  it("accepts ids and system, rejects anything else as a shape error", () => {
+    const parse = (map: unknown): boolean => useCaseSchema.safeParse({ ...useCase(), variants: [{ id: "v", title: "V", when: {}, actors: map }] }).success;
+    expect(parse({ "member-ana": "staff-lee", system: "member-ana", "member-lee": "system" })).toBe(true);
+    expect(parse({})).toBe(true);
+    for (const bad of [{ "Member Ana": "x" }, { x: "Not An Id" }, { x: "" }, { x: 1 }, ["x"], "x"]) expect(parse(bad)).toBe(false);
+  });
+
+  it("remaps the actor of every inherited step whose actor is a key and marks it changed", () => {
+    expect(actors(withMap({ "member-ana": "staff-lee" }))).toEqual([["tap", "staff-lee", "changed"], ["pick", "staff-lee", "changed"], ["done", "system", undefined]]);
+  });
+
+  it("is not chained", () => {
+    const base = useCase({ steps: [{ id: "a", actor: "one", action: "A" }, { id: "b", actor: "two", action: "B" }] });
+    const chained = useCaseSchema.parse({ ...base, variants: [{ id: "v", title: "V", when: {}, actors: { one: "two", two: "three" } }] });
+    expect(actors(chained)).toEqual([["a", "two", "changed"], ["b", "three", "changed"]]);
+  });
+
+  it("ignores a→a and marks a step changed only when its actor really changes", () => {
+    expect(actors(withMap({ "member-ana": "member-ana", system: "system" }))).toEqual([["tap", "member-ana", undefined], ["pick", "member-ana", undefined], ["done", "system", undefined]]);
+  });
+
+  it("a key system changes steps only, and a value system remaps a step to the system", () => {
+    const both = withMap({ system: "staff-lee", "member-ana": "system" });
+    const r = resolveUseCase(both, both.variants![0]);
+    expect(r.use_case.steps.map((s) => s.actor)).toEqual(["system", "system", "staff-lee"]);
+    expect(r.use_case.personas).toEqual([]); // the value system is dropped; personas never hold "system"
+  });
+
+  it("remaps the base personas when the variant sets none: listed keys, duplicates dropped, order kept", () => {
+    const base = withMap({ b: "c", d: "a" }, {}, { personas: ["a", "b", "c", "d", "e"] });
+    expect(resolveUseCase(base, base.variants![0]).use_case.personas).toEqual(["a", "c", "e"]);
+  });
+
+  it("takes the variant's own personas as written", () => {
+    const base = withMap({ "member-ana": "staff-lee" }, { personas: ["member-ana"] });
+    expect(resolveUseCase(base, base.variants![0]).use_case.personas).toEqual(["member-ana"]);
+  });
+
+  it("takes steps written by an op as written and lets remove delete a remapped step", () => {
+    const base = withMap(
+      { "member-ana": "staff-lee" },
+      {
+        steps: [
+          { op: "replace", step_id: "tap", step: { id: "tap", actor: "member-ana", action: "Taps again" } },
+          { op: "append", step: { id: "late", actor: "member-ana", action: "Waits" } },
+          { op: "remove", step_id: "pick" },
+        ],
+      },
+    );
+    const resolved = resolveUseCase(base, base.variants![0]);
+    expect(resolved.use_case.steps.map((s) => [s.id, s.actor, s.change])).toEqual([["tap", "member-ana", "changed"], ["done", "system", undefined], ["late", "member-ana", "added"]]);
+    expect(resolved.removed_steps).toEqual([expect.objectContaining({ id: "pick", change: "removed", after: "tap" })]);
+  });
+
+  it("reports a removed step with its base actor when only the map changed it, and as written when an op wrote it", () => {
+    const mapOnly = withMap({ "member-ana": "staff-lee" }, { steps: [{ op: "remove", step_id: "pick" }] });
+    const a = resolveUseCase(mapOnly, mapOnly.variants![0]);
+    expect(a.removed_steps).toEqual([expect.objectContaining({ id: "pick", actor: "member-ana", change: "removed", after: "tap" })]);
+
+    const written = withMap(
+      { "member-ana": "staff-lee" },
+      { steps: [{ op: "replace", step_id: "pick", step: { id: "pick", actor: "member-ana", action: "Picks again" } }, { op: "remove", step_id: "pick" }] },
+    );
+    const b = resolveUseCase(written, written.variants![0]);
+    expect(b.removed_steps).toEqual([expect.objectContaining({ id: "pick", actor: "member-ana", action: "Picks again", change: "removed" })]);
+    const rewritten = withMap(
+      { "member-ana": "staff-lee" },
+      { steps: [{ op: "replace", step_id: "pick", step: { id: "pick", actor: "robot", action: "Picks again" } }, { op: "remove", step_id: "pick" }] },
+    );
+    expect(resolveUseCase(rewritten, rewritten.variants![0]).removed_steps[0]).toMatchObject({ actor: "robot" });
+  });
+
+  it("leaves the base personas untouched when every entry maps to itself", () => {
+    const base = withMap({ "member-ana": "member-ana" }, {}, { personas: ["a", "a", "b"] });
+    expect(resolveUseCase(base, base.variants![0]).use_case.personas).toEqual(["a", "a", "b"]);
+  });
+
+  it("does not touch the base use case", () => {
+    const base = withMap({ "member-ana": "staff-lee" });
+    resolveUseCase(base, base.variants![0]);
+    expect(base.steps.map((s) => s.actor)).toEqual(["member-ana", "member-ana", "system"]);
+    expect(base.personas).toEqual(["member-ana"]);
+  });
+
+  it("a key that happens to be an Object.prototype name does not match", () => {
+    const base = withMap({ constructor: "staff-lee" });
+    expect(resolveUseCase(base, base.variants![0]).use_case.steps.map((s) => s.change)).toEqual([undefined, undefined, undefined]);
+  });
+
+  it("personasOf and the persona filter count keys and values but never system", () => {
+    const base = withMap({ "member-ana": "staff-lee", system: "robot" }, {}, { personas: [], steps: [{ id: "s", actor: "system", action: "x" }] });
+    expect([...personasOf(base)].sort()).toEqual(["member-ana", "robot", "staff-lee"]);
+    expect(matchesFilter(base, { persona: "robot" })).toBe(true);
+    expect(matchesFilter(base, { persona: "system" })).toBe(false);
+    expect(facetCounts([base]).facets.persona).toEqual({ "member-ana": 1, robot: 1, "staff-lee": 1 });
+  });
+});
 
 describe("use case schema", () => {
   it("defaults status, personas and steps, and requires inputs and outputs", () => {

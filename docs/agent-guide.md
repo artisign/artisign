@@ -545,7 +545,10 @@ Workflow, in this order:
    must match). A variant may override `personas`, `trigger`, `goal`,
    `outcome`, replace `inputs`/`outputs` wholesale, and change the flow with
    `steps` ops: `replace` / `insert_after` / `remove` (each by `step_id`) and
-   `append`. `suggest_use_case_variants {id}` names the trait values of the persona pool
+   `append`. `actors` (`{"member-ana": "staff-lee"}`) swaps the persona of the inherited
+   steps whose actor is a key, once and before the ops (not chained); the base `personas`
+   follow unless the variant sets its own, a value `"system"` drops the persona, and steps
+   written by an op are not touched. `suggest_use_case_variants {id}` names the trait values of the persona pool
    that neither the case's personas nor an existing variant cover, with
    skeletons to fill in. Write variants back with `set_use_cases` — `variants`
    is replaced as a whole, so read the existing ones first.

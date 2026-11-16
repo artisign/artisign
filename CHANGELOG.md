@@ -16,7 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   unstable step mapping is reported, never rewritten. A project without `usecases/` behaves exactly as before.
   `list_use_cases` pages at most 100 per call, a `generate_personas` dry run lists at most 50 personas (`would_create` is
   the full count, `personas_truncated` marks the cut), `set_use_cases` returns counts instead of id lists, and an
-  input or output `example` must hold at least one key.
+  input or output `example` must hold at least one key. A variant's optional `actors` map swaps the persona of the
+  inherited steps (and of the base `personas`) without rewriting each step as an op.
 - **Use Cases tab in the preview:** a fourth tab with a grouped, searchable and filterable list (tested with 2,400 use cases),
   the detail with personas, flow and before/after data, variants shown as a difference with a coverage matrix, a mapping view that
   places each step on the live screen, the persona, dimension and data-object pools, and dialogs to create, edit and delete them. The Screens

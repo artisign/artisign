@@ -423,7 +423,8 @@ export function undeclaredExampleKeys(dataObject, example) {
 
 /**
  * "Leave unmapped" for one step of the view shown: drops its target in the place the step lives. With a variant selected that is the
- * variant's own op (replace / insert_after / append) when it carries the step, else the base step (an unchanged one). Returns
+ * variant's op that produces the effective step (the last op carrying the step id: an append followed by a replace of the same step
+ * is edited in the replace) when there is one, else the base step (an unchanged one). Returns
  * { changed: false } when there is nothing to change, so a caller never reports a success that did not happen.
  */
 export function removeStepTarget(source, stepId, variantId) {
@@ -435,8 +436,10 @@ export function removeStepTarget(source, stepId, variantId) {
   if (variantId) {
     const variants = source.variants ?? [];
     const variant = variants.find((v) => v.id === variantId);
-    const index = (variant?.steps ?? []).findIndex((op) => op.step?.id === stepId && op.step.target);
+    const ops = variant?.steps ?? [];
+    const index = ops.findLastIndex((op) => op.step?.id === stepId);
     if (variant && index >= 0) {
+      if (!ops[index].step.target) return { changed: false }; // the variant's own step has no target: the base step is not what the view shows
       const next = variants.map((v) => (v === variant ? { ...v, steps: v.steps.map((op, i) => (i === index ? { ...op, step: strip(op.step) } : op)) } : v));
       return { changed: true, patch: { variants: next }, where: "variant" };
     }

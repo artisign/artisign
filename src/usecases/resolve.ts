@@ -1,5 +1,7 @@
 import type { UseCase, UseCaseInput, UseCaseOutput, UseCaseStep, UseCaseVariant } from "./schema.js";
 
+const SYSTEM_ACTOR = "system";
+
 export type StepChange = "changed" | "added";
 
 export type EffectiveStep = UseCaseStep & { change?: StepChange };
@@ -43,6 +45,15 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
   if (variant.outcome !== undefined) effective.outcome = variant.outcome;
   if (variant.inputs !== undefined) effective.inputs = variant.inputs;
   if (variant.outputs !== undefined) effective.outputs = variant.outputs;
+
+  // The actors map runs once, before the ops, on the inherited steps only; it is never chained.
+  const actors = variant.actors ?? {};
+  const mapped = (actor: string): string => (Object.hasOwn(actors, actor) ? actors[actor]! : actor);
+  effective.steps = effective.steps.map((step) => (mapped(step.actor) === step.actor ? step : { ...step, actor: mapped(step.actor), change: "changed" }));
+  if (variant.personas === undefined && Object.keys(actors).length > 0) {
+    // The system is not a persona, so a value "system" drops the entry.
+    effective.personas = [...new Set(base.personas.map(mapped).filter((id) => id !== SYSTEM_ACTOR))];
+  }
 
   const steps = effective.steps;
   (variant.steps ?? []).forEach((op, opIndex) => {

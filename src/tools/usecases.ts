@@ -20,6 +20,7 @@ import {
   ownValue,
   matchesFilter,
   objectIdsOf,
+  actorMapPersonas,
   personasOf,
   personaSchema,
   dataObjectSchema,
@@ -216,6 +217,8 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   // variant touches, otherwise everything the case and its variants name (so the whole picture is one call).
   const personaIds = personasOf(variant ? effective : useCase);
   const objectIds = objectIdsOf(variant ? effective : useCase);
+  // The selected variant's map names personas the effective flow may no longer show (a key nothing uses any more).
+  if (variant) for (const id of actorMapPersonas(variant)) personaIds.add(id);
   personaIds.delete("system");
   // Objects reached through `ref` fields travel along.
   for (const id of objectIds) {

@@ -106,6 +106,8 @@ const variantSchema = z.strictObject({
   description: z.string().optional(),
   when: z.record(z.string(), z.array(z.string()).min(1)),
   personas: z.array(z.string()).optional(),
+  /** Persona (or `system`) of an inherited base step → the persona it becomes in this variant. Keys and values are ids; `system` is a valid id. */
+  actors: z.record(idSchema, idSchema).optional(),
   trigger: z.string().optional(),
   goal: z.string().optional(),
   outcome: z.string().optional(),

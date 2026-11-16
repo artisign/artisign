@@ -63,7 +63,7 @@ type ListRes = {
   warnings?: Warning[];
 };
 type Bundle = {
-  use_case: { personas: string[]; steps: { id: string; change?: string }[]; outputs: { example: unknown }[]; [key: string]: unknown };
+  use_case: { personas: string[]; steps: { id: string; actor: string; change?: string }[]; outputs: { example: unknown }[]; [key: string]: unknown };
   variant?: Row;
   variants?: Row[];
   removed_steps?: Row[];
@@ -437,6 +437,109 @@ describe("use case tools", () => {
       expect(res.removed_steps).toEqual([expect.objectContaining({ id: "done", change: "removed", after: "pick" })]);
       expect(res.screens.find((s) => s.screen === "sheet")!.mappings).toEqual([{ step: "pick", scope: "element", node: { id: "sheet-title", tag: "h1", text: "Choose a copy" } }]);
       await expect(getUseCase(fx.store, { id: "borrow-book", variant: "nope" })).rejects.toMatchObject({ code: "not_found" });
+    });
+
+    describe("variant actors map", () => {
+      const actorsVariant = (actors: Record<string, string>, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
+        id: "staff-view",
+        title: "Staff view",
+        when: { membership: ["staff"] },
+        actors,
+        ...extra,
+      });
+
+      it("stores the map and resolves it: inherited steps remapped and marked changed, personas remapped", async () => {
+        await seed();
+        await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", variants: [actorsVariant({ "member-ana": "staff-lee" })] }] });
+        const stored = await fx.store.readUseCase("borrow-book");
+        expect(stored.variants?.[0]?.actors).toEqual({ "member-ana": "staff-lee" });
+
+        const res = (await getUseCase(fx.store, { id: "borrow-book", variant: "staff-view" })) as Bundle;
+        expect(res.use_case.personas).toEqual(["staff-lee"]);
+        expect(res.use_case.steps.map((s) => [s.id, s.actor, s.change])).toEqual([["tap-book", "staff-lee", "changed"], ["pick", "staff-lee", "changed"], ["done", "system", undefined]]);
+        expect(res.personas.map((p) => p.id).sort()).toEqual(["member-ana", "staff-lee"]);
+        expect(res.warnings).toEqual([]);
+      });
+
+      it("takes steps written by ops as written and lets remove delete a remapped step", async () => {
+        await seed();
+        await setUseCases(fx.store, {
+          use_cases: [
+            {
+              id: "borrow-book",
+              variants: [
+                actorsVariant(
+                  { "member-ana": "staff-lee" },
+                  {
+                    steps: [
+                      { op: "insert_after", step_id: "tap-book", step: { id: "extra", actor: "member-ana", action: "Looks around" } },
+                      { op: "remove", step_id: "pick" },
+                    ],
+                  },
+                ),
+              ],
+            },
+          ],
+        });
+        const res = (await getUseCase(fx.store, { id: "borrow-book", variant: "staff-view" })) as Bundle;
+        expect(res.use_case.steps.map((s) => [s.id, s.actor, s.change])).toEqual([["tap-book", "staff-lee", "changed"], ["extra", "member-ana", "added"], ["done", "system", undefined]]);
+        expect(res.removed_steps).toEqual([expect.objectContaining({ id: "pick", change: "removed", after: "extra" })]);
+      });
+
+      it("rejects a key or value that is not an id, and writes nothing", async () => {
+        for (const actors of [{ "Member Ana": "staff-lee" }, { "member-ana": "Staff Lee" }, { "member-ana": "" }, { "member-ana": 3 }]) {
+          await expect(setUseCases(fx.store, { use_cases: [borrowCase({ variants: [actorsVariant(actors as unknown as Record<string, string>)] })] })).rejects.toMatchObject({ code: "validation_failed" });
+        }
+        await expect(stat(join(fx.dir, "usecases"))).rejects.toMatchObject({ code: "ENOENT" });
+      });
+
+      it("warns unknown_persona for every unknown key and value, never for system, and still writes", async () => {
+        await seed();
+        const res = (await setUseCases(fx.store, {
+          use_cases: [{ id: "borrow-book", variants: [actorsVariant({ ghost: "system", "member-ana": "phantom", system: "member-ana" })] }],
+        })) as { warnings: Warning[] };
+        const unknown = res.warnings.filter((w) => w.kind === "unknown_persona");
+        expect(unknown.map((w) => w.message).sort()).toEqual(['persona "ghost" does not exist', 'persona "phantom" does not exist']);
+        expect(unknown.every((w) => w.target === "use_case:borrow-book#staff-view")).toBe(true);
+        expect((await fx.store.readUseCase("borrow-book")).variants?.[0]?.actors).toBeDefined();
+      });
+
+      it("counts the map's keys and values for the persona filter and the persona facet", async () => {
+        await seed();
+        await setUseCases(fx.store, {
+          use_cases: [
+            borrowCase({ id: "plain", title: "Plain", steps: [{ id: "only", actor: "system", action: "Does it" }], personas: [], variants: [] }),
+            borrowCase({ id: "swapped", title: "Swapped", steps: [{ id: "only", actor: "system", action: "Does it" }], personas: [], variants: [actorsVariant({ "member-ana": "staff-lee" })] }),
+          ],
+        });
+        const byStaff = (await listUseCases(fx.store, { persona: "staff-lee" })) as ListRes;
+        expect(byStaff.use_cases.map((u) => u.id)).toEqual(["swapped"]);
+        expect(((await listUseCases(fx.store, { persona: "member-ana" })) as ListRes).use_cases.map((u) => u.id)).toEqual(["borrow-book", "swapped"]);
+        expect(((await listUseCases(fx.store, {})) as ListRes).facets.persona).toEqual({ "member-ana": 2, "staff-lee": 1 });
+      });
+
+      it("puts the selected variant's map personas in the bundle even when no step uses them any more", async () => {
+        await seed();
+        await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", personas: [], variants: [actorsVariant({ "member-ana": "staff-lee" })] }] });
+        const res = (await getUseCase(fx.store, { id: "borrow-book", variant: "staff-view" })) as Bundle;
+        expect(res.personas.map((p) => p.id).sort()).toEqual(["member-ana", "staff-lee"]);
+        const base = (await getUseCase(fx.store, { id: "borrow-book" })) as Bundle;
+        expect(base.personas.map((p) => p.id).sort()).toEqual(["member-ana", "staff-lee"]);
+      });
+
+      it("delete_entity persona warns about a use case whose variant actors name it, as key or value", async () => {
+        await seed();
+        await setUseCases(fx.store, {
+          use_cases: [
+            borrowCase({ id: "only-in-map", steps: [{ id: "only", actor: "system", action: "Does it" }], personas: [], variants: [actorsVariant({ "member-ana": "staff-lee" })] }),
+          ],
+        });
+        for (const [name, expected] of [["member-ana", "only-in-map"], ["staff-lee", "only-in-map"]] as const) {
+          const res = await deleteEntity(fx.store, { kind: "persona", name });
+          expect(res.warnings).toEqual([expect.objectContaining({ kind: "dangling_reference", target: `persona:${name}`, message: expect.stringContaining(expected) })]);
+        }
+        expect(await fx.store.listUseCaseIds()).toContain("only-in-map");
+      });
     });
 
     it("reads nested and component-slot text as a node's text", async () => {

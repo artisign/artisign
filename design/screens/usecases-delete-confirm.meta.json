@@ -2,7 +2,8 @@
   "notes": "Deleting a use case (as built). Two steps, both drawn here:\n\n1. **More menu.** The detail header's More button (`chrome-icon-btn`, icon `more_horiz`, `aria-label` \"More actions\", `aria-haspopup=\"menu\"`) opens a menu (`chrome-menu-item` rows, popover anchored under the button, right-aligned) with one item: leading icon `delete` + \"Delete use case\". Drawn behind the scrim to show the anchor; in the build the menu closes when the item is picked.\n2. **Confirmation** — native modal `<dialog>`, 520px, the shared dialog shell: title \"Delete use case\", text `Delete \"<title>\"? Its file is removed. This cannot be undone here (the project history keeps it when auto-commit is on).`, footer **Cancel** (autofocus — the safe action has the focus) and **Delete use case** (danger text). Esc / close = Cancel.\n\nAfter delete: toast \"Use case deleted.\", the list reloads and the detail shows the placeholder \"Select a use case.\" (no auto-selection). A failing delete shows the server message as a toast and keeps the use case.\n\nFlows: close / Cancel → `usecases-detail`; Delete use case → `usecases-list`.",
   "tags": [
     "chr-1062",
-    "dialog"
+    "dialog",
+    "chr-1104"
   ],
   "variant_of": "usecases-detail",
   "variant_kind": "overlay"

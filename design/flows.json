@@ -516,18 +516,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-variant.dv-close",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-variant.dv-cancel",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
     "from": "usecases-delete-confirm.cf-close",
     "event": "tap",
     "to": "usecases-detail",
@@ -780,30 +768,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "usecases-mapping.map-back",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-mapping.ms4-remap",
-    "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-mapping.fr-detail",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-mapping.fr-dialog",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
     "from": "usecases-data-objects.sub-cases",
     "event": "tap",
     "to": "usecases-list",
@@ -927,6 +891,42 @@
     "from": "app-shell.el-checkout",
     "event": "tap",
     "to": "inspector-selected",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.map-back",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.ms4-remap",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.fr-detail",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.fr-dialog",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant.dv-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant.dv-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
     "to_kind": "screen"
   }
 ]

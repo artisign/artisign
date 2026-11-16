@@ -5,7 +5,7 @@
 import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
 import { segmented, avatar } from "./usecases-parts.js";
-import { AVATAR_COLORS, AVATAR_EMOJIS, FIELD_TYPES, slugify, uniqueId, isValidId, initials, safeColor, formatExampleValue, parseExampleValue, plural, formatCount } from "./usecases-data.js";
+import { AVATAR_COLORS, AVATAR_EMOJIS, FIELD_TYPES, slugify, uniqueId, isValidId, initials, formatExampleValue, parseExampleValue, plural, formatCount } from "./usecases-data.js";
 
 const REMOVE_NOTE = "Nothing is repaired: use cases that still name it keep a warning.";
 
@@ -118,7 +118,8 @@ export async function openPersonaDialog(options) {
     name: source?.name ?? "",
     role: source?.role ?? "",
     emoji: source?.avatar?.emoji ?? (mode === "new" ? "🧑" : ""),
-    color: safeColor(source?.avatar?.color) || AVATAR_COLORS[pool.personas.length % AVATAR_COLORS.length],
+    // A stored colour stays as stored, even one safeColor rejects (a named colour): it only changes when a swatch is clicked.
+    color: source?.avatar?.color || AVATAR_COLORS[pool.personas.length % AVATAR_COLORS.length],
     traits: { ...(source?.traits ?? {}) },
     description: source?.description ?? "",
     goals: (source?.goals ?? []).join("\n"),

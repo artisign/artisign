@@ -361,6 +361,26 @@ describe("persona dialog", () => {
     expect(save.mock.calls[0][0]).toMatchObject({ id: "sol", name: "Sol", traits: { size: "large" }, goals: ["Find cover", "Never ask twice"] });
   });
 
+  it("keeps a stored named colour byte-identical on save, and a swatch click still sets the colour", async () => {
+    const source = { ...makePool().personas[2], avatar: { emoji: "🧑", color: "teal" } };
+    const save = vi.fn(async () => ({ ok: true, data: {} }));
+    const kept = openPersonaDialog({ mode: "edit", source, pool: () => makePool(), takenIds: () => new Set(), save, remove: vi.fn() });
+    await flush();
+    type($("dialog input[autofocus]"), "Renamed");
+    button("Save persona").click();
+    await kept;
+    expect(save.mock.calls[0][0].avatar.color).toBe("teal");
+    const save2 = vi.fn(async () => ({ ok: true, data: {} }));
+    const picked = openPersonaDialog({ mode: "edit", source, pool: () => makePool(), takenIds: () => new Set(), save: save2, remove: vi.fn() });
+    await flush();
+    const swatch = $$("dialog .uc-swatch-btn")[1];
+    swatch.click();
+    button("Save persona").click();
+    await picked;
+    expect(save2.mock.calls[0][0].avatar.color).toBe(swatch.getAttribute("aria-label"));
+    expect(save2.mock.calls[0][0].avatar.color).not.toBe("teal");
+  });
+
   it("edit mode keeps the id, marks a generated persona and deletes after a confirmation line", async () => {
     const remove = vi.fn(async () => ({ ok: true, data: { warnings: [{ kind: "dangling_reference", message: "used by assign" }] } }));
     const closed = openPersonaDialog({ mode: "edit", source: makePool().personas[2], pool: () => makePool(), takenIds: () => new Set(), save: vi.fn(), remove });

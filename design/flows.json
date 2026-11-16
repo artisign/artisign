@@ -1068,19 +1068,31 @@
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-step-keyboard.dlg-close",
+    "from": "usecases-edit-dialog-step-menu.dlg-close",
     "event": "tap",
     "to": "usecases-detail",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-step-keyboard.dlg-cancel",
+    "from": "usecases-edit-dialog-step-menu.st-menu-up",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-menu.st-menu-down",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-menu.dlg-cancel",
     "event": "tap",
     "to": "usecases-detail",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-step-keyboard.dlg-save",
+    "from": "usecases-edit-dialog-step-menu.dlg-save",
     "event": "tap",
     "to": "usecases-detail",
     "to_kind": "screen"
@@ -1122,31 +1134,19 @@
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-step-menu.dlg-close",
+    "from": "usecases-edit-dialog-step-keyboard.dlg-close",
     "event": "tap",
     "to": "usecases-detail",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-step-menu.st-menu-up",
-    "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-step-menu.st-menu-down",
-    "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-step-menu.dlg-cancel",
+    "from": "usecases-edit-dialog-step-keyboard.dlg-cancel",
     "event": "tap",
     "to": "usecases-detail",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-step-menu.dlg-save",
+    "from": "usecases-edit-dialog-step-keyboard.dlg-save",
     "event": "tap",
     "to": "usecases-detail",
     "to_kind": "screen"

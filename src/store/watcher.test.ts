@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile, rename } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FSWatcher } from "chokidar";
@@ -104,12 +104,13 @@ describe("watchProject", () => {
 
   it("categorizes usecases/personas.json and usecases/cases/<id>.json as \"usecases\", the folder being created live", async () => {
     const events: ProjectChangeEvent[] = [];
-    unwatch = watchProject(dir, (event) => events.push(event));
+    const stop = watchProject(dir, (event) => events.push(event));
+    unwatch = stop;
+    await stop.ready;
+    // macOS: the native watch only delivers events a moment after chokidar reports ready.
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     await mkdir(join(dir, "usecases", "cases"), { recursive: true });
-    // Files written into a directory chokidar has not started watching yet can be missed under load: wait for the folder event first.
-    await waitFor(events, (e) => e.path === "usecases/cases", 3000);
     await writeFile(join(dir, "usecases", "personas.json"), "{}");
     await writeFile(join(dir, "usecases", "cases", "borrow-book.json"), "{}");
 
@@ -117,6 +118,25 @@ describe("watchProject", () => {
     await waitFor(events, (e) => e.path.endsWith("borrow-book.json"), 3000);
     expect(events.find((e) => e.path.endsWith("personas.json"))?.category).toBe("usecases");
     expect(events.find((e) => e.path.endsWith("borrow-book.json"))?.category).toBe("usecases");
+  });
+
+  it("reports a file written into a folder right after the folder was created, with no wait in between", async () => {
+    const events: ProjectChangeEvent[] = [];
+    const stop = watchProject(dir, (event) => events.push(event));
+    unwatch = stop;
+    await stop.ready;
+    // macOS: the native watch only delivers events a moment after chokidar reports ready.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // Same sequence as atomicWrite: mkdir -p, then a temp file renamed into place.
+    await mkdir(join(dir, "usecases"), { recursive: true });
+    await writeFile(join(dir, "usecases", "personas.json.tmp"), "{}");
+    await rename(join(dir, "usecases", "personas.json.tmp"), join(dir, "usecases", "personas.json"));
+
+    await waitFor(events, (e) => e.path === "usecases/personas.json", 3000);
+    // Reported once (as add or, when chokidar's own change folds in, change), not once per scan.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(events.filter((e) => e.path === "usecases/personas.json" && e.type !== "unlink")).toHaveLength(1);
   });
 
   it("categorizes assets/<path> as \"asset\"", async () => {
@@ -180,5 +200,66 @@ describe("watchProject", () => {
 
     await waitFor(events, (e) => e.path.includes("home.html"), 500);
     expect(events.some((e) => e.path.startsWith(".artisign"))).toBe(false);
+  });
+
+  it("reports a file again after its folder was deleted and recreated the same way", async () => {
+    const events: ProjectChangeEvent[] = [];
+    const stop = watchProject(dir, (event) => events.push(event));
+    unwatch = stop;
+    await stop.ready;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const write = async (): Promise<void> => {
+      await mkdir(join(dir, "usecases"), { recursive: true });
+      await writeFile(join(dir, "usecases", "personas.json.tmp"), "{}");
+      await rename(join(dir, "usecases", "personas.json.tmp"), join(dir, "usecases", "personas.json"));
+    };
+    const adds = (): number => events.filter((e) => e.path === "usecases/personas.json" && e.type !== "unlink").length;
+
+    await write();
+    await waitFor(events, (e) => e.path === "usecases/personas.json", 3000);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await rm(join(dir, "usecases"), { recursive: true, force: true });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await write();
+
+    const start = Date.now();
+    while (adds() < 2 && Date.now() - start < 3000) await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(adds()).toBe(2);
+  });
+
+  it("reports a file again when only the file is deleted and written again after the folder window", async () => {
+    const events: ProjectChangeEvent[] = [];
+    const stop = watchProject(dir, (event) => events.push(event));
+    unwatch = stop;
+    await stop.ready;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const file = join(dir, "usecases", "cases", "borrow-book.json");
+    const reports = (): number => events.filter((e) => e.path === "usecases/cases/borrow-book.json" && e.type !== "unlink").length;
+
+    // Deterministic stand-in for "the file lands in chokidar's gap": chokidar
+    // still tracks the file internally, but its events for it never reach the
+    // listener, so only the folder scan reports it and no `unlink` follows its
+    // deletion.
+    const watcher = capturedWatcher!;
+    const realEmit = watcher.emit.bind(watcher) as (event: string, ...args: unknown[]) => boolean;
+    let blind = true;
+    watcher.emit = ((event: string, ...args: unknown[]): boolean =>
+      blind && (event === "add" || event === "unlink") && String(args[0]).endsWith("borrow-book.json")
+        ? false
+        : realEmit(event, ...args)) as typeof watcher.emit;
+
+    await mkdir(join(dir, "usecases", "cases"), { recursive: true });
+    await writeFile(file, "{}");
+    await waitFor(events, (e) => e.path === "usecases/cases/borrow-book.json", 3000);
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // past the new-folder window
+    await rm(file);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const before = reports();
+    blind = false;
+    await writeFile(file, "{}");
+
+    const start = Date.now();
+    while (reports() <= before && Date.now() - start < 3000) await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(reports()).toBeGreaterThan(before);
   });
 });

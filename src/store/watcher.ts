@@ -1,9 +1,13 @@
 import { watch as chokidarWatch } from "chokidar";
-import { relative, sep } from "node:path";
+import { readdir } from "node:fs/promises";
+import { join, relative, sep } from "node:path";
 import { CONFIG_FILENAME, CACHE_DIR } from "../init/artisign-config.js";
 import type { ChangeCategory, ProjectChangeEvent } from "./types.js";
 
 const DEBOUNCE_MS = 100;
+// A directory that appears live is scanned once right away and once more after
+// this settle delay (see `scanNewDir`).
+const NEW_DIR_RESCAN_MS = 250;
 
 function categorize(relativePath: string): ChangeCategory {
   const segments = relativePath.split(sep);
@@ -25,22 +29,23 @@ function categorize(relativePath: string): ChangeCategory {
 /**
  * Watches `projectDir` for external changes, debounced per-path and
  * ignoring `.artisign/` (the derived cache would otherwise re-trigger
- * itself). Returns an unwatch function.
+ * itself). Returns an unwatch function; its `ready` promise resolves once the
+ * initial scan is done and the watcher is live.
  */
 export function watchProject(
   projectDir: string,
   onChange: (event: ProjectChangeEvent) => void,
-): () => void {
-  const watcher = chokidarWatch(projectDir, {
-    ignored: (path: string) => {
-      const rel = relative(projectDir, path);
-      // Ignore the derived cache and .tmp files transiently created by atomicWrite
-      // — otherwise every write would be observed twice (temp file + final rename).
-      const top = rel.split(sep)[0];
-      return top === CACHE_DIR || top === ".git" || path.endsWith(".tmp");
-    },
-    ignoreInitial: true,
-  });
+): (() => void) & { ready: Promise<void> } {
+  const isIgnored = (path: string): boolean => {
+    const rel = relative(projectDir, path);
+    // Ignore the derived cache and .tmp files transiently created by atomicWrite
+    // — otherwise every write would be observed twice (temp file + final rename).
+    const top = rel.split(sep)[0];
+    return top === CACHE_DIR || top === ".git" || path.endsWith(".tmp");
+  };
+  const watcher = chokidarWatch(projectDir, { ignored: isIgnored, ignoreInitial: true });
+  const ready = new Promise<void>((resolve) => watcher.once("ready", () => resolve()));
+  let closed = false;
 
   const timers = new Map<string, NodeJS.Timeout>();
   const emit = (type: ProjectChangeEvent["type"], path: string): void => {
@@ -56,7 +61,68 @@ export function watchProject(
     );
   };
 
-  watcher.on("add", (path) => emit("add", path));
+  // Files already reported, so the new-directory scan below never repeats one.
+  const known = new Set<string>();
+
+  // chokidar attaches its watch to a directory that appears live only after
+  // it has emitted `addDir` and read the directory once. A file that lands in
+  // that gap (atomicWrite's rename right after its `mkdir -p`, first write of
+  // `usecases/personas.json`) is reported by neither the read nor the watch.
+  // So scan a new directory ourselves: once now, and once after chokidar's
+  // watch is certainly in place; whatever sits there by then is reported.
+  const scanNewDir = async (dir: string): Promise<void> => {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return; // vanished again
+    }
+    for (const entry of entries) {
+      if (closed) return;
+      const full = join(dir, entry.name);
+      if (isIgnored(full)) continue;
+      if (entry.isDirectory()) await scanNewDir(full);
+      else if (entry.isFile() && !known.has(full)) {
+        known.add(full);
+        emit("add", full);
+      }
+    }
+  };
+  // chokidar emits `unlink` only for entries it tracks itself, so files that
+  // only the scan reported would stay in `known` after their folder is
+  // removed and a recreated folder would never report them again.
+  const forgetUnder = (dir: string): void => {
+    const prefix = dir + sep;
+    for (const path of known) if (path.startsWith(prefix)) known.delete(path);
+  };
+  const rescans = new Set<NodeJS.Timeout>();
+  const onNewDir = (dir: string): void => {
+    forgetUnder(dir); // a (re)created folder starts empty
+    void scanNewDir(dir);
+    const timer = setTimeout(() => {
+      rescans.delete(timer);
+      void scanNewDir(dir).then(() => {
+        if (closed) return;
+        // The dedup only matters inside this window. A scan-reported file is
+        // not tracked by chokidar's events, so deleting it sends no `unlink`:
+        // without this expiry a later rewrite of the same file would be
+        // skipped as "known". Started only once the rescan is done, so a late
+        // rescan cannot add entries after the expiry.
+        const expiry = setTimeout(() => {
+          rescans.delete(expiry);
+          forgetUnder(dir);
+        }, DEBOUNCE_MS);
+        rescans.add(expiry);
+      });
+    }, NEW_DIR_RESCAN_MS);
+    rescans.add(timer);
+  };
+
+  watcher.on("add", (path) => {
+    if (known.has(path)) return; // already reported by the scan
+    known.add(path);
+    emit("add", path);
+  });
   // Mockups are the only category with a live-created directory of
   // its own (`mockups/<name>/`) — every other category's directories are
   // scaffolded once at init and never appear afterwards. `write_mockup`
@@ -66,9 +132,16 @@ export function watchProject(
   // directory segment — see `sse.ts` `baseName`) a signal as soon as the
   // directory itself appears, rather than depending solely on chokidar's
   // live discovery of the file(s) written into it a moment later.
-  watcher.on("addDir", (path) => emit("add", path));
+  watcher.on("addDir", (path) => {
+    emit("add", path);
+    onNewDir(path);
+  });
+  watcher.on("unlinkDir", (path) => forgetUnder(path));
   watcher.on("change", (path) => emit("change", path));
-  watcher.on("unlink", (path) => emit("unlink", path));
+  watcher.on("unlink", (path) => {
+    known.delete(path);
+    emit("unlink", path);
+  });
   // An EventEmitter "error" with no listener throws, outside any HTTP
   // request's catch — a chokidar error on a vanishing project root (e.g. the
   // whole directory being deleted) would otherwise kill the daemon process.
@@ -76,9 +149,13 @@ export function watchProject(
     console.error(`watcher error (${projectDir}):`, err instanceof Error ? err.message : err);
   });
 
-  return () => {
+  const unwatch = (): void => {
+    closed = true;
     for (const timer of timers.values()) clearTimeout(timer);
+    for (const timer of rescans) clearTimeout(timer);
     timers.clear();
+    rescans.clear();
     void watcher.close();
   };
+  return Object.assign(unwatch, { ready });
 }

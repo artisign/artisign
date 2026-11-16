@@ -524,7 +524,7 @@ Workflow, in this order:
    `status` (`draft | ready`: how mature the spec is, not whether it is built),
    `personas`, `trigger`, `goal`, `outcome`, and:
    - Work state, priority and assignee are not use-case fields — they live in
-     your ticket tracker. Link a ticket with a tag such as `chr-1234`.
+     your ticket tracker. Link a ticket with a tag such as `proj-123`.
    - **`inputs` and `outputs` are mandatory** — at least one each, every entry
      `{object, example}` (`source` on an input, `target` on an output): what
      the case consumes and produces, with concrete example values.

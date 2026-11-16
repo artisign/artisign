@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { useCaseSchema, personaSchema, dimensionSchema, type Dimension, type Persona, type UseCase } from "./schema.js";
+import { isValidId, useCaseSchema, personaSchema, dimensionSchema, type Dimension, type Persona, type UseCase } from "./schema.js";
 import { resolveUseCase } from "./resolve.js";
-import { buildGeneratedPersona, expandCombinations, suggestVariantGaps } from "./generate.js";
+import { buildGeneratedPersona, expandCombinations, pairSpace, suggestVariantGaps, WORK_BUDGET } from "./generate.js";
 import { compareUseCases, facetCounts, matchesFilter, summarize } from "./query.js";
 
 function useCase(overrides: Record<string, unknown> = {}): UseCase {
@@ -240,5 +240,63 @@ describe("query helpers", () => {
     expect(facets.tag).toEqual({ loans: 1 });
     expect(facets.persona["member-ana"]).toBe(3);
     expect(facets.persona.guest).toBe(1);
+  });
+});
+
+describe("expansion work budget", () => {
+  const dim = (id: string, count: number): Dimension => ({ id, label: id, values: Array.from({ length: count }, (_, i) => ({ id: `v${i}`, label: `V${i}` })) });
+
+  it("stops all at the budget and says the result is partial; the default budget leaves normal calls alone", () => {
+    const dims = [dim("a", 10), dim("b", 10), dim("c", 10)];
+    const full = expandCombinations(dims, "all", [], 5000);
+    expect(full.partial).toBeUndefined();
+    expect(full.combinations).toHaveLength(1000);
+
+    const cut = expandCombinations(dims, "all", [], 5000, 50);
+    expect(cut.partial).toBe(true);
+    expect(cut.combinations.length).toBeLessThanOrEqual(50);
+    expect(cut.combinations).toEqual(full.combinations.slice(0, cut.combinations.length));
+  });
+
+  it("counts the existing personas against the budget, so a long walk over a mostly covered space ends early", () => {
+    const dims = [dim("a", 4), dim("b", 4), dim("c", 4), dim("d", 4), dim("e", 4), dim("f", 4), dim("g", 4), dim("h", 4), dim("i", 4)]; // 262,144 combinations
+    const covering = Array.from({ length: 30 }, (_, i) => persona(`cover-${i}`, { a: "v0" }));
+    const result = expandCombinations(dims, "all", covering, 100);
+    expect(result.partial).toBe(true);
+    expect(result.combinations).toEqual([]);
+    expect(WORK_BUDGET).toBeLessThanOrEqual(2_000_000);
+  });
+
+  it("stops pairwise at the budget too, and pairSpace is the number of value pairs", () => {
+    const dims = [dim("a", 5), dim("b", 5), dim("c", 5)];
+    expect(pairSpace(dims)).toBe(75);
+    expect(expandCombinations(dims, "pairwise", [], 100).partial).toBeUndefined();
+    const cut = expandCombinations(dims, "pairwise", [], 100, 100);
+    expect(cut.partial).toBe(true);
+    expect(cut.combinations.length).toBeGreaterThan(0);
+    expect(cut.combinations.length).toBeLessThan(expandCombinations(dims, "pairwise", [], 100).combinations.length);
+  });
+});
+
+describe("variant skeleton ids", () => {
+  const dimension = (id: string, values: string[]): Dimension => ({ id, label: id, values: values.map((v) => ({ id: v, label: v })) });
+
+  it("stay valid kebab-case and unique among each other and against existing variants", () => {
+    const dims = [dimension("plan", ["free", "pro", "team"])];
+    const pool = [persona("a", { plan: "free" }), persona("b", { plan: "pro" }), persona("c", { plan: "team" })];
+    const withClash = useCase({ personas: [], variants: [{ id: "plan-pro", title: "Taken", when: {} }] });
+    const ids = suggestVariantGaps(withClash, dims, pool).suggestions.map((s) => s.id);
+    expect(ids).toEqual(["plan-free", "plan-pro-2", "plan-team"]);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("never ends in a hyphen or exceeds 80 characters when a dimension id is almost as long as an id may be", () => {
+    const longId = "d".repeat(79);
+    const dims = [dimension(longId, ["x", "y"])];
+    const pool = [persona("a", { [longId]: "x" }), persona("b", { [longId]: "y" })];
+    const ids = suggestVariantGaps(useCase({ personas: [] }), dims, pool).suggestions.map((s) => s.id);
+    expect(ids).toHaveLength(2);
+    for (const id of ids) expect(isValidId(id), id).toBe(true);
+    expect(new Set(ids).size).toBe(2);
   });
 });

@@ -13,6 +13,7 @@ import {
   compareUseCases,
   describeIssues,
   expandCombinations,
+  pairSpace,
   facetCounts,
   InvalidFileError,
   isValidId,
@@ -465,6 +466,10 @@ async function generatePersonasInner(store: Store, input: GeneratePersonasInput,
   if (strategy === "all" && space > MAX_COMBINATION_SPACE) {
     throw new ToolError("validation_failed", `strategy "all" would span ${space} combinations — use "pairwise" or narrow dimensions`);
   }
+  const pairs = pairSpace(dimensions);
+  if (strategy === "pairwise" && pairs > MAX_COMBINATION_SPACE) {
+    throw new ToolError("validation_failed", `strategy "pairwise" would have to cover ${pairs} value pairs — narrow dimensions`);
+  }
 
   const generated = expandCombinations(dimensions, strategy, pool.personas, limit);
   const taken = new Set(pool.personas.map((p) => p.id));
@@ -475,6 +480,12 @@ async function generatePersonasInner(store: Store, input: GeneratePersonasInput,
     total: generated.total,
     skipped_covered: generated.skipped_covered,
     ...(generated.truncated ? { truncated: true } : {}),
+    ...(generated.partial
+      ? {
+          partial: true,
+          warnings: [{ kind: "partial_result", message: "generation stopped at its work budget before the whole space was walked, so this is a prefix of the full result — narrow dimensions and call again" } satisfies Warning],
+        }
+      : {}),
   };
   if (input.dry_run === true) {
     return { dry_run: true, ...base, would_create: created.length, personas: created.map((p) => ({ id: p.id, name: p.name, traits: p.traits })) };

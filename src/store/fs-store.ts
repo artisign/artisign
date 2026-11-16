@@ -164,7 +164,7 @@ function listDirs(dir: string): Promise<string[]> {
 }
 
 /** Project sources `lastWriteAt` scans — deliberately not `.artisign/` (derived) or `.git/`. */
-const LAST_WRITE_SOURCES = [CONFIG_FILENAME, "screens", "design-system", "mockups", "tags", "usecases", "flows.json", "comments.jsonl"];
+const LAST_WRITE_SOURCES = [CONFIG_FILENAME, "screens", "design-system", "mockups", "tags", "flows.json", "comments.jsonl"];
 
 /** How many case files are read at once — enough to hide disk latency, few enough to stay clear of the fd limit. */
 const CASE_READ_CONCURRENCY = 64;

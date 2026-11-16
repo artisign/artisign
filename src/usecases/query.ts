@@ -59,17 +59,28 @@ function haystack(useCase: UseCase): string {
   return parts.filter((p): p is string => p !== undefined).join("\n").toLowerCase();
 }
 
+/** An empty string is "no filter", like an empty `query` — a cleared form field must not match nothing. */
+function given(value: string | undefined): string | undefined {
+  return value === undefined || value.trim() === "" ? undefined : value;
+}
+
 export function matchesFilter(useCase: UseCase, filter: UseCaseFilter): boolean {
+  const group = given(filter.group?.replace(/\/+$/, ""));
+  const tag = given(filter.tag);
+  const persona = given(filter.persona);
+  const screen = given(filter.screen);
+  const node = given(filter.node);
+  const query = given(filter.query);
   if (filter.status !== undefined && useCase.status !== filter.status) return false;
-  if (filter.group !== undefined && !inGroup(useCase.group, filter.group)) return false;
-  if (filter.tag !== undefined && !(useCase.tags ?? []).some((t) => t.toLowerCase() === filter.tag!.toLowerCase())) return false;
+  if (group !== undefined && !inGroup(useCase.group, group)) return false;
+  if (tag !== undefined && !(useCase.tags ?? []).some((t) => t.toLowerCase() === tag.toLowerCase())) return false;
   if (filter.has_variants !== undefined && ((useCase.variants?.length ?? 0) > 0) !== filter.has_variants) return false;
-  if (filter.persona !== undefined && !personasOf(useCase).has(filter.persona)) return false;
-  if (filter.screen !== undefined || filter.node !== undefined) {
-    const hit = allSteps(useCase).some((s) => (filter.screen === undefined || s.screen === filter.screen) && (filter.node === undefined || s.node === filter.node));
+  if (persona !== undefined && !personasOf(useCase).has(persona)) return false;
+  if (screen !== undefined || node !== undefined) {
+    const hit = allSteps(useCase).some((s) => (screen === undefined || s.screen === screen) && (node === undefined || s.node === node));
     if (!hit) return false;
   }
-  if (filter.query !== undefined && filter.query.trim() !== "" && !haystack(useCase).includes(filter.query.trim().toLowerCase())) return false;
+  if (query !== undefined && !haystack(useCase).includes(query.trim().toLowerCase())) return false;
   return true;
 }
 

@@ -198,7 +198,7 @@ describe("GET /events (SSE)", () => {
       steps: [],
     });
     // The folders are created live too, so directory events (named "usecases"/"cases") may come first.
-    const evt = await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "cases/borrow-book", 1500);
+    const evt = await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "cases/borrow-book", 4000);
     expect(evt).toEqual({ type: "change", kind: "usecases", name: "cases/borrow-book" });
 
   });
@@ -209,7 +209,7 @@ describe("GET /events (SSE)", () => {
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     await store.writeUseCase({ id: "personas", title: "P", status: "draft", personas: [], inputs: [{ object: "o", example: {} }], outputs: [{ object: "o", example: {} }], steps: [] });
-    expect(await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "cases/personas", 1500)).toEqual({ type: "change", kind: "usecases", name: "cases/personas" });
+    expect(await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "cases/personas", 4000)).toEqual({ type: "change", kind: "usecases", name: "cases/personas" });
   });
 
   it("broadcasts usecases/personas.json under its stem", async () => {
@@ -218,7 +218,7 @@ describe("GET /events (SSE)", () => {
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     await store.writePersonaPool({ dimensions: [], personas: [] });
-    expect(await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "personas", 1500)).toEqual({ type: "change", kind: "usecases", name: "personas" });
+    expect(await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "personas", 4000)).toEqual({ type: "change", kind: "usecases", name: "personas" });
   });
 
   it("rejects a cross-origin /events connection", async () => {

@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Features
+
+- **Use cases:** specs that coding agents write and read. An optional `usecases/` folder holds personas, reusable
+  data objects and one file per use case; a use case has inputs and outputs with example values, a flow of steps
+  that can be mapped to screens and elements, and variants stored as differences. Five new tools
+  (`get_use_cases`, `get_use_case`, `set_use_cases`, `generate_personas`, `suggest_use_case_variants`) and four new
+  `delete_entity` kinds (`persona`, `dimension`, `data_object`, `use_case`) read and write them. A stale or
+  unstable step mapping is reported, never rewritten. A project without `usecases/` behaves exactly as before.
+
 ## [2.2.1] - 2026-11-14
 
 An agent skill on how to design with artisign, mockup variants in `patch_html` and `inspect_node`,

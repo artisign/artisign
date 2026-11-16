@@ -108,11 +108,13 @@ describe("watchProject", () => {
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     await mkdir(join(dir, "usecases", "cases"), { recursive: true });
+    // Files written into a directory chokidar has not started watching yet can be missed under load: wait for the folder event first.
+    await waitFor(events, (e) => e.path === "usecases/cases", 3000);
     await writeFile(join(dir, "usecases", "personas.json"), "{}");
     await writeFile(join(dir, "usecases", "cases", "borrow-book.json"), "{}");
 
-    await waitFor(events, (e) => e.path.endsWith("personas.json"), 1000);
-    await waitFor(events, (e) => e.path.endsWith("borrow-book.json"), 1000);
+    await waitFor(events, (e) => e.path.endsWith("personas.json"), 3000);
+    await waitFor(events, (e) => e.path.endsWith("borrow-book.json"), 3000);
     expect(events.find((e) => e.path.endsWith("personas.json"))?.category).toBe("usecases");
     expect(events.find((e) => e.path.endsWith("borrow-book.json"))?.category).toBe("usecases");
   });

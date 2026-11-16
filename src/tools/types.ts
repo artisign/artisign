@@ -56,7 +56,9 @@ export type WarningKind =
   | "mapping_unstable"
   | "duplicate_step_id"
   | "dangling_reference"
-  | "invalid_file";
+  | "invalid_file"
+  // generate_personas stopped at its work budget: the result is a prefix of the full expansion.
+  | "partial_result";
 
 export type Warning = {
   kind: WarningKind;
@@ -108,8 +110,10 @@ export type ViewState = {
  * `invalid_state` rather than silently pretending to hold state it can't).
  * `source` names which door a request came through — `"agent"` for `/mcp`,
  * `"human"` for `POST /api/tools/<name>` — and is set by the route that
- * builds the context; only `set_board_state` reads it (to tag its
- * broadcast), the activity sink (CHR-630) stays a separate parameter.
+ * builds the context. `set_board_state` reads it to tag its broadcast, and the
+ * use-case writes (`set_use_cases`, `generate_personas`, `delete_entity` on a
+ * use-case kind) read it to decide how to commit; the activity sink (CHR-630)
+ * stays a separate parameter.
  */
 export type ToolHandlerContext = {
   openProject?: (dir: string) => Promise<unknown>;

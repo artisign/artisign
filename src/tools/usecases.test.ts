@@ -122,11 +122,57 @@ describe("use case tools", () => {
     });
   });
 
+  describe("existing tools do not see use cases", () => {
+    it("keeps get_project, get_screen, get_design_system, find_nodes and last_write_at identical once usecases/ exists", async () => {
+      await writeHtml(fx.store, { screen: "home", mode: "create", title: "Home", html_aug: `<div id="n1">Hi</div>` });
+      const existing = async (): Promise<string> =>
+        JSON.stringify([
+          await getProject(fx.store, {}),
+          await getProject(fx.store, { view: "tree" }),
+          await getProject(fx.store, { view: "full" }),
+          await getScreen(fx.store, { screen: "home" }),
+          await getDesignSystem(fx.store, {}),
+          await findNodes(fx.store, { where: [{ kind: "has_flow" }] }),
+        ]);
+      const before = await existing();
+      const stamp = ((await getProject(fx.store, {})) as { last_write_at: string }).last_write_at;
+      await new Promise((resolve) => setTimeout(resolve, 40));
+
+      await setUseCases(fx.store, { dimensions: DIMENSIONS, personas: PERSONAS, data_objects: DATA_OBJECTS, use_cases: [borrowCase()] });
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", title: "Changed" }] });
+      await deleteEntity(fx.store, { kind: "persona", name: "staff-lee" });
+
+      expect(await existing()).toBe(before);
+      expect(((await getProject(fx.store, {})) as { last_write_at: string }).last_write_at).toBe(stamp);
+    });
+  });
+
+  describe("inputs and outputs need an example", () => {
+    it("rejects an input or output without an example and writes nothing", async () => {
+      await expect(setUseCases(fx.store, { use_cases: [borrowCase({ inputs: [{ object: "loan" }] })] })).rejects.toMatchObject({ code: "validation_failed" });
+      await expect(setUseCases(fx.store, { use_cases: [borrowCase({ outputs: [{ object: "loan", target: "catalog" }] })] })).rejects.toMatchObject({ code: "validation_failed" });
+      await expect(setUseCases(fx.store, { use_cases: [borrowCase({ inputs: [] })] })).rejects.toMatchObject({ code: "validation_failed" });
+      await expect(stat(join(fx.dir, "usecases"))).rejects.toMatchObject({ code: "ENOENT" });
+    });
+  });
+
   describe("palette", () => {
     it("registers the five use-case tools next to the existing ones", () => {
       const names = TOOLS.map((t) => t.name);
       for (const name of ["get_use_cases", "get_use_case", "set_use_cases", "generate_personas", "suggest_use_case_variants"]) expect(names).toContain(name);
       expect(names).toHaveLength(30);
+    });
+  });
+
+  describe("generate_personas bounds", () => {
+    const wide = (count: number, values: number): Record<string, unknown>[] =>
+      Array.from({ length: count }, (_, i) => ({ id: `dim-${i}`, label: `Dim ${i}`, values: Array.from({ length: values }, (_, v) => ({ id: `v${v}`, label: `V${v}` })) }));
+
+    it("refuses pairwise beyond the same space cap as all, without writing", async () => {
+      await setUseCases(fx.store, { dimensions: wide(6, 300) }); // 15 dimension pairs x 90,000 = 1,350,000 value pairs
+      await expect(generatePersonas(fx.store, { strategy: "pairwise" })).rejects.toMatchObject({ code: "validation_failed", message: expect.stringContaining("value pairs") });
+      await expect(generatePersonas(fx.store, { strategy: "pairwise", dimensions: ["dim-0", "dim-1", "dim-2"] })).resolves.toMatchObject({ created: expect.any(Number) });
     });
   });
 
@@ -369,6 +415,15 @@ describe("use case tools", () => {
       const filtered = (await getUseCases(fx.store, { query: "profile" })) as ListRes;
       expect(filtered.total).toBe(1);
       expect(filtered.facets.tag).toEqual({ profile: 1 });
+    });
+
+    it("treats an empty-string filter as no filter, like an empty query", async () => {
+      const all = ((await getUseCases(fx.store, {})) as ListRes).total;
+      for (const empty of [{ group: "" }, { group: "/" }, { persona: "" }, { tag: "" }, { screen: "" }, { node: "" }, { query: "" }, { group: "  " }]) {
+        expect(((await getUseCases(fx.store, empty)) as ListRes).total, JSON.stringify(empty)).toBe(all);
+      }
+      // A real value next to an empty one still filters.
+      expect(((await getUseCases(fx.store, { group: "", persona: "staff-lee" })) as ListRes).use_cases.map((u) => u.id)).toEqual(["c-3"]);
     });
 
     it("pages with a cursor, repeating neither counts nor facets", async () => {

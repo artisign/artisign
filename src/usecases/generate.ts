@@ -22,20 +22,49 @@ export type GeneratedCombinations = {
   total: number;
   skipped_covered: number;
   truncated: boolean;
+  /** Set when the work budget ran out before the whole space was walked: the result is a prefix, not the full answer. */
+  partial?: true;
 };
+
+/**
+ * Upper bound on the basic steps one expansion may take (a step is one
+ * combination visited, one persona checked against it, one pair weighed).
+ * The daemon runs the expansion in a single tick, so a call must not walk an
+ * unbounded space: 2,000,000 steps is on the order of 100 ms, far above what
+ * the default limit of 100 personas needs, and still lets `all` visit the
+ * whole 1,000,000-combination space when few personas exist. When it runs out
+ * the result is returned as `partial`.
+ */
+export const WORK_BUDGET = 2_000_000;
+
+/** Number of value pairs `pairwise` has to cover — the pairwise counterpart of the size of the full product. */
+export function pairSpace(dimensions: Dimension[]): number {
+  let pairs = 0;
+  for (let i = 0; i < dimensions.length; i++) {
+    for (let j = i + 1; j < dimensions.length; j++) pairs += dimensions[i]!.values.length * dimensions[j]!.values.length;
+  }
+  return pairs;
+}
 
 function productSize(dimensions: Dimension[]): number {
   return dimensions.reduce((size, d) => size * d.values.length, 1);
 }
 
-function expandAll(dimensions: Dimension[], existing: Persona[], limit: number): GeneratedCombinations {
+function expandAll(dimensions: Dimension[], existing: Persona[], limit: number, budget: number): GeneratedCombinations {
   const combinations: Combination[] = [];
   let skipped = 0;
   let truncated = false;
+  let partial = false;
+  let work = 0;
   const counters = dimensions.map(() => 0);
   const total = productSize(dimensions);
   // Odometer over the dimensions in declared order — last dimension varies fastest, so output order is stable.
   for (let n = 0; n < total; n++) {
+    work += 1 + existing.length;
+    if (work > budget) {
+      partial = true;
+      break;
+    }
     const combination: Combination = {};
     dimensions.forEach((d, i) => {
       combination[d.id] = d.values[counters[i]!]!.id;
@@ -54,7 +83,7 @@ function expandAll(dimensions: Dimension[], existing: Persona[], limit: number):
       counters[i] = 0;
     }
   }
-  return { combinations, total, skipped_covered: skipped, truncated };
+  return { combinations, total, skipped_covered: skipped, truncated, ...(partial ? { partial: true as const } : {}) };
 }
 
 function pairKey(da: string, va: string, db: string, vb: string): string {
@@ -68,7 +97,7 @@ function pairKey(da: string, va: string, db: string, vb: string): string {
  * the value that covers the most new pairs, ties to the first declared value.
  * A single dimension degenerates to one combination per value.
  */
-function expandPairwise(dimensions: Dimension[], existing: Persona[], limit: number): GeneratedCombinations {
+function expandPairwise(dimensions: Dimension[], existing: Persona[], limit: number, budget: number): GeneratedCombinations {
   if (dimensions.length === 1) {
     const only = dimensions[0]!;
     const all = only.values.map((v): Combination => ({ [only.id]: v.id }));
@@ -113,8 +142,17 @@ function expandPairwise(dimensions: Dimension[], existing: Persona[], limit: num
 
   const combinations: Combination[] = [];
   let truncated = false;
+  let partial = false;
+  let work = 0;
+  const valueCount = dimensions.reduce((n, d) => n + d.values.length, 0);
   for (const seed of ordered) {
     if (!uncovered.has(pairKey(seed.da, seed.va, seed.db, seed.vb))) continue;
+    // Building one row weighs every value of every other dimension against the row so far.
+    work += 1 + valueCount * dimensions.length;
+    if (work > budget) {
+      partial = true;
+      break;
+    }
     if (combinations.length >= limit) {
       truncated = true;
       break;
@@ -144,11 +182,11 @@ function expandPairwise(dimensions: Dimension[], existing: Persona[], limit: num
     cover(row);
     combinations.push(row);
   }
-  return { combinations, total, skipped_covered: skipped, truncated };
+  return { combinations, total, skipped_covered: skipped, truncated, ...(partial ? { partial: true as const } : {}) };
 }
 
-export function expandCombinations(dimensions: Dimension[], strategy: Strategy, existing: Persona[], limit: number): GeneratedCombinations {
-  return strategy === "all" ? expandAll(dimensions, existing, limit) : expandPairwise(dimensions, existing, limit);
+export function expandCombinations(dimensions: Dimension[], strategy: Strategy, existing: Persona[], limit: number, budget: number = WORK_BUDGET): GeneratedCombinations {
+  return strategy === "all" ? expandAll(dimensions, existing, limit, budget) : expandPairwise(dimensions, existing, limit, budget);
 }
 
 const AVATAR_COLORS = ["#4F7CAC", "#C0504D", "#4E9A6B", "#B0833A", "#7B5EA7", "#3F8F9B", "#A65E7E", "#6B7A8F"];
@@ -187,6 +225,18 @@ export type VariantSuggestion = {
   personas: string[];
 };
 
+/** An id derived from `base` (two valid ids joined by "-"): cut to ID_MAX without a trailing hyphen, a numeric suffix on collision. Always valid, never in `taken`; added to it. */
+function freeVariantId(base: string, taken: Set<string>): string {
+  const candidate = (n: number): string => {
+    const suffix = n === 1 ? "" : `-${n}`;
+    return `${base.slice(0, ID_MAX - suffix.length).replace(/-+$/, "")}${suffix}`;
+  };
+  let id = candidate(1);
+  for (let n = 2; taken.has(id); n++) id = candidate(n);
+  taken.add(id);
+  return id;
+}
+
 /**
  * Per dimension, the trait values the persona pool actually uses and whether
  * this use case reaches them: through the traits of its own personas (a
@@ -202,6 +252,7 @@ export function suggestVariantGaps(
   const own = useCase.personas.map((id) => byId.get(id)).filter((p): p is Persona => p !== undefined);
   const coverage: DimensionCoverage[] = [];
   const suggestions: VariantSuggestion[] = [];
+  const taken = new Set((useCase.variants ?? []).map((v) => v.id));
 
   for (const dimension of dimensions) {
     const used = dimension.values.filter((v) => personas.some((p) => ownValue(p.traits, dimension.id) === v.id));
@@ -220,7 +271,7 @@ export function suggestVariantGaps(
     coverage.push({ dimension: dimension.id, covered: used.filter((v) => covered.has(v.id)).map((v) => v.id), uncovered: open.map((v) => v.id) });
     for (const value of open) {
       suggestions.push({
-        id: `${dimension.id}-${value.id}`.slice(0, ID_MAX),
+        id: freeVariantId(`${dimension.id}-${value.id}`, taken),
         title: `${useCase.title} — ${dimension.label}: ${value.label}`,
         when: { [dimension.id]: [value.id] },
         personas: personas.filter((p) => ownValue(p.traits, dimension.id) === value.id).map((p) => p.id),

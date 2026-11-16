@@ -250,7 +250,7 @@ src/daemon/          daemon lifecycle — project registry, global config/lock (
 src/init/            project scaffolding (init) and artisign.json
 src/store/           Store interface, FsStore, watcher, atomic writes, git auto-commit
 src/model/           HTML parser, canonical ref model, index
-src/tools/           the 25 tools (reads, writes, lifecycle, comments, visual review)
+src/tools/           the tools (reads, writes, lifecycle, comments, visual review, use cases)
 src/mcp/             MCP server (streamable HTTP) and the stdio bridge to it
 src/http/            internal JSON API + SSE, consumed by the preview
 src/preview/         browser preview — plain ES modules, no build step

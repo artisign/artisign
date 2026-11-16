@@ -1,0 +1,10 @@
+{
+  "notes": "**Pointer drag in progress** in the Steps of the use-case dialog (CHR-1103; replaces the up/down buttons). Body scrolled to Steps. Step 4 \"Clicks Save use case\" is being dragged up; the drop marker says it will land between steps 1 and 2. The same mechanics apply to a variant's step changes (`uc-step-op`).\n\nPer the platform guidance for one-axis drag-and-drop:\n- **Only the handle drags** (`uc-drag-handle`, primary button only, `setPointerCapture`, one pointer followed). Fields in the row stay usable and their text selectable.\n- **The real row is lifted, not cloned:** it follows the pointer with `translate`, `scale(1.02)`, `chrome-shadow-float`, `border-strong`, `pointer-events: none`; handle `grabbed`. Its own slot stays in the list as an empty dashed box (`chrome-field` fill, `border-strong` dashed) so it is clear where it came from. Nothing else moves while dragging.\n- **Drop marker** (`uc-drop-marker`) centred in the gap where the row will land, found from the siblings' layout midpoints. No marker when the drop spot is the row's own slot. Body has `cursor: grabbing`.\n- **The body auto-scrolls** while the pointer is near its top or bottom edge, so a step can travel past the visible area.\n- **On release** the row moves once (`moveBefore`, fallback `before()` + refocus the handle), animates from where it was let go to its new place, and the numbers update. Esc during the drag puts it back with the same animation. All motion is skipped under `prefers-reduced-motion: reduce`.\n- A polite live region announces the result: \"Clicks Save use case, moved to step 2 of 5.\" (only when the position changed; also \"Move cancelled.\").\n\nStep numbers are positions: they are not stored, and step ids do not change. A reorder marks the form dirty like any other edit. Warnings travel with their row.\n\nFlows: close / Cancel / Save → `usecases-detail`.",
+  "tags": [
+    "chr-1062",
+    "dialog",
+    "chr-1103"
+  ],
+  "variant_of": "usecases-edit-dialog",
+  "variant_kind": "state"
+}

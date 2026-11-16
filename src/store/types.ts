@@ -65,6 +65,7 @@ export type CommitSkippedReason =
   | "disabled"
   | "nested_repo"
   | "nothing_to_commit"
+  | "merge_in_progress"
   | `git_error: ${string}`;
 
 export type CommitResult = {

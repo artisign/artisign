@@ -177,6 +177,11 @@ async function isKnownToGit(projectDir: string, path: string): Promise<{ inHead:
   return { inHead, inIndex };
 }
 
+/** True while an unfinished merge leaves `MERGE_HEAD` behind. */
+async function isMergeInProgress(projectDir: string): Promise<boolean> {
+  return (await git(projectDir, ["rev-parse", "-q", "--verify", "MERGE_HEAD"]).catch(() => "")) !== "";
+}
+
 /**
  * Commits exactly `paths` (project-relative) and nothing else: `git add -- <paths>`
  * then `git commit --only -- <paths>`. Anything else that is modified or staged
@@ -191,6 +196,9 @@ export async function autoCommitPaths(projectDir: string, message: string, paths
     const nested = await prepareRepo(projectDir);
     if (nested) return nested;
 
+    // A partial commit (`--only`) is refused by git while a merge is unfinished.
+    if (await isMergeInProgress(projectDir)) return { sha: null, skipped_reason: "merge_in_progress" };
+
     const specs: string[] = [];
     for (const path of [...new Set(paths)]) {
       if (await pathExists(join(projectDir, path))) {
@@ -204,7 +212,13 @@ export async function autoCommitPaths(projectDir: string, message: string, paths
     }
     if (specs.length === 0) return { sha: null, skipped_reason: "nothing_to_commit" };
 
-    await git(projectDir, ["add", "--", ...specs]);
+    // `git add` refuses a pathspec that matches neither disk nor index (a deletion that is already staged);
+    // such a path is committed as it stands in the index.
+    const toAdd: string[] = [];
+    for (const path of specs) {
+      if ((await pathExists(join(projectDir, path))) || (await isKnownToGit(projectDir, path)).inIndex) toAdd.push(path);
+    }
+    if (toAdd.length > 0) await git(projectDir, ["add", "--", ...toAdd]);
     if ((await git(projectDir, ["status", "--porcelain", "--", ...specs])) === "") {
       return { sha: null, skipped_reason: "nothing_to_commit" };
     }

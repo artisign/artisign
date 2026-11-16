@@ -1,7 +1,7 @@
 // Use Cases tab — the detail view of one use case: header, variant chips, people, trigger / goal / outcome, the flow as a
 // step sequence (actor, action, target chip, before/after data cards), inputs and outputs as data-object cards, and for a
 // selected variant the difference against the base plus the coverage matrix. Built from get_use_case bundles
-// (docs/usecases-spec.md); a variant is always shown as a diff, never as a full copy.
+// (see the use-case spec); a variant is always shown as a diff, never as a full copy.
 
 import { h, icon } from "./usecases-dom.js";
 import { openMenu } from "./usecases-menu.js";

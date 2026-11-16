@@ -1,5 +1,5 @@
 // Shared fixtures for the Use Cases tests: a small persona pool, a use case with two variants, and the bundle shapes
-// get_use_case returns for the base flow and for a selected variant (docs/usecases-spec.md).
+// get_use_case returns for the base flow and for a selected variant (see the use-case spec).
 
 import { indexById } from "./usecases-data.js";
 

@@ -461,7 +461,7 @@ const board = createBoardView({
 });
 board.mount();
 
-// Use Cases tab (experiment): nothing is fetched until the tab is first shown. Opening a mapped screen leaves the tab for Screens.
+// Use Cases tab: nothing is fetched until the tab is first shown. Opening a mapped screen leaves the tab for Screens.
 const useCases = createUseCasesView({
   rootEl: usecasesViewEl,
   getProject: () => activeProjectRoot,
@@ -1742,7 +1742,7 @@ async function selectScreen(screen) {
 
 let screenUseCasesRequest = 0;
 
-/** Reverse entry (Use Cases experiment): the use cases whose steps map to the screen shown. One read per screen, independent of the Use Cases tab; hidden when nothing maps to it or the project has no usecases/ folder. */
+/** Reverse entry (Use Cases): the use cases whose steps map to the screen shown. One read per screen, independent of the Use Cases tab; hidden when nothing maps to it or the project has no usecases/ folder. */
 async function updateScreenUseCases() {
   const request = ++screenUseCasesRequest;
   screenUseCasesEl.hidden = true;

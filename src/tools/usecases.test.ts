@@ -997,6 +997,33 @@ describe("preview commits (ctx.source: human)", () => {
     expect(await lastFiles()).toEqual(["usecases/cases/renew-loan.json"]);
   });
 
+  it("commits a deletion that is already staged", async () => {
+    const file = "usecases/cases/borrow-book.json";
+    await git("rm", "--quiet", "--", file);
+    await writeFile(join(dir, "stray.txt"), "left over");
+    const res = await store.commitPaths("delete_entity (preview): use_case:borrow-book", [file]);
+    expect(res.sha).toMatch(/^[0-9a-f]{40}$/);
+    expect(res.skipped_reason).toBeUndefined();
+    expect(await lastFiles()).toEqual([file]);
+    expect(await dirty()).toEqual(["stray.txt"]);
+  });
+
+  it("reports merge_in_progress instead of git_error during an unfinished merge", async () => {
+    await git("checkout", "-q", "-b", "side");
+    await writeFile(join(dir, "side.txt"), "side");
+    await git("add", "side.txt");
+    await git("commit", "-q", "-m", "side change");
+    await git("checkout", "-q", "-");
+    await writeFile(join(dir, "main.txt"), "main");
+    await git("add", "main.txt");
+    await git("commit", "-q", "-m", "main change");
+    await git("merge", "--no-commit", "--no-ff", "side");
+    const head = await git("rev-parse", "HEAD");
+    const res = await setUseCases(store, { use_cases: [borrowCase({ id: "renew-loan", title: "Renew a loan" })] }, human);
+    expect(res).toMatchObject({ commit: null, commit_skipped_reason: "merge_in_progress" });
+    expect(await git("rev-parse", "HEAD")).toBe(head);
+  });
+
   it("generate_personas commits personas.json only; a dry run commits nothing", async () => {
     const head = await git("rev-parse", "HEAD");
     await generatePersonas(store, { dry_run: true }, human);

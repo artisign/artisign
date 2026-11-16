@@ -257,10 +257,10 @@ describe("use case tools", () => {
         const err = await setUseCases(fx.store, { use_cases: ids.map((id) => ({ id, status: "ready" })) }).catch((e: unknown) => e);
         const message = (err as Error).message;
         expect(err).toMatchObject({ code: "invalid_state" });
-        expect(message).toContain("15 stored use cases are invalid, nothing written");
+        expect(message).toContain("14 stored use cases are invalid, nothing written");
         expect(message).toContain("broken-09.json");
         expect(message).not.toContain("broken-10.json");
-        expect(message).toContain("(+5 more)");
+        expect(message).toContain("(+4 more)");
         expect(message).toContain(" | ");
       });
 

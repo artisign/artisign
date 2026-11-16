@@ -2,11 +2,11 @@
 
 An artificial artisan for UI design: agents build screens, a design system keeps them consistent. <!-- [TAGLINE von Christian] -->
 
-Local-first UX design tool for AI agents. Agents design through MCP, the human reviews in the browser, state lives in plain files.
+Local-first UX design tool for AI agents. Agents design through MCP, the human reviews in the browser and can also create, edit and delete use-case data there, state lives in plain files.
 
 One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
-**Status:** Stable (`2.2.1`) — CLI, store, parser/model, the 25-tool MCP surface, browser preview with live reload/flows/comments, screen variants with side-by-side compare, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
+**Status:** Stable (`2.2.1`) — CLI, store, parser/model, the 30-tool MCP surface, browser preview with live reload/flows/comments, screen variants with side-by-side compare, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
 
 ## Why
 
@@ -105,7 +105,7 @@ Replace `/opt/homebrew/bin` with the directory `which npx` shows. Quit and reope
 
 **Just trying it.** `npx artisign` runs it once without installing.
 
-## The 25 tools
+## The 30 tools
 
 Every tool except `list_projects`, `init_project` and `get_guide` takes a required `project` input: a known project's name (as `list_projects` returns it) or an absolute path to a project folder. There is no implicit "current project" for agents.
 
@@ -117,6 +117,9 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 | Reads | `get_node` | Subtree of one node, addressed as `<screen>.<node-id>`. Tiered + field selection. |
 | Reads | `get_design_system` | Tokens, components (with variants and the default variant's slot names), and patterns. `tree` carries every token value, grouped by bucket. |
 | Reads | `find_nodes` | Where-query across screens (style ref, component ref, variant, comments, text, flow). |
+| Reads | `list_use_cases` | Use cases filtered by group prefix, persona, screen, node, tag, status, text or variants; sorted, paged, with facet counts. `include` adds the personas, dimensions and data objects. |
+| Reads | `get_use_case` | One-call bundle for a coding agent: the (variant-resolved) use case, its personas, data objects and the mapped screens with their nodes. |
+| Reads | `suggest_use_case_variants` | For one use case, the persona-pool trait values no variant covers yet, with variant skeletons to fill in. |
 | Reads | `list_comments` | Open/resolved comments, filtered by screen or node. |
 | Reads | `get_mockup` | A mockup's variants — raw HTML, outside the ref model. |
 | Writes | `write_html` | Create or fully replace a screen from augmented HTML. |
@@ -125,6 +128,8 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 | Writes | `set_tokens` | Design-system token mutation — one call re-resolves every bound screen. |
 | Writes | `set_flow` | Mutate a flow edge in `flows.json` without touching any screen file. |
 | Writes | `set_meta` | Screen notes/tags and `variant_of`/`variant_kind`, design-system idea/decisions, component/pattern usage, a tag's own notes — the handoff contract. |
+| Writes | `set_use_cases` | Bulk upsert of dimensions, personas, data objects and use cases; one commit per call, reference problems are warnings. |
+| Writes | `generate_personas` | Deterministic generic personas from the dimensions (`pairwise` or `all`), skipping combinations already covered; `dry_run` previews. |
 | Writes | `write_mockup` | Create or revise one variant of a mockup — raw HTML, outside the design system. |
 | Writes | `set_board_state` | Read or mutate the Board's shared filter, pinned screens and expanded variant clusters — daemon memory only. |
 | Lifecycle | `list_projects` | Every project the daemon has opened or created, as `{ name, root, open }`; works with no project open. |
@@ -132,23 +137,10 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 | Lifecycle | `import_html` | Incremental HTML ingest into an existing project, with content-hash dedup. |
 | Lifecycle | `promote_to_system` | Lift an inline value or a repeated element into a token, component, or pattern. |
 | Lifecycle | `promote_mockup` | Copy a chosen mockup variant into a new, design-system-bound screen (the mockup stays). |
-| Lifecycle | `delete_entity` | Delete a screen, component, pattern, or mockup; refuses a component still referenced by a screen, and a screen that still has variants (`has_variants`) unless `cascade: true` deletes the whole subtree. |
+| Lifecycle | `delete_entity` | Delete a screen, component, pattern, mockup, persona, dimension, data object or use case (the last four warn about dangling references); refuses a component still referenced by a screen, and a screen that still has variants (`has_variants`) unless `cascade: true` deletes the whole subtree. |
 | Comments | `reply_comment` | Answer a comment and optionally resolve it. |
 | Visual review | `get_screenshot` | Screenshots a rendered screen (or one node), or one mockup variant, as a PNG — the write → screenshot → adjust loop. |
 | Visual review | `inspect_node` | Computed box and styles of one node as text — cheaper than vision for geometry questions. |
-
-### Unreleased — on `main`, not part of 2.2.1
-
-Specs that coding agents write and read: an optional `usecases/` folder with personas, data objects and use cases whose steps map onto screens and elements. A project without it behaves exactly as before. These five tools and four extra `delete_entity` kinds are merged but not yet in a release, so the tool count above is unchanged until one ships. The preview shows them in a fourth tab, **Use Cases**, where people can also create, edit and delete the same data.
-
-| Bucket | Tool | Does |
-|---|---|---|
-| Reads | `list_use_cases` | Use cases filtered by group prefix, persona, screen, node, tag, status, text or variants; sorted, paged, with facet counts. `include` adds the personas, dimensions and data objects. |
-| Reads | `get_use_case` | One-call bundle for a coding agent: the (variant-resolved) use case, its personas, data objects and the mapped screens with their nodes. |
-| Reads | `suggest_use_case_variants` | For one use case, the persona-pool trait values no variant covers yet, with variant skeletons to fill in. |
-| Writes | `set_use_cases` | Bulk upsert of dimensions, personas, data objects and use cases; one commit per call, reference problems are warnings. |
-| Writes | `generate_personas` | Deterministic generic personas from the dimensions (`pairwise` or `all`), skipping combinations already covered; `dry_run` previews. |
-| Lifecycle | `delete_entity` | Also takes the kinds `persona`, `dimension`, `data_object` and `use_case`, warning about dangling references. |
 
 ### The write → screenshot → adjust loop
 
@@ -212,6 +204,7 @@ Served at `http://127.0.0.1:<port>` once the daemon is running — plain ES modu
 - **Comment mode** — click an element to anchor a comment; appended to `comments.jsonl`, picked up by `list_comments` / answered via `reply_comment`
 - **Design System** — token swatches by bucket, every component with every variant rendered side by side
 - **Mockup view** — a mockup's variants rendered live, side by side in columns, each with its title and description
+- **Use Cases** — a tab for the optional `usecases/` folder. A list of use cases (filter by group, persona, status, text; has-variants toggle) beside a detail view with steps, variants and the persona and data objects each uses; a mapping view that shows which screens and elements each step points at; and pools for personas, dimensions and data objects. People create, edit and delete all of it through dialogs, and generate personas from the dimensions. A project without `usecases/` shows an empty tab
 - **Follow mode** — off by default; the topbar's Follow toggle (three states: off / Following / Follow paused) makes the preview track a live agent session's own MCP tool calls, switching the view/selection to whatever it touches and briefly outlining the affected nodes (solid teal for a read, dashed violet + wash for a write, or a dashed border + "Updated" badge around the whole screen after `write_html`). Every tool call also lands in the right panel's new Activity tab (last 50, in-memory, newest first) regardless of follow's own state. Human navigation — a screen/tab click, clicking an entry in the Activity feed, or opening comment/inspect mode — pauses it; only the toggle's own "Resume" un-pauses it
 - Live reload over SSE — any file change on disk shows up in the browser within ~200 ms
 

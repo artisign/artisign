@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { autoCommit, getHeadCommit, FALLBACK_IDENTITY } from "./git.js";
+import { autoCommit, autoCommitPaths, getHeadCommit, FALLBACK_IDENTITY } from "./git.js";
 import { setupGitConfig, type GitConfigFixture } from "../tools/test-fixtures.js";
 
 const execFileAsync = promisify(execFile);
@@ -229,5 +229,142 @@ describe("getHeadCommit", () => {
     await writeFile(join(dir, ".git"), "not a git dir");
     const result = await getHeadCommit(dir);
     expect(result).toEqual({ sha: null, head_reason: "git_error" });
+  });
+});
+
+describe("unfinished git operations", () => {
+  let dir: string;
+
+  const run = (cwd: string, ...args: string[]) => git(cwd, args);
+  const fails = (cwd: string, ...args: string[]) => run(cwd, ...args).then(() => false, () => true);
+
+  /** `main` and `side` both changed `a.txt` after `base`, so merge, cherry-pick, rebase and revert of `base` conflict. */
+  async function conflictingRepo(root: string): Promise<void> {
+    await run(root, "init", "-q", "-b", "main");
+    await run(root, "config", "user.name", "Test");
+    await run(root, "config", "user.email", "test@example.com");
+    await writeFile(join(root, "a.txt"), "one\n");
+    await run(root, "add", "-A");
+    await run(root, "commit", "-q", "-m", "first");
+    await writeFile(join(root, "a.txt"), "two\n");
+    await run(root, "commit", "-q", "-am", "second");
+    await run(root, "checkout", "-q", "-b", "side", "HEAD~1");
+    await writeFile(join(root, "a.txt"), "side\n");
+    await run(root, "commit", "-q", "-am", "side");
+    await run(root, "checkout", "-q", "main");
+    await writeFile(join(root, "a.txt"), "three\n");
+    await run(root, "commit", "-q", "-am", "third");
+  }
+
+  /** What an agent write must leave alone: HEAD and the index. */
+  async function snapshot(root: string): Promise<{ head: string; index: string }> {
+    return { head: await run(root, "rev-parse", "HEAD"), index: await run(root, "ls-files", "--stage") };
+  }
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "artisign-git-op-"));
+    await conflictingRepo(dir);
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("an agent write during a --no-commit merge leaves HEAD and the index unchanged", async () => {
+    await run(dir, "checkout", "-q", "-b", "other");
+    await writeFile(join(dir, "b.txt"), "b\n");
+    await run(dir, "add", "b.txt");
+    await run(dir, "commit", "-q", "-m", "other");
+    await run(dir, "checkout", "-q", "main");
+    await run(dir, "merge", "--no-commit", "--no-ff", "other");
+    const before = await snapshot(dir);
+    await writeFile(join(dir, "screen.html"), "<div></div>");
+
+    const result = await autoCommit(dir, "write_html: screen");
+
+    expect(result).toEqual({ sha: null, skipped_reason: "merge_in_progress" });
+    expect(await snapshot(dir)).toEqual(before);
+    expect(await run(dir, "status", "--porcelain")).toContain("?? screen.html");
+  });
+
+  it("an agent write during a conflicted merge does not stage the conflict markers", async () => {
+    expect(await fails(dir, "merge", "--no-edit", "side")).toBe(true);
+    const before = await snapshot(dir);
+
+    const result = await autoCommit(dir, "write_html: screen");
+
+    expect(result.skipped_reason).toBe("merge_in_progress");
+    expect(await snapshot(dir)).toEqual(before);
+    expect(await run(dir, "diff", "--name-only", "--diff-filter=U")).toBe("a.txt");
+  });
+
+  it.each([
+    ["cherry-pick", ["cherry-pick", "side"]],
+    ["revert", ["revert", "--no-edit", "HEAD~1"]],
+    ["rebase", ["rebase", "side"]],
+  ])("an agent write during a %s skips with operation_in_progress and stages nothing", async (_name, args) => {
+    expect(await fails(dir, ...args)).toBe(true);
+    const before = await snapshot(dir);
+    await writeFile(join(dir, "screen.html"), "<div></div>");
+
+    const result = await autoCommit(dir, "write_html: screen");
+
+    expect(result).toEqual({ sha: null, skipped_reason: "operation_in_progress" });
+    expect(await snapshot(dir)).toEqual(before);
+  });
+
+  it("a multi-commit cherry-pick keeps skipping after a resolved step was committed (sequencer)", async () => {
+    await run(dir, "checkout", "-q", "side");
+    await writeFile(join(dir, "s2.txt"), "s2\n");
+    await run(dir, "add", "s2.txt");
+    await run(dir, "commit", "-q", "-m", "side two");
+    await run(dir, "checkout", "-q", "main");
+    expect(await fails(dir, "cherry-pick", "main..side")).toBe(true);
+    await writeFile(join(dir, "a.txt"), "resolved\n");
+    await run(dir, "add", "a.txt");
+    await run(dir, "commit", "-q", "-m", "resolved step");
+    expect(await fails(dir, "rev-parse", "-q", "--verify", "CHERRY_PICK_HEAD")).toBe(true);
+    const before = await snapshot(dir);
+    await writeFile(join(dir, "screen.html"), "<div></div>");
+
+    const result = await autoCommit(dir, "write_html: screen");
+
+    expect(result).toEqual({ sha: null, skipped_reason: "operation_in_progress" });
+    expect(await snapshot(dir)).toEqual(before);
+  });
+
+  it("a preview write during a cherry-pick returns operation_in_progress", async () => {
+    expect(await fails(dir, "cherry-pick", "side")).toBe(true);
+    const before = await snapshot(dir);
+    await writeFile(join(dir, "personas.json"), "{}\n");
+
+    const result = await autoCommitPaths(dir, "preview: personas", ["personas.json"]);
+
+    expect(result).toEqual({ sha: null, skipped_reason: "operation_in_progress" });
+    expect(await snapshot(dir)).toEqual(before);
+  });
+
+  it("a preview write during a rebase returns operation_in_progress", async () => {
+    expect(await fails(dir, "rebase", "side")).toBe(true);
+    const before = await snapshot(dir);
+    await writeFile(join(dir, "personas.json"), "{}\n");
+
+    const result = await autoCommitPaths(dir, "preview: personas", ["personas.json"]);
+
+    expect(result).toEqual({ sha: null, skipped_reason: "operation_in_progress" });
+    expect(await snapshot(dir)).toEqual(before);
+  });
+
+  it("finds the operation in a linked worktree, whose .git is a file", async () => {
+    const wt = join(dir, "wt");
+    await run(dir, "worktree", "add", "-q", "-b", "wt-branch", wt, "main");
+    expect(await fails(wt, "cherry-pick", "side")).toBe(true);
+    expect((await readFile(join(wt, ".git"), "utf8")).startsWith("gitdir:")).toBe(true);
+
+    expect(await autoCommit(wt, "write_html: screen")).toEqual({ sha: null, skipped_reason: "operation_in_progress" });
+    expect(await autoCommitPaths(wt, "preview: x", ["a.txt"])).toEqual({
+      sha: null,
+      skipped_reason: "operation_in_progress",
+    });
   });
 });

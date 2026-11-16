@@ -478,6 +478,7 @@ describe("generate personas: partial result", () => {
     expect(text).toContain("80 would be created");
     expect(text).toContain("generation stopped at its work budget");
     expect(text).toContain("and 68 more");
+    expect(text).not.toContain("null"); // an absent block must not leave a text node behind
     expect($$("dialog .uc-foot-actions button").pop().textContent).toBe("Create 80 personas");
   });
 });

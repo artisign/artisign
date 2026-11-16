@@ -404,7 +404,8 @@ export async function openGenerateDialog(options) {
     state.preview = data;
     dialog.setMessage("");
     const list = data.personas ?? [];
-    previewBox.replaceChildren(
+    fill(
+      previewBox,
       h("p", { class: "uc-preview-summary" }, h("strong", null, `${formatCount(data.would_create ?? 0)} would be created`), ` · ${formatCount(data.total ?? 0)} ${data.strategy === "all" ? "combinations" : "value pairs"} in total · ${formatCount(data.skipped_covered ?? 0)} already covered by existing personas${data.truncated ? " · cut off by the limit" : ""}`),
       data.partial ? h("p", { class: "uc-field-warn", role: "status" }, (data.warnings ?? []).find((w) => w.kind === "partial_result")?.message ?? "This is only part of the full result: narrow the dimensions and preview again.") : null,
       list.length === 0 ? h("p", { class: "uc-muted" }, "Nothing to create: every combination is already covered.") : h("ul", { class: "uc-preview-list" }, list.slice(0, 12).map((p) => h("li", null, h("span", { class: "uc-preview-name" }, p.name), h("span", { class: "uc-muted uc-mono" }, Object.entries(p.traits ?? {}).map(([k, v]) => `${k}=${v}`).join(" ")))), list.length > 12 ? h("li", { class: "uc-muted" }, `… and ${formatCount((data.would_create ?? list.length) - 12)} more`) : null),

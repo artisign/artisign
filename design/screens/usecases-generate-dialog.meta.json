@@ -1,0 +1,9 @@
+{
+  "notes": "Generate personas from dimensions (new in CHR-1062; tool `generate_personas`). Same dialog shell, 580px. Drawn after **Preview** was clicked.\n\nBody: lede (\"Expands your dimensions into generic personas. Existing personas that already cover a combination are skipped. Preview first: nothing is written until you create.\"), Strategy (`uc-segmented two-first`: Pairwise (recommended) / All combinations), Dimensions (one checkbox per dimension with its value count, all checked by default; \"traits on other dimensions are ignored\"; none checked disables Preview), Limit (number input, 1–5,000, default 100), **Preview** (secondary) = a dry run.\n\nPreview result (`aria-live=\"polite\"`): summary \"**9 would be created** · 33 value pairs in total · 24 already covered by existing personas\" (+ \" · cut off by the limit\" when truncated), then up to 12 names with their traits (mono, tertiary) and \"… and N more\". Nothing to create → \"Nothing to create: every combination is already covered.\" Changing any input clears the preview and disables Create again.\n\nFooter: Close, primary **Create N personas** (disabled until a preview with at least one persona). Flows: close / Close / Create → `usecases-personas`.",
+  "tags": [
+    "chr-1062",
+    "dialog"
+  ],
+  "variant_of": "usecases-personas",
+  "variant_kind": "overlay"
+}

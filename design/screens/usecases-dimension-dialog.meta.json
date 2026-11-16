@@ -1,0 +1,9 @@
+{
+  "notes": "New/edit dimension (new in CHR-1062; the build has it, the experiment drawing did not). Same dialog shell as `usecases-edit-dialog`, 580px. Drawn: edit mode of \"Project size\" while a fourth value is being added.\n\nHeader: \"Edit dimension\" + id chip (create mode: \"New dimension\", no chip). Fields: Label (autofocus) | ID (derived from the label in create mode; \"fixed once used\", read-only in edit mode), Description (one line), Values (\"· the ways users differ along this dimension\"): one row per value — label input, the value id (mono, tertiary; derived from the label for new values, fixed for existing ones), remove; \"+ Value\" adds a row and focuses it. New dimensions start with two empty value rows.\n\nValidation: Save is disabled while the payload is invalid (empty label, fewer than two values, duplicate ids); the first error shows in the footer message once the form is dirty. Footer: **Delete** (edit mode only, left, danger text; asks before deleting, focus on the safe action), Cancel, **Save dimension** / **Create dimension**.\n\nFlows: close / Cancel / Save → `usecases-personas`.",
+  "tags": [
+    "chr-1062",
+    "dialog"
+  ],
+  "variant_of": "usecases-personas",
+  "variant_kind": "overlay"
+}

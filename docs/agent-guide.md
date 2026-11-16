@@ -515,7 +515,12 @@ Workflow, in this order:
    deterministically (`pairwise` by default: every value pair of two
    dimensions at least once; `all`: the full product) — preview with
    `dry_run: true`, cap with `limit`. It skips combinations an existing
-   persona already covers.
+   persona already covers. `truncated: true` means `limit` was reached. A call
+   has a work budget: when it runs out the response carries `partial: true` and
+   a `partial_result` warning, the personas written are a prefix of the full
+   result, and calling again continues because covered combinations are
+   skipped. `pairwise` is rejected above 1,000,000 value pairs, like `all`
+   above 1,000,000 combinations — narrow `dimensions`.
 2. **Data objects.** The reusable things the product handles (`loan`,
    `member`): `fields` with `name`, `type` (`string | number | boolean |
    date | datetime | enum | ref | list | object`), `values` for an enum, `ref`

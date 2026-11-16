@@ -1,0 +1,10 @@
+{
+  "notes": "**Empty state** of the structured variant editor (CHR-1103): what + Variant opens. A new variant box is appended after the last one, the body scrolls to it and Title has focus (placeholder \"Large project: map from the list\"; ID placeholder \"from the title\"; Description placeholder \"What is different in this variant\").\n\nNothing is overridden yet:\n- Overrides: all six rows inherited (`uc-inherited`).\n- Actor swaps: \"None. Every inherited step keeps its base actor.\" + \"+ Actor swap\".\n- Step changes: \"None. This variant runs the 5 base steps as they are.\" (the number is the base step count) + \"+ Step change\".\n\nA variant with no overrides and no changes is valid once it has a title and a condition. Drawn: no title yet, so Save is disabled and the footer says \"Variant 2 needs a title.\" (danger). The box above is the end of the first variant. Drawing: the dialog is 996px here to show the whole new box; the real dialog is 836px and scrolls.\n\nFlows: close / Cancel → `usecases-detail`.",
+  "tags": [
+    "chr-1062",
+    "dialog",
+    "chr-1103"
+  ],
+  "variant_of": "usecases-edit-dialog-variant",
+  "variant_kind": "state"
+}

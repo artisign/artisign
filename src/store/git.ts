@@ -188,8 +188,11 @@ async function isMergeInProgress(projectDir: string): Promise<boolean> {
  * stays out of the commit and goes into the next one. A path that is gone from
  * disk and was never committed (a file created and deleted before any commit)
  * cannot be part of a pathspec and is dropped; if no path remains, or none has
- * a change, nothing is committed (`nothing_to_commit`). Same repo rules as
- * `autoCommit`: initialized on first use, skipped inside an outer repo.
+ * a change, nothing is committed (`nothing_to_commit`). A deletion that is
+ * already staged is committed as it stands. During an unfinished merge git
+ * refuses partial commits, so nothing is committed (`merge_in_progress`).
+ * Same repo rules as `autoCommit`: initialized on first use, skipped inside
+ * an outer repo.
  */
 export async function autoCommitPaths(projectDir: string, message: string, paths: string[]): Promise<CommitResult> {
   try {
@@ -199,25 +202,26 @@ export async function autoCommitPaths(projectDir: string, message: string, paths
     // A partial commit (`--only`) is refused by git while a merge is unfinished.
     if (await isMergeInProgress(projectDir)) return { sha: null, skipped_reason: "merge_in_progress" };
 
+    // `git add` refuses a pathspec that matches neither disk nor index (a deletion that is already staged);
+    // such a path stays in `specs` and is committed as it stands in the index.
     const specs: string[] = [];
+    const toAdd: string[] = [];
     for (const path of [...new Set(paths)]) {
       if (await pathExists(join(projectDir, path))) {
         specs.push(path);
+        toAdd.push(path);
         continue;
       }
       const known = await isKnownToGit(projectDir, path);
-      if (known.inHead) specs.push(path);
+      if (known.inHead) {
+        specs.push(path);
+        if (known.inIndex) toAdd.push(path);
+      }
       // Staged earlier, deleted since, never committed: forget the index entry so it cannot leak into a later commit.
       else if (known.inIndex) await git(projectDir, ["rm", "--cached", "--quiet", "--", path]);
     }
     if (specs.length === 0) return { sha: null, skipped_reason: "nothing_to_commit" };
 
-    // `git add` refuses a pathspec that matches neither disk nor index (a deletion that is already staged);
-    // such a path is committed as it stands in the index.
-    const toAdd: string[] = [];
-    for (const path of specs) {
-      if ((await pathExists(join(projectDir, path))) || (await isKnownToGit(projectDir, path)).inIndex) toAdd.push(path);
-    }
     if (toAdd.length > 0) await git(projectDir, ["add", "--", ...toAdd]);
     if ((await git(projectDir, ["status", "--porcelain", "--", ...specs])) === "") {
       return { sha: null, skipped_reason: "nothing_to_commit" };

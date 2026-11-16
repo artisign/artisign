@@ -215,7 +215,7 @@ export interface Store {
    * Commits all current changes when `autoCommit` is enabled in `artisign.json`.
    * `sha` is `null` when auto-commit is disabled, there is nothing to
    * commit, the project dir is nested inside an outer repo, or the commit
-   * failed — `skipped_reason` says which (failures never break the write).
+   * failed, or (`commitPaths` only) a merge is unfinished — `skipped_reason` says which (failures never break the write).
    */
   commit(message: string): Promise<CommitResult>;
 
@@ -223,7 +223,9 @@ export interface Store {
    * Same as `commit`, but records only `paths` (project-relative) — what one
    * call itself wrote or deleted — and leaves every other change uncommitted.
    * A deleted path that was never committed is dropped; with nothing left the
-   * result is `nothing_to_commit`. Used for writes that arrive from the preview.
+   * result is `nothing_to_commit`. A deletion that is already staged is
+   * committed; during an unfinished merge nothing is committed and the result
+   * is `merge_in_progress`. Used for writes that arrive from the preview.
    */
   commitPaths(message: string, paths: string[]): Promise<CommitResult>;
 

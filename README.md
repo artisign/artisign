@@ -195,7 +195,7 @@ instance's declarations last so they win the inline cascade. Only the tag is
 the definition's call. The example above therefore renders the hover template
 with `padding-inline: 16px` on top of whatever the definition sets.
 
-Everything is human-readable and diffable. With `autoCommit` on (the `init` default), every write op becomes one git commit named after the tool and its target (`write_html: dashboard`, `set_tokens: color.primary`, ...) — that is the audit log. The commit is authored by the git identity on the machine, or by `artisign <noreply@artisign.dev>` when there is none (see [Install](#install)). Every write's result carries the commit as `commit`; when no commit was made, `commit` is `null` and `commit_skipped_reason` says why — `disabled`, `nothing_to_commit`, `nested_repo` (the project sits inside another repo), or `git_error: <git's message>`.
+Everything is human-readable and diffable. With `autoCommit` on (the `init` default), every write op becomes one git commit named after the tool and its target (`write_html: dashboard`, `set_tokens: color.primary`, ...) — that is the audit log. The commit is authored by the git identity on the machine, or by `artisign <noreply@artisign.dev>` when there is none (see [Install](#install)). Every write's result carries the commit as `commit`; when no commit was made, `commit` is `null` and `commit_skipped_reason` says why — `disabled`, `nothing_to_commit`, `nested_repo` (the project sits inside another repo), `merge_in_progress` (a preview write met an unfinished merge), or `git_error: <git's message>`.
 
 ## Browser preview
 

@@ -342,48 +342,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "app-shell.project-picker",
-    "event": "tap",
-    "to": "open-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.tab-ds",
-    "event": "tap",
-    "to": "design-system-view",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.tab-board",
-    "event": "tap",
-    "to": "board-view",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.tab-usecases",
-    "event": "tap",
-    "to": "usecases-list",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.left-header",
-    "event": "tap",
-    "to": "sidebars-collapsed",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.comments-header",
-    "event": "tap",
-    "to": "comments-panel",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.el-checkout",
-    "event": "tap",
-    "to": "inspector-selected",
-    "to_kind": "screen"
-  },
-  {
     "from": "usecases-detail.sub-personas",
     "event": "tap",
     "to": "usecases-personas",
@@ -771,6 +729,66 @@
     "from": "usecases-edit-dialog.dlg-save",
     "event": "tap",
     "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.project-picker",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-ds",
+    "event": "tap",
+    "to": "design-system-view",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-board",
+    "event": "tap",
+    "to": "board-view",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-usecases",
+    "event": "tap",
+    "to": "usecases-list",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.left-header",
+    "event": "tap",
+    "to": "sidebars-collapsed",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.su-row-1",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.su-row-2",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.su-row-3",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.comments-header",
+    "event": "tap",
+    "to": "comments-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.el-checkout",
+    "event": "tap",
+    "to": "inspector-selected",
     "to_kind": "screen"
   }
 ]

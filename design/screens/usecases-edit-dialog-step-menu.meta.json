@@ -3,7 +3,8 @@
   "tags": [
     "chr-1062",
     "dialog",
-    "chr-1103"
+    "chr-1103",
+    "chr-1104"
   ],
   "variant_of": "usecases-edit-dialog",
   "variant_kind": "overlay"

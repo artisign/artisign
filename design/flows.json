@@ -282,408 +282,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "usecases-personas.sub-cases",
-    "event": "tap",
-    "to": "usecases-list",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-personas.sub-objects",
-    "event": "tap",
-    "to": "usecases-data-objects",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-personas.btn-add-persona",
-    "event": "tap",
-    "to": "usecases-edit-dialog-persona",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-personas.btn-generate",
-    "event": "tap",
-    "to": "usecases-generate-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-personas.btn-new-persona",
-    "event": "tap",
-    "to": "usecases-edit-dialog-persona",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-personas.btn-add-dim",
-    "event": "tap",
-    "to": "usecases-dimension-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-personas.dim-actor-name",
-    "event": "tap",
-    "to": "usecases-dimension-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-personas.dim-role-name",
-    "event": "tap",
-    "to": "usecases-dimension-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-personas.dim-size-name",
-    "event": "tap",
-    "to": "usecases-dimension-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-personas.dim-adoption-name",
-    "event": "tap",
-    "to": "usecases-dimension-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-personas.pc-new",
-    "event": "tap",
-    "to": "usecases-edit-dialog-persona",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-empty.sub-personas",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-empty.sub-objects",
-    "event": "tap",
-    "to": "usecases-data-objects",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-empty.btn-add",
-    "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-empty.btn-new-persona",
-    "event": "tap",
-    "to": "usecases-edit-dialog-persona",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-empty.btn-dimensions",
-    "event": "tap",
-    "to": "usecases-dimension-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-empty.btn-new-case",
-    "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-dimension-dialog.dd-close",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-dimension-dialog.dd-cancel",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-dimension-dialog.dd-save",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-generate-dialog.gd-close",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-generate-dialog.gd-cancel",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-generate-dialog.gd-create",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-delete-confirm.cf-close",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-delete-confirm.cf-cancel",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-delete-confirm.cf-delete",
-    "event": "tap",
-    "to": "usecases-list",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-object-dialog.od-close",
-    "event": "tap",
-    "to": "usecases-data-objects",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-object-dialog.od-cancel",
-    "event": "tap",
-    "to": "usecases-data-objects",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-object-dialog.od-save",
-    "event": "tap",
-    "to": "usecases-data-objects",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.sub-personas",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.sub-objects",
-    "event": "tap",
-    "to": "usecases-data-objects",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.btn-new-case",
-    "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.btn-mapping",
-    "event": "tap",
-    "to": "usecases-mapping",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.btn-edit",
-    "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.btn-more",
-    "event": "tap",
-    "to": "usecases-delete-confirm",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.v-agent",
-    "event": "tap",
-    "to": "usecases-detail-variant",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.v-add",
-    "event": "tap",
-    "to": "usecases-edit-dialog-variant",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.v-coverage",
-    "event": "tap",
-    "to": "usecases-detail-variant",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.s1-target",
-    "event": "tap",
-    "to": "usecases-mapping",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.s2-target",
-    "event": "tap",
-    "to": "usecases-mapping",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.s3-target",
-    "event": "tap",
-    "to": "usecases-mapping",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.s4-target",
-    "event": "tap",
-    "to": "usecases-mapping",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail.s5-target",
-    "event": "tap",
-    "to": "usecases-mapping",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail-variant.sub-personas",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail-variant.sub-objects",
-    "event": "tap",
-    "to": "usecases-data-objects",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail-variant.btn-new-case",
-    "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail-variant.btn-mapping",
-    "event": "tap",
-    "to": "usecases-mapping",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail-variant.btn-edit",
-    "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail-variant.btn-more",
-    "event": "tap",
-    "to": "usecases-delete-confirm",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail-variant.v-base",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail-variant.v-add",
-    "event": "tap",
-    "to": "usecases-edit-dialog-variant",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-detail-variant.vs5-target",
-    "event": "tap",
-    "to": "usecases-mapping",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-data-objects.sub-cases",
-    "event": "tap",
-    "to": "usecases-list",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-data-objects.sub-personas",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-data-objects.btn-add-object",
-    "event": "tap",
-    "to": "usecases-object-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-data-objects.btn-new-object",
-    "event": "tap",
-    "to": "usecases-object-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-data-objects.oc-persona-edit",
-    "event": "tap",
-    "to": "usecases-object-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-data-objects.oc-dimension-edit",
-    "event": "tap",
-    "to": "usecases-object-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-data-objects.oc-data-object-edit",
-    "event": "tap",
-    "to": "usecases-object-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-data-objects.oc-use-case-edit",
-    "event": "tap",
-    "to": "usecases-object-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-data-objects.oc-step-edit",
-    "event": "tap",
-    "to": "usecases-object-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-data-objects.oc-variant-edit",
-    "event": "tap",
-    "to": "usecases-object-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-data-objects.oc-mapping-edit",
-    "event": "tap",
-    "to": "usecases-object-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-mapping.map-back",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-mapping.ms4-remap",
-    "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-mapping.fr-detail",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-mapping.fr-dialog",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
     "from": "board-view-clusters-collapsed.bar",
     "event": "tap",
     "to": "app-shell",
@@ -888,21 +486,243 @@
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-persona.pd-close",
+    "from": "usecases-data-objects.sub-cases",
+    "event": "tap",
+    "to": "usecases-list",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-data-objects.sub-personas",
     "event": "tap",
     "to": "usecases-personas",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-persona.pd-cancel",
+    "from": "usecases-data-objects.btn-add-object",
+    "event": "tap",
+    "to": "usecases-object-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-data-objects.btn-new-object",
+    "event": "tap",
+    "to": "usecases-object-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-data-objects.oc-persona-edit",
+    "event": "tap",
+    "to": "usecases-object-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-data-objects.oc-dimension-edit",
+    "event": "tap",
+    "to": "usecases-object-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-data-objects.oc-data-object-edit",
+    "event": "tap",
+    "to": "usecases-object-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-data-objects.oc-use-case-edit",
+    "event": "tap",
+    "to": "usecases-object-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-data-objects.oc-step-edit",
+    "event": "tap",
+    "to": "usecases-object-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-data-objects.oc-variant-edit",
+    "event": "tap",
+    "to": "usecases-object-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-data-objects.oc-mapping-edit",
+    "event": "tap",
+    "to": "usecases-object-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.sub-personas",
     "event": "tap",
     "to": "usecases-personas",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-persona.pd-save",
+    "from": "usecases-detail.sub-objects",
+    "event": "tap",
+    "to": "usecases-data-objects",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.btn-new-case",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.btn-mapping",
+    "event": "tap",
+    "to": "usecases-mapping",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.btn-edit",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.btn-more",
+    "event": "tap",
+    "to": "usecases-delete-confirm",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.v-agent",
+    "event": "tap",
+    "to": "usecases-detail-variant",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.v-add",
+    "event": "tap",
+    "to": "usecases-edit-dialog-variant",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.v-coverage",
+    "event": "tap",
+    "to": "usecases-detail-variant",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.s1-target",
+    "event": "tap",
+    "to": "usecases-mapping",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.s2-target",
+    "event": "tap",
+    "to": "usecases-mapping",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.s3-target",
+    "event": "tap",
+    "to": "usecases-mapping",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.s4-target",
+    "event": "tap",
+    "to": "usecases-mapping",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail.s5-target",
+    "event": "tap",
+    "to": "usecases-mapping",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-variant.sub-personas",
     "event": "tap",
     "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-variant.sub-objects",
+    "event": "tap",
+    "to": "usecases-data-objects",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-variant.btn-new-case",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-variant.btn-mapping",
+    "event": "tap",
+    "to": "usecases-mapping",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-variant.btn-edit",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-variant.btn-more",
+    "event": "tap",
+    "to": "usecases-delete-confirm",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-variant.v-base",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-variant.v-add",
+    "event": "tap",
+    "to": "usecases-edit-dialog-variant",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-variant.vs5-target",
+    "event": "tap",
+    "to": "usecases-mapping",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-empty.sub-personas",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-empty.sub-objects",
+    "event": "tap",
+    "to": "usecases-data-objects",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-empty.btn-add",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-empty.btn-new-persona",
+    "event": "tap",
+    "to": "usecases-edit-dialog-persona",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-empty.btn-dimensions",
+    "event": "tap",
+    "to": "usecases-dimension-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-empty.btn-new-case",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
     "to_kind": "screen"
   },
   {
@@ -1002,6 +822,216 @@
     "to_kind": "screen"
   },
   {
+    "from": "usecases-mapping.map-back",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.ms4-remap",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.fr-detail",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.fr-dialog",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-personas.sub-cases",
+    "event": "tap",
+    "to": "usecases-list",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-personas.sub-objects",
+    "event": "tap",
+    "to": "usecases-data-objects",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-personas.btn-add-persona",
+    "event": "tap",
+    "to": "usecases-edit-dialog-persona",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-personas.btn-generate",
+    "event": "tap",
+    "to": "usecases-generate-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-personas.btn-new-persona",
+    "event": "tap",
+    "to": "usecases-edit-dialog-persona",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-personas.btn-add-dim",
+    "event": "tap",
+    "to": "usecases-dimension-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-personas.dim-actor-name",
+    "event": "tap",
+    "to": "usecases-dimension-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-personas.dim-role-name",
+    "event": "tap",
+    "to": "usecases-dimension-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-personas.dim-size-name",
+    "event": "tap",
+    "to": "usecases-dimension-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-personas.dim-adoption-name",
+    "event": "tap",
+    "to": "usecases-dimension-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-personas.pc-new",
+    "event": "tap",
+    "to": "usecases-edit-dialog-persona",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-delete-confirm.cf-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-delete-confirm.cf-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-delete-confirm.cf-delete",
+    "event": "tap",
+    "to": "usecases-list",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-dimension-dialog.dd-close",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-dimension-dialog.dd-cancel",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-dimension-dialog.dd-save",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-persona.pd-close",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-persona.pd-cancel",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-persona.pd-save",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-drag.dlg-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-drag.dlg-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-drag.dlg-save",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-keyboard.dlg-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-keyboard.dlg-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-keyboard.dlg-save",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-menu.dlg-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-menu.st-menu-up",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-menu.st-menu-down",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-menu.dlg-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-step-menu.dlg-save",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
     "from": "usecases-edit-dialog-variant-empty.dv-close",
     "event": "tap",
     "to": "usecases-detail",
@@ -1011,6 +1041,42 @@
     "from": "usecases-edit-dialog-variant-empty.dv-cancel",
     "event": "tap",
     "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant-invalid.dv-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant-invalid.dv-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant.dv-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant.var-add",
+    "event": "tap",
+    "to": "usecases-edit-dialog-variant-empty",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant.dv-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant.dv-save",
+    "event": "tap",
+    "to": "usecases-detail-variant",
     "to_kind": "screen"
   },
   {
@@ -1050,105 +1116,39 @@
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-step-drag.dlg-close",
+    "from": "usecases-generate-dialog.gd-close",
     "event": "tap",
-    "to": "usecases-detail",
+    "to": "usecases-personas",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-step-drag.dlg-cancel",
+    "from": "usecases-generate-dialog.gd-cancel",
     "event": "tap",
-    "to": "usecases-detail",
+    "to": "usecases-personas",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-step-drag.dlg-save",
+    "from": "usecases-generate-dialog.gd-create",
     "event": "tap",
-    "to": "usecases-detail",
+    "to": "usecases-personas",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-step-menu.dlg-close",
+    "from": "usecases-object-dialog.od-close",
     "event": "tap",
-    "to": "usecases-detail",
+    "to": "usecases-data-objects",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-step-menu.st-menu-up",
+    "from": "usecases-object-dialog.od-cancel",
     "event": "tap",
-    "to": "usecases-edit-dialog",
+    "to": "usecases-data-objects",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-step-menu.st-menu-down",
+    "from": "usecases-object-dialog.od-save",
     "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-step-menu.dlg-cancel",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-step-menu.dlg-save",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-variant.dv-close",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-variant.var-add",
-    "event": "tap",
-    "to": "usecases-edit-dialog-variant-empty",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-variant.dv-cancel",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-variant.dv-save",
-    "event": "tap",
-    "to": "usecases-detail-variant",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-step-keyboard.dlg-close",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-step-keyboard.dlg-cancel",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-step-keyboard.dlg-save",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-variant-invalid.dv-close",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-variant-invalid.dv-cancel",
-    "event": "tap",
-    "to": "usecases-detail",
+    "to": "usecases-data-objects",
     "to_kind": "screen"
   }
 ]

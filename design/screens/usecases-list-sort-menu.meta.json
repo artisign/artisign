@@ -2,7 +2,8 @@
   "notes": "Sort menu of the use-case list (CHR-1097), opened from the sort control in the result line (`uc-sort`, a button with `aria-haspopup=\"menu\"`, `aria-expanded=\"true\"` while open). Same list as `usecases-list`, with the Status filter applied (\"Status: Ready\") and its menu closed.\n\n**Options, in this order:** Group A–Z (default; tree grouped by `group` path) · Title · Status. There is no title row, no divider and no clear item. There is no \"Recently changed\" sort (Christian, 2026-11-16): the case files carry no timestamp that `list_use_cases` reports.\n\n**Semantics (as built, `usecases-menu.js`).** The menu has `role=\"menu\"` and `aria-label=\"Sort\"`. Each option is a `<button>` with `role=\"menuitemradio\"` and `aria-checked=\"true\"` on the current sort, `\"false\"` on the others; the check icon is `aria-hidden`. Drawn: Group A–Z checked (`chrome-menu-item` `checked`), Title hovered.\n\n**Behaviour (same menu as the filter chips).** A manual popover in the top layer, placed 4px below the control and left-aligned with it. Up/Down move, Home/End jump, Enter or click picks and reloads the list from the first page; Esc or a click outside closes it and returns focus to the control. A second click on the control re-opens the menu (it does not toggle), so the control has no close edge here. Title and Status show a flat list without group headers; Group A–Z shows the tree.\n\n**Flows.** Any option → `usecases-list`.",
   "tags": [
     "chr-1062",
-    "chr-1097"
+    "chr-1097",
+    "chr-1104"
   ],
   "variant_of": "usecases-list",
   "variant_kind": "overlay"

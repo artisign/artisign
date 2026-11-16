@@ -259,8 +259,8 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   });
 
   // 21,500 before the five use-case tools (CHR-1065: ~3,600 chars together, with
-  // `priority` gone); measured at 24,001. CHR-1070 renamed get_use_cases to
-  // list_use_cases (+1 char) and trimmed the tool's description by 3: 24,001 to
+  // `priority` gone); measured at 24,001. CHR-1070 renamed the list tool from get_ to
+  // list_ (+1 char) and trimmed the tool's description by 3: 24,001 to
   // 23,999, measured at 23,999. ADR-010 caps this at 24,500 and the limit may
   // only go down from here.
   it("keeps the whole tools/list within 23,999 chars (~6,000 tokens)", () => {

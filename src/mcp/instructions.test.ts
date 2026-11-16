@@ -48,3 +48,12 @@ describe("INSTRUCTIONS icon font (CHR-957)", () => {
     expect(INSTRUCTIONS).toMatch(/full-<html> mockup gets none/);
   });
 });
+
+describe("INSTRUCTIONS delete_entity kinds (CHR-1105)", () => {
+  it("names the four use-case kinds next to the design kinds", () => {
+    const lifecycle = INSTRUCTIONS.slice(INSTRUCTIONS.indexOf("LIFECYCLE:"), INSTRUCTIONS.indexOf("USE CASES"));
+    for (const kind of ["screen", "component", "pattern", "mockup", "persona", "dimension", "data_object", "use_case"]) {
+      expect(lifecycle).toContain(kind);
+    }
+  });
+});

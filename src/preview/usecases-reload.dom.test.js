@@ -13,6 +13,7 @@ let bundle; // what get_use_case answers
 let failGroup;
 let holdLists; // a promise the list_use_cases answers wait for, or null
 let source;
+let poolObjects; // the data objects the fake daemon holds
 
 const flush = async () => {
   for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0));
@@ -37,17 +38,20 @@ function stubDaemon() {
     const path = String(url).split("?")[0];
     const body = init?.body ? JSON.parse(init.body) : null;
     calls.push({ path, tool: path.startsWith("/api/tools/") ? path.slice(11) : null, body });
-    const json = (value) => ({ ok: true, status: 200, json: async () => value, text: async () => "" });
+    const json = (value) => ({ ok: true, status: 200, json: async () => structuredClone(value), text: async () => "" });
     if (path === "/api/tools/list_use_cases") {
       if (holdLists) await holdLists;
       if (body.group && failGroup) return { ok: false, status: 500, json: async () => ({ code: "io_error", message: "disk on fire" }) };
       const summary = { id: "map-step", title: rawUseCase.title, group: "alpha", status: "ready", steps: 3 };
-      return json({ total: 1, use_cases: body.group || body.limit !== 1 ? [summary] : [], counts: { use_cases: 1, personas: personas.length, dimensions: dimensions.length, data_objects: objects.length }, facets: { status: {}, group: { alpha: 1 }, tag: {}, persona: {} }, personas, dimensions, data_objects: objects, ...invalid });
+      return json({ total: 1, use_cases: body.group || body.limit !== 1 ? [summary] : [], counts: { use_cases: 1, personas: personas.length, dimensions: dimensions.length, data_objects: objects.length }, facets: { status: {}, group: { alpha: 1 }, tag: {}, persona: {} }, personas, dimensions, data_objects: poolObjects, ...invalid });
     }
     if (path === "/api/tools/get_use_case") return json(bundle);
     if (path === "/api/tools/suggest_use_case_variants") return json({ suggestions: [] });
     if (path === "/api/use-case") return json({ use_case: source });
-    if (path === "/api/tools/set_use_cases") return json({ warnings: [] });
+    if (path === "/api/tools/set_use_cases") {
+      poolObjects.push(...(body.data_objects ?? []));
+      return json({ warnings: [] });
+    }
     return json({});
   });
 }
@@ -72,6 +76,7 @@ beforeEach(() => {
   failGroup = false;
   holdLists = null;
   source = structuredClone(rawUseCase);
+  poolObjects = [...objects];
   stubDaemon();
 });
 afterEach(() => {
@@ -122,7 +127,7 @@ describe("the invalid-files toast", () => {
     expect(toast()).toBe("Some use case files could not be loaded.");
   });
 
-  it("never replaces a save confirmation, and shows with the next reload once that is gone", async () => {
+  it("never replaces a save confirmation, and shows right after that is gone", async () => {
     bundle = staleBundle();
     const view = await openView();
     await toMapping();
@@ -133,9 +138,21 @@ describe("the invalid-files toast", () => {
     view.onChange();
     await settle();
     expect(toast()).toBe("Step left unmapped.");
-    $(".uc-toast button").click();
+    $(".uc-toast button").click(); // dismissing the confirmation releases the held-back report
+    expect(toast()).toBe("Some use case files could not be loaded.");
+  });
+
+  it("a confirmation that hides by itself releases the held-back report too", async () => {
+    bundle = staleBundle();
+    const view = await openView();
+    await toMapping();
+    leaveUnmapped();
+    await flush();
+    invalid = { warnings, invalid_file_count: 1 };
     view.onChange();
     await settle();
+    expect(toast()).toBe("Step left unmapped."); // held back
+    await new Promise((r) => setTimeout(r, 1800));
     expect(toast()).toBe("Some use case files could not be loaded.");
   });
 });
@@ -171,5 +188,57 @@ describe("a failed reload of a group", () => {
     await flush();
     expect($(".uc-error-row")).toBeNull();
     expect($$(".uc-list-title").map((n) => n.textContent)).toEqual([rawUseCase.title]);
+  });
+
+  it("drops the error row when the next reload succeeds", async () => {
+    const view = await openView();
+    failGroup = true;
+    view.onChange();
+    await settle();
+    expect($(".uc-error-row")).not.toBeNull();
+    failGroup = false;
+    view.onChange();
+    await settle();
+    expect($(".uc-error-row")).toBeNull();
+  });
+});
+
+describe("New data object inside the use case dialog", () => {
+  it("offers the object just created in the dialog's select, without waiting for the SSE event", async () => {
+    await openView();
+    $$(".uc-actions button").find((b) => b.textContent.includes("Edit")).click();
+    await flush();
+    const selectOptions = () => [...document.querySelector("dialog select[aria-label='Data object']").options].map((o) => o.textContent);
+    expect(selectOptions()).not.toContain("Notification");
+    $$("dialog button").find((b) => b.textContent.includes("New data object")).click();
+    await flush();
+    const dialogs = $$("dialog");
+    const objectDialog = dialogs[dialogs.length - 1];
+    const type = (el, value) => {
+      el.value = value;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    type(objectDialog.querySelector("input[autofocus]"), "Notification");
+    type(objectDialog.querySelector("input[aria-label='Field 1 name']"), "text");
+    [...objectDialog.querySelectorAll(".uc-foot-actions button")].find((b) => b.textContent === "Create data object").click();
+    await flush();
+    expect(selectOptions()).toContain("Notification");
+  });
+});
+
+describe("deleting a use case", () => {
+  it("clears the selected row at once, and the reload that follows opens a use case only once", async () => {
+    const view = await openView();
+    expect($$(".uc-list-row.is-selected")).toHaveLength(1);
+    $("[aria-label='More actions']").click();
+    $$(".chrome-menu-item").find((b) => b.textContent.includes("Delete use case")).click();
+    await flush();
+    $$("dialog button").find((b) => b.textContent === "Delete use case").click();
+    await flush();
+    expect($$(".uc-list-row.is-selected")).toHaveLength(0);
+    calls.length = 0;
+    view.onChange();
+    await settle();
+    expect(count("get_use_case")).toBe(1); // the landing auto-select only: no second load of the same detail
   });
 });

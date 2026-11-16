@@ -79,6 +79,7 @@ export function createUseCasesView(options) {
   let selectedStep = null; // the mapping view's focused step: survives a reload while the step still exists
   let shownInvalid = ""; // key of the set of unreadable files the toast last reported
   let writeToast = false; // the visible toast is a write's confirmation
+  let pendingInvalid = null; // an invalid-files report held back while a confirmation was visible
 
   const pool = emptyPool();
   const list = { req: 0, loading: false, error: "", total: 0, counts: null, facets: null, facetsTruncated: [], mode: "tree", tree: null, expanded: new Set(), groupState: new Map(), groupErrors: new Map(), ungrouped: { count: 0, rows: [], loading: false }, flat: { items: [], cursor: null, loading: false, error: "" }, activeKey: null };
@@ -220,14 +221,31 @@ export function createUseCasesView(options) {
   function reportInvalidFiles(data) {
     const warnings = data.warnings ?? [];
     const key = warnings.length ? JSON.stringify([data.invalid_file_count ?? warnings.length, warnings.map((w) => w.message ?? String(w))]) : "";
-    if (key === shownInvalid) return;
-    if (key === "") {
-      shownInvalid = "";
+    if (key === shownInvalid || key === "") {
+      pendingInvalid = null;
+      shownInvalid = key === "" ? "" : shownInvalid;
       return;
     }
-    if (writeToast && !toast.hidden) return; // shown with the next reload once the confirmation is gone
-    shownInvalid = key;
-    showToast("Some use case files could not be loaded.", warnings, 0, data.invalid_file_count);
+    const report = { key, warnings, total: data.invalid_file_count };
+    if (writeToast && !toast.hidden) {
+      pendingInvalid = report; // shown when the confirmation goes away
+      return;
+    }
+    showInvalid(report);
+  }
+
+  function showInvalid(report) {
+    pendingInvalid = null;
+    shownInvalid = report.key;
+    showToast("Some use case files could not be loaded.", report.warnings, 0, report.total);
+  }
+
+  function hideToast() {
+    toast.hidden = true;
+    if (writeToast) {
+      writeToast = false;
+      if (pendingInvalid) showInvalid(pendingInvalid);
+    }
   }
 
   async function loadList() {
@@ -323,7 +341,8 @@ export function createUseCasesView(options) {
     renderList();
     const result = await pageRows({ ...buildQuery(filters), group: path, sort: "group" }, want, undefined, (u) => u.group === path);
     if (req !== list.req) return;
-    if (!result.ok) list.groupErrors.set(path, result.message); // the error row offers Retry (loadMore continues at the cursor)
+    if (result.ok) list.groupErrors.delete(path);
+    else list.groupErrors.set(path, result.message); // the error row offers Retry (loadMore continues at the cursor)
     list.groupState.set(path, { rows: result.rows, cursor: result.cursor, loading: false });
     renderList();
   }
@@ -337,7 +356,8 @@ export function createUseCasesView(options) {
     if (req !== list.req) return;
     list.ungrouped.rows = result.rows;
     list.ungrouped.loading = false;
-    if (!result.ok) list.groupErrors.set("", result.message);
+    if (result.ok) list.groupErrors.delete("");
+    else list.groupErrors.set("", result.message);
     renderList();
   }
 
@@ -430,9 +450,10 @@ export function createUseCasesView(options) {
     clearTimeout(reloadTimer);
     reloadTimer = setTimeout(async () => {
       if (!project) return;
+      const hadDetail = Boolean(detail?.id); // a detail that loadList's auto-select opens is fresh already
       await Promise.all([loadPool(), loadList()]);
       renderPools();
-      if (detail?.id) await reloadDetail();
+      if (hadDetail && detail?.id) await reloadDetail();
       options.onDataChanged?.();
     }, RELOAD_DEBOUNCE_MS);
   }
@@ -673,12 +694,12 @@ export function createUseCasesView(options) {
   function showToast(text, warnings = [], autoHideMs = 0, total = warnings.length) {
     toast.replaceChildren(
       h("div", { class: "uc-toast-body" }, h("strong", null, text), warnings.length > 0 ? h("ul", null, warnings.slice(0, 5).map((w) => h("li", null, w.message ?? String(w)))) : null, total > 5 ? h("p", { class: "uc-muted" }, `… and ${total - 5} more`) : null),
-      h("button", { type: "button", class: "chrome-icon-btn chrome-icon-btn--sm", "aria-label": "Dismiss", onClick: () => { toast.hidden = true; } }, icon("close")),
+      h("button", { type: "button", class: "chrome-icon-btn chrome-icon-btn--sm", "aria-label": "Dismiss", onClick: hideToast }, icon("close")),
     );
     toast.hidden = false;
     writeToast = false;
     clearTimeout(showToast.timer);
-    if (autoHideMs > 0) showToast.timer = setTimeout(() => { toast.hidden = true; }, autoHideMs);
+    if (autoHideMs > 0) showToast.timer = setTimeout(hideToast, autoHideMs);
   }
 
   /** Response of a write: warnings are shown, never blocking. */
@@ -716,7 +737,10 @@ export function createUseCasesView(options) {
       },
       loadNodes: nodeIds,
       save: (payload) => api.setUseCases(project, { use_cases: [payload] }),
-      newObject: () => editObject(null),
+      newObject: async () => {
+        await editObject(null);
+        await loadPool(); // the dialog's select reads the pool now, not after the write's SSE event
+      },
       ...extra,
     };
   }
@@ -770,6 +794,7 @@ export function createUseCasesView(options) {
     mode = "detail";
     autoSelected = false;
     renderAll();
+    renderList();
   }
 
   async function editPersona(id) {
@@ -828,6 +853,7 @@ export function createUseCasesView(options) {
     list.expanded = new Set();
     list.groupState = new Map();
     shownInvalid = "";
+    pendingInvalid = null;
     selectedStep = null;
     renderAll();
     await Promise.all([loadPool(), loadList()]);
@@ -859,6 +885,7 @@ export function createUseCasesView(options) {
       loadedFor = null;
       detail = null;
       shownInvalid = "";
+      pendingInvalid = null;
       selectedStep = null;
       filters = { ...EMPTY_FILTERS };
       Object.assign(pool, emptyPool());

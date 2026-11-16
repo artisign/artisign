@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { access, realpath } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { CommitResult, HeadCommitResult } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -122,7 +122,9 @@ async function realOrSelf(path: string): Promise<string> {
  * Commits all current changes in `projectDir` with `message`, initializing a
  * git repo on first use. `sha` is `null` (with `skipped_reason`) if there
  * was nothing to commit, the commit could not be made, or the project dir
- * lives inside an outer repo — a failing auto-commit must never break the
+ * lives inside an outer repo, or a merge, cherry-pick, revert or rebase is
+ * unfinished (`merge_in_progress` / `operation_in_progress`; nothing is staged
+ * then) — a failing auto-commit must never break the
  * write it follows. A commit git refuses only for want of an identity is
  * retried once as `FALLBACK_IDENTITY`.
  *
@@ -135,6 +137,9 @@ export async function autoCommit(projectDir: string, message: string): Promise<C
   try {
     const nested = await prepareRepo(projectDir);
     if (nested) return nested;
+
+    const busy = await operationInProgress(projectDir);
+    if (busy) return { sha: null, skipped_reason: busy };
 
     await git(projectDir, ["add", "-A", "--", "."]);
     const status = await git(projectDir, ["status", "--porcelain"]);
@@ -177,9 +182,35 @@ async function isKnownToGit(projectDir: string, path: string): Promise<{ inHead:
   return { inHead, inIndex };
 }
 
-/** True while an unfinished merge leaves `MERGE_HEAD` behind. */
-async function isMergeInProgress(projectDir: string): Promise<boolean> {
-  return (await git(projectDir, ["rev-parse", "-q", "--verify", "MERGE_HEAD"]).catch(() => "")) !== "";
+/**
+ * The marker git leaves behind while a history-rewriting operation is
+ * unfinished, and the reason it is reported under. Merge keeps its own,
+ * already shipped `merge_in_progress`; cherry-pick, revert and rebase share
+ * `operation_in_progress`.
+ */
+const OPERATION_MARKERS: { marker: string; reason: "merge_in_progress" | "operation_in_progress" }[] = [
+  { marker: "MERGE_HEAD", reason: "merge_in_progress" },
+  { marker: "CHERRY_PICK_HEAD", reason: "operation_in_progress" },
+  { marker: "REVERT_HEAD", reason: "operation_in_progress" },
+  { marker: "rebase-merge", reason: "operation_in_progress" },
+  { marker: "rebase-apply", reason: "operation_in_progress" },
+];
+
+/**
+ * The reason to skip the commit while the user has a merge, cherry-pick,
+ * revert or rebase unfinished, else `undefined`. Committing then would finish
+ * that operation under an Artisign message, or record conflict markers that
+ * `git add` just marked as resolved. `--git-path` resolves each marker to the
+ * real git dir, so a worktree or a repo whose `.git` is a file is covered.
+ */
+async function operationInProgress(
+  projectDir: string,
+): Promise<"merge_in_progress" | "operation_in_progress" | undefined> {
+  for (const { marker, reason } of OPERATION_MARKERS) {
+    const path = await git(projectDir, ["rev-parse", "--git-path", marker]);
+    if (await pathExists(resolve(projectDir, path))) return reason;
+  }
+  return undefined;
 }
 
 /**
@@ -189,8 +220,9 @@ async function isMergeInProgress(projectDir: string): Promise<boolean> {
  * disk and was never committed (a file created and deleted before any commit)
  * cannot be part of a pathspec and is dropped; if no path remains, or none has
  * a change, nothing is committed (`nothing_to_commit`). A deletion that is
- * already staged is committed as it stands. During an unfinished merge git
- * refuses partial commits, so nothing is committed (`merge_in_progress`).
+ * already staged is committed as it stands. During an unfinished merge,
+ * cherry-pick, revert or rebase nothing is staged or committed
+ * (`merge_in_progress` for a merge, `operation_in_progress` for the others).
  * Same repo rules as `autoCommit`: initialized on first use, skipped inside
  * an outer repo.
  */
@@ -199,8 +231,8 @@ export async function autoCommitPaths(projectDir: string, message: string, paths
     const nested = await prepareRepo(projectDir);
     if (nested) return nested;
 
-    // A partial commit (`--only`) is refused by git while a merge is unfinished.
-    if (await isMergeInProgress(projectDir)) return { sha: null, skipped_reason: "merge_in_progress" };
+    const busy = await operationInProgress(projectDir);
+    if (busy) return { sha: null, skipped_reason: busy };
 
     // `git add` refuses a pathspec that matches neither disk nor index (a deletion that is already staged);
     // such a path stays in `specs` and is committed as it stands in the index.

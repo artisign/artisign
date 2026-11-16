@@ -139,7 +139,7 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 
 ### Unreleased — on `main`, not part of 2.2.1
 
-Specs that coding agents write and read: an optional `usecases/` folder with personas, data objects and use cases whose steps map onto screens and elements. A project without it behaves exactly as before. These five tools and four extra `delete_entity` kinds are merged but not yet in a release, so the tool count above is unchanged until one ships.
+Specs that coding agents write and read: an optional `usecases/` folder with personas, data objects and use cases whose steps map onto screens and elements. A project without it behaves exactly as before. These five tools and four extra `delete_entity` kinds are merged but not yet in a release, so the tool count above is unchanged until one ships. The preview shows them in a fourth tab, **Use Cases**, where people can also create, edit and delete the same data.
 
 | Bucket | Tool | Does |
 |---|---|---|

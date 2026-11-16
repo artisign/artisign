@@ -237,8 +237,9 @@ describe("watchProject", () => {
     const reports = (): number => events.filter((e) => e.path === "usecases/cases/borrow-book.json" && e.type !== "unlink").length;
 
     // Deterministic stand-in for "the file lands in chokidar's gap": chokidar
-    // never learns about the file, so only the folder scan reports it and no
-    // `unlink` follows its deletion.
+    // still tracks the file internally, but its events for it never reach the
+    // listener, so only the folder scan reports it and no `unlink` follows its
+    // deletion.
     const watcher = capturedWatcher!;
     const realEmit = watcher.emit.bind(watcher) as (event: string, ...args: unknown[]) => boolean;
     let blind = true;

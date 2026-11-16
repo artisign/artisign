@@ -101,17 +101,21 @@ export function watchProject(
     void scanNewDir(dir);
     const timer = setTimeout(() => {
       rescans.delete(timer);
-      void scanNewDir(dir);
+      void scanNewDir(dir).then(() => {
+        if (closed) return;
+        // The dedup only matters inside this window. A scan-reported file is
+        // not tracked by chokidar's events, so deleting it sends no `unlink`:
+        // without this expiry a later rewrite of the same file would be
+        // skipped as "known". Started only once the rescan is done, so a late
+        // rescan cannot add entries after the expiry.
+        const expiry = setTimeout(() => {
+          rescans.delete(expiry);
+          forgetUnder(dir);
+        }, DEBOUNCE_MS);
+        rescans.add(expiry);
+      });
     }, NEW_DIR_RESCAN_MS);
     rescans.add(timer);
-    // The dedup only matters inside this window. A scan-reported file is not
-    // tracked by chokidar, so deleting it sends no `unlink`: without this
-    // expiry a later rewrite of the same file would be skipped as "known".
-    const expiry = setTimeout(() => {
-      rescans.delete(expiry);
-      forgetUnder(dir);
-    }, 2 * NEW_DIR_RESCAN_MS);
-    rescans.add(expiry);
   };
 
   watcher.on("add", (path) => {

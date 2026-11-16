@@ -41,59 +41,59 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:#1a1a1a;bac
 .ins{padding:12px}.ins .kv{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;color:#555}.ins .kv b{color:#1a1a1a;font-weight:600}
 .el{display:flex;gap:8px;padding:7px 12px;border-bottom:1px solid #e2e2e2;font-family:monospace;font-size:12px;color:#333}.el i{font-style:normal;color:#999;font-size:9px;width:10px}
 </style></head><body><div class="app">
-<div class="tb"><span class="logo">Artisign</span><span class="proj">Lückenzeit ▾</span><span class="tab on">Screens</span><span class="tab">Design System</span><span class="tab">Board</span><span style="flex:1"></span><span class="btn on">Flow mode</span><span class="btn">Comment mode</span><span class="dot"></span></div>
+<div class="tb"><span class="logo">Artisign</span><span class="proj">Café Finder ▾</span><span class="tab on">Screens</span><span class="tab">Design System</span><span class="tab">Board</span><span style="flex:1"></span><span class="btn on">Flow mode</span><span class="btn">Comment mode</span><span class="dot"></span></div>
 <div class="body">
 <div class="side l"><div class="sbh">Screens<span>◂</span></div><div class="fw"><i class="mg"></i>Search screens, mockups and tags…</div>
 <div class="list">
 <div class="r"><span class="tri">▸</span>dashboard</div>
-<div class="r" style="background:#f7f8ff;color:#2a3edb"><span class="tri">▾</span>family-l2</div>
-<div class="r d1"><span class="tri">▸</span><i class="ic st"></i>family-l2-two-parents</div>
-<div class="r d1"><span class="tri"></span><i class="ic ov"></i>family-l2-sheet-add-parent</div>
-<div class="r d1"><span class="tri"></span><i class="ic ov"></i>family-l2-sheet-name</div>
-<div class="r d1" style="color:#2a3edb"><span class="tri">▾</span><i class="ic ov"></i>family-l2-sheet-leave</div>
-<div class="r d2 sel"><span class="tri"></span><span class="gl">↪</span><span><span class="px">…</span>leave-confirm</span></div>
-<div class="r d2"><span class="tri"></span><span class="gl">↪</span><span><span class="px">…</span>leave-dissolve</span></div>
-<div class="r d2"><span class="tri"></span><span class="gl">↪</span><span><span class="px">…</span>leave-no-transfer</span></div>
-<div class="r"><span class="tri">▸</span>parent-l3</div>
+<div class="r" style="background:#f7f8ff;color:#2a3edb"><span class="tri">▾</span>cart-l2</div>
+<div class="r d1"><span class="tri">▸</span><i class="ic st"></i>cart-l2-two-items</div>
+<div class="r d1"><span class="tri"></span><i class="ic ov"></i>cart-l2-sheet-add-item</div>
+<div class="r d1"><span class="tri"></span><i class="ic ov"></i>cart-l2-sheet-name</div>
+<div class="r d1" style="color:#2a3edb"><span class="tri">▾</span><i class="ic ov"></i>cart-l2-sheet-clear</div>
+<div class="r d2 sel"><span class="tri"></span><span class="gl">↪</span><span><span class="px">…</span>clear-confirm</span></div>
+<div class="r d2"><span class="tri"></span><span class="gl">↪</span><span><span class="px">…</span>clear-all</span></div>
+<div class="r d2"><span class="tri"></span><span class="gl">↪</span><span><span class="px">…</span>clear-no-save</span></div>
+<div class="r"><span class="tri">▸</span>order-l3</div>
 </div></div>
 
 <div class="main">
 <div class="bc">
-<span class="cr"><span style="font-size:11px">⌂</span>family-l2 <small>▾</small></span><span class="sep">›</span>
-<span class="cr open"><i class="ic ov" style="width:7px;height:10px"></i>family-l2-sheet-leave <small>▾</small></span><span class="sep">›</span>
-<span class="cr on"><span class="gl">↪</span>…leave-confirm <small>▾</small></span>
-<span class="back">⤴ Back to family-l2</span></div>
-<div class="trail"><span class="tag">depth 3</span><span class="tag s">step</span><span style="margin-left:auto">Flow mode: tap on <b>sheet-leave.btn-verlassen</b> → <b>leave-confirm</b></span></div>
+<span class="cr"><span style="font-size:11px">⌂</span>cart-l2 <small>▾</small></span><span class="sep">›</span>
+<span class="cr open"><i class="ic ov" style="width:7px;height:10px"></i>cart-l2-sheet-clear <small>▾</small></span><span class="sep">›</span>
+<span class="cr on"><span class="gl">↪</span>…clear-confirm <small>▾</small></span>
+<span class="back">⤴ Back to cart-l2</span></div>
+<div class="trail"><span class="tag">depth 3</span><span class="tag s">step</span><span style="margin-left:auto">Flow mode: tap on <b>sheet-clear.btn-clear</b> → <b>clear-confirm</b></span></div>
 
-<div class="pop"><h4>Inside sheet-leave · 3</h4>
-<div class="r sel"><span class="gl">↪</span>leave-confirm<span class="z">current</span></div>
-<div class="r"><span class="gl">↪</span>leave-dissolve</div>
-<div class="r"><span class="gl">↪</span>leave-no-transfer</div><hr>
-<h4>Siblings in family-l2 · 5</h4>
-<div class="r"><i class="ic ov"></i>sheet-add-parent</div>
+<div class="pop"><h4>Inside sheet-clear · 3</h4>
+<div class="r sel"><span class="gl">↪</span>clear-confirm<span class="z">current</span></div>
+<div class="r"><span class="gl">↪</span>clear-all</div>
+<div class="r"><span class="gl">↪</span>clear-no-save</div><hr>
+<h4>Siblings in cart-l2 · 5</h4>
+<div class="r"><i class="ic ov"></i>sheet-add-item</div>
 <div class="r"><i class="ic ov"></i>sheet-name</div>
-<div class="r"><i class="ic st"></i>two-parents<span class="z" style="color:#888">▸ 1</span></div><hr>
-<div class="r" style="color:#2a3edb">Open sheet-leave itself</div></div>
+<div class="r"><i class="ic st"></i>two-items<span class="z" style="color:#888">▸ 1</span></div><hr>
+<div class="r" style="color:#2a3edb">Open sheet-clear itself</div></div>
 
 <div class="canvas">
-<i class="mp big"><b class="h">Familie</b><b class="c">Lena · Elternteil</b><b class="c">Tom · Kind</b><b class="c">Mia · Kind</b><u></u><s><em></em><strong>Wirklich verlassen?</strong><span>Die Familie wird für dich gelöscht. Das kann nicht rückgängig gemacht werden.</span><i class="bt p">Ja, verlassen</i><i class="bt">Zurück</i></s></i>
-<div class="map"><div class="card"><h3>Variant tree · family-l2</h3>
-<div class="n dim">⌂ family-l2 <span style="margin-left:auto;font-size:10px">base</span></div>
-<div class="n dim l1"><i class="ic st"></i>two-parents</div>
+<i class="mp big"><b class="h">Cart</b><b class="c">Sara · Host</b><b class="c">Mara · Guest</b><b class="c">Noa · Guest</b><u></u><s><em></em><strong>Really clear the cart?</strong><span>All items are removed from your cart. This cannot be undone.</span><i class="bt p">Yes, clear</i><i class="bt">Back</i></s></i>
+<div class="map"><div class="card"><h3>Variant tree · cart-l2</h3>
+<div class="n dim">⌂ cart-l2 <span style="margin-left:auto;font-size:10px">base</span></div>
+<div class="n dim l1"><i class="ic st"></i>two-items</div>
 <div class="n dim l2"><i class="ic st"></i>…-solo</div>
-<div class="n dim l1"><i class="ic ov"></i>sheet-add-parent</div>
+<div class="n dim l1"><i class="ic ov"></i>sheet-add-item</div>
 <div class="n dim l1"><i class="ic ov"></i>sheet-name</div>
-<div class="n l1" style="color:#2a3edb"><i class="ic ov"></i>sheet-leave</div>
-<div class="n on l2"><span class="gl">↪</span>leave-confirm</div>
-<div class="fl">← tap “Ja, verlassen” here</div>
-<div class="n dim l2"><span class="gl">↪</span>leave-dissolve</div>
-<div class="n dim l2"><span class="gl">↪</span>leave-no-transfer</div>
+<div class="n l1" style="color:#2a3edb"><i class="ic ov"></i>sheet-clear</div>
+<div class="n on l2"><span class="gl">↪</span>clear-confirm</div>
+<div class="fl">← tap “Yes, clear” here</div>
+<div class="n dim l2"><span class="gl">↪</span>clear-all</div>
+<div class="n dim l2"><span class="gl">↪</span>clear-no-save</div>
 </div>
 <div class="card" style="margin-top:12px;font-size:12px;line-height:1.5;color:#333"><h3>Context guarantee</h3>Wherever flow mode lands, crumbs and map redraw. Every crumb and map node is clickable.</div></div>
 </div></div>
 
 <div class="side rt"><div class="sbh">Elements<span>▸</span></div>
 <div class="ins"><div class="card"><h3>Variant</h3>
-<div class="kv">Path<b>family-l2 › sheet-leave</b></div><div class="kv">Kind<b>step</b></div><div class="kv">Depth<b>3</b></div><div class="kv">Siblings<b>2</b></div><div class="kv">Flows in / out<b>1 / 1</b></div></div></div>
+<div class="kv">Path<b>cart-l2 › sheet-clear</b></div><div class="kv">Kind<b>step</b></div><div class="kv">Depth<b>3</b></div><div class="kv">Siblings<b>2</b></div><div class="kv">Flows in / out<b>1 / 1</b></div></div></div>
 <div class="el"><i>▸</i>&lt;div&gt; · sheet</div><div class="el"><i>▸</i>&lt;div&gt; · scrim</div><div class="el"><i>▸</i>&lt;div&gt; · btn-confirm</div></div>
 </div></div></body></html>

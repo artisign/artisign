@@ -1,17 +1,5 @@
 [
   {
-    "from": "board-view-clusters-collapsed.bar",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "board-view-clusters-collapsed.frame-family-head",
-    "event": "tap",
-    "to": "board-view-clusters-expanded",
-    "to_kind": "screen"
-  },
-  {
     "from": "board-view.si-open",
     "event": "tap",
     "to": "open-project-dialog",
@@ -129,54 +117,6 @@
     "from": "shell-empty-project-dark.screens-collapse",
     "event": "tap",
     "to": "sidebars-collapsed",
-    "to_kind": "screen"
-  },
-  {
-    "from": "inspector-variant-reached-from.bar",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "sidebar-variant-tree.bar",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "board-view-clusters-expanded-dark.bar",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "board-view-clusters-expanded-dark.frame-family-head",
-    "event": "tap",
-    "to": "board-view-clusters-collapsed",
-    "to_kind": "screen"
-  },
-  {
-    "from": "board-view-clusters-expanded.bar",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "board-view-clusters-expanded.frame-family-head",
-    "event": "tap",
-    "to": "board-view-clusters-collapsed",
-    "to_kind": "screen"
-  },
-  {
-    "from": "screen-view-variant-breadcrumb-dark.bar",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "screen-view-variant-breadcrumb.bar",
-    "event": "tap",
-    "to": "app-shell",
     "to_kind": "screen"
   },
   {
@@ -834,6 +774,54 @@
     "to_kind": "screen"
   },
   {
+    "from": "usecases-mapping.map-back",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.ms4-remap",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.fr-detail",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.fr-dialog",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant.dv-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant.dv-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-clusters-collapsed.bar",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-clusters-collapsed.frame-cart-head",
+    "event": "tap",
+    "to": "board-view-clusters-expanded",
+    "to_kind": "screen"
+  },
+  {
     "from": "app-shell.project-picker",
     "event": "tap",
     "to": "open-project-dialog",
@@ -894,39 +882,51 @@
     "to_kind": "screen"
   },
   {
-    "from": "usecases-mapping.map-back",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-mapping.ms4-remap",
-    "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-mapping.fr-detail",
+    "from": "board-view-clusters-expanded-dark.bar",
     "event": "tap",
     "to": "app-shell",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-mapping.fr-dialog",
+    "from": "board-view-clusters-expanded-dark.frame-cart-head",
+    "event": "tap",
+    "to": "board-view-clusters-collapsed",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view-clusters-expanded.bar",
     "event": "tap",
     "to": "app-shell",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-variant.dv-close",
+    "from": "board-view-clusters-expanded.frame-cart-head",
     "event": "tap",
-    "to": "usecases-detail",
+    "to": "board-view-clusters-collapsed",
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog-variant.dv-cancel",
+    "from": "inspector-variant-reached-from.bar",
     "event": "tap",
-    "to": "usecases-detail",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "screen-view-variant-breadcrumb-dark.bar",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "screen-view-variant-breadcrumb.bar",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "sidebar-variant-tree.bar",
+    "event": "tap",
+    "to": "app-shell",
     "to_kind": "screen"
   }
 ]

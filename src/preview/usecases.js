@@ -78,7 +78,7 @@ export function createUseCasesView(options) {
   let coverageOpen = false;
 
   const pool = emptyPool();
-  const list = { req: 0, loading: false, error: "", total: 0, counts: null, facets: null, facetsTruncated: [], mode: "tree", tree: null, expanded: new Set(), groupState: new Map(), ungrouped: { count: 0, rows: [], loading: false }, flat: { items: [], cursor: null, loading: false, error: "" }, activeKey: null };
+  const list = { req: 0, loading: false, error: "", total: 0, counts: null, facets: null, facetsTruncated: [], mode: "tree", tree: null, expanded: new Set(), groupState: new Map(), groupErrors: new Map(), ungrouped: { count: 0, rows: [], loading: false }, flat: { items: [], cursor: null, loading: false, error: "" }, activeKey: null };
   let detail = null; // { id, variantId, view, base, source, error, loading }
 
   // --- DOM skeleton --------------------------------------------------------------------------------------------
@@ -125,7 +125,7 @@ export function createUseCasesView(options) {
       list.activeKey = key;
     },
     onNeedMore: () => loadMore(null),
-    onRetry: () => loadMore(null),
+    onRetry: (path) => loadMore(path),
   });
 
   personaSearch.addEventListener("input", () => {
@@ -195,7 +195,11 @@ export function createUseCasesView(options) {
   // --- List ------------------------------------------------------------------------------------------------------
 
   function listRows() {
-    if (list.mode === "tree" && list.tree) return flattenTree({ roots: list.tree.roots, expanded: list.expanded, groupState: list.groupState, ungrouped: list.ungrouped });
+    if (list.mode === "tree" && list.tree) {
+      const rows = flattenTree({ roots: list.tree.roots, expanded: list.expanded, groupState: list.groupState, ungrouped: list.ungrouped });
+      // A group whose last page failed shows the error row (with Retry) in place of its "Show N more" row.
+      return rows.map((row) => (row.kind === "more" && list.groupErrors.has(row.path) ? { kind: "error", key: `e:${row.path}`, path: row.path, depth: row.depth, message: list.groupErrors.get(row.path) } : row));
+    }
     return flattenFlat({ items: list.flat.items, withHeaders: sort === "group", total: list.total, loading: list.flat.loading, error: list.flat.error });
   }
 
@@ -213,6 +217,7 @@ export function createUseCasesView(options) {
     const query = buildQuery(filters);
     list.loading = true;
     list.error = "";
+    list.groupErrors = new Map();
     const stale = () => req !== list.req || forProject !== project;
     const first = await api.listUseCases(forProject, { ...query, sort, limit: sort === "group" ? 1 : FLAT_PAGE });
     if (stale()) return;
@@ -258,6 +263,9 @@ export function createUseCasesView(options) {
         if (page.ok) {
           list.flat.items = page.data.use_cases ?? [];
           list.flat.cursor = page.data.next_cursor ?? null;
+        } else {
+          // The error row offers Retry; nothing retries by itself.
+          list.flat.error = errorMessage(page);
         }
       } else {
         list.flat.items = data.use_cases ?? [];
@@ -275,7 +283,7 @@ export function createUseCasesView(options) {
     let cursor = startCursor;
     while (rows.length < want) {
       const res = await api.listUseCases(project, { ...query, limit: Math.min(PAGE_MAX, want - rows.length), ...(cursor !== undefined ? { cursor } : {}) });
-      if (!res.ok) return { ok: false, rows, cursor };
+      if (!res.ok) return { ok: false, rows, cursor, message: errorMessage(res) };
       rows.push(...(res.data.use_cases ?? []).filter(keep));
       cursor = res.data.next_cursor;
       if (cursor === undefined) break;
@@ -324,11 +332,13 @@ export function createUseCasesView(options) {
   async function loadMore(path) {
     const req = list.req;
     if (list.mode === "flat" || path === null) {
-      if (list.flat.loading || !list.flat.cursor) return;
+      // Without a cursor only a failed first page (no rows, an error) may load: that is Retry.
+      const retryFirst = !list.flat.cursor && list.flat.error && list.flat.items.length === 0;
+      if (list.flat.loading || (!list.flat.cursor && !retryFirst)) return;
       list.flat.loading = true;
       list.flat.error = "";
       renderList();
-      const res = await api.listUseCases(project, { ...buildQuery(filters), sort, limit: FLAT_PAGE, cursor: list.flat.cursor });
+      const res = await api.listUseCases(project, { ...buildQuery(filters), sort, limit: FLAT_PAGE, ...(list.flat.cursor ? { cursor: list.flat.cursor } : {}) });
       if (req !== list.req) return;
       list.flat.loading = false;
       if (res.ok) {
@@ -344,11 +354,13 @@ export function createUseCasesView(options) {
     if (path === "") {
       const offset = list.total - list.ungrouped.count + list.ungrouped.rows.length;
       list.ungrouped.loading = true;
+      list.groupErrors.delete("");
       renderList();
       const result = await pageRows({ ...buildQuery(filters), sort: "group" }, Math.min(GROUP_PAGE, list.ungrouped.count - list.ungrouped.rows.length), String(offset), () => true);
       if (req !== list.req) return;
       list.ungrouped.loading = false;
       list.ungrouped.rows = list.ungrouped.rows.concat(result.rows);
+      if (!result.ok) list.groupErrors.set("", result.message);
       renderList();
       return;
     }
@@ -356,9 +368,11 @@ export function createUseCasesView(options) {
     const state = list.groupState.get(path);
     if (!node || !state || state.loading) return;
     state.loading = true;
+    list.groupErrors.delete(path);
     renderList();
     const result = await pageRows({ ...buildQuery(filters), group: path, sort: "group" }, Math.min(GROUP_PAGE, node.direct - state.rows.length), state.cursor, (u) => u.group === path);
     if (req !== list.req) return;
+    if (!result.ok) list.groupErrors.set(path, result.message);
     list.groupState.set(path, { rows: state.rows.concat(result.rows), cursor: result.cursor, loading: false });
     renderList();
   }

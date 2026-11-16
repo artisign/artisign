@@ -27,7 +27,7 @@ function rowDomId(key) {
  *   onMore: (path: string | null) => void,
  *   onActive: (key: string | null) => void,
  *   onNeedMore: () => void, // scrolled near the end of a flat list
- *   onRetry: () => void, // the page request failed: try again (nothing retries by itself)
+ *   onRetry: (path: string | null) => void, // the page request failed: try again (nothing retries by itself)
  * }} handlers
  */
 export function createListPanel(el, handlers) {
@@ -136,7 +136,7 @@ export function createListPanel(el, handlers) {
       return h("div", { ...common, class: `uc-more-row${active ? " is-active" : ""}`, onClick: () => { handlers.onActive(row.key); handlers.onMore(row.path); } }, h("span", { class: "uc-more-link" }, `Show ${formatCount(row.remaining)} more`));
     }
     if (row.kind === "error") {
-      return h("div", { ...common, class: "uc-error-row", role: "none" }, h("span", { class: "uc-error-text" }, `Could not load more: ${row.message}`), h("button", { type: "button", class: "uc-link-btn", onClick: () => handlers.onRetry() }, "Retry"));
+      return h("div", { ...common, class: "uc-error-row", role: "none" }, h("span", { class: "uc-error-text" }, `Could not load more: ${row.message}`), h("button", { type: "button", class: "uc-link-btn", onClick: () => handlers.onRetry(row.path ?? null) }, "Retry"));
     }
     if (row.kind === "loading") return h("div", { ...common, class: "uc-loading-row", role: "none" }, "Loading…");
     return h("div", { ...common, class: "uc-header-row", role: "none" }, row.name);

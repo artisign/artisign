@@ -34,6 +34,7 @@ function summarize(u) {
 /** A small stand-in for list_use_cases: group prefix, status, query, limit/cursor, include, counts and facets on the first page. */
 function listUseCases(input) {
   if (store?.failCursor && input.cursor !== undefined) return { __fail: true };
+  if (store?.failFlatFirst && input.sort === "group" && input.limit === 100 && input.cursor === undefined) return { __fail: true };
   if (store?.failInclude && input.include) return { __fail: true, status: 422, code: "invalid_state", message: "invalid usecases/personas.json: not valid JSON" };
   const all = store?.cases ?? [];
   let list = all.filter((u) => (!input.screen || u.steps.some((s) => s.target?.screen === input.screen)) && (!input.group || u.group === input.group || u.group?.startsWith(`${input.group}/`)) && (!input.status || u.status === input.status) && (!input.query || u.title.toLowerCase().includes(input.query.toLowerCase())));
@@ -447,6 +448,51 @@ describe("review fixes", () => {
     await flush();
     expect($(".uc-error-row")).toBeNull();
     expect($(".uc-tree-spacer").style.height).not.toBe(heightBefore);
+  });
+
+  it("a failed page inside a group shows the error row with Retry; nothing retries by itself and Retry loads the page", async () => {
+    store = { personas, dimensions, objects, cases: Array.from({ length: 140 }, (_, i) => caseOf(i, "big")), failCursor: true };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    expect($(".uc-more-row")).not.toBeNull();
+    calls.length = 0;
+    $(".uc-more-row").click();
+    await flush();
+    expect($(".uc-error-row .uc-error-text").textContent).toBe("Could not load more: disk on fire");
+    expect($(".uc-more-row")).toBeNull();
+    const failing = () => calls.filter((c) => c.tool === "list_use_cases").length;
+    const afterFirst = failing();
+    expect(afterFirst).toBe(1);
+    await new Promise((r) => setTimeout(r, 50));
+    await flush();
+    expect(failing()).toBe(afterFirst); // no request loop
+    store.failCursor = false;
+    $(".uc-error-row button").click();
+    await flush();
+    expect($(".uc-error-row")).toBeNull();
+    expect($$(".uc-list-row").length).toBeGreaterThan(4);
+    expect($(".uc-tree-spacer").style.height).toBe(`${28 + 29 * 46 + 26}px`);
+  });
+
+  it("a failed first page in flat-with-headers mode shows the error row with Retry and Retry loads it", async () => {
+    store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/"), caseOf(2, "a//b"), caseOf(3, "mapping")], failFlatFirst: true };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    expect($(".uc-group-row")).toBeNull();
+    expect($$(".uc-list-row")).toHaveLength(0);
+    expect($(".uc-error-row .uc-error-text").textContent).toBe("Could not load more: disk on fire");
+    const pages = () => calls.filter((c) => c.tool === "list_use_cases" && c.body.limit === 100).length;
+    const afterFirst = pages();
+    await new Promise((r) => setTimeout(r, 50));
+    await flush();
+    expect(pages()).toBe(afterFirst); // no request loop
+    store.failFlatFirst = false;
+    $(".uc-error-row button").click();
+    await flush();
+    expect($(".uc-error-row")).toBeNull();
+    expect($$(".uc-list-title").map((n) => n.textContent)).toEqual(expect.arrayContaining(["Case 1", "Case 2", "Case 3"]));
   });
 
   it("with truncated persona facets the persona menu still lists every persona of the pool", async () => {

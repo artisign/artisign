@@ -104,6 +104,14 @@ export function watchProject(
       void scanNewDir(dir);
     }, NEW_DIR_RESCAN_MS);
     rescans.add(timer);
+    // The dedup only matters inside this window. A scan-reported file is not
+    // tracked by chokidar, so deleting it sends no `unlink`: without this
+    // expiry a later rewrite of the same file would be skipped as "known".
+    const expiry = setTimeout(() => {
+      rescans.delete(expiry);
+      forgetUnder(dir);
+    }, 2 * NEW_DIR_RESCAN_MS);
+    rescans.add(expiry);
   };
 
   watcher.on("add", (path) => {

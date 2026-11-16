@@ -226,4 +226,39 @@ describe("watchProject", () => {
     while (adds() < 2 && Date.now() - start < 3000) await new Promise((resolve) => setTimeout(resolve, 20));
     expect(adds()).toBe(2);
   });
+
+  it("reports a file again when only the file is deleted and written again after the folder window", async () => {
+    const events: ProjectChangeEvent[] = [];
+    const stop = watchProject(dir, (event) => events.push(event));
+    unwatch = stop;
+    await stop.ready;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const file = join(dir, "usecases", "cases", "borrow-book.json");
+    const reports = (): number => events.filter((e) => e.path === "usecases/cases/borrow-book.json" && e.type !== "unlink").length;
+
+    // Deterministic stand-in for "the file lands in chokidar's gap": chokidar
+    // never learns about the file, so only the folder scan reports it and no
+    // `unlink` follows its deletion.
+    const watcher = capturedWatcher!;
+    const realEmit = watcher.emit.bind(watcher);
+    let blind = true;
+    watcher.emit = ((event: string, ...args: unknown[]) =>
+      blind && (event === "add" || event === "unlink") && String(args[0]).endsWith("borrow-book.json")
+        ? false
+        : realEmit(event, ...args)) as typeof watcher.emit;
+
+    await mkdir(join(dir, "usecases", "cases"), { recursive: true });
+    await writeFile(file, "{}");
+    await waitFor(events, (e) => e.path === "usecases/cases/borrow-book.json", 3000);
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // past the new-folder window
+    await rm(file);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const before = reports();
+    blind = false;
+    await writeFile(file, "{}");
+
+    const start = Date.now();
+    while (reports() <= before && Date.now() - start < 3000) await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(reports()).toBeGreaterThan(before);
+  });
 });

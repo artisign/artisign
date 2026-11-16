@@ -46,6 +46,7 @@ import type { CommitResult } from "../store/index.js";
 import { ToolError, commitFields, type ToolHandlerContext, type Warning } from "./types.js";
 
 const WARNING_CAP = 50;
+const ERROR_LIMIT = 10;
 /** Most personas a generate_personas dry run lists; would_create keeps the full count. */
 const DRY_RUN_PERSONA_CAP = 50;
 
@@ -91,10 +92,11 @@ function invalidFileAsToolError(err: unknown): never {
   throw new ToolError("invalid_state", `${err.message} — ${remedy}`);
 }
 
-/** Several invalid stored cases in one call: one error naming every file, with the remedy of the single-file message once. */
+/** Several invalid stored cases in one call: one error naming the first ERROR_LIMIT files and counting the rest, with the remedy of the single-file message once. */
 function invalidCasesAsToolError(errors: InvalidFileError[]): never {
   if (errors.length === 1) return invalidFileAsToolError(errors[0]);
-  const named = errors.map((err) => err.message).join("; ");
+  const more = errors.length > ERROR_LIMIT ? ` (+${errors.length - ERROR_LIMIT} more)` : "";
+  const named = errors.slice(0, ERROR_LIMIT).map((err) => err.message).join(" | ") + more;
   throw new ToolError(
     "invalid_state",
     `${errors.length} stored use cases are invalid, nothing written — ${named} — repair each file by hand (the one case where usecases/ may be edited directly) or remove the use case with delete_entity {kind: "use_case", name: "<id>"} and write it again with set_use_cases (the full case)`,
@@ -292,7 +294,6 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
 // ---------------------------------------------------------------------------
 
 const ENTITY_LIMIT = 5000;
-const ERROR_LIMIT = 10;
 
 export type SetUseCasesInput = {
   dimensions?: Record<string, unknown>[];

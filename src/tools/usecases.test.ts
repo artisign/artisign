@@ -250,6 +250,20 @@ describe("use case tools", () => {
         expect(await fx.store.listUseCaseIds()).not.toContain("fresh-case");
       });
 
+      it("caps the named files of a multi-file invalid_state and counts the rest", async () => {
+        const ids = Array.from({ length: 14 }, (_, i) => `broken-${String(i).padStart(2, "0")}`);
+        await setUseCases(fx.store, { use_cases: ids.map((id) => borrowCase({ id })) });
+        for (const id of ids) await writeFile(join(fx.dir, "usecases", "cases", `${id}.json`), BROKEN);
+        const err = await setUseCases(fx.store, { use_cases: ids.map((id) => ({ id, status: "ready" })) }).catch((e: unknown) => e);
+        const message = (err as Error).message;
+        expect(err).toMatchObject({ code: "invalid_state" });
+        expect(message).toContain("15 stored use cases are invalid, nothing written");
+        expect(message).toContain("broken-09.json");
+        expect(message).not.toContain("broken-10.json");
+        expect(message).toContain("(+5 more)");
+        expect(message).toContain(" | ");
+      });
+
       it("reads more existing cases than one batch holds and still finds the invalid ones", async () => {
         const ids = Array.from({ length: 70 }, (_, i) => `bulk-${String(i).padStart(2, "0")}`);
         await setUseCases(fx.store, { use_cases: ids.map((id) => borrowCase({ id })) });

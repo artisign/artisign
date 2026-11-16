@@ -8,6 +8,7 @@ import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
 import { segmented, avatar } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
+import { createReorder } from "./usecases-reorder.js";
 import {
   STATUSES,
   STATUS_LABELS,
@@ -322,6 +323,28 @@ export async function openUseCaseDialog(options) {
     const personas = pool.personas.filter((p) => !p.generated || used.has(p.id));
     return [{ value: "system", label: "System" }, ...personas.map((p) => ({ value: p.id, label: p.name }))];
   };
+  // Rows are moved in the DOM, not redrawn: the draft array follows (`onReorder`) and the "Step N" labels are rewritten (`onMoved`).
+  const relabelRows = () => {
+    stepsBox.querySelectorAll(":scope > .uc-step-edit").forEach((row, i) => {
+      row.dataset.index = String(i);
+      row.querySelector(".uc-step-edit-no").textContent = String(i + 1);
+      for (const el of row.querySelectorAll("[aria-label^='Step ']")) el.setAttribute("aria-label", el.getAttribute("aria-label").replace(/^Step \d+/, `Step ${i + 1}`));
+      for (const el of row.querySelectorAll("[data-path^='step.']")) el.dataset.path = el.dataset.path.replace(/^step\.\d+/, `step.${i}`);
+      row.querySelector("[aria-label^='Remove step']")?.setAttribute("aria-label", `Remove step ${i + 1}`);
+      row.querySelector("[aria-label^='Remove step']")?.setAttribute("title", `Remove step ${i + 1}`);
+      row.querySelector(".uc-drag-handle")?.relabel();
+      row.querySelector("[aria-haspopup='menu']")?.relabel();
+    });
+    refreshWarnings();
+  };
+  const reorder = createReorder({
+    list: stepsBox,
+    rowSelector: ".uc-step-edit",
+    nameOf: (row, i) => draft.steps[i]?.action?.trim() || `Step ${i + 1}`,
+    onReorder: (from, to) => { draft.steps.splice(to, 0, draft.steps.splice(from, 1)[0]); },
+    onMoved: relabelRows,
+    onCommit: markDirty,
+  });
   const drawSteps = (focusIndex = null) => {
     stepsBox.replaceChildren();
     draft.steps.forEach((step, index) => {
@@ -371,25 +394,20 @@ export async function openUseCaseDialog(options) {
       };
       drawData();
 
-      const move = (delta) => {
-        const to = index + delta;
-        if (to < 0 || to >= draft.steps.length) return;
-        [draft.steps[index], draft.steps[to]] = [draft.steps[to], draft.steps[index]];
-        markDirty();
-        drawSteps(to);
-      };
       const actionInput = textInput({ value: step.action, placeholder: "What happens", ariaLabel: `Step ${index + 1} action`, onInput: (value) => { step.action = value; markDirty(); } });
-      stepsBox.append(
-        h(
+      let rowEl;
+      rowEl = h(
           "div",
           { class: "uc-step-edit", dataset: { index: String(index), step: step.id ?? "" } },
-          h("div", { class: "uc-step-edit-top" }, h("span", { class: "uc-step-edit-no" }, String(index + 1)), selectInput({ options: actorOptions(step.actor), value: step.actor || "system", ariaLabel: `Step ${index + 1} actor`, onChange: (value) => { step.actor = value; markDirty(); } }), actionInput, h("button", { type: "button", class: "chrome-icon-btn chrome-icon-btn--sm", "aria-label": `Move step ${index + 1} up`, title: "Move up", disabled: index === 0, onClick: () => move(-1) }, icon("arrow_upward")), h("button", { type: "button", class: "chrome-icon-btn chrome-icon-btn--sm", "aria-label": `Move step ${index + 1} down`, title: "Move down", disabled: index === draft.steps.length - 1, onClick: () => move(1) }, icon("arrow_downward")), removeButton(`Remove step ${index + 1}`, () => { draft.steps.splice(index, 1); markDirty(); drawSteps(); })),
+          h("div", { class: "uc-step-edit-top" }, reorder.handle(() => rowEl), h("span", { class: "uc-step-edit-no" }, String(index + 1)), selectInput({ options: actorOptions(step.actor), value: step.actor || "system", ariaLabel: `Step ${index + 1} actor`, onChange: (value) => { step.actor = value; markDirty(); } }), actionInput, h("span", { class: "uc-step-edit-tools" }, reorder.moreButton(() => rowEl), removeButton(`Remove step ${index + 1}`, () => { draft.steps.splice(draft.steps.indexOf(step), 1); markDirty(); drawSteps(); }))),
+          reorder.keyHint(),
           targetRow,
           warnScreen,
           warnNode,
           dataBox,
-        ),
-      );
+        );
+      stepsBox.append(rowEl);
+      rowEl.querySelector("[aria-haspopup='menu']").relabel();
     });
     stepsBox.append(h("button", { type: "button", class: "uc-link-btn", onClick: () => { draft.steps.push({ id: "", actor: draft.personas[0] ?? "system", action: "", kind: "screen", screen: "", node: "", data: [] }); markDirty(); drawSteps(draft.steps.length - 1); } }, icon("add"), "Step"));
     if (focusIndex !== null) stepsBox.querySelectorAll(".uc-step-edit")[focusIndex]?.querySelector("input")?.focus();
@@ -505,7 +523,7 @@ export async function openUseCaseDialog(options) {
       h("div", { class: "uc-field" }, h("span", { class: "uc-label" }, "Personas"), personaRow),
       h("div", { class: "uc-form-row is-three" }, storyArea("trigger", "Trigger"), storyArea("goal", "Goal"), storyArea("outcome", "Outcome")),
       h("section", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Inputs and outputs", h("span", { class: "uc-label-hint" }, " · at least one of each, each with an example")), ioBox),
-      h("section", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Steps"), stepsBox),
+      h("section", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Steps", h("span", { class: "uc-form-h-hint" }, " · drag a handle to reorder, or focus it and press Space")), stepsBox, reorder.live),
       h("section", { class: "uc-form-section", id: "uc-variants-section" }, h("h2", { class: "uc-form-h" }, "Variants", h("span", { class: "uc-label-hint" }, " · shown as a difference against the base")), variantsBox),
     ),
   );

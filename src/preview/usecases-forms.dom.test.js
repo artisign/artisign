@@ -328,7 +328,8 @@ describe("use case dialog", () => {
     await flush();
     const dialog = $("dialog");
     expect($$(".uc-step-edit", dialog)).toHaveLength(3);
-    $("button[aria-label='Move step 2 up']", dialog).click();
+    $("button[aria-label='Actions for step 2']", dialog).click();
+    $("[role=menuitem][data-value=up]").click();
     expect($$(".uc-step-edit input[aria-label$='action']", dialog).map((i) => i.value)).toEqual(["Picks Pablo", "Taps the step", "Dex gets a push"]);
     $("button[aria-label='Remove step 3']", dialog).click();
     expect($$(".uc-step-edit", dialog)).toHaveLength(2);

@@ -7977,7 +7977,7 @@ button.uc-target:hover {
 
 .uc-step-edit-top {
   display: grid;
-  grid-template-columns: 20px 130px minmax(0, 1fr) auto auto auto;
+  grid-template-columns: 20px 20px 130px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-md);
 }
@@ -7993,7 +7993,7 @@ button.uc-target:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-md);
-  padding-left: 28px;
+  padding-left: 48px;
 }
 
 .uc-target-edit .chrome-field {
@@ -8360,4 +8360,176 @@ button.uc-target:hover {
 .uc-error-text {
   flex: 1;
   min-width: 0;
+}
+
+/* Step reordering (CHR-1110, design CHR-1103): drag handle, lifted row, drop marker, key hint, live region, disabled menu item. */
+.uc-steps-edit {
+  position: relative;
+}
+
+.uc-form-h-hint {
+  font-weight: 400;
+  color: var(--chrome-text-tertiary);
+}
+
+.uc-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: var(--size-control);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--chrome-text-secondary);
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.uc-drag-handle .icon {
+  font-size: var(--size-icon-sm);
+  line-height: 1;
+}
+
+.uc-drag-handle:is(:hover, :focus-visible) {
+  background: var(--chrome-hover);
+  color: var(--chrome-text);
+}
+
+.uc-drag-handle[aria-pressed="true"] {
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+  cursor: grabbing;
+}
+
+.uc-dragging,
+.uc-dragging * {
+  cursor: grabbing !important;
+}
+
+.uc-step-edit-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs, 2px);
+}
+
+.uc-step-edit.is-lifted,
+.uc-step-edit.is-grabbed {
+  position: relative;
+  z-index: 2;
+  scale: 1.02;
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-float);
+}
+
+.uc-step-edit.is-lifted {
+  pointer-events: none;
+  border-color: var(--chrome-border-strong);
+}
+
+.uc-step-edit.is-grabbed {
+  border-color: var(--chrome-accent);
+  box-shadow: 0 0 0 3px var(--chrome-focus-ring), var(--chrome-shadow-float);
+}
+
+.uc-step-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--chrome-border-strong);
+  background: var(--chrome-field);
+  pointer-events: none;
+}
+
+.uc-drop-marker {
+  position: absolute;
+  left: -4px;
+  right: 0;
+  height: 8px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.uc-drop-marker[hidden] {
+  display: none;
+}
+
+.uc-drop-marker::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  border: 2px solid var(--chrome-accent);
+  background: var(--chrome-raised);
+}
+
+.uc-drop-marker::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 0;
+  top: 3px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--chrome-accent);
+}
+
+@media (forced-colors: active) {
+  .uc-drop-marker::before,
+  .uc-drop-marker::after {
+    border-color: Highlight;
+    background: Highlight;
+  }
+}
+
+.uc-step-keys {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-left: 48px;
+  font-size: var(--ui-2xs);
+  color: var(--chrome-accent);
+}
+
+.uc-step-keys[hidden] {
+  display: none;
+}
+
+.uc-step-keys .icon {
+  font-size: var(--size-icon-xs);
+  line-height: 1;
+}
+
+.uc-reorder-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.chrome-menu-item[aria-disabled="true"] {
+  color: var(--chrome-text-tertiary);
+  cursor: default;
+}
+
+.chrome-menu-item[aria-disabled="true"]:hover {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uc-step-edit.is-lifted,
+  .uc-step-edit.is-grabbed {
+    transition: none;
+  }
 }

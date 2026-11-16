@@ -61,9 +61,11 @@ export function draftFromSource(source) {
 }
 
 function parseIo(list, sideKey, label, errors) {
+  // The number is the row's position in the unfiltered list, the one aria-label and the remove button show.
   return list
-    .filter((row) => row.object !== "")
-    .map((row, index) => {
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => row.object !== "")
+    .map(({ row, index }) => {
       const parsed = parseOrKeep(row.example, row.orig);
       if (!parsed.ok) errors.push(`${label} ${index + 1}: ${parsed.error}`);
       else if (Object.keys(parsed.value).length === 0) errors.push(`${label} ${index + 1}: the example needs at least one key.`);

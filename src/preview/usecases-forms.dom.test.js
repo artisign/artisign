@@ -165,6 +165,14 @@ describe("use case dialog", () => {
     await closed;
   });
 
+  it("a blank example is reported under the row's position in the full list, even when an earlier row has no data object", async () => {
+    const source = { ...rawUseCase, inputs: [{ object: "", example: { a: 1 } }, { object: "mapping", example: {} }] };
+    openUseCaseDialog(options({ source }));
+    await flush();
+    expect($(".uc-foot-msg").textContent).toBe("Input 2: the example needs at least one key.");
+    expect(button("Save use case").disabled).toBe(true);
+  });
+
   it("opens as a labelled dialog and shows the warnings count live, saving stays enabled", async () => {
     const opts = options();
     const closed = openUseCaseDialog(opts);

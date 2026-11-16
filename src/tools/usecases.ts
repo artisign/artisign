@@ -45,6 +45,8 @@ import type { CommitResult } from "../store/index.js";
 import { ToolError, commitFields, type ToolHandlerContext, type Warning } from "./types.js";
 
 const WARNING_CAP = 50;
+/** Most personas a generate_personas dry run lists; would_create keeps the full count. */
+const DRY_RUN_PERSONA_CAP = 50;
 
 /** De-duplicated and capped: a bulk write over thousands of cases must not answer with thousands of lines. */
 function reportWarnings(warnings: Warning[]): { warnings: Warning[]; warning_count?: number } {
@@ -490,8 +492,8 @@ async function generatePersonasInner(store: Store, input: GeneratePersonasInput,
       dry_run: true,
       ...base,
       would_create: created.length,
-      personas: created.slice(0, WARNING_CAP).map((p) => ({ id: p.id, name: p.name, traits: p.traits })),
-      ...(created.length > WARNING_CAP ? { personas_truncated: true } : {}),
+      personas: created.slice(0, DRY_RUN_PERSONA_CAP).map((p) => ({ id: p.id, name: p.name, traits: p.traits })),
+      ...(created.length > DRY_RUN_PERSONA_CAP ? { personas_truncated: true } : {}),
     };
   }
   if (created.length === 0) return { ...base, created: 0 };

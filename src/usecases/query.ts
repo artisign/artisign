@@ -48,6 +48,21 @@ export function personasOf(useCase: UseCase): Set<string> {
   return ids;
 }
 
+/** Every data object a use case names: inputs, outputs and step data of the base flow and of every variant. */
+export function objectIdsOf(useCase: UseCase): Set<string> {
+  const ids = new Set<string>();
+  const add = (list: { object: string }[] | undefined): void => list?.forEach((item) => ids.add(item.object));
+  add(useCase.inputs);
+  add(useCase.outputs);
+  for (const step of useCase.steps) add(step.data);
+  for (const variant of useCase.variants ?? []) {
+    add(variant.inputs);
+    add(variant.outputs);
+    for (const op of variant.steps ?? []) if (op.op !== "remove") add(op.step.data);
+  }
+  return ids;
+}
+
 /** Path-prefix match: "catalog" matches "catalog" and "catalog/loans", not "catalog-x". */
 function inGroup(group: string | undefined, prefix: string): boolean {
   const wanted = prefix.replace(/\/+$/, "");

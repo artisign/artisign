@@ -5799,6 +5799,12 @@ body:has(#settings-menu:not([hidden])) #update-notice {
   font-family: ui-monospace, Menlo, monospace;
 }
 
+/* Design chrome-field#mono: a mono field is ui-sm, one step below the ui-base of a plain field. Scoped to the field so the
+   mono text in tables and chips keeps the size it inherits. */
+.chrome-field.uc-mono {
+  font-size: var(--ui-sm);
+}
+
 /* Avatars: the colour is persona data (--avatar-color on the element), not a token. */
 .uc-avatar {
   display: inline-flex;

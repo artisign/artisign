@@ -71,7 +71,7 @@ describe("variant step changes: reordering", () => {
     expect($("button[aria-label='Remove change 2 of variant 1']", first)).not.toBeNull();
     expect(document.activeElement.getAttribute("aria-label")).toBe("Actions for change 2");
     vi.advanceTimersByTime(600);
-    expect(live()).toBe("Picks the agent today, moved to step 2 of 3.");
+    expect(live()).toBe("Picks the agent today, moved to change 2 of 3.");
     button("Save use case").click();
     await vi.advanceTimersByTimeAsync(10);
     expect(opts.save.mock.calls[0][0].variants[0].steps.map((op) => op.op)).toEqual(["remove", "replace", "append"]);
@@ -124,30 +124,110 @@ describe("grab announcement", () => {
     const change = $(".uc-drag-handle", ops()[0]);
     key(change, " ");
     vi.advanceTimersByTime(600);
-    expect(live()).toBe(grabbedText("Picks the agent", 0, 3));
+    expect(live()).toBe(grabbedText("Picks the agent", 0, 3, "change"));
+    expect(live()).toBe("Picks the agent, grabbed, change 1 of 3. Arrow up and down move it, Space drops it, Escape cancels.");
   });
 });
 
 describe("a re-grab during the settle animation", () => {
-  it("keeps the lifted look when the earlier animation finishes after the new drag started", async () => {
+  it("keeps the lifted look when the earlier animation finishes after the new drag started; only that animation is finished", async () => {
     await open();
     const rows = $$(".uc-steps-edit .uc-step-edit");
+    const list = $(".uc-steps-edit");
+    rows.forEach((row, i) => {
+      Object.defineProperty(row, "offsetTop", { configurable: true, get: () => i * 100 });
+      Object.defineProperty(row, "offsetHeight", { configurable: true, get: () => 80 });
+      row.getBoundingClientRect = () => ({ top: i * 100, bottom: i * 100 + 80, height: 80, left: 0, right: 100, width: 100 });
+    });
+    // the lifted row is 150px from the top, 50px below its resting place, so the release has a distance to settle over
+    rows[0].getBoundingClientRect = () => ({ top: rows[0].style.translate ? 150 : 0, bottom: 80, height: 80, left: 0, right: 100, width: 100 });
+    list.getBoundingClientRect = () => ({ top: 0, bottom: 300, height: 300, left: 0, right: 100, width: 100 });
+    Object.defineProperty(list, "offsetHeight", { configurable: true, get: () => 300 });
     let onFinish;
-    const animation = { finish: vi.fn(() => onFinish?.()), addEventListener: (type, fn) => { if (type === "finish") onFinish = fn; } };
-    rows[0].animate = () => animation;
-    rows[0].getAnimations = () => [animation];
-    rows[0].getBoundingClientRect = () => ({ top: 0, bottom: 80, height: 80, left: 0, right: 100, width: 100 });
-    rows[1].getBoundingClientRect = () => ({ top: 100, bottom: 180, height: 80, left: 0, right: 100, width: 100 });
-    rows[2].getBoundingClientRect = () => ({ top: 200, bottom: 280, height: 80, left: 0, right: 100, width: 100 });
-    const down = (el, y) => el.dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), { pointerId: 1, clientY: y, button: 0, isPrimary: true }));
+    const settle = { finish: vi.fn(() => onFinish?.()), addEventListener: (type, fn) => { if (type === "finish") onFinish = fn; } };
+    const unrelated = { finish: vi.fn() };
+    rows[0].animate = () => settle;
+    rows[0].getAnimations = () => [unrelated, settle];
+    const pointer = (type, y) => document.dispatchEvent(Object.assign(new Event(type), { pointerId: 1, clientY: y }));
     const handle = $(".uc-drag-handle", rows[0]);
-    down(handle, 10);
-    document.dispatchEvent(Object.assign(new Event("pointerup"), { pointerId: 1, clientY: 10 })); // dropped in place
-    down(handle, 10); // grabbed again while the first release is still settling
-    expect(animation.finish).toHaveBeenCalled();
-    onFinish?.(); // the old animation's finish callback arrives late
+    const down = (y) => handle.dispatchEvent(Object.assign(new Event("pointerdown", { bubbles: true, cancelable: true }), { pointerId: 1, clientY: y, button: 0, isPrimary: true }));
+    down(10);
+    pointer("pointermove", 190);
+    pointer("pointerup", 190); // dropped lower: one move, one settle animation
+    expect($$(".uc-steps-edit .uc-step-edit")[2]).toBe(rows[0]);
+    expect(rows[0].classList.contains("is-lifted")).toBe(true); // until the animation finishes
+    down(10); // grabbed again while the release is still settling
+    expect(settle.finish).toHaveBeenCalled();
+    expect(unrelated.finish).not.toHaveBeenCalled();
+    onFinish(); // the old animation's finish callback arrives late
     expect(rows[0].classList.contains("is-lifted")).toBe(true);
-    document.dispatchEvent(Object.assign(new Event("pointercancel"), { pointerId: 1 }));
+    pointer("pointercancel", 0);
+  });
+});
+
+describe("review fixes (second round)", () => {
+  it("a base step removed or added redraws with its field errors intact", async () => {
+    await open();
+    const first = () => $$(".uc-steps-edit .uc-step-edit")[0];
+    const action = () => $("input[aria-label='Step 1 action']", first());
+    action().value = "";
+    action().dispatchEvent(new Event("input", { bubbles: true }));
+    first().dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: null }));
+    expect(action().getAttribute("aria-invalid")).toBe("true");
+    $("button[aria-label='Remove step 3']").click(); // redraws every row
+    expect(action().getAttribute("aria-invalid")).toBe("true");
+    expect(document.getElementById(action().getAttribute("aria-describedby")).textContent).toBe("The step needs an action.");
+  });
+
+  it("focus going into the row's own ⋯ menu is not leaving the row; a real leave still counts", async () => {
+    await open();
+    $$("button", card()).find((b) => b.textContent === "addStep change").click();
+    const kind = $("select[aria-label$='operation']", ops().at(-1));
+    kind.value = "append";
+    kind.dispatchEvent(new Event("change", { bubbles: true }));
+    const row = ops().at(-1);
+    const action = $("input[aria-label$='action']", row);
+    $("button[aria-haspopup=menu]", row).click();
+    row.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: $("[role=menuitem]") }));
+    expect(row.dataset.touched).toBeUndefined();
+    const gone = document.createElement("button");
+    row.append(gone);
+    const leave = new FocusEvent("focusout", { bubbles: true, relatedTarget: null });
+    gone.dispatchEvent(leave); // still connected: a real leave
+    expect(row.dataset.touched).toBe("true");
+    expect(action.getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("an actor swap with an empty from shows the error state on both selects", async () => {
+    await open();
+    $$("button", card()).find((b) => b.textContent === "addActor swap").click();
+    const [from, to] = $$(".uc-swap-row select", card()).slice(-2);
+    to.value = "dex";
+    to.dispatchEvent(new Event("change", { bubbles: true }));
+    from.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: null }));
+    expect(from.getAttribute("aria-invalid")).toBe("true");
+    expect(from.classList.contains("is-error")).toBe(true);
+  });
+
+  it("one committed move runs one warning pass", async () => {
+    await open();
+    const message = $(".uc-foot-msg");
+    const observer = new MutationObserver(() => {});
+    observer.observe(message, { childList: true, characterData: true, subtree: true });
+    $(".uc-steps-edit .uc-step-edit button[aria-haspopup=menu]").click();
+    $("[role=menuitem][data-value=down]").click();
+    expect(observer.takeRecords()).toHaveLength(1); // the pass sets the footer message once
+    observer.disconnect();
+  });
+
+  it("the move wording names the noun of the list", async () => {
+    await open();
+    const handle = $(".uc-drag-handle", ops()[0]);
+    handle.focus();
+    key(handle, " ");
+    key(handle, "ArrowDown");
+    vi.advanceTimersByTime(600);
+    expect(live()).toBe("Picks the agent, moved to change 2 of 3.");
   });
 });
 

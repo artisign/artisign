@@ -18,13 +18,32 @@ export function dropIndex(midpoints, y) {
 }
 
 /** The wording shared by every path. */
-export function movedText(name, to, total) {
-  return `${name}, moved to step ${to + 1} of ${total}.`;
+export function movedText(name, to, total, noun = "step") {
+  return `${name}, moved to ${noun} ${to + 1} of ${total}.`;
 }
 
 /** What a screen reader hears on pickup: the row, its place and the keys (the visual hint is aria-hidden). */
-export function grabbedText(name, index, total) {
-  return `${name}, grabbed, step ${index + 1} of ${total}. Arrow up and down move it, Space drops it, Escape cancels.`;
+export function grabbedText(name, index, total, noun = "step") {
+  return `${name}, grabbed, ${noun} ${index + 1} of ${total}. Arrow up and down move it, Space drops it, Escape cancels.`;
+}
+
+/**
+ * Brings what a row was drawn from its position up to date after a move: labels (`aria-label` and `title`) and the field paths
+ * (`data-path`, `data-error-path`) that match. Each regex captures the text before the number in group 1, e.g. `/^(Step )\d+/` and
+ * `/^(step\.)\d+/`; `label` counts from 1, `path` from 0.
+ */
+export function renumberRow(row, index, { label, path }) {
+  for (const attr of ["aria-label", "title"]) {
+    for (const el of row.querySelectorAll(`[${attr}]`)) {
+      const text = el.getAttribute(attr);
+      if (label.test(text)) el.setAttribute(attr, text.replace(label, `$1${index + 1}`));
+    }
+  }
+  for (const [data, attr] of [["path", "data-path"], ["errorPath", "data-error-path"]]) {
+    for (const el of row.querySelectorAll(`[${attr}]`)) {
+      if (path.test(el.dataset[data])) el.dataset[data] = el.dataset[data].replace(path, `$1${index}`);
+    }
+  }
 }
 
 export const CANCELLED_TEXT = "Move cancelled.";
@@ -56,6 +75,7 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
   let announceTimer = 0;
   let drag = null; // a pointer drag in progress
   let grab = null; // a keyboard grab in progress
+  const settling = new WeakMap(); // row -> the settle animation of its last release
   let moving = false; // the DOM move in progress: a blur it causes must not end a grab
   const nativeMove = typeof list.moveBefore === "function";
 
@@ -83,7 +103,10 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
         continue;
       }
       const animation = row.animate(lifted ? [{ translate: `0 ${dy}px`, scale: "1.02" }, { translate: "0 0", scale: "1" }] : [{ translate: `0 ${dy}px` }, { translate: "0 0" }], { duration: 160, easing: "ease-out" });
-      if (lifted) animation.addEventListener("finish", () => unlift(row));
+      if (lifted) {
+        settling.set(row, animation);
+        animation.addEventListener("finish", () => unlift(row));
+      }
     }
   }
 
@@ -108,7 +131,7 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     onMoved();
     row.scrollIntoView?.({ block: "nearest" });
     flip(before, releasedTop === undefined ? new Map() : new Map([[row, releasedTop]]));
-    if (!silent) announce(movedText(nameOf(row, to), to, all.length));
+    if (!silent) announce(movedText(nameOf(row, to), to, all.length, noun));
     return true;
   }
 
@@ -141,7 +164,7 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
       else {
         grab = { handle, origin: rows().indexOf(row) };
         setGrabbed(handle, true);
-        announce(grabbedText(nameOf(row, grab.origin), grab.origin, rows().length));
+        announce(grabbedText(nameOf(row, grab.origin), grab.origin, rows().length, noun));
       }
     } else if (grab?.handle === handle && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
       event.preventDefault();
@@ -161,7 +184,7 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     if (grab) endGrab(grab.handle, { cancel: false }); // dragging another handle drops the grabbed row where it is
     event.preventDefault();
     const row = handle.closest(rowSelector);
-    for (const animation of row.getAnimations?.() ?? []) animation.finish(); // the settle animation of an earlier drag: measure the row where it rests
+    settling.get(row)?.finish(); // the settle animation of this row's last release: measure the row where it rests
     const scroller = scrollParent(list);
     const slot = h("div", { class: "uc-step-slot", "aria-hidden": "true" });
     const marker = h("div", { class: "uc-drop-marker", "aria-hidden": "true" });
@@ -265,6 +288,7 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     if (!reducedMotion() && typeof row.animate === "function") {
       const dy = releasedTop - row.getBoundingClientRect().top;
       const animation = row.animate([{ translate: `0 ${dy}px`, scale: "1.02" }, { translate: "0 0", scale: "1" }], { duration: 160, easing: "ease-out" });
+      settling.set(row, animation);
       animation.addEventListener("finish", () => unlift(row));
     } else unlift(row);
     announce(CANCELLED_TEXT);

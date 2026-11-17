@@ -8,7 +8,7 @@ import { h, icon, fill } from "./usecases-dom.js";
 import { field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
 import { segmented, avatar, diffBadge } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
-import { createReorder } from "./usecases-reorder.js";
+import { createReorder, renumberRow } from "./usecases-reorder.js";
 import { slugify, uniqueId, isValidId, formatExample, parseOrKeep, avatarOf, actorName } from "./usecases-data.js";
 
 // --- Draft <-> payload (pure) ---------------------------------------------------------------------------------------
@@ -239,7 +239,7 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
     const path = `variant.${index}.op.${i}`;
     if (op.op !== "append" && op.stepId === "") {
       errors.push(`${where}: pick the step it changes.`);
-      fieldErrors.push({ path: `${path}.pick`, message: "Pick the step this change applies to." });
+      fieldErrors.push({ path: `${path}.pick`, message: "Pick the step this change applies to.", untilTouched: true });
     }
     if (op.op === "remove") {
       applyOp(flow, op);
@@ -328,6 +328,8 @@ export function touchScope(el, model, refresh) {
   if (model.touched) el.dataset.touched = "true";
   el.addEventListener("focusout", (event) => {
     if (el.contains(event.relatedTarget) || model.touched) return;
+    // Not leaving: focus going into a menu the row opened (its ⋯), or a focused node that a redraw took out of the page.
+    if (event.relatedTarget?.closest?.("[role=menu]") || (event.relatedTarget === null && !event.target.isConnected)) return;
     model.touched = true;
     el.dataset.touched = "true";
     refresh();
@@ -347,6 +349,7 @@ const OP_LABELS = { replace: "Replace", insert_after: "Insert after", remove: "R
  *   objectOptions: () => { value: string, label: string }[],
  *   actorOptions: (current: string) => { value: string, label: string }[],
  *   markDirty: () => void,
+ *   setDirty: () => void, // marks the form dirty without a warning pass (a move already did one)
  *   refresh: () => void, // re-runs the dialog's warning / error pass; called after every redraw, because a redrawn field starts without its hint
  * }} env `draft` is the dialog's draft: the editor reads the base fields from it live and edits `draft.variants` in place.
  * @returns {{ el: HTMLElement, draw: (focusIndex?: number | null) => void, cards: () => HTMLElement[] }}
@@ -596,6 +599,8 @@ export function createVariantEditor(env) {
           const fromSel = selectInput({ options: actorChoices(swap.from), value: swap.from, ariaLabel: `Variant ${n} swap ${j + 1} from`, onChange: onSwap("from") });
           const toSel = selectInput({ options: actorChoices(swap.to), value: swap.to, ariaLabel: `Variant ${n} swap ${j + 1} to`, onChange: onSwap("to") });
           fromSel.dataset.path = `variant.${index}.swap.${j}.from`;
+          fromSel.dataset.errorPath = `variant.${index}.swap.${j}`;
+          fromSel.dataset.hint = same.id;
           toSel.dataset.path = `variant.${index}.swap.${j}.to`;
           toSel.dataset.errorPath = `variant.${index}.swap.${j}`;
           toSel.dataset.hint = same.id;
@@ -649,11 +654,7 @@ export function createVariantEditor(env) {
       onMoved: () => {
         opsBox.querySelectorAll(":scope > .uc-step-op").forEach((row, i) => {
           row.dataset.index = String(i);
-          for (const el of row.querySelectorAll("[aria-label^='Variant ']")) el.setAttribute("aria-label", el.getAttribute("aria-label").replace(/^(Variant \d+ change )\d+/, `$1${i + 1}`));
-          for (const attr of ["path", "errorPath"]) for (const el of row.querySelectorAll(`[data-${attr === "path" ? "path" : "error-path"}*='.op.']`)) el.dataset[attr] = el.dataset[attr].replace(/\.op\.\d+/, `.op.${i}`);
-          const removeBtn = row.querySelector(".uc-op-top [aria-label^='Remove change']");
-          removeBtn?.setAttribute("aria-label", `Remove change ${i + 1} of variant ${n}`);
-          removeBtn?.setAttribute("title", `Remove change ${i + 1} of variant ${n}`);
+          renumberRow(row, i, { label: /^(Variant \d+ change |Remove change )\d+/, path: /^(variant\.\d+\.op\.)\d+/ });
           const removed = row.querySelector(".uc-op-removed");
           if (removed) removed.replaceChildren(...removedBody(variant.ops[i]));
           row.querySelector(".uc-drag-handle")?.relabel();
@@ -662,7 +663,7 @@ export function createVariantEditor(env) {
         refreshOptions();
         env.refresh();
       },
-      onCommit: markDirty,
+      onCommit: env.setDirty, // the refresh above already covers this move
     });
     const drawOps = (focus = null) => {
       stepSelects = [];

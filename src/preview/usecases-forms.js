@@ -9,7 +9,7 @@ import { createDialog, field, textInput, textArea, selectInput, removeButton, ne
 import { segmented, avatar } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
 import { createVariantEditor, touchScope, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, variantWarnings, showFieldErrors } from "./usecases-variant-edit.js";
-import { createReorder } from "./usecases-reorder.js";
+import { createReorder, renumberRow } from "./usecases-reorder.js";
 import {
   STATUSES,
   STATUS_LABELS,
@@ -275,11 +275,7 @@ export async function openUseCaseDialog(options) {
     stepsBox.querySelectorAll(":scope > .uc-step-edit").forEach((row, i) => {
       row.dataset.index = String(i);
       row.querySelector(".uc-step-edit-no").textContent = String(i + 1);
-      for (const el of row.querySelectorAll("[aria-label^='Step ']")) el.setAttribute("aria-label", el.getAttribute("aria-label").replace(/^Step \d+/, `Step ${i + 1}`));
-      for (const el of row.querySelectorAll("[data-path^='step.']")) el.dataset.path = el.dataset.path.replace(/^step\.\d+/, `step.${i}`);
-      for (const el of row.querySelectorAll("[data-error-path^='step.']")) el.dataset.errorPath = el.dataset.errorPath.replace(/^step\.\d+/, `step.${i}`);
-      row.querySelector("[aria-label^='Remove step']")?.setAttribute("aria-label", `Remove step ${i + 1}`);
-      row.querySelector("[aria-label^='Remove step']")?.setAttribute("title", `Remove step ${i + 1}`);
+      renumberRow(row, i, { label: /^(Step |Remove step )\d+/, path: /^(step\.)\d+/ });
       row.querySelector(".uc-drag-handle")?.relabel();
       row.querySelector("[aria-haspopup='menu']")?.relabel();
     });
@@ -291,7 +287,7 @@ export async function openUseCaseDialog(options) {
     nameOf: (row, i) => draft.steps[i]?.action?.trim() || `Step ${i + 1}`,
     onReorder: (from, to) => { draft.steps.splice(to, 0, draft.steps.splice(from, 1)[0]); },
     onMoved: relabelRows,
-    onCommit: markDirty,
+    onCommit: () => dialog.setDirty(true), // relabelRows already refreshed the warnings for this move
   });
   const drawSteps = (focusIndex = null) => {
     stepsBox.replaceChildren();
@@ -366,10 +362,11 @@ export async function openUseCaseDialog(options) {
     });
     stepsBox.append(h("button", { type: "button", class: "uc-link-btn", onClick: () => { draft.steps.push({ id: "", actor: draft.personas[0] ?? "system", action: "", kind: "screen", screen: "", node: "", data: [] }); markDirty(); drawSteps(draft.steps.length - 1); } }, icon("add"), "Step"));
     if (focusIndex !== null) stepsBox.querySelectorAll(".uc-step-edit")[focusIndex]?.querySelector("input")?.focus();
+    refreshWarnings(); // redrawn fields start without their hints and error states
   };
 
   // --- Variants (usecases-variant-edit.js) -----------------------------------------------------------------------
-  variantEditor = createVariantEditor({ draft, pool: options.pool, screens: options.screens, ensureNodes, objectOptions, actorOptions, markDirty: touch, refresh: refreshWarnings });
+  variantEditor = createVariantEditor({ draft, pool: options.pool, screens: options.screens, ensureNodes, objectOptions, actorOptions, markDirty: touch, setDirty: () => dialog.setDirty(true), refresh: refreshWarnings });
   const variantsBox = variantEditor.el;
 
   // --- Footer: warnings, the one hard requirement, Save ---------------------------------------------------------

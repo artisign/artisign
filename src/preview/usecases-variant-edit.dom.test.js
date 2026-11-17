@@ -464,6 +464,8 @@ describe("review fixes", () => {
     const card = variantCard(1);
     addChange(card);
     const select = stepSel(card, 2, 1);
+    expect(select.getAttribute("aria-invalid")).toBe("false"); // a row just added waits until it was left
+    select.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: null }));
     expect(select.getAttribute("aria-invalid")).toBe("true");
     expect(select.classList.contains("is-error")).toBe(true);
     expect(document.getElementById(select.getAttribute("aria-describedby")).textContent).toBe("Pick the step this change applies to.");

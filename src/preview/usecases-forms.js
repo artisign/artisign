@@ -8,7 +8,7 @@ import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
 import { segmented, avatar } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
-import { createVariantEditor, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, variantWarnings, showFieldErrors } from "./usecases-variant-edit.js";
+import { createVariantEditor, touchScope, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, variantWarnings, showFieldErrors } from "./usecases-variant-edit.js";
 import { createReorder } from "./usecases-reorder.js";
 import {
   STATUSES,
@@ -65,15 +65,18 @@ export function buildPayload({ id, draft, source }) {
 
   // Generated ids must not collide with ANY id the case already has: every step, every variant, and the steps variants add.
   const usedStepIds = new Set([...draft.steps.map((s) => s.id).filter(Boolean), ...variantStepIds(draft.variants)]);
+  const fieldErrors = [];
   const steps = draft.steps.map((step, index) => {
     const stepId = step.id || uniqueId(slugify(step.action) || `step-${index + 1}`, usedStepIds);
     usedStepIds.add(stepId);
-    if (step.action.trim() === "") errors.push(`Step ${index + 1} needs an action.`);
+    if (step.action.trim() === "") {
+      errors.push(`Step ${index + 1} needs an action.`);
+      fieldErrors.push({ path: `step.${index}.action`, message: "The step needs an action.", untilTouched: true });
+    }
     return buildStepObject(step, stepId, `Step ${index + 1}`, errors);
   });
 
   const variantIds = new Set(draft.variants.map((v) => v.id).filter(Boolean));
-  const fieldErrors = [];
   const variants = draft.variants.map((variant, index) => {
     const built = buildVariant(variant, index, { baseSteps: draft.steps, usedStepIds, variantIds });
     errors.push(...built.errors);
@@ -274,6 +277,7 @@ export async function openUseCaseDialog(options) {
       row.querySelector(".uc-step-edit-no").textContent = String(i + 1);
       for (const el of row.querySelectorAll("[aria-label^='Step ']")) el.setAttribute("aria-label", el.getAttribute("aria-label").replace(/^Step \d+/, `Step ${i + 1}`));
       for (const el of row.querySelectorAll("[data-path^='step.']")) el.dataset.path = el.dataset.path.replace(/^step\.\d+/, `step.${i}`);
+      for (const el of row.querySelectorAll("[data-error-path^='step.']")) el.dataset.errorPath = el.dataset.errorPath.replace(/^step\.\d+/, `step.${i}`);
       row.querySelector("[aria-label^='Remove step']")?.setAttribute("aria-label", `Remove step ${i + 1}`);
       row.querySelector("[aria-label^='Remove step']")?.setAttribute("title", `Remove step ${i + 1}`);
       row.querySelector(".uc-drag-handle")?.relabel();
@@ -339,18 +343,23 @@ export async function openUseCaseDialog(options) {
       };
       drawData();
 
+      const actionHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `step.${index}.action` } });
       const actionInput = textInput({ value: step.action, placeholder: "What happens", ariaLabel: `Step ${index + 1} action`, onInput: (value) => { step.action = value; markDirty(); } });
+      actionInput.dataset.errorPath = `step.${index}.action`;
+      actionInput.dataset.hint = actionHint.id;
       let rowEl;
       rowEl = h(
           "div",
           { class: "uc-step-edit", dataset: { index: String(index), step: step.id ?? "" } },
           h("div", { class: "uc-step-edit-top" }, reorder.handle(() => rowEl), h("span", { class: "uc-step-edit-no" }, String(index + 1)), selectInput({ options: actorOptions(step.actor), value: step.actor || "system", ariaLabel: `Step ${index + 1} actor`, onChange: (value) => { step.actor = value; markDirty(); } }), actionInput, h("span", { class: "uc-step-edit-tools" }, reorder.moreButton(() => rowEl), removeButton(`Remove step ${index + 1}`, () => { draft.steps.splice(draft.steps.indexOf(step), 1); markDirty(); drawSteps(); }))),
+          actionHint,
           targetRow,
           warnScreen,
           warnNode,
           dataBox,
           reorder.keyHint(),
         );
+      touchScope(rowEl, step, refreshWarnings);
       stepsBox.append(rowEl);
       rowEl.querySelector("[aria-haspopup='menu']").relabel();
       rowEl.querySelector(".uc-drag-handle").relabel();

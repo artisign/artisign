@@ -22,6 +22,11 @@ export function movedText(name, to, total) {
   return `${name}, moved to step ${to + 1} of ${total}.`;
 }
 
+/** What a screen reader hears on pickup: the row, its place and the keys (the visual hint is aria-hidden). */
+export function grabbedText(name, index, total) {
+  return `${name}, grabbed, step ${index + 1} of ${total}. Arrow up and down move it, Space drops it, Escape cancels.`;
+}
+
 export const CANCELLED_TEXT = "Move cancelled.";
 
 const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -62,6 +67,11 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     announceTimer = setTimeout(() => { live.textContent = text; }, nativeMove ? 0 : 500);
   }
 
+  /** Drops the lifted look, unless a new drag of the same row started meanwhile (a re-grab during the settle animation keeps it). */
+  function unlift(row) {
+    if (drag?.row !== row) row.classList.remove("is-lifted");
+  }
+
   function flip(before, overrides = new Map()) {
     const animate = !reducedMotion();
     for (const row of rows()) {
@@ -69,11 +79,11 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
       const old = overrides.get(row) ?? before.get(row);
       const dy = old === undefined ? 0 : old - row.getBoundingClientRect().top;
       if (!animate || typeof row.animate !== "function" || Math.abs(dy) < 1) {
-        if (lifted) row.classList.remove("is-lifted");
+        if (lifted) unlift(row);
         continue;
       }
       const animation = row.animate(lifted ? [{ translate: `0 ${dy}px`, scale: "1.02" }, { translate: "0 0", scale: "1" }] : [{ translate: `0 ${dy}px` }, { translate: "0 0" }], { duration: 160, easing: "ease-out" });
-      if (lifted) animation.addEventListener("finish", () => row.classList.remove("is-lifted"));
+      if (lifted) animation.addEventListener("finish", () => unlift(row));
     }
   }
 
@@ -131,6 +141,7 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
       else {
         grab = { handle, origin: rows().indexOf(row) };
         setGrabbed(handle, true);
+        announce(grabbedText(nameOf(row, grab.origin), grab.origin, rows().length));
       }
     } else if (grab?.handle === handle && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
       event.preventDefault();
@@ -150,6 +161,7 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     if (grab) endGrab(grab.handle, { cancel: false }); // dragging another handle drops the grabbed row where it is
     event.preventDefault();
     const row = handle.closest(rowSelector);
+    for (const animation of row.getAnimations?.() ?? []) animation.finish(); // the settle animation of an earlier drag: measure the row where it rests
     const scroller = scrollParent(list);
     const slot = h("div", { class: "uc-step-slot", "aria-hidden": "true" });
     const marker = h("div", { class: "uc-drop-marker", "aria-hidden": "true" });
@@ -162,7 +174,6 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     list.append(slot, marker);
     marker.hidden = true;
     row.classList.add("is-lifted");
-    list.dataset.drop = "true";
     document.documentElement.classList.add("uc-dragging");
     drag = { handle, row, scroller, slot, marker, slotTop, rowHeight, others, listHeight: list.offsetHeight, listTop: list.getBoundingClientRect().top, scroll0: scroller?.scrollTop ?? 0, pointerId: event.pointerId, offset: event.clientY - row.getBoundingClientRect().top, y: event.clientY, from: rows().indexOf(row), target: rows().indexOf(row), frame: 0, last: 0 };
     try {
@@ -230,7 +241,6 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     state.handle.removeEventListener("lostpointercapture", onLost);
     state.slot.remove();
     state.marker.remove();
-    delete list.dataset.drop;
     document.documentElement.classList.remove("uc-dragging");
     state.handle.setAttribute("aria-pressed", "false");
     return state;
@@ -242,7 +252,7 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     const { row, from, target } = finishDrag();
     row.style.translate = "";
     if (!moveRow(from, target, { releasedTop })) {
-      row.classList.remove("is-lifted");
+      unlift(row);
       return;
     }
     onCommit?.();
@@ -255,8 +265,8 @@ export function createReorder({ list, rowSelector, nameOf, onReorder, onMoved, o
     if (!reducedMotion() && typeof row.animate === "function") {
       const dy = releasedTop - row.getBoundingClientRect().top;
       const animation = row.animate([{ translate: `0 ${dy}px`, scale: "1.02" }, { translate: "0 0", scale: "1" }], { duration: 160, easing: "ease-out" });
-      animation.addEventListener("finish", () => row.classList.remove("is-lifted"));
-    } else row.classList.remove("is-lifted");
+      animation.addEventListener("finish", () => unlift(row));
+    } else unlift(row);
     announce(CANCELLED_TEXT);
   }
 

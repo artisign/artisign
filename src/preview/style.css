@@ -8618,7 +8618,8 @@ button.uc-target:hover {
   outline: none;
 }
 
-.uc-step-edit:has(.uc-drag-handle:focus-visible) {
+.uc-step-edit:has(.uc-drag-handle:focus-visible),
+.uc-step-op:has(.uc-drag-handle:focus-visible) {
   border-color: var(--chrome-accent);
   box-shadow: 0 0 0 3px var(--chrome-focus-ring);
 }
@@ -8641,7 +8642,9 @@ button.uc-target:hover {
 }
 
 .uc-step-edit.is-lifted,
-.uc-step-edit.is-grabbed {
+.uc-step-edit.is-grabbed,
+.uc-step-op.is-lifted,
+.uc-step-op.is-grabbed {
   position: relative;
   z-index: 2;
   scale: 1.02;
@@ -8649,12 +8652,14 @@ button.uc-target:hover {
   box-shadow: var(--chrome-shadow-float);
 }
 
-.uc-step-edit.is-lifted {
+.uc-step-edit.is-lifted,
+.uc-step-op.is-lifted {
   pointer-events: none;
   border-color: var(--chrome-border-strong);
 }
 
-.uc-step-edit.is-grabbed {
+.uc-step-edit.is-grabbed,
+.uc-step-op.is-grabbed {
   border-color: var(--chrome-accent);
   box-shadow: 0 0 0 3px var(--chrome-focus-ring), var(--chrome-shadow-float);
 }
@@ -8724,16 +8729,20 @@ button.uc-target:hover {
 }
 
 .uc-step-edit:has(.uc-drag-handle:focus-visible) .uc-step-keys,
-.uc-step-edit.is-grabbed .uc-step-keys {
+.uc-step-edit.is-grabbed .uc-step-keys,
+.uc-step-op:has(.uc-drag-handle:focus-visible) .uc-step-keys,
+.uc-step-op.is-grabbed .uc-step-keys {
   display: flex;
 }
 
 .uc-step-keys-grab,
-.uc-step-edit.is-grabbed .uc-step-keys-rest {
+.uc-step-edit.is-grabbed .uc-step-keys-rest,
+.uc-step-op.is-grabbed .uc-step-keys-rest {
   display: none;
 }
 
-.uc-step-edit.is-grabbed .uc-step-keys-grab {
+.uc-step-edit.is-grabbed .uc-step-keys-grab,
+.uc-step-op.is-grabbed .uc-step-keys-grab {
   display: inline;
 }
 
@@ -8749,4 +8758,17 @@ button.uc-target:hover {
 
 .chrome-menu-item[aria-disabled="true"]:hover {
   background: transparent;
+}
+
+/* Variant step changes can be reordered like the base steps (CHR-1118): a handle column on the left, the ⋯ and remove buttons on the right. */
+.uc-op-top {
+  grid-template-columns: 20px 130px minmax(0, 1fr) auto;
+}
+
+.uc-step-op > .uc-op-hint {
+  padding-left: calc(20px + 130px + 2 * var(--space-md));
+}
+
+.uc-step-op > .uc-step-keys {
+  padding-left: calc(20px + var(--space-md));
 }

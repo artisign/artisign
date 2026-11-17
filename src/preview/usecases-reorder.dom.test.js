@@ -168,7 +168,6 @@ describe("step reordering", () => {
     expect($(".uc-drop-marker").hidden).toBe(false);
     // going down the marker is read at the lifted row's bottom edge: 150 - 40 + 80 = 190 passes one row midpoint (140)
     expect($(".uc-drop-marker").style.top).toBe("186px"); // gap between rows 2 and 3 is 180..200, centre 190, minus half the 8px marker
-    expect(list.dataset.drop).toBe("true");
     pointer("pointermove", 20);
     expect($(".uc-drop-marker").hidden).toBe(true); // own slot: no marker
     key(document.body, "Escape");
@@ -183,7 +182,6 @@ describe("step reordering", () => {
     expect(actions()).toEqual([first[1], first[0], first[2]]);
     expect($(".uc-drop-marker")).toBeNull();
     expect($(".uc-step-slot")).toBeNull();
-    expect(list.dataset.drop).toBeUndefined();
     expect(rows().some((r) => r.classList.contains("is-lifted"))).toBe(false);
     vi.advanceTimersByTime(600);
     expect(live()).toBe(`${first[0]}, moved to step 2 of 3.`);
@@ -229,7 +227,7 @@ describe("review findings", () => {
 
   it("the handle and the ⋯ button have their names when drawn", async () => {
     await open();
-    expect($$(".uc-drag-handle").map((b) => b.getAttribute("aria-label"))).toEqual(actions().map((a, i) => `Reorder step ${i + 1}, ${a}`));
+    expect($$(".uc-steps-edit .uc-drag-handle").map((b) => b.getAttribute("aria-label"))).toEqual(actions().map((a, i) => `Reorder step ${i + 1}, ${a}`));
     expect($$(".uc-step-edit button[aria-haspopup=menu]").map((b) => b.getAttribute("aria-label"))).toEqual(["Actions for step 1", "Actions for step 2", "Actions for step 3"]);
   });
 

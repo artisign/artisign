@@ -8,6 +8,7 @@ import { h, icon, fill } from "./usecases-dom.js";
 import { field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
 import { segmented, avatar, diffBadge } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
+import { createReorder, renumberRow } from "./usecases-reorder.js";
 import { slugify, uniqueId, isValidId, formatExample, parseOrKeep, avatarOf, actorName } from "./usecases-data.js";
 
 // --- Draft <-> payload (pure) ---------------------------------------------------------------------------------------
@@ -202,7 +203,7 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
   const out = { id: vid, title: written(variant.title, variant.origTitle), ...(written(variant.description, variant.origDescription) !== "" ? { description: written(variant.description, variant.origDescription) } : {}), when: variant.when };
 
   const { overrides } = variant;
-  // A stored value is written back exactly as it is (no trimming); an override that is empty is an error, not a silent removal.
+  // A stored value the user did not touch is written back exactly as it is; one they edited is trimmed (`written`). An override that is empty is an error, not a silent removal.
   for (const [key, label] of TEXT_OVERRIDES) {
     if (overrides[key] === undefined) continue;
     out[key] = written(overrides[key], variant.origOverrides?.[key]);
@@ -218,7 +219,7 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
   variant.swaps.forEach((swap, j) => {
     if (swap.from === "" || swap.to === "") {
       errors.push(`Variant "${name}", swap ${j + 1}: pick both actors.`);
-      fieldErrors.push({ path: `variant.${index}.swap.${j}`, message: "Pick both actors." });
+      fieldErrors.push({ path: `variant.${index}.swap.${j}`, message: "Pick both actors.", untilTouched: true }); // a swap row just added is not an error until the user leaves it
     } else if (swap.from === swap.to) {
       errors.push(`Variant "${name}", swap ${j + 1}: pick two different actors.`);
       fieldErrors.push({ path: `variant.${index}.swap.${j}`, message: "Pick two different actors." });
@@ -238,7 +239,7 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
     const path = `variant.${index}.op.${i}`;
     if (op.op !== "append" && op.stepId === "") {
       errors.push(`${where}: pick the step it changes.`);
-      fieldErrors.push({ path: `${path}.pick`, message: "Pick the step this change applies to." });
+      fieldErrors.push({ path: `${path}.pick`, message: "Pick the step this change applies to.", untilTouched: true });
     }
     if (op.op === "remove") {
       applyOp(flow, op);
@@ -246,7 +247,10 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
       return;
     }
     const step = op.step ?? emptyStep();
-    if (step.action.trim() === "") errors.push(`${where}: the step needs an action.`);
+    if (step.action.trim() === "") {
+      errors.push(`${where}: the step needs an action.`);
+      fieldErrors.push({ path: `${path}.action`, message: "The step needs an action.", untilTouched: true });
+    }
     const typed = step.id.trim();
     const id = typed || uniqueId(slugify(step.action) || `step-${i + 1}`, usedStepIds);
     usedStepIds.add(id);
@@ -296,13 +300,15 @@ export function variantWarnings({ variant, index, baseSteps, pool }) {
  * one polite live region (`role="status"`) that announces the first error.
  */
 export function showFieldErrors(root, fieldErrors) {
+  // An error marked `untilTouched` waits until the user has left its row (`[data-touch-scope]` gets `data-touched`); Save stays blocked meanwhile.
+  const shownFor = (el, e) => !e.untilTouched || el.closest("[data-touch-scope]")?.dataset.touched === "true";
   for (const hint of root.querySelectorAll(".uc-field-error")) {
-    const found = fieldErrors.filter((e) => e.path === hint.dataset.path);
+    const found = fieldErrors.filter((e) => e.path === hint.dataset.path && shownFor(hint, e));
     hint.hidden = found.length === 0;
     hint.textContent = found.map((e) => e.message).join(" ");
   }
   for (const el of root.querySelectorAll("[data-error-path]")) {
-    const bad = fieldErrors.some((e) => e.path === el.dataset.errorPath);
+    const bad = fieldErrors.some((e) => e.path === el.dataset.errorPath && shownFor(el, e));
     el.classList.toggle("is-error", bad);
     el.setAttribute("aria-invalid", bad ? "true" : "false");
   }
@@ -314,6 +320,41 @@ export function showFieldErrors(root, fieldErrors) {
     if (shown.length > 0) el.setAttribute("aria-describedby", shown.join(" "));
     else el.removeAttribute("aria-describedby");
   }
+}
+
+/** Marks a row (`[data-touch-scope]`) as left once focus moves out of it, so its `untilTouched` errors show; `model.touched` keeps that across redraws. */
+export function touchScope(el, model, refresh) {
+  el.dataset.touchScope = "";
+  if (model.touched) el.dataset.touched = "true";
+  const leave = () => {
+    if (model.touched) return;
+    model.touched = true;
+    el.dataset.touched = "true";
+    refresh();
+  };
+  /** The row's menu took the focus: the row counts as left once the menu is gone and the focus did not come back to the row (or another menu). */
+  const watchMenu = (menu) => {
+    const check = () => setTimeout(() => {
+      if (!el.contains(document.activeElement) && !document.activeElement?.closest?.("[role=menu]")) leave();
+    }, 0);
+    menu.addEventListener("focusout", check, { once: true });
+    if (menu.parentNode) {
+      const observer = new MutationObserver(() => {
+        if (menu.isConnected) return;
+        observer.disconnect();
+        check();
+      });
+      observer.observe(menu.parentNode, { childList: true });
+    }
+  };
+  el.addEventListener("focusout", (event) => {
+    if (el.contains(event.relatedTarget) || model.touched) return;
+    const menu = event.relatedTarget?.closest?.("[role=menu]");
+    if (menu) return watchMenu(menu);
+    // A focused node that a redraw took out of the page is not a leave.
+    if (event.relatedTarget === null && !event.target.isConnected) return;
+    leave();
+  });
 }
 
 // --- The editor (DOM) -------------------------------------------------------------------------------------------------
@@ -329,6 +370,7 @@ const OP_LABELS = { replace: "Replace", insert_after: "Insert after", remove: "R
  *   objectOptions: () => { value: string, label: string }[],
  *   actorOptions: (current: string) => { value: string, label: string }[],
  *   markDirty: () => void,
+ *   setDirty: () => void, // marks the form dirty without a warning pass (a move already did one)
  *   refresh: () => void, // re-runs the dialog's warning / error pass; called after every redraw, because a redrawn field starts without its hint
  * }} env `draft` is the dialog's draft: the editor reads the base fields from it live and edits `draft.variants` in place.
  * @returns {{ el: HTMLElement, draw: (focusIndex?: number | null) => void, cards: () => HTMLElement[] }}
@@ -343,24 +385,28 @@ export function createVariantEditor(env) {
   const objectName = (id) => env.pool().objectsById.get(id)?.name ?? id;
 
   /** A step's own fields: id, actor, action, target, data changes. Used by the three change kinds that carry a step. */
-  function stepBody(step, variantIndex, opIndex, onEdit) {
-    const path = `variant.${variantIndex}.op.${opIndex}`;
-    const label = `Variant ${variantIndex + 1} change ${opIndex + 1}`;
+  function stepBody(step, variantIndex, opIndexOf, onEdit) {
+    // The change may be moved after this was drawn: parts drawn later (a target switch, a new data change) ask for its position then.
+    const path = `variant.${variantIndex}.op.${opIndexOf()}`;
+    const label = () => `Variant ${variantIndex + 1} change ${opIndexOf() + 1}`;
     const screenListId = nextId("uc-screens");
     const nodeListId = nextId("uc-nodes");
     const nodeList = h("datalist", { id: nodeListId });
     const fillNodes = (screen) => env.ensureNodes(screen)?.then((list) => nodeList.replaceChildren(...(list ?? []).slice(0, 400).map((n) => h("option", { value: n }, n))));
     const idHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `${path}.id` } });
-    const idInput = textInput({ value: step.id, mono: true, placeholder: "step id", ariaLabel: `${label} step id`, onInput: (value) => { step.id = value; markDirty(); onEdit(); } });
+    const idInput = textInput({ value: step.id, mono: true, placeholder: "step id", ariaLabel: `${label()} step id`, onInput: (value) => { step.id = value; markDirty(); onEdit(); } });
     idInput.dataset.errorPath = `${path}.id`;
     idInput.dataset.hint = idHint.id;
-    const actionInput = textInput({ value: step.action, placeholder: "What happens", ariaLabel: `${label} action`, onInput: (value) => { step.action = value; markDirty(); onEdit(); } });
-    const screenInput = textInput({ value: step.screen, list: screenListId, placeholder: "screen", mono: true, ariaLabel: `${label} screen`, onInput: (value) => { step.screen = value; markDirty(); if (env.screens().includes(value.trim())) fillNodes(value.trim()); } });
-    const nodeInput = textInput({ value: step.node, list: nodeListId, placeholder: "element id", mono: true, ariaLabel: `${label} element`, onInput: (value) => { step.node = value; markDirty(); } });
+    const actionHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `${path}.action` } });
+    const actionInput = textInput({ value: step.action, placeholder: "What happens", ariaLabel: `${label()} action`, onInput: (value) => { step.action = value; markDirty(); onEdit(); } });
+    actionInput.dataset.errorPath = `${path}.action`;
+    actionInput.dataset.hint = actionHint.id;
+    const screenInput = textInput({ value: step.screen, list: screenListId, placeholder: "screen", mono: true, ariaLabel: `${label()} screen`, onInput: (value) => { step.screen = value; markDirty(); if (env.screens().includes(value.trim())) fillNodes(value.trim()); } });
+    const nodeInput = textInput({ value: step.node, list: nodeListId, placeholder: "element id", mono: true, ariaLabel: `${label()} element`, onInput: (value) => { step.node = value; markDirty(); } });
     const targetRow = h("div", { class: "uc-target-edit" });
     const drawTarget = () => {
       fill(targetRow,
-        segmented({ label: `${label} target`, name: `kind-${variantIndex}-${opIndex}`, value: step.kind, options: [{ value: "screen", label: "Screen" }, { value: "element", label: "Element" }, { value: "none", label: "None" }], onChange: (value) => { step.kind = value; markDirty(); drawTarget(); } }),
+        segmented({ label: `${label()} target`, name: nextId("uc-kind"), value: step.kind, options: [{ value: "screen", label: "Screen" }, { value: "element", label: "Element" }, { value: "none", label: "None" }], onChange: (value) => { step.kind = value; markDirty(); drawTarget(); } }),
         step.kind !== "none" ? screenInput : null,
         step.kind === "element" ? nodeInput : null,
         step.kind !== "none" ? h("datalist", { id: screenListId }, env.screens().map((s) => h("option", { value: s }))) : null,
@@ -378,9 +424,9 @@ export function createVariantEditor(env) {
             "div",
             { class: "uc-data-edit" },
             selectInput({ options: env.objectOptions(), value: d.object, ariaLabel: "Data object", onChange: (value) => { d.object = value; markDirty(); } }),
-            textInput({ value: d.before, mono: true, placeholder: "status: draft", ariaLabel: `${label} data ${j + 1} before`, onInput: (value) => { d.before = value; markDirty(); } }),
+            textInput({ value: d.before, mono: true, placeholder: "status: draft", ariaLabel: `${label()} data ${j + 1} before`, onInput: (value) => { d.before = value; markDirty(); } }),
             icon("arrow_forward", "uc-data-arrow"),
-            textInput({ value: d.after, mono: true, placeholder: "status: ready", ariaLabel: `${label} data ${j + 1} after`, onInput: (value) => { d.after = value; markDirty(); } }),
+            textInput({ value: d.after, mono: true, placeholder: "status: ready", ariaLabel: `${label()} data ${j + 1} after`, onInput: (value) => { d.after = value; markDirty(); } }),
             removeButton("Remove data change", () => { step.data.splice(j, 1); markDirty(); drawData(); }),
           ),
         ),
@@ -391,8 +437,9 @@ export function createVariantEditor(env) {
     return h(
       "div",
       { class: "uc-op-body" },
-      h("div", { class: "uc-op-fields" }, idInput, selectInput({ options: env.actorOptions(step.actor), value: step.actor || "system", ariaLabel: `${label} actor`, onChange: (value) => { step.actor = value; markDirty(); } }), actionInput),
+      h("div", { class: "uc-op-fields" }, idInput, selectInput({ options: env.actorOptions(step.actor), value: step.actor || "system", ariaLabel: `${label()} actor`, onChange: (value) => { step.actor = value; markDirty(); } }), actionInput),
       idHint,
+      actionHint,
       targetRow,
       dataBox,
     );
@@ -573,10 +620,12 @@ export function createVariantEditor(env) {
           const fromSel = selectInput({ options: actorChoices(swap.from), value: swap.from, ariaLabel: `Variant ${n} swap ${j + 1} from`, onChange: onSwap("from") });
           const toSel = selectInput({ options: actorChoices(swap.to), value: swap.to, ariaLabel: `Variant ${n} swap ${j + 1} to`, onChange: onSwap("to") });
           fromSel.dataset.path = `variant.${index}.swap.${j}.from`;
+          fromSel.dataset.errorPath = `variant.${index}.swap.${j}`;
+          fromSel.dataset.hint = same.id;
           toSel.dataset.path = `variant.${index}.swap.${j}.to`;
           toSel.dataset.errorPath = `variant.${index}.swap.${j}`;
           toSel.dataset.hint = same.id;
-          return h(
+          const swapRow = h(
             "div",
             { class: "uc-swap-row" },
             fromSel,
@@ -587,6 +636,8 @@ export function createVariantEditor(env) {
             warn("to"),
             same,
           );
+          touchScope(swapRow, swap, env.refresh);
+          return swapRow;
         }),
         h("button", { type: "button", class: "uc-link-btn", onClick: () => { variant.swaps.push({ from: "", to: "" }); markDirty(); drawSwaps(true); } }, icon("add"), "Actor swap"),
       );
@@ -607,22 +658,50 @@ export function createVariantEditor(env) {
     };
     let stepSelects = [];
     /** Re-lists the flow in every change's step select. Called when the changes or the base change, never on focus (that would rewrite an open select). */
-    const refreshOptions = () => stepSelects.forEach(({ select, op, i }) => fillStepOptions(select, op, i));
+    const refreshOptions = () => stepSelects.forEach(({ select, op }) => fillStepOptions(select, op, variant.ops.indexOf(op)));
+    const removedBody = (op) => {
+      const entry = flowBefore(baseSteps(), variant, variant.ops.indexOf(op)).find((e) => e.id === op.stepId);
+      return [diffBadge("removed"), entry ? h("span", { class: "uc-op-struck" }, [actorName(entry.baseActor, pool.personasById), entry.action, entry.step.screen].filter(Boolean).join(" · ")) : h("span", { class: "uc-muted" }, "Pick the step to remove.")];
+    };
+    const opName = (i) => variant.ops[i]?.step?.action.trim() || (variant.ops[i]?.op === "remove" && variant.ops[i].stepId ? `Remove ${variant.ops[i].stepId}` : `Change ${i + 1}`);
+    // The change rows move in the DOM, not through drawOps, so focus and typed values survive. The model follows (onReorder); what
+    // was drawn from a position (labels, field paths, the flow each step select lists, the struck line of a removal) is brought up to date.
+    const reorder = createReorder({
+      list: opsBox,
+      rowSelector: ".uc-step-op",
+      noun: "change",
+      nameOf: (row, i) => opName(i),
+      onReorder: (from, to) => { variant.ops.splice(to, 0, variant.ops.splice(from, 1)[0]); },
+      onMoved: () => {
+        opsBox.querySelectorAll(":scope > .uc-step-op").forEach((row, i) => {
+          row.dataset.index = String(i);
+          renumberRow(row, i, { label: /^(Variant \d+ change |Remove change )\d+/, path: /^(variant\.\d+\.op\.)\d+/ });
+          const removed = row.querySelector(".uc-op-removed");
+          if (removed) removed.replaceChildren(...removedBody(variant.ops[i]));
+          row.querySelector(".uc-drag-handle")?.relabel();
+          row.querySelector("[aria-haspopup='menu']")?.relabel();
+        });
+        refreshOptions();
+        env.refresh();
+      },
+      onCommit: env.setDirty, // the refresh above already covers this move
+    });
     const drawOps = (focus = null) => {
       stepSelects = [];
       fill(opsBox,
         variant.ops.length === 0 ? h("p", { class: "uc-muted uc-var-empty" }, `None. This variant runs the ${baseSteps().length} base steps as they are.`) : null,
         ...variant.ops.map((op, i) => {
+          const at = () => variant.ops.indexOf(op);
           const label = `Variant ${n} change ${i + 1}`;
-          const kindSel = selectInput({ options: Object.entries(OP_LABELS).map(([value, text]) => ({ value, label: text })), value: op.op, ariaLabel: `${label} operation`, onChange: (value) => changeKind(op, i, value) });
+          const kindSel = selectInput({ options: Object.entries(OP_LABELS).map(([value, text]) => ({ value, label: text })), value: op.op, ariaLabel: `${label} operation`, onChange: (value) => changeKind(op, at(), value) });
           let stepControl;
           if (op.op === "append") stepControl = h("span", { class: "uc-op-after-last" }, "after the last step");
           else {
             stepControl = h("select", { class: "chrome-field uc-select", "aria-label": `${label} step`, dataset: { path: `variant.${index}.op.${i}.step`, role: "step" } });
             fillStepOptions(stepControl, op, i);
-            stepSelects.push({ select: stepControl, op, i });
+            stepSelects.push({ select: stepControl, op });
             stepControl.dataset.errorPath = `variant.${index}.op.${i}.pick`;
-            stepControl.addEventListener("change", () => pickStep(op, i, stepControl.value));
+            stepControl.addEventListener("change", () => pickStep(op, at(), stepControl.value));
           }
           const warn = h("p", { class: "uc-field-warn", id: nextId("uc-warn"), hidden: true, dataset: { path: `variant.${index}.op.${i}.step` } });
           const pickErr = h("p", { class: "uc-field-error uc-op-hint", id: nextId("uc-err"), hidden: true, dataset: { path: `variant.${index}.op.${i}.pick` } });
@@ -630,25 +709,26 @@ export function createVariantEditor(env) {
           if (stepControl.tagName === "SELECT") stepControl.dataset.hint = `${pickErr.id} ${warn.id}`;
           let body = null;
           if (op.op === "remove") {
-            const entry = flowBefore(baseSteps(), variant, i).find((e) => e.id === op.stepId);
-            body = h(
-              "div",
-              { class: "uc-op-removed" },
-              diffBadge("removed"),
-              entry ? h("span", { class: "uc-op-struck" }, [actorName(entry.baseActor, pool.personasById), entry.action, entry.step.screen].filter(Boolean).join(" · ")) : h("span", { class: "uc-muted" }, "Pick the step to remove."),
-            );
-          } else if (op.step) body = stepBody(op.step, index, i, refreshOptions);
-          return h(
+            body = h("div", { class: "uc-op-removed" }, removedBody(op));
+          } else if (op.step) body = stepBody(op.step, index, at, refreshOptions);
+          const opRow = h(
             "div",
             { class: "uc-step-op", dataset: { op: op.op, index: String(i) } },
-            h("div", { class: "uc-op-top" }, kindSel, stepControl, removeButton(`Remove change ${i + 1} of variant ${n}`, () => { variant.ops.splice(i, 1); markDirty(); drawOps(); })),
+            h("div", { class: "uc-op-top" }, reorder.handle(() => opRow), kindSel, stepControl, h("span", { class: "uc-step-edit-tools" }, reorder.moreButton(() => opRow), removeButton(`Remove change ${i + 1} of variant ${n}`, () => { variant.ops.splice(at(), 1); markDirty(); drawOps(); }))),
             pickErr,
             warn,
             body,
+            reorder.keyHint(),
           );
+          touchScope(opRow, op, env.refresh);
+          return opRow;
         }),
         h("button", { type: "button", class: "uc-link-btn", onClick: () => { variant.ops.push({ op: "replace", stepId: "", step: null }); markDirty(); drawOps({ index: variant.ops.length - 1 }); } }, icon("add"), "Step change"),
       );
+      opsBox.querySelectorAll(":scope > .uc-step-op").forEach((row) => {
+        row.querySelector(".uc-drag-handle").relabel();
+        row.querySelector("[aria-haspopup='menu']").relabel();
+      });
       if (focus) opsBox.querySelectorAll(".uc-step-op")[focus.index]?.querySelector(focus.part === "step" ? "[data-role=step]" : "select")?.focus();
       env.refresh();
     };
@@ -702,7 +782,7 @@ export function createVariantEditor(env) {
       field("Applies when", whenBox, { hint: "any of the chosen values per dimension; every listed dimension must match" }),
       section("Overrides", "what you do not override comes from the base", overrideGrid),
       section("Actor swaps", "applied once to the inherited base steps, before the step changes; not chained", swapBox),
-      section("Step changes", "applied in order, top to bottom", opsBox),
+      section("Step changes", "applied in order, top to bottom; drag a handle to reorder, or focus it and press Space", opsBox, reorder.live),
     );
   }
 

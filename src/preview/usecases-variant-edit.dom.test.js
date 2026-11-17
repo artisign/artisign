@@ -464,6 +464,8 @@ describe("review fixes", () => {
     const card = variantCard(1);
     addChange(card);
     const select = stepSel(card, 2, 1);
+    expect(select.getAttribute("aria-invalid")).toBe("false"); // a row just added waits until it was left
+    select.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: null }));
     expect(select.getAttribute("aria-invalid")).toBe("true");
     expect(select.classList.contains("is-error")).toBe(true);
     expect(document.getElementById(select.getAttribute("aria-describedby")).textContent).toBe("Pick the step this change applies to.");
@@ -485,6 +487,11 @@ describe("review fixes", () => {
     addSwap(card);
     const [from, to] = $$(".uc-swap-row select", card);
     type(from, "dana");
+    // a row just added is not an error yet; Save is blocked and the footer says why
+    expect(to.getAttribute("aria-invalid")).toBe("false");
+    expect(button("Save use case").disabled).toBe(true);
+    // leaving the row (focus moves outside it) shows the error on the field
+    to.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: null }));
     expect(to.getAttribute("aria-invalid")).toBe("true");
     expect(document.getElementById(to.getAttribute("aria-describedby")).textContent).toBe("Pick both actors.");
     expect($(".uc-foot-msg").textContent).toBe('Variant "Large project", swap 1: pick both actors.');

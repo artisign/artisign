@@ -8,8 +8,8 @@ import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
 import { segmented, avatar } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
-import { createVariantEditor, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, variantWarnings, showFieldErrors } from "./usecases-variant-edit.js";
-import { createReorder } from "./usecases-reorder.js";
+import { createVariantEditor, touchScope, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, variantWarnings, showFieldErrors } from "./usecases-variant-edit.js";
+import { createReorder, renumberRow } from "./usecases-reorder.js";
 import {
   STATUSES,
   STATUS_LABELS,
@@ -65,15 +65,18 @@ export function buildPayload({ id, draft, source }) {
 
   // Generated ids must not collide with ANY id the case already has: every step, every variant, and the steps variants add.
   const usedStepIds = new Set([...draft.steps.map((s) => s.id).filter(Boolean), ...variantStepIds(draft.variants)]);
+  const fieldErrors = [];
   const steps = draft.steps.map((step, index) => {
     const stepId = step.id || uniqueId(slugify(step.action) || `step-${index + 1}`, usedStepIds);
     usedStepIds.add(stepId);
-    if (step.action.trim() === "") errors.push(`Step ${index + 1} needs an action.`);
+    if (step.action.trim() === "") {
+      errors.push(`Step ${index + 1} needs an action.`);
+      fieldErrors.push({ path: `step.${index}.action`, message: "The step needs an action.", untilTouched: true });
+    }
     return buildStepObject(step, stepId, `Step ${index + 1}`, errors);
   });
 
   const variantIds = new Set(draft.variants.map((v) => v.id).filter(Boolean));
-  const fieldErrors = [];
   const variants = draft.variants.map((variant, index) => {
     const built = buildVariant(variant, index, { baseSteps: draft.steps, usedStepIds, variantIds });
     errors.push(...built.errors);
@@ -268,17 +271,19 @@ export async function openUseCaseDialog(options) {
     return [{ value: "system", label: "System" }, ...personas.map((p) => ({ value: p.id, label: p.name }))];
   };
   // Rows are moved in the DOM, not redrawn: the draft array follows (`onReorder`) and the "Step N" labels are rewritten (`onMoved`).
+  let quiet = false; // the variant editor redraws while a base move already runs its own warning pass
   const relabelRows = () => {
     stepsBox.querySelectorAll(":scope > .uc-step-edit").forEach((row, i) => {
       row.dataset.index = String(i);
       row.querySelector(".uc-step-edit-no").textContent = String(i + 1);
-      for (const el of row.querySelectorAll("[aria-label^='Step ']")) el.setAttribute("aria-label", el.getAttribute("aria-label").replace(/^Step \d+/, `Step ${i + 1}`));
-      for (const el of row.querySelectorAll("[data-path^='step.']")) el.dataset.path = el.dataset.path.replace(/^step\.\d+/, `step.${i}`);
-      row.querySelector("[aria-label^='Remove step']")?.setAttribute("aria-label", `Remove step ${i + 1}`);
-      row.querySelector("[aria-label^='Remove step']")?.setAttribute("title", `Remove step ${i + 1}`);
+      renumberRow(row, i, { label: /^(Step |Remove step )\d+/, path: /^(step\.)\d+/ });
       row.querySelector(".uc-drag-handle")?.relabel();
       row.querySelector("[aria-haspopup='menu']")?.relabel();
     });
+    // The variant editor lists the base steps (its step selects, "From base" values): it follows every move, with one warning pass in all.
+    quiet = true;
+    variantEditor?.syncBase();
+    quiet = false;
     refreshWarnings();
   };
   const reorder = createReorder({
@@ -287,7 +292,7 @@ export async function openUseCaseDialog(options) {
     nameOf: (row, i) => draft.steps[i]?.action?.trim() || `Step ${i + 1}`,
     onReorder: (from, to) => { draft.steps.splice(to, 0, draft.steps.splice(from, 1)[0]); },
     onMoved: relabelRows,
-    onCommit: markDirty,
+    onCommit: () => dialog.setDirty(true), // relabelRows already synced the variants and refreshed the warnings for this move
   });
   const drawSteps = (focusIndex = null) => {
     stepsBox.replaceChildren();
@@ -339,28 +344,34 @@ export async function openUseCaseDialog(options) {
       };
       drawData();
 
+      const actionHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `step.${index}.action` } });
       const actionInput = textInput({ value: step.action, placeholder: "What happens", ariaLabel: `Step ${index + 1} action`, onInput: (value) => { step.action = value; markDirty(); } });
+      actionInput.dataset.errorPath = `step.${index}.action`;
+      actionInput.dataset.hint = actionHint.id;
       let rowEl;
       rowEl = h(
           "div",
           { class: "uc-step-edit", dataset: { index: String(index), step: step.id ?? "" } },
           h("div", { class: "uc-step-edit-top" }, reorder.handle(() => rowEl), h("span", { class: "uc-step-edit-no" }, String(index + 1)), selectInput({ options: actorOptions(step.actor), value: step.actor || "system", ariaLabel: `Step ${index + 1} actor`, onChange: (value) => { step.actor = value; markDirty(); } }), actionInput, h("span", { class: "uc-step-edit-tools" }, reorder.moreButton(() => rowEl), removeButton(`Remove step ${index + 1}`, () => { draft.steps.splice(draft.steps.indexOf(step), 1); markDirty(); drawSteps(); }))),
+          actionHint,
           targetRow,
           warnScreen,
           warnNode,
           dataBox,
           reorder.keyHint(),
         );
+      touchScope(rowEl, step, refreshWarnings);
       stepsBox.append(rowEl);
       rowEl.querySelector("[aria-haspopup='menu']").relabel();
       rowEl.querySelector(".uc-drag-handle").relabel();
     });
     stepsBox.append(h("button", { type: "button", class: "uc-link-btn", onClick: () => { draft.steps.push({ id: "", actor: draft.personas[0] ?? "system", action: "", kind: "screen", screen: "", node: "", data: [] }); markDirty(); drawSteps(draft.steps.length - 1); } }, icon("add"), "Step"));
     if (focusIndex !== null) stepsBox.querySelectorAll(".uc-step-edit")[focusIndex]?.querySelector("input")?.focus();
+    refreshWarnings(); // redrawn fields start without their hints and error states
   };
 
   // --- Variants (usecases-variant-edit.js) -----------------------------------------------------------------------
-  variantEditor = createVariantEditor({ draft, pool: options.pool, screens: options.screens, ensureNodes, objectOptions, actorOptions, markDirty: touch, refresh: refreshWarnings });
+  variantEditor = createVariantEditor({ draft, pool: options.pool, screens: options.screens, ensureNodes, objectOptions, actorOptions, markDirty: touch, setDirty: () => dialog.setDirty(true), refresh: () => { if (!quiet) refreshWarnings(); } });
   const variantsBox = variantEditor.el;
 
   // --- Footer: warnings, the one hard requirement, Save ---------------------------------------------------------

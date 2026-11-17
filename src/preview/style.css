@@ -8624,9 +8624,13 @@ button.uc-target:hover {
   outline: none;
 }
 
+.uc-step-edit:has(.uc-drag-handle:focus-visible),
+.uc-step-op:has(.uc-drag-handle:focus-visible) {
+  box-shadow: 0 0 0 3px var(--chrome-focus-ring);
+}
+
 .uc-step-edit:has(.uc-drag-handle:focus-visible) {
   border-color: var(--chrome-accent);
-  box-shadow: 0 0 0 3px var(--chrome-focus-ring);
 }
 
 .uc-drag-handle[aria-pressed="true"] {
@@ -8647,7 +8651,9 @@ button.uc-target:hover {
 }
 
 .uc-step-edit.is-lifted,
-.uc-step-edit.is-grabbed {
+.uc-step-edit.is-grabbed,
+.uc-step-op.is-lifted,
+.uc-step-op.is-grabbed {
   position: relative;
   z-index: 2;
   scale: 1.02;
@@ -8655,14 +8661,22 @@ button.uc-target:hover {
   box-shadow: var(--chrome-shadow-float);
 }
 
-.uc-step-edit.is-lifted {
+.uc-step-edit.is-lifted,
+.uc-step-op.is-lifted {
   pointer-events: none;
+}
+
+.uc-step-edit.is-lifted {
   border-color: var(--chrome-border-strong);
+}
+
+.uc-step-edit.is-grabbed,
+.uc-step-op.is-grabbed {
+  box-shadow: 0 0 0 3px var(--chrome-focus-ring), var(--chrome-shadow-float);
 }
 
 .uc-step-edit.is-grabbed {
   border-color: var(--chrome-accent);
-  box-shadow: 0 0 0 3px var(--chrome-focus-ring), var(--chrome-shadow-float);
 }
 
 .uc-step-slot {
@@ -8730,16 +8744,20 @@ button.uc-target:hover {
 }
 
 .uc-step-edit:has(.uc-drag-handle:focus-visible) .uc-step-keys,
-.uc-step-edit.is-grabbed .uc-step-keys {
+.uc-step-edit.is-grabbed .uc-step-keys,
+.uc-step-op:has(.uc-drag-handle:focus-visible) .uc-step-keys,
+.uc-step-op.is-grabbed .uc-step-keys {
   display: flex;
 }
 
 .uc-step-keys-grab,
-.uc-step-edit.is-grabbed .uc-step-keys-rest {
+.uc-step-edit.is-grabbed .uc-step-keys-rest,
+.uc-step-op.is-grabbed .uc-step-keys-rest {
   display: none;
 }
 
-.uc-step-edit.is-grabbed .uc-step-keys-grab {
+.uc-step-edit.is-grabbed .uc-step-keys-grab,
+.uc-step-op.is-grabbed .uc-step-keys-grab {
   display: inline;
 }
 
@@ -8755,4 +8773,42 @@ button.uc-target:hover {
 
 .chrome-menu-item[aria-disabled="true"]:hover {
   background: transparent;
+}
+
+/* Variant step changes can be reordered like the base steps (CHR-1118): a handle column on the left, the ⋯ and remove buttons on the right. */
+.uc-op-top {
+  grid-template-columns: 20px 130px minmax(0, 1fr) auto;
+}
+
+.uc-step-op > .uc-op-hint {
+  padding-left: calc(20px + 130px + 2 * var(--space-md));
+}
+
+.uc-step-op > .uc-step-keys {
+  padding-left: calc(20px + var(--space-md));
+}
+
+.uc-ops-edit {
+  position: relative; /* the offset parent of the change rows: the drag measures against it */
+}
+
+/* A change row keeps its operation colour in every state: the 3px left border stays amber / green, only the other sides take the
+   state border; a Remove row keeps its dashed red border on all sides. */
+.uc-step-op:not([data-op="remove"]):has(.uc-drag-handle:focus-visible),
+.uc-step-op:not([data-op="remove"]).is-grabbed {
+  border-top-color: var(--chrome-accent);
+  border-right-color: var(--chrome-accent);
+  border-bottom-color: var(--chrome-accent);
+}
+
+.uc-step-op:not([data-op="remove"]).is-lifted {
+  border-top-color: var(--chrome-border-strong);
+  border-right-color: var(--chrome-border-strong);
+  border-bottom-color: var(--chrome-border-strong);
+}
+
+/* The body and the removal line start in the operation select's column, under the handle column. */
+.uc-step-op > .uc-op-body,
+.uc-step-op > .uc-op-removed {
+  padding-left: calc(20px + var(--space-md));
 }

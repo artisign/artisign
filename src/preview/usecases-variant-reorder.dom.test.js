@@ -220,6 +220,48 @@ describe("review fixes (second round)", () => {
     observer.disconnect();
   });
 
+  it("a base step moved: the variant's step selects list the new numbering (one warning pass included)", async () => {
+    await open();
+    const options = () => [...$("select[aria-label='Variant 1 change 1 step']", card()).options].map((o) => o.textContent);
+    expect(options()).toContain("1 · Taps the step");
+    $(".uc-steps-edit .uc-step-edit button[aria-haspopup=menu]").click();
+    $("[role=menuitem][data-value=down]").click();
+    expect(options()).toContain("2 · Taps the step");
+    expect(options()).toContain("1 · Picks Pablo");
+  });
+
+  it("the row's menu closing without the focus coming back to the row counts as leaving it", async () => {
+    await open();
+    $$("button", card()).find((b) => b.textContent === "addStep change").click();
+    const kind = $("select[aria-label$='operation']", ops().at(-1));
+    kind.value = "append";
+    kind.dispatchEvent(new Event("change", { bubbles: true }));
+    const row = ops().at(-1);
+    const action = $("input[aria-label$='action']", row);
+    $("button[aria-haspopup=menu]", row).click();
+    const menu = $("[role=menu][aria-label^='Actions for change']");
+    row.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: $("[role=menuitem]", menu) }));
+    expect(row.dataset.touched).toBeUndefined();
+    document.activeElement?.blur();
+    menu.remove(); // closed by an outside click that took the focus elsewhere
+    await vi.advanceTimersByTimeAsync(10);
+    expect(row.dataset.touched).toBe("true");
+    expect(action.getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("the row's menu closing with the focus back on the row is not leaving", async () => {
+    await open();
+    $$("button", card()).find((b) => b.textContent === "addStep change").click();
+    const row = ops().at(-1);
+    const more = $("button[aria-haspopup=menu]", row);
+    more.click();
+    row.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: $("[role=menuitem]") }));
+    closeMenu(); // the menu returns the focus to its button
+    await vi.advanceTimersByTimeAsync(10);
+    expect(document.activeElement).toBe(more);
+    expect(row.dataset.touched).toBeUndefined();
+  });
+
   it("the move wording names the noun of the list", async () => {
     await open();
     const handle = $(".uc-drag-handle", ops()[0]);

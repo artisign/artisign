@@ -326,13 +326,34 @@ export function showFieldErrors(root, fieldErrors) {
 export function touchScope(el, model, refresh) {
   el.dataset.touchScope = "";
   if (model.touched) el.dataset.touched = "true";
-  el.addEventListener("focusout", (event) => {
-    if (el.contains(event.relatedTarget) || model.touched) return;
-    // Not leaving: focus going into a menu the row opened (its ⋯), or a focused node that a redraw took out of the page.
-    if (event.relatedTarget?.closest?.("[role=menu]") || (event.relatedTarget === null && !event.target.isConnected)) return;
+  const leave = () => {
+    if (model.touched) return;
     model.touched = true;
     el.dataset.touched = "true";
     refresh();
+  };
+  /** The row's menu took the focus: the row counts as left once the menu is gone and the focus did not come back to the row (or another menu). */
+  const watchMenu = (menu) => {
+    const check = () => setTimeout(() => {
+      if (!el.contains(document.activeElement) && !document.activeElement?.closest?.("[role=menu]")) leave();
+    }, 0);
+    menu.addEventListener("focusout", check, { once: true });
+    if (menu.parentNode) {
+      const observer = new MutationObserver(() => {
+        if (menu.isConnected) return;
+        observer.disconnect();
+        check();
+      });
+      observer.observe(menu.parentNode, { childList: true });
+    }
+  };
+  el.addEventListener("focusout", (event) => {
+    if (el.contains(event.relatedTarget) || model.touched) return;
+    const menu = event.relatedTarget?.closest?.("[role=menu]");
+    if (menu) return watchMenu(menu);
+    // A focused node that a redraw took out of the page is not a leave.
+    if (event.relatedTarget === null && !event.target.isConnected) return;
+    leave();
   });
 }
 

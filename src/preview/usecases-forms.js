@@ -271,6 +271,7 @@ export async function openUseCaseDialog(options) {
     return [{ value: "system", label: "System" }, ...personas.map((p) => ({ value: p.id, label: p.name }))];
   };
   // Rows are moved in the DOM, not redrawn: the draft array follows (`onReorder`) and the "Step N" labels are rewritten (`onMoved`).
+  let quiet = false; // the variant editor redraws while a base move already runs its own warning pass
   const relabelRows = () => {
     stepsBox.querySelectorAll(":scope > .uc-step-edit").forEach((row, i) => {
       row.dataset.index = String(i);
@@ -279,6 +280,10 @@ export async function openUseCaseDialog(options) {
       row.querySelector(".uc-drag-handle")?.relabel();
       row.querySelector("[aria-haspopup='menu']")?.relabel();
     });
+    // The variant editor lists the base steps (its step selects, "From base" values): it follows every move, with one warning pass in all.
+    quiet = true;
+    variantEditor?.syncBase();
+    quiet = false;
     refreshWarnings();
   };
   const reorder = createReorder({
@@ -287,7 +292,7 @@ export async function openUseCaseDialog(options) {
     nameOf: (row, i) => draft.steps[i]?.action?.trim() || `Step ${i + 1}`,
     onReorder: (from, to) => { draft.steps.splice(to, 0, draft.steps.splice(from, 1)[0]); },
     onMoved: relabelRows,
-    onCommit: () => dialog.setDirty(true), // relabelRows already refreshed the warnings for this move
+    onCommit: () => dialog.setDirty(true), // relabelRows already synced the variants and refreshed the warnings for this move
   });
   const drawSteps = (focusIndex = null) => {
     stepsBox.replaceChildren();
@@ -366,7 +371,7 @@ export async function openUseCaseDialog(options) {
   };
 
   // --- Variants (usecases-variant-edit.js) -----------------------------------------------------------------------
-  variantEditor = createVariantEditor({ draft, pool: options.pool, screens: options.screens, ensureNodes, objectOptions, actorOptions, markDirty: touch, setDirty: () => dialog.setDirty(true), refresh: refreshWarnings });
+  variantEditor = createVariantEditor({ draft, pool: options.pool, screens: options.screens, ensureNodes, objectOptions, actorOptions, markDirty: touch, setDirty: () => dialog.setDirty(true), refresh: () => { if (!quiet) refreshWarnings(); } });
   const variantsBox = variantEditor.el;
 
   // --- Footer: warnings, the one hard requirement, Save ---------------------------------------------------------

@@ -4,7 +4,8 @@
     "chr-1062",
     "dialog",
     "chr-1103",
-    "chr-1104"
+    "chr-1104",
+    "chr-1118"
   ],
   "variant_of": "usecases-edit-dialog-variant",
   "variant_kind": "state"

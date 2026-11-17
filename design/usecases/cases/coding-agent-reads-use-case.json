@@ -1,0 +1,54 @@
+{
+  "id": "coding-agent-reads-use-case",
+  "title": "Coding agent reads a use case with everything attached",
+  "group": "handoff",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "coding-agent-coda"
+  ],
+  "trigger": "Coda picks up a ticket that names a use case.",
+  "goal": "Implement the flow without guessing.",
+  "outcome": "One call returned the case, its personas, data objects and mapped screens.",
+  "inputs": [
+    {
+      "object": "use-case",
+      "source": "Ticket tag",
+      "example": {
+        "id": "create-project"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "screen",
+      "target": "Codebase",
+      "example": {
+        "screen": "init-project-dialog"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "read",
+      "actor": "coding-agent-coda",
+      "action": "Calls get_use_case with the id"
+    },
+    {
+      "id": "variant",
+      "actor": "coding-agent-coda",
+      "action": "Reads a variant resolved with variant id"
+    },
+    {
+      "id": "check",
+      "actor": "product-owner-pablo",
+      "action": "Sees the same case in the detail view",
+      "target": {
+        "screen": "usecases-detail",
+        "node": "btn-mapping"
+      }
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "id": "promote-chosen-mockup",
+  "title": "Promote the chosen mockup into a screen",
+  "group": "mockups",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "designer-dana",
+    "design-agent-dex"
+  ],
+  "trigger": "Dana picked one option.",
+  "goal": "The chosen option becomes a real screen bound to the design system.",
+  "outcome": "A screen exists; the mockup stays as history until it is deleted.",
+  "inputs": [
+    {
+      "object": "mockup",
+      "source": "mockups/",
+      "example": {
+        "mockup": "onboarding-options",
+        "variants": [
+          "b-checklist"
+        ]
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "screen",
+      "target": "screens/",
+      "example": {
+        "screen": "onboarding"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "choose",
+      "actor": "designer-dana",
+      "action": "Names the winning variant",
+      "target": {
+        "screen": "chrome-c-mockup-columns"
+      }
+    },
+    {
+      "id": "promote",
+      "actor": "design-agent-dex",
+      "action": "Calls promote_mockup into a screen"
+    },
+    {
+      "id": "bind",
+      "actor": "design-agent-dex",
+      "action": "Replaces inline values with refs"
+    },
+    {
+      "id": "cleanup",
+      "actor": "design-agent-dex",
+      "action": "Deletes the mockup with delete_entity when no longer needed"
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "id": "define-personas",
+  "title": "Define dimensions and personas",
+  "group": "use-cases",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo"
+  ],
+  "trigger": "Pablo starts writing specs for a product.",
+  "goal": "A persona pool that covers how users differ.",
+  "outcome": "Dimensions with values and personas with traits; generated personas fill the gaps.",
+  "inputs": [
+    {
+      "object": "persona",
+      "source": "Product knowledge",
+      "example": {
+        "id": "designer-dana",
+        "traits": {
+          "actor-type": "human"
+        }
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "persona",
+      "target": "usecases/personas.json",
+      "example": {
+        "id": "gen-agent-large",
+        "generated": true
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open",
+      "actor": "product-owner-pablo",
+      "action": "Opens Personas in the Use Cases tab",
+      "target": {
+        "screen": "usecases-list",
+        "node": "sub-personas"
+      }
+    },
+    {
+      "id": "add-dim",
+      "actor": "product-owner-pablo",
+      "action": "Adds a dimension with its values",
+      "target": {
+        "screen": "usecases-dimension-dialog"
+      }
+    },
+    {
+      "id": "add-persona",
+      "actor": "product-owner-pablo",
+      "action": "Adds a persona with traits",
+      "target": {
+        "screen": "usecases-edit-dialog-persona"
+      }
+    },
+    {
+      "id": "generate",
+      "actor": "product-owner-pablo",
+      "action": "Generates the missing combinations after a dry run",
+      "target": {
+        "screen": "usecases-generate-dialog"
+      }
+    }
+  ]
+}

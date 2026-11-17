@@ -1,0 +1,61 @@
+{
+  "id": "switch-project",
+  "title": "Switch the project of one tab",
+  "group": "setup",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "designer-dana"
+  ],
+  "trigger": "Dana works on two projects and wants the other one in this tab.",
+  "goal": "The tab shows the other project without changing other tabs.",
+  "outcome": "Only this tab switched; the daemon's default project stays.",
+  "inputs": [
+    {
+      "object": "project",
+      "source": "Project menu",
+      "example": {
+        "name": "website"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "project",
+      "target": "Tab state",
+      "example": {
+        "name": "website",
+        "open": true
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open-menu",
+      "actor": "designer-dana",
+      "action": "Opens the project picker in the topbar",
+      "target": {
+        "screen": "app-shell",
+        "node": "project-picker"
+      }
+    },
+    {
+      "id": "choose",
+      "actor": "designer-dana",
+      "action": "Chooses the other project",
+      "target": {
+        "screen": "chrome-c-shell-menu"
+      }
+    },
+    {
+      "id": "reload",
+      "actor": "system",
+      "action": "Loads the other project in this tab only",
+      "target": {
+        "screen": "app-shell"
+      }
+    }
+  ]
+}

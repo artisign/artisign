@@ -1,0 +1,62 @@
+{
+  "id": "change-preferences",
+  "title": "Change theme and preview preferences",
+  "group": "settings",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "designer-dana"
+  ],
+  "trigger": "Dana prefers a dark preview.",
+  "goal": "The preference applies to every browser and reload.",
+  "outcome": "The chrome is dark and the choice is stored by the daemon.",
+  "inputs": [
+    {
+      "object": "settings",
+      "source": "Settings menu",
+      "example": {
+        "theme": "system"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "settings",
+      "target": "ARTISIGN_HOME/settings.json",
+      "example": {
+        "theme": "dark"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open",
+      "actor": "designer-dana",
+      "action": "Opens the settings menu",
+      "target": {
+        "screen": "shell-settings-menu"
+      }
+    },
+    {
+      "id": "theme",
+      "actor": "designer-dana",
+      "action": "Picks Dark in the theme control",
+      "target": {
+        "screen": "shell-settings-menu-dark"
+      },
+      "data": [
+        {
+          "object": "settings",
+          "before": {
+            "theme": "system"
+          },
+          "after": {
+            "theme": "dark"
+          }
+        }
+      ]
+    }
+  ]
+}

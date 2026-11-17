@@ -1,0 +1,72 @@
+{
+  "id": "present-ticket-on-board",
+  "title": "Present a ticket's screens on the Board",
+  "group": "board",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "design-agent-dex"
+  ],
+  "trigger": "The agent finished the screens of a ticket and wants Dana to review them.",
+  "goal": "Dana's open browser shows exactly the ticket's screens.",
+  "outcome": "The Board is filtered to the ticket tag with the key screens pinned.",
+  "inputs": [
+    {
+      "object": "screen",
+      "source": "Ticket tag",
+      "example": {
+        "tags": [
+          "chr-123"
+        ]
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "board-state",
+      "target": "Shared board state",
+      "example": {
+        "filter": "chr-123",
+        "pinned": [
+          "checkout"
+        ]
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "set-state",
+      "actor": "design-agent-dex",
+      "action": "Calls set_board_state with filter, pins and expanded clusters",
+      "data": [
+        {
+          "object": "board-state",
+          "before": {
+            "filter": ""
+          },
+          "after": {
+            "filter": "chr-123"
+          }
+        }
+      ]
+    },
+    {
+      "id": "switch",
+      "actor": "system",
+      "action": "Switches the open browser to the Board without a reload",
+      "target": {
+        "screen": "board-view-presented"
+      }
+    },
+    {
+      "id": "review",
+      "actor": "designer-dana",
+      "action": "Reviews the screens and their flow edges",
+      "target": {
+        "screen": "board-view-clusters-expanded"
+      }
+    }
+  ]
+}

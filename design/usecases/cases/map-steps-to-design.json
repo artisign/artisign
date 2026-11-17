@@ -1,0 +1,53 @@
+{
+  "id": "map-steps-to-design",
+  "title": "Map use-case steps onto screens and elements",
+  "group": "use-cases",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "design-agent-dex"
+  ],
+  "trigger": "A use case has steps without targets.",
+  "goal": "Each step points at the screen or element it happens on.",
+  "outcome": "The mapping view shows every step on its screen; nothing is stale.",
+  "inputs": [
+    {
+      "object": "screen",
+      "source": "find_nodes / get_screen",
+      "example": {
+        "screen": "usecases-list"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "use-case",
+      "target": "usecases/cases/",
+      "example": {
+        "id": "write-use-case"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "ids",
+      "actor": "design-agent-dex",
+      "action": "Gives the target nodes authored ids"
+    },
+    {
+      "id": "map",
+      "actor": "design-agent-dex",
+      "action": "Sets step.target with set_use_cases"
+    },
+    {
+      "id": "view",
+      "actor": "product-owner-pablo",
+      "action": "Checks the mapping view",
+      "target": {
+        "screen": "usecases-mapping"
+      }
+    }
+  ]
+}

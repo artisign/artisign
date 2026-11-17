@@ -1,0 +1,59 @@
+{
+  "id": "coding-agent-reads-screen",
+  "title": "Coding agent reads a screen spec for implementation",
+  "group": "handoff",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "coding-agent-coda"
+  ],
+  "trigger": "Coda implements a screen from the design.",
+  "goal": "Exact values, refs and notes without reading screenshots.",
+  "outcome": "Code matches the design tokens and component usage.",
+  "inputs": [
+    {
+      "object": "screen",
+      "source": "Ticket tag",
+      "example": {
+        "screen": "app-shell",
+        "tags": [
+          "chr-1062"
+        ]
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "component",
+      "target": "Codebase",
+      "example": {
+        "name": "shell-topbar"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "find",
+      "actor": "coding-agent-coda",
+      "action": "Finds the ticket's screens with get_project tags"
+    },
+    {
+      "id": "read",
+      "actor": "coding-agent-coda",
+      "action": "Reads screen, notes and tag notes with get_screen",
+      "target": {
+        "screen": "app-shell"
+      }
+    },
+    {
+      "id": "tokens",
+      "actor": "coding-agent-coda",
+      "action": "Reads the design system and inspects nodes for computed values",
+      "target": {
+        "screen": "design-system-view"
+      }
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "id": "address-comments",
+  "title": "Address open comments and resolve them",
+  "group": "review",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "design-agent-dex"
+  ],
+  "trigger": "A design session starts and the project has open comments.",
+  "goal": "Every open comment is answered and the screen fixed.",
+  "outcome": "Comments are resolved with a reply naming the change.",
+  "inputs": [
+    {
+      "object": "comment",
+      "source": "list_comments status open",
+      "example": {
+        "id": "c-42",
+        "status": "open"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "comment",
+      "target": "comments.jsonl",
+      "example": {
+        "id": "c-42",
+        "status": "resolved"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "list",
+      "actor": "design-agent-dex",
+      "action": "Lists open comments"
+    },
+    {
+      "id": "fix",
+      "actor": "design-agent-dex",
+      "action": "Fixes the node with patch_html and checks the screenshot"
+    },
+    {
+      "id": "reply",
+      "actor": "design-agent-dex",
+      "action": "Replies and resolves with reply_comment",
+      "data": [
+        {
+          "object": "comment",
+          "before": {
+            "status": "open"
+          },
+          "after": {
+            "status": "resolved"
+          }
+        }
+      ]
+    },
+    {
+      "id": "see",
+      "actor": "designer-dana",
+      "action": "Sees the reply in the Comments panel",
+      "target": {
+        "screen": "comments-panel"
+      }
+    }
+  ]
+}

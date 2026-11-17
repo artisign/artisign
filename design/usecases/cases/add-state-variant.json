@@ -1,0 +1,55 @@
+{
+  "id": "add-state-variant",
+  "title": "Add a state, overlay or step variant of a screen",
+  "group": "variants",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "design-agent-dex"
+  ],
+  "trigger": "A screen needs its empty, error or dialog state.",
+  "goal": "The state lives next to its parent in the sidebar tree.",
+  "outcome": "A variant screen with variant_of and variant_kind, nested under its parent.",
+  "inputs": [
+    {
+      "object": "screen",
+      "source": "Parent screen",
+      "example": {
+        "screen": "checkout"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "screen",
+      "target": "screens/",
+      "example": {
+        "screen": "checkout-empty",
+        "variant_of": "checkout",
+        "variant_kind": "state"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "write",
+      "actor": "design-agent-dex",
+      "action": "Writes the variant screen with stable structural ids"
+    },
+    {
+      "id": "meta",
+      "actor": "design-agent-dex",
+      "action": "Sets variant_of and variant_kind with set_meta"
+    },
+    {
+      "id": "tree",
+      "actor": "system",
+      "action": "Nests the variant under its parent in the sidebar",
+      "target": {
+        "screen": "sidebar-variant-tree"
+      }
+    }
+  ]
+}

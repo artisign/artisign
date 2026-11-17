@@ -1,0 +1,64 @@
+{
+  "id": "build-design-system",
+  "title": "Build tokens and components before screens",
+  "group": "design",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "design-agent-dex"
+  ],
+  "trigger": "A new direction starts and the project has no design system.",
+  "goal": "Screens can be composed of refs only.",
+  "outcome": "Tokens and base components exist with usage notes and show in the Design System view.",
+  "inputs": [
+    {
+      "object": "token",
+      "source": "Brief or brand",
+      "example": {
+        "path": "color.primary",
+        "value": "#3F6BFF"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "component",
+      "target": "design-system/components",
+      "example": {
+        "name": "btn-primary",
+        "variants": [
+          "default",
+          "hover"
+        ],
+        "usage": "Primary action, at most one per screen."
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "set-tokens",
+      "actor": "design-agent-dex",
+      "action": "Sets color, spacing, radius and type tokens with set_tokens"
+    },
+    {
+      "id": "write-components",
+      "actor": "design-agent-dex",
+      "action": "Writes base components with variants via write_html kind component"
+    },
+    {
+      "id": "usage",
+      "actor": "design-agent-dex",
+      "action": "Adds usage metadata to each component with set_meta"
+    },
+    {
+      "id": "review",
+      "actor": "designer-dana",
+      "action": "Reviews tokens as swatches and components side by side",
+      "target": {
+        "screen": "design-system-view"
+      }
+    }
+  ]
+}

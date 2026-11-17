@@ -1,0 +1,74 @@
+{
+  "id": "add-variant-from-gap",
+  "title": "Add a variant for an uncovered persona group",
+  "group": "use-cases",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo"
+  ],
+  "trigger": "A use case does not cover some trait values of the persona pool.",
+  "goal": "Every persona group has a matching flow.",
+  "outcome": "A variant with when, overrides and step ops.",
+  "inputs": [
+    {
+      "object": "use-case",
+      "source": "suggest_use_case_variants",
+      "example": {
+        "id": "write-use-case"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "use-case",
+      "target": "usecases/cases/",
+      "example": {
+        "id": "write-use-case",
+        "steps": [
+          {
+            "id": "write"
+          }
+        ]
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "coverage",
+      "actor": "product-owner-pablo",
+      "action": "Opens the coverage hint",
+      "target": {
+        "screen": "usecases-detail",
+        "node": "v-coverage"
+      }
+    },
+    {
+      "id": "add",
+      "actor": "product-owner-pablo",
+      "action": "Adds a variant",
+      "target": {
+        "screen": "usecases-detail",
+        "node": "v-add"
+      }
+    },
+    {
+      "id": "edit",
+      "actor": "product-owner-pablo",
+      "action": "Edits when and step changes in the structured editor",
+      "target": {
+        "screen": "usecases-edit-dialog-variant"
+      }
+    },
+    {
+      "id": "view",
+      "actor": "product-owner-pablo",
+      "action": "Reads the resolved variant",
+      "target": {
+        "screen": "usecases-detail-variant"
+      }
+    }
+  ]
+}

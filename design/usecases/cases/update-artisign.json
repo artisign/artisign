@@ -1,0 +1,67 @@
+{
+  "id": "update-artisign",
+  "title": "Update Artisign and read what's new",
+  "group": "settings",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "solo-founder-sol"
+  ],
+  "trigger": "The daemon's daily check finds a newer version.",
+  "goal": "Sol runs the new version and knows what changed.",
+  "outcome": "The client entries are re-pinned and the release notes were shown once.",
+  "inputs": [
+    {
+      "object": "settings",
+      "source": "Update check",
+      "example": {
+        "version": "2.2.1"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "settings",
+      "target": "Daemon settings",
+      "example": {
+        "version": "2.3.0"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "notice",
+      "actor": "system",
+      "action": "Shows the update notice under the settings gear",
+      "target": {
+        "screen": "shell-update-notice"
+      }
+    },
+    {
+      "id": "run",
+      "actor": "solo-founder-sol",
+      "action": "Copies and runs artisign update"
+    },
+    {
+      "id": "whats-new",
+      "actor": "system",
+      "action": "Shows the release notes on the first start after the update",
+      "target": {
+        "screen": "shell-whats-new"
+      },
+      "data": [
+        {
+          "object": "settings",
+          "before": {
+            "version": "2.2.1"
+          },
+          "after": {
+            "version": "2.3.0"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "id": "inspect-node",
+  "title": "Inspect an element's tokens and geometry",
+  "group": "review",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "designer-dana"
+  ],
+  "trigger": "Dana wants to know which token an element uses.",
+  "goal": "See refs, computed values and size of one element.",
+  "outcome": "The Elements panel shows the selected node's details.",
+  "inputs": [
+    {
+      "object": "screen",
+      "source": "Open screen",
+      "example": {
+        "screen": "checkout"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "token",
+      "target": "Inspector",
+      "example": {
+        "path": "color.primary",
+        "value": "#3F6BFF"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "mode",
+      "actor": "designer-dana",
+      "action": "Turns on Inspect mode",
+      "target": {
+        "screen": "app-shell"
+      }
+    },
+    {
+      "id": "select",
+      "actor": "designer-dana",
+      "action": "Selects an element in the frame",
+      "target": {
+        "screen": "inspector-selected"
+      }
+    },
+    {
+      "id": "variant-card",
+      "actor": "system",
+      "action": "Shows the Variant card and Also reached from for a variant screen",
+      "target": {
+        "screen": "inspector-variant-reached-from"
+      }
+    }
+  ]
+}

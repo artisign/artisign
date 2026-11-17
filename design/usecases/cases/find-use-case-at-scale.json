@@ -1,0 +1,98 @@
+{
+  "id": "find-use-case-at-scale",
+  "title": "Find one use case among thousands",
+  "group": "use-cases",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo"
+  ],
+  "trigger": "Pablo needs the spec of one flow in a large project.",
+  "goal": "Open the right case in seconds.",
+  "outcome": "The list is narrowed by search, filters and groups.",
+  "inputs": [
+    {
+      "object": "use-case",
+      "source": "usecases/cases",
+      "example": {
+        "group": "checkout"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "use-case",
+      "target": "Detail view",
+      "example": {
+        "id": "pay-with-card"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "search",
+      "actor": "product-owner-pablo",
+      "action": "Types into the search and sets filters",
+      "target": {
+        "screen": "usecases-list"
+      }
+    },
+    {
+      "id": "sort",
+      "actor": "product-owner-pablo",
+      "action": "Sorts by group, title or status",
+      "target": {
+        "screen": "usecases-list",
+        "node": "uc-sort"
+      }
+    },
+    {
+      "id": "open",
+      "actor": "product-owner-pablo",
+      "action": "Opens the case",
+      "target": {
+        "screen": "usecases-detail"
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "agent",
+      "title": "Agent browses through MCP",
+      "when": {
+        "actor-type": [
+          "agent"
+        ]
+      },
+      "actors": {
+        "product-owner-pablo": "coding-agent-coda"
+      },
+      "steps": [
+        {
+          "op": "replace",
+          "step_id": "search",
+          "step": {
+            "id": "list",
+            "actor": "coding-agent-coda",
+            "action": "Calls list_use_cases with group, persona or query"
+          }
+        },
+        {
+          "op": "remove",
+          "step_id": "sort"
+        },
+        {
+          "op": "replace",
+          "step_id": "open",
+          "step": {
+            "id": "get",
+            "actor": "coding-agent-coda",
+            "action": "Calls get_use_case"
+          }
+        }
+      ]
+    }
+  ]
+}

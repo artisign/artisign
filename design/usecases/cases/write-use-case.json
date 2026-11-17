@@ -1,0 +1,103 @@
+{
+  "id": "write-use-case",
+  "title": "Write a use case in the preview",
+  "group": "use-cases",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo"
+  ],
+  "trigger": "Pablo wants to specify a new flow.",
+  "goal": "A use case with trigger, goal, outcome, inputs, outputs and steps.",
+  "outcome": "The case is saved under usecases/cases and listed.",
+  "inputs": [
+    {
+      "object": "persona",
+      "source": "Personas pool",
+      "example": {
+        "id": "designer-dana"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "use-case",
+      "target": "usecases/cases/",
+      "example": {
+        "id": "comment-on-node",
+        "status": "draft"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "new",
+      "actor": "product-owner-pablo",
+      "action": "Chooses New use case",
+      "target": {
+        "screen": "usecases-list",
+        "node": "btn-new-case"
+      }
+    },
+    {
+      "id": "fill",
+      "actor": "product-owner-pablo",
+      "action": "Fills the fields and adds steps",
+      "target": {
+        "screen": "usecases-edit-dialog"
+      }
+    },
+    {
+      "id": "reorder",
+      "actor": "product-owner-pablo",
+      "action": "Reorders steps by drag and drop",
+      "target": {
+        "screen": "usecases-edit-dialog-step-drag"
+      }
+    },
+    {
+      "id": "save",
+      "actor": "system",
+      "action": "Validates and writes the case through set_use_cases",
+      "target": {
+        "screen": "usecases-detail"
+      }
+    }
+  ],
+  "variants": [
+    {
+      "id": "agent",
+      "title": "Agent writes the case through MCP",
+      "when": {
+        "actor-type": [
+          "agent"
+        ]
+      },
+      "actors": {
+        "product-owner-pablo": "design-agent-dex"
+      },
+      "trigger": "The user asks the agent to turn existing screens into use cases.",
+      "steps": [
+        {
+          "op": "remove",
+          "step_id": "new"
+        },
+        {
+          "op": "remove",
+          "step_id": "reorder"
+        },
+        {
+          "op": "replace",
+          "step_id": "fill",
+          "step": {
+            "id": "write",
+            "actor": "design-agent-dex",
+            "action": "Calls set_use_cases with the full case"
+          }
+        }
+      ]
+    }
+  ]
+}

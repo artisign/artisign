@@ -1,0 +1,79 @@
+{
+  "id": "connect-ai-tools",
+  "title": "Connect AI tools to Artisign",
+  "group": "setup",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "solo-founder-sol"
+  ],
+  "trigger": "Sol has installed artisign and starts it for the first time; no AI tool is connected yet.",
+  "goal": "Every AI tool Sol uses can call the Artisign MCP tools.",
+  "outcome": "Each selected client has one pinned MCP entry and shows as connected in the MCP setup dialog.",
+  "inputs": [
+    {
+      "object": "mcp-client",
+      "source": "Local AI tool configs",
+      "example": {
+        "client": "claude-code",
+        "connected": false
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "mcp-client",
+      "target": "Client config file",
+      "example": {
+        "client": "claude-code",
+        "connected": true,
+        "pinned_version": "2.2.1"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open-settings",
+      "actor": "solo-founder-sol",
+      "action": "Opens the settings menu and picks Connect AI tools",
+      "target": {
+        "screen": "shell-settings-menu",
+        "node": "item-mcp"
+      }
+    },
+    {
+      "id": "pick-clients",
+      "actor": "solo-founder-sol",
+      "action": "Sees which clients are installed and selects the ones to connect",
+      "target": {
+        "screen": "shell-mcp-setup-dialog"
+      }
+    },
+    {
+      "id": "write-entries",
+      "actor": "system",
+      "action": "Writes one pinned npx entry per selected client",
+      "data": [
+        {
+          "object": "mcp-client",
+          "before": {
+            "connected": false
+          },
+          "after": {
+            "connected": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "install-skill",
+      "actor": "solo-founder-sol",
+      "action": "Installs the agent skill for the connected tools",
+      "target": {
+        "screen": "shell-mcp-setup-dialog-skill"
+      }
+    }
+  ]
+}

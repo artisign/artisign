@@ -1,0 +1,70 @@
+{
+  "id": "comment-on-node",
+  "title": "Comment on a node in the preview",
+  "group": "review",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "designer-dana"
+  ],
+  "trigger": "Dana sees something wrong on a screen.",
+  "goal": "The note is anchored to the exact element for the agent.",
+  "outcome": "An open comment on the node, listed in the Comments panel.",
+  "inputs": [
+    {
+      "object": "screen",
+      "source": "Open screen",
+      "example": {
+        "screen": "checkout"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "comment",
+      "target": "comments.jsonl",
+      "example": {
+        "node": "checkout.btn-pay",
+        "body": "Button label should say the amount.",
+        "status": "open"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "add",
+      "actor": "designer-dana",
+      "action": "Chooses Add comment in the Comments panel",
+      "target": {
+        "screen": "app-shell",
+        "node": "comments-header"
+      }
+    },
+    {
+      "id": "pick-node",
+      "actor": "designer-dana",
+      "action": "Clicks the element in the frame to anchor the comment",
+      "target": {
+        "screen": "comments-panel"
+      }
+    },
+    {
+      "id": "save",
+      "actor": "system",
+      "action": "Appends the comment",
+      "data": [
+        {
+          "object": "comment",
+          "before": {
+            "status": "none"
+          },
+          "after": {
+            "status": "open"
+          }
+        }
+      ]
+    }
+  ]
+}

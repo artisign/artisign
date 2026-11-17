@@ -1,0 +1,58 @@
+{
+  "id": "wire-flows",
+  "title": "Wire click flows between screens",
+  "group": "board",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "design-agent-dex"
+  ],
+  "trigger": "A CTA on a screen goes nowhere.",
+  "goal": "Every interactive element leads to its target.",
+  "outcome": "Flows show as edges on the Board and work in Flow mode.",
+  "inputs": [
+    {
+      "object": "screen",
+      "source": "Screen with CTA",
+      "example": {
+        "screen": "login"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "flow",
+      "target": "flows.json",
+      "example": {
+        "from": "login.btn-login",
+        "to": "dashboard",
+        "trigger": "tap"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "wire",
+      "actor": "design-agent-dex",
+      "action": "Adds data-flow-target or calls set_flow"
+    },
+    {
+      "id": "edges",
+      "actor": "system",
+      "action": "Draws the edge on the Board",
+      "target": {
+        "screen": "board-view"
+      }
+    },
+    {
+      "id": "click",
+      "actor": "designer-dana",
+      "action": "Clicks through the flow in Flow mode",
+      "target": {
+        "screen": "app-shell"
+      }
+    }
+  ]
+}

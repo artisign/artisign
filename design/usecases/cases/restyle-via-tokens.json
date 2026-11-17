@@ -1,0 +1,69 @@
+{
+  "id": "restyle-via-tokens",
+  "title": "Restyle the whole product through tokens",
+  "group": "design",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "design-agent-dex"
+  ],
+  "trigger": "Dana wants a different accent colour across all screens.",
+  "goal": "Every screen, component and pattern follows the new value.",
+  "outcome": "One set_tokens call changed the look of the whole project.",
+  "inputs": [
+    {
+      "object": "token",
+      "source": "Designer request",
+      "example": {
+        "path": "color.primary",
+        "value": "#3F6BFF"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "token",
+      "target": "design-system/tokens",
+      "example": {
+        "path": "color.primary",
+        "value": "#C8553D"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "request",
+      "actor": "designer-dana",
+      "action": "Asks for the new accent colour",
+      "target": {
+        "screen": "design-system-view"
+      }
+    },
+    {
+      "id": "set",
+      "actor": "design-agent-dex",
+      "action": "Changes the token with set_tokens",
+      "data": [
+        {
+          "object": "token",
+          "before": {
+            "value": "#3F6BFF"
+          },
+          "after": {
+            "value": "#C8553D"
+          }
+        }
+      ]
+    },
+    {
+      "id": "reload",
+      "actor": "system",
+      "action": "Re-renders every screen that references the token",
+      "target": {
+        "screen": "board-view"
+      }
+    }
+  ]
+}

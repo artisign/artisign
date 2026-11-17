@@ -1,0 +1,153 @@
+{
+  "id": "create-project",
+  "title": "Create a new design project",
+  "group": "setup",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "solo-founder-sol"
+  ],
+  "trigger": "No project is open and Sol wants to start designing.",
+  "goal": "A new, empty Artisign project exists in a folder of Sol's choice.",
+  "outcome": "The project is open in the tab and shows how to start.",
+  "inputs": [
+    {
+      "object": "project",
+      "source": "Folder browser",
+      "example": {
+        "root": "/Users/sol/coffee-finder/design"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "project",
+      "target": "artisign.json in the folder",
+      "example": {
+        "name": "coffee-finder",
+        "open": true,
+        "screen_count": 0
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "start-create",
+      "actor": "solo-founder-sol",
+      "action": "Chooses Create project in the empty state",
+      "target": {
+        "screen": "no-project-empty-state",
+        "node": "empty-btn-init"
+      }
+    },
+    {
+      "id": "browse-folder",
+      "actor": "solo-founder-sol",
+      "action": "Browses to a parent folder in the dialog",
+      "target": {
+        "screen": "init-project-dialog"
+      }
+    },
+    {
+      "id": "new-folder",
+      "actor": "solo-founder-sol",
+      "action": "Creates a new folder in place",
+      "target": {
+        "screen": "init-project-dialog",
+        "node": "init-dialog-newfolder"
+      }
+    },
+    {
+      "id": "folder-created",
+      "actor": "system",
+      "action": "Creates the folder and selects it",
+      "target": {
+        "screen": "init-project-dialog-new-folder-created"
+      }
+    },
+    {
+      "id": "scaffold",
+      "actor": "system",
+      "action": "Scaffolds artisign.json and opens the project",
+      "target": {
+        "screen": "shell-empty-project"
+      },
+      "data": [
+        {
+          "object": "project",
+          "before": {
+            "open": false
+          },
+          "after": {
+            "open": true,
+            "screen_count": 0
+          }
+        }
+      ]
+    }
+  ],
+  "variants": [
+    {
+      "id": "folder-exists",
+      "title": "Folder name already taken",
+      "when": {
+        "experience": [
+          "first-run",
+          "regular"
+        ]
+      },
+      "steps": [
+        {
+          "op": "replace",
+          "step_id": "folder-created",
+          "step": {
+            "id": "folder-exists",
+            "actor": "system",
+            "action": "Refuses the name and says the folder exists",
+            "target": {
+              "screen": "init-project-dialog-new-folder-exists"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "title": "Agent creates the project through MCP",
+      "when": {
+        "actor-type": [
+          "agent"
+        ]
+      },
+      "personas": [
+        "design-agent-dex"
+      ],
+      "trigger": "The user asks the AI tool to create an Artisign project.",
+      "steps": [
+        {
+          "op": "remove",
+          "step_id": "start-create"
+        },
+        {
+          "op": "remove",
+          "step_id": "browse-folder"
+        },
+        {
+          "op": "remove",
+          "step_id": "new-folder"
+        },
+        {
+          "op": "replace",
+          "step_id": "folder-created",
+          "step": {
+            "id": "ask-folder",
+            "actor": "design-agent-dex",
+            "action": "Asks the user where the project should live, then calls init_project"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "id": "compose-screen-from-refs",
+  "title": "Compose a screen from refs and review it",
+  "group": "design",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "design-agent-dex"
+  ],
+  "trigger": "A ticket asks for a new screen.",
+  "goal": "The screen uses tokens and components only and renders without unresolved refs.",
+  "outcome": "A screen with stable node ids, flows wired, and no red outlines.",
+  "inputs": [
+    {
+      "object": "component",
+      "source": "Design system",
+      "example": {
+        "name": "btn-primary"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "screen",
+      "target": "screens/",
+      "example": {
+        "screen": "checkout",
+        "tags": [
+          "chr-123"
+        ]
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "read-system",
+      "actor": "design-agent-dex",
+      "action": "Reads the design system at view tree"
+    },
+    {
+      "id": "write",
+      "actor": "design-agent-dex",
+      "action": "Writes the screen with write_html, refs only"
+    },
+    {
+      "id": "look",
+      "actor": "design-agent-dex",
+      "action": "Takes a screenshot and fixes red outlines before the next write"
+    },
+    {
+      "id": "live",
+      "actor": "system",
+      "action": "Shows the new screen in the preview within a moment",
+      "target": {
+        "screen": "app-shell"
+      }
+    }
+  ]
+}

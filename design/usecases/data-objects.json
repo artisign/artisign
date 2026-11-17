@@ -1,0 +1,354 @@
+{
+  "objects": [
+    {
+      "id": "project",
+      "name": "Project",
+      "description": "A folder with artisign.json: screens, design system, mockups, flows, comments and optional use cases.",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "example": "coffee-finder"
+        },
+        {
+          "name": "root",
+          "type": "string",
+          "example": "/Users/sol/coffee-finder/design"
+        },
+        {
+          "name": "open",
+          "type": "boolean",
+          "example": true
+        },
+        {
+          "name": "screen_count",
+          "type": "number",
+          "example": 12
+        }
+      ]
+    },
+    {
+      "id": "screen",
+      "name": "Screen",
+      "description": "One HTML file under screens/, composed of token and component refs, with a sidecar for notes, tags and variant metadata.",
+      "fields": [
+        {
+          "name": "screen",
+          "type": "string",
+          "example": "checkout"
+        },
+        {
+          "name": "tags",
+          "type": "list",
+          "example": [
+            "chr-123"
+          ]
+        },
+        {
+          "name": "variant_of",
+          "type": "string",
+          "example": "checkout"
+        },
+        {
+          "name": "variant_kind",
+          "type": "enum",
+          "values": [
+            "state",
+            "overlay",
+            "step"
+          ],
+          "example": "state"
+        },
+        {
+          "name": "viewport",
+          "type": "object",
+          "example": {
+            "width": 390,
+            "height": 844
+          }
+        }
+      ]
+    },
+    {
+      "id": "token",
+      "name": "Token",
+      "description": "A named design value (color, spacing, radius, type) referenced as $group.name.",
+      "fields": [
+        {
+          "name": "path",
+          "type": "string",
+          "example": "color.primary"
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "example": "#3F6BFF"
+        }
+      ]
+    },
+    {
+      "id": "component",
+      "name": "Component",
+      "description": "A reusable definition with slots and variants, instantiated as class=\"$name\".",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "example": "btn-primary"
+        },
+        {
+          "name": "variants",
+          "type": "list",
+          "example": [
+            "default",
+            "hover"
+          ]
+        },
+        {
+          "name": "slots",
+          "type": "list",
+          "example": [
+            "label"
+          ]
+        },
+        {
+          "name": "usage",
+          "type": "string",
+          "example": "Primary action, at most one per screen."
+        }
+      ]
+    },
+    {
+      "id": "mockup",
+      "name": "Mockup",
+      "description": "Raw-HTML options of one idea, outside the design system, until one is promoted into a screen.",
+      "fields": [
+        {
+          "name": "mockup",
+          "type": "string",
+          "example": "onboarding-options"
+        },
+        {
+          "name": "variants",
+          "type": "list",
+          "example": [
+            "a-carousel",
+            "b-checklist"
+          ]
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "example": "Checklist instead of slides"
+        }
+      ]
+    },
+    {
+      "id": "flow",
+      "name": "Flow",
+      "description": "A click route from a node to a screen or node.",
+      "fields": [
+        {
+          "name": "from",
+          "type": "string",
+          "example": "login.btn-login"
+        },
+        {
+          "name": "to",
+          "type": "string",
+          "example": "dashboard"
+        },
+        {
+          "name": "trigger",
+          "type": "enum",
+          "values": [
+            "tap",
+            "hover",
+            "longpress",
+            "swipe-left",
+            "swipe-right"
+          ],
+          "example": "tap"
+        }
+      ]
+    },
+    {
+      "id": "comment",
+      "name": "Comment",
+      "description": "A review note anchored to a node of a screen, with replies and a status.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "example": "c-42"
+        },
+        {
+          "name": "node",
+          "type": "string",
+          "example": "checkout.btn-pay"
+        },
+        {
+          "name": "body",
+          "type": "string",
+          "example": "Button label should say the amount."
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "values": [
+            "open",
+            "resolved"
+          ],
+          "example": "open"
+        }
+      ]
+    },
+    {
+      "id": "board-state",
+      "name": "Board state",
+      "description": "Shared filter, pins and expanded clusters of the Board view, set by the agent or the human.",
+      "fields": [
+        {
+          "name": "filter",
+          "type": "string",
+          "example": "chr-123"
+        },
+        {
+          "name": "pinned",
+          "type": "list",
+          "example": [
+            "checkout"
+          ]
+        },
+        {
+          "name": "expanded",
+          "type": "list",
+          "example": [
+            "checkout"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "name": "Settings",
+      "description": "Standing preferences of the preview, stored by the daemon.",
+      "fields": [
+        {
+          "name": "theme",
+          "type": "enum",
+          "values": [
+            "system",
+            "light",
+            "dark"
+          ],
+          "example": "dark"
+        },
+        {
+          "name": "follow",
+          "type": "boolean",
+          "example": true
+        },
+        {
+          "name": "version",
+          "type": "string",
+          "example": "2.2.1"
+        }
+      ]
+    },
+    {
+      "id": "mcp-client",
+      "name": "MCP client entry",
+      "description": "One AI tool connected to the daemon by artisign setup.",
+      "fields": [
+        {
+          "name": "client",
+          "type": "enum",
+          "values": [
+            "claude-code",
+            "claude-desktop",
+            "cursor",
+            "codex",
+            "vscode",
+            "opencode"
+          ],
+          "example": "claude-code"
+        },
+        {
+          "name": "connected",
+          "type": "boolean",
+          "example": true
+        },
+        {
+          "name": "pinned_version",
+          "type": "string",
+          "example": "2.2.1"
+        }
+      ]
+    },
+    {
+      "id": "use-case",
+      "name": "Use case",
+      "description": "A spec: trigger, goal, outcome, inputs, outputs, steps mapped to the design, and variants.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "example": "create-project"
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "example": "Create a new project"
+        },
+        {
+          "name": "group",
+          "type": "string",
+          "example": "setup"
+        },
+        {
+          "name": "status",
+          "type": "enum",
+          "values": [
+            "draft",
+            "ready"
+          ],
+          "example": "draft"
+        },
+        {
+          "name": "steps",
+          "type": "list",
+          "example": [
+            {
+              "id": "open-dialog"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "persona",
+      "name": "Persona",
+      "description": "One member of the user pool, described by trait values of the dimensions.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "example": "designer-dana"
+        },
+        {
+          "name": "traits",
+          "type": "object",
+          "example": {
+            "actor-type": "human"
+          }
+        },
+        {
+          "name": "generated",
+          "type": "boolean",
+          "example": false
+        }
+      ]
+    }
+  ]
+}

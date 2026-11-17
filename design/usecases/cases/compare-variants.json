@@ -1,0 +1,60 @@
+{
+  "id": "compare-variants",
+  "title": "Compare variants against the main screen",
+  "group": "variants",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "designer-dana"
+  ],
+  "trigger": "Dana wants to check what a variant changes.",
+  "goal": "See differences between the main screen and up to three variants.",
+  "outcome": "Columns with a diff overlay of added, changed and removed nodes.",
+  "inputs": [
+    {
+      "object": "screen",
+      "source": "Variant family",
+      "example": {
+        "screen": "checkout",
+        "variant_kind": "state"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "settings",
+      "target": "Daemon settings",
+      "example": {
+        "version": "2.2.1"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "navigate",
+      "actor": "designer-dana",
+      "action": "Moves through the variant family with the breadcrumb",
+      "target": {
+        "screen": "screen-view-variant-breadcrumb"
+      }
+    },
+    {
+      "id": "compare",
+      "actor": "designer-dana",
+      "action": "Switches to Compare and picks members",
+      "target": {
+        "screen": "chrome-c-compare"
+      }
+    },
+    {
+      "id": "diff",
+      "actor": "system",
+      "action": "Marks node differences by authored id",
+      "target": {
+        "screen": "chrome-c-compare"
+      }
+    }
+  ]
+}

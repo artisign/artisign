@@ -1,0 +1,78 @@
+{
+  "id": "follow-agent-live",
+  "title": "Follow the agent while it works",
+  "group": "follow",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "designer-dana"
+  ],
+  "trigger": "The agent starts a task and Dana wants to watch.",
+  "goal": "The preview shows whatever the agent touches.",
+  "outcome": "Each tool call navigates and highlights the nodes; Dana's own navigation pauses following.",
+  "inputs": [
+    {
+      "object": "settings",
+      "source": "Topbar Follow pill",
+      "example": {
+        "follow": false
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "settings",
+      "target": "Daemon settings",
+      "example": {
+        "follow": true
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "turn-on",
+      "actor": "designer-dana",
+      "action": "Turns on Follow in the topbar",
+      "target": {
+        "screen": "follow-active-feed"
+      },
+      "data": [
+        {
+          "object": "settings",
+          "before": {
+            "follow": false
+          },
+          "after": {
+            "follow": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "highlight",
+      "actor": "system",
+      "action": "Navigates to the touched screen and highlights nodes",
+      "target": {
+        "screen": "follow-highlight-definition"
+      }
+    },
+    {
+      "id": "pause",
+      "actor": "designer-dana",
+      "action": "Clicks elsewhere, which pauses following",
+      "target": {
+        "screen": "follow-paused-node-highlights"
+      }
+    },
+    {
+      "id": "resume",
+      "actor": "designer-dana",
+      "action": "Resumes explicitly",
+      "target": {
+        "screen": "follow-active-feed"
+      }
+    }
+  ]
+}

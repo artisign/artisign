@@ -1,0 +1,83 @@
+{
+  "id": "first-screen-in-empty-project",
+  "title": "Design the first screen of an empty project",
+  "group": "setup",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "solo-founder-sol",
+    "design-agent-dex"
+  ],
+  "trigger": "A project is open but has no screens.",
+  "goal": "The project has a first screen built on tokens and components.",
+  "outcome": "The first screen replaces the how-to-start guide on the canvas.",
+  "inputs": [
+    {
+      "object": "project",
+      "source": "Open project",
+      "example": {
+        "name": "coffee-finder",
+        "screen_count": 0
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "screen",
+      "target": "screens/",
+      "example": {
+        "screen": "login",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        }
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "read-guide",
+      "actor": "solo-founder-sol",
+      "action": "Reads the guide and copies the suggested prompt",
+      "target": {
+        "screen": "shell-empty-project"
+      }
+    },
+    {
+      "id": "prompt",
+      "actor": "solo-founder-sol",
+      "action": "Pastes the prompt into the AI tool"
+    },
+    {
+      "id": "tokens",
+      "actor": "design-agent-dex",
+      "action": "Defines tokens and base components first"
+    },
+    {
+      "id": "write",
+      "actor": "design-agent-dex",
+      "action": "Writes the screen from refs and checks it with a screenshot"
+    },
+    {
+      "id": "shown",
+      "actor": "system",
+      "action": "Live-reloads the canvas with the new screen",
+      "target": {
+        "screen": "app-shell"
+      },
+      "data": [
+        {
+          "object": "project",
+          "before": {
+            "screen_count": 0
+          },
+          "after": {
+            "screen_count": 1
+          }
+        }
+      ]
+    }
+  ]
+}

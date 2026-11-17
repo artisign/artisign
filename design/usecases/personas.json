@@ -1,0 +1,176 @@
+{
+  "dimensions": [
+    {
+      "id": "actor-type",
+      "label": "Actor type",
+      "description": "Who performs the flow: a person in the browser preview, or an agent through MCP.",
+      "values": [
+        {
+          "id": "human",
+          "label": "Human"
+        },
+        {
+          "id": "agent",
+          "label": "Agent"
+        }
+      ]
+    },
+    {
+      "id": "role",
+      "label": "Role",
+      "description": "What the actor is responsible for in the project.",
+      "values": [
+        {
+          "id": "designer",
+          "label": "Designer"
+        },
+        {
+          "id": "product-owner",
+          "label": "Product owner"
+        },
+        {
+          "id": "solo-founder",
+          "label": "Solo founder"
+        },
+        {
+          "id": "design-agent",
+          "label": "Design agent"
+        },
+        {
+          "id": "coding-agent",
+          "label": "Coding agent"
+        }
+      ]
+    },
+    {
+      "id": "experience",
+      "label": "Experience",
+      "description": "How familiar the actor is with Artisign.",
+      "values": [
+        {
+          "id": "first-run",
+          "label": "First run"
+        },
+        {
+          "id": "regular",
+          "label": "Regular"
+        }
+      ]
+    },
+    {
+      "id": "project-size",
+      "label": "Project size",
+      "description": "How many screens and use cases the project holds. Decides whether lists need filters and paging.",
+      "values": [
+        {
+          "id": "small",
+          "label": "Small (up to 30 screens)"
+        },
+        {
+          "id": "large",
+          "label": "Large (hundreds of screens or thousands of use cases)"
+        }
+      ]
+    }
+  ],
+  "personas": [
+    {
+      "id": "designer-dana",
+      "name": "Dana",
+      "role": "Designer",
+      "description": "Reviews and steers the design in the browser preview while agents write the screens.",
+      "avatar": {
+        "emoji": "🎨",
+        "color": "#8E6BB1"
+      },
+      "traits": {
+        "actor-type": "human",
+        "role": "designer",
+        "experience": "regular"
+      },
+      "goals": [
+        "See every change the agent makes as it happens",
+        "Comment on a node instead of describing it in chat",
+        "Approve one direction out of several options"
+      ]
+    },
+    {
+      "id": "product-owner-pablo",
+      "name": "Pablo",
+      "role": "Product owner",
+      "description": "Owns the spec of a large product and maintains use cases before they become tickets.",
+      "avatar": {
+        "emoji": "🧭",
+        "color": "#4F7CAC"
+      },
+      "traits": {
+        "actor-type": "human",
+        "role": "product-owner",
+        "experience": "regular",
+        "project-size": "large"
+      },
+      "goals": [
+        "Find one use case among thousands in seconds",
+        "Spot persona groups without a variant"
+      ]
+    },
+    {
+      "id": "solo-founder-sol",
+      "name": "Sol",
+      "role": "Solo founder",
+      "description": "Builds a product alone with AI tools. Installs Artisign for the first time and has no design system yet.",
+      "avatar": {
+        "emoji": "🚀",
+        "color": "#D08A2E"
+      },
+      "traits": {
+        "actor-type": "human",
+        "role": "solo-founder",
+        "experience": "first-run",
+        "project-size": "small"
+      },
+      "goals": [
+        "Get from install to a first screen in minutes",
+        "Never edit a config file by hand"
+      ]
+    },
+    {
+      "id": "design-agent-dex",
+      "name": "Dex",
+      "role": "Design agent",
+      "description": "An AI agent that writes tokens, components and screens through the MCP tools and checks every write with a screenshot.",
+      "avatar": {
+        "emoji": "✨",
+        "color": "#C8553D"
+      },
+      "traits": {
+        "actor-type": "agent",
+        "role": "design-agent",
+        "experience": "regular"
+      },
+      "goals": [
+        "Reuse the design system instead of inline values",
+        "Spend as few tokens as possible per task"
+      ]
+    },
+    {
+      "id": "coding-agent-coda",
+      "name": "Coda",
+      "role": "Coding agent",
+      "description": "An AI agent that implements screens in a codebase from the design and the use cases. Reads, never writes the design.",
+      "avatar": {
+        "emoji": "🤖",
+        "color": "#3F8F6B"
+      },
+      "traits": {
+        "actor-type": "agent",
+        "role": "coding-agent",
+        "experience": "regular"
+      },
+      "goals": [
+        "Get a screen or use case with everything attached in one call",
+        "Be told when a mapping is stale"
+      ]
+    }
+  ]
+}

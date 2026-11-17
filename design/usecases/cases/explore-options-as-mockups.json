@@ -1,0 +1,58 @@
+{
+  "id": "explore-options-as-mockups",
+  "title": "Explore several options as mockups",
+  "group": "mockups",
+  "tags": [
+    "chr-1120"
+  ],
+  "status": "ready",
+  "personas": [
+    "design-agent-dex",
+    "designer-dana"
+  ],
+  "trigger": "The interaction model of a screen is still open.",
+  "goal": "Dana sees two to four options side by side.",
+  "outcome": "A mockup with one variant per option, each with a title and description.",
+  "inputs": [
+    {
+      "object": "screen",
+      "source": "Ticket",
+      "example": {
+        "screen": "onboarding"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "mockup",
+      "target": "mockups/",
+      "example": {
+        "mockup": "onboarding-options",
+        "variants": [
+          "a-carousel",
+          "b-checklist"
+        ]
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "write-variants",
+      "actor": "design-agent-dex",
+      "action": "Writes one mockup variant per option with write_mockup"
+    },
+    {
+      "id": "look",
+      "actor": "design-agent-dex",
+      "action": "Screenshots each variant"
+    },
+    {
+      "id": "compare",
+      "actor": "designer-dana",
+      "action": "Compares the options in the column view",
+      "target": {
+        "screen": "chrome-c-mockup-columns"
+      }
+    }
+  ]
+}

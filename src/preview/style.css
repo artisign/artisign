@@ -8772,3 +8772,7 @@ button.uc-target:hover {
 .uc-step-op > .uc-step-keys {
   padding-left: calc(20px + var(--space-md));
 }
+
+.uc-ops-edit {
+  position: relative; /* the offset parent of the change rows: the drag measures against it */
+}

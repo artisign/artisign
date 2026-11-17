@@ -52,7 +52,7 @@ describe("variant step changes: reordering", () => {
       expect($("button[aria-haspopup=menu]", row)).not.toBeNull();
       expect(row.lastElementChild.classList.contains("uc-step-keys")).toBe(true);
     }
-    expect($$(".uc-drag-handle", card()).map((b) => b.getAttribute("aria-label"))).toEqual(["Reorder change 1, Picks the agent", "Reorder change 2, Change 2", "Reorder change 3, Sets the time"]);
+    expect($$(".uc-drag-handle", card()).map((b) => b.getAttribute("aria-label"))).toEqual(["Reorder change 1, Picks the agent", "Reorder change 2, Remove notify", "Reorder change 3, Sets the time"]);
     expect($$(".uc-step-op button[aria-haspopup=menu]", card()).map((b) => b.getAttribute("aria-label"))).toEqual(["Actions for change 1", "Actions for change 2", "Actions for change 3"]);
   });
 

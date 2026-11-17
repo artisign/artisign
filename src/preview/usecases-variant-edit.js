@@ -637,7 +637,7 @@ export function createVariantEditor(env) {
       const entry = flowBefore(baseSteps(), variant, variant.ops.indexOf(op)).find((e) => e.id === op.stepId);
       return [diffBadge("removed"), entry ? h("span", { class: "uc-op-struck" }, [actorName(entry.baseActor, pool.personasById), entry.action, entry.step.screen].filter(Boolean).join(" · ")) : h("span", { class: "uc-muted" }, "Pick the step to remove.")];
     };
-    const opName = (i) => variant.ops[i]?.step?.action.trim() || `Change ${i + 1}`;
+    const opName = (i) => variant.ops[i]?.step?.action.trim() || (variant.ops[i]?.op === "remove" && variant.ops[i].stepId ? `Remove ${variant.ops[i].stepId}` : `Change ${i + 1}`);
     // The change rows move in the DOM, not through drawOps, so focus and typed values survive. The model follows (onReorder); what
     // was drawn from a position (labels, field paths, the flow each step select lists, the struck line of a removal) is brought up to date.
     const reorder = createReorder({

@@ -11,6 +11,7 @@ import { renderDetail } from "./usecases-detail.js";
 import { createMappingView } from "./usecases-mapping.js";
 import { renderPersonaList, renderPersonaPage, renderObjectList, renderObjectPage, CARD_PAGE, LIST_PAGE } from "./usecases-pool.js";
 import { openUseCaseDialog, draftFromSource } from "./usecases-forms.js";
+import { blankVariant } from "./usecases-variant-edit.js";
 import { openPersonaDialog, openDimensionDialog, openObjectDialog, openGenerateDialog } from "./usecases-forms-pool.js";
 import { confirmDialog } from "./usecases-dialog.js";
 import { openMenu, closeMenu } from "./usecases-menu.js";
@@ -760,7 +761,7 @@ export function createUseCasesView(options) {
     if (!res.ok) return showToast(res.message, []);
     const source = res.useCase;
     const initialDraft = focus.addVariant ? Object.assign(draftFromSource(source), {}) : undefined;
-    if (initialDraft) initialDraft.variants.push({ id: "", title: "", description: "", when: {}, rest: "" });
+    if (initialDraft) initialDraft.variants.push(blankVariant());
     const saved = await openUseCaseDialog(useCaseDialogOptions({ mode: "edit", source, focus, initialDraft }));
     if (!saved) return;
     reportWrite(saved.data, "Use case saved."); // the SSE event reloads list, pool and detail (and keeps the mapping view)

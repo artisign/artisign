@@ -336,6 +336,22 @@ describe("flow rows", () => {
     expect(variantChangeCount({ steps: [{}, {}], outputs: [] })).toBe(3);
     expect(variantChangeCount({})).toBe(0);
   });
+
+  it("counts each actor swap that changes a step, and ignores one that changes nothing (spec §4)", () => {
+    const base = [{ actor: "dana" }, { actor: "dana" }, { actor: "system" }];
+    // one entry that remaps two steps counts once; a→a and a key no base step has change nothing
+    expect(variantChangeCount({ actors: { dana: "dex" } }, base)).toBe(1);
+    expect(variantChangeCount({ actors: { dana: "dex", system: "dana", dex: "dana", sol: "dex", mia: "mia" } }, base)).toBe(2);
+    expect(variantChangeCount({ actors: { dana: "dana" } }, base)).toBe(0);
+    // added to the other differences
+    expect(variantChangeCount({ actors: { dana: "dex" }, steps: [{}], inputs: [{}], outputs: [{}] }, base)).toBe(4);
+    // a swap counts only for base steps the ops leave alone: removed or replaced steps are taken as written
+    const removing = { actors: { dana: "dex" }, steps: [{ op: "remove", step_id: "a" }, { op: "replace", step_id: "b" }] };
+    expect(variantChangeCount(removing, [{ id: "a", actor: "dana" }, { id: "b", actor: "dana" }])).toBe(2);
+    expect(variantChangeCount(removing, [{ id: "a", actor: "dana" }, { id: "b", actor: "dana" }, { id: "c", actor: "dana" }])).toBe(3);
+    // an actor-swap-only variant is not "0 changes"; without base steps nothing can be counted
+    expect(variantChangeCount({ actors: { dana: "dex" } })).toBe(0);
+  });
 });
 
 describe("variants and coverage", () => {

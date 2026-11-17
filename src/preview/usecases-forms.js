@@ -1,6 +1,6 @@
 // Use Cases tab — the create/edit dialog of a use case: title, group, status, tags, personas, trigger / goal /
 // outcome, inputs and outputs with example values, steps with a target picker (screen / element / none) and before/after
-// data, and variants (title, id, when, plus the remaining overrides as JSON). Saved through set_use_cases (the MCP tool);
+// data, and variants (title, id, when, overrides, actor swaps and step changes, see usecases-variant-edit.js). Saved through set_use_cases (the MCP tool);
 // reference problems are warnings, shown live in the footer and never blocking. The pure parts (draft <-> payload, the
 // warnings) are exported for the tests.
 
@@ -8,6 +8,7 @@ import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
 import { segmented, avatar } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
+import { createVariantEditor, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, variantWarnings, showFieldErrors } from "./usecases-variant-edit.js";
 import { createReorder } from "./usecases-reorder.js";
 import {
   STATUSES,
@@ -15,9 +16,7 @@ import {
   slugify,
   uniqueId,
   isValidId,
-  formatExample,
   parseExample,
-  parseOrKeep,
   undeclaredExampleKeys,
   avatarOf,
   actorName,
@@ -26,13 +25,9 @@ import {
 
 // --- Draft <-> payload (pure) ---------------------------------------------------------------------------------------
 
-const VARIANT_BASE_KEYS = ["id", "title", "description", "when"];
-
 /** The editable draft of a stored use case (or an empty one): every field is text, ready to bind to an input. */
 export function draftFromSource(source) {
   const s = source ?? {};
-  // `orig` keeps the stored object: an example the user does not touch is saved exactly as it was, never re-read from text.
-  const io = (list, sideKey) => (list ?? []).map((item) => ({ object: item.object, side: item[sideKey] ?? "", example: formatExample(item.example), orig: item.example }));
   return {
     title: s.title ?? "",
     group: s.group ?? "",
@@ -42,41 +37,17 @@ export function draftFromSource(source) {
     trigger: s.trigger ?? "",
     goal: s.goal ?? "",
     outcome: s.outcome ?? "",
-    inputs: io(s.inputs, "source"),
-    outputs: io(s.outputs, "target"),
-    steps: (s.steps ?? []).map((step) => ({
-      id: step.id,
-      actor: step.actor,
-      action: step.action,
-      kind: step.target ? (step.target.node ? "element" : "screen") : "none",
-      screen: step.target?.screen ?? "",
-      node: step.target?.node ?? "",
-      note: step.note,
-      data: (step.data ?? []).map((d) => ({ object: d.object, before: formatExample(d.before), after: formatExample(d.after), origBefore: d.before, origAfter: d.after })),
-    })),
-    variants: (s.variants ?? []).map((variant) => {
-      const rest = Object.fromEntries(Object.entries(variant).filter(([key]) => !VARIANT_BASE_KEYS.includes(key)));
-      return { id: variant.id, title: variant.title, description: variant.description ?? "", when: { ...variant.when }, rest: Object.keys(rest).length === 0 ? "" : JSON.stringify(rest, null, 2) };
-    }),
+    // `orig` keeps the stored object: an example the user does not touch is saved exactly as it was, never re-read from text.
+    inputs: ioDraft(s.inputs, "source"),
+    outputs: ioDraft(s.outputs, "target"),
+    steps: (s.steps ?? []).map(stepDraft),
+    variants: (s.variants ?? []).map(variantDraft),
   };
 }
 
 /** JSON with object keys sorted, so two values that differ only in key order compare equal (array order still counts). */
 function canonical(value) {
   return JSON.stringify(value, (_key, v) => (v !== null && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v));
-}
-
-function parseIo(list, sideKey, label, errors) {
-  // The number is the row's position in the unfiltered list, the one aria-label and the remove button show.
-  return list
-    .map((row, index) => ({ row, index }))
-    .filter(({ row }) => row.object !== "")
-    .map(({ row, index }) => {
-      const parsed = parseOrKeep(row.example, row.orig);
-      if (!parsed.ok) errors.push(`${label} ${index + 1}: ${parsed.error}`);
-      else if (Object.keys(parsed.value).length === 0) errors.push(`${label} ${index + 1}: the example needs at least one key.`);
-      return { object: row.object, ...(row.side.trim() ? { [sideKey]: row.side.trim() } : {}), example: parsed.ok ? parsed.value : {} };
-    });
 }
 
 /**
@@ -93,58 +64,24 @@ export function buildPayload({ id, draft, source }) {
   if (outputs.length === 0) errors.push("Add at least one output with an example.");
 
   // Generated ids must not collide with ANY id the case already has: every step, every variant, and the steps variants add.
-  const variantStepIds = draft.variants.flatMap((variant) => {
-    try {
-      const ops = variant.rest.trim() === "" ? [] : (JSON.parse(variant.rest).steps ?? []);
-      return ops.map((op) => op?.step?.id).filter(Boolean);
-    } catch {
-      return [];
-    }
-  });
-  const usedStepIds = new Set([...draft.steps.map((s) => s.id).filter(Boolean), ...variantStepIds]);
+  const usedStepIds = new Set([...draft.steps.map((s) => s.id).filter(Boolean), ...variantStepIds(draft.variants)]);
   const steps = draft.steps.map((step, index) => {
     const stepId = step.id || uniqueId(slugify(step.action) || `step-${index + 1}`, usedStepIds);
     usedStepIds.add(stepId);
-    const out = { id: stepId, actor: step.actor || "system", action: step.action.trim() };
-    if (out.action === "") errors.push(`Step ${index + 1} needs an action.`);
-    if (step.kind !== "none" && step.screen.trim() !== "") out.target = { screen: step.screen.trim(), ...(step.kind === "element" && step.node.trim() !== "" ? { node: step.node.trim() } : {}) };
-    const data = step.data
-      .filter((d) => d.object !== "")
-      .map((d) => {
-        const before = parseOrKeep(d.before, d.origBefore);
-        const after = parseOrKeep(d.after, d.origAfter);
-        if (!before.ok) errors.push(`Step ${index + 1} data (before): ${before.error}`);
-        if (!after.ok) errors.push(`Step ${index + 1} data (after): ${after.error}`);
-        // An empty stored `{}` reads as empty text and stays `{}` (spec §3.4 allows it); text the user cleared is dropped.
-        const keeps = (text, orig) => text.trim() !== "" || (orig !== null && typeof orig === "object" && Object.keys(orig).length === 0);
-        return { object: d.object, ...(keeps(d.before, d.origBefore) && before.ok ? { before: before.value } : {}), ...(keeps(d.after, d.origAfter) && after.ok ? { after: after.value } : {}) };
-      });
-    if (data.length > 0) out.data = data;
-    if (step.note) out.note = step.note;
-    return out;
+    if (step.action.trim() === "") errors.push(`Step ${index + 1} needs an action.`);
+    return buildStepObject(step, stepId, `Step ${index + 1}`, errors);
   });
 
   const variantIds = new Set(draft.variants.map((v) => v.id).filter(Boolean));
+  const fieldErrors = [];
   const variants = draft.variants.map((variant, index) => {
-    const vid = variant.id || uniqueId(slugify(variant.title) || `variant-${index + 1}`, variantIds);
-    variantIds.add(vid);
-    let rest = {};
-    if (variant.rest.trim() !== "") {
-      try {
-        rest = JSON.parse(variant.rest);
-        if (rest === null || typeof rest !== "object" || Array.isArray(rest)) throw new Error("not an object");
-      } catch {
-        errors.push(`Variant "${variant.title || vid}": the overrides are not a JSON object.`);
-        rest = {};
-      }
-    }
-    if (variant.title.trim() === "") errors.push(`Variant ${index + 1} needs a title.`);
-    if (Object.keys(variant.when).length === 0) errors.push(`Variant "${variant.title || vid}" needs a condition (when).`);
-    const out = { id: vid, title: variant.title.trim(), ...(variant.description.trim() ? { description: variant.description.trim() } : {}), when: variant.when, ...rest };
-    return out;
+    const built = buildVariant(variant, index, { baseSteps: draft.steps, usedStepIds, variantIds });
+    errors.push(...built.errors);
+    fieldErrors.push(...built.fieldErrors);
+    return built.out;
   });
 
-  if (errors.length > 0) return { errors };
+  if (errors.length > 0) return { errors, fieldErrors };
 
   const text = (value) => (value.trim() === "" ? undefined : value.trim());
   const tags = draft.tags.split(",").map((t) => t.trim()).filter(Boolean);
@@ -198,6 +135,7 @@ export function draftWarnings({ draft, pool, screens, nodes }) {
       check(`step.${i}.data.${j}.after`, d.object, d.after);
     });
   });
+  draft.variants.forEach((variant, index) => warnings.push(...variantWarnings({ variant, index, baseSteps: draft.steps, pool })));
   return warnings;
 }
 
@@ -241,7 +179,13 @@ export async function openUseCaseDialog(options) {
     return request;
   };
 
+  let variantEditor = null;
+  // The variant editor reads the base (its "From base" values, the step lists), so a base edit tells it to re-read.
   const markDirty = () => {
+    touch();
+    variantEditor?.syncBase();
+  };
+  const touch = () => {
     dialog.setDirty(true);
     refreshWarnings();
   };
@@ -415,53 +359,9 @@ export async function openUseCaseDialog(options) {
     if (focusIndex !== null) stepsBox.querySelectorAll(".uc-step-edit")[focusIndex]?.querySelector("input")?.focus();
   };
 
-  // --- Variants -----------------------------------------------------------------------------------------------
-  const variantsBox = h("div", { class: "uc-variants-edit" });
-  const drawVariants = (focusIndex = null) => {
-    const pool = options.pool();
-    variantsBox.replaceChildren();
-    draft.variants.forEach((variant, index) => {
-      const whenBox = h("div", { class: "uc-when-edit" });
-      const drawWhen = () => {
-        fill(whenBox,
-          ...pool.dimensions.map((dimension) =>
-            h(
-              "div",
-              { class: "uc-when-dim-edit" },
-              h("span", { class: "uc-when-dim" }, dimension.label),
-              dimension.values.map((value) => {
-                const on = (variant.when[dimension.id] ?? []).includes(value.id);
-                return h("button", { type: "button", class: "uc-value-toggle", "aria-pressed": on ? "true" : "false", onClick: () => {
-                  const next = new Set(variant.when[dimension.id] ?? []);
-                  if (next.has(value.id)) next.delete(value.id);
-                  else next.add(value.id);
-                  if (next.size === 0) delete variant.when[dimension.id];
-                  else variant.when[dimension.id] = [...next];
-                  markDirty();
-                  drawWhen();
-                } }, value.label);
-              }),
-            ),
-          ),
-          pool.dimensions.length === 0 ? h("p", { class: "uc-muted" }, "Add dimensions in the Personas view to describe when a variant applies.") : null,
-        );
-      };
-      drawWhen();
-      const titleField = textInput({ value: variant.title, placeholder: "Large project: map from the list", ariaLabel: `Variant ${index + 1} title`, onInput: (value) => { variant.title = value; markDirty(); } });
-      variantsBox.append(
-        h(
-          "div",
-          { class: "uc-variant-edit", dataset: { index: String(index) } },
-          h("div", { class: "uc-variant-edit-top" }, field("Title", titleField), field("ID", textInput({ value: variant.id, mono: true, readonly: Boolean(variant.id), placeholder: "from the title", onInput: (value) => { variant.id = value; markDirty(); } })), removeButton(`Remove variant ${index + 1}`, () => { draft.variants.splice(index, 1); markDirty(); drawVariants(); })),
-          field("Description", textInput({ value: variant.description, ariaLabel: `Variant ${index + 1} description`, onInput: (value) => { variant.description = value; markDirty(); } })),
-          field("Applies when", whenBox, { hint: "any of the chosen values per dimension; every listed dimension must match" }),
-          field("Other overrides (JSON)", textArea({ value: variant.rest, rows: 5, placeholder: '{ "steps": [ { "op": "replace", "step_id": "…", "step": { … } } ], "outputs": [ … ] }', onInput: (value) => { variant.rest = value; markDirty(); } }), { hint: "personas, trigger, goal, outcome, inputs, outputs, steps (replace | insert_after | remove | append)" }),
-        ),
-      );
-    });
-    variantsBox.append(h("button", { type: "button", class: "uc-link-btn", onClick: () => { draft.variants.push({ id: "", title: "", description: "", when: {}, rest: "" }); markDirty(); drawVariants(draft.variants.length - 1); } }, icon("add"), "Variant"));
-    if (focusIndex !== null) variantsBox.querySelectorAll(".uc-variant-edit")[focusIndex]?.querySelector("input")?.focus();
-  };
+  // --- Variants (usecases-variant-edit.js) -----------------------------------------------------------------------
+  variantEditor = createVariantEditor({ draft, pool: options.pool, screens: options.screens, ensureNodes, objectOptions, actorOptions, markDirty: touch, refresh: refreshWarnings });
+  const variantsBox = variantEditor.el;
 
   // --- Footer: warnings, the one hard requirement, Save ---------------------------------------------------------
   let currentWarnings = [];
@@ -477,6 +377,7 @@ export async function openUseCaseDialog(options) {
       el.classList.toggle("is-warning", currentWarnings.some((w) => w.path === el.dataset.path));
     }
     const built = buildPayload({ id: id || uniqueId(slugify(draft.title), options.takenIds()), draft, source });
+    showFieldErrors(dialog.body, built.fieldErrors ?? []);
     saveButton.disabled = saving || Boolean(built.errors);
     dialog.setMessage(built.errors ? built.errors[0] : warningSummary(currentWarnings), built.errors ? "error" : "warning");
   }
@@ -533,18 +434,18 @@ export async function openUseCaseDialog(options) {
   drawPersonas();
   drawIo();
   drawSteps();
-  drawVariants();
+  variantEditor.draw();
   for (const step of draft.steps) if (step.kind !== "none" && options.screens().includes(step.screen)) ensureNodes(step.screen);
   const closed = dialog.open();
   refreshWarnings();
   if (options.focus?.variantId) {
     const at = draft.variants.findIndex((v) => v.id === options.focus.variantId);
-    const card = variantsBox.querySelectorAll(".uc-variant-edit")[at];
+    const card = variantEditor.cards()[at];
     card?.scrollIntoView?.({ block: "center" });
-    card?.querySelector("textarea")?.focus();
+    card?.querySelector("input")?.focus();
   } else if (options.focus?.variants) {
     dialog.el.querySelector("#uc-variants-section")?.scrollIntoView?.({ block: "start" });
-    variantsBox.querySelectorAll(".uc-variant-edit")[draft.variants.length - 1]?.querySelector("input")?.focus();
+    variantEditor.cards()[draft.variants.length - 1]?.querySelector("input")?.focus();
   } else if (options.focus?.step) {
     const index = draft.steps.findIndex((s) => s.id === options.focus.step);
     const row = stepsBox.querySelectorAll(".uc-step-edit")[index];

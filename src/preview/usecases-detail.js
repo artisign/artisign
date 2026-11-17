@@ -100,7 +100,7 @@ function variantBar(ctx, variants, source, matrix) {
   const chips = [variantChip({ label: "Base", meta: plural(baseCase.steps.length, "step"), selected: !variantId, onClick: () => handlers.onVariant(null) })];
   for (const variant of variants) {
     const raw = (source?.variants ?? []).find((v) => v.id === variant.id);
-    const changes = raw ? variantChangeCount(raw) : 0;
+    const changes = raw ? variantChangeCount(raw, baseCase.steps) : 0;
     chips.push(variantChip({ label: variant.title, meta: raw ? plural(changes, "change") : "", selected: variantId === variant.id, title: variant.description, onClick: () => handlers.onVariant(variant.id) }));
   }
   chips.push(variantChip({ label: "Variant", add: true, onClick: handlers.onAddVariant, title: "Add a variant" }));

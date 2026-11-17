@@ -1,0 +1,3 @@
+{
+  "notes": "**CHR-1118**: notes on the CHR-1103 variant editor (Step changes hint copy, when an empty new row turns into an error, change-row reorder states). The full spec is in the `chr-1103` tag note; the reorder states are in the `uc-step-op` usage."
+}

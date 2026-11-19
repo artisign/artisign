@@ -39,7 +39,9 @@ const CONSTELLATIONS = [
   { id: "claim-case", name: "A claim", traits: { region: "north" }, relationships: [{ from: "broker", type: "files", to: "claim" }] },
 ];
 const DATA_OBJECTS = [
-  { id: "policy", name: "Policy", fields: [{ name: "premium", type: "number" }] },
+  { id: "policy", name: "Policy", fields: [{ name: "premium", type: "number" }, { name: "holder", type: "ref", ref: "customer" }] },
+  { id: "customer", name: "Customer", fields: [{ name: "address", type: "ref", ref: "address" }] },
+  { id: "address", name: "Address", fields: [] },
   { id: "other", name: "Other", fields: [] },
 ];
 
@@ -79,7 +81,7 @@ describe("world block in get_use_case and list filters (CHR-1150)", () => {
       // traits of personas, entities and constellations
       expect(ids(res, "dimensions").sort()).toEqual(["age-group", "household", "region"]);
       // entity.object and relationship type field.object, plus the objects the case names
-      expect(ids(res, "data_objects")).toEqual(["policy", "other"]);
+      expect(ids(res, "data_objects")).toEqual(["policy", "customer", "address", "other"]);
     });
 
     it("with a variant carries the effective case's constellations only", async () => {
@@ -102,6 +104,26 @@ describe("world block in get_use_case and list filters (CHR-1150)", () => {
       const res = await getUseCase(fx.store, { id: "review-premium", variant: "lean" });
       expect(res.removed_branches).toMatchObject([{ id: "late", change: "removed" }]);
       expect(res.removed_state).toMatchObject([{ subject: "leo", property: "insured", change: "removed" }]);
+    });
+
+    it("follows ref fields of the objects the world brings, transitively", async () => {
+      const res = await getUseCase(fx.store, { id: "review-premium", variant: "claim-variant" });
+      expect(ids(res, "data_objects")).toEqual(["other"]);
+      const full = await getUseCase(fx.store, { id: "review-premium" });
+      expect(ids(full, "data_objects")).toEqual(expect.arrayContaining(["policy", "customer", "address"]));
+    });
+
+    it("keeps the subjects of removed state and removed branches resolvable under a variant", async () => {
+      await setUseCases(fx.store, {
+        use_cases: [
+          base({
+            state: [{ subject: "unused", property: "flag", value: true }],
+            variants: [{ id: "lean", title: "Lean", when: { region: ["south"] }, state: [{ subject: "unused", property: "flag", unset: true }], steps: [{ op: "remove_branch", branch_id: "late" }] }],
+          }),
+        ],
+      });
+      const res = await getUseCase(fx.store, { id: "review-premium", variant: "lean" });
+      expect(ids(res, "entities")).toEqual(expect.arrayContaining(["claim", "unused"]));
     });
 
     it("omits the world keys for a case without constellations or state subjects", async () => {
@@ -136,6 +158,11 @@ describe("world block in get_use_case and list filters (CHR-1150)", () => {
       expect(await list({ entity: "unused" })).toEqual([]);
     });
 
+    it("matches only ids that resolve to an entity, not personas", async () => {
+      expect(await list({ entity: "maria" })).toEqual([]);
+      expect(await list({ entity: "broker" })).toEqual([]);
+    });
+
     it("treats an empty or blank string as no filter", async () => {
       const all = await list({});
       expect(all).toHaveLength(2);
@@ -148,7 +175,7 @@ describe("world block in get_use_case and list filters (CHR-1150)", () => {
     it("carries branches and constellations in the summary and adds no facet", async () => {
       const res = await listUseCases(fx.store, {});
       const summary = (res.use_cases as Record<string, unknown>[]).find((u) => u.id === "review-premium")!;
-      expect(summary).toMatchObject({ branches: 1, constellations: ["one-parent-one-child"] });
+      expect(summary).toMatchObject({ branches: 1, constellations: ["one-parent-one-child", "claim-case"] });
       const plain = (res.use_cases as Record<string, unknown>[]).find((u) => u.id === "plain")!;
       expect(plain).not.toHaveProperty("branches");
       expect(plain).not.toHaveProperty("constellations");

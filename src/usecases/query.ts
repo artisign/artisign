@@ -140,8 +140,10 @@ function given(value: string | undefined): string | undefined {
   return value === undefined || value.trim() === "" ? undefined : value;
 }
 
-/** `constellations` is the world's constellation pool; the `entity` filter needs it to find the members of the case's constellations. */
-export function matchesFilter(useCase: UseCase, filter: UseCaseFilter, constellations: Constellation[] = []): boolean {
+/** What the `entity` filter needs: the constellation pool and whether an id names an entity (a persona wins on a shared id). */
+export type WorldLookup = { constellations: Constellation[]; isEntity: (id: string) => boolean };
+
+export function matchesFilter(useCase: UseCase, filter: UseCaseFilter, world?: WorldLookup): boolean {
   const group = given(filter.group?.replace(/\/+$/, ""));
   const tag = given(filter.tag);
   const persona = given(filter.persona);
@@ -161,8 +163,9 @@ export function matchesFilter(useCase: UseCase, filter: UseCaseFilter, constella
   }
   if (constellation !== undefined && !constellationsOf(useCase).has(constellation)) return false;
   if (entity !== undefined) {
+    if (world === undefined || !world.isEntity(entity)) return false;
     const listed = constellationsOf(useCase);
-    const member = constellations.some((c) => listed.has(c.id) && constellationMembers(c).has(entity));
+    const member = world.constellations.some((c) => listed.has(c.id) && constellationMembers(c).has(entity));
     if (!member && !stateSubjectsOf(useCase).has(entity)) return false;
   }
   if (query !== undefined && !haystack(useCase).includes(query.trim().toLowerCase())) return false;
@@ -195,6 +198,7 @@ export function compareUseCases(sort: SortKey): (a: UseCase, b: UseCase) => numb
 
 export function summarize(useCase: UseCase): UseCaseSummary {
   const screens = screensOf(useCase);
+  const constellations = [...constellationsOf(useCase)];
   return {
     id: useCase.id,
     title: useCase.title,
@@ -206,7 +210,7 @@ export function summarize(useCase: UseCase): UseCaseSummary {
     ...(useCase.variants && useCase.variants.length > 0 ? { variants: useCase.variants.length } : {}),
     ...(screens.length > 0 ? { screens } : {}),
     ...(useCase.branches && useCase.branches.length > 0 ? { branches: useCase.branches.length } : {}),
-    ...(useCase.constellations.length > 0 ? { constellations: useCase.constellations } : {}),
+    ...(constellations.length > 0 ? { constellations } : {}),
   };
 }
 

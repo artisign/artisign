@@ -43,6 +43,7 @@ import {
   validateUseCase,
   type DataObject,
   type World,
+  type WorldLookup,
   type Constellation,
   type StepOp,
   type UseCaseStep,
@@ -178,8 +179,12 @@ async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promis
 
   const { useCases, invalid } = await store.readUseCases();
   // The world is read only for the `entity` filter, so a project without one pays nothing.
-  const constellations = (input.entity ?? "").trim() === "" ? [] : (await store.readWorld()).constellations;
-  const matches = useCases.filter((useCase) => matchesFilter(useCase, input, constellations));
+  let world: WorldLookup | undefined;
+  if ((input.entity ?? "").trim() !== "") {
+    const [{ constellations, entities }, pool] = await Promise.all([store.readWorld(), store.readPersonaPool()]);
+    world = { constellations, isEntity: (id) => resolveParticipant(id, pool.personas, entities) === "entity" };
+  }
+  const matches = useCases.filter((useCase) => matchesFilter(useCase, input, world));
   matches.sort(compareUseCases(sort));
 
   const response: Record<string, unknown> = {
@@ -233,7 +238,9 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   const constellationIds = variant ? new Set(effective.constellations) : constellationsOf(useCase);
   const bundleConstellations = world.constellations.filter((c) => constellationIds.has(c.id));
   const memberIds = new Set(bundleConstellations.flatMap((c) => [...constellationMembers(c)]));
-  const entityIds = new Set([...memberIds, ...stateSubjectsOf(variant ? effective : useCase)].filter((id) => resolveParticipant(id, personas, world.entities) === "entity"));
+  // With a variant, what it removed still names subjects: they stay resolvable in the same response.
+  const removedSubjects = [...resolved.removed_state.map((e) => e.subject), ...resolved.removed_branches.flatMap((b) => b.when.map((c) => c.subject))];
+  const entityIds = new Set([...memberIds, ...stateSubjectsOf(variant ? effective : useCase), ...removedSubjects].filter((id) => resolveParticipant(id, personas, world.entities) === "entity"));
   const bundleEntities = world.entities.filter((e) => entityIds.has(e.id));
   const bundleRelationshipTypes = world.relationship_types.filter((t) => bundleConstellations.some((c) => c.relationships.some((r) => r.type === t.id)));
 
@@ -245,12 +252,12 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   if (variant) for (const id of actorMapPersonas(variant)) personaIds.add(id);
   personaIds.delete("system");
   for (const id of memberIds) if (resolveParticipant(id, personas, world.entities) === "persona") personaIds.add(id);
-  // Objects reached through `ref` fields travel along.
+  for (const entity of bundleEntities) if (entity.object !== undefined) objectIds.add(entity.object);
+  for (const type of bundleRelationshipTypes) if (type.field !== undefined) objectIds.add(type.field.object);
+  // Objects reached through `ref` fields travel along, also from the world's objects.
   for (const id of objectIds) {
     for (const field of pools.objects.get(id)?.fields ?? []) if (field.type === "ref" && field.ref !== undefined) objectIds.add(field.ref);
   }
-  for (const entity of bundleEntities) if (entity.object !== undefined) objectIds.add(entity.object);
-  for (const type of bundleRelationshipTypes) if (type.field !== undefined) objectIds.add(type.field.object);
   const bundlePersonas = personas.filter((p) => personaIds.has(p.id));
   const dimensionIds = new Set<string>(bundlePersonas.flatMap((p) => Object.keys(p.traits)));
   for (const item of [...bundleEntities, ...bundleConstellations]) Object.keys(item.traits).forEach((id) => dimensionIds.add(id));

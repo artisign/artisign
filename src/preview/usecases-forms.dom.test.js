@@ -539,6 +539,15 @@ describe("generate personas dialog", () => {
     expect(result.created).toBe(2);
   });
 
+  it("starts with Preview disabled and a note when no persona-scoped dimension exists (CHR-1144)", async () => {
+    const generate = vi.fn();
+    openGenerateDialog({ pool: () => makePool({ dimensions: [{ id: "household", label: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }] }] }), generate });
+    await flush();
+    expect($$("dialog button").find((b) => b.textContent.includes("Preview")).disabled).toBe(true);
+    expect($("dialog").textContent).toContain("Only persona-scoped dimensions apply");
+    expect($$("dialog .uc-gen-dims input")).toHaveLength(0);
+  });
+
   it("restricts to the checked dimensions and offers all combinations as a strategy", async () => {
     const generate = vi.fn(async () => ({ ok: true, data: { dry_run: true, strategy: "all", total: 3, skipped_covered: 0, would_create: 0, personas: [] } }));
     openGenerateDialog({ pool: () => makePool(), generate });

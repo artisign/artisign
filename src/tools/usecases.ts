@@ -9,6 +9,7 @@ import {
   ScreenLookup,
   SORT_KEYS,
   ambiguousIds,
+  buildGeneratedConstellation,
   buildGeneratedPersona,
   buildPools,
   compareUseCases,
@@ -40,6 +41,7 @@ import {
   validateUseCase,
   type DataObject,
   type World,
+  type Constellation,
   type UseCaseStep,
   type Dimension,
   type Persona,
@@ -491,23 +493,31 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
 // generate_personas
 // ---------------------------------------------------------------------------
 
-export type GeneratePersonasInput = { strategy?: Strategy; dimensions?: string[]; limit?: number; dry_run?: boolean };
+export type GeneratePersonasInput = { strategy?: Strategy; dimensions?: string[]; limit?: number; dry_run?: boolean; target?: "personas" | "constellations" };
 
 const MAX_COMBINATION_SPACE = 1_000_000;
 
 async function generatePersonasInner(store: Store, input: GeneratePersonasInput, ctx: ToolHandlerContext | undefined): Promise<Record<string, unknown>> {
   const strategy = input.strategy ?? "pairwise";
   const limit = input.limit ?? 100;
+  const target = input.target ?? "personas";
   const pool = await store.readPersonaPool();
+  const world = await store.readWorld();
 
-  let dimensions = pool.dimensions;
+  // A dimension is expanded for exactly one target; unset means personas.
+  const scopeOf = (d: { scope?: string }): string => d.scope ?? "personas";
+  let dimensions = pool.dimensions.filter((d) => scopeOf(d) === target);
   if (input.dimensions !== undefined) {
     const unknown = input.dimensions.filter((id) => !pool.dimensions.some((d) => d.id === id));
     if (unknown.length > 0) throw new ToolError("not_found", `unknown dimension(s): ${unknown.join(", ")}`);
-    dimensions = pool.dimensions.filter((d) => input.dimensions!.includes(d.id));
+    const wrong = pool.dimensions.filter((d) => input.dimensions!.includes(d.id) && scopeOf(d) !== target);
+    if (wrong.length > 0) {
+      throw new ToolError("validation_failed", `dimension(s) with the wrong scope for target "${target}": ${wrong.map((d) => `${d.id} (scope "${scopeOf(d)}")`).join(", ")}`);
+    }
+    dimensions = dimensions.filter((d) => input.dimensions!.includes(d.id));
   }
   if (dimensions.length === 0) {
-    throw new ToolError("validation_failed", "no dimensions to expand — define them first with set_use_cases { dimensions: [...] }");
+    throw new ToolError("validation_failed", `no ${target}-scoped dimensions to expand — define them first with set_use_cases { dimensions: [...] }`);
   }
   const space = dimensions.reduce((size, d) => size * d.values.length, 1);
   if (strategy === "all" && space > MAX_COMBINATION_SPACE) {
@@ -518,12 +528,20 @@ async function generatePersonasInner(store: Store, input: GeneratePersonasInput,
     throw new ToolError("validation_failed", `strategy "pairwise" would have to cover ${pairs} value pairs — narrow dimensions`);
   }
 
-  const generated = expandCombinations(dimensions, strategy, pool.personas, limit);
-  const taken = new Set(pool.personas.map((p) => p.id));
-  const created = generated.combinations.map((combination, index) => buildGeneratedPersona(combination, dimensions, taken, pool.personas.length + index));
+  const forConstellations = target === "constellations";
+  const existing = forConstellations ? world.constellations : pool.personas;
+  const generated = expandCombinations(dimensions, strategy, existing, limit);
+  // Personas share their id space with entities; constellations only collide with constellations.
+  const taken = new Set(forConstellations ? world.constellations.map((c) => c.id) : [...pool.personas.map((p) => p.id), ...world.entities.map((e) => e.id)]);
+  const created = generated.combinations.map((combination, index) =>
+    forConstellations
+      ? buildGeneratedConstellation(combination, dimensions, taken, existing.length + index)
+      : buildGeneratedPersona(combination, dimensions, taken, existing.length + index),
+  );
 
   const base = {
     strategy,
+    ...(forConstellations ? { target } : {}),
     total: generated.total,
     skipped_covered: generated.skipped_covered,
     ...(generated.truncated ? { truncated: true } : {}),
@@ -539,14 +557,18 @@ async function generatePersonasInner(store: Store, input: GeneratePersonasInput,
       dry_run: true,
       ...base,
       would_create: created.length,
-      personas: created.slice(0, DRY_RUN_PERSONA_CAP).map((p) => ({ id: p.id, name: p.name, traits: p.traits })),
-      ...(created.length > DRY_RUN_PERSONA_CAP ? { personas_truncated: true } : {}),
+      [target]: created.slice(0, DRY_RUN_PERSONA_CAP).map((p) => ({ id: p.id, name: p.name, traits: p.traits })),
+      ...(created.length > DRY_RUN_PERSONA_CAP ? { [`${target}_truncated`]: true } : {}),
     };
   }
   if (created.length === 0) return { ...base, created: 0 };
 
-  await store.writePersonaPool({ dimensions: pool.dimensions, personas: [...pool.personas, ...created] });
-  const commitResult = await commitUseCaseWrite(store, ctx, "generate_personas", `${created.length} ${strategy}`, [POOL_FILE]);
+  if (forConstellations) {
+    await store.writeWorld({ ...world, constellations: [...world.constellations, ...(created as Constellation[])] });
+  } else {
+    await store.writePersonaPool({ dimensions: pool.dimensions, personas: [...pool.personas, ...(created as Persona[])] });
+  }
+  const commitResult = await commitUseCaseWrite(store, ctx, "generate_personas", `${created.length} ${strategy}${forConstellations ? " constellations" : ""}`, [forConstellations ? WORLD_FILE : POOL_FILE]);
   return { ...base, created: created.length, ...(created.length <= WARNING_CAP ? { ids: created.map((p) => p.id) } : {}), ...commitFields(commitResult) };
 }
 
@@ -559,13 +581,14 @@ export type SuggestVariantsInput = { id: string; limit?: number };
 async function suggestVariantsInner(store: Store, input: SuggestVariantsInput): Promise<Record<string, unknown>> {
   const useCase = await loadUseCase(store, input.id);
   const pool = await store.readPersonaPool();
-  const { coverage, suggestions } = suggestVariantGaps(useCase, pool.dimensions, pool.personas);
+  const world = await store.readWorld();
+  const { coverage, suggestions } = suggestVariantGaps(useCase, pool.dimensions, pool.personas, world.constellations);
   const limit = input.limit ?? 20;
   return {
     coverage,
     suggestions: suggestions.slice(0, limit),
     ...(suggestions.length > limit ? { suggestion_count: suggestions.length } : {}),
-    ...(pool.dimensions.length === 0 || pool.personas.length === 0 ? { hint: "define dimensions and personas first (set_use_cases), traits drive the suggestions" } : {}),
+    ...(coverage.length === 0 && (pool.dimensions.length === 0 || pool.personas.length === 0) ? { hint: "define dimensions and personas first (set_use_cases), traits drive the suggestions" } : {}),
   };
 }
 

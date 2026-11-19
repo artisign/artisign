@@ -291,18 +291,19 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "generate_personas",
-    "Generic personas from the dimensions: pairwise (default, every value pair once) or all (cartesian); dimensions subset, limit, dry_run previews. Skips combinations an existing persona covers; sets generated: true.",
+    "Generic personas from the persona-scoped dimensions: pairwise (default, every value pair once) or all (cartesian); dimensions subset, limit, dry_run previews. target \"constellations\" generates constellation skeletons over the constellation-scoped dimensions instead. Skips combinations an existing persona (or constellation) covers; sets generated: true.",
     {
       strategy: z.enum(["all", "pairwise"]).optional(),
       dimensions: z.array(z.string()).optional(),
       limit: z.number().int().positive().max(5000).optional(),
       dry_run: z.boolean().optional(),
+      target: z.enum(["personas", "constellations"]).optional(),
     },
     (store, input, ctx) => generatePersonas(store, input as never, ctx),
   ),
   tool(
     "suggest_use_case_variants",
-    "Trait values of the persona pool that neither a use case's personas nor its variants' when cover yet, with variant skeletons to complete and write back via set_use_cases (variants replaced whole).",
+    "Trait values of the persona pool (and, for a case with constellations, the constellation pool) that neither the use case's personas or constellations nor its variants' when cover yet, with variant skeletons to complete and write back via set_use_cases (variants replaced whole).",
     { id: z.string(), limit: z.number().int().positive().optional() },
     (store, input) => suggestVariants(store, input as never),
   ),

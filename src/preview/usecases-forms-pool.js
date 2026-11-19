@@ -374,7 +374,9 @@ export async function openObjectDialog(options) {
  * @returns {Promise<{ created: number, data: any } | null>}
  */
 export async function openGenerateDialog(options) {
-  const pool = options.pool();
+  // Persona generation expands persona-scoped dimensions only (constellation-scoped ones belong to target "constellations").
+  const full = options.pool();
+  const pool = { ...full, dimensions: full.dimensions.filter((d) => (d.scope ?? "personas") === "personas") };
   const state = { strategy: "pairwise", dimensions: new Set(pool.dimensions.map((d) => d.id)), limit: "100", preview: null };
   const dialog = createDialog({ title: "Generate personas from dimensions" });
   let result = null;
@@ -394,6 +396,8 @@ export async function openGenerateDialog(options) {
   limit.max = "5000";
   const dims = h("div", { class: "uc-gen-dims" }, pool.dimensions.map((d) => h("label", { class: "uc-check" }, h("input", { type: "checkbox", checked: true, onChange: (e) => { if (e.target.checked) state.dimensions.add(d.id); else state.dimensions.delete(d.id); invalidate(); previewButton.disabled = state.dimensions.size === 0; } }), `${d.label} (${d.values.length})`)));
   const previewButton = h("button", { type: "button", class: "chrome-btn", onClick: runPreview }, icon("visibility"), "Preview");
+  previewButton.disabled = state.dimensions.size === 0;
+  const noDimensions = pool.dimensions.length === 0 ? h("p", { class: "uc-muted", role: "status" }, "No persona-scoped dimensions. Only persona-scoped dimensions apply here.") : null;
   const createButton = h("button", { type: "button", class: "chrome-btn chrome-btn--primary", disabled: true, onClick: create }, "Create personas");
 
   async function runPreview() {
@@ -428,7 +432,7 @@ export async function openGenerateDialog(options) {
   }
 
   dialog.body.append(
-    h("div", { class: "uc-form" }, h("p", { class: "uc-page-lede" }, "Expands your dimensions into generic personas. Existing personas that already cover a combination are skipped. Preview first: nothing is written until you create."), field("Strategy", strategy), field("Dimensions", dims, { hint: "traits on other dimensions are ignored" }), field("Limit", limit, { hint: "at most 5,000" }), h("div", { class: "uc-gen-preview-row" }, previewButton), previewBox),
+    h("div", { class: "uc-form" }, h("p", { class: "uc-page-lede" }, "Expands your dimensions into generic personas. Existing personas that already cover a combination are skipped. Preview first: nothing is written until you create."), field("Strategy", strategy), field("Dimensions", pool.dimensions.length === 0 ? noDimensions : dims, { hint: "traits on other dimensions are ignored" }), field("Limit", limit, { hint: "at most 5,000" }), h("div", { class: "uc-gen-preview-row" }, previewButton), previewBox),
   );
   dialog.setActions([{ label: "Close", onClick: () => dialog.close(null) }, createButton]);
   const closed = dialog.open();

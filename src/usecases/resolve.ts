@@ -54,7 +54,7 @@ export type ResolvedUseCase = {
   removed_branches: RemovedBranch[];
   /** Base starting-state entries the variant unsets. */
   removed_state: RemovedStateEntry[];
-  /** Ops that point at a step the flow does not have at that point — skipped, never fatal. */
+  /** Problems a variant causes while it is applied (an op naming a step or branch the case lacks, a duplicate id, an unset state entry the base lacks, an invalid trigger actor map) — the op is skipped, never fatal. */
   issues: ResolveIssue[];
 };
 

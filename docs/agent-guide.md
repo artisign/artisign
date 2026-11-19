@@ -511,8 +511,8 @@ Workflow, in this order:
    (`membership` with values `student`, `staff`; `branch-access`; ...).
    Define the dimensions first, then personas with `traits` (`{dimension:
    value}`). A missing trait means "any value", so one generic persona can
-   stand for a homogeneous group. `generate_personas` expands the dimensions
-   deterministically (`pairwise` by default: every value pair of two
+   stand for a homogeneous group. `generate_personas` expands the
+   persona-scoped dimensions deterministically (`pairwise` by default: every value pair of two
    dimensions at least once; `all`: the full product) — preview with
    `dry_run: true`, cap with `limit`. It skips combinations an existing
    persona already covers. `truncated: true` means `limit` was reached. A dry run
@@ -527,7 +527,29 @@ Workflow, in this order:
    `member`): `fields` with `name`, `type` (`string | number | boolean |
    date | datetime | enum | ref | list | object`), `values` for an enum, `ref`
    for a reference to another object, an `example`.
-3. **Use cases** — `title`, `group` (a path like `catalog/loans`), `tags`,
+3. **World (optional — skip it for a plain screen spec).** The real situation
+   a case plays in; it works before any data model exists. A *main entity* is
+   a thing with identity that is related to a persona or another entity (an
+   order, a policy, a book copy); a value without identity is a property
+   state (step 4). Pool entries, set with `set_use_cases`:
+   - `entities`: `{id, name, type?, traits?, object?}` (`object` names a data
+     object). Entities never act and are never generated.
+   - `relationship_types`: `{id, label, inverse_label?, same_traits?, field?}`.
+   - `constellations`: one fixed starting world, `{id, name, traits?,
+     relationships: [{from, type, to}]}`. `from` and `to` name personas or
+     entities; relationships exist only inside a constellation.
+   - A dimension takes `scope: "personas"` (default) or `"constellations"`; a
+     persona takes `kind`: `human | agent | service | organization` — any
+     outside actor. A hook is no persona, it is the `via` of one.
+   - `system` is reserved for the app. A persona and an entity must not share
+     an id (`ambiguous_id`; references resolve to the persona).
+
+   `generate_personas` with `target: "constellations"` writes skeletons over
+   the constellation-scoped dimensions (`relationships: []`, you fill them
+   in; nothing is derived from traits). A `dimensions` entry of the other
+   scope is `validation_failed`. The dry run lists `constellations` and sets
+   `constellations_truncated` when it cuts the list.
+4. **Use cases** — `title`, `group` (a path like `catalog/loans`), `tags`,
    `status` (`draft | ready`: how mature the spec is, not whether it is built),
    `personas`, `trigger`, `goal`, `outcome`, and:
    - Work state, priority and assignee are not use-case fields — they live in
@@ -536,10 +558,20 @@ Workflow, in this order:
      `{object, example}` (`source` on an input, `target` on an output): what
      the case consumes and produces, with concrete example values. An
      `example` is an object with at least one key; `{}` is refused.
-   - **`steps`** — the flow: `{id, actor, action, target?, data?}`. `actor` is
-     a persona id or `"system"`. `data` lists the state change of a step:
-     `{object, before, after}`.
-4. **Variants.** Where a persona group behaves differently, add a variant, not
+   - **`steps`** — the flow: `{id, actor, action, target?, data?, via?}`.
+     `actor` is a persona id or `"system"`; `via` names the interface an
+     outside actor uses. `data` lists the state change of a step: `{object,
+     before, after}`.
+   - **World fields**, all optional. `constellations`: the starting worlds the
+     case holds for. `trigger`: a string, or `{text, actor?, via?, state?,
+     at?}` — an action (a persona `actor`, `via` the interface, e.g.
+     "webhook"; `via` only together with an `actor`, else `validation_failed`) or a state or point in time (`state` conditions, `at` an ISO
+     date), never both. `state`: the starting state, entries `{subject,
+     property, value}` — subject a persona, an entity or `"system"`, property a
+     free name, one entry per pair. A *condition* (a branch `when`, a trigger
+     `state`) also takes `op`: `eq` (default) `ne` `lt` `lte` `gt` `gte` `in`.
+     Artisign stores and shows states and conditions; it never evaluates them.
+5. **Variants.** Where a persona group behaves differently, add a variant, not
    a copy of the case: `{id, title, when, ...}`. `when` selects trait values
    (`{"branch-access": ["all-branches"]}`: any-of per dimension, all dimensions
    must match). A variant may override `personas`, `trigger`, `goal`,
@@ -551,8 +583,32 @@ Workflow, in this order:
    written by an op are not touched. `suggest_use_case_variants {id}` names the trait values of the persona pool
    that neither the case's personas nor an existing variant cover, with
    skeletons to fill in. Write variants back with `set_use_cases` — `variants`
-   is replaced as a whole, so read the existing ones first.
-5. **Map steps to the design.** `step.target = {screen, node?}`. With `node`
+   is replaced as a whole, so read the existing ones first. `when` names at
+   least one dimension, of either scope. A variant may also override
+   `constellations`, merge `state` by key (an entry replaces or adds;
+   `{subject, property, unset: true}` removes) and use the ops `append`
+   (with `branch` to append to a branch), `add_branch`, `replace_branch` (same
+   id) and `remove_branch`; `step_id` ops reach branch steps, `actors` remaps
+   them and an inherited `trigger.actor` too. For a case with constellations
+   `suggest_use_case_variants` also covers the constellation-scoped
+   dimensions; such a skeleton carries `constellations`, not `personas`.
+6. **Branches, and which mechanism for which difference.** `branches: [{id,
+   title, from?, when, steps, rejoin?, outcome?}]`: an alternative path that
+   forks after main-flow step `from` (absent: before the first step) when all
+   `when` conditions hold, and continues at `rejoin` (absent: the case ends
+   there, `outcome` says how). Step ids are unique across main flow and
+   branches; no nesting — `from` and `rejoin` name main-flow steps, a deeper
+   alternative is a second branch with a narrower `when`.
+   - a different **goal** → a separate use case
+   - a different **actor or world** (persona or constellation traits) → a
+     variant
+   - a different **path** given a state (data, result, time, connectivity) →
+     a branch
+   - a **starting state** caused by a dimension value → a variant `state`
+     under that `when`; one any persona of the case can meet → a branch
+     without `from`. Can you name the dimension value that causes it? Variant.
+   - an outside **reason to start** → `trigger`
+7. **Map steps to the design.** `step.target = {screen, node?}`. With `node`
    the step touches one element, without it the whole screen — the scope is
    derived. Use ids from `get_screen`/`find_nodes`, and **give a node an
    authored id before mapping a step to it**: a generated id (`n17`) is a
@@ -562,31 +618,54 @@ Workflow, in this order:
    reported as `mapping_stale` on read.
    An element inside a component instance's slot fill is mapped by its authored
    id, like any other node; a fill without an authored id, or an element of a
-   backdrop layer, cannot be mapped.
-6. **Coding agents read `get_use_case {id}`** — one call returns the use case,
+   backdrop layer, cannot be mapped. Branch steps map like main-flow steps.
+8. **Coding agents read `get_use_case {id}`** — one call returns the use case,
    its personas, dimensions, data objects and the mapped screens with their
-   nodes. `variant: "<id>"` returns that variant resolved into a full use case:
-   steps carry `change: "changed" | "added"`, deleted steps come as
-   `removed_steps`. Browse with `list_use_cases` (filters `group` prefix,
-   `persona`, `screen`, `node`, `tag`, `status`, `query`, `has_variants`;
-   `sort`, `cursor`, `limit` (at most 100, default 50); facet counts on the first page; `include:
-   ["personas", "dimensions", "data_objects"]` adds the pools).
+   nodes. For a case with a world it adds `entities`, `constellations` and
+   `relationship_types`: the constellations the case lists (without `variant`,
+   every variant's too), their members, and the participants named as a state,
+   trigger or branch-condition subject. A mapping of a branch step carries
+   `branch`. `variant: "<id>"` returns that variant resolved into a full use
+   case: steps carry `change: "changed" | "added"`; what it deleted comes as
+   `removed_steps`, `removed_branches` and `removed_state`. The resolver never
+   evaluates a condition: the effective case holds all its branches. Browse
+   with `list_use_cases` (filters `group` prefix, `persona`, `screen`, `node`,
+   `tag`, `status`, `query`, `has_variants`, `constellation` (listed by the
+   case or a variant), `entity` (a member of such a constellation or a subject
+   of a state or condition; a persona id matches nothing here — use
+   `persona`); `sort`, `cursor`, `limit` (at most 100, default 50); facet
+   counts on the first page; `include: ["personas", "dimensions",
+   "data_objects"]` adds the pools). A summary also carries `branches` (count)
+   and `constellations`.
 
-Writing: `set_use_cases` takes `{dimensions?, personas?, data_objects?,
-use_cases?}`, each a list of entities with an `id` (lowercase kebab-case,
+Writing: `set_use_cases` takes `{dimensions?, personas?, entities?,
+relationship_types?, constellations?, data_objects?, use_cases?}`, each a list of entities with an `id` (lowercase kebab-case,
 chosen by you, stable — a use case id is its filename). It upserts by id; an
 existing entity is merged at top level (given keys replace, arrays whole,
 `null` removes a key), so a status change is `{id, status: "ready"}`. The whole
 call is validated before anything is written; unknown personas, data objects,
 dimensions, example fields or screens only come back as warnings. The
 response gives `created` and `updated` counts per kind, not the ids. Delete with
-`delete_entity` kinds `persona`, `data_object`, `use_case`, `dimension` — it
+`delete_entity` kinds `persona`, `dimension`, `data_object`, `use_case`,
+`entity`, `constellation`, `relationship_type` — it
 warns about references left dangling and does not repair them. Like design
 files, `usecases/` changes only through these tools. The one exception: a file
 under `usecases/` that no longer validates (hand edit, merge conflict, a newer
 version's key) makes the tools fail with `invalid_state` naming it; then you may
 repair that file by hand, or remove a case with a valid id via `delete_entity` and
 write it again with `set_use_cases` (the full case).
+
+World problems only warn and never block a write; the message names the fix:
+unknown participants, relationship types or constellations, an entity as actor
+(`entity_as_actor`), an actor or state subject outside the case's
+constellations (`outside_constellation`, once per participant — actor or state or
+condition subject — per case and per variant), conflicting
+traits (`trait_conflict`), an entity in no constellation (`entity_unrelated`),
+a branch `from` / `rejoin` that is no main-flow step (`branch_from_missing`,
+`branch_rejoin_missing`). Data-object references are checked only when
+`data-objects.json` exists (an empty file counts). `get_use_case` also checks
+the world objects of its bundle; `set_use_cases` re-checks the constellations
+whose members or relationship types the call touches.
 
 ## Anti-pattern checklist
 

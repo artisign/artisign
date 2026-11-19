@@ -8,6 +8,7 @@ import type { Store } from "../store/index.js";
 import {
   ScreenLookup,
   SORT_KEYS,
+  ambiguousIds,
   buildGeneratedPersona,
   buildPools,
   compareUseCases,
@@ -23,8 +24,11 @@ import {
   actorMapPersonas,
   personasOf,
   personaSchema,
+  constellationSchema,
   dataObjectSchema,
   dimensionSchema,
+  entitySchema,
+  relationshipTypeSchema,
   resolveUseCase,
   suggestVariantGaps,
   summarize,
@@ -33,6 +37,7 @@ import {
   validatePersona,
   validateUseCase,
   type DataObject,
+  type World,
   type UseCaseStep,
   type Dimension,
   type Persona,
@@ -125,6 +130,7 @@ function commitUseCaseWrite(store: Store, ctx: ToolHandlerContext | undefined, t
 }
 
 const POOL_FILE = "usecases/personas.json";
+const WORLD_FILE = "usecases/world.json";
 const OBJECTS_FILE = "usecases/data-objects.json";
 const caseFile = (id: string): string => `usecases/cases/${id}.json`;
 
@@ -276,6 +282,7 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   }
 
   const warnings = await validateUseCase(useCase, pools, lookup);
+  warnings.push(...ambiguousIds(bundlePersonas, (await store.readWorld()).entities));
   const response: Record<string, unknown> = {
     use_case: effective,
     ...(variant ? { variant: { id: variant.id, title: variant.title, ...(variant.description !== undefined ? { description: variant.description } : {}), when: variant.when } } : {}),
@@ -297,12 +304,16 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
 // ---------------------------------------------------------------------------
 
 const ENTITY_LIMIT = 5000;
+const SET_KEYS = ["dimensions", "personas", "entities", "relationship_types", "constellations", "data_objects", "use_cases"] as const;
 
 export type SetUseCasesInput = {
   dimensions?: Record<string, unknown>[];
   personas?: Record<string, unknown>[];
   data_objects?: Record<string, unknown>[];
   use_cases?: Record<string, unknown>[];
+  entities?: Record<string, unknown>[];
+  relationship_types?: Record<string, unknown>[];
+  constellations?: Record<string, unknown>[];
 };
 
 type Parsed<T> = { id: string; value: T; created: boolean };
@@ -388,20 +399,23 @@ async function readExistingCases(store: Store, items: Record<string, unknown>[] 
 }
 
 async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: ToolHandlerContext | undefined): Promise<Record<string, unknown>> {
-  for (const key of ["dimensions", "personas", "data_objects", "use_cases"] as const) {
+  for (const key of SET_KEYS) {
     const items = input[key];
     if (items !== undefined && items.length > ENTITY_LIMIT) throw new ToolError("validation_failed", `${key}: at most ${ENTITY_LIMIT} per call, got ${items.length}`);
   }
-  if (!input.dimensions?.length && !input.personas?.length && !input.data_objects?.length && !input.use_cases?.length) {
-    throw new ToolError("validation_failed", "at least one of dimensions, personas, data_objects, use_cases is required");
+  if (SET_KEYS.every((key) => !input[key]?.length)) {
+    throw new ToolError("validation_failed", `at least one of ${SET_KEYS.join(", ")} is required`);
   }
 
-  const [pool, objects] = await Promise.all([store.readPersonaPool(), store.readDataObjects()]);
+  const [pool, world, objects] = await Promise.all([store.readPersonaPool(), store.readWorld(), store.readDataObjects()]);
   const existingCases = await readExistingCases(store, input.use_cases);
 
   const errors: string[] = [];
   const dimensions = parseEntities("dimensions", input.dimensions, new Map(pool.dimensions.map((d) => [d.id, d])), dimensionSchema, errors);
   const personas = parseEntities("personas", input.personas, new Map(pool.personas.map((p) => [p.id, p])), personaSchema, errors);
+  const entities = parseEntities("entities", input.entities, new Map(world.entities.map((e) => [e.id, e])), entitySchema, errors);
+  const relationshipTypes = parseEntities("relationship_types", input.relationship_types, new Map(world.relationship_types.map((t) => [t.id, t])), relationshipTypeSchema, errors);
+  const constellations = parseEntities("constellations", input.constellations, new Map(world.constellations.map((c) => [c.id, c])), constellationSchema, errors);
   const dataObjects = parseEntities("data_objects", input.data_objects, new Map(objects.map((o) => [o.id, o])), dataObjectSchema, errors);
   const useCases = parseEntities("use_cases", input.use_cases, existingCases, useCaseSchema, errors);
   // A variant op must not put a second step with an existing id into the effective flow.
@@ -419,11 +433,18 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
 
   const nextDimensions = upsert(pool.dimensions, dimensions);
   const nextPersonas = upsert(pool.personas, personas);
+  const nextWorld: World = {
+    entities: upsert(world.entities, entities),
+    relationship_types: upsert(world.relationship_types, relationshipTypes),
+    constellations: upsert(world.constellations, constellations),
+  };
   const nextObjects = upsert(objects, dataObjects);
   const pools = buildPools(nextDimensions, nextPersonas, nextObjects);
 
   const warnings: Warning[] = [];
   for (const persona of personas) warnings.push(...validatePersona(persona.value, pools));
+  // A persona and an entity with one id are both written; the warning names the ids this call touched.
+  warnings.push(...ambiguousIds(nextPersonas, nextWorld.entities, new Set([...personas, ...entities].map((c) => c.id))));
   for (const object of dataObjects) warnings.push(...validateDataObject(object.value, pools));
   const lookup = new ScreenLookup(store);
   for (const useCase of useCases) warnings.push(...(await validateUseCase(useCase.value, pools, lookup)));
@@ -432,6 +453,10 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
   if (dimensions.length > 0 || personas.length > 0) {
     await store.writePersonaPool({ dimensions: nextDimensions, personas: nextPersonas });
     files.push(POOL_FILE);
+  }
+  if (entities.length > 0 || relationshipTypes.length > 0 || constellations.length > 0) {
+    await store.writeWorld(nextWorld);
+    files.push(WORLD_FILE);
   }
   if (dataObjects.length > 0) {
     await store.writeDataObjects(nextObjects);
@@ -445,7 +470,7 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
 
   const counts: Record<string, unknown> = {};
   const summary: string[] = [];
-  for (const [kind, changes] of [["dimensions", dimensions], ["personas", personas], ["data_objects", dataObjects], ["use_cases", useCases]] as const) {
+  for (const [kind, changes] of [["dimensions", dimensions], ["personas", personas], ["entities", entities], ["relationship_types", relationshipTypes], ["constellations", constellations], ["data_objects", dataObjects], ["use_cases", useCases]] as const) {
     if (changes.length === 0) continue;
     const created = changes.filter((c) => c.created).map((c) => c.id);
     const updated = changes.filter((c) => !c.created).map((c) => c.id);
@@ -545,8 +570,12 @@ async function suggestVariantsInner(store: Store, input: SuggestVariantsInput): 
 // delete_entity — use-case kinds
 // ---------------------------------------------------------------------------
 
-export const USE_CASE_ENTITY_KINDS = ["persona", "data_object", "use_case", "dimension"] as const;
+export const USE_CASE_ENTITY_KINDS = ["persona", "data_object", "use_case", "dimension", "entity", "constellation", "relationship_type"] as const;
 export type UseCaseEntityKind = (typeof USE_CASE_ENTITY_KINDS)[number];
+
+export function isUseCaseEntityKind(kind: string): kind is UseCaseEntityKind {
+  return (USE_CASE_ENTITY_KINDS as readonly string[]).includes(kind);
+}
 
 const EXAMPLE_IDS = 5;
 
@@ -555,6 +584,11 @@ function dangling(kind: string, name: string, referrers: string[], by: string): 
   const shown = referrers.slice(0, EXAMPLE_IDS).join(", ");
   const more = referrers.length > EXAMPLE_IDS ? `, +${referrers.length - EXAMPLE_IDS} more` : "";
   return [{ kind: "dangling_reference", target: `${kind}:${name}`, message: `${kind} "${name}" is still referenced by ${referrers.length} ${by}: ${shown}${more}` }];
+}
+
+/** A constellation names a participant when it is an end of one of its relationships. */
+function namesParticipant(constellation: World["constellations"][number], id: string): boolean {
+  return constellation.relationships.some((r) => r.from === id || r.to === id);
 }
 
 async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, name: string, ctx: ToolHandlerContext | undefined): Promise<Record<string, unknown>> {
@@ -566,19 +600,41 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
     path = caseFile(name);
     if (!isValidId(name) || !(await store.listUseCaseIds()).includes(name)) throw notFound();
     await store.deleteUseCase(name);
+  } else if (kind === "entity" || kind === "constellation" || kind === "relationship_type") {
+    path = WORLD_FILE;
+    const world = await store.readWorld();
+    if (kind === "entity") {
+      if (!world.entities.some((e) => e.id === name)) throw notFound();
+      warnings = dangling("entity", name, world.constellations.filter((c) => namesParticipant(c, name)).map((c) => c.id), "constellation(s)");
+      await store.writeWorld({ ...world, entities: world.entities.filter((e) => e.id !== name) });
+    } else if (kind === "constellation") {
+      if (!world.constellations.some((c) => c.id === name)) throw notFound();
+      await store.writeWorld({ ...world, constellations: world.constellations.filter((c) => c.id !== name) });
+    } else {
+      if (!world.relationship_types.some((t) => t.id === name)) throw notFound();
+      warnings = dangling("relationship_type", name, world.constellations.filter((c) => c.relationships.some((r) => r.type === name)).map((c) => c.id), "constellation(s)");
+      await store.writeWorld({ ...world, relationship_types: world.relationship_types.filter((t) => t.id !== name) });
+    }
   } else if (kind === "persona" || kind === "dimension") {
     path = POOL_FILE;
     const pool = await store.readPersonaPool();
     const list: { id: string }[] = kind === "persona" ? pool.personas : pool.dimensions;
     if (!list.some((item) => item.id === name)) throw notFound();
     const { useCases } = await store.readUseCases();
+    const world = await store.readWorld();
     if (kind === "persona") {
-      warnings = dangling("persona", name, useCases.filter((u) => personasOf(u).has(name)).map((u) => u.id), "use case(s)");
+      warnings = [
+        ...dangling("persona", name, useCases.filter((u) => personasOf(u).has(name)).map((u) => u.id), "use case(s)"),
+        ...dangling("persona", name, world.constellations.filter((c) => namesParticipant(c, name)).map((c) => c.id), "constellation(s)"),
+      ];
       await store.writePersonaPool({ dimensions: pool.dimensions, personas: pool.personas.filter((p) => p.id !== name) });
     } else {
       warnings = [
         ...dangling("dimension", name, pool.personas.filter((p) => ownValue(p.traits, name) !== undefined).map((p) => p.id), "persona(s)"),
         ...dangling("dimension", name, useCases.filter((u) => u.variants?.some((v) => ownValue(v.when, name) !== undefined)).map((u) => u.id), "use case(s) via variant conditions"),
+        ...dangling("dimension", name, world.entities.filter((e) => ownValue(e.traits, name) !== undefined).map((e) => e.id), "entity(ies)"),
+        ...dangling("dimension", name, world.constellations.filter((c) => ownValue(c.traits, name) !== undefined).map((c) => c.id), "constellation(s)"),
+        ...dangling("dimension", name, world.relationship_types.filter((t) => t.same_traits?.includes(name)).map((t) => t.id), "relationship type(s) via same_traits"),
       ];
       await store.writePersonaPool({ dimensions: pool.dimensions.filter((d) => d.id !== name), personas: pool.personas });
     }
@@ -587,9 +643,12 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
     const objects = await store.readDataObjects();
     if (!objects.some((o) => o.id === name)) throw notFound();
     const { useCases } = await store.readUseCases();
+    const world = await store.readWorld();
     warnings = [
       ...dangling("data_object", name, useCases.filter((u) => objectIdsOf(u).has(name)).map((u) => u.id), "use case(s)"),
       ...dangling("data_object", name, objects.filter((o) => o.id !== name && o.fields.some((f) => f.ref === name)).map((o) => o.id), "data object(s) via a ref field"),
+      ...dangling("data_object", name, world.entities.filter((e) => e.object === name).map((e) => e.id), "entity(ies)"),
+      ...dangling("data_object", name, world.relationship_types.filter((t) => t.field?.object === name).map((t) => t.id), "relationship type(s) via field"),
     ];
     await store.writeDataObjects(objects.filter((o) => o.id !== name));
   }

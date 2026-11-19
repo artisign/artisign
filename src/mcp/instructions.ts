@@ -70,7 +70,7 @@ render as Markdown in the preview.
 
 LIFECYCLE: write_html kind:"component"|"pattern" writes a definition (default
 variant + <template data-variant> siblings); delete_entity removes a
-screen/component/pattern/mockup, or a persona/dimension/data_object/use_case.
+screen/component/pattern/mockup, or a persona/dimension/data_object/use_case/entity/constellation/relationship_type.
 
 USE CASES (optional): personas, data objects, use cases (steps mapped to
 screens/nodes); get_use_case reads, set_use_cases writes; shapes: get_guide.

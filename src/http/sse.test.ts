@@ -221,6 +221,15 @@ describe("GET /events (SSE)", () => {
     expect(await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "personas", 4000)).toEqual({ type: "change", kind: "usecases", name: "personas" });
   });
 
+  it("broadcasts usecases/world.json under its stem", async () => {
+    const res = await fetch(`http://127.0.0.1:${daemon.port}/events`);
+    const store = new FsStore(dir);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    await store.writeWorld({ entities: [], relationship_types: [], constellations: [] });
+    expect(await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "world", 4000)).toEqual({ type: "change", kind: "usecases", name: "world" });
+  });
+
   it("rejects a cross-origin /events connection", async () => {
     const res = await fetch(`http://127.0.0.1:${daemon.port}/events`, {
       headers: { origin: "https://evil.example" },

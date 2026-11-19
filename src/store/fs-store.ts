@@ -7,7 +7,7 @@ import { CONFIG_FILENAME, CACHE_DIR } from "../init/artisign-config.js";
 import { atomicWrite, ensureCacheGitignore } from "./atomic-write.js";
 import { autoCommit, autoCommitPaths, getHeadCommit } from "./git.js";
 import { watchProject } from "./watcher.js";
-import { InvalidFileError, dataObjectsDocSchema, describeIssues, isValidId, personaPoolSchema, useCaseSchema, type DataObject, type PersonaPool, type UseCase } from "../usecases/schema.js";
+import { InvalidFileError, dataObjectsDocSchema, describeIssues, isValidId, personaPoolSchema, useCaseSchema, worldSchema, type DataObject, type PersonaPool, type UseCase, type World } from "../usecases/schema.js";
 import type { Store, UseCaseFileIssue, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, VariantKind, TagMeta, DesignSystemMeta, DesignDecision, CommitResult, HeadCommitResult, MockupMeta, MockupVariantMeta } from "./types.js";
 
 function emptyScreenMeta(): ScreenMeta {
@@ -443,6 +443,16 @@ export class FsStore implements Store {
     const checked = personaPoolSchema.safeParse({ dimensions: pool.dimensions, personas: pool.personas });
     if (!checked.success) throw new InvalidFileError("usecases/personas.json", `refusing to write: ${describeIssues(checked.error)}`);
     await atomicWrite(this.path("usecases", "personas.json"), `${JSON.stringify(checked.data, null, 2)}\n`);
+  }
+
+  async readWorld(): Promise<World> {
+    return this.readUseCaseDocument("world.json", (v) => worldSchema.safeParse(v), { entities: [], relationship_types: [], constellations: [] });
+  }
+
+  async writeWorld(world: World): Promise<void> {
+    const checked = worldSchema.safeParse({ entities: world.entities, relationship_types: world.relationship_types, constellations: world.constellations });
+    if (!checked.success) throw new InvalidFileError("usecases/world.json", `refusing to write: ${describeIssues(checked.error)}`);
+    await atomicWrite(this.path("usecases", "world.json"), `${JSON.stringify(checked.data, null, 2)}\n`);
   }
 
   async readDataObjects(): Promise<DataObject[]> {

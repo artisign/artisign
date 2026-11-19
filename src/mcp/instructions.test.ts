@@ -50,9 +50,9 @@ describe("INSTRUCTIONS icon font (CHR-957)", () => {
 });
 
 describe("INSTRUCTIONS delete_entity kinds (CHR-1105)", () => {
-  it("names the four use-case kinds next to the design kinds", () => {
+  it("names every use-case kind next to the design kinds", () => {
     const lifecycle = INSTRUCTIONS.slice(INSTRUCTIONS.indexOf("LIFECYCLE:"), INSTRUCTIONS.indexOf("USE CASES"));
-    for (const kind of ["screen", "component", "pattern", "mockup", "persona", "dimension", "data_object", "use_case"]) {
+    for (const kind of ["screen", "component", "pattern", "mockup", "persona", "dimension", "data_object", "use_case", "entity", "constellation", "relationship_type"]) {
       expect(lifecycle).toContain(kind);
     }
   });

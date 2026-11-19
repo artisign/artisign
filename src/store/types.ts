@@ -1,5 +1,5 @@
 import type { ArtisignConfig } from "../init/artisign-config.js";
-import type { DataObject, PersonaPool, UseCase } from "../usecases/schema.js";
+import type { DataObject, PersonaPool, UseCase, World } from "../usecases/schema.js";
 
 export type TokensDocument = Record<string, Record<string, unknown>>;
 
@@ -182,13 +182,15 @@ export interface Store {
    * Use cases live under `usecases/` and are optional:
    * nothing is created until the first write, and every read of a project
    * without the folder yields empty results. The two pool files are rewritten
-   * whole (`personas.json`, `data-objects.json`); each case is its own file
+   * whole (`personas.json`, `world.json`, `data-objects.json`); each case is its own file
    * (`cases/<id>.json`) so thousands stay cheap and diffs stay small. A pool
    * file that no longer validates throws (naming the file) rather than being
    * coerced — a hand edit must not be silently dropped by the next write.
    */
   readPersonaPool(): Promise<PersonaPool>;
   writePersonaPool(pool: PersonaPool): Promise<void>;
+  readWorld(): Promise<World>;
+  writeWorld(world: World): Promise<void>;
   readDataObjects(): Promise<DataObject[]>;
   writeDataObjects(objects: DataObject[]): Promise<void>;
   /** Sorted ids of the case files; `[]` without a `usecases/cases/` folder. */

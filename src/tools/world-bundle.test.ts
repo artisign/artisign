@@ -23,7 +23,7 @@ const RELATIONSHIP_TYPES = [
   { id: "parent-of", label: "is parent of", same_traits: ["household"] },
   { id: "holds", label: "holds", field: { object: "policy", name: "holder" } },
   { id: "insures", label: "insures" },
-  { id: "files", label: "files" },
+  { id: "files", label: "files", same_traits: ["age-group"] },
 ];
 const CONSTELLATIONS = [
   {
@@ -124,6 +124,16 @@ describe("world block in get_use_case and list filters (CHR-1150)", () => {
       });
       const res = await getUseCase(fx.store, { id: "review-premium", variant: "lean" });
       expect(ids(res, "entities")).toEqual(expect.arrayContaining(["claim", "unused"]));
+    });
+
+    it("takes a persona that is only a state subject, and the dimensions of same_traits", async () => {
+      await setUseCases(fx.store, { use_cases: [base({ personas: [], steps: [], state: [{ subject: "insurer-north", property: "active", value: true }] })] });
+      const res = await getUseCase(fx.store, { id: "review-premium" });
+      expect(ids(res, "personas")).toContain("insurer-north");
+      // the claim variant's bundle has no age-group trait anywhere; only `files.same_traits` names it
+      const only = await getUseCase(fx.store, { id: "review-premium", variant: "claim-variant" });
+      expect(ids(only, "dimensions").sort()).toEqual(["age-group", "region"]);
+      expect(ids(only, "personas")).toContain("insurer-north");
     });
 
     it("omits the world keys for a case without constellations or state subjects", async () => {

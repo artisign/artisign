@@ -240,7 +240,8 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   const memberIds = new Set(bundleConstellations.flatMap((c) => [...constellationMembers(c)]));
   // With a variant, what it removed still names subjects: they stay resolvable in the same response.
   const removedSubjects = [...resolved.removed_state.map((e) => e.subject), ...resolved.removed_branches.flatMap((b) => b.when.map((c) => c.subject))];
-  const entityIds = new Set([...memberIds, ...stateSubjectsOf(variant ? effective : useCase), ...removedSubjects].filter((id) => resolveParticipant(id, personas, world.entities) === "entity"));
+  const subjectIds = new Set([...stateSubjectsOf(variant ? effective : useCase), ...removedSubjects]);
+  const entityIds = new Set([...memberIds, ...subjectIds].filter((id) => resolveParticipant(id, personas, world.entities) === "entity"));
   const bundleEntities = world.entities.filter((e) => entityIds.has(e.id));
   const bundleRelationshipTypes = world.relationship_types.filter((t) => bundleConstellations.some((c) => c.relationships.some((r) => r.type === t.id)));
 
@@ -251,7 +252,7 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   // The selected variant's map names personas the effective flow may no longer show (a key nothing uses any more).
   if (variant) for (const id of actorMapPersonas(variant)) personaIds.add(id);
   personaIds.delete("system");
-  for (const id of memberIds) if (resolveParticipant(id, personas, world.entities) === "persona") personaIds.add(id);
+  for (const id of [...memberIds, ...subjectIds]) if (resolveParticipant(id, personas, world.entities) === "persona") personaIds.add(id);
   for (const entity of bundleEntities) if (entity.object !== undefined) objectIds.add(entity.object);
   for (const type of bundleRelationshipTypes) if (type.field !== undefined) objectIds.add(type.field.object);
   // Objects reached through `ref` fields travel along, also from the world's objects.
@@ -260,6 +261,7 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   }
   const bundlePersonas = personas.filter((p) => personaIds.has(p.id));
   const dimensionIds = new Set<string>(bundlePersonas.flatMap((p) => Object.keys(p.traits)));
+  for (const type of bundleRelationshipTypes) type.same_traits?.forEach((id) => dimensionIds.add(id));
   for (const item of [...bundleEntities, ...bundleConstellations]) Object.keys(item.traits).forEach((id) => dimensionIds.add(id));
   for (const v of variant ? [variant] : (useCase.variants ?? [])) Object.keys(v.when).forEach((id) => dimensionIds.add(id));
 

@@ -9,6 +9,7 @@ import { FsStore } from "../store/index.js";
 import { setupGitConfig, setupProject, type GitConfigFixture, type ProjectFixture } from "./test-fixtures.js";
 import { deleteEntity } from "./lifecycle.js";
 import { getUseCase, listUseCases, setUseCases } from "./usecases.js";
+import type { Warning } from "./types.js";
 import { TOOLS } from "./registry.js";
 import { z } from "zod";
 import { resolveParticipant } from "../usecases/index.js";
@@ -173,16 +174,17 @@ describe("world pool (ADR-011)", () => {
     it("warns on write, still writes both and names the ids the call touched", async () => {
       const res = await setUseCases(fx.store, { personas: [{ id: "leo", name: "Leo the persona" }], entities: [{ id: "leo", name: "Leo the entity" }] });
       expect(res).toMatchObject({ personas: { created: 1 }, entities: { created: 1 } });
-      expect(res.warnings).toEqual([expect.objectContaining({ kind: "ambiguous_id", target: "persona:leo", message: expect.stringContaining("resolve to the persona") })]);
+      expect((res.warnings as Warning[]).filter((w) => w.kind === "ambiguous_id")).toEqual([expect.objectContaining({ target: "persona:leo", message: expect.stringContaining("resolve to the persona") })]);
       expect((await fx.store.readPersonaPool()).personas.map((p) => p.id)).toEqual(["leo"]);
       expect((await fx.store.readWorld()).entities.map((e) => e.id)).toEqual(["leo"]);
     });
 
     it("warns when a later call creates the second one, and not for untouched ids", async () => {
       await setUseCases(fx.store, { personas: [{ id: "leo", name: "Leo" }, { id: "maria", name: "Maria" }] });
-      expect((await setUseCases(fx.store, { entities: [{ id: "policy", name: "Policy" }] })).warnings).toEqual([]);
+      const ambiguous = (res: { warnings?: unknown }): Warning[] => (res.warnings as Warning[]).filter((w) => w.kind === "ambiguous_id");
+      expect(ambiguous(await setUseCases(fx.store, { entities: [{ id: "policy", name: "Policy" }] }))).toEqual([]);
       const res = await setUseCases(fx.store, { entities: [{ id: "leo", name: "Leo" }] });
-      expect(res.warnings).toEqual([expect.objectContaining({ kind: "ambiguous_id", target: "persona:leo" })]);
+      expect(ambiguous(res)).toEqual([expect.objectContaining({ target: "persona:leo" })]);
     });
 
     it("also warns on read, in get_use_case", async () => {

@@ -37,7 +37,10 @@ import {
   summarize,
   useCaseSchema,
   validateDataObject,
+  validateConstellation,
+  validateEntity,
   validatePersona,
+  validateRelationshipType,
   validateUseCase,
   type DataObject,
   type World,
@@ -74,8 +77,8 @@ function reportWarnings(warnings: Warning[]): { warnings: Warning[]; warning_cou
 }
 
 async function loadPools(store: Store): Promise<{ pools: ValidationPools; dimensions: Dimension[]; personas: Persona[]; objects: DataObject[] }> {
-  const [pool, objects] = await Promise.all([store.readPersonaPool(), store.readDataObjects()]);
-  return { pools: buildPools(pool.dimensions, pool.personas, objects), dimensions: pool.dimensions, personas: pool.personas, objects };
+  const [pool, objects, world, dataModel] = await Promise.all([store.readPersonaPool(), store.readDataObjects(), store.readWorld(), store.dataModelExists()]);
+  return { pools: buildPools(pool.dimensions, pool.personas, objects, world, dataModel), dimensions: pool.dimensions, personas: pool.personas, objects };
 }
 
 /**
@@ -461,13 +464,16 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
     constellations: upsert(world.constellations, constellations),
   };
   const nextObjects = upsert(objects, dataObjects);
-  const pools = buildPools(nextDimensions, nextPersonas, nextObjects);
+  const pools = buildPools(nextDimensions, nextPersonas, nextObjects, nextWorld, dataObjects.length > 0 || (await store.dataModelExists()));
 
   const warnings: Warning[] = [];
   for (const persona of personas) warnings.push(...validatePersona(persona.value, pools));
   // A persona and an entity with one id are both written; the warning names the ids this call touched.
   warnings.push(...ambiguousIds(nextPersonas, nextWorld.entities, new Set([...personas, ...entities].map((c) => c.id))));
   for (const object of dataObjects) warnings.push(...validateDataObject(object.value, pools));
+  for (const entity of entities) warnings.push(...validateEntity(entity.value, pools));
+  for (const type of relationshipTypes) warnings.push(...validateRelationshipType(type.value, pools));
+  for (const constellation of constellations) warnings.push(...validateConstellation(constellation.value, pools));
   const lookup = new ScreenLookup(store);
   for (const useCase of useCases) warnings.push(...(await validateUseCase(useCase.value, pools, lookup)));
 

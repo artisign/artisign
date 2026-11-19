@@ -22,6 +22,18 @@ const TEXT_OVERRIDES = [
 /** A text as it is written: untouched since it was stored it stays byte-for-byte, a field the user edited is trimmed. `orig` is undefined for a new one. */
 const written = (value, orig) => (value === orig ? value : value.trim());
 
+/**
+ * The keys of a stored object the editor does not manage, copied as they are. They are written back untouched, so a key the
+ * editor does not know (a variant's `state` or `constellations`, a step's `via`, an op's `branch`) survives every save.
+ */
+function unmanaged(stored, managed) {
+  return Object.fromEntries(Object.entries(stored).filter(([key]) => !managed.includes(key)));
+}
+
+const STEP_KEYS = ["id", "actor", "action", "target", "data", "note"];
+const OP_KEYS = ["op", "step_id", "step"];
+const VARIANT_KEYS = ["id", "title", "description", "when", "personas", "actors", "trigger", "goal", "outcome", "inputs", "outputs", "steps"];
+
 /** The draft rows of an inputs / outputs list. `orig` keeps the stored example: one the user does not touch is saved exactly as it was. */
 export function ioDraft(list, sideKey) {
   return (list ?? []).map((item) => ({ object: item.object, side: item[sideKey] ?? "", example: formatExample(item.example), orig: item.example, origSide: item[sideKey] ?? "" }));
@@ -39,6 +51,7 @@ export function stepDraft(step) {
     node: step.target?.node ?? "",
     note: step.note,
     data: (step.data ?? []).map((d) => ({ object: d.object, before: formatExample(d.before), after: formatExample(d.after), origBefore: d.before, origAfter: d.after })),
+    extra: unmanaged(step, STEP_KEYS),
   };
 }
 
@@ -80,11 +93,12 @@ export function variantDraft(variant) {
     // A key stored empty (`steps: []`, `actors: {}`) stays empty while it is empty; one the user emptied is removed.
     hadSteps: variant.steps !== undefined && variant.steps.length === 0,
     hadActors: variant.actors !== undefined && Object.keys(variant.actors).length === 0,
+    extra: unmanaged(variant, VARIANT_KEYS),
     overrides,
     origTrigger,
     origOverrides, // the stored override texts: an untouched one is written back as it is, an edited one is trimmed
     swaps: Object.entries(variant.actors ?? {}).map(([from, to]) => ({ from, to })),
-    ops: (variant.steps ?? []).map((op) => ({ op: op.op, stepId: op.step_id ?? "", step: op.step ? stepDraft(op.step) : null })),
+    ops: (variant.steps ?? []).map((op) => ({ op: op.op, stepId: op.step_id ?? "", step: op.step ? stepDraft(op.step) : null, extra: unmanaged(op, OP_KEYS) })),
   };
 }
 
@@ -103,7 +117,7 @@ export function parseIo(list, sideKey, label, errors) {
 
 /** One step as a payload object (a base step or the step of a change); `label` prefixes problems with its data changes. */
 export function buildStepObject(step, id, label, errors) {
-  const out = { id, actor: step.actor || "system", action: written(step.action, step.origAction) };
+  const out = { ...step.extra, id, actor: step.actor || "system", action: written(step.action, step.origAction) };
   if (step.kind !== "none" && step.screen.trim() !== "") out.target = { screen: step.screen.trim(), ...(step.kind === "element" && step.node.trim() !== "" ? { node: step.node.trim() } : {}) };
   const data = step.data
     .filter((d) => d.object !== "")
@@ -203,7 +217,7 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
   const name = variant.title || vid;
   if (variant.title.trim() === "") errors.push(`Variant ${index + 1} needs a title.`);
   if (Object.keys(variant.when).length === 0) errors.push(`Variant "${name}" needs a condition (when).`);
-  const out = { id: vid, title: written(variant.title, variant.origTitle), ...(written(variant.description, variant.origDescription) !== "" ? { description: written(variant.description, variant.origDescription) } : {}), when: variant.when };
+  const out = { ...variant.extra, id: vid, title: written(variant.title, variant.origTitle), ...(written(variant.description, variant.origDescription) !== "" ? { description: written(variant.description, variant.origDescription) } : {}), when: variant.when };
 
   const { overrides } = variant;
   // A stored value the user did not touch is written back exactly as it is; one they edited is trimmed (`written`). An override that is empty is an error, not a silent removal.
@@ -247,7 +261,7 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
     }
     if (op.op === "remove") {
       applyOp(flow, op);
-      ops.push({ op: "remove", step_id: op.stepId });
+      ops.push({ ...op.extra, op: "remove", step_id: op.stepId });
       return;
     }
     const step = op.step ?? emptyStep();
@@ -273,7 +287,7 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
     }
     const built = buildStepObject(step, id, where, errors);
     applyOp(flow, op, built);
-    ops.push(op.op === "append" ? { op: "append", step: built } : { op: op.op, step_id: op.stepId, step: built });
+    ops.push(op.op === "append" ? { ...op.extra, op: "append", step: built } : { ...op.extra, op: op.op, step_id: op.stepId, step: built });
   });
   if (ops.length > 0 || variant.hadSteps) out.steps = ops;
   return { out, errors, fieldErrors };

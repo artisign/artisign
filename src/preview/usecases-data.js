@@ -21,7 +21,6 @@ export const AVATAR_EMOJIS = ["👨", "👩", "🧑", "👵", "👴", "🧒", "�
 
 // --- Ids and text ---------------------------------------------------------------------------------------------
 
-/** Lowercase kebab-case id from free text ("Map a Step!" -> "map-a-step"); "" when nothing usable is left. */
 /** The text of a trigger, whichever form it has: a stored string, or the object `get_use_case` always returns. */
 export function triggerText(trigger) {
   if (trigger === undefined || trigger === null) return "";
@@ -44,6 +43,7 @@ export function triggerWithText(stored, text, original) {
   return text;
 }
 
+/** Lowercase kebab-case id from free text ("Map a Step!" -> "map-a-step"); "" when nothing usable is left. */
 export function slugify(text) {
   return String(text ?? "")
     .normalize("NFKD")

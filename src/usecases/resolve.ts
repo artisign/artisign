@@ -71,25 +71,19 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
   // 2. The state merges per (subject, property): an entry replaces or adds, `unset` removes.
   if (variant.state !== undefined) {
     const state: EffectiveStateEntry[] = (base.state ?? []).map((entry) => ({ ...entry }));
-    const baseState = base.state ?? [];
-    const sameKey = (a: { subject: string; property: string }, b: { subject: string; property: string }): boolean => a.subject === b.subject && a.property === b.property;
+    // The schema allows one entry per (subject, property) in the case and in the variant, so each key is visited once.
     for (const entry of variant.state) {
-      const index = state.findIndex((e) => sameKey(e, entry));
-      const inBase = baseState.find((e) => sameKey(e, entry));
+      const index = state.findIndex((e) => e.subject === entry.subject && e.property === entry.property);
       if (entry.unset === true) {
         if (index === -1) {
-          if (!inBase) issues.push({ kind: "missing_state", variant: variant.id, op: -1, step_id: `${entry.subject}.${entry.property}`, message: `variant "${variant.id}" unsets state "${entry.subject}.${entry.property}", which the base case does not have` });
+          issues.push({ kind: "missing_state", variant: variant.id, op: -1, step_id: `${entry.subject}.${entry.property}`, message: `variant "${variant.id}" unsets state "${entry.subject}.${entry.property}", which the base case does not have` });
           continue;
         }
         const [gone] = state.splice(index, 1);
-        // An entry this variant added itself leaves no trace in the base state.
-        if (gone!.change !== "added" && inBase) removedState.push({ ...inBase, change: "removed" });
+        removedState.push({ subject: gone!.subject, property: gone!.property, value: gone!.value, change: "removed" });
         continue;
       }
-      // A key the variant unset and sets again is a change of the base entry, not an addition, and no longer removed.
-      const reset = index === -1 && inBase !== undefined;
-      if (reset) removedState.splice(0, removedState.length, ...removedState.filter((r) => !sameKey(r, entry)));
-      const next: EffectiveStateEntry = { subject: entry.subject, property: entry.property, value: entry.value, change: reset || (index !== -1 && state[index]!.change !== "added") ? "changed" : "added" };
+      const next: EffectiveStateEntry = { subject: entry.subject, property: entry.property, value: entry.value, change: index === -1 ? "added" : "changed" };
       if (index === -1) state.push(next);
       else state[index] = next;
     }

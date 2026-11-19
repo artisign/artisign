@@ -155,17 +155,6 @@ describe("variant state merge", () => {
     expect(r.removed_state).toHaveLength(3);
   });
 
-  it("unset then set of one base key is a change and drops out of removed_state", () => {
-    const r = merged([{ subject: "ana", property: "open-loans", unset: true }]);
-    expect(r.removed_state).toHaveLength(1);
-    // The same key twice in one list is a shape error, so the case is built without the schema.
-    const c = useCase({ ...base });
-    const v = { id: "v", title: "V", when: { membership: ["staff"] }, state: [{ subject: "ana", property: "open-loans", unset: true }, { subject: "ana", property: "open-loans", value: 7 }] } as never;
-    const out = resolveUseCase(c, v);
-    expect(out.use_case.state!.find((e) => e.subject === "ana")).toEqual({ subject: "ana", property: "open-loans", value: 7, change: "changed" });
-    expect(out.removed_state).toEqual([]);
-  });
-
   it("reports an unset of a key the base lacks as missing_state and changes nothing", () => {
     const r = merged([{ subject: "nobody", property: "none", unset: true }]);
     expect(r.issues).toEqual([expect.objectContaining({ kind: "missing_state", step_id: "nobody.none" })]);

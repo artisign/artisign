@@ -130,7 +130,7 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
     }
     for (const op of variant.steps ?? []) if (op.op !== "remove") await checkStep(op.step, variant.id);
     for (const issue of resolveUseCase(useCase, variant).issues) {
-      const kind = ({ missing_step: "variant_step_missing", duplicate_step_id: "duplicate_step_id", actor_invalid: "variant_actor_invalid" } as const)[issue.kind];
+      const kind = ({ missing_step: "variant_step_missing", duplicate_step_id: "duplicate_step_id", actor_invalid: "variant_actor_invalid", missing_state: "variant_state_missing" } as const)[issue.kind];
       warn({ kind, target: at(variant.id), message: issue.message });
     }
   }

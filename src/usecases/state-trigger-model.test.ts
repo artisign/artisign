@@ -155,10 +155,29 @@ describe("variant state merge", () => {
     expect(r.removed_state).toHaveLength(3);
   });
 
-  it("an entry the variant adds and unsets itself leaves no trace; a later entry wins", () => {
-    const r = merged([{ subject: "ben", property: "x", value: 1 }, { subject: "ben", property: "x", value: 2 }, { subject: "ben", property: "y", value: 1 }, { subject: "ben", property: "y", unset: true }]);
-    expect(r.use_case.state!.filter((e) => e.subject === "ben")).toEqual([{ subject: "ben", property: "x", value: 2, change: "added" }]);
-    expect(r.removed_state).toEqual([]);
+  it("unset then set of one base key is a change and drops out of removed_state", () => {
+    const r = merged([{ subject: "ana", property: "open-loans", unset: true }]);
+    expect(r.removed_state).toHaveLength(1);
+    // The same key twice in one list is a shape error, so the case is built without the schema.
+    const c = useCase({ ...base });
+    const v = { id: "v", title: "V", when: { membership: ["staff"] }, state: [{ subject: "ana", property: "open-loans", unset: true }, { subject: "ana", property: "open-loans", value: 7 }] } as never;
+    const out = resolveUseCase(c, v);
+    expect(out.use_case.state!.find((e) => e.subject === "ana")).toEqual({ subject: "ana", property: "open-loans", value: 7, change: "changed" });
+    expect(out.removed_state).toEqual([]);
+  });
+
+  it("reports an unset of a key the base lacks as missing_state and changes nothing", () => {
+    const r = merged([{ subject: "nobody", property: "none", unset: true }]);
+    expect(r.issues).toEqual([expect.objectContaining({ kind: "missing_state", step_id: "nobody.none" })]);
+    expect(r.use_case.state).toHaveLength(3);
+  });
+
+  it("rejects a duplicate (subject, property) in case state and in variant state", () => {
+    const dup = [{ subject: "a", property: "b", value: 1 }, { subject: "a", property: "b", value: 2 }];
+    expect(parses({ state: dup })).toBe(false);
+    expect(useCaseSchema.safeParse(raw({ variants: [variant({ state: dup })] })).success).toBe(false);
+    expect(useCaseSchema.safeParse(raw({ variants: [variant({ state: [{ subject: "a", property: "b", value: 1 }, { subject: "a", property: "b", unset: true }] })] })).success).toBe(false);
+    expect(parses({ state: [{ subject: "a", property: "b", value: 1 }, { subject: "c", property: "b", value: 1 }] })).toBe(true);
   });
 
   it("adds state to a case without one", () => {

@@ -135,6 +135,20 @@ describe("use-case state, structured trigger and constellations (ADR-011)", () =
     });
   });
 
+  it("warns variant_state_missing for an unset of a key the base lacks", async () => {
+    const res = await setUseCases(fx.store, {
+      use_cases: [loanCase({ state: [{ subject: "a", property: "b", value: 1 }], variants: [{ id: "v", title: "V", when: { membership: ["staff"] }, state: [{ subject: "x", property: "y", unset: true }] }] })],
+    });
+    expect(res.warnings).toEqual([expect.objectContaining({ kind: "variant_state_missing", target: "use_case:borrow-a-book#v", message: expect.stringContaining("x.y") })]);
+  });
+
+  it("rejects a duplicate state key with validation_failed", async () => {
+    await expect(setUseCases(fx.store, { use_cases: [loanCase({ state: [{ subject: "a", property: "b", value: 1 }, { subject: "a", property: "b", value: 2 }] })] })).rejects.toMatchObject({
+      code: "validation_failed",
+      message: expect.stringContaining("duplicate state entry"),
+    });
+  });
+
   describe("delete_entity dangling scans", () => {
     const warningsOf = (res: Record<string, unknown>): { kind: string; message: string }[] => res.warnings as { kind: string; message: string }[];
 
@@ -174,6 +188,21 @@ describe("use-case state, structured trigger and constellations (ADR-011)", () =
       expect(warningsOf(res)).toEqual([expect.objectContaining({ kind: "dangling_reference", message: expect.stringContaining("4 use case(s) as a state, condition or trigger subject") })]);
       expect(warningsOf(res)[0]!.message).toContain("borrow-a-book, trigger-case, variant-case, variant-trigger");
       expect(warningsOf(await deleteEntity(fx.store, { kind: "entity", name: "idle" }))).toEqual([]);
+    });
+
+    it("a persona lists the use cases naming it as a state, condition or trigger subject, unless an entity with that id still resolves it", async () => {
+      await setUseCases(fx.store, {
+        use_cases: [
+          loanCase({ id: "subject-case", title: "S", state: [{ subject: "lee", property: "open-loans", value: 1 }] }),
+          loanCase({ id: "trigger-case", title: "T", trigger: { text: "t", state: [{ subject: "lee", property: "open-loans", op: "gt", value: 3 }] } }),
+        ],
+      });
+      const res = await deleteEntity(fx.store, { kind: "persona", name: "lee" });
+      const messages = warningsOf(res).map((w) => w.message).join("\n");
+      expect(messages).toContain("2 use case(s) as a state, condition or trigger subject: subject-case, trigger-case");
+
+      await setUseCases(fx.store, { personas: [{ id: "lee", name: "Lee" }], entities: [{ id: "lee", name: "Lee entity" }] });
+      expect(warningsOf(await deleteEntity(fx.store, { kind: "persona", name: "lee" })).map((w) => w.message).join("\n")).not.toContain("subject");
     });
 
     it("N1: with a persona and an entity sharing an id, deleting one does not warn for what still resolves to the other", async () => {

@@ -27,8 +27,9 @@ export type ResolveIssue = {
   /**
    * `missing_step`: the op points at a step the flow lacks. `duplicate_step_id`: the op would put a second step with an existing id into the flow.
    * `actor_invalid`: the `actors` map would turn the inherited trigger actor into `system` (not applied; `op` is -1 and `step_id` empty).
+   * `missing_state`: the variant unsets a state entry the base lacks (`op` is -1, `step_id` is `subject.property`).
    */
-  kind: "missing_step" | "duplicate_step_id" | "actor_invalid";
+  kind: "missing_step" | "duplicate_step_id" | "actor_invalid" | "missing_state";
   variant: string;
   op: number;
   step_id: string;
@@ -71,16 +72,24 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
   if (variant.state !== undefined) {
     const state: EffectiveStateEntry[] = (base.state ?? []).map((entry) => ({ ...entry }));
     const baseState = base.state ?? [];
+    const sameKey = (a: { subject: string; property: string }, b: { subject: string; property: string }): boolean => a.subject === b.subject && a.property === b.property;
     for (const entry of variant.state) {
-      const index = state.findIndex((e) => e.subject === entry.subject && e.property === entry.property);
+      const index = state.findIndex((e) => sameKey(e, entry));
+      const inBase = baseState.find((e) => sameKey(e, entry));
       if (entry.unset === true) {
-        if (index === -1) continue;
+        if (index === -1) {
+          if (!inBase) issues.push({ kind: "missing_state", variant: variant.id, op: -1, step_id: `${entry.subject}.${entry.property}`, message: `variant "${variant.id}" unsets state "${entry.subject}.${entry.property}", which the base case does not have` });
+          continue;
+        }
         const [gone] = state.splice(index, 1);
         // An entry this variant added itself leaves no trace in the base state.
-        if (gone!.change !== "added") removedState.push({ ...baseState.find((e) => e.subject === entry.subject && e.property === entry.property)!, change: "removed" });
+        if (gone!.change !== "added" && inBase) removedState.push({ ...inBase, change: "removed" });
         continue;
       }
-      const next: EffectiveStateEntry = { subject: entry.subject, property: entry.property, value: entry.value, change: index === -1 || state[index]!.change === "added" ? "added" : "changed" };
+      // A key the variant unset and sets again is a change of the base entry, not an addition, and no longer removed.
+      const reset = index === -1 && inBase !== undefined;
+      if (reset) removedState.splice(0, removedState.length, ...removedState.filter((r) => !sameKey(r, entry)));
+      const next: EffectiveStateEntry = { subject: entry.subject, property: entry.property, value: entry.value, change: reset || (index !== -1 && state[index]!.change !== "added") ? "changed" : "added" };
       if (index === -1) state.push(next);
       else state[index] = next;
     }

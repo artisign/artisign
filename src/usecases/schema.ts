@@ -147,6 +147,16 @@ function requireValue(entry: { value?: unknown }, ctx: z.RefinementCtx): void {
   if (!Object.hasOwn(entry, "value")) ctx.addIssue({ code: "custom", path: ["value"], message: "value is required" });
 }
 
+/** One state entry per (subject, property): the merge key must be unambiguous. */
+function uniqueStateKeys(entries: { subject: string; property: string }[] | undefined, ctx: z.RefinementCtx): void {
+  const seen = new Set<string>();
+  (entries ?? []).forEach((entry, index) => {
+    const key = JSON.stringify([entry.subject, entry.property]);
+    if (seen.has(key)) ctx.addIssue({ code: "custom", path: [index], message: `duplicate state entry "${entry.subject}.${entry.property}"` });
+    seen.add(key);
+  });
+}
+
 /** An entry of the starting state: no `op` (conditions only). */
 export const stateEntrySchema = z.strictObject({ ...stateKey, value: z.unknown() }).superRefine(requireValue);
 
@@ -218,7 +228,7 @@ const variantSchema = z.strictObject({
   personas: z.array(z.string()).optional(),
   constellations: z.array(z.string()).optional(),
   /** Merged into the base `state` by (subject, property). */
-  state: z.array(variantStateEntrySchema).optional(),
+  state: z.array(variantStateEntrySchema).optional().superRefine(uniqueStateKeys),
   /** Persona (or `system`) of an inherited base step → the persona it becomes in this variant. Keys and values are ids; `system` is a valid id. */
   actors: z.record(idSchema, idSchema).optional(),
   trigger: triggerSchema.optional(),
@@ -245,7 +255,7 @@ export const useCaseSchema = z.strictObject({
   goal: z.string().optional(),
   outcome: z.string().optional(),
   /** The starting state: property values at the start of the case. */
-  state: z.array(stateEntrySchema).optional(),
+  state: z.array(stateEntrySchema).optional().superRefine(uniqueStateKeys),
   inputs: z.array(inputSchema).min(1),
   outputs: z.array(outputSchema).min(1),
   steps: z.array(stepSchema).default([]).superRefine((steps, ctx) => uniqueIds(steps, ctx, "step")),

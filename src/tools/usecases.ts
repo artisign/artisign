@@ -646,6 +646,7 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
       const stillResolves = resolveParticipant(name, personasAfter, world.entities) !== undefined;
       warnings = [
         ...dangling("persona", name, useCases.filter((u) => personasOf(u).has(name)).map((u) => u.id), "use case(s)"),
+        ...(stillResolves ? [] : dangling("persona", name, useCases.filter((u) => stateSubjectsOf(u).has(name)).map((u) => u.id), "use case(s) as a state, condition or trigger subject")),
         ...(stillResolves ? [] : dangling("persona", name, world.constellations.filter((c) => namesParticipant(c, name)).map((c) => c.id), "constellation(s)")),
       ];
       await store.writePersonaPool({ dimensions: pool.dimensions, personas: personasAfter });

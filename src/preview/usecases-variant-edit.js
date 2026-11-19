@@ -9,7 +9,7 @@ import { field, textInput, textArea, selectInput, removeButton, nextId } from ".
 import { segmented, avatar, diffBadge } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
 import { createReorder, renumberRow } from "./usecases-reorder.js";
-import { slugify, uniqueId, isValidId, formatExample, parseOrKeep, avatarOf, actorName } from "./usecases-data.js";
+import { triggerText, triggerWithText, slugify, uniqueId, isValidId, formatExample, parseOrKeep, avatarOf, actorName } from "./usecases-data.js";
 
 // --- Draft <-> payload (pure) ---------------------------------------------------------------------------------------
 
@@ -63,8 +63,10 @@ export function blankVariant() {
 /** The draft of a stored variant. An optional key that is present becomes an override; absent keys stay absent. */
 export function variantDraft(variant) {
   const overrides = {};
-  for (const [key] of TEXT_OVERRIDES) if (variant[key] !== undefined) overrides[key] = variant[key];
+  for (const [key] of TEXT_OVERRIDES) if (variant[key] !== undefined) overrides[key] = key === "trigger" ? triggerText(variant[key]) : variant[key];
   const origOverrides = { ...overrides };
+  // A structured trigger override keeps its actor / via / state / at: only its text is edited here.
+  const origTrigger = variant.trigger;
   if (variant.personas !== undefined) overrides.personas = [...variant.personas];
   if (variant.inputs !== undefined) overrides.inputs = ioDraft(variant.inputs, "source");
   if (variant.outputs !== undefined) overrides.outputs = ioDraft(variant.outputs, "target");
@@ -79,6 +81,7 @@ export function variantDraft(variant) {
     hadSteps: variant.steps !== undefined && variant.steps.length === 0,
     hadActors: variant.actors !== undefined && Object.keys(variant.actors).length === 0,
     overrides,
+    origTrigger,
     origOverrides, // the stored override texts: an untouched one is written back as it is, an edited one is trimmed
     swaps: Object.entries(variant.actors ?? {}).map(([from, to]) => ({ from, to })),
     ops: (variant.steps ?? []).map((op) => ({ op: op.op, stepId: op.step_id ?? "", step: op.step ? stepDraft(op.step) : null })),
@@ -207,6 +210,7 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
   for (const [key, label] of TEXT_OVERRIDES) {
     if (overrides[key] === undefined) continue;
     out[key] = written(overrides[key], variant.origOverrides?.[key]);
+    if (key === "trigger") out[key] = triggerWithText(variant.origTrigger, out[key], variant.origOverrides?.[key]);
     if (overrides[key].trim() === "") {
       errors.push(`Variant "${name}": the ${label.toLowerCase()} override is empty.`);
       fieldErrors.push({ path: `variant.${index}.override.${key}`, message: `The ${label.toLowerCase()} override is empty. Enter text or use the base.` });

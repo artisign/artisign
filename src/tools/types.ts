@@ -61,6 +61,8 @@ export type WarningKind =
   | "ambiguous_id"
   // A variant's `actors` map would turn the inherited trigger actor into `system`; a trigger actor is a persona, so it is not applied.
   | "variant_actor_invalid"
+  // A variant unsets a state entry the base case does not have.
+  | "variant_state_missing"
   // generate_personas stopped at its work budget: the result is a prefix of the full expansion.
   | "partial_result";
 

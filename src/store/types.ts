@@ -192,6 +192,8 @@ export interface Store {
   readWorld(): Promise<World>;
   writeWorld(world: World): Promise<void>;
   readDataObjects(): Promise<DataObject[]>;
+  /** Whether `usecases/data-objects.json` exists: data-model checks (`unknown_data_object`, `state_value_mismatch`, …) apply only then, even if it lists no object. */
+  dataModelExists(): Promise<boolean>;
   writeDataObjects(objects: DataObject[]): Promise<void>;
   /** Sorted ids of the case files; `[]` without a `usecases/cases/` folder. */
   listUseCaseIds(): Promise<string[]>;

@@ -1,19 +1,27 @@
 import type { Warning } from "../tools/types.js";
-import { SYSTEM_ACTOR, normalizeTrigger, type DataObject, type Dimension, type Persona, type UseCase, type UseCaseStep } from "./schema.js";
+import { SYSTEM_ACTOR, normalizeTrigger, type DataObject, type Dimension, type Persona, type UseCase, type UseCaseStep, type World } from "./schema.js";
 import { isGeneratedId } from "../model/node-id.js";
 import { actorMapPersonas, stepsOfOp } from "./query.js";
 import { resolveUseCase, type EffectiveUseCase } from "./resolve.js";
 import type { ScreenLookup } from "./screens.js";
+import { caseWorldWarnings, participantKind, traitWarnings } from "./world.js";
 
 /** The pools a use case is checked against. Built once per call, shared by every entity checked in it. */
 export type ValidationPools = {
   dimensions: Map<string, Dimension>;
   personas: Map<string, Persona>;
   objects: Map<string, DataObject>;
+  /** The world after the call (entities, relationship types, constellations). */
+  world: World;
+  /** Whether `usecases/data-objects.json` exists: only then are data-object references checked (ADR-011 choice 5 A). */
+  dataModel: boolean;
 };
 
-export function buildPools(dimensions: Dimension[], personas: Persona[], objects: DataObject[]): ValidationPools {
+/** `dataModel` is whether `usecases/data-objects.json` exists; the caller knows (`Store.dataModelExists`), there is no second definition here. */
+export function buildPools(dimensions: Dimension[], personas: Persona[], objects: DataObject[], world: World, dataModel: boolean): ValidationPools {
   return {
+    world,
+    dataModel,
     dimensions: new Map(dimensions.map((d) => [d.id, d])),
     personas: new Map(personas.map((p) => [p.id, p])),
     objects: new Map(objects.map((o) => [o.id, o])),
@@ -22,16 +30,7 @@ export function buildPools(dimensions: Dimension[], personas: Persona[], objects
 
 /** Trait problems of one persona: a dimension or a value the pool does not define. */
 export function validatePersona(persona: Persona, pools: ValidationPools): Warning[] {
-  const warnings: Warning[] = [];
-  for (const [dimId, valueId] of Object.entries(persona.traits)) {
-    const dimension = pools.dimensions.get(dimId);
-    if (!dimension) {
-      warnings.push({ kind: "unknown_dimension", target: `persona:${persona.id}`, message: `trait "${dimId}" is not a defined dimension` });
-    } else if (!dimension.values.some((v) => v.id === valueId)) {
-      warnings.push({ kind: "unknown_trait_value", target: `persona:${persona.id}`, message: `"${valueId}" is not a value of dimension "${dimId}"`, suggestion: dimension.values.map((v) => v.id).join(", ") });
-    }
-  }
-  return warnings;
+  return traitWarnings(persona.traits, `persona:${persona.id}`, pools);
 }
 
 /** Field problems of one data object: a `ref` to an object the pool does not have. */
@@ -74,10 +73,14 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
     warnings.push(warning);
   };
 
-  const checkPersona = (id: string, target: string): void => {
-    if (id !== SYSTEM_ACTOR && !pools.personas.has(id)) warn({ kind: "unknown_persona", target, message: `persona "${id}" does not exist` });
+  /** `actor`: the id acts (step actor, trigger actor, `actors` map); an entity there is `entity_as_actor`, not `unknown_persona`. */
+  const checkPersona = (id: string, target: string, actor = false): void => {
+    if (id === SYSTEM_ACTOR || pools.personas.has(id)) return;
+    if (actor && participantKind(id, pools) === "entity") warn({ kind: "entity_as_actor", target, message: `"${id}" is an entity; only a persona or "system" can act`, suggestion: `model the acting side as a persona, or make "${id}" the subject of a state entry` });
+    else warn({ kind: "unknown_persona", target, message: `persona "${id}" does not exist` });
   };
   const checkExample = (objectId: string, example: Record<string, unknown> | undefined, target: string): void => {
+    if (!pools.dataModel) return; // no data-objects.json: no data-object reference is checked
     const object = pools.objects.get(objectId);
     if (!object) {
       warn({ kind: "unknown_data_object", target, message: `data object "${objectId}" does not exist` });
@@ -93,7 +96,7 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
   };
   const checkStep = async (step: UseCaseStep, variant?: string): Promise<void> => {
     const target = at(variant, step.id);
-    checkPersona(step.actor, target);
+    checkPersona(step.actor, target, true);
     for (const data of step.data ?? []) {
       checkExample(data.object, data.before, target);
       checkExample(data.object, data.after, target);
@@ -118,21 +121,23 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
   for (const id of useCase.personas) checkPersona(id, at());
   if (useCase.trigger !== undefined) {
     const actor = normalizeTrigger(useCase.trigger).actor;
-    if (actor !== undefined) checkPersona(actor, at());
+    if (actor !== undefined) checkPersona(actor, at(), true);
   }
   checkIo(useCase.inputs, at());
   checkIo(useCase.outputs, at());
   for (const step of useCase.steps) await checkStep(step);
   for (const branch of useCase.branches ?? []) for (const step of branch.steps) await checkStep(step);
-  const baseBranchWarnings = branchWarnings(resolveUseCase(useCase).use_case, at());
-  warnings.push(...baseBranchWarnings);
+  // What the base case has once, a variant does not repeat: same `kind` and the target without its `#<variant>`, never the message.
+  const baseResolved = resolveUseCase(useCase).use_case;
+  const baseWorldWarnings = [...branchWarnings(baseResolved, at()), ...caseWorldWarnings(baseResolved, pools, at())];
+  warnings.push(...baseWorldWarnings);
 
   for (const variant of useCase.variants ?? []) {
     for (const id of variant.personas ?? []) checkPersona(id, at(variant.id));
-    for (const id of actorMapPersonas(variant)) checkPersona(id, at(variant.id));
+    for (const id of actorMapPersonas(variant)) checkPersona(id, at(variant.id), true);
     if (variant.trigger !== undefined) {
       const actor = normalizeTrigger(variant.trigger).actor;
-      if (actor !== undefined) checkPersona(actor, at(variant.id));
+      if (actor !== undefined) checkPersona(actor, at(variant.id), true);
     }
     checkIo(variant.inputs ?? [], at(variant.id));
     checkIo(variant.outputs ?? [], at(variant.id));
@@ -164,10 +169,11 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
       warn({ kind, target: at(variant.id), message: issue.message });
     }
     // A problem the base case already has is reported once, on the base; the variant adds only what it causes.
-    // Matched by kind and the target without its variant, never by the message text.
-    const sameProblem = (w: Warning): string => `${w.kind}|${(w.target ?? "").replace(/#[^/]*/, "")}`;
-    const known = new Set(baseBranchWarnings.map(sameProblem));
-    for (const w of branchWarnings(resolved.use_case, at(variant.id))) if (!known.has(sameProblem(w))) warn(w);
+    // A variant's resolved state is judged on its own, not as a union over all variants.
+    const sameProblem = (w: Warning): string => `${w.kind}|${(w.target ?? "").replace(/^(use_case:[^#/]*)#[^/]*/, "$1")}`;
+    const known = new Set(baseWorldWarnings.map(sameProblem));
+    const own = [...branchWarnings(resolved.use_case, at(variant.id)), ...caseWorldWarnings(resolved.use_case, pools, at(variant.id), variant.when)];
+    for (const w of own) if (!known.has(sameProblem(w))) warn(w);
   }
   return warnings;
 }

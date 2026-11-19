@@ -126,6 +126,22 @@ describe("world block in get_use_case and list filters (CHR-1150)", () => {
       expect(ids(res, "entities")).toEqual(expect.arrayContaining(["claim", "unused"]));
     });
 
+    it("keeps a persona that is only the subject of a removed state entry in the personas of the bundle", async () => {
+      await setUseCases(fx.store, {
+        use_cases: [
+          base({
+            personas: [],
+            steps: [],
+            state: [{ subject: "insurer-north", property: "active", value: true }],
+            variants: [{ id: "lean", title: "Lean", when: { region: ["south"] }, constellations: [], state: [{ subject: "insurer-north", property: "active", unset: true }] }],
+          }),
+        ],
+      });
+      const res = await getUseCase(fx.store, { id: "review-premium", variant: "lean" });
+      expect(res.removed_state).toMatchObject([{ subject: "insurer-north", property: "active", change: "removed" }]);
+      expect(ids(res, "personas")).toEqual(["insurer-north"]);
+    });
+
     it("takes a persona that is only a state subject, and the dimensions of same_traits", async () => {
       await setUseCases(fx.store, { use_cases: [base({ personas: [], steps: [], state: [{ subject: "insurer-north", property: "active", value: true }] })] });
       const res = await getUseCase(fx.store, { id: "review-premium" });

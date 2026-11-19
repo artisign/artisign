@@ -176,7 +176,7 @@ export const TOOLS: ToolDefinition[] = [
 
   tool(
     "list_use_cases",
-    "Use cases, filtered, sorted, paged (group is a path prefix, query is text). Returns summaries, total and, on the first page, facet counts; include adds the pools. Empty without a usecases/ folder.",
+    "Use cases, filtered, sorted, paged (group is a path prefix, query is text; constellation, entity: world filters). Returns summaries, total and, on the first page, facet counts; include adds the pools. Empty without a usecases/ folder.",
     {
       group: z.string().optional(),
       persona: z.string().optional(),
@@ -186,6 +186,8 @@ export const TOOLS: ToolDefinition[] = [
       status: z.enum(USE_CASE_STATUSES).optional(),
       query: z.string().optional(),
       has_variants: z.boolean().optional(),
+      constellation: z.string().optional(),
+      entity: z.string().optional(),
       sort: z.enum(SORT_KEYS).optional(),
       cursor: z.string().optional(),
       limit: z.number().int().positive().max(100).optional(),

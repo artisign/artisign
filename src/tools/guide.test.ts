@@ -54,4 +54,15 @@ describe("get_guide — use cases", () => {
     }
     expect(guide).toMatch(/inputs` and `outputs` are mandatory/);
   });
+
+  it("teaches the world model, branches and the mechanism rule (CHR-1153)", async () => {
+    const { guide } = await getGuide();
+    for (const term of ["constellations", "relationship_types", "entities", "branches", "removed_branches", 'target: "constellations"', "`constellation`", "`entity`"]) {
+      expect(guide, term).toContain(term);
+    }
+    expect(guide).toContain("`relationship_type`");
+    for (const rule of ["a separate use case", "→ a variant", "→ a branch"]) {
+      expect(guide, rule).toContain(rule);
+    }
+  });
 });

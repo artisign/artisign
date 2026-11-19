@@ -1,0 +1,9 @@
+{
+  "notes": "**World pool, empty** (CHR-1146): no `world.json`, or one with no entities, relationship types and constellations. Same for both; Artisign creates the file on the first write.\n\nLeft panel: section list with counts 0, no warning count. Main: title \"Describe the world your use cases start in\" and one line of what it is for, then the three steps in the order they depend on each other (numbered, because they are a sequence): **New entity** (things that are not personas: a policy, a book, a child), **New relationship type** (how participants relate), **New constellation** (who is in one world, with which relationships) plus the ghost button **Generate constellations** (from constellation-scoped dimensions). Each button opens its dialog empty.\n\nA single empty section in a filled pool shows one line in place of its table: \"No entities yet.\" / \"No relationship types yet.\" / \"No constellations yet.\" plus its New button. Use cases work without a world; nothing in the case editor requires it.",
+  "tags": [
+    "chr-1146",
+    "empty-state"
+  ],
+  "variant_of": "usecases-world",
+  "variant_kind": "state"
+}

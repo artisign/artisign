@@ -930,42 +930,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "usecases-dimension-dialog.dd-close",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-dimension-dialog.dd-cancel",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-dimension-dialog.dd-save",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-persona.pd-close",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-persona.pd-cancel",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog-persona.pd-save",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
     "from": "usecases-edit-dialog-step-drag.dlg-close",
     "event": "tap",
     "to": "usecases-detail",
@@ -1032,60 +996,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "usecases-edit-dialog.dlg-close",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.st1-handle",
-    "event": "tap",
-    "to": "usecases-edit-dialog-step-keyboard",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.st4-handle",
-    "event": "longpress",
-    "to": "usecases-edit-dialog-step-drag",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.st4-more",
-    "event": "tap",
-    "to": "usecases-edit-dialog-step-menu",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.dlg-cancel",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-edit-dialog.dlg-save",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-generate-dialog.gd-close",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-generate-dialog.gd-cancel",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-generate-dialog.gd-create",
-    "event": "tap",
-    "to": "usecases-personas",
-    "to_kind": "screen"
-  },
-  {
     "from": "usecases-object-dialog.od-close",
     "event": "tap",
     "to": "usecases-data-objects",
@@ -1149,6 +1059,636 @@
     "from": "usecases-edit-dialog-variant-invalid.dv-cancel",
     "event": "tap",
     "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-persona.pd-close",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-persona.pd-cancel",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-persona.pd-save",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-generate-dialog.gd-close",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-generate-dialog.gd-target",
+    "event": "tap",
+    "to": "usecases-generate-dialog-constellations",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-generate-dialog.gd-cancel",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-generate-dialog.gd-create",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-dimension-dialog.dd-close",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-dimension-dialog.dd-cancel",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-dimension-dialog.dd-save",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world-empty.sub-cases",
+    "event": "tap",
+    "to": "usecases-detail-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world-empty.sub-personas",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world-empty.sub-objects",
+    "event": "tap",
+    "to": "usecases-data-objects",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world-empty.wg-new-ent",
+    "event": "tap",
+    "to": "usecases-entity-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world-empty.wg-new-rel",
+    "event": "tap",
+    "to": "usecases-relationship-type-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world-empty.wg-new-cst",
+    "event": "tap",
+    "to": "usecases-constellation-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world-empty.wg-gen",
+    "event": "tap",
+    "to": "usecases-generate-dialog-constellations",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world.sub-cases",
+    "event": "tap",
+    "to": "usecases-detail-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world.sub-personas",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world.sub-objects",
+    "event": "tap",
+    "to": "usecases-data-objects",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world.ent-new",
+    "event": "tap",
+    "to": "usecases-entity-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world.e-leo",
+    "event": "tap",
+    "to": "usecases-entity-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world.rel-new",
+    "event": "tap",
+    "to": "usecases-relationship-type-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world.r-parent",
+    "event": "tap",
+    "to": "usecases-relationship-type-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world.cst-gen",
+    "event": "tap",
+    "to": "usecases-generate-dialog-constellations",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world.cst-new",
+    "event": "tap",
+    "to": "usecases-constellation-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world.c-two",
+    "event": "tap",
+    "to": "usecases-constellation-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-world.c-couple",
+    "event": "tap",
+    "to": "usecases-constellation-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-entity-dialog.ed-close",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-entity-dialog.ed-cancel",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-entity-dialog.ed-save",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-relationship-type-dialog.rd-close",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-relationship-type-dialog.rd-cancel",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-relationship-type-dialog.rd-save",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-generate-dialog-constellations.gd-close",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-generate-dialog-constellations.gd-target",
+    "event": "tap",
+    "to": "usecases-generate-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-generate-dialog-constellations.gd-cancel",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-generate-dialog-constellations.gd-create",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-constellation-dialog.cd-close",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-constellation-dialog.cd-cancel",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-constellation-dialog.cd-save",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping-branches.map-back",
+    "event": "tap",
+    "to": "usecases-detail-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.sub-personas",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.sub-world",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.sub-objects",
+    "event": "tap",
+    "to": "usecases-data-objects",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.btn-new-case",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.f-constellation",
+    "event": "tap",
+    "to": "usecases-list-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.btn-mapping",
+    "event": "tap",
+    "to": "usecases-mapping-branches",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.btn-edit",
+    "event": "tap",
+    "to": "usecases-edit-dialog-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.btn-more",
+    "event": "tap",
+    "to": "usecases-delete-confirm",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.v-single",
+    "event": "tap",
+    "to": "usecases-detail-world-variant",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.v-add",
+    "event": "tap",
+    "to": "usecases-edit-dialog-variant-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.v-coverage",
+    "event": "tap",
+    "to": "usecases-detail-world-variant",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.world-open",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.cst-two",
+    "event": "tap",
+    "to": "usecases-constellation-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.cst-single",
+    "event": "tap",
+    "to": "usecases-constellation-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.cst-unknown",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.c1-target",
+    "event": "tap",
+    "to": "usecases-mapping-branches",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.s1-target",
+    "event": "tap",
+    "to": "usecases-mapping-branches",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.s2-target",
+    "event": "tap",
+    "to": "usecases-mapping-branches",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.a1-target",
+    "event": "tap",
+    "to": "usecases-mapping-branches",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.a2-target",
+    "event": "tap",
+    "to": "usecases-mapping-branches",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.b1-target",
+    "event": "tap",
+    "to": "usecases-mapping-branches",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.s3-target",
+    "event": "tap",
+    "to": "usecases-mapping-branches",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world.s4-target",
+    "event": "tap",
+    "to": "usecases-mapping-branches",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-list-world.sub-personas",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-list-world.sub-world",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-list-world.sub-objects",
+    "event": "tap",
+    "to": "usecases-data-objects",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-list-world.row-premium",
+    "event": "tap",
+    "to": "usecases-detail-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world-variant.sub-personas",
+    "event": "tap",
+    "to": "usecases-personas",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world-variant.sub-world",
+    "event": "tap",
+    "to": "usecases-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world-variant.sub-objects",
+    "event": "tap",
+    "to": "usecases-data-objects",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world-variant.f-constellation",
+    "event": "tap",
+    "to": "usecases-list-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world-variant.btn-edit",
+    "event": "tap",
+    "to": "usecases-edit-dialog-variant-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-detail-world-variant.v-base",
+    "event": "tap",
+    "to": "usecases-detail-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.dlg-close",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.st1-handle",
+    "event": "tap",
+    "to": "usecases-edit-dialog-step-keyboard",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.st4-handle",
+    "event": "longpress",
+    "to": "usecases-edit-dialog-step-drag",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.st4-more",
+    "event": "tap",
+    "to": "usecases-edit-dialog-step-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.dlg-cancel",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog.dlg-save",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-branch-invalid.bd-back",
+    "event": "tap",
+    "to": "usecases-edit-dialog-variant-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-branch-invalid.bd-close",
+    "event": "tap",
+    "to": "usecases-detail-world-variant",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-branch-invalid.bd-cancel",
+    "event": "tap",
+    "to": "usecases-edit-dialog-variant-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-trigger-state.dlg-close",
+    "event": "tap",
+    "to": "usecases-detail-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-trigger-state.tr-mode-action",
+    "event": "tap",
+    "to": "usecases-edit-dialog-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-trigger-state.dlg-cancel",
+    "event": "tap",
+    "to": "usecases-detail-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-trigger-state.dlg-save",
+    "event": "tap",
+    "to": "usecases-detail-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-branch.bd-back",
+    "event": "tap",
+    "to": "usecases-edit-dialog-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-branch.bd-close",
+    "event": "tap",
+    "to": "usecases-detail-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-branch.bd-cancel",
+    "event": "tap",
+    "to": "usecases-edit-dialog-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-branch.bd-save",
+    "event": "tap",
+    "to": "usecases-edit-dialog-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant-world.dlg-close",
+    "event": "tap",
+    "to": "usecases-detail-world-variant",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant-world.bo-1-e",
+    "event": "tap",
+    "to": "usecases-edit-dialog-branch",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant-world.bo-2-e",
+    "event": "tap",
+    "to": "usecases-edit-dialog-branch",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant-world.dlg-cancel",
+    "event": "tap",
+    "to": "usecases-detail-world-variant",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-variant-world.dlg-save",
+    "event": "tap",
+    "to": "usecases-detail-world-variant",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-world.dlg-close",
+    "event": "tap",
+    "to": "usecases-detail-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-world.tr-mode-state",
+    "event": "tap",
+    "to": "usecases-edit-dialog-trigger-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-world.b-r1-e",
+    "event": "tap",
+    "to": "usecases-edit-dialog-branch",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-world.b-r2-e",
+    "event": "tap",
+    "to": "usecases-edit-dialog-branch",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-world.b-r3-e",
+    "event": "tap",
+    "to": "usecases-edit-dialog-branch",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-world.b-add",
+    "event": "tap",
+    "to": "usecases-edit-dialog-branch",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-world.dlg-cancel",
+    "event": "tap",
+    "to": "usecases-detail-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-edit-dialog-world.dlg-save",
+    "event": "tap",
+    "to": "usecases-detail-world",
     "to_kind": "screen"
   }
 ]

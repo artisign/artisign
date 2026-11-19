@@ -1,0 +1,9 @@
+{
+  "notes": "Generate dialog with the target switch on **Constellations** (CHR-1146; `generate_personas {target: \"constellations\"}`). Opened from \"Generate…\" in `usecases-world` (target preset to Constellations); from the persona pool it opens on Personas (`usecases-generate-dialog`). Same 580px shell, title \"Generate from dimensions\".\n\nBody: **Generate** `uc-segmented` Personas | Constellations (switching clears the preview), lede for constellations, Strategy, Dimensions (only those with scope Constellations; a note names the persona-scoped ones that are left out; no constellation-scoped dimension → Preview disabled with \"Give a dimension the scope Constellations first.\"), Limit, Preview. Preview lists names \"Two parents · Two or more\" with traits in mono, plus \"Generated constellations start without relationships. Add them in each constellation.\" (skeletons have `relationships: []`).\n\nFooter: Close, primary **Create N constellations**. Flows → `usecases-world`.",
+  "tags": [
+    "chr-1146",
+    "dialog"
+  ],
+  "variant_of": "usecases-generate-dialog",
+  "variant_kind": "state"
+}

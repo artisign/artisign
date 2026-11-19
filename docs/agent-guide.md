@@ -529,8 +529,8 @@ Workflow, in this order:
    for a reference to another object, an `example`.
 3. **World (optional — skip it for a plain screen spec).** The real situation
    a case plays in; it works before any data model exists. A *main entity* is
-   a thing with identity that is related to a persona or another entity (a
-   child, a policy, a book copy); a value without identity is a property
+   a thing with identity that is related to a persona or another entity (an
+   order, a policy, a book copy); a value without identity is a property
    state (step 4). Pool entries, set with `set_use_cases`:
    - `entities`: `{id, name, type?, traits?, object?}` (`object` names a data
      object). Entities never act and are never generated.
@@ -547,7 +547,8 @@ Workflow, in this order:
    `generate_personas` with `target: "constellations"` writes skeletons over
    the constellation-scoped dimensions (`relationships: []`, you fill them
    in; nothing is derived from traits). A `dimensions` entry of the other
-   scope is `validation_failed`.
+   scope is `validation_failed`. The dry run lists `constellations` and sets
+   `constellations_truncated` when it cuts the list.
 4. **Use cases** — `title`, `group` (a path like `catalog/loans`), `tags`,
    `status` (`draft | ready`: how mature the spec is, not whether it is built),
    `personas`, `trigger`, `goal`, `outcome`, and:
@@ -564,7 +565,7 @@ Workflow, in this order:
    - **World fields**, all optional. `constellations`: the starting worlds the
      case holds for. `trigger`: a string, or `{text, actor?, via?, state?,
      at?}` — an action (a persona `actor`, `via` the interface, e.g.
-     "webhook") or a state or point in time (`state` conditions, `at` an ISO
+     "webhook"; `via` only together with an `actor`, else `validation_failed`) or a state or point in time (`state` conditions, `at` an ISO
      date), never both. `state`: the starting state, entries `{subject,
      property, value}` — subject a persona, an entity or `"system"`, property a
      free name, one entry per pair. A *condition* (a branch `when`, a trigger
@@ -657,7 +658,8 @@ write it again with `set_use_cases` (the full case).
 World problems only warn and never block a write; the message names the fix:
 unknown participants, relationship types or constellations, an entity as actor
 (`entity_as_actor`), an actor or state subject outside the case's
-constellations (`outside_constellation`, once per actor per case), conflicting
+constellations (`outside_constellation`, once per participant — actor or state or
+condition subject — per case and per variant), conflicting
 traits (`trait_conflict`), an entity in no constellation (`entity_unrelated`),
 a branch `from` / `rejoin` that is no main-flow step (`branch_from_missing`,
 `branch_rejoin_missing`). Data-object references are checked only when

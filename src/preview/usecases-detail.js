@@ -201,7 +201,8 @@ function flowSummary(rows, variantSelected) {
 
 function flow(ctx, useCase) {
   const { bundle, base, variantId } = ctx;
-  const rows = buildFlowRows({ steps: useCase.steps ?? [], removedSteps: bundle.removed_steps ?? [], baseSteps: base.use_case.steps ?? [], variantSelected: Boolean(variantId) });
+  // A step removed from a branch is not a main-flow row; branch removals are shown with the branch view.
+  const rows = buildFlowRows({ steps: useCase.steps ?? [], removedSteps: (bundle.removed_steps ?? []).filter((r) => r.branch === undefined), baseSteps: base.use_case.steps ?? [], variantSelected: Boolean(variantId) });
   const list = h("ol", { class: "uc-flow" });
   for (const row of rows) {
     if (row.kind === "removed") {

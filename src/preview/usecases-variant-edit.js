@@ -144,6 +144,11 @@ export function variantStepIds(variants) {
   return variants.flatMap((variant) => variant.ops.filter((op) => op.op !== "remove").flatMap((op) => (op.raw ? branchOpStepIds(op.raw) : [op.step?.id])).filter(Boolean));
 }
 
+/** Every step id that lives in a branch: those of the case's branches and those of stored branch ops of any variant. */
+export function allBranchStepIds(draft) {
+  return new Set([...(draft.branchStepIds ?? []), ...draft.variants.flatMap((variant) => variant.ops.flatMap((op) => (op.raw ? branchOpStepIds(op.raw) : [])))]);
+}
+
 /** The step ids a stored branch op writes (the steps of the branch it adds or replaces). */
 export function branchOpStepIds(op) {
   return (op.branch?.steps ?? []).map((step) => step.id);
@@ -227,7 +232,7 @@ export function inheritedPersonas(basePersonas, swaps) {
  * a generated step id must avoid. `errors` are the messages (the footer shows the first), `fieldErrors` the ones that belong to a field
  * (`path`), shown under it.
  */
-export function buildVariant(variant, index, { baseSteps, usedStepIds, variantIds }) {
+export function buildVariant(variant, index, { baseSteps, usedStepIds, variantIds, branchStepIds = new Set() }) {
   const errors = [];
   const fieldErrors = [];
   const vid = variant.id || uniqueId(slugify(variant.title) || `variant-${index + 1}`, variantIds);
@@ -300,9 +305,12 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
       fieldErrors.push({ path: `${path}.id`, message });
     }
     const at = op.stepId === "" ? -1 : flow.findIndex((entry) => entry.id === op.stepId);
-    const applies = op.op === "append" || at >= 0;
+    // A step of a branch is not in the modelled flow, but its id is taken all the same (one step namespace, spec §2).
+    const inBranch = op.stepId !== "" && branchStepIds.has(op.stepId);
+    const applies = op.op === "append" || at >= 0 || inBranch;
     // The effective flow must not hold a second step with this id (spec §6); a replace may keep the id of the step it replaces.
-    if (applies && flow.some((entry, j) => entry.id === id && !(op.op === "replace" && j === at))) {
+    const ownBranchId = op.op === "replace" && inBranch && op.stepId === id;
+    if (applies && (flow.some((entry, j) => entry.id === id && !(op.op === "replace" && j === at)) || (branchStepIds.has(id) && !ownBranchId))) {
       const message = `${id} is already a step in this flow. Give the new step another id.`;
       errors.push(`${where}: ${id} is already a step in this flow.`);
       fieldErrors.push({ path: `${path}.id`, message });
@@ -316,10 +324,10 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
 }
 
 /** Reference problems of one variant (warnings, never blocking): a change naming a step that is not in the flow at that point, an unknown persona in a swap. */
-export function variantWarnings({ variant, index, baseSteps, pool }) {
+export function variantWarnings({ variant, index, baseSteps, pool, branchStepIds = new Set() }) {
   const warnings = [];
   variant.ops.forEach((op, i) => {
-    if (op.raw || op.op === "append" || op.stepId === "") return;
+    if (op.raw || op.op === "append" || op.stepId === "" || branchStepIds.has(op.stepId)) return; // a branch step is outside the modelled flow, not missing
     if (!flowBefore(baseSteps, variant, i).some((entry) => entry.id === op.stepId)) {
       warnings.push({ path: `variant.${index}.op.${i}.step`, message: `${op.stepId} is not a step of the flow at this point. This change is skipped; you can still save.` });
     }
@@ -692,7 +700,7 @@ export function createVariantEditor(env) {
     const fillStepOptions = (select, op, i) => {
       const flow = flowBefore(baseSteps(), variant, i);
       const options = [{ value: "", label: "Step…" }, ...flow.flatMap((entry, k) => (entry.id === "" ? [] : [{ value: entry.id, label: `${k + 1} · ${entry.action || "(no action yet)"}` }]))];
-      if (op.stepId !== "" && !options.some((o) => o.value === op.stepId)) options.push({ value: op.stepId, label: `${op.stepId} (unknown)` });
+      if (op.stepId !== "" && !options.some((o) => o.value === op.stepId)) options.push({ value: op.stepId, label: `${op.stepId} (${allBranchStepIds(draft).has(op.stepId) ? "branch step" : "unknown"})` });
       select.replaceChildren(...options.map((o) => h("option", { value: o.value }, o.label)));
       select.value = op.stepId;
     };
@@ -803,6 +811,7 @@ export function createVariantEditor(env) {
     }
     function changeKind(op, i, value) {
       op.op = value;
+      if (value !== "append" && op.extra) delete op.extra.branch; // `branch` belongs to append only; any other op carrying it fails validation
       if (value === "replace") {
         if (!op.step || isUntouched(op.step)) op.step = op.stepId !== "" ? prefill(op, i) : null;
       } else if (value === "insert_after" || value === "append") {

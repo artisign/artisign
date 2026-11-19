@@ -118,7 +118,7 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
   const mapped = (actor: string): string => (Object.hasOwn(actors, actor) ? actors[actor]! : actor);
   // A step only the map changed keeps its base form for the removed-steps report: the map is not an op.
   const baseOf = new Map<EffectiveStep, UseCaseStep>();
-  const baseBranchOf = new Map<EffectiveBranch, UseCaseBranch>();
+  const baseIdOf = new Map<EffectiveBranch, string>();
   const remap = (steps: EffectiveStep[]): EffectiveStep[] =>
     steps.map((step) => {
       if (mapped(step.actor) === step.actor) return step;
@@ -128,13 +128,13 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
     });
   effective.steps = remap(effective.steps);
   if (effective.branches !== undefined) {
-    effective.branches = effective.branches.map((branch, index) => {
+    effective.branches = effective.branches.map((branch) => {
       const steps = remap(branch.steps);
       if (steps.every((step, i) => step === branch.steps[i])) return branch;
-      const remapped: EffectiveBranch = { ...branch, steps };
-      baseBranchOf.set(remapped, base.branches![index]!);
-      return remapped;
+      return { ...branch, steps } as EffectiveBranch;
     });
+    // Which base branch each effective branch stems from (by id), so a removal reports the pristine base branch.
+    effective.branches.forEach((branch, index) => baseIdOf.set(branch, base.branches![index]!.id));
   }
   // It also maps an inherited `trigger.actor`; a trigger the variant wrote itself is taken as written. A trigger actor is never the system.
   if (variant.trigger === undefined && effective.trigger?.actor !== undefined && mapped(effective.trigger.actor) !== effective.trigger.actor) {
@@ -168,7 +168,11 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
   /** A branch an op writes: a step that keeps the id of a step of the branch it replaces is `changed`, every other one `added`. */
   const writtenBranch = (branch: UseCaseBranch, change: StepChange, replaced?: EffectiveBranch): EffectiveBranch => ({
     ...branch,
-    steps: branch.steps.map((step) => ({ ...step, change: replaced?.steps.some((old) => old.id === step.id) ? ("changed" as const) : ("added" as const) })),
+    steps: branch.steps.map((step) => {
+      const old = replaced?.steps.find((o) => o.id === step.id);
+      // A step the variant added itself stays `added` however often it is rewritten.
+      return { ...step, change: old && old.change !== "added" ? ("changed" as const) : ("added" as const) };
+    }),
     change,
   });
 
@@ -200,7 +204,10 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
       if (op.branch.steps.some((step) => stepCollides(step, undefined, current))) return;
       if (current) {
         // A branch this variant added itself stays "added" however often it is rewritten.
-        branches()[branches().indexOf(current)] = writtenBranch(op.branch, current.change === "added" ? "added" : "changed", current);
+        const written = writtenBranch(op.branch, current.change === "added" ? "added" : "changed", current);
+        branches()[branches().indexOf(current)] = written;
+        const origin = baseIdOf.get(current);
+        if (origin !== undefined) baseIdOf.set(written, origin);
       } else {
         branches().push(writtenBranch(op.branch, "added"));
       }
@@ -210,10 +217,13 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
       const current = findBranch(op.branch_id);
       if (!current) return missingBranch(op.branch_id);
       branches().splice(branches().indexOf(current), 1);
-      // Removing a branch the variant itself added leaves no trace in the base case.
-      if (current.change !== "added") {
-        const original = baseBranchOf.get(current) ?? current;
-        removedBranches.push({ ...original, steps: original.steps.map((step) => plainStep(step)), change: "removed" } as RemovedBranch);
+      // A branch that stems from the base is reported as the base had it; one the variant added itself leaves no trace.
+      const origin = baseIdOf.get(current);
+      const pristine = origin === undefined ? undefined : base.branches?.find((branch) => branch.id === origin);
+      if (pristine) {
+        removedBranches.push({ ...pristine, steps: pristine.steps.map((step) => ({ ...step })), change: "removed" });
+        // Its steps are listed with the branch, not a second time as removed steps.
+        for (let i = removed.length - 1; i >= 0; i--) if (removed[i]!.branch === current.id || removed[i]!.branch === origin) removed.splice(i, 1);
       }
       if (effective.branches!.length === 0) delete effective.branches;
       return;

@@ -8,7 +8,7 @@ import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
 import { segmented, avatar } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
-import { createVariantEditor, touchScope, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, variantWarnings, showFieldErrors } from "./usecases-variant-edit.js";
+import { createVariantEditor, touchScope, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, allBranchStepIds, variantWarnings, showFieldErrors } from "./usecases-variant-edit.js";
 import { createReorder, renumberRow } from "./usecases-reorder.js";
 import {
   triggerText,
@@ -83,7 +83,7 @@ export function buildPayload({ id, draft, source }) {
 
   const variantIds = new Set(draft.variants.map((v) => v.id).filter(Boolean));
   const variants = draft.variants.map((variant, index) => {
-    const built = buildVariant(variant, index, { baseSteps: draft.steps, usedStepIds, variantIds });
+    const built = buildVariant(variant, index, { baseSteps: draft.steps, usedStepIds, variantIds, branchStepIds: allBranchStepIds(draft) });
     errors.push(...built.errors);
     fieldErrors.push(...built.fieldErrors);
     return built.out;
@@ -148,7 +148,7 @@ export function draftWarnings({ draft, pool, screens, nodes }) {
       check(`step.${i}.data.${j}.after`, d.object, d.after);
     });
   });
-  draft.variants.forEach((variant, index) => warnings.push(...variantWarnings({ variant, index, baseSteps: draft.steps, pool })));
+  draft.variants.forEach((variant, index) => warnings.push(...variantWarnings({ variant, index, baseSteps: draft.steps, pool, branchStepIds: allBranchStepIds(draft) })));
   return warnings;
 }
 

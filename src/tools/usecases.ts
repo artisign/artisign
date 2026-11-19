@@ -246,13 +246,20 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   const sources: Source[] = [...effective.steps.map((step): Source => ({ step })), ...(effective.branches ?? []).flatMap((branch) => branch.steps.map((step): Source => ({ step, branch: branch.id })))];
   if (!variant) {
     const byKey = new Map<string, Source>();
-    // The steps a variant writes: a step op (into the main flow, or a branch for `append`), or the steps of a branch it adds or replaces.
-    const introduced = (op: StepOp): Source[] => {
-      if (op.op === "add_branch" || op.op === "replace_branch") return op.branch.steps.map((step) => ({ step, branch: op.branch.id }));
-      if (op.op === "remove" || op.op === "remove_branch") return [];
-      return [{ step: op.step, ...(op.op === "append" && op.branch !== undefined ? { branch: op.branch } : {}) }];
-    };
     for (const v of useCase.variants ?? []) {
+      // The branch each step is in at this point of the variant's ops: the base branches first, then what the ops write.
+      const branchOfStep = new Map<string, string>((useCase.branches ?? []).flatMap((br) => br.steps.map((st): [string, string] => [st.id, br.id])));
+      // The steps an op writes: a step op (into the branch of the step it names, or `append`'s branch), or the steps of a branch it adds or replaces.
+      const introduced = (op: StepOp): Source[] => {
+        if (op.op === "add_branch" || op.op === "replace_branch") {
+          op.branch.steps.forEach((st) => branchOfStep.set(st.id, op.branch.id));
+          return op.branch.steps.map((step) => ({ step, branch: op.branch.id }));
+        }
+        if (op.op === "remove" || op.op === "remove_branch") return [];
+        const branch = op.op === "append" ? op.branch : branchOfStep.get(op.step_id);
+        if (branch !== undefined) branchOfStep.set(op.step.id, branch);
+        return [{ step: op.step, ...(branch !== undefined ? { branch } : {}) }];
+      };
       for (const op of v.steps ?? []) {
         for (const { step, branch } of introduced(op)) {
           if (!step.target) continue;

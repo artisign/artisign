@@ -296,3 +296,47 @@ describe("branch warnings", () => {
     expect(kinds).toEqual(expect.arrayContaining(["variant_step_missing", "duplicate_branch_id"]));
   });
 });
+
+describe("removed branches report the pristine base branch (review fixes)", () => {
+  const pristine = () => useCase().branches!.find((b) => b.id === "limit-reached")!;
+
+  it("an append into the branch before its removal leaves no trace of the appended step", () => {
+    const resolved = resolve(withVariant([{ op: "append", step: step("never-existed"), branch: "limit-reached" }, { op: "remove_branch", branch_id: "limit-reached" }]));
+    expect(resolved.removed_branches).toEqual([{ ...pristine(), change: "removed" }]);
+    expect(resolved.removed_steps).toEqual([]);
+  });
+
+  it("a replace_branch before the removal does not change what is reported", () => {
+    const next = { id: "limit-reached", title: "Other", when: [{ subject: "ana", property: "p", value: 1 }], steps: [step("b9")] };
+    const resolved = resolve(withVariant([{ op: "replace_branch", branch_id: "limit-reached", branch: next }, { op: "remove_branch", branch_id: "limit-reached" }]));
+    expect(resolved.removed_branches).toEqual([{ ...pristine(), change: "removed" }]);
+    expect(resolved.removed_branches[0]!.steps.every((s) => !("change" in s))).toBe(true);
+  });
+
+  it("removing a step and then the branch lists the step once, with the branch", () => {
+    const resolved = resolve(withVariant([{ op: "remove", step_id: "show-limit" }, { op: "remove_branch", branch_id: "limit-reached" }]));
+    expect(resolved.removed_branches[0]!.steps.map((s) => s.id)).toEqual(["show-limit", "dismiss"]);
+    expect(resolved.removed_steps).toEqual([]);
+  });
+
+  it("a removed step of a branch that stays is still listed as a removed step", () => {
+    expect(resolve(withVariant([{ op: "remove", step_id: "dismiss" }])).removed_steps).toEqual([expect.objectContaining({ id: "dismiss", branch: "limit-reached" })]);
+  });
+});
+
+describe("replace_branch keeps what the variant added itself `added` (review fixes)", () => {
+  const next = (steps: Record<string, unknown>[]) => ({ id: "limit-reached", title: "L", when: [{ subject: "ana", property: "p", value: 1 }], steps });
+
+  it("add_branch then replace_branch: the branch and its kept step stay added", () => {
+    const added = { id: "mine", title: "M", when: [{ subject: "ana", property: "p", value: 1 }], steps: [step("m1")] };
+    const resolved = resolve(withVariant([{ op: "add_branch", branch: added }, { op: "replace_branch", branch_id: "mine", branch: { ...added, steps: [step("m1"), step("m2")] } }]));
+    const mine = resolved.use_case.branches!.find((b) => b.id === "mine")!;
+    expect([mine.change, ...mine.steps.map((s) => s.change)]).toEqual(["added", "added", "added"]);
+  });
+
+  it("insert_after into a base branch, then replace_branch: the inserted step stays added, a base step becomes changed", () => {
+    const resolved = resolve(withVariant([{ op: "insert_after", step_id: "show-limit", step: step("b1x") }, { op: "replace_branch", branch_id: "limit-reached", branch: next([step("show-limit"), step("b1x")]) }]));
+    const branch = resolved.use_case.branches!.find((b) => b.id === "limit-reached")!;
+    expect(branch.steps.map((s) => [s.id, s.change])).toEqual([["show-limit", "changed"], ["b1x", "added"]]);
+  });
+});

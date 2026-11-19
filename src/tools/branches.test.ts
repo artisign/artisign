@@ -128,6 +128,34 @@ describe("branches inside a use case (ADR-011)", () => {
       expect(screens.find((s) => s.screen === "hold-screen")!.mappings).toEqual([expect.objectContaining({ step: "show-hold", branch: "staff-hold" })]);
     });
 
+    it("a replace or insert_after on a branch step carries the branch of that step, also in a branch an earlier op added", async () => {
+      await setUseCases(fx.store, {
+        use_cases: [
+          loanCase({
+            id: "edited",
+            title: "Edited",
+            variants: [
+              {
+                id: "v",
+                title: "V",
+                when: { membership: ["staff"] },
+                steps: [
+                  { op: "replace", step_id: "show-limit", step: { id: "show-limit", actor: "system", action: "x", target: { screen: "replaced-screen" } } },
+                  { op: "insert_after", step_id: "show-limit", step: { id: "after-limit", actor: "system", action: "x", target: { screen: "inserted-screen" } } },
+                  { op: "add_branch", branch: { id: "fresh", title: "F", when: when("lee"), steps: [{ id: "f1", actor: "system", action: "x" }] } },
+                  { op: "insert_after", step_id: "f1", step: { id: "f2", actor: "system", action: "x", target: { screen: "fresh-screen" } } },
+                  { op: "replace", step_id: "done", step: { id: "done", actor: "system", action: "x", target: { screen: "main-screen" } } },
+                ],
+              },
+            ],
+          }),
+        ],
+      });
+      const screens = (await getUseCase(fx.store, { id: "edited" })).screens as { screen: string; mappings: { step: string; branch?: string }[] }[];
+      const branchOf = (screen: string) => screens.find((s) => s.screen === screen)!.mappings[0]!.branch;
+      expect([branchOf("replaced-screen"), branchOf("inserted-screen"), branchOf("fresh-screen"), branchOf("main-screen")]).toEqual(["limit-reached", "limit-reached", "fresh", undefined]);
+    });
+
     it("lists no removed_branches key when nothing was removed", async () => {
       expect(await getUseCase(fx.store, { id: "borrow-a-book" })).not.toHaveProperty("removed_branches");
     });

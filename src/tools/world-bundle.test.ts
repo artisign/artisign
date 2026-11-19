@@ -175,7 +175,7 @@ describe("world block in get_use_case and list filters (CHR-1150)", () => {
     it("carries branches and constellations in the summary and adds no facet", async () => {
       const res = await listUseCases(fx.store, {});
       const summary = (res.use_cases as Record<string, unknown>[]).find((u) => u.id === "review-premium")!;
-      expect(summary).toMatchObject({ branches: 1, constellations: ["one-parent-one-child", "claim-case"] });
+      expect(summary).toMatchObject({ branches: 1, constellations: ["one-parent-one-child"] });
       const plain = (res.use_cases as Record<string, unknown>[]).find((u) => u.id === "plain")!;
       expect(plain).not.toHaveProperty("branches");
       expect(plain).not.toHaveProperty("constellations");

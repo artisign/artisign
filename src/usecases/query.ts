@@ -198,7 +198,6 @@ export function compareUseCases(sort: SortKey): (a: UseCase, b: UseCase) => numb
 
 export function summarize(useCase: UseCase): UseCaseSummary {
   const screens = screensOf(useCase);
-  const constellations = [...constellationsOf(useCase)];
   return {
     id: useCase.id,
     title: useCase.title,
@@ -210,7 +209,7 @@ export function summarize(useCase: UseCase): UseCaseSummary {
     ...(useCase.variants && useCase.variants.length > 0 ? { variants: useCase.variants.length } : {}),
     ...(screens.length > 0 ? { screens } : {}),
     ...(useCase.branches && useCase.branches.length > 0 ? { branches: useCase.branches.length } : {}),
-    ...(constellations.length > 0 ? { constellations } : {}),
+    ...(useCase.constellations.length > 0 ? { constellations: useCase.constellations } : {}),
   };
 }
 

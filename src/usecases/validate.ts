@@ -170,7 +170,7 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
     }
     // A problem the base case already has is reported once, on the base; the variant adds only what it causes.
     // A variant's resolved state is judged on its own, not as a union over all variants.
-    const sameProblem = (w: Warning): string => `${w.kind}|${(w.target ?? "").replace(/#[^/]*/, "")}`;
+    const sameProblem = (w: Warning): string => `${w.kind}|${(w.target ?? "").replace(/^(use_case:[^#/]*)#[^/]*/, "$1")}`;
     const known = new Set(baseWorldWarnings.map(sameProblem));
     const own = [...branchWarnings(resolved.use_case, at(variant.id)), ...caseWorldWarnings(resolved.use_case, pools, at(variant.id), variant.when)];
     for (const w of own) if (!known.has(sameProblem(w))) warn(w);

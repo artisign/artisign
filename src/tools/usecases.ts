@@ -76,8 +76,14 @@ function reportWarnings(warnings: Warning[]): { warnings: Warning[]; warning_cou
   return unique.length > WARNING_CAP ? { warnings: unique.slice(0, WARNING_CAP), warning_count: unique.length } : { warnings: unique };
 }
 
-async function loadPools(store: Store): Promise<{ pools: ValidationPools; dimensions: Dimension[]; personas: Persona[]; objects: DataObject[] }> {
-  const [pool, objects, world, dataModel] = await Promise.all([store.readPersonaPool(), store.readDataObjects(), store.readWorld(), store.dataModelExists()]);
+/** `validating`: the world and the data-model flag are read only for the paths that validate a case; a listing must not depend on `world.json`. */
+async function loadPools(store: Store, validating: boolean): Promise<{ pools: ValidationPools; dimensions: Dimension[]; personas: Persona[]; objects: DataObject[] }> {
+  const [pool, objects, world, dataModel] = await Promise.all([
+    store.readPersonaPool(),
+    store.readDataObjects(),
+    validating ? store.readWorld() : undefined,
+    validating ? store.dataModelExists() : undefined,
+  ]);
   return { pools: buildPools(pool.dimensions, pool.personas, objects, world, dataModel), dimensions: pool.dimensions, personas: pool.personas, objects };
 }
 
@@ -189,7 +195,7 @@ async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promis
 
   const wantsPools = (input.include ?? []).length > 0;
   if (input.cursor === undefined || wantsPools) {
-    const { dimensions, personas, objects } = await loadPools(store);
+    const { dimensions, personas, objects } = await loadPools(store, false);
     if (input.cursor === undefined) {
       response.counts = { use_cases: useCases.length, personas: personas.length, dimensions: dimensions.length, data_objects: objects.length };
       const { facets, truncated } = facetCounts(matches);
@@ -225,7 +231,7 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
 
   const resolved = resolveUseCase(useCase, variant);
   const effective = resolved.use_case;
-  const { pools, dimensions, personas, objects } = await loadPools(store);
+  const { pools, dimensions, personas, objects } = await loadPools(store, true);
 
   // What a coding agent needs to implement this view of the case: with a variant selected only what that
   // variant touches, otherwise everything the case and its variants name (so the whole picture is one call).

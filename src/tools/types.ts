@@ -68,7 +68,6 @@ export type WarningKind =
   // A variant unsets a state entry the base case does not have.
   | "variant_state_missing"
   // World consistency (ADR-011, spec §6): never blocking.
-  | "unknown_entity"
   | "unknown_participant"
   | "unknown_relationship_type"
   | "unknown_constellation"

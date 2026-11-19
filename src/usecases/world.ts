@@ -1,5 +1,5 @@
 import type { Warning } from "../tools/types.js";
-import { SYSTEM_ACTOR, type Constellation, type DataField, type Entity, type Persona, type RelationshipType, type UseCaseVariant } from "./schema.js";
+import { SYSTEM_ACTOR, ownValue, type Constellation, type DataField, type Entity, type Persona, type RelationshipType, type UseCaseVariant } from "./schema.js";
 import type { EffectiveUseCase } from "./resolve.js";
 import type { ValidationPools } from "./validate.js";
 
@@ -75,6 +75,13 @@ export function traitWarnings(traits: Record<string, string>, target: string, po
   return warnings;
 }
 
+/** `YYYY-MM-DD` that exists in the calendar (no 2024-02-30). */
+function isCalendarDate(value: string): boolean {
+  const [year, month, day] = value.split("-").map(Number) as [number, number, number];
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return probe.getUTCFullYear() === year && probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day;
+}
+
 /** Whether `value` fits the field's type (and `enum` values). `null` fits anything: nothing there yet. Dates are checked by shape, not evaluated. */
 function fitsField(field: DataField, value: unknown): boolean {
   if (value === null) return true;
@@ -87,9 +94,9 @@ function fitsField(field: DataField, value: unknown): boolean {
     case "boolean":
       return typeof value === "boolean";
     case "date":
-      return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
+      return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && isCalendarDate(value);
     case "datetime":
-      return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value));
+      return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value)) && isCalendarDate(value.slice(0, 10));
     case "enum":
       return typeof value === "string" && (field.values === undefined || field.values.includes(value));
     case "list":
@@ -114,16 +121,19 @@ export function validateEntity(entity: Entity, pools: ValidationPools): Warning[
 
 /** `field` of a relationship type against the data model (only with one): an existing object, a `ref` or `list` field on it. */
 export function validateRelationshipType(type: RelationshipType, pools: ValidationPools): Warning[] {
-  if (!pools.dataModel || type.field === undefined) return [];
   const target = `relationship_type:${type.id}`;
+  const warnings: Warning[] = (type.same_traits ?? [])
+    .filter((dimId) => !pools.dimensions.has(dimId))
+    .map((dimId): Warning => ({ kind: "unknown_dimension", target, message: `same_traits names "${dimId}", which is not a defined dimension` }));
+  if (!pools.dataModel || type.field === undefined) return warnings;
   const object = pools.objects.get(type.field.object);
-  if (!object) return [{ kind: "unknown_data_object", target, message: `field of relationship type "${type.id}" names unknown data object "${type.field.object}"` }];
+  if (!object) return [...warnings, { kind: "unknown_data_object", target, message: `field of relationship type "${type.id}" names unknown data object "${type.field.object}"` }];
   const field = object.fields.find((f) => f.name === type.field!.name);
-  if (!field) return [{ kind: "unknown_data_field", target, message: `"${type.field.name}" is not a field of data object "${object.id}"` }];
+  if (!field) return [...warnings, { kind: "unknown_data_field", target, message: `"${type.field.name}" is not a field of data object "${object.id}"` }];
   if (field.type !== "ref" && field.type !== "list") {
-    return [{ kind: "unknown_data_field", target, message: `field "${object.id}.${field.name}" is of type ${field.type}; a relationship maps to a ref or list field` }];
+    return [...warnings, { kind: "unknown_data_field", target, message: `field "${object.id}.${field.name}" is of type ${field.type}; a relationship maps to a ref or list field` }];
   }
-  return [];
+  return warnings;
 }
 
 /** One constellation: traits against the dimensions, every relationship against the participants and types, and the three trait conflicts it can have itself. */
@@ -148,8 +158,8 @@ export function validateConstellation(constellation: Constellation, pools: Valid
     const fromTraits = traitsOf(rel.from, pools);
     const toTraits = traitsOf(rel.to, pools);
     for (const dimId of type?.same_traits ?? []) {
-      const a = fromTraits?.[dimId];
-      const b = toTraits?.[dimId];
+      const a = fromTraits && ownValue(fromTraits, dimId);
+      const b = toTraits && ownValue(toTraits, dimId);
       if (a !== undefined && b !== undefined && a !== b) {
         warnings.push({ kind: "trait_conflict", target, message: `"${rel.from}" (${dimId}: ${a}) and "${rel.to}" (${dimId}: ${b}) differ on "${dimId}", which type "${rel.type}" requires to agree` });
       }
@@ -159,7 +169,7 @@ export function validateConstellation(constellation: Constellation, pools: Valid
   for (const member of membersOf(constellation)) {
     const traits = traitsOf(member, pools);
     for (const [dimId, valueId] of Object.entries(constellation.traits)) {
-      const memberValue = traits?.[dimId];
+      const memberValue = traits && ownValue(traits, dimId);
       if (memberValue !== undefined && memberValue !== valueId) {
         warnings.push({ kind: "trait_conflict", target, message: `constellation "${constellation.id}" has ${dimId}: ${valueId}, member "${member}" has ${dimId}: ${memberValue}` });
       }
@@ -179,13 +189,15 @@ export function caseWorldWarnings(effective: EffectiveUseCase, pools: Validation
   const warnings: Warning[] = [];
   const known = effective.constellations.flatMap((id) => {
     const found = pools.world.constellations.find((c) => c.id === id);
-    if (!found) warnings.push({ kind: "unknown_constellation", target: at, message: `constellation "${id}" does not exist` });
+    if (!found) warnings.push({ kind: "unknown_constellation", target: `${at}/constellation:${id}`, message: `constellation "${id}" does not exist` });
     return found ? [found] : [];
   });
 
   /** `outside_constellation` when the case lists constellations and the participant is a member of none of them. */
-  const checkMember = (id: string, target: string): void => {
-    if (known.length === 0 || id === SYSTEM_ACTOR || participantKind(id, pools) === undefined) return;
+  const checkMember = (id: string, target: string, actor = false): void => {
+    if (known.length === 0 || id === SYSTEM_ACTOR) return;
+    const kind = participantKind(id, pools);
+    if (kind === undefined || (actor && kind === "entity")) return; // an entity actor is entity_as_actor already
     if (known.some((c) => membersOf(c).has(id))) return;
     const names = known.map((c) => `"${c.id}"`).join(", ");
     warnings.push({ kind: "outside_constellation", target, message: `"${id}" is not a member of ${known.length === 1 ? "constellation" : "any of the constellations"} ${names}`, suggestion: `add a relationship naming "${id}" to ${known.length === 1 ? "it" : "one of them"}` });
@@ -213,19 +225,21 @@ export function caseWorldWarnings(effective: EffectiveUseCase, pools: Validation
     }
   };
 
-  for (const entry of effective.state ?? []) checkSubject(entry, at);
-  for (const condition of effective.trigger?.state ?? []) checkSubject(condition, at);
-  for (const branch of effective.branches ?? []) for (const condition of branch.when) checkSubject(condition, `${at}/branch:${branch.id}`);
-  if (effective.trigger?.actor !== undefined) checkMember(effective.trigger.actor, at);
-  for (const step of [...effective.steps, ...(effective.branches ?? []).flatMap((b) => b.steps)]) checkMember(step.actor, `${at}/${step.id}`);
+  // Every warning gets a target of its own subject, because a base warning suppresses a variant's of the same kind and target.
+  const stateAt = (base: string, entry: Subject): string => `${base}/state:${entry.subject}.${entry.property}`;
+  for (const entry of effective.state ?? []) checkSubject(entry, stateAt(at, entry));
+  for (const condition of effective.trigger?.state ?? []) checkSubject(condition, stateAt(`${at}/trigger`, condition));
+  for (const branch of effective.branches ?? []) for (const condition of branch.when) checkSubject(condition, stateAt(`${at}/branch:${branch.id}`, condition));
+  if (effective.trigger?.actor !== undefined) checkMember(effective.trigger.actor, `${at}/trigger`, true);
+  for (const step of [...effective.steps, ...(effective.branches ?? []).flatMap((b) => b.steps)]) checkMember(step.actor, `${at}/${step.id}`, true);
 
   // (3) a variant `when` on a constellation-scoped dimension must cover the traits of the constellations it uses
   for (const [dimId, valueIds] of Object.entries(when ?? {})) {
     if (pools.dimensions.get(dimId)?.scope !== "constellations") continue;
     for (const c of known) {
-      const trait = c.traits[dimId];
+      const trait = ownValue(c.traits, dimId);
       if (trait !== undefined && !valueIds.includes(trait)) {
-        warnings.push({ kind: "trait_conflict", target: at, message: `variant "when" names ${dimId}: ${valueIds.join(", ")}, but constellation "${c.id}" has ${dimId}: ${trait}` });
+        warnings.push({ kind: "trait_conflict", target: `${at}/constellation:${c.id}`, message: `variant "when" names ${dimId}: ${valueIds.join(", ")}, but constellation "${c.id}" has ${dimId}: ${trait}` });
       }
     }
   }

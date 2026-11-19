@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { access } from "node:fs/promises";
+import { access, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { deleteEntity } from "./lifecycle.js";
-import { getUseCase, setUseCases } from "./usecases.js";
+import { getUseCase, listUseCases, setUseCases } from "./usecases.js";
 import type { Warning } from "./types.js";
 
 const DIMENSIONS = [
@@ -95,6 +95,14 @@ describe("world consistency warnings (CHR-1149)", () => {
     await deleteEntity(fx.store, { kind: "data_object", name: "book-copy" });
     expect(await hasFile("data-objects.json")).toBe(true);
     expect(kindsOf(await getUseCase(fx.store, { id: "borrow-a-book" }))).toContain("unknown_data_object");
+  });
+
+  it("lists use cases without reading world.json", async () => {
+    await setUseCases(fx.store, { dimensions: DIMENSIONS, personas: PERSONAS, ...WORLD, data_objects: [BOOK_COPY], use_cases: [borrowCase()] });
+    await writeFile(join(fx.dir, "usecases", "world.json"), "{ not json");
+    expect((await listUseCases(fx.store, {})).use_cases).toHaveLength(1);
+    expect((await listUseCases(fx.store, { include: ["personas"] })).use_cases).toHaveLength(1);
+    await expect(getUseCase(fx.store, { id: "borrow-a-book" })).rejects.toMatchObject({ code: "invalid_state" });
   });
 
   it("de-duplicates and caps at 50 and reports the count", async () => {

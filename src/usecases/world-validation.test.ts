@@ -103,7 +103,7 @@ describe("world warnings on a case", () => {
       }),
       pools({ dataModel: false }),
     );
-    expect(warnings.filter((w) => w.kind === "unknown_participant").map((w) => w.target)).toEqual(["use_case:borrow-a-book", "use_case:borrow-a-book/branch:late"]);
+    expect(warnings.filter((w) => w.kind === "unknown_participant").map((w) => w.target)).toEqual(["use_case:borrow-a-book/state:ghost.p", "use_case:borrow-a-book/branch:late/state:phantom.p"]);
   });
 
   describe("variants are judged on their resolved state", () => {
@@ -129,7 +129,7 @@ describe("world warnings on a case", () => {
     it("reports a constellation-trait conflict against the variant's when (form 3)", async () => {
       const warnings = await validateUseCase(useCase({ variants: [{ id: "south", title: "South", when: { branch: ["south"] } }] }), pools());
       const conflicts = warnings.filter((w) => w.kind === "trait_conflict");
-      expect(conflicts.map((w) => w.target)).toEqual(["use_case:borrow-a-book#south"]);
+      expect(conflicts.map((w) => w.target)).toEqual(["use_case:borrow-a-book#south/constellation:ana-at-north"]);
       expect(conflicts[0]!.message).toContain("ana-at-north");
       const covered = await validateUseCase(useCase({ variants: [{ id: "north", title: "North", when: { branch: ["north", "south"] } }] }), pools());
       expect(kinds(covered)).not.toContain("trait_conflict");
@@ -140,7 +140,33 @@ describe("world warnings on a case", () => {
         useCase({ variants: [{ id: "v", title: "V", when: { membership: ["member"] }, state: [{ subject: "ghost", property: "p", value: 1 }] }] }),
         pools(),
       );
-      expect(warnings.filter((w) => w.kind === "unknown_participant").map((w) => w.target)).toEqual(["use_case:borrow-a-book#v"]);
+      expect(warnings.filter((w) => w.kind === "unknown_participant").map((w) => w.target)).toEqual(["use_case:borrow-a-book#v/state:ghost.p"]);
+    });
+
+    it("keeps a variant's warning about another subject than the base's", async () => {
+      const warnings = await validateUseCase(
+        useCase({ state: [{ subject: "ghost", property: "p", value: 1 }], variants: [{ id: "v", title: "V", when: { membership: ["member"] }, state: [{ subject: "phantom", property: "p", value: 1 }] }] }),
+        pools(),
+      );
+      expect(warnings.filter((w) => w.kind === "unknown_participant").map((w) => w.target)).toEqual(["use_case:borrow-a-book/state:ghost.p", "use_case:borrow-a-book#v/state:phantom.p"]);
+    });
+
+    it("strips only the variant segment, so a # inside a state property does not repeat a base warning", async () => {
+      const warnings = await validateUseCase(
+        useCase({ state: [{ subject: "ghost", property: "a#b", value: 1 }], variants: [{ id: "v", title: "V", when: { membership: ["member"] }, state: [{ subject: "ghost", property: "a#b", value: 2 }] }] }),
+        pools(),
+      );
+      expect(warnings.filter((w) => w.kind === "unknown_participant").map((w) => w.target)).toEqual(["use_case:borrow-a-book/state:ghost.a#b"]);
+    });
+
+    it("keeps a variant's unknown constellation next to the base's", async () => {
+      const warnings = await validateUseCase(useCase({ constellations: ["nowhere"], variants: [{ id: "v", title: "V", when: { membership: ["member"] }, constellations: ["elsewhere"] }] }), pools());
+      expect(warnings.filter((w) => w.kind === "unknown_constellation").map((w) => w.target)).toEqual(["use_case:borrow-a-book/constellation:nowhere", "use_case:borrow-a-book#v/constellation:elsewhere"]);
+    });
+
+    it("does not add outside_constellation for an entity actor (entity_as_actor covers it)", async () => {
+      const warnings = await validateUseCase(useCase({ steps: [{ id: "pick", actor: "shelf", action: "x" }] }), pools());
+      expect(kinds(warnings)).toEqual(["entity_as_actor"]);
     });
   });
 });
@@ -166,13 +192,17 @@ describe("data-model checks", () => {
 
   it("flags a state property the entity's object does not declare", async () => {
     const warnings = await validateUseCase(stateCase([{ subject: "copy-42", property: "colour", value: "red" }]), pools());
-    expect(warnings.map((w) => [w.kind, w.target])).toEqual([["unknown_data_field", "use_case:borrow-a-book"]]);
+    expect(warnings.map((w) => [w.kind, w.target])).toEqual([["unknown_data_field", "use_case:borrow-a-book/state:copy-42.colour"]]);
   });
 
   it("flags a value that does not fit the field's type or enum values", async () => {
     const mismatches = async (state: unknown[]) => (await validateUseCase(stateCase(state), pools())).filter((w) => w.kind === "state_value_mismatch");
     expect(await mismatches([{ subject: "copy-42", property: "status", value: "lost" }])).toHaveLength(1);
     expect(await mismatches([{ subject: "copy-42", property: "loans", value: "three" }])).toHaveLength(1);
+    const dated = { ...bookCopy, fields: [{ name: "due", type: "date" as const }] };
+    const onDate = async (value: string) => (await validateUseCase(stateCase([{ subject: "copy-42", property: "due", value }]), pools({ objects: [dated] }))).filter((w) => w.kind === "state_value_mismatch");
+    expect(await onDate("2024-02-29")).toHaveLength(0);
+    expect(await onDate("2024-02-30")).toHaveLength(1);
     expect(await mismatches([{ subject: "copy-42", property: "status", value: "on-loan" }, { subject: "copy-42", property: "loans", value: 3 }])).toHaveLength(0);
   });
 
@@ -182,7 +212,7 @@ describe("data-model checks", () => {
       branches: [{ id: "b", title: "B", when: [{ subject: "copy-42", property: "loans", op: "gt", value: "many" }], steps: [{ id: "x", actor: "system", action: "x" }] }],
     });
     const warnings = (await validateUseCase(c, pools())).filter((w) => w.kind === "state_value_mismatch");
-    expect(warnings.map((w) => w.target)).toEqual(["use_case:borrow-a-book", "use_case:borrow-a-book/branch:b"]);
+    expect(warnings.map((w) => w.target)).toEqual(["use_case:borrow-a-book/trigger/state:copy-42.status", "use_case:borrow-a-book/branch:b/state:copy-42.loans"]);
   });
 
   it("checks entity.object and relationship_type.field", () => {
@@ -219,6 +249,17 @@ describe("world entities", () => {
     expect(form2.filter((w) => w.kind === "trait_conflict")).toHaveLength(1);
     expect(form2[0]!.message).toContain("shelf");
     expect(validateConstellation(north, pools()).filter((w) => w.kind === "trait_conflict")).toEqual([]);
+  });
+
+  it("reports an unknown dimension in same_traits", () => {
+    expect(validateRelationshipType({ id: "t", label: "t", same_traits: ["membership", "nope"] }, pools()).map((w) => w.kind)).toEqual(["unknown_dimension"]);
+  });
+
+  it("reads traits as own properties only (a dimension id such as constructor is no conflict)", () => {
+    const c = constellation("c", [["ana", "colleague-of", "ben"]], { constructor: "x" });
+    const odd = { ...relationshipTypes[1]!, same_traits: ["constructor"] };
+    const p = pools({ world: { ...world, relationship_types: [odd] } });
+    expect(validateConstellation(c, p).filter((w) => w.kind === "trait_conflict")).toEqual([]);
   });
 
   it("lets a persona win over an entity of the same id when reading traits", () => {

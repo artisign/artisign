@@ -23,6 +23,8 @@ import {
   matchesFilter,
   objectIdsOf,
   actorMapPersonas,
+  constellationMembers,
+  constellationsOf,
   personasOf,
   stateSubjectsOf,
   resolveParticipant,
@@ -175,7 +177,9 @@ async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promis
   if (!SORT_KEYS.includes(sort)) throw new ToolError("validation_failed", `sort must be one of ${SORT_KEYS.join(", ")}`);
 
   const { useCases, invalid } = await store.readUseCases();
-  const matches = useCases.filter((useCase) => matchesFilter(useCase, input));
+  // The world is read only for the `entity` filter, so a project without one pays nothing.
+  const constellations = (input.entity ?? "").trim() === "" ? [] : (await store.readWorld()).constellations;
+  const matches = useCases.filter((useCase) => matchesFilter(useCase, input, constellations));
   matches.sort(compareUseCases(sort));
 
   const response: Record<string, unknown> = {
@@ -223,6 +227,15 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   const resolved = resolveUseCase(useCase, variant);
   const effective = resolved.use_case;
   const { pools, dimensions, personas, objects } = await loadPools(store);
+  const world = await store.readWorld();
+
+  // The world the bundle names (ADR-011): with a variant the effective case's constellations, otherwise the case's and every variant's.
+  const constellationIds = variant ? new Set(effective.constellations) : constellationsOf(useCase);
+  const bundleConstellations = world.constellations.filter((c) => constellationIds.has(c.id));
+  const memberIds = new Set(bundleConstellations.flatMap((c) => [...constellationMembers(c)]));
+  const entityIds = new Set([...memberIds, ...stateSubjectsOf(variant ? effective : useCase)].filter((id) => resolveParticipant(id, personas, world.entities) === "entity"));
+  const bundleEntities = world.entities.filter((e) => entityIds.has(e.id));
+  const bundleRelationshipTypes = world.relationship_types.filter((t) => bundleConstellations.some((c) => c.relationships.some((r) => r.type === t.id)));
 
   // What a coding agent needs to implement this view of the case: with a variant selected only what that
   // variant touches, otherwise everything the case and its variants name (so the whole picture is one call).
@@ -231,12 +244,16 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   // The selected variant's map names personas the effective flow may no longer show (a key nothing uses any more).
   if (variant) for (const id of actorMapPersonas(variant)) personaIds.add(id);
   personaIds.delete("system");
+  for (const id of memberIds) if (resolveParticipant(id, personas, world.entities) === "persona") personaIds.add(id);
   // Objects reached through `ref` fields travel along.
   for (const id of objectIds) {
     for (const field of pools.objects.get(id)?.fields ?? []) if (field.type === "ref" && field.ref !== undefined) objectIds.add(field.ref);
   }
+  for (const entity of bundleEntities) if (entity.object !== undefined) objectIds.add(entity.object);
+  for (const type of bundleRelationshipTypes) if (type.field !== undefined) objectIds.add(type.field.object);
   const bundlePersonas = personas.filter((p) => personaIds.has(p.id));
   const dimensionIds = new Set<string>(bundlePersonas.flatMap((p) => Object.keys(p.traits)));
+  for (const item of [...bundleEntities, ...bundleConstellations]) Object.keys(item.traits).forEach((id) => dimensionIds.add(id));
   for (const v of variant ? [variant] : (useCase.variants ?? [])) Object.keys(v.when).forEach((id) => dimensionIds.add(id));
 
   const lookup = new ScreenLookup(store);
@@ -302,7 +319,7 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   }
 
   const warnings = await validateUseCase(useCase, pools, lookup);
-  warnings.push(...ambiguousIds(bundlePersonas, (await store.readWorld()).entities));
+  warnings.push(...ambiguousIds(bundlePersonas, world.entities));
   const response: Record<string, unknown> = {
     use_case: effective,
     ...(variant ? { variant: { id: variant.id, title: variant.title, ...(variant.description !== undefined ? { description: variant.description } : {}), when: variant.when } } : {}),
@@ -315,6 +332,9 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
     personas: bundlePersonas,
     dimensions: dimensions.filter((d) => dimensionIds.has(d.id)),
     data_objects: objects.filter((o) => objectIds.has(o.id)),
+    ...(bundleEntities.length > 0 ? { entities: bundleEntities } : {}),
+    ...(bundleConstellations.length > 0 ? { constellations: bundleConstellations } : {}),
+    ...(bundleRelationshipTypes.length > 0 ? { relationship_types: bundleRelationshipTypes } : {}),
     screens: [...screens.values()],
     ...reportWarnings(warnings),
   };

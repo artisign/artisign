@@ -278,9 +278,11 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   // 23,999 to 24,490 (+491), measured at 24,490. The caps are gone
   // (Christian, 2026-11-19): this value is information, not a limit; a PR
   // that grows it updates the pin and states the delta in its description.
+  // CHR-1150: list_use_cases gains the constellation and entity filters:
+  // 24,780 to 24,879 (+99).
   // The pin is exact (CHR-1143): any change, up or down, shows here.
-  it("pins the measured tools/list size as information, not a limit (24,780 chars, ~6,200 tokens)", () => {
-    expect(JSON.stringify(tools).length).toBe(24_780);
+  it("pins the measured tools/list size as information, not a limit (24,879 chars, ~6,220 tokens)", () => {
+    expect(JSON.stringify(tools).length).toBe(24_879);
   });
 
   it("keeps every advertised tool entry within 2,000 chars", () => {

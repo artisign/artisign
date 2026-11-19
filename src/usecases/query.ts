@@ -1,4 +1,4 @@
-import { SYSTEM_ACTOR, normalizeTrigger, type StepOp, type Trigger, type UseCase, type UseCaseStep, type UseCaseVariant } from "./schema.js";
+import { SYSTEM_ACTOR, normalizeTrigger, type Constellation, type StepOp, type Trigger, type UseCase, type UseCaseStep, type UseCaseVariant } from "./schema.js";
 
 export type UseCaseFilter = {
   group?: string;
@@ -9,6 +9,8 @@ export type UseCaseFilter = {
   status?: string;
   query?: string;
   has_variants?: boolean;
+  constellation?: string;
+  entity?: string;
 };
 
 export const SORT_KEYS = ["group", "title", "id", "status"] as const;
@@ -24,6 +26,8 @@ export type UseCaseSummary = {
   steps: number;
   variants?: number;
   screens?: string[];
+  branches?: number;
+  constellations?: string[];
 };
 
 /** The steps a variant op writes: one step, the steps of a branch, or none (`remove`, `remove_branch`). */
@@ -108,6 +112,18 @@ export function objectIdsOf(useCase: UseCase): Set<string> {
   return ids;
 }
 
+/** The constellations a case lists: its own, plus (ADR-011) those of every variant. */
+export function constellationsOf(useCase: UseCase): Set<string> {
+  const ids = new Set(useCase.constellations);
+  for (const variant of useCase.variants ?? []) for (const id of variant.constellations ?? []) ids.add(id);
+  return ids;
+}
+
+/** The participants a constellation names in its relationships (`from` and `to`, personas and entities alike). */
+export function constellationMembers(constellation: Constellation): Set<string> {
+  return new Set(constellation.relationships.flatMap((r) => [r.from, r.to]));
+}
+
 /** Path-prefix match: "catalog" matches "catalog" and "catalog/loans", not "catalog-x". */
 function inGroup(group: string | undefined, prefix: string): boolean {
   const wanted = prefix.replace(/\/+$/, "");
@@ -124,13 +140,16 @@ function given(value: string | undefined): string | undefined {
   return value === undefined || value.trim() === "" ? undefined : value;
 }
 
-export function matchesFilter(useCase: UseCase, filter: UseCaseFilter): boolean {
+/** `constellations` is the world's constellation pool; the `entity` filter needs it to find the members of the case's constellations. */
+export function matchesFilter(useCase: UseCase, filter: UseCaseFilter, constellations: Constellation[] = []): boolean {
   const group = given(filter.group?.replace(/\/+$/, ""));
   const tag = given(filter.tag);
   const persona = given(filter.persona);
   const screen = given(filter.screen);
   const node = given(filter.node);
   const query = given(filter.query);
+  const constellation = given(filter.constellation);
+  const entity = given(filter.entity);
   if (filter.status !== undefined && useCase.status !== filter.status) return false;
   if (group !== undefined && !inGroup(useCase.group, group)) return false;
   if (tag !== undefined && !(useCase.tags ?? []).some((t) => t.toLowerCase() === tag.toLowerCase())) return false;
@@ -139,6 +158,12 @@ export function matchesFilter(useCase: UseCase, filter: UseCaseFilter): boolean 
   if (screen !== undefined || node !== undefined) {
     const hit = allSteps(useCase).some((s) => (screen === undefined || s.screen === screen) && (node === undefined || s.node === node));
     if (!hit) return false;
+  }
+  if (constellation !== undefined && !constellationsOf(useCase).has(constellation)) return false;
+  if (entity !== undefined) {
+    const listed = constellationsOf(useCase);
+    const member = constellations.some((c) => listed.has(c.id) && constellationMembers(c).has(entity));
+    if (!member && !stateSubjectsOf(useCase).has(entity)) return false;
   }
   if (query !== undefined && !haystack(useCase).includes(query.trim().toLowerCase())) return false;
   return true;
@@ -180,6 +205,8 @@ export function summarize(useCase: UseCase): UseCaseSummary {
     steps: useCase.steps.length,
     ...(useCase.variants && useCase.variants.length > 0 ? { variants: useCase.variants.length } : {}),
     ...(screens.length > 0 ? { screens } : {}),
+    ...(useCase.branches && useCase.branches.length > 0 ? { branches: useCase.branches.length } : {}),
+    ...(useCase.constellations.length > 0 ? { constellations: useCase.constellations } : {}),
   };
 }
 

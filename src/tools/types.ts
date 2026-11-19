@@ -55,6 +55,10 @@ export type WarningKind =
   // An element mapping onto a generated node id (n<counter>): a position, not an identity — it can silently point at another element after a rewrite.
   | "mapping_unstable"
   | "duplicate_step_id"
+  | "duplicate_branch_id"
+  | "branch_empty"
+  | "branch_from_missing"
+  | "branch_rejoin_missing"
   | "dangling_reference"
   | "invalid_file"
   // A persona and a main entity share an id; references to it resolve to the persona.

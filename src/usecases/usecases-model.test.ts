@@ -208,7 +208,7 @@ describe("resolveUseCase", () => {
     });
     const resolved = resolveUseCase(base, base.variants![0]);
     expect(resolved.use_case.steps).toHaveLength(3);
-    expect(resolved.issues.map((i) => i.step_id)).toEqual(["ghost", "ghost2"]);
+    expect(resolved.issues.map((i) => (i.kind === "missing_step" ? i.step_id : null))).toEqual(["ghost", "ghost2"]);
   });
 
   it("does not mutate the base use case", () => {

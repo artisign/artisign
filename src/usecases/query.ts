@@ -1,4 +1,4 @@
-import { SYSTEM_ACTOR, normalizeTrigger, type Trigger, type UseCase, type UseCaseVariant } from "./schema.js";
+import { SYSTEM_ACTOR, normalizeTrigger, type StepOp, type Trigger, type UseCase, type UseCaseStep, type UseCaseVariant } from "./schema.js";
 
 export type UseCaseFilter = {
   group?: string;
@@ -26,13 +26,19 @@ export type UseCaseSummary = {
   screens?: string[];
 };
 
-/** Every step of the base flow plus every step a variant introduces — the places a use case can touch a screen. */
+/** The steps a variant op writes: one step, the steps of a branch, or none (`remove`, `remove_branch`). */
+export function stepsOfOp(op: StepOp): UseCaseStep[] {
+  if (op.op === "add_branch" || op.op === "replace_branch") return op.branch.steps;
+  if (op.op === "remove" || op.op === "remove_branch") return [];
+  return [op.step];
+}
+
+/** Every step of the base flow, of every base branch and every step a variant introduces — the places a use case can touch a screen. */
 function allSteps(useCase: UseCase): { actor: string; screen?: string; node?: string; action: string }[] {
-  const steps = useCase.steps.map((s) => ({ actor: s.actor, action: s.action, screen: s.target?.screen, node: s.target?.node }));
+  const written = (step: UseCaseStep) => ({ actor: step.actor, action: step.action, screen: step.target?.screen, node: step.target?.node });
+  const steps = [...useCase.steps, ...(useCase.branches ?? []).flatMap((branch) => branch.steps)].map(written);
   for (const variant of useCase.variants ?? []) {
-    for (const op of variant.steps ?? []) {
-      if (op.op !== "remove") steps.push({ actor: op.step.actor, action: op.step.action, screen: op.step.target?.screen, node: op.step.target?.node });
-    }
+    for (const op of variant.steps ?? []) steps.push(...stepsOfOp(op).map(written));
   }
   return steps;
 }
@@ -67,8 +73,9 @@ export function personasOf(useCase: UseCase): Set<string> {
 }
 
 /**
- * Every participant a use case names as the subject of a state entry or condition: the starting `state` and the
- * `trigger.state` conditions of the case and of every variant (the variant `state` included, `unset` entries too).
+ * Every participant a use case names as the subject of a state entry or condition: the starting `state`, the
+ * `trigger.state` conditions and the branch `when` conditions of the case and of every variant (the variant `state`
+ * included, `unset` entries too; branches a variant adds or replaces too).
  */
 export function stateSubjectsOf(useCase: UseCase): Set<string> {
   const ids = new Set<string>();
@@ -76,9 +83,11 @@ export function stateSubjectsOf(useCase: UseCase): Set<string> {
   const addTrigger = (trigger: Trigger | undefined): void => add(trigger === undefined ? undefined : normalizeTrigger(trigger).state);
   add(useCase.state);
   addTrigger(useCase.trigger);
+  for (const branch of useCase.branches ?? []) add(branch.when);
   for (const variant of useCase.variants ?? []) {
     add(variant.state);
     addTrigger(variant.trigger);
+    for (const op of variant.steps ?? []) if (op.op === "add_branch" || op.op === "replace_branch") add(op.branch.when);
   }
   return ids;
 }
@@ -90,10 +99,11 @@ export function objectIdsOf(useCase: UseCase): Set<string> {
   add(useCase.inputs);
   add(useCase.outputs);
   for (const step of useCase.steps) add(step.data);
+  for (const branch of useCase.branches ?? []) for (const step of branch.steps) add(step.data);
   for (const variant of useCase.variants ?? []) {
     add(variant.inputs);
     add(variant.outputs);
-    for (const op of variant.steps ?? []) if (op.op !== "remove") add(op.step.data);
+    for (const op of variant.steps ?? []) for (const step of stepsOfOp(op)) add(step.data);
   }
   return ids;
 }

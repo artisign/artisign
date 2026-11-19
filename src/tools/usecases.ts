@@ -42,6 +42,7 @@ import {
   type DataObject,
   type World,
   type Constellation,
+  type StepOp,
   type UseCaseStep,
   type Dimension,
   type Persona,
@@ -209,7 +210,7 @@ async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promis
 
 export type GetUseCaseInput = { id: string; variant?: string };
 
-type Mapping = { step: string; scope: "screen" | "element"; node?: { id: string; tag: string; text: string }; stale?: true; unstable?: true; variants?: string[] };
+type Mapping = { step: string; scope: "screen" | "element"; node?: { id: string; tag: string; text: string }; stale?: true; unstable?: true; variants?: string[]; branch?: string };
 type MappedScreen = { screen: string; exists: boolean; title?: string; mappings: Mapping[] };
 
 async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Record<string, unknown>> {
@@ -241,25 +242,40 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   const lookup = new ScreenLookup(store);
   const screens = new Map<string, MappedScreen>();
   // The effective flow, plus (without a selected variant) the steps only variants map, tagged with the variants using them.
-  type Source = { step: UseCaseStep; variants?: string[] };
-  const sources: Source[] = effective.steps.map((step) => ({ step }));
+  type Source = { step: UseCaseStep; variants?: string[]; branch?: string };
+  const sources: Source[] = [...effective.steps.map((step): Source => ({ step })), ...(effective.branches ?? []).flatMap((branch) => branch.steps.map((step): Source => ({ step, branch: branch.id })))];
   if (!variant) {
     const byKey = new Map<string, Source>();
     for (const v of useCase.variants ?? []) {
+      // The branch each step is in at this point of the variant's ops: the base branches first, then what the ops write.
+      const branchOfStep = new Map<string, string>((useCase.branches ?? []).flatMap((br) => br.steps.map((st): [string, string] => [st.id, br.id])));
+      // The steps an op writes: a step op (into the branch of the step it names, or `append`'s branch), or the steps of a branch it adds or replaces.
+      const introduced = (op: StepOp): Source[] => {
+        if (op.op === "add_branch" || op.op === "replace_branch") {
+          op.branch.steps.forEach((st) => branchOfStep.set(st.id, op.branch.id));
+          return op.branch.steps.map((step) => ({ step, branch: op.branch.id }));
+        }
+        if (op.op === "remove" || op.op === "remove_branch") return [];
+        const branch = op.op === "append" ? op.branch : branchOfStep.get(op.step_id);
+        if (branch !== undefined) branchOfStep.set(op.step.id, branch);
+        return [{ step: op.step, ...(branch !== undefined ? { branch } : {}) }];
+      };
       for (const op of v.steps ?? []) {
-        if (op.op === "remove" || !op.step.target) continue;
-        const key = `${op.step.id}|${op.step.target.screen}|${op.step.target.node ?? ""}`;
-        const known = byKey.get(key);
-        if (known) known.variants!.push(v.id);
-        else {
-          const source: Source = { step: op.step, variants: [v.id] };
-          byKey.set(key, source);
-          sources.push(source);
+        for (const { step, branch } of introduced(op)) {
+          if (!step.target) continue;
+          const key = `${step.id}|${step.target.screen}|${step.target.node ?? ""}|${branch ?? ""}`;
+          const known = byKey.get(key);
+          if (known) known.variants!.push(v.id);
+          else {
+            const source: Source = { step, variants: [v.id], ...(branch !== undefined ? { branch } : {}) };
+            byKey.set(key, source);
+            sources.push(source);
+          }
         }
       }
     }
   }
-  for (const { step, variants } of sources) {
+  for (const { step, variants, branch } of sources) {
     if (!step.target) continue;
     const { screen, node } = step.target;
     let entry = screens.get(screen);
@@ -269,7 +285,7 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
       entry = { screen, exists, ...(title !== undefined ? { title } : {}), mappings: [] };
       screens.set(screen, entry);
     }
-    const tail = { ...(variants ? { variants } : {}) };
+    const tail = { ...(variants ? { variants } : {}), ...(branch !== undefined ? { branch } : {}) };
     if (node === undefined) {
       entry.mappings.push({ step: step.id, scope: "screen", ...(entry.exists ? {} : { stale: true as const }), ...tail });
       continue;
@@ -294,6 +310,7 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
       ? { variants: useCase.variants!.map((v) => ({ id: v.id, title: v.title, ...(v.description !== undefined ? { description: v.description } : {}), when: v.when })) }
       : {}),
     ...(resolved.removed_steps.length > 0 ? { removed_steps: resolved.removed_steps } : {}),
+    ...(resolved.removed_branches.length > 0 ? { removed_branches: resolved.removed_branches } : {}),
     ...(resolved.removed_state.length > 0 ? { removed_state: resolved.removed_state } : {}),
     personas: bundlePersonas,
     dimensions: dimensions.filter((d) => dimensionIds.has(d.id)),
@@ -427,7 +444,7 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
   for (const { id, value } of useCases) {
     for (const variant of value.variants ?? []) {
       for (const issue of resolveUseCase(value, variant).issues) {
-        if (issue.kind === "duplicate_step_id") errors.push(`use_cases (${id}).variants.${variant.id}.steps.${issue.op}: ${issue.message}`);
+        if (issue.kind === "duplicate_step_id" || issue.kind === "duplicate_branch_id") errors.push(`use_cases (${id}).variants.${variant.id}.steps.${issue.op}: ${issue.message}`);
       }
     }
   }

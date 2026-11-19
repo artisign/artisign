@@ -1,8 +1,8 @@
 import type { Warning } from "../tools/types.js";
 import { SYSTEM_ACTOR, normalizeTrigger, type DataObject, type Dimension, type Persona, type UseCase, type UseCaseStep } from "./schema.js";
 import { isGeneratedId } from "../model/node-id.js";
-import { actorMapPersonas } from "./query.js";
-import { resolveUseCase } from "./resolve.js";
+import { actorMapPersonas, stepsOfOp } from "./query.js";
+import { resolveUseCase, type EffectiveUseCase } from "./resolve.js";
 import type { ScreenLookup } from "./screens.js";
 
 /** The pools a use case is checked against. Built once per call, shared by every entity checked in it. */
@@ -41,6 +41,23 @@ export function validateDataObject(object: DataObject, pools: ValidationPools): 
     if (field.type === "ref" && field.ref !== undefined && !pools.objects.has(field.ref)) {
       warnings.push({ kind: "unknown_data_object", target: `data_object:${object.id}`, message: `field "${field.name}" refs unknown data object "${field.ref}"` });
     }
+  }
+  return warnings;
+}
+
+/** Branch problems of an effective case: a `from` / `rejoin` that is not a main-flow step, a branch a variant left without steps. */
+function branchWarnings(effective: EffectiveUseCase, target: string): Warning[] {
+  const warnings: Warning[] = [];
+  const mainSteps = new Set(effective.steps.map((step) => step.id));
+  for (const branch of effective.branches ?? []) {
+    const at = `${target}/branch:${branch.id}`;
+    if (branch.from !== undefined && !mainSteps.has(branch.from)) {
+      warnings.push({ kind: "branch_from_missing", target: at, message: `branch "${branch.id}" forks from "${branch.from}", which is not a main-flow step` });
+    }
+    if (branch.rejoin !== undefined && !mainSteps.has(branch.rejoin)) {
+      warnings.push({ kind: "branch_rejoin_missing", target: at, message: `branch "${branch.id}" rejoins at "${branch.rejoin}", which is not a main-flow step` });
+    }
+    if (branch.steps.length === 0) warnings.push({ kind: "branch_empty", target: at, message: `branch "${branch.id}" has no steps` });
   }
   return warnings;
 }
@@ -106,6 +123,9 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
   checkIo(useCase.inputs, at());
   checkIo(useCase.outputs, at());
   for (const step of useCase.steps) await checkStep(step);
+  for (const branch of useCase.branches ?? []) for (const step of branch.steps) await checkStep(step);
+  const baseBranchWarnings = branchWarnings(resolveUseCase(useCase).use_case, at());
+  warnings.push(...baseBranchWarnings);
 
   for (const variant of useCase.variants ?? []) {
     for (const id of variant.personas ?? []) checkPersona(id, at(variant.id));
@@ -128,11 +148,26 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
         }
       }
     }
-    for (const op of variant.steps ?? []) if (op.op !== "remove") await checkStep(op.step, variant.id);
-    for (const issue of resolveUseCase(useCase, variant).issues) {
-      const kind = ({ missing_step: "variant_step_missing", duplicate_step_id: "duplicate_step_id", actor_invalid: "variant_actor_invalid", missing_state: "variant_state_missing" } as const)[issue.kind];
+    for (const op of variant.steps ?? []) for (const step of stepsOfOp(op)) await checkStep(step, variant.id);
+    const resolved = resolveUseCase(useCase, variant);
+    for (const issue of resolved.issues) {
+      const kind = (
+        {
+          missing_step: "variant_step_missing",
+          missing_branch: "variant_step_missing",
+          duplicate_step_id: "duplicate_step_id",
+          duplicate_branch_id: "duplicate_branch_id",
+          actor_invalid: "variant_actor_invalid",
+          missing_state: "variant_state_missing",
+        } as const
+      )[issue.kind];
       warn({ kind, target: at(variant.id), message: issue.message });
     }
+    // A problem the base case already has is reported once, on the base; the variant adds only what it causes.
+    // Matched by kind and the target without its variant, never by the message text.
+    const sameProblem = (w: Warning): string => `${w.kind}|${(w.target ?? "").replace(/#[^/]*/, "")}`;
+    const known = new Set(baseBranchWarnings.map(sameProblem));
+    for (const w of branchWarnings(resolved.use_case, at(variant.id))) if (!known.has(sameProblem(w))) warn(w);
   }
   return warnings;
 }

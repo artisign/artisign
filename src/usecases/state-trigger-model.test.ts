@@ -157,7 +157,7 @@ describe("variant state merge", () => {
 
   it("reports an unset of a key the base lacks as missing_state and changes nothing", () => {
     const r = merged([{ subject: "nobody", property: "none", unset: true }]);
-    expect(r.issues).toEqual([expect.objectContaining({ kind: "missing_state", step_id: "nobody.none" })]);
+    expect(r.issues).toEqual([expect.objectContaining({ kind: "missing_state", subject: "nobody", property: "none" })]);
     expect(r.use_case.state).toHaveLength(3);
   });
 

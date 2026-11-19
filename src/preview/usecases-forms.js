@@ -8,7 +8,7 @@ import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
 import { segmented, avatar } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
-import { createVariantEditor, touchScope, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, variantWarnings, showFieldErrors } from "./usecases-variant-edit.js";
+import { createVariantEditor, touchScope, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, allBranchStepIds, variantWarnings, showFieldErrors } from "./usecases-variant-edit.js";
 import { createReorder, renumberRow } from "./usecases-reorder.js";
 import {
   triggerText,
@@ -44,6 +44,8 @@ export function draftFromSource(source) {
     inputs: ioDraft(s.inputs, "source"),
     outputs: ioDraft(s.outputs, "target"),
     steps: (s.steps ?? []).map(stepDraft),
+    // Branches are not edited here and are never sent (the save merges into the stored case); their step ids stay taken.
+    branchStepIds: (s.branches ?? []).flatMap((branch) => (branch.steps ?? []).map((step) => step.id)),
     variants: (s.variants ?? []).map(variantDraft),
   };
 }
@@ -67,7 +69,7 @@ export function buildPayload({ id, draft, source }) {
   if (outputs.length === 0) errors.push("Add at least one output with an example.");
 
   // Generated ids must not collide with ANY id the case already has: every step, every variant, and the steps variants add.
-  const usedStepIds = new Set([...draft.steps.map((s) => s.id).filter(Boolean), ...variantStepIds(draft.variants)]);
+  const usedStepIds = new Set([...draft.steps.map((s) => s.id).filter(Boolean), ...(draft.branchStepIds ?? []), ...variantStepIds(draft.variants)]);
   const fieldErrors = [];
   const steps = draft.steps.map((step, index) => {
     const stepId = step.id || uniqueId(slugify(step.action) || `step-${index + 1}`, usedStepIds);
@@ -81,7 +83,7 @@ export function buildPayload({ id, draft, source }) {
 
   const variantIds = new Set(draft.variants.map((v) => v.id).filter(Boolean));
   const variants = draft.variants.map((variant, index) => {
-    const built = buildVariant(variant, index, { baseSteps: draft.steps, usedStepIds, variantIds });
+    const built = buildVariant(variant, index, { baseSteps: draft.steps, usedStepIds, variantIds, branchStepIds: allBranchStepIds(draft) });
     errors.push(...built.errors);
     fieldErrors.push(...built.fieldErrors);
     return built.out;
@@ -146,7 +148,7 @@ export function draftWarnings({ draft, pool, screens, nodes }) {
       check(`step.${i}.data.${j}.after`, d.object, d.after);
     });
   });
-  draft.variants.forEach((variant, index) => warnings.push(...variantWarnings({ variant, index, baseSteps: draft.steps, pool })));
+  draft.variants.forEach((variant, index) => warnings.push(...variantWarnings({ variant, index, baseSteps: draft.steps, pool, branchStepIds: allBranchStepIds(draft) })));
   return warnings;
 }
 

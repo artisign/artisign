@@ -1,11 +1,20 @@
-import { SYSTEM_ACTOR, normalizeTrigger, type StateEntry, type TriggerObject, type UseCase, type UseCaseInput, UseCaseOutput, UseCaseStep, UseCaseVariant } from "./schema.js";
+import { SYSTEM_ACTOR, normalizeTrigger, type StateEntry, type TriggerObject, type UseCase, type UseCaseBranch, type UseCaseInput, type UseCaseOutput, type UseCaseStep, type UseCaseVariant } from "./schema.js";
 
 export type StepChange = "changed" | "added";
 
 export type EffectiveStep = UseCaseStep & { change?: StepChange };
 
-/** A base step a variant deletes; `after` is the step it followed in the effective flow (`null` = it opened the flow). */
-export type RemovedStep = UseCaseStep & { change: "removed"; after: string | null };
+/**
+ * A base step a variant deletes; `after` is the step it followed in the effective flow of its own list (`null` = it opened the
+ * main flow or its branch), `branch` the branch it was in (absent = the main flow).
+ */
+export type RemovedStep = UseCaseStep & { change: "removed"; after: string | null; branch?: string };
+
+/** A branch of the effective case: `change` is set only when a variant replaced or added the branch itself (its steps carry their own). */
+export type EffectiveBranch = Omit<UseCaseBranch, "steps"> & { steps: EffectiveStep[]; change?: StepChange };
+
+/** A base branch a variant removes, steps included. */
+export type RemovedBranch = UseCaseBranch & { change: "removed" };
 
 /** A starting-state entry of the effective case; `change` is set only when a variant replaced or added it. */
 export type EffectiveStateEntry = StateEntry & { change?: StateChange };
@@ -14,36 +23,46 @@ export type StateChange = "changed" | "added";
 /** A base state entry a variant unsets. */
 export type RemovedStateEntry = StateEntry & { change: "removed" };
 
-export type EffectiveUseCase = Omit<UseCase, "variants" | "steps" | "inputs" | "outputs" | "trigger" | "state"> & {
+export type EffectiveUseCase = Omit<UseCase, "variants" | "steps" | "branches" | "inputs" | "outputs" | "trigger" | "state"> & {
   /** Always the object form, however it is stored. */
   trigger?: TriggerObject;
   state?: EffectiveStateEntry[];
   inputs: UseCaseInput[];
   outputs: UseCaseOutput[];
   steps: EffectiveStep[];
+  branches?: EffectiveBranch[];
 };
 
-export type ResolveIssue = {
-  /**
-   * `missing_step`: the op points at a step the flow lacks. `duplicate_step_id`: the op would put a second step with an existing id into the flow.
-   * `actor_invalid`: the `actors` map would turn the inherited trigger actor into `system` (not applied; `op` is -1 and `step_id` empty).
-   * `missing_state`: the variant unsets a state entry the base lacks (`op` is -1, `step_id` is `subject.property`).
-   */
-  kind: "missing_step" | "duplicate_step_id" | "actor_invalid" | "missing_state";
-  variant: string;
-  op: number;
-  step_id: string;
-  message: string;
-};
+/**
+ * A problem a variant causes while it is applied; the op is skipped, never fatal. One shape per subject, told apart by `kind`:
+ * a step (`missing_step`: the op names a step the case lacks; `duplicate_step_id`: it would add a second step with an existing
+ * id), a state entry (`missing_state`: the variant unsets an entry the base lacks), a branch (`missing_branch`: the op names a
+ * branch the case lacks; `duplicate_branch_id`: it would add a second branch with an existing id) or the trigger actor
+ * (`actor_invalid`: the `actors` map would turn the inherited trigger actor into `system`; not applied).
+ */
+export type ResolveIssue = { variant: string; message: string } & (
+  | { kind: "missing_step" | "duplicate_step_id"; op: number; step_id: string }
+  | { kind: "missing_state"; subject: string; property: string }
+  | { kind: "missing_branch" | "duplicate_branch_id"; op: number; branch_id: string }
+  | { kind: "actor_invalid"; actor: string }
+);
 
 export type ResolvedUseCase = {
   use_case: EffectiveUseCase;
   removed_steps: RemovedStep[];
+  /** Base branches the variant removes. */
+  removed_branches: RemovedBranch[];
   /** Base starting-state entries the variant unsets. */
   removed_state: RemovedStateEntry[];
-  /** Ops that point at a step the flow does not have at that point — skipped, never fatal. */
+  /** Problems a variant causes while it is applied (an op naming a step or branch the case lacks, a duplicate id, an unset state entry the base lacks, an invalid trigger actor map) — the op is skipped, never fatal. */
   issues: ResolveIssue[];
 };
+
+function plainStep(step: EffectiveStep): UseCaseStep {
+  const plain: EffectiveStep = { ...step };
+  delete plain.change;
+  return plain;
+}
 
 /** The base use case without its variants; a variant, when given, is applied on top. Pure: nothing is read or written. */
 export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): ResolvedUseCase {
@@ -54,10 +73,13 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
   };
   delete effective.variants;
   if (effective.trigger === undefined) delete effective.trigger;
+  if (base.branches !== undefined) effective.branches = base.branches.map((branch) => ({ ...branch, steps: branch.steps.map((step) => ({ ...step })) }));
   const removed: RemovedStep[] = [];
+  const removedBranches: RemovedBranch[] = [];
   const removedState: RemovedStateEntry[] = [];
   const issues: ResolveIssue[] = [];
-  if (!variant) return { use_case: effective, removed_steps: removed, removed_state: removedState, issues };
+  const result = (): ResolvedUseCase => ({ use_case: effective, removed_steps: removed, removed_branches: removedBranches, removed_state: removedState, issues });
+  if (!variant) return result();
 
   // 1. Overrides, each replaced whole.
   if (variant.personas !== undefined) effective.personas = variant.personas;
@@ -76,7 +98,7 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
       const index = state.findIndex((e) => e.subject === entry.subject && e.property === entry.property);
       if (entry.unset === true) {
         if (index === -1) {
-          issues.push({ kind: "missing_state", variant: variant.id, op: -1, step_id: `${entry.subject}.${entry.property}`, message: `variant "${variant.id}" unsets state "${entry.subject}.${entry.property}", which the base case does not have` });
+          issues.push({ kind: "missing_state", variant: variant.id, subject: entry.subject, property: entry.property, message: `variant "${variant.id}" unsets state "${entry.subject}.${entry.property}", which the base case does not have` });
           continue;
         }
         const [gone] = state.splice(index, 1);
@@ -91,21 +113,33 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
     else delete effective.state;
   }
 
-  // 3. The actors map runs once, before the ops, on the inherited steps only; it is never chained.
+  // 3. The actors map runs once, before the ops, on the inherited steps (main flow and branches); it is never chained.
   const actors = variant.actors ?? {};
   const mapped = (actor: string): string => (Object.hasOwn(actors, actor) ? actors[actor]! : actor);
   // A step only the map changed keeps its base form for the removed-steps report: the map is not an op.
   const baseOf = new Map<EffectiveStep, UseCaseStep>();
-  effective.steps = effective.steps.map((step) => {
-    if (mapped(step.actor) === step.actor) return step;
-    const remapped: EffectiveStep = { ...step, actor: mapped(step.actor), change: "changed" };
-    baseOf.set(remapped, step);
-    return remapped;
-  });
+  const baseIdOf = new Map<EffectiveBranch, string>();
+  const remap = (steps: EffectiveStep[]): EffectiveStep[] =>
+    steps.map((step) => {
+      if (mapped(step.actor) === step.actor) return step;
+      const remapped: EffectiveStep = { ...step, actor: mapped(step.actor), change: "changed" };
+      baseOf.set(remapped, step);
+      return remapped;
+    });
+  effective.steps = remap(effective.steps);
+  if (effective.branches !== undefined) {
+    effective.branches = effective.branches.map((branch) => {
+      const steps = remap(branch.steps);
+      if (steps.every((step, i) => step === branch.steps[i])) return branch;
+      return { ...branch, steps } as EffectiveBranch;
+    });
+    // Which base branch each effective branch stems from (by id), so a removal reports the pristine base branch.
+    effective.branches.forEach((branch, index) => baseIdOf.set(branch, base.branches![index]!.id));
+  }
   // It also maps an inherited `trigger.actor`; a trigger the variant wrote itself is taken as written. A trigger actor is never the system.
   if (variant.trigger === undefined && effective.trigger?.actor !== undefined && mapped(effective.trigger.actor) !== effective.trigger.actor) {
     if (mapped(effective.trigger.actor) === SYSTEM_ACTOR) {
-      issues.push({ kind: "actor_invalid", variant: variant.id, op: -1, step_id: "", message: `variant "${variant.id}" maps trigger actor "${effective.trigger.actor}" to "${SYSTEM_ACTOR}": a trigger actor is a persona, so the mapping is not applied to the trigger` });
+      issues.push({ kind: "actor_invalid", variant: variant.id, actor: effective.trigger.actor, message: `variant "${variant.id}" maps trigger actor "${effective.trigger.actor}" to "${SYSTEM_ACTOR}": a trigger actor is a persona, so the mapping is not applied to the trigger` });
     } else {
       effective.trigger = { ...effective.trigger, actor: mapped(effective.trigger.actor) };
     }
@@ -115,43 +149,109 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
     effective.personas = [...new Set(base.personas.map(mapped).filter((id) => id !== SYSTEM_ACTOR))];
   }
 
-  // 4. The ops, in order.
+  // 4. The ops, in order. Step ids are one namespace: the main flow and every branch.
   const steps = effective.steps;
+  const branches = (): EffectiveBranch[] => (effective.branches ??= []);
+  const findBranch = (id: string): EffectiveBranch | undefined => effective.branches?.find((branch) => branch.id === id);
+  const locate = (stepId: string): { list: EffectiveStep[]; index: number; branch?: EffectiveBranch } | undefined => {
+    const index = steps.findIndex((step) => step.id === stepId);
+    if (index !== -1) return { list: steps, index };
+    for (const branch of effective.branches ?? []) {
+      const at = branch.steps.findIndex((step) => step.id === stepId);
+      if (at !== -1) return { list: branch.steps, index: at, branch };
+    }
+    return undefined;
+  };
+  /** Whether the flow already has a step with this id, leaving out the steps of the branch being replaced. */
+  const idTaken = (id: string, ignore?: EffectiveBranch): boolean =>
+    steps.some((step) => step.id === id) || (effective.branches ?? []).some((branch) => branch !== ignore && branch.steps.some((step) => step.id === id));
+  /** A branch an op writes: a step that keeps the id of a step of the branch it replaces is `changed`, every other one `added`. */
+  const writtenBranch = (branch: UseCaseBranch, change: StepChange, replaced?: EffectiveBranch): EffectiveBranch => ({
+    ...branch,
+    steps: branch.steps.map((step) => {
+      const old = replaced?.steps.find((o) => o.id === step.id);
+      // A step the variant added itself stays `added` however often it is rewritten.
+      return { ...step, change: old && old.change !== "added" ? ("changed" as const) : ("added" as const) };
+    }),
+    change,
+  });
+
   (variant.steps ?? []).forEach((op, opIndex) => {
-    const missing = (stepId: string): void => {
-      issues.push({ kind: "missing_step", variant: variant.id, op: opIndex, step_id: stepId, message: `variant "${variant.id}" op ${opIndex} (${op.op}) points at step "${stepId}", which the flow does not have at that point` });
+    const label = `variant "${variant.id}" op ${opIndex} (${op.op})`;
+    const missingStep = (stepId: string): void => {
+      issues.push({ kind: "missing_step", variant: variant.id, op: opIndex, step_id: stepId, message: `${label} points at step "${stepId}", which the flow does not have at that point` });
     };
-    // An op never creates a second step with an id the flow already has (a replace may keep its own id).
-    const collides = (ownId?: string): boolean => {
-      if (op.op === "remove" || op.step.id === ownId || !steps.some((step) => step.id === op.step.id)) return false;
-      issues.push({ kind: "duplicate_step_id", variant: variant.id, op: opIndex, step_id: op.step.id, message: `variant "${variant.id}" op ${opIndex} (${op.op}) would add a second step "${op.step.id}" to the flow` });
+    const missingBranch = (branchId: string): void => {
+      issues.push({ kind: "missing_branch", variant: variant.id, op: opIndex, branch_id: branchId, message: `${label} points at branch "${branchId}", which the case does not have at that point` });
+    };
+    const duplicateStep = (stepId: string): void => {
+      issues.push({ kind: "duplicate_step_id", variant: variant.id, op: opIndex, step_id: stepId, message: `${label} would add a second step "${stepId}" to the flow` });
+    };
+    const duplicateBranch = (branchId: string): void => {
+      issues.push({ kind: "duplicate_branch_id", variant: variant.id, op: opIndex, branch_id: branchId, message: `${label} would add a second branch "${branchId}" to the case` });
+    };
+    /** A step id the op brings in must be new to the flow (a replace may keep its own id; `ignore` is the branch a replace_branch rewrites). */
+    const stepCollides = (step: UseCaseStep, ownId?: string, ignore?: EffectiveBranch): boolean => {
+      if (step.id === ownId || !idTaken(step.id, ignore)) return false;
+      duplicateStep(step.id);
       return true;
     };
+
+    if (op.op === "add_branch" || op.op === "replace_branch") {
+      const current = op.op === "replace_branch" ? findBranch(op.branch_id) : undefined;
+      if (op.op === "replace_branch" && !current) return missingBranch(op.branch_id);
+      if (findBranch(op.branch.id) !== undefined && findBranch(op.branch.id) !== current) return duplicateBranch(op.branch.id);
+      if (op.branch.steps.some((step) => stepCollides(step, undefined, current))) return;
+      if (current) {
+        // A branch this variant added itself stays "added" however often it is rewritten.
+        const written = writtenBranch(op.branch, current.change === "added" ? "added" : "changed", current);
+        branches()[branches().indexOf(current)] = written;
+        const origin = baseIdOf.get(current);
+        if (origin !== undefined) baseIdOf.set(written, origin);
+      } else {
+        branches().push(writtenBranch(op.branch, "added"));
+      }
+      return;
+    }
+    if (op.op === "remove_branch") {
+      const current = findBranch(op.branch_id);
+      if (!current) return missingBranch(op.branch_id);
+      branches().splice(branches().indexOf(current), 1);
+      // A branch that stems from the base is reported as the base had it; one the variant added itself leaves no trace.
+      const origin = baseIdOf.get(current);
+      const pristine = origin === undefined ? undefined : base.branches?.find((branch) => branch.id === origin);
+      if (pristine) {
+        removedBranches.push({ ...pristine, steps: pristine.steps.map((step) => ({ ...step })), change: "removed" });
+        // Its steps are listed with the branch, not a second time as removed steps.
+        for (let i = removed.length - 1; i >= 0; i--) if (removed[i]!.branch === current.id || removed[i]!.branch === origin) removed.splice(i, 1);
+      }
+      if (effective.branches!.length === 0) delete effective.branches;
+      return;
+    }
     if (op.op === "append") {
-      if (!collides()) steps.push({ ...op.step, change: "added" });
+      const target = op.branch === undefined ? steps : findBranch(op.branch)?.steps;
+      if (!target) return missingBranch(op.branch!);
+      if (!stepCollides(op.step)) target.push({ ...op.step, change: "added" });
       return;
     }
-    const index = steps.findIndex((step) => step.id === op.step_id);
-    if (index === -1) {
-      missing(op.step_id);
-      return;
-    }
-    const current = steps[index]!;
-    if (op.op !== "remove" && collides(op.op === "replace" ? op.step_id : undefined)) return;
+    const found = locate(op.step_id);
+    if (!found) return missingStep(op.step_id);
+    const { list, index, branch } = found;
+    const current = list[index]!;
+    if (op.op !== "remove" && stepCollides(op.step, op.op === "replace" ? op.step_id : undefined)) return;
     if (op.op === "replace") {
       // A step this variant added itself stays "added" however often it is rewritten.
-      steps[index] = { ...op.step, change: current.change === "added" ? "added" : "changed" };
+      list[index] = { ...op.step, change: current.change === "added" ? "added" : "changed" };
     } else if (op.op === "insert_after") {
-      steps.splice(index + 1, 0, { ...op.step, change: "added" });
+      list.splice(index + 1, 0, { ...op.step, change: "added" });
     } else {
-      steps.splice(index, 1);
+      list.splice(index, 1);
       // Removing a step the variant itself added leaves no trace in the base flow.
       if (current.change !== "added") {
-        const plain: EffectiveStep = { ...(baseOf.get(current) ?? current) };
-        delete plain.change;
-        removed.push({ ...plain, change: "removed", after: index > 0 ? steps[index - 1]!.id : null });
+        const plain = plainStep(baseOf.get(current) ?? current);
+        removed.push({ ...plain, change: "removed", after: index > 0 ? list[index - 1]!.id : null, ...(branch ? { branch: branch.id } : {}) });
       }
     }
   });
-  return { use_case: effective, removed_steps: removed, removed_state: removedState, issues };
+  return result();
 }

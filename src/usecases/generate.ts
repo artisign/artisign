@@ -322,7 +322,8 @@ export type VariantSuggestion = {
   id: string;
   title: string;
   when: Record<string, string[]>;
-  personas: string[];
+  /** Left out on skeletons for constellation-scoped dimensions: a variant override replaces the base value whole, so an empty list would wipe it. */
+  personas?: string[];
   /** Only on skeletons for constellation-scoped dimensions: the pool constellations with that value. */
   constellations?: string[];
 };
@@ -361,8 +362,8 @@ export function suggestVariantGaps(
 
   for (const dimension of dimensions) {
     const forConstellations = dimension.scope === "constellations";
-    // Constellation-scoped dimensions only matter for a case that lists constellations.
-    if (forConstellations && (useCase.constellations ?? []).length === 0) continue;
+    // Constellation-scoped dimensions only matter for a case with constellations that resolve.
+    if (forConstellations && ownConstellations.length === 0) continue;
     const pool: Covering[] = forConstellations ? constellations : personas;
     const own: Covering[] = forConstellations ? ownConstellations : ownPersonas;
     const used = dimension.values.filter((v) => pool.some((p) => ownValue(p.traits, dimension.id) === v.id));
@@ -384,8 +385,9 @@ export function suggestVariantGaps(
         id: freeVariantId(`${dimension.id}-${value.id}`, taken),
         title: `${useCase.title} — ${dimension.label}: ${value.label}`,
         when: { [dimension.id]: [value.id] },
-        personas: forConstellations ? [] : personas.filter((p) => ownValue(p.traits, dimension.id) === value.id).map((p) => p.id),
-        ...(forConstellations ? { constellations: constellations.filter((c) => ownValue(c.traits, dimension.id) === value.id).map((c) => c.id) } : {}),
+        ...(forConstellations
+          ? { constellations: constellations.filter((c) => ownValue(c.traits, dimension.id) === value.id).map((c) => c.id) }
+          : { personas: personas.filter((p) => ownValue(p.traits, dimension.id) === value.id).map((p) => p.id) }),
       });
     }
   }

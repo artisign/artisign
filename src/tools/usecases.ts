@@ -588,7 +588,7 @@ async function suggestVariantsInner(store: Store, input: SuggestVariantsInput): 
     coverage,
     suggestions: suggestions.slice(0, limit),
     ...(suggestions.length > limit ? { suggestion_count: suggestions.length } : {}),
-    ...(pool.dimensions.length === 0 || pool.personas.length === 0 ? { hint: "define dimensions and personas first (set_use_cases), traits drive the suggestions" } : {}),
+    ...(coverage.length === 0 && (pool.dimensions.length === 0 || pool.personas.length === 0) ? { hint: "define dimensions and personas first (set_use_cases), traits drive the suggestions" } : {}),
   };
 }
 

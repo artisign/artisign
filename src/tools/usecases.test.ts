@@ -895,7 +895,38 @@ describe("use case tools", () => {
       expect(plain.suggestions.some((s) => "constellations" in s)).toBe(false);
       const world = (await suggestVariants(fx.store, { id: "with-world" })) as SuggestRes;
       expect(world.coverage.find((c) => c.dimension === "household")).toEqual({ dimension: "household", covered: ["single"], uncovered: ["family"] });
-      expect(world.suggestions.find((s) => s.id === "household-family")).toEqual({ id: "household-family", title: "Borrow a book — Household: Family", when: { household: ["family"] }, personas: [], constellations: ["clan"] });
+      expect(world.suggestions.find((s) => s.id === "household-family")).toEqual({ id: "household-family", title: "Borrow a book — Household: Family", when: { household: ["family"] }, constellations: ["clan"] });
+      expect(world.suggestions.find((s) => s.id === "household-family")).not.toHaveProperty("personas");
+      expect(world).not.toHaveProperty("hint");
+    });
+
+    it("a written-back constellation suggestion keeps the base personas when resolved (CHR-1144)", async () => {
+      await setUseCases(fx.store, {
+        dimensions: [{ id: "household", label: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "family", label: "Family" }] }],
+        personas: PERSONAS,
+        constellations: [
+          { id: "solo", name: "Solo", traits: { household: "single" }, relationships: [] },
+          { id: "clan", name: "Clan", traits: { household: "family" }, relationships: [] },
+        ],
+        use_cases: [{ ...borrowCase(), constellations: ["solo"] }],
+      });
+      const res = (await suggestVariants(fx.store, { id: "borrow-book" })) as SuggestRes;
+      const skeleton = res.suggestions.find((s) => s.id === "household-family")!;
+      await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", variants: [skeleton] }] });
+      const got = (await getUseCase(fx.store, { id: "borrow-book", variant: "household-family" })) as { use_case: { personas: string[]; constellations: string[] } };
+      expect(got.use_case.personas).toEqual(borrowCase().personas);
+      expect(got.use_case.constellations).toEqual(["clan"]);
+    });
+
+    it("ignores constellation ids that do not resolve (CHR-1144)", async () => {
+      await setUseCases(fx.store, {
+        dimensions: [{ id: "household", label: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }] }],
+        personas: PERSONAS,
+        constellations: [{ id: "solo", name: "Solo", traits: { household: "single" }, relationships: [] }],
+        use_cases: [{ ...borrowCase(), constellations: ["nowhere"] }],
+      });
+      const res = (await suggestVariants(fx.store, { id: "borrow-book" })) as SuggestRes;
+      expect(res.coverage.some((c) => c.dimension === "household")).toBe(false);
     });
 
     it("hints when there is nothing to derive suggestions from", async () => {

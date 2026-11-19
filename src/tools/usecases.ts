@@ -39,7 +39,10 @@ import {
   summarize,
   useCaseSchema,
   validateDataObject,
+  validateConstellation,
+  validateEntity,
   validatePersona,
+  validateRelationshipType,
   validateUseCase,
   type DataObject,
   type World,
@@ -76,9 +79,17 @@ function reportWarnings(warnings: Warning[]): { warnings: Warning[]; warning_cou
   return unique.length > WARNING_CAP ? { warnings: unique.slice(0, WARNING_CAP), warning_count: unique.length } : { warnings: unique };
 }
 
-async function loadPools(store: Store): Promise<{ pools: ValidationPools; dimensions: Dimension[]; personas: Persona[]; objects: DataObject[] }> {
-  const [pool, objects] = await Promise.all([store.readPersonaPool(), store.readDataObjects()]);
-  return { pools: buildPools(pool.dimensions, pool.personas, objects), dimensions: pool.dimensions, personas: pool.personas, objects };
+const EMPTY_WORLD: World = { entities: [], relationship_types: [], constellations: [] };
+
+/** `validating`: the world and the data-model flag are read only for the paths that validate a case; a listing must not depend on `world.json`. */
+async function loadPools(store: Store, validating: boolean): Promise<{ pools: ValidationPools; dimensions: Dimension[]; personas: Persona[]; objects: DataObject[] }> {
+  const [pool, objects, world, dataModel] = await Promise.all([
+    store.readPersonaPool(),
+    store.readDataObjects(),
+    validating ? store.readWorld() : undefined,
+    validating ? store.dataModelExists() : undefined,
+  ]);
+  return { pools: buildPools(pool.dimensions, pool.personas, objects, world ?? EMPTY_WORLD, dataModel ?? false), dimensions: pool.dimensions, personas: pool.personas, objects };
 }
 
 /**
@@ -195,7 +206,7 @@ async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promis
 
   const wantsPools = (input.include ?? []).length > 0;
   if (input.cursor === undefined || wantsPools) {
-    const { dimensions, personas, objects } = await loadPools(store);
+    const { dimensions, personas, objects } = await loadPools(store, false);
     if (input.cursor === undefined) {
       response.counts = { use_cases: useCases.length, personas: personas.length, dimensions: dimensions.length, data_objects: objects.length };
       const { facets, truncated } = facetCounts(matches);
@@ -231,8 +242,8 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
 
   const resolved = resolveUseCase(useCase, variant);
   const effective = resolved.use_case;
-  const { pools, dimensions, personas, objects } = await loadPools(store);
-  const world = await store.readWorld();
+  const { pools, dimensions, personas, objects } = await loadPools(store, true);
+  const world = pools.world; // read once with the pools
 
   // The world the bundle names (ADR-011): with a variant the effective case's constellations, otherwise the case's and every variant's.
   const constellationIds = variant ? new Set(effective.constellations) : constellationsOf(useCase);
@@ -329,6 +340,10 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
 
   const warnings = await validateUseCase(useCase, pools, lookup);
   warnings.push(...ambiguousIds(bundlePersonas, world.entities));
+  // The world the bundle shows is checked on read too: a member's change after the constellation was written shows up here.
+  for (const entity of bundleEntities) warnings.push(...validateEntity(entity, pools));
+  for (const type of bundleRelationshipTypes) warnings.push(...validateRelationshipType(type, pools));
+  for (const constellation of bundleConstellations) warnings.push(...validateConstellation(constellation, pools));
   const response: Record<string, unknown> = {
     use_case: effective,
     ...(variant ? { variant: { id: variant.id, title: variant.title, ...(variant.description !== undefined ? { description: variant.description } : {}), when: variant.when } } : {}),
@@ -490,13 +505,25 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
     constellations: upsert(world.constellations, constellations),
   };
   const nextObjects = upsert(objects, dataObjects);
-  const pools = buildPools(nextDimensions, nextPersonas, nextObjects);
+  const pools = buildPools(nextDimensions, nextPersonas, nextObjects, nextWorld, dataObjects.length > 0 || (await store.dataModelExists()));
 
   const warnings: Warning[] = [];
   for (const persona of personas) warnings.push(...validatePersona(persona.value, pools));
   // A persona and an entity with one id are both written; the warning names the ids this call touched.
   warnings.push(...ambiguousIds(nextPersonas, nextWorld.entities, new Set([...personas, ...entities].map((c) => c.id))));
   for (const object of dataObjects) warnings.push(...validateDataObject(object.value, pools));
+  for (const entity of entities) warnings.push(...validateEntity(entity.value, pools));
+  for (const type of relationshipTypes) warnings.push(...validateRelationshipType(type.value, pools));
+  for (const constellation of constellations) warnings.push(...validateConstellation(constellation.value, pools));
+  // A call that changes a member or a relationship type re-checks the constellations that use it (the pool after the call).
+  const touchedParticipants = new Set([...personas, ...entities].map((c) => c.id));
+  const touchedTypes = new Set(relationshipTypes.map((t) => t.id));
+  const inCall = new Set(constellations.map((c) => c.id));
+  for (const constellation of nextWorld.constellations) {
+    if (inCall.has(constellation.id)) continue;
+    const touched = [...constellationMembers(constellation)].some((id) => touchedParticipants.has(id)) || constellation.relationships.some((r) => touchedTypes.has(r.type));
+    if (touched) warnings.push(...validateConstellation(constellation, pools));
+  }
   const lookup = new ScreenLookup(store);
   for (const useCase of useCases) warnings.push(...(await validateUseCase(useCase.value, pools, lookup)));
 

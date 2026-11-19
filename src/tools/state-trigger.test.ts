@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { deleteEntity } from "./lifecycle.js";
 import { getUseCase, listUseCases, setUseCases } from "./usecases.js";
+import type { Warning } from "./types.js";
 
 const DIMENSIONS = [{ id: "membership", label: "Membership", values: [{ id: "member", label: "Member" }, { id: "staff", label: "Staff" }] }];
 
@@ -128,10 +129,10 @@ describe("use-case state, structured trigger and constellations (ADR-011)", () =
 
     it("warns variant_actor_invalid when the map would make the trigger actor the system", async () => {
       const res = await setUseCases(fx.store, { use_cases: [{ id: "borrow-a-book", variants: [{ id: "staff", title: "Staff", when: { membership: ["staff"] }, actors: { ana: "system" } }] }] });
-      expect(res.warnings).toEqual([expect.objectContaining({ kind: "variant_actor_invalid", target: "use_case:borrow-a-book#staff" })]);
+      expect((res.warnings as Warning[]).filter((w) => w.kind === "variant_actor_invalid")).toEqual([expect.objectContaining({ target: "use_case:borrow-a-book#staff" })]);
       const bundle = await getUseCase(fx.store, { id: "borrow-a-book", variant: "staff" });
       expect((bundle.use_case as { trigger: { actor: string } }).trigger.actor).toBe("ana");
-      expect(bundle.warnings).toEqual([expect.objectContaining({ kind: "variant_actor_invalid" })]);
+      expect((bundle.warnings as Warning[]).filter((w) => w.kind === "variant_actor_invalid")).toEqual([expect.objectContaining({ target: "use_case:borrow-a-book#staff" })]);
     });
   });
 
@@ -139,7 +140,7 @@ describe("use-case state, structured trigger and constellations (ADR-011)", () =
     const res = await setUseCases(fx.store, {
       use_cases: [loanCase({ state: [{ subject: "a", property: "b", value: 1 }], variants: [{ id: "v", title: "V", when: { membership: ["staff"] }, state: [{ subject: "x", property: "y", unset: true }] }] })],
     });
-    expect(res.warnings).toEqual([expect.objectContaining({ kind: "variant_state_missing", target: "use_case:borrow-a-book#v", message: expect.stringContaining("x.y") })]);
+    expect((res.warnings as Warning[]).filter((w) => w.kind === "variant_state_missing")).toEqual([expect.objectContaining({ target: "use_case:borrow-a-book#v", message: expect.stringContaining("x.y") })]);
   });
 
   it("rejects a duplicate state key with validation_failed", async () => {

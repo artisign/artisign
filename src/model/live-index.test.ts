@@ -56,6 +56,9 @@ class FakeStore implements Store {
     return { entities: [], relationship_types: [], constellations: [] };
   }
   async writeWorld() {}
+  async dataModelExists(): Promise<boolean> {
+    return false;
+  }
   async readDataObjects(): Promise<DataObject[]> {
     return [];
   }

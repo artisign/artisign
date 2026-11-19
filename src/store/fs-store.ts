@@ -459,6 +459,13 @@ export class FsStore implements Store {
     return (await this.readUseCaseDocument("data-objects.json", (v) => dataObjectsDocSchema.safeParse(v), { objects: [] })).objects;
   }
 
+  async dataModelExists(): Promise<boolean> {
+    return stat(this.path("usecases", "data-objects.json")).then(() => true, (err: NodeJS.ErrnoException) => {
+      if (err.code === "ENOENT") return false;
+      throw err;
+    });
+  }
+
   async writeDataObjects(objects: DataObject[]): Promise<void> {
     const checked = dataObjectsDocSchema.safeParse({ objects });
     if (!checked.success) throw new InvalidFileError("usecases/data-objects.json", `refusing to write: ${describeIssues(checked.error)}`);

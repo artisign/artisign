@@ -67,6 +67,17 @@ export type WarningKind =
   | "variant_actor_invalid"
   // A variant unsets a state entry the base case does not have.
   | "variant_state_missing"
+  // World consistency (ADR-011, spec §6): never blocking.
+  | "unknown_participant"
+  | "unknown_relationship_type"
+  | "unknown_constellation"
+  | "self_relationship"
+  | "duplicate_relationship"
+  | "trait_conflict"
+  | "entity_unrelated"
+  | "entity_as_actor"
+  | "outside_constellation"
+  | "state_value_mismatch"
   // generate_personas stopped at its work budget: the result is a prefix of the full expansion.
   | "partial_result";
 

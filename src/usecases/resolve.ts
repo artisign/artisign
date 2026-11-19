@@ -1,4 +1,4 @@
-import { SYSTEM_ACTOR, type UseCase, type UseCaseInput, UseCaseOutput, UseCaseStep, UseCaseVariant } from "./schema.js";
+import { SYSTEM_ACTOR, normalizeTrigger, type StateEntry, type TriggerObject, type UseCase, type UseCaseInput, UseCaseOutput, UseCaseStep, UseCaseVariant } from "./schema.js";
 
 export type StepChange = "changed" | "added";
 
@@ -7,15 +7,28 @@ export type EffectiveStep = UseCaseStep & { change?: StepChange };
 /** A base step a variant deletes; `after` is the step it followed in the effective flow (`null` = it opened the flow). */
 export type RemovedStep = UseCaseStep & { change: "removed"; after: string | null };
 
-export type EffectiveUseCase = Omit<UseCase, "variants" | "steps" | "inputs" | "outputs"> & {
+/** A starting-state entry of the effective case; `change` is set only when a variant replaced or added it. */
+export type EffectiveStateEntry = StateEntry & { change?: StateChange };
+export type StateChange = "changed" | "added";
+
+/** A base state entry a variant unsets. */
+export type RemovedStateEntry = StateEntry & { change: "removed" };
+
+export type EffectiveUseCase = Omit<UseCase, "variants" | "steps" | "inputs" | "outputs" | "trigger" | "state"> & {
+  /** Always the object form, however it is stored. */
+  trigger?: TriggerObject;
+  state?: EffectiveStateEntry[];
   inputs: UseCaseInput[];
   outputs: UseCaseOutput[];
   steps: EffectiveStep[];
 };
 
 export type ResolveIssue = {
-  /** `missing_step`: the op points at a step the flow lacks. `duplicate_step_id`: the op would put a second step with an existing id into the flow. */
-  kind: "missing_step" | "duplicate_step_id";
+  /**
+   * `missing_step`: the op points at a step the flow lacks. `duplicate_step_id`: the op would put a second step with an existing id into the flow.
+   * `actor_invalid`: the `actors` map would turn the inherited trigger actor into `system` (not applied; `op` is -1 and `step_id` empty).
+   */
+  kind: "missing_step" | "duplicate_step_id" | "actor_invalid";
   variant: string;
   op: number;
   step_id: string;
@@ -25,26 +38,57 @@ export type ResolveIssue = {
 export type ResolvedUseCase = {
   use_case: EffectiveUseCase;
   removed_steps: RemovedStep[];
+  /** Base starting-state entries the variant unsets. */
+  removed_state: RemovedStateEntry[];
   /** Ops that point at a step the flow does not have at that point — skipped, never fatal. */
   issues: ResolveIssue[];
 };
 
 /** The base use case without its variants; a variant, when given, is applied on top. Pure: nothing is read or written. */
 export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): ResolvedUseCase {
-  const effective: EffectiveUseCase & { variants?: unknown } = { ...base, steps: base.steps.map((step) => ({ ...step })) };
+  const effective: EffectiveUseCase & { variants?: unknown } = {
+    ...base,
+    trigger: base.trigger !== undefined ? normalizeTrigger(base.trigger) : undefined,
+    steps: base.steps.map((step) => ({ ...step })),
+  };
   delete effective.variants;
+  if (effective.trigger === undefined) delete effective.trigger;
   const removed: RemovedStep[] = [];
+  const removedState: RemovedStateEntry[] = [];
   const issues: ResolveIssue[] = [];
-  if (!variant) return { use_case: effective, removed_steps: removed, issues };
+  if (!variant) return { use_case: effective, removed_steps: removed, removed_state: removedState, issues };
 
+  // 1. Overrides, each replaced whole.
   if (variant.personas !== undefined) effective.personas = variant.personas;
-  if (variant.trigger !== undefined) effective.trigger = variant.trigger;
+  if (variant.constellations !== undefined) effective.constellations = variant.constellations;
+  if (variant.trigger !== undefined) effective.trigger = normalizeTrigger(variant.trigger);
   if (variant.goal !== undefined) effective.goal = variant.goal;
   if (variant.outcome !== undefined) effective.outcome = variant.outcome;
   if (variant.inputs !== undefined) effective.inputs = variant.inputs;
   if (variant.outputs !== undefined) effective.outputs = variant.outputs;
 
-  // The actors map runs once, before the ops, on the inherited steps only; it is never chained.
+  // 2. The state merges per (subject, property): an entry replaces or adds, `unset` removes.
+  if (variant.state !== undefined) {
+    const state: EffectiveStateEntry[] = (base.state ?? []).map((entry) => ({ ...entry }));
+    const baseState = base.state ?? [];
+    for (const entry of variant.state) {
+      const index = state.findIndex((e) => e.subject === entry.subject && e.property === entry.property);
+      if (entry.unset === true) {
+        if (index === -1) continue;
+        const [gone] = state.splice(index, 1);
+        // An entry this variant added itself leaves no trace in the base state.
+        if (gone!.change !== "added") removedState.push({ ...baseState.find((e) => e.subject === entry.subject && e.property === entry.property)!, change: "removed" });
+        continue;
+      }
+      const next: EffectiveStateEntry = { subject: entry.subject, property: entry.property, value: entry.value, change: index === -1 || state[index]!.change === "added" ? "added" : "changed" };
+      if (index === -1) state.push(next);
+      else state[index] = next;
+    }
+    if (state.length > 0) effective.state = state;
+    else delete effective.state;
+  }
+
+  // 3. The actors map runs once, before the ops, on the inherited steps only; it is never chained.
   const actors = variant.actors ?? {};
   const mapped = (actor: string): string => (Object.hasOwn(actors, actor) ? actors[actor]! : actor);
   // A step only the map changed keeps its base form for the removed-steps report: the map is not an op.
@@ -55,11 +99,20 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
     baseOf.set(remapped, step);
     return remapped;
   });
+  // It also maps an inherited `trigger.actor`; a trigger the variant wrote itself is taken as written. A trigger actor is never the system.
+  if (variant.trigger === undefined && effective.trigger?.actor !== undefined && mapped(effective.trigger.actor) !== effective.trigger.actor) {
+    if (mapped(effective.trigger.actor) === SYSTEM_ACTOR) {
+      issues.push({ kind: "actor_invalid", variant: variant.id, op: -1, step_id: "", message: `variant "${variant.id}" maps trigger actor "${effective.trigger.actor}" to "${SYSTEM_ACTOR}": a trigger actor is a persona, so the mapping is not applied to the trigger` });
+    } else {
+      effective.trigger = { ...effective.trigger, actor: mapped(effective.trigger.actor) };
+    }
+  }
   if (variant.personas === undefined && Object.entries(actors).some(([key, value]) => key !== value)) {
     // The system is not a persona, so a value "system" drops the entry.
     effective.personas = [...new Set(base.personas.map(mapped).filter((id) => id !== SYSTEM_ACTOR))];
   }
 
+  // 4. The ops, in order.
   const steps = effective.steps;
   (variant.steps ?? []).forEach((op, opIndex) => {
     const missing = (stepId: string): void => {
@@ -97,5 +150,5 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
       }
     }
   });
-  return { use_case: effective, removed_steps: removed, issues };
+  return { use_case: effective, removed_steps: removed, removed_state: removedState, issues };
 }

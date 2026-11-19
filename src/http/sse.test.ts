@@ -192,7 +192,7 @@ describe("GET /events (SSE)", () => {
       id: "borrow-book",
       title: "Assign",
       status: "draft",
-      personas: [],
+      personas: [], constellations: [],
       inputs: [{ object: "loan", example: { id: 1 } }],
       outputs: [{ object: "loan", example: { id: 1 } }],
       steps: [],
@@ -208,7 +208,7 @@ describe("GET /events (SSE)", () => {
     const store = new FsStore(dir);
     await new Promise((resolve) => setTimeout(resolve, 200));
 
-    await store.writeUseCase({ id: "personas", title: "P", status: "draft", personas: [], inputs: [{ object: "o", example: { id: 1 } }], outputs: [{ object: "o", example: { id: 1 } }], steps: [] });
+    await store.writeUseCase({ id: "personas", title: "P", status: "draft", personas: [], constellations: [], inputs: [{ object: "o", example: { id: 1 } }], outputs: [{ object: "o", example: { id: 1 } }], steps: [] });
     expect(await waitForSseEvent(res, (e) => e.kind === "usecases" && e.name === "cases/personas", 4000)).toEqual({ type: "change", kind: "usecases", name: "cases/personas" });
   });
 

@@ -242,9 +242,10 @@ describe("MCP server — instructions budget", () => {
   // delete_entity (entity/constellation/relationship_type, +39 chars): 1147.25
   // to 1157, measured at 1157. The caps are gone (Christian, 2026-11-19): this
   // value is information, not a limit; a PR that grows it updates the pin and
-  // states the delta in its description.
+  // states the delta in its description. The pin is exact (CHR-1143), so any
+  // change, up or down, shows here and has to be stated.
   it("pins the measured instructions size as information, not a limit (~1157 tokens, chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(1157);
+    expect(INSTRUCTIONS.length / 4).toBe(1157);
   });
 });
 
@@ -277,8 +278,9 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   // 23,999 to 24,490 (+491), measured at 24,490. The caps are gone
   // (Christian, 2026-11-19): this value is information, not a limit; a PR
   // that grows it updates the pin and states the delta in its description.
+  // The pin is exact (CHR-1143): any change, up or down, shows here.
   it("pins the measured tools/list size as information, not a limit (24,490 chars, ~6,100 tokens)", () => {
-    expect(JSON.stringify(tools).length).toBeLessThanOrEqual(24_490);
+    expect(JSON.stringify(tools).length).toBe(24_490);
   });
 
   it("keeps every advertised tool entry within 2,000 chars", () => {

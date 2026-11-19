@@ -59,6 +59,8 @@ export type WarningKind =
   | "invalid_file"
   // A persona and a main entity share an id; references to it resolve to the persona.
   | "ambiguous_id"
+  // A variant's `actors` map would turn the inherited trigger actor into `system`; a trigger actor is a persona, so it is not applied.
+  | "variant_actor_invalid"
   // generate_personas stopped at its work budget: the result is a prefix of the full expansion.
   | "partial_result";
 

@@ -953,7 +953,7 @@ describe("use case tools", () => {
     });
 
     it("rejects a variant op that would duplicate a step id, and warns about one found in a file", async () => {
-      const dup = (op: Record<string, unknown>): Record<string, unknown> => borrowCase({ variants: [{ id: "v", title: "V", when: {}, steps: [op] }] });
+      const dup = (op: Record<string, unknown>): Record<string, unknown> => borrowCase({ variants: [{ id: "v", title: "V", when: { size: ["small"] }, steps: [op] }] });
       const step = { id: "pick", actor: "system", action: "again" };
       for (const op of [{ op: "append", step }, { op: "insert_after", step_id: "tap-book", step }, { op: "replace", step_id: "tap-book", step }]) {
         await expect(setUseCases(fx.store, { use_cases: [dup(op)] })).rejects.toMatchObject({ code: "validation_failed", message: expect.stringContaining("second step \"pick\"") });
@@ -961,7 +961,7 @@ describe("use case tools", () => {
       await expect(stat(join(fx.dir, "usecases"))).rejects.toMatchObject({ code: "ENOENT" });
       // Re-using its own id in a replace, or an id freed by an earlier remove, is fine.
       await setUseCases(fx.store, { use_cases: [dup({ op: "replace", step_id: "tap-book", step: { id: "tap-book", actor: "system", action: "x" } })] });
-      await setUseCases(fx.store, { use_cases: [borrowCase({ variants: [{ id: "v", title: "V", when: {}, steps: [{ op: "remove", step_id: "pick" }, { op: "append", step }] }] })] });
+      await setUseCases(fx.store, { use_cases: [borrowCase({ variants: [{ id: "v", title: "V", when: { size: ["small"] }, steps: [{ op: "remove", step_id: "pick" }, { op: "append", step }] }] })] });
       // A hand-edited file still gets a warning.
       const path = join(fx.dir, "usecases", "cases", "borrow-book.json");
       const stored = JSON.parse(await readFile(path, "utf-8")) as { variants: { steps: unknown[] }[] };
@@ -986,8 +986,8 @@ describe("use case tools", () => {
           {
             id: "borrow-book",
             variants: [
-              { id: "v1", title: "V1", when: {}, steps: [{ op: "append", step: { id: "x", actor: "system", action: "x", target: { screen: "sheet", node: "sheet-title" } } }] },
-              { id: "v2", title: "V2", when: {}, steps: [{ op: "append", step: { id: "x", actor: "system", action: "x", target: { screen: "sheet", node: "sheet-title" } } }, { op: "remove", step_id: "done" }] },
+              { id: "v1", title: "V1", when: { size: ["small"] }, steps: [{ op: "append", step: { id: "x", actor: "system", action: "x", target: { screen: "sheet", node: "sheet-title" } } }] },
+              { id: "v2", title: "V2", when: { size: ["small"] }, steps: [{ op: "append", step: { id: "x", actor: "system", action: "x", target: { screen: "sheet", node: "sheet-title" } } }, { op: "remove", step_id: "done" }] },
             ],
           },
         ],

@@ -23,6 +23,8 @@ import {
   objectIdsOf,
   actorMapPersonas,
   personasOf,
+  stateSubjectsOf,
+  resolveParticipant,
   personaSchema,
   constellationSchema,
   dataObjectSchema,
@@ -290,6 +292,7 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
       ? { variants: useCase.variants!.map((v) => ({ id: v.id, title: v.title, ...(v.description !== undefined ? { description: v.description } : {}), when: v.when })) }
       : {}),
     ...(resolved.removed_steps.length > 0 ? { removed_steps: resolved.removed_steps } : {}),
+    ...(resolved.removed_state.length > 0 ? { removed_state: resolved.removed_state } : {}),
     personas: bundlePersonas,
     dimensions: dimensions.filter((d) => dimensionIds.has(d.id)),
     data_objects: objects.filter((o) => objectIds.has(o.id)),
@@ -605,10 +608,25 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
     const world = await store.readWorld();
     if (kind === "entity") {
       if (!world.entities.some((e) => e.id === name)) throw notFound();
-      warnings = dangling("entity", name, world.constellations.filter((c) => namesParticipant(c, name)).map((c) => c.id), "constellation(s)");
-      await store.writeWorld({ ...world, entities: world.entities.filter((e) => e.id !== name) });
+      const [pool, { useCases }] = await Promise.all([store.readPersonaPool(), store.readUseCases()]);
+      const entitiesAfter = world.entities.filter((e) => e.id !== name);
+      // A persona with the same id still resolves the reference: nothing dangles then.
+      const stillResolves = resolveParticipant(name, pool.personas, entitiesAfter) !== undefined;
+      if (!stillResolves) {
+        warnings = [
+          ...dangling("entity", name, world.constellations.filter((c) => namesParticipant(c, name)).map((c) => c.id), "constellation(s)"),
+          ...dangling("entity", name, useCases.filter((u) => stateSubjectsOf(u).has(name)).map((u) => u.id), "use case(s) as a state, condition or trigger subject"),
+        ];
+      }
+      await store.writeWorld({ ...world, entities: entitiesAfter });
     } else if (kind === "constellation") {
       if (!world.constellations.some((c) => c.id === name)) throw notFound();
+      const { useCases } = await store.readUseCases();
+      const referrers = useCases.flatMap((u) => [
+        ...(u.constellations.includes(name) ? [u.id] : []),
+        ...(u.variants ?? []).filter((v) => v.constellations?.includes(name)).map((v) => `${u.id}#${v.id}`),
+      ]);
+      warnings = dangling("constellation", name, referrers, "use case(s) or variant(s)");
       await store.writeWorld({ ...world, constellations: world.constellations.filter((c) => c.id !== name) });
     } else {
       if (!world.relationship_types.some((t) => t.id === name)) throw notFound();
@@ -623,11 +641,14 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
     const { useCases } = await store.readUseCases();
     const world = await store.readWorld();
     if (kind === "persona") {
+      const personasAfter = pool.personas.filter((p) => p.id !== name);
+      // An entity with the same id still resolves the constellation references: nothing dangles there then.
+      const stillResolves = resolveParticipant(name, personasAfter, world.entities) !== undefined;
       warnings = [
         ...dangling("persona", name, useCases.filter((u) => personasOf(u).has(name)).map((u) => u.id), "use case(s)"),
-        ...dangling("persona", name, world.constellations.filter((c) => namesParticipant(c, name)).map((c) => c.id), "constellation(s)"),
+        ...(stillResolves ? [] : dangling("persona", name, world.constellations.filter((c) => namesParticipant(c, name)).map((c) => c.id), "constellation(s)")),
       ];
-      await store.writePersonaPool({ dimensions: pool.dimensions, personas: pool.personas.filter((p) => p.id !== name) });
+      await store.writePersonaPool({ dimensions: pool.dimensions, personas: personasAfter });
     } else {
       warnings = [
         ...dangling("dimension", name, pool.personas.filter((p) => ownValue(p.traits, name) !== undefined).map((p) => p.id), "persona(s)"),

@@ -1,4 +1,4 @@
-import { SYSTEM_ACTOR, type UseCase, type UseCaseVariant } from "./schema.js";
+import { SYSTEM_ACTOR, normalizeTrigger, type Trigger, type UseCase, type UseCaseVariant } from "./schema.js";
 
 export type UseCaseFilter = {
   group?: string;
@@ -46,13 +46,40 @@ export function actorMapPersonas(variant: UseCaseVariant): string[] {
   return Object.entries(variant.actors ?? {}).flat().filter((id) => id !== SYSTEM_ACTOR);
 }
 
+/** The persona a trigger names as its actor, if any. A trigger is never performed by `system`. */
+function triggerActor(trigger: Trigger | undefined): string | undefined {
+  const actor = trigger === undefined ? undefined : normalizeTrigger(trigger).actor;
+  return actor === SYSTEM_ACTOR ? undefined : actor;
+}
+
 export function personasOf(useCase: UseCase): Set<string> {
   const ids = new Set(useCase.personas);
+  const actor = triggerActor(useCase.trigger);
+  if (actor !== undefined) ids.add(actor);
   for (const variant of useCase.variants ?? []) {
     for (const id of variant.personas ?? []) ids.add(id);
     for (const id of actorMapPersonas(variant)) ids.add(id);
+    const variantActor = triggerActor(variant.trigger);
+    if (variantActor !== undefined) ids.add(variantActor);
   }
   for (const step of allSteps(useCase)) if (step.actor !== SYSTEM_ACTOR) ids.add(step.actor);
+  return ids;
+}
+
+/**
+ * Every participant a use case names as the subject of a state entry or condition: the starting `state` and the
+ * `trigger.state` conditions of the case and of every variant (the variant `state` included, `unset` entries too).
+ */
+export function stateSubjectsOf(useCase: UseCase): Set<string> {
+  const ids = new Set<string>();
+  const add = (list: { subject: string }[] | undefined): void => list?.forEach((item) => ids.add(item.subject));
+  const addTrigger = (trigger: Trigger | undefined): void => add(trigger === undefined ? undefined : normalizeTrigger(trigger).state);
+  add(useCase.state);
+  addTrigger(useCase.trigger);
+  for (const variant of useCase.variants ?? []) {
+    add(variant.state);
+    addTrigger(variant.trigger);
+  }
   return ids;
 }
 
@@ -78,7 +105,7 @@ function inGroup(group: string | undefined, prefix: string): boolean {
 }
 
 function haystack(useCase: UseCase): string {
-  const parts = [useCase.id, useCase.title, useCase.goal, useCase.trigger, useCase.outcome, ...useCase.steps.map((s) => s.action)];
+  const parts = [useCase.id, useCase.title, useCase.goal, useCase.trigger === undefined ? undefined : normalizeTrigger(useCase.trigger).text, useCase.outcome, ...useCase.steps.map((s) => s.action)];
   return parts.filter((p): p is string => p !== undefined).join("\n").toLowerCase();
 }
 

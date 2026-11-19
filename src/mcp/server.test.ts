@@ -279,8 +279,8 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   // (Christian, 2026-11-19): this value is information, not a limit; a PR
   // that grows it updates the pin and states the delta in its description.
   // The pin is exact (CHR-1143): any change, up or down, shows here.
-  it("pins the measured tools/list size as information, not a limit (24,490 chars, ~6,100 tokens)", () => {
-    expect(JSON.stringify(tools).length).toBe(24_490);
+  it("pins the measured tools/list size as information, not a limit (24,780 chars, ~6,200 tokens)", () => {
+    expect(JSON.stringify(tools).length).toBe(24_780);
   });
 
   it("keeps every advertised tool entry within 2,000 chars", () => {

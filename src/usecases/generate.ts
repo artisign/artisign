@@ -1,7 +1,9 @@
-import type { Dimension, Persona, UseCase } from "./schema.js";
+import type { Constellation, Dimension, Persona, UseCase } from "./schema.js";
 import { ID_MAX, isValidId, ownValue } from "./schema.js";
 
 export type Combination = Record<string, string>;
+/** Anything coverage looks at: a persona, or a constellation when generating those. */
+export type Covering = { traits: Record<string, string> };
 export type Strategy = "all" | "pairwise";
 
 /**
@@ -10,7 +12,7 @@ export type Strategy = "all" | "pairwise";
  * A persona without any trait is a catch-all and covers nothing here, or
  * generating around it would never produce anything.
  */
-export function personaCovers(persona: Persona, combination: Combination): boolean {
+export function personaCovers(persona: Covering, combination: Combination): boolean {
   // Only the dimensions being expanded count: a trait outside a chosen subset says nothing about the combination.
   const traits = Object.entries(persona.traits).filter(([dim]) => Object.hasOwn(combination, dim));
   return traits.length > 0 && traits.every(([dim, value]) => combination[dim] === value);
@@ -50,7 +52,7 @@ function productSize(dimensions: Dimension[]): number {
   return dimensions.reduce((size, d) => size * d.values.length, 1);
 }
 
-function expandAll(dimensions: Dimension[], existing: Persona[], limit: number, budget: number): GeneratedCombinations {
+function expandAll(dimensions: Dimension[], existing: Covering[], limit: number, budget: number): GeneratedCombinations {
   const combinations: Combination[] = [];
   let skipped = 0;
   let truncated = false;
@@ -101,7 +103,7 @@ function expandAll(dimensions: Dimension[], existing: Persona[], limit: number, 
  * weighed while a row is built. If the budget runs out before coverage is
  * known, nothing is generated.
  */
-function expandPairwise(dimensions: Dimension[], existing: Persona[], limit: number, budget: number): GeneratedCombinations {
+function expandPairwise(dimensions: Dimension[], existing: Covering[], limit: number, budget: number): GeneratedCombinations {
   let work = 0;
   if (dimensions.length === 1) {
     const only = dimensions[0]!;
@@ -266,15 +268,14 @@ function expandPairwise(dimensions: Dimension[], existing: Persona[], limit: num
   return { combinations, total, skipped_covered: skipped, truncated, ...(partial ? { partial: true as const } : {}) };
 }
 
-export function expandCombinations(dimensions: Dimension[], strategy: Strategy, existing: Persona[], limit: number, budget: number = WORK_BUDGET): GeneratedCombinations {
+export function expandCombinations(dimensions: Dimension[], strategy: Strategy, existing: Covering[], limit: number, budget: number = WORK_BUDGET): GeneratedCombinations {
   return strategy === "all" ? expandAll(dimensions, existing, limit, budget) : expandPairwise(dimensions, existing, limit, budget);
 }
 
 const AVATAR_COLORS = ["#4F7CAC", "#C0504D", "#4E9A6B", "#B0833A", "#7B5EA7", "#3F8F9B", "#A65E7E", "#6B7A8F"];
 
-/** Builds the persona for one combination; ids derive from the value ids and never collide with `takenIds`. */
-export function buildGeneratedPersona(combination: Combination, dimensions: Dimension[], takenIds: Set<string>, index: number): Persona {
-  const labels = dimensions.map((d) => d.values.find((v) => v.id === combination[d.id])?.label ?? combination[d.id]!);
+/** `gen-<value ids>` cut to ID_MAX, falling back to `gen-<n>`; a numeric suffix on collision. Added to `takenIds`. */
+function generatedId(combination: Combination, dimensions: Dimension[], takenIds: Set<string>, index: number): string {
   let base = `gen-${dimensions.map((d) => combination[d.id]).join("-")}`;
   if (!isValidId(base.slice(0, ID_MAX).replace(/-+$/, ""))) base = `gen-${index + 1}`;
   // The collision suffix counts against ID_MAX too.
@@ -285,12 +286,30 @@ export function buildGeneratedPersona(combination: Combination, dimensions: Dime
   let id = candidate(1);
   for (let n = 2; takenIds.has(id); n++) id = candidate(n);
   takenIds.add(id);
+  return id;
+}
+
+const valueLabel = (d: Dimension, combination: Combination): string => d.values.find((v) => v.id === combination[d.id])?.label ?? combination[d.id]!;
+
+/** Builds the persona for one combination; ids derive from the value ids and never collide with `takenIds`. */
+export function buildGeneratedPersona(combination: Combination, dimensions: Dimension[], takenIds: Set<string>, index: number): Persona {
   return {
-    id,
-    name: labels.join(" · "),
-    description: `Generated from ${dimensions.map((d) => `${d.label}: ${d.values.find((v) => v.id === combination[d.id])?.label ?? combination[d.id]}`).join(", ")}.`,
+    id: generatedId(combination, dimensions, takenIds, index),
+    name: dimensions.map((d) => valueLabel(d, combination)).join(" · "),
+    description: `Generated from ${dimensions.map((d) => `${d.label}: ${valueLabel(d, combination)}`).join(", ")}.`,
     avatar: { emoji: "🧑", color: AVATAR_COLORS[index % AVATAR_COLORS.length]! },
     traits: { ...combination },
+    generated: true,
+  };
+}
+
+/** Builds a constellation skeleton for one combination: traits only, relationships are left to the agent or the human. */
+export function buildGeneratedConstellation(combination: Combination, dimensions: Dimension[], takenIds: Set<string>, index: number): Constellation {
+  return {
+    id: generatedId(combination, dimensions, takenIds, index),
+    name: dimensions.map((d) => valueLabel(d, combination)).join(" · "),
+    traits: { ...combination },
+    relationships: [],
     generated: true,
   };
 }
@@ -304,6 +323,8 @@ export type VariantSuggestion = {
   title: string;
   when: Record<string, string[]>;
   personas: string[];
+  /** Only on skeletons for constellation-scoped dimensions: the pool constellations with that value. */
+  constellations?: string[];
 };
 
 /** An id derived from `base` (two valid ids joined by "-"): cut to ID_MAX without a trailing hyphen, a numeric suffix on collision. Always valid, never in `taken`; added to it. */
@@ -328,15 +349,23 @@ export function suggestVariantGaps(
   useCase: UseCase,
   dimensions: Dimension[],
   personas: Persona[],
+  constellations: Constellation[] = [],
 ): { coverage: DimensionCoverage[]; suggestions: VariantSuggestion[] } {
   const byId = new Map(personas.map((p) => [p.id, p]));
-  const own = useCase.personas.map((id) => byId.get(id)).filter((p): p is Persona => p !== undefined);
+  const ownPersonas = useCase.personas.map((id) => byId.get(id)).filter((p): p is Persona => p !== undefined);
+  const constellationById = new Map(constellations.map((c) => [c.id, c]));
+  const ownConstellations = (useCase.constellations ?? []).map((id) => constellationById.get(id)).filter((c): c is Constellation => c !== undefined);
   const coverage: DimensionCoverage[] = [];
   const suggestions: VariantSuggestion[] = [];
   const taken = new Set((useCase.variants ?? []).map((v) => v.id));
 
   for (const dimension of dimensions) {
-    const used = dimension.values.filter((v) => personas.some((p) => ownValue(p.traits, dimension.id) === v.id));
+    const forConstellations = dimension.scope === "constellations";
+    // Constellation-scoped dimensions only matter for a case that lists constellations.
+    if (forConstellations && (useCase.constellations ?? []).length === 0) continue;
+    const pool: Covering[] = forConstellations ? constellations : personas;
+    const own: Covering[] = forConstellations ? ownConstellations : ownPersonas;
+    const used = dimension.values.filter((v) => pool.some((p) => ownValue(p.traits, dimension.id) === v.id));
     if (used.length === 0) continue;
     const covered = new Set<string>();
     for (const persona of own) {
@@ -355,7 +384,8 @@ export function suggestVariantGaps(
         id: freeVariantId(`${dimension.id}-${value.id}`, taken),
         title: `${useCase.title} — ${dimension.label}: ${value.label}`,
         when: { [dimension.id]: [value.id] },
-        personas: personas.filter((p) => ownValue(p.traits, dimension.id) === value.id).map((p) => p.id),
+        personas: forConstellations ? [] : personas.filter((p) => ownValue(p.traits, dimension.id) === value.id).map((p) => p.id),
+        ...(forConstellations ? { constellations: constellations.filter((c) => ownValue(c.traits, dimension.id) === value.id).map((c) => c.id) } : {}),
       });
     }
   }

@@ -74,7 +74,7 @@ type Bundle = {
   warnings: Warning[];
 };
 type GenRes = { would_create: number; personas: { id: string; traits: object }[] };
-type SuggestRes = { suggestions: Row[] };
+type SuggestRes = { suggestions: Row[]; coverage: { dimension: string; covered: string[]; uncovered: string[] }[] };
 
 const kinds = (warnings: unknown): string[] => (warnings as Warning[]).map((w) => w.kind);
 
@@ -803,6 +803,70 @@ describe("use case tools", () => {
       await expect(generatePersonas(fx.store, { strategy: "all", dimensions: wide.map((d) => d.id) })).rejects.toMatchObject({ code: "validation_failed" });
       expect(((await generatePersonas(fx.store, { dimensions: wide.map((d) => d.id), limit: 5, dry_run: true })) as GenRes).would_create).toBe(5);
     });
+
+    describe("target constellations (CHR-1144)", () => {
+      const WORLD_DIMS = [
+        { id: "household", label: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "family", label: "Family" }] },
+        { id: "branch", label: "Branch", scope: "constellations", values: [{ id: "main", label: "Main" }, { id: "annex", label: "Annex" }] },
+      ];
+      type ConRes = GenRes & { target?: string; constellations: { id: string; name: string; traits: Record<string, string> }[]; constellations_truncated?: boolean };
+
+      beforeEach(async () => {
+        await setUseCases(fx.store, { dimensions: WORLD_DIMS });
+      });
+
+      it("expands constellation-scoped dimensions and echoes the target", async () => {
+        const res = (await generatePersonas(fx.store, { strategy: "all", target: "constellations", dry_run: true })) as ConRes;
+        expect(res).toMatchObject({ dry_run: true, target: "constellations", total: 4, would_create: 4 });
+        expect(res.constellations[0]).toEqual({ id: "gen-single-main", name: "Single · Main", traits: { household: "single", branch: "main" } });
+        expect(res).not.toHaveProperty("personas");
+      });
+
+      it("writes skeletons to the world, skips what exists and leaves the personas alone", async () => {
+        await generatePersonas(fx.store, { strategy: "all", target: "constellations" });
+        const world = await fx.store.readWorld();
+        expect(world.constellations).toHaveLength(4);
+        expect(world.constellations[0]).toMatchObject({ id: "gen-single-main", relationships: [], generated: true });
+        expect((await fx.store.readPersonaPool()).personas).toEqual([]);
+        const again = (await generatePersonas(fx.store, { strategy: "all", target: "constellations" })) as ConRes;
+        expect(again).toMatchObject({ created: 0, skipped_covered: 4 });
+      });
+
+      it("rejects a dimension with the wrong scope, both ways, and writes nothing", async () => {
+        await setUseCases(fx.store, { dimensions: [{ id: "role", label: "Role", values: [{ id: "a", label: "A" }] }] });
+        await expect(generatePersonas(fx.store, { target: "constellations", dimensions: ["role"] })).rejects.toMatchObject({ code: "validation_failed", message: expect.stringContaining("role") });
+        await expect(generatePersonas(fx.store, { dimensions: ["household"] })).rejects.toMatchObject({ code: "validation_failed", message: expect.stringContaining("household") });
+        expect((await fx.store.readWorld()).constellations).toEqual([]);
+      });
+
+      it("persona generation ignores constellation-scoped dimensions; no dimensions of the scope is validation_failed", async () => {
+        const res = (await generatePersonas(fx.store, { strategy: "all", dry_run: true })) as GenRes;
+        expect(res).toMatchObject({ total: 4, would_create: 4 });
+        expect(res.personas.every((p) => !("household" in p.traits))).toBe(true);
+        expect(res).not.toHaveProperty("target");
+        await expect(generatePersonas(fx.store, { target: "constellations", dimensions: ["nope"] })).rejects.toMatchObject({ code: "not_found" });
+      });
+
+      it("collision rule: personas avoid persona and entity ids, constellations only constellation ids", async () => {
+        await setUseCases(fx.store, {
+          entities: [{ id: "gen-student-single", name: "Thing", type: "thing" }],
+          constellations: [{ id: "gen-single-main", name: "Mine", relationships: [] }],
+        });
+        expect(((await generatePersonas(fx.store, { strategy: "all", dry_run: true })) as GenRes).personas[0]!.id).toBe("gen-student-single-2");
+        const res = (await generatePersonas(fx.store, { strategy: "all", target: "constellations", dry_run: true })) as ConRes;
+        expect(res.constellations.map((c) => c.id)).toContain("gen-single-main-2");
+        expect(res.constellations.map((c) => c.id)).not.toContain("gen-single-main");
+      });
+
+      it("caps the dry-run list at 50 with constellations_truncated", async () => {
+        const big = [0, 1].map((i) => ({ id: `w${i}`, label: `W${i}`, scope: "constellations", values: Array.from({ length: 8 }, (_, v) => ({ id: `v${v}`, label: `V${v}` })) }));
+        await setUseCases(fx.store, { dimensions: big });
+        const res = (await generatePersonas(fx.store, { strategy: "all", target: "constellations", dimensions: ["w0", "w1"], dry_run: true })) as ConRes;
+        expect(res.would_create).toBe(64);
+        expect(res.constellations).toHaveLength(50);
+        expect(res.constellations_truncated).toBe(true);
+      });
+    });
   });
 
   describe("suggest_use_case_variants", () => {
@@ -814,6 +878,24 @@ describe("use case tools", () => {
       await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", variants: [{ id: "sep", title: "Staff", when: { membership: ["staff"] } }] }] });
       const after = (await suggestVariants(fx.store, { id: "borrow-book" })) as SuggestRes;
       expect(after.suggestions.map((s) => s.id)).toEqual(["branch-access-all-branches"]);
+    });
+
+    it("covers constellation-scoped dimensions only for cases with constellations (CHR-1144)", async () => {
+      await setUseCases(fx.store, {
+        dimensions: [...DIMENSIONS, { id: "household", label: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "family", label: "Family" }] }],
+        personas: PERSONAS,
+        constellations: [
+          { id: "solo", name: "Solo", traits: { household: "single" }, relationships: [] },
+          { id: "clan", name: "Clan", traits: { household: "family" }, relationships: [] },
+        ],
+        use_cases: [borrowCase(), { ...borrowCase(), id: "with-world", constellations: ["solo"] }],
+      });
+      const plain = (await suggestVariants(fx.store, { id: "borrow-book" })) as SuggestRes;
+      expect(plain.suggestions.map((s) => s.id)).toEqual(["membership-staff", "branch-access-all-branches"]);
+      expect(plain.suggestions.some((s) => "constellations" in s)).toBe(false);
+      const world = (await suggestVariants(fx.store, { id: "with-world" })) as SuggestRes;
+      expect(world.coverage.find((c) => c.dimension === "household")).toEqual({ dimension: "household", covered: ["single"], uncovered: ["family"] });
+      expect(world.suggestions.find((s) => s.id === "household-family")).toEqual({ id: "household-family", title: "Borrow a book — Household: Family", when: { household: ["family"] }, personas: [], constellations: ["clan"] });
     });
 
     it("hints when there is nothing to derive suggestions from", async () => {

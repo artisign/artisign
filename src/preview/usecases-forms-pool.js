@@ -374,7 +374,9 @@ export async function openObjectDialog(options) {
  * @returns {Promise<{ created: number, data: any } | null>}
  */
 export async function openGenerateDialog(options) {
-  const pool = options.pool();
+  // Persona generation expands persona-scoped dimensions only (constellation-scoped ones belong to target "constellations").
+  const full = options.pool();
+  const pool = { ...full, dimensions: full.dimensions.filter((d) => (d.scope ?? "personas") === "personas") };
   const state = { strategy: "pairwise", dimensions: new Set(pool.dimensions.map((d) => d.id)), limit: "100", preview: null };
   const dialog = createDialog({ title: "Generate personas from dimensions" });
   let result = null;

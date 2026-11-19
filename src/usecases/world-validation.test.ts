@@ -88,6 +88,19 @@ describe("world warnings on a case", () => {
     expect(outside[0]!.message).toContain('"ana-at-north"');
   });
 
+  it("reports a trigger actor outside the constellations on the /trigger target", async () => {
+    const warnings = await validateUseCase(useCase({ trigger: { text: "t", actor: "ben" } }), pools());
+    const outside = warnings.filter((w) => w.kind === "outside_constellation");
+    expect(outside.map((w) => w.target)).toEqual(["use_case:borrow-a-book/trigger"]);
+    expect(outside[0]!.message).toContain('"ana-at-north"');
+  });
+
+  it("checks the membership of branch step actors too", async () => {
+    const branches = [{ id: "late", title: "Late", from: "pick", when: [{ subject: "system", property: "p", value: 1 }], steps: [{ id: "chase", actor: "ben", action: "chases" }, { id: "note", actor: "ana", action: "notes" }] }];
+    const warnings = await validateUseCase(useCase({ branches }), pools({ dataModel: false }));
+    expect(warnings.filter((w) => w.kind === "outside_constellation").map((w) => w.target)).toEqual(["use_case:borrow-a-book/chase"]);
+  });
+
   it("does not check membership without constellations, and skips unknown constellations", async () => {
     expect(kinds(await validateUseCase(useCase({ constellations: [], steps: [{ id: "help", actor: "ben", action: "h" }] }), pools()))).toEqual([]);
     const warnings = await validateUseCase(useCase({ constellations: ["nowhere"], steps: [{ id: "help", actor: "ben", action: "h" }] }), pools());

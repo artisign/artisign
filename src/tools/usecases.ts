@@ -40,7 +40,6 @@ import {
   useCaseSchema,
   validateDataObject,
   validateConstellation,
-  membersOf,
   validateEntity,
   validatePersona,
   validateRelationshipType,
@@ -522,7 +521,7 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
   const inCall = new Set(constellations.map((c) => c.id));
   for (const constellation of nextWorld.constellations) {
     if (inCall.has(constellation.id)) continue;
-    const touched = [...membersOf(constellation)].some((id) => touchedParticipants.has(id)) || constellation.relationships.some((r) => touchedTypes.has(r.type));
+    const touched = [...constellationMembers(constellation)].some((id) => touchedParticipants.has(id)) || constellation.relationships.some((r) => touchedTypes.has(r.type));
     if (touched) warnings.push(...validateConstellation(constellation, pools));
   }
   const lookup = new ScreenLookup(store);

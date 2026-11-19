@@ -1,5 +1,6 @@
 import type { Warning } from "../tools/types.js";
 import { SYSTEM_ACTOR, ownValue, type Constellation, type DataField, type Entity, type Persona, type RelationshipType, type UseCaseVariant } from "./schema.js";
+import { constellationMembers } from "./query.js";
 import type { EffectiveUseCase } from "./resolve.js";
 import type { ValidationPools } from "./validate.js";
 
@@ -56,11 +57,6 @@ function traitsOf(id: string, pools: ValidationPools): Record<string, string> | 
   return undefined;
 }
 
-/** The ends of a constellation's relationships: its members. */
-export function membersOf(constellation: Constellation): Set<string> {
-  return new Set(constellation.relationships.flatMap((r) => [r.from, r.to]));
-}
-
 /** Trait problems of one participant or constellation: a dimension or a value the pool does not define. */
 export function traitWarnings(traits: Record<string, string>, target: string, pools: ValidationPools): Warning[] {
   const warnings: Warning[] = [];
@@ -113,7 +109,7 @@ export function validateEntity(entity: Entity, pools: ValidationPools): Warning[
   if (pools.dataModel && entity.object !== undefined && !pools.objects.has(entity.object)) {
     warnings.push({ kind: "unknown_data_object", target, message: `entity "${entity.id}" is an instance of unknown data object "${entity.object}"` });
   }
-  if (!pools.world.constellations.some((c) => membersOf(c).has(entity.id))) {
+  if (!pools.world.constellations.some((c) => constellationMembers(c).has(entity.id))) {
     warnings.push({ kind: "entity_unrelated", target, message: `no constellation names entity "${entity.id}"` });
   }
   return warnings;
@@ -166,7 +162,7 @@ export function validateConstellation(constellation: Constellation, pools: Valid
     }
   }
   // (2) the constellation's own trait must not differ from a member's trait on the same dimension
-  for (const member of membersOf(constellation)) {
+  for (const member of constellationMembers(constellation)) {
     const traits = traitsOf(member, pools);
     for (const [dimId, valueId] of Object.entries(constellation.traits)) {
       const memberValue = traits && ownValue(traits, dimId);
@@ -199,7 +195,7 @@ export function caseWorldWarnings(effective: EffectiveUseCase, pools: Validation
     if (known.length === 0 || id === SYSTEM_ACTOR || flagged.has(id)) return;
     const kind = participantKind(id, pools);
     if (kind === undefined || (actor && kind === "entity")) return; // an entity actor is entity_as_actor already
-    if (known.some((c) => membersOf(c).has(id))) return;
+    if (known.some((c) => constellationMembers(c).has(id))) return;
     flagged.add(id);
     const names = known.map((c) => `"${c.id}"`).join(", ");
     warnings.push({ kind: "outside_constellation", target, message: `"${id}" is not a member of ${known.length === 1 ? "constellation" : "any of the constellations"} ${names}`, suggestion: `add a relationship naming "${id}" to ${known.length === 1 ? "it" : "one of them"}` });

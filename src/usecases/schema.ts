@@ -211,6 +211,8 @@ const stepSchema = z.strictObject({
   target: z.strictObject({ screen: z.string(), node: z.string().optional() }).optional(),
   data: z.array(z.strictObject({ object: z.string(), before: stepExample.optional(), after: stepExample.optional() })).optional(),
   note: z.string().optional(),
+  /** How the step is triggered when it is not a person's action: free display text ("webhook", "email"); nothing resolves it. */
+  via: z.string().optional(),
 });
 
 /**
@@ -235,7 +237,9 @@ const stepOpSchema = z.discriminatedUnion("op", [
   z.strictObject({ op: z.literal("remove"), step_id: z.string() }),
   z.strictObject({ op: z.literal("append"), step: stepSchema, branch: z.string().optional() }),
   z.strictObject({ op: z.literal("add_branch"), branch: branchSchema }),
-  z.strictObject({ op: z.literal("replace_branch"), branch_id: z.string(), branch: branchSchema }),
+  z
+    .strictObject({ op: z.literal("replace_branch"), branch_id: z.string(), branch: branchSchema })
+    .refine((op) => op.branch.id === op.branch_id, { path: ["branch", "id"], message: "replace_branch keeps the id; to rename a branch, use remove_branch and add_branch" }),
   z.strictObject({ op: z.literal("remove_branch"), branch_id: z.string() }),
 ]);
 

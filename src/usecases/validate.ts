@@ -164,8 +164,10 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
       warn({ kind, target: at(variant.id), message: issue.message });
     }
     // A problem the base case already has is reported once, on the base; the variant adds only what it causes.
-    const known = new Set(baseBranchWarnings.map((w) => `${w.kind}|${w.message}`));
-    for (const w of branchWarnings(resolved.use_case, at(variant.id))) if (!known.has(`${w.kind}|${w.message}`)) warn(w);
+    // Matched by kind and the target without its variant, never by the message text.
+    const sameProblem = (w: Warning): string => `${w.kind}|${(w.target ?? "").replace(/#[^/]*/, "")}`;
+    const known = new Set(baseBranchWarnings.map(sameProblem));
+    for (const w of branchWarnings(resolved.use_case, at(variant.id))) if (!known.has(sameProblem(w))) warn(w);
   }
   return warnings;
 }

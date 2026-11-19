@@ -92,7 +92,7 @@ describe("branch ops of a variant", () => {
     const ok = (steps: Record<string, unknown>[]): boolean => useCaseSchema.safeParse(raw({ variants: [variant(steps)] })).success;
     const branch = { id: "extra", title: "Extra", when: [{ subject: "ana", property: "p", value: 1 }], steps: [step("extra-1")] };
     expect(ok([{ op: "add_branch", branch }])).toBe(true);
-    expect(ok([{ op: "replace_branch", branch_id: "offline", branch }])).toBe(true);
+    expect(ok([{ op: "replace_branch", branch_id: "extra", branch }])).toBe(true);
     expect(ok([{ op: "remove_branch", branch_id: "offline" }])).toBe(true);
     expect(ok([{ op: "append", step: step("x"), branch: "offline" }])).toBe(true);
     expect(ok([{ op: "add_branch", branch: { ...branch, steps: [] } }])).toBe(false);
@@ -170,7 +170,7 @@ describe("branch ops of a variant", () => {
   });
 
   it("skips an op naming a missing branch and reports it as a branch issue", () => {
-    const resolved = resolve(withVariant([{ op: "remove_branch", branch_id: "ghost" }, { op: "replace_branch", branch_id: "ghost", branch: { id: "x", title: "X", when: [{ subject: "a", property: "p", value: 1 }], steps: [step("x1")] } }]));
+    const resolved = resolve(withVariant([{ op: "remove_branch", branch_id: "ghost" }, { op: "replace_branch", branch_id: "ghost", branch: { id: "ghost", title: "X", when: [{ subject: "a", property: "p", value: 1 }], steps: [step("x1")] } }]));
     expect(resolved.issues).toEqual([expect.objectContaining({ kind: "missing_branch", branch_id: "ghost", op: 0 }), expect.objectContaining({ kind: "missing_branch", branch_id: "ghost", op: 1 })]);
     expect(resolved.use_case.branches).toHaveLength(2);
   });
@@ -338,5 +338,38 @@ describe("replace_branch keeps what the variant added itself `added` (review fix
     const resolved = resolve(withVariant([{ op: "insert_after", step_id: "show-limit", step: step("b1x") }, { op: "replace_branch", branch_id: "limit-reached", branch: next([step("show-limit"), step("b1x")]) }]));
     const branch = resolved.use_case.branches!.find((b) => b.id === "limit-reached")!;
     expect(branch.steps.map((s) => [s.id, s.change])).toEqual([["show-limit", "changed"], ["b1x", "added"]]);
+  });
+});
+
+describe("base branch warnings are not repeated per variant (review)", () => {
+  const pools = buildPools([], [], []);
+  const warningsOf = async (c: UseCase) => (await validateUseCase(c, pools)).filter((w) => w.kind.startsWith("branch_"));
+
+  it("matches by kind and target without the variant, so a base problem shows once however many variants there are", async () => {
+    const c = useCase({
+      branches: [{ id: "b", title: "B", from: "ghost", when: [{ subject: "a", property: "p", value: 1 }], steps: [step("b1")] }],
+      variants: [variant([{ op: "remove", step_id: "done" }], { id: "v1" }), variant([{ op: "remove", step_id: "open" }], { id: "v2" })],
+    });
+    expect(await warningsOf(c)).toEqual([expect.objectContaining({ kind: "branch_from_missing", target: "use_case:borrow-a-book/branch:b" })]);
+  });
+
+  it("still reports what only the variant causes, on the same branch", async () => {
+    const c = useCase({
+      branches: [{ id: "b", title: "B", from: "open", when: [{ subject: "a", property: "p", value: 1 }], steps: [step("b1")], rejoin: "ghost" }],
+      variants: [variant([{ op: "remove", step_id: "open" }])],
+    });
+    expect((await warningsOf(c)).map((w) => [w.kind, w.target])).toEqual([
+      ["branch_rejoin_missing", "use_case:borrow-a-book/branch:b"],
+      ["branch_from_missing", "use_case:borrow-a-book#v/branch:b"],
+    ]);
+  });
+});
+
+describe("replace_branch keeps the id (shape)", () => {
+  it("is a shape error when branch.id differs from branch_id", () => {
+    const branch = (id: string) => ({ id, title: "T", when: [{ subject: "a", property: "p", value: 1 }], steps: [step("s9")] });
+    const ok = (id: string) => useCaseSchema.safeParse(raw({ variants: [variant([{ op: "replace_branch", branch_id: "offline", branch: branch(id) }])] })).success;
+    expect(ok("offline")).toBe(true);
+    expect(ok("other")).toBe(false);
   });
 });

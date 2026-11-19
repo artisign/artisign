@@ -57,6 +57,8 @@ export type WarningKind =
   | "duplicate_step_id"
   | "dangling_reference"
   | "invalid_file"
+  // A persona and a main entity share an id; references to it resolve to the persona.
+  | "ambiguous_id"
   // generate_personas stopped at its work budget: the result is a prefix of the full expansion.
   | "partial_result";
 

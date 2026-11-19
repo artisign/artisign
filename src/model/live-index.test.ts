@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { FsStore } from "../store/fs-store.js";
 import type { Store, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, TagMeta, MockupMeta, DesignSystemMeta, CommitResult, HeadCommitResult } from "../store/index.js";
 import { initProject } from "../init/init-project.js";
-import type { DataObject, PersonaPool, UseCase } from "../usecases/schema.js";
+import type { DataObject, PersonaPool, UseCase, World } from "../usecases/schema.js";
 import { watchAndReindex } from "./live-index.js";
 import type { ProjectIndex } from "./index-builder.js";
 
@@ -52,6 +52,10 @@ class FakeStore implements Store {
     return { dimensions: [], personas: [] };
   }
   async writePersonaPool() {}
+  async readWorld(): Promise<World> {
+    return { entities: [], relationship_types: [], constellations: [] };
+  }
+  async writeWorld() {}
   async readDataObjects(): Promise<DataObject[]> {
     return [];
   }

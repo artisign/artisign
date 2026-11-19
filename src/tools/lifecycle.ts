@@ -22,7 +22,7 @@ import { danglingBackdropWarnings } from "./backdrop.js";
 import { readVariantLinks } from "./variants.js";
 import { nodeToSubtree, convertToComponentInstance, subtreesStructurallyEqual } from "./node-convert.js";
 import { deleteMockupEntity } from "./mockups.js";
-import { deleteUseCaseEntity, type UseCaseEntityKind } from "./usecases.js";
+import { deleteUseCaseEntity, isUseCaseEntityKind, type UseCaseEntityKind } from "./usecases.js";
 import { slotStylingWarnings } from "./definition-checks.js";
 import { checkNewTokenMembers, checkNewComponentName } from "./name-collision.js";
 import { assertValidEntityName, assertValidVariantName } from "./name-validation.js";
@@ -699,7 +699,7 @@ export async function deleteEntity(store: Store, input: DeleteEntityInput, ctx?:
   if (input.cascade === true && input.kind !== "screen") {
     throw new ToolError("validation_failed", "cascade only applies to kind \"screen\"");
   }
-  if (input.kind === "persona" || input.kind === "data_object" || input.kind === "use_case" || input.kind === "dimension") {
+  if (isUseCaseEntityKind(input.kind)) {
     return deleteUseCaseEntity(store, input.kind, input.name, ctx);
   }
   if (input.kind === "component") return deleteComponent(store, input.name);

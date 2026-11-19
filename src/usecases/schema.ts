@@ -35,30 +35,78 @@ function uniqueIds<T extends { id: string }>(items: T[], ctx: z.RefinementCtx, l
 
 // --- Dimensions and personas --------------------------------------------------
 
+/** The actor of a step the product itself performs. Not a persona and not an entity; never an id in either pool. */
+export const SYSTEM_ACTOR = "system";
+
+/** An id of a persona or entity: `system` is the app itself (a shape error, like the kebab-case rule). */
+const participantIdSchema = idSchema.refine((id) => id !== SYSTEM_ACTOR, { message: `"${SYSTEM_ACTOR}" is reserved for the app itself` });
+
 const dimensionValueSchema = z.strictObject({ id: idSchema, label: z.string() });
+
+/** What generation and coverage expand a dimension for; traits of any participant may still name any dimension. */
+export const DIMENSION_SCOPES = ["personas", "constellations"] as const;
 
 export const dimensionSchema = z.strictObject({
   id: idSchema,
   label: z.string(),
   description: z.string().optional(),
+  scope: z.enum(DIMENSION_SCOPES).optional(),
   values: z.array(dimensionValueSchema).min(1).superRefine((values, ctx) => uniqueIds(values, ctx, "value")),
 });
 
+const avatarSchema = z.strictObject({ emoji: z.string().optional(), color: z.string().optional() });
+
+/** What kind of external actor a persona is. Not a dimension: it plays no part in generation or coverage. */
+export const PERSONA_KINDS = ["human", "agent", "service", "organization"] as const;
+
 export const personaSchema = z.strictObject({
-  id: idSchema,
+  id: participantIdSchema,
   name: z.string(),
+  kind: z.enum(PERSONA_KINDS).optional(),
   role: z.string().optional(),
   description: z.string().optional(),
-  avatar: z.strictObject({ emoji: z.string().optional(), color: z.string().optional() }).optional(),
+  avatar: avatarSchema.optional(),
   traits: z.record(z.string(), z.string()).default({}),
   goals: z.array(z.string()).optional(),
   generated: z.boolean().optional(),
 });
 
-// --- Data objects -------------------------------------------------------------
+// --- World: main entities, relationship types, constellations ----------------
 
-/** The actor of a step the product itself performs. Not a persona; never listed in `personas`. */
-export const SYSTEM_ACTOR = "system";
+export const entitySchema = z.strictObject({
+  id: participantIdSchema,
+  name: z.string(),
+  type: z.string().optional(),
+  description: z.string().optional(),
+  avatar: avatarSchema.optional(),
+  traits: z.record(z.string(), z.string()).default({}),
+  /** The data object this entity is an instance of; only checked once a data model exists. */
+  object: z.string().optional(),
+});
+
+export const relationshipTypeSchema = z.strictObject({
+  id: idSchema,
+  label: z.string(),
+  inverse_label: z.string().optional(),
+  description: z.string().optional(),
+  /** Dimension ids on which both ends of a relationship of this type must agree. */
+  same_traits: z.array(z.string()).optional(),
+  /** The `ref` (or `list`) field of a data object this relationship maps to, once a data model exists. */
+  field: z.strictObject({ object: z.string(), name: z.string() }).optional(),
+});
+
+const relationshipSchema = z.strictObject({ from: z.string().min(1), type: z.string().min(1), to: z.string().min(1), note: z.string().optional() });
+
+export const constellationSchema = z.strictObject({
+  id: idSchema,
+  name: z.string(),
+  description: z.string().optional(),
+  traits: z.record(z.string(), z.string()).default({}),
+  relationships: z.array(relationshipSchema),
+  generated: z.boolean().optional(),
+});
+
+// --- Data objects -------------------------------------------------------------
 
 export const FIELD_TYPES = ["string", "number", "boolean", "date", "datetime", "enum", "ref", "list", "object"] as const;
 
@@ -145,6 +193,12 @@ export const personaPoolSchema = z.strictObject({
   personas: z.array(personaSchema).default([]).superRefine((items, ctx) => uniqueIds(items, ctx, "persona")),
 });
 
+export const worldSchema = z.strictObject({
+  entities: z.array(entitySchema).default([]).superRefine((items, ctx) => uniqueIds(items, ctx, "entity")),
+  relationship_types: z.array(relationshipTypeSchema).default([]).superRefine((items, ctx) => uniqueIds(items, ctx, "relationship type")),
+  constellations: z.array(constellationSchema).default([]).superRefine((items, ctx) => uniqueIds(items, ctx, "constellation")),
+});
+
 export const dataObjectsDocSchema = z.strictObject({
   objects: z.array(dataObjectSchema).default([]).superRefine((items, ctx) => uniqueIds(items, ctx, "data object")),
 });
@@ -153,6 +207,10 @@ export const dataObjectsDocSchema = z.strictObject({
 
 export type Dimension = z.infer<typeof dimensionSchema>;
 export type Persona = z.infer<typeof personaSchema>;
+export type Entity = z.infer<typeof entitySchema>;
+export type RelationshipType = z.infer<typeof relationshipTypeSchema>;
+export type Constellation = z.infer<typeof constellationSchema>;
+export type World = { entities: Entity[]; relationship_types: RelationshipType[]; constellations: Constellation[] };
 export type DataField = z.infer<typeof dataFieldSchema>;
 export type DataObject = z.infer<typeof dataObjectSchema>;
 export type UseCaseInput = z.infer<typeof inputSchema>;

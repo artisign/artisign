@@ -277,10 +277,13 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "set_use_cases",
-    "Bulk upsert by id of dimensions, personas, data_objects, use_cases (shapes: get_guide). An existing entity merges at top level: given keys replace (arrays whole), null removes a key. Validated before anything is written; unknown references only warn.",
+    "Bulk upsert by id of dimensions, personas, entities, relationship_types, constellations, data_objects, use_cases (shapes: get_guide). An existing entity merges at top level: given keys replace (arrays whole), null removes a key. Validated before anything is written; unknown references only warn.",
     {
       dimensions: z.array(z.record(z.string(), z.unknown())).optional(),
       personas: z.array(z.record(z.string(), z.unknown())).optional(),
+      entities: z.array(z.record(z.string(), z.unknown())).optional(),
+      relationship_types: z.array(z.record(z.string(), z.unknown())).optional(),
+      constellations: z.array(z.record(z.string(), z.unknown())).optional(),
       data_objects: z.array(z.record(z.string(), z.unknown())).optional(),
       use_cases: z.array(z.record(z.string(), z.unknown())).optional(),
     },
@@ -396,8 +399,8 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "delete_entity",
-    "Delete a screen, component, pattern or mockup (or one mockup variant via variant). A screen takes its flow edges and meta with it; comments stay. Referenced components are refused (references listed), as are screens with variant screens unless cascade: true (screen only) deletes the subtree. Use-case kinds persona, data_object, use_case, dimension delete by id and warn about dangling references.",
-    { kind: z.enum(["screen", "component", "pattern", "mockup", "persona", "data_object", "use_case", "dimension"]), name: z.string(), variant: z.string().optional(), cascade: z.boolean().optional() },
+    "Delete a screen, component, pattern or mockup (or one mockup variant via variant). A screen takes its flow edges and meta with it; comments stay. Referenced components are refused (references listed), as are screens with variant screens unless cascade: true (screen only) deletes the subtree. Use-case kinds persona, dimension, entity, relationship_type, constellation, data_object, use_case delete by id and warn about dangling references.",
+    { kind: z.enum(["screen", "component", "pattern", "mockup", "persona", "data_object", "use_case", "dimension", "entity", "constellation", "relationship_type"]), name: z.string(), variant: z.string().optional(), cascade: z.boolean().optional() },
     // ctx threaded through the way init_project's is — deleteEntity uses
     // ctx.viewState.pruneScreen(name) to drop a deleted screen from the
     // Board's pinned set (CHR-624), a no-op when ctx/viewState is absent.

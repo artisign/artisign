@@ -238,8 +238,13 @@ describe("MCP server — instructions budget", () => {
   // measured at 1147.25. The USE CASES block still points to get_guide for
   // shapes instead of naming more tools: each of the other use-case tools
   // carries its own description.
-  it("stays within the ~1147 token cheat-sheet budget (chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(1147.25);
+  // CHR-1142 (ADR-011): the LIFECYCLE line names the three world kinds of
+  // delete_entity (entity/constellation/relationship_type, +39 chars): 1147.25
+  // to 1157, measured at 1157. The caps are gone (Christian, 2026-11-19): this
+  // value is information, not a limit; a PR that grows it updates the pin and
+  // states the delta in its description.
+  it("pins the measured instructions size as information, not a limit (~1157 tokens, chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBeLessThanOrEqual(1157);
   });
 });
 
@@ -267,10 +272,13 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   // 21,500 before the five use-case tools (CHR-1065: ~3,600 chars together, with
   // `priority` gone); measured at 24,001. CHR-1070: rename +1 char, offset by a
   // one-word trim (list_use_cases description lost "and"): 24,001 to 23,999,
-  // measured at 23,999. ADR-010 caps this at 24,500 and the limit may only go
-  // down from here.
-  it("keeps the whole tools/list within 23,999 chars (~6,000 tokens)", () => {
-    expect(JSON.stringify(tools).length).toBeLessThanOrEqual(23_999);
+  // measured at 23,999. CHR-1142 (ADR-011): set_use_cases gains entities,
+  // relationship_types, constellations; delete_entity gains three kinds:
+  // 23,999 to 24,490 (+491), measured at 24,490. The caps are gone
+  // (Christian, 2026-11-19): this value is information, not a limit; a PR
+  // that grows it updates the pin and states the delta in its description.
+  it("pins the measured tools/list size as information, not a limit (24,490 chars, ~6,100 tokens)", () => {
+    expect(JSON.stringify(tools).length).toBeLessThanOrEqual(24_490);
   });
 
   it("keeps every advertised tool entry within 2,000 chars", () => {

@@ -213,11 +213,30 @@ const stepSchema = z.strictObject({
   note: z.string().optional(),
 });
 
+/**
+ * An alternative or exception path of a case: forks after the main-flow step `from` (none = before the first step), holds while
+ * every condition of `when` does, runs `steps`, and either continues at the main-flow step `rejoin` or ends with `outcome`.
+ * Never evaluated by Artisign. Step ids share one namespace with the main flow.
+ */
+export const branchSchema = z
+  .strictObject({
+    id: idSchema,
+    title: z.string(),
+    from: z.string().optional(),
+    when: z.array(conditionSchema).min(1),
+    steps: z.array(stepSchema).min(1).superRefine((steps, ctx) => uniqueIds(steps, ctx, "step")),
+    rejoin: z.string().optional(),
+    outcome: z.string().optional(),
+  });
+
 const stepOpSchema = z.discriminatedUnion("op", [
   z.strictObject({ op: z.literal("replace"), step_id: z.string(), step: stepSchema }),
   z.strictObject({ op: z.literal("insert_after"), step_id: z.string(), step: stepSchema }),
   z.strictObject({ op: z.literal("remove"), step_id: z.string() }),
-  z.strictObject({ op: z.literal("append"), step: stepSchema }),
+  z.strictObject({ op: z.literal("append"), step: stepSchema, branch: z.string().optional() }),
+  z.strictObject({ op: z.literal("add_branch"), branch: branchSchema }),
+  z.strictObject({ op: z.literal("replace_branch"), branch_id: z.string(), branch: branchSchema }),
+  z.strictObject({ op: z.literal("remove_branch"), branch_id: z.string() }),
 ]);
 
 const variantSchema = z.strictObject({
@@ -259,7 +278,21 @@ export const useCaseSchema = z.strictObject({
   inputs: z.array(inputSchema).min(1),
   outputs: z.array(outputSchema).min(1),
   steps: z.array(stepSchema).default([]).superRefine((steps, ctx) => uniqueIds(steps, ctx, "step")),
+  /** Alternative and error paths, each from a main-flow step. */
+  branches: z.array(branchSchema).optional().superRefine((branches, ctx) => uniqueIds(branches ?? [], ctx, "branch")),
   variants: z.array(variantSchema).optional().superRefine((variants, ctx) => uniqueIds(variants ?? [], ctx, "variant")),
+}).superRefine((useCase, ctx) => {
+  // One step namespace per case: a branch step must not reuse the id of a main-flow step or of a step in another branch.
+  const seen = new Set((useCase.steps ?? []).map((step) => step.id));
+  (useCase.branches ?? []).forEach((branch, b) => {
+    const own = new Set<string>();
+    branch.steps.forEach((step, s) => {
+      if (own.has(step.id)) return; // a repeat inside one branch is reported by the branch itself
+      own.add(step.id);
+      if (seen.has(step.id)) ctx.addIssue({ code: "custom", path: ["branches", b, "steps", s, "id"], message: `duplicate step id "${step.id}" (step ids are unique across the main flow and all branches)` });
+    });
+    own.forEach((id) => seen.add(id));
+  });
 });
 
 // --- File documents -----------------------------------------------------------
@@ -297,6 +330,7 @@ export type VariantStateEntry = z.infer<typeof variantStateEntrySchema>;
 export type TriggerObject = z.infer<typeof triggerObjectSchema>;
 export type Trigger = z.infer<typeof triggerSchema>;
 export type UseCaseStep = z.infer<typeof stepSchema>;
+export type UseCaseBranch = z.infer<typeof branchSchema>;
 export type StepOp = z.infer<typeof stepOpSchema>;
 export type UseCaseVariant = z.infer<typeof variantSchema>;
 export type UseCase = z.infer<typeof useCaseSchema>;

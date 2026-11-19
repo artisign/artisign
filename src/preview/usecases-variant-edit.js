@@ -32,6 +32,9 @@ function unmanaged(stored, managed) {
 
 const STEP_KEYS = ["id", "actor", "action", "target", "data", "note"];
 const OP_KEYS = ["op", "step_id", "step"];
+/** The ops that add, rewrite or remove a whole branch (no `step_id`). The editor does not edit them yet: they are written back as stored. */
+const BRANCH_OPS = ["add_branch", "replace_branch", "remove_branch"];
+const isBranchOp = (op) => BRANCH_OPS.includes(op.op);
 const VARIANT_KEYS = ["id", "title", "description", "when", "personas", "actors", "trigger", "goal", "outcome", "inputs", "outputs", "steps"];
 
 /** The draft rows of an inputs / outputs list. `orig` keeps the stored example: one the user does not touch is saved exactly as it was. */
@@ -98,7 +101,8 @@ export function variantDraft(variant) {
     origTrigger,
     origOverrides, // the stored override texts: an untouched one is written back as it is, an edited one is trimmed
     swaps: Object.entries(variant.actors ?? {}).map(([from, to]) => ({ from, to })),
-    ops: (variant.steps ?? []).map((op) => ({ op: op.op, stepId: op.step_id ?? "", step: op.step ? stepDraft(op.step) : null, extra: unmanaged(op, OP_KEYS) })),
+    // A branch op keeps its stored object (`raw`): it is shown read-only and written back exactly as it was.
+    ops: (variant.steps ?? []).map((op) => (isBranchOp(op) ? { op: op.op, stepId: "", step: null, extra: {}, raw: op } : { op: op.op, stepId: op.step_id ?? "", step: op.step ? stepDraft(op.step) : null, extra: unmanaged(op, OP_KEYS) })),
   };
 }
 
@@ -137,7 +141,20 @@ export function buildStepObject(step, id, label, errors) {
 
 /** The ids the changes of all variants write by hand: a generated id must not collide with them. */
 export function variantStepIds(variants) {
-  return variants.flatMap((variant) => variant.ops.filter((op) => op.op !== "remove").map((op) => op.step?.id).filter(Boolean));
+  return variants.flatMap((variant) => variant.ops.filter((op) => op.op !== "remove").flatMap((op) => (op.raw ? branchOpStepIds(op.raw) : [op.step?.id])).filter(Boolean));
+}
+
+/** The step ids a stored branch op writes (the steps of the branch it adds or replaces). */
+export function branchOpStepIds(op) {
+  return (op.branch?.steps ?? []).map((step) => step.id);
+}
+
+/** A one-line description of a stored branch op, for the read-only row. */
+export function branchOpSummary(op) {
+  if (op.op === "remove_branch") return `Remove branch ${op.branch_id}`;
+  const steps = op.branch?.steps?.length ?? 0;
+  const what = `${op.branch?.title || op.branch?.id || "branch"} (${steps} ${steps === 1 ? "step" : "steps"})`;
+  return op.op === "add_branch" ? `Add branch ${what}` : `Replace branch ${op.branch_id} with ${what}`;
 }
 
 /** The swaps as the stored `actors` map (complete rows only; a later row wins over an earlier one with the same "from"). */
@@ -160,6 +177,7 @@ function entryOf(step) {
 
 /** Applies one change to a flow the way the resolver does; a change naming a step that is not there is skipped. Returns whether it applied. */
 function applyOp(flow, op, step) {
+  if (op.raw) return false; // a branch op leaves the main flow as it is
   if (op.op === "append") {
     flow.push(entryOf(step));
     return true;
@@ -255,6 +273,10 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
   variant.ops.forEach((op, i) => {
     const where = `Variant "${name}", change ${i + 1}`;
     const path = `variant.${index}.op.${i}`;
+    if (op.raw) {
+      ops.push(op.raw);
+      return;
+    }
     if (op.op !== "append" && op.stepId === "") {
       errors.push(`${where}: pick the step it changes.`);
       fieldErrors.push({ path: `${path}.pick`, message: "Pick the step this change applies to.", untilTouched: true });
@@ -297,7 +319,7 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
 export function variantWarnings({ variant, index, baseSteps, pool }) {
   const warnings = [];
   variant.ops.forEach((op, i) => {
-    if (op.op === "append" || op.stepId === "") return;
+    if (op.raw || op.op === "append" || op.stepId === "") return;
     if (!flowBefore(baseSteps, variant, i).some((entry) => entry.id === op.stepId)) {
       warnings.push({ path: `variant.${index}.op.${i}.step`, message: `${op.stepId} is not a step of the flow at this point. This change is skipped; you can still save.` });
     }
@@ -681,7 +703,7 @@ export function createVariantEditor(env) {
       const entry = flowBefore(baseSteps(), variant, variant.ops.indexOf(op)).find((e) => e.id === op.stepId);
       return [diffBadge("removed"), entry ? h("span", { class: "uc-op-struck" }, [actorName(entry.baseActor, pool.personasById), entry.action, entry.step.screen].filter(Boolean).join(" · ")) : h("span", { class: "uc-muted" }, "Pick the step to remove.")];
     };
-    const opName = (i) => variant.ops[i]?.step?.action.trim() || (variant.ops[i]?.op === "remove" && variant.ops[i].stepId ? `Remove ${variant.ops[i].stepId}` : `Change ${i + 1}`);
+    const opName = (i) => (variant.ops[i]?.raw ? branchOpSummary(variant.ops[i].raw) : null) || variant.ops[i]?.step?.action.trim() || (variant.ops[i]?.op === "remove" && variant.ops[i].stepId ? `Remove ${variant.ops[i].stepId}` : `Change ${i + 1}`);
     // The change rows move in the DOM, not through drawOps, so focus and typed values survive. The model follows (onReorder); what
     // was drawn from a position (labels, field paths, the flow each step select lists, the struck line of a removal) is brought up to date.
     const reorder = createReorder({
@@ -711,6 +733,17 @@ export function createVariantEditor(env) {
         ...variant.ops.map((op, i) => {
           const at = () => variant.ops.indexOf(op);
           const label = `Variant ${n} change ${i + 1}`;
+          if (op.raw) {
+            // A branch op is not editable here yet: it is listed, can be moved or removed, and is saved as it was stored.
+            const rawRow = h(
+              "div",
+              { class: "uc-step-op", dataset: { op: op.op, index: String(i) } },
+              h("div", { class: "uc-op-top" }, reorder.handle(() => rawRow), h("span", { class: "uc-label-hint" }, "Branch change"), h("span", { class: "uc-op-after-last" }, branchOpSummary(op.raw)), h("span", { class: "uc-step-edit-tools" }, reorder.moreButton(() => rawRow), removeButton(`Remove change ${i + 1} of variant ${n}`, () => { variant.ops.splice(at(), 1); markDirty(); drawOps(); }))),
+              h("p", { class: "uc-muted uc-op-hint" }, "Kept exactly as stored. Editing branches comes later."),
+              reorder.keyHint(),
+            );
+            return rawRow;
+          }
           const kindSel = selectInput({ options: Object.entries(OP_LABELS).map(([value, text]) => ({ value, label: text })), value: op.op, ariaLabel: `${label} operation`, onChange: (value) => changeKind(op, at(), value) });
           let stepControl;
           if (op.op === "append") stepControl = h("span", { class: "uc-op-after-last" }, "after the last step");
@@ -752,7 +785,7 @@ export function createVariantEditor(env) {
     };
     /** A new id for a step a change adds: unique in the flow at that point and among every id the case already has. */
     const freshId = (i) => {
-      const taken = new Set([...flowBefore(baseSteps(), variant, i).map((e) => e.id), ...baseSteps().map((s) => s.id), ...variantStepIds(draft.variants)].filter(Boolean));
+      const taken = new Set([...flowBefore(baseSteps(), variant, i).map((e) => e.id), ...baseSteps().map((s) => s.id), ...(draft.branchStepIds ?? []), ...variantStepIds(draft.variants)].filter(Boolean));
       return uniqueId("new-step", taken);
     };
     const newBody = (i) => ({ ...emptyStep(draft.personas[0] ?? "system"), id: freshId(i) });

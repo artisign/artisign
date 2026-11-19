@@ -839,7 +839,7 @@ describe("use case tools", () => {
         expect((await fx.store.readWorld()).constellations).toEqual([]);
       });
 
-      it("persona generation ignores constellation-scoped dimensions; no dimensions of the scope is validation_failed", async () => {
+      it("persona generation ignores constellation-scoped dimensions; an unknown dimension id is not_found", async () => {
         const res = (await generatePersonas(fx.store, { strategy: "all", dry_run: true })) as GenRes;
         expect(res).toMatchObject({ total: 4, would_create: 4 });
         expect(res.personas.every((p) => !("household" in p.traits))).toBe(true);
@@ -856,6 +856,16 @@ describe("use case tools", () => {
         const res = (await generatePersonas(fx.store, { strategy: "all", target: "constellations", dry_run: true })) as ConRes;
         expect(res.constellations.map((c) => c.id)).toContain("gen-single-main-2");
         expect(res.constellations.map((c) => c.id)).not.toContain("gen-single-main");
+      });
+
+      it("target constellations without any constellation-scoped dimension is validation_failed", async () => {
+        await setUseCases(fx.store, { dimensions: [{ id: "role", label: "Role", values: [{ id: "a", label: "A" }] }] });
+        await deleteEntity(fx.store, { kind: "dimension", name: "household" });
+        await deleteEntity(fx.store, { kind: "dimension", name: "branch" });
+        await expect(generatePersonas(fx.store, { target: "constellations", dry_run: true })).rejects.toMatchObject({
+          code: "validation_failed",
+          message: expect.stringContaining("constellations-scoped"),
+        });
       });
 
       it("caps the dry-run list at 50 with constellations_truncated", async () => {

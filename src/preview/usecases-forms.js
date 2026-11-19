@@ -11,6 +11,8 @@ import { openMenu } from "./usecases-menu.js";
 import { createVariantEditor, touchScope, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, variantWarnings, showFieldErrors } from "./usecases-variant-edit.js";
 import { createReorder, renumberRow } from "./usecases-reorder.js";
 import {
+  triggerText,
+  triggerWithText,
   STATUSES,
   STATUS_LABELS,
   slugify,
@@ -34,7 +36,8 @@ export function draftFromSource(source) {
     status: s.status ?? "draft",
     tags: (s.tags ?? []).join(", "),
     personas: [...(s.personas ?? [])],
-    trigger: s.trigger ?? "",
+    // The edit form changes the trigger's text only; a structured trigger keeps its other parts (see buildPayload).
+    trigger: triggerText(s.trigger),
     goal: s.goal ?? "",
     outcome: s.outcome ?? "",
     // `orig` keeps the stored object: an example the user does not touch is saved exactly as it was, never re-read from text.
@@ -88,6 +91,11 @@ export function buildPayload({ id, draft, source }) {
 
   const text = (value) => (value.trim() === "" ? undefined : value.trim());
   const tags = draft.tags.split(",").map((t) => t.trim()).filter(Boolean);
+  const triggerValue = (d, src) => {
+    const edited = text(d.trigger);
+    if (src?.trigger !== null && typeof src?.trigger === "object") return triggerWithText(src.trigger, edited ?? "", triggerText(src.trigger).trim());
+    return edited;
+  };
   const optional = (key, value, had) => (value !== undefined ? { [key]: value } : had ? { [key]: null } : {});
   const payload = {
     id,
@@ -99,7 +107,7 @@ export function buildPayload({ id, draft, source }) {
     steps,
     ...optional("group", text(draft.group), source?.group !== undefined),
     ...optional("tags", tags.length > 0 ? tags : undefined, source?.tags !== undefined),
-    ...optional("trigger", text(draft.trigger), source?.trigger !== undefined),
+    ...optional("trigger", triggerValue(draft, source), source?.trigger !== undefined),
     ...optional("goal", text(draft.goal), source?.goal !== undefined),
     ...optional("outcome", text(draft.outcome), source?.outcome !== undefined),
   };

@@ -27,19 +27,19 @@ const persona = (id: string, traits: Record<string, string> = {}): Persona => pe
 
 describe("variant actors map", () => {
   const withMap = (actors: Record<string, string>, extra: Record<string, unknown> = {}, base: Record<string, unknown> = {}): UseCase =>
-    useCase({ variants: [{ id: "v", title: "V", when: {}, actors, ...extra }], ...base });
+    useCase({ variants: [{ id: "v", title: "V", when: { size: ["small"] }, actors, ...extra }], ...base });
   const actors = (base: UseCase): [string, string, string | undefined][] =>
     resolveUseCase(base, base.variants![0]).use_case.steps.map((s) => [s.id, s.actor, s.change]);
 
   it("is optional: a variant without it resolves exactly as before", () => {
-    const base = useCase({ variants: [{ id: "v", title: "V", when: {}, steps: [{ op: "remove", step_id: "done" }] }] });
+    const base = useCase({ variants: [{ id: "v", title: "V", when: { size: ["small"] }, steps: [{ op: "remove", step_id: "done" }] }] });
     const resolved = resolveUseCase(base, base.variants![0]);
     expect(resolved.use_case.steps.map((s) => [s.id, s.actor, s.change])).toEqual([["tap", "member-ana", undefined], ["pick", "member-ana", undefined]]);
     expect(resolved.use_case.personas).toEqual(["member-ana"]);
   });
 
   it("accepts ids and system, rejects anything else as a shape error", () => {
-    const parse = (map: unknown): boolean => useCaseSchema.safeParse({ ...useCase(), variants: [{ id: "v", title: "V", when: {}, actors: map }] }).success;
+    const parse = (map: unknown): boolean => useCaseSchema.safeParse({ ...useCase(), variants: [{ id: "v", title: "V", when: { size: ["small"] }, actors: map }] }).success;
     expect(parse({ "member-ana": "staff-lee", system: "member-ana", "member-lee": "system" })).toBe(true);
     expect(parse({})).toBe(true);
     for (const bad of [{ "Member Ana": "x" }, { x: "Not An Id" }, { x: "" }, { x: 1 }, ["x"], "x"]) expect(parse(bad)).toBe(false);
@@ -51,7 +51,7 @@ describe("variant actors map", () => {
 
   it("is not chained", () => {
     const base = useCase({ steps: [{ id: "a", actor: "one", action: "A" }, { id: "b", actor: "two", action: "B" }] });
-    const chained = useCaseSchema.parse({ ...base, variants: [{ id: "v", title: "V", when: {}, actors: { one: "two", two: "three" } }] });
+    const chained = useCaseSchema.parse({ ...base, variants: [{ id: "v", title: "V", when: { size: ["small"] }, actors: { one: "two", two: "three" } }] });
     expect(actors(chained)).toEqual([["a", "two", "changed"], ["b", "three", "changed"]]);
   });
 
@@ -204,7 +204,7 @@ describe("resolveUseCase", () => {
 
   it("skips an op pointing at a missing step and reports it", () => {
     const base = useCase({
-      variants: [{ id: "v", title: "V", when: {}, steps: [{ op: "remove", step_id: "ghost" }, { op: "replace", step_id: "ghost2", step: { id: "x", actor: "system", action: "x" } }] }],
+      variants: [{ id: "v", title: "V", when: { size: ["small"] }, steps: [{ op: "remove", step_id: "ghost" }, { op: "replace", step_id: "ghost2", step: { id: "x", actor: "system", action: "x" } }] }],
     });
     const resolved = resolveUseCase(base, base.variants![0]);
     expect(resolved.use_case.steps).toHaveLength(3);
@@ -212,7 +212,7 @@ describe("resolveUseCase", () => {
   });
 
   it("does not mutate the base use case", () => {
-    const base = useCase({ variants: [{ id: "v", title: "V", when: {}, steps: [{ op: "remove", step_id: "tap" }] }] });
+    const base = useCase({ variants: [{ id: "v", title: "V", when: { size: ["small"] }, steps: [{ op: "remove", step_id: "tap" }] }] });
     const before = JSON.stringify(base);
     resolveUseCase(base, base.variants![0]);
     expect(JSON.stringify(base)).toBe(before);
@@ -220,7 +220,7 @@ describe("resolveUseCase", () => {
 
   it("drops a step the variant added and then removed without a trace", () => {
     const base = useCase({
-      variants: [{ id: "v", title: "V", when: {}, steps: [{ op: "append", step: { id: "tmp", actor: "system", action: "x" } }, { op: "remove", step_id: "tmp" }] }],
+      variants: [{ id: "v", title: "V", when: { size: ["small"] }, steps: [{ op: "append", step: { id: "tmp", actor: "system", action: "x" } }, { op: "remove", step_id: "tmp" }] }],
     });
     const resolved = resolveUseCase(base, base.variants![0]);
     expect(resolved.use_case.steps.map((s) => s.id)).toEqual(["tap", "pick", "done"]);
@@ -358,7 +358,7 @@ describe("query helpers", () => {
   const cases = [
     useCase({ id: "a", title: "Beta", group: "catalog/loans", tags: ["loans"], steps: [] }),
     useCase({ id: "b", title: "Alpha", group: "catalog", status: "ready", steps: [{ id: "s", actor: "staff-lee", action: "Opens the sheet", target: { screen: "sheet", node: "row" } }] }),
-    useCase({ id: "c", title: "Gamma", group: "catalog-x", steps: [], variants: [{ id: "v", title: "V", when: {}, personas: ["guest"] }] }),
+    useCase({ id: "c", title: "Gamma", group: "catalog-x", steps: [], variants: [{ id: "v", title: "V", when: { size: ["small"] }, personas: ["guest"] }] }),
   ];
 
   it("filters by path-prefix group, persona (base, step actor, variant), screen+node, tag, status, text and variants", () => {
@@ -478,7 +478,7 @@ describe("variant skeleton ids", () => {
   it("stay valid kebab-case and unique among each other and against existing variants", () => {
     const dims = [dimension("plan", ["free", "pro", "team"])];
     const pool = [persona("a", { plan: "free" }), persona("b", { plan: "pro" }), persona("c", { plan: "team" })];
-    const withClash = useCase({ personas: [], variants: [{ id: "plan-pro", title: "Taken", when: {} }] });
+    const withClash = useCase({ personas: [], variants: [{ id: "plan-pro", title: "Taken", when: { size: ["small"] } }] });
     const ids = suggestVariantGaps(withClash, dims, pool).suggestions.map((s) => s.id);
     expect(ids).toEqual(["plan-free", "plan-pro-2", "plan-team"]);
     expect(new Set(ids).size).toBe(ids.length);

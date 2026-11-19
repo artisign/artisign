@@ -7,6 +7,8 @@ import { h, icon } from "./usecases-dom.js";
 import { openMenu } from "./usecases-menu.js";
 import { avatar, statusBadge, diffBadge, targetChip, dataCard, variantChip } from "./usecases-parts.js";
 import {
+  triggerText,
+  triggerKey,
   avatarOf,
   actorName,
   buildFlowRows,
@@ -168,6 +170,10 @@ function people(ctx, useCase) {
   );
 }
 
+/** A trigger is a string in a stored variant and an object in a read bundle: compare what it says, not how it is shaped. */
+const differs = (key, a, b) => (key === "trigger" ? triggerKey(a) !== triggerKey(b) : a !== b);
+const shown = (key, value) => (key === "trigger" ? triggerText(value) : value);
+
 function story(useCase, baseCase, rawVariant) {
   const cells = [
     ["bolt", "Trigger", "trigger"],
@@ -178,7 +184,7 @@ function story(useCase, baseCase, rawVariant) {
     "div",
     { class: "uc-story" },
     cells.map(([ic, label, key]) =>
-      h("div", { class: "uc-story-cell" }, h("div", { class: "uc-story-label" }, icon(ic), label, rawVariant?.[key] !== undefined && rawVariant[key] !== baseCase[key] ? diffBadge("changed") : null), h("p", null, useCase[key] ?? h("span", { class: "uc-muted" }, "—"))),
+      h("div", { class: "uc-story-cell" }, h("div", { class: "uc-story-label" }, icon(ic), label, rawVariant?.[key] !== undefined && differs(key, rawVariant[key], baseCase[key]) ? diffBadge("changed") : null), h("p", null, shown(key, useCase[key]) || h("span", { class: "uc-muted" }, "—"))),
     ),
   );
 }

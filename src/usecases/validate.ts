@@ -1,5 +1,5 @@
 import type { Warning } from "../tools/types.js";
-import { SYSTEM_ACTOR, type DataObject, type Dimension, type Persona, type UseCase, type UseCaseStep } from "./schema.js";
+import { SYSTEM_ACTOR, normalizeTrigger, type DataObject, type Dimension, type Persona, type UseCase, type UseCaseStep } from "./schema.js";
 import { isGeneratedId } from "../model/node-id.js";
 import { actorMapPersonas } from "./query.js";
 import { resolveUseCase } from "./resolve.js";
@@ -99,6 +99,10 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
   };
 
   for (const id of useCase.personas) checkPersona(id, at());
+  if (useCase.trigger !== undefined) {
+    const actor = normalizeTrigger(useCase.trigger).actor;
+    if (actor !== undefined) checkPersona(actor, at());
+  }
   checkIo(useCase.inputs, at());
   checkIo(useCase.outputs, at());
   for (const step of useCase.steps) await checkStep(step);
@@ -106,6 +110,10 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
   for (const variant of useCase.variants ?? []) {
     for (const id of variant.personas ?? []) checkPersona(id, at(variant.id));
     for (const id of actorMapPersonas(variant)) checkPersona(id, at(variant.id));
+    if (variant.trigger !== undefined) {
+      const actor = normalizeTrigger(variant.trigger).actor;
+      if (actor !== undefined) checkPersona(actor, at(variant.id));
+    }
     checkIo(variant.inputs ?? [], at(variant.id));
     checkIo(variant.outputs ?? [], at(variant.id));
     for (const [dimId, valueIds] of Object.entries(variant.when)) {
@@ -122,7 +130,8 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
     }
     for (const op of variant.steps ?? []) if (op.op !== "remove") await checkStep(op.step, variant.id);
     for (const issue of resolveUseCase(useCase, variant).issues) {
-      warn({ kind: issue.kind === "missing_step" ? "variant_step_missing" : "duplicate_step_id", target: at(variant.id), message: issue.message });
+      const kind = ({ missing_step: "variant_step_missing", duplicate_step_id: "duplicate_step_id", actor_invalid: "variant_actor_invalid", missing_state: "variant_state_missing" } as const)[issue.kind];
+      warn({ kind, target: at(variant.id), message: issue.message });
     }
   }
   return warnings;

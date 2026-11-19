@@ -135,6 +135,75 @@ const example = stepExample.refine((value) => Object.keys(value).length > 0, { m
 const inputSchema = z.strictObject({ object: z.string(), source: z.string().optional(), example });
 const outputSchema = z.strictObject({ object: z.string(), target: z.string().optional(), example });
 
+// --- Property states, conditions and triggers ----------------------------------
+
+/** Comparison operators of a condition; `eq` is the default. Never evaluated by Artisign. */
+export const CONDITION_OPS = ["eq", "ne", "lt", "lte", "gt", "gte", "in"] as const;
+
+const stateKey = { subject: z.string().min(1), property: z.string().min(1) };
+
+/** `value` is any JSON value, so its mere presence is the rule (`z.unknown()` alone would also accept a missing key). */
+function requireValue(entry: { value?: unknown }, ctx: z.RefinementCtx): void {
+  if (!Object.hasOwn(entry, "value")) ctx.addIssue({ code: "custom", path: ["value"], message: "value is required" });
+}
+
+/** One state entry per (subject, property): the merge key must be unambiguous. */
+function uniqueStateKeys(entries: { subject: string; property: string }[] | undefined, ctx: z.RefinementCtx): void {
+  const seen = new Set<string>();
+  (entries ?? []).forEach((entry, index) => {
+    const key = JSON.stringify([entry.subject, entry.property]);
+    if (seen.has(key)) ctx.addIssue({ code: "custom", path: [index], message: `duplicate state entry "${entry.subject}.${entry.property}"` });
+    seen.add(key);
+  });
+}
+
+/** An entry of the starting state: no `op` (conditions only). */
+export const stateEntrySchema = z.strictObject({ ...stateKey, value: z.unknown() }).superRefine(requireValue);
+
+/** A condition (branch `when`, state trigger): a state entry with an optional operator; `in` needs an array. */
+export const conditionSchema = z
+  .strictObject({ ...stateKey, op: z.enum(CONDITION_OPS).optional(), value: z.unknown() })
+  .superRefine((condition, ctx) => {
+    requireValue(condition, ctx);
+    if (condition.op === "in" && !Array.isArray(condition.value)) ctx.addIssue({ code: "custom", path: ["value"], message: '"in" needs an array value' });
+  });
+
+/** A variant `state` entry: replaces or adds one by (subject, property), or `unset: true` (no `value`) removes the base entry. */
+export const variantStateEntrySchema = z.strictObject({ ...stateKey, value: z.unknown().optional(), unset: z.literal(true).optional() }).superRefine((entry, ctx) => {
+  if (entry.unset === true && Object.hasOwn(entry, "value")) ctx.addIssue({ code: "custom", path: ["value"], message: "an unset entry has no value" });
+  if (entry.unset !== true) requireValue(entry, ctx);
+});
+
+const ISO_AT = /^(\d{4})-(\d{2})-(\d{2})(?:T([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)?)?$/;
+
+/** An ISO date or datetime, calendar-checked (no 2026-02-31). */
+function isIsoAt(value: string): boolean {
+  const match = ISO_AT.exec(value);
+  if (!match) return false;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return probe.getUTCFullYear() === year && probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day;
+}
+
+export const triggerObjectSchema = z
+  .strictObject({
+    text: z.string(),
+    actor: idSchema.optional(),
+    via: z.string().optional(),
+    state: z.array(conditionSchema).min(1).optional(),
+    at: z.string().refine(isIsoAt, { message: "at must be an ISO date (2026-12-01) or datetime (2026-12-01T09:30:00Z)" }).optional(),
+  })
+  .superRefine((trigger, ctx) => {
+    if (trigger.actor === SYSTEM_ACTOR) ctx.addIssue({ code: "custom", path: ["actor"], message: `a trigger actor is a persona, never "${SYSTEM_ACTOR}"` });
+    if (trigger.actor !== undefined && (trigger.state !== undefined || trigger.at !== undefined)) {
+      ctx.addIssue({ code: "custom", path: ["actor"], message: "actor cannot be combined with state or at: an action trigger and a state trigger are different forms" });
+    }
+    if (trigger.via !== undefined && trigger.actor === undefined) ctx.addIssue({ code: "custom", path: ["via"], message: "via needs an actor" });
+  });
+
+/** Stored as a string (text only) or an object; reads always return the object. */
+export const triggerSchema = z.union([z.string(), triggerObjectSchema]);
+
 const stepSchema = z.strictObject({
   id: idSchema,
   actor: z.string(),
@@ -155,11 +224,14 @@ const variantSchema = z.strictObject({
   id: idSchema,
   title: z.string(),
   description: z.string().optional(),
-  when: z.record(z.string(), z.array(z.string()).min(1)),
+  when: z.record(z.string(), z.array(z.string()).min(1)).refine((when) => Object.keys(when).length > 0, { message: "when must name at least one dimension" }),
   personas: z.array(z.string()).optional(),
+  constellations: z.array(z.string()).optional(),
+  /** Merged into the base `state` by (subject, property). */
+  state: z.array(variantStateEntrySchema).optional().superRefine(uniqueStateKeys),
   /** Persona (or `system`) of an inherited base step → the persona it becomes in this variant. Keys and values are ids; `system` is a valid id. */
   actors: z.record(idSchema, idSchema).optional(),
-  trigger: z.string().optional(),
+  trigger: triggerSchema.optional(),
   goal: z.string().optional(),
   outcome: z.string().optional(),
   inputs: z.array(inputSchema).min(1).optional(),
@@ -177,9 +249,13 @@ export const useCaseSchema = z.strictObject({
   tags: z.array(z.string()).optional(),
   status: z.enum(USE_CASE_STATUSES).default("draft"),
   personas: z.array(z.string()).default([]),
-  trigger: z.string().optional(),
+  /** The starting worlds the case holds for (a set, any of which applies). */
+  constellations: z.array(z.string()).default([]),
+  trigger: triggerSchema.optional(),
   goal: z.string().optional(),
   outcome: z.string().optional(),
+  /** The starting state: property values at the start of the case. */
+  state: z.array(stateEntrySchema).optional().superRefine(uniqueStateKeys),
   inputs: z.array(inputSchema).min(1),
   outputs: z.array(outputSchema).min(1),
   steps: z.array(stepSchema).default([]).superRefine((steps, ctx) => uniqueIds(steps, ctx, "step")),
@@ -215,11 +291,21 @@ export type DataField = z.infer<typeof dataFieldSchema>;
 export type DataObject = z.infer<typeof dataObjectSchema>;
 export type UseCaseInput = z.infer<typeof inputSchema>;
 export type UseCaseOutput = z.infer<typeof outputSchema>;
+export type StateEntry = z.infer<typeof stateEntrySchema>;
+export type Condition = z.infer<typeof conditionSchema>;
+export type VariantStateEntry = z.infer<typeof variantStateEntrySchema>;
+export type TriggerObject = z.infer<typeof triggerObjectSchema>;
+export type Trigger = z.infer<typeof triggerSchema>;
 export type UseCaseStep = z.infer<typeof stepSchema>;
 export type StepOp = z.infer<typeof stepOpSchema>;
 export type UseCaseVariant = z.infer<typeof variantSchema>;
 export type UseCase = z.infer<typeof useCaseSchema>;
 export type PersonaPool = { dimensions: Dimension[]; personas: Persona[] };
+
+/** The object form of a trigger: a string is text only. Reads always return this. */
+export function normalizeTrigger(trigger: Trigger): TriggerObject {
+  return typeof trigger === "string" ? { text: trigger } : trigger;
+}
 
 /** `path: message` lines for a zod failure — what a caller needs to fix their input. */
 export function describeIssues(error: z.ZodError, prefix = ""): string {

@@ -89,7 +89,7 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
       id: "assign",
       title: "Assign",
       status: "draft" as const,
-      personas: [],
+      personas: [], constellations: [],
       inputs: [{ object: "o", example: { id: 1 } }],
       outputs: [{ object: "o", example: { id: 1 } }],
       steps: [],

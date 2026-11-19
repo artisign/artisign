@@ -193,12 +193,14 @@ export function caseWorldWarnings(effective: EffectiveUseCase, pools: Validation
     return found ? [found] : [];
   });
 
-  /** `outside_constellation` when the case lists constellations and the participant is a member of none of them. */
+  /** `outside_constellation` when the case lists constellations and the participant is a member of none of them; once per participant, on its first occurrence. */
+  const flagged = new Set<string>();
   const checkMember = (id: string, target: string, actor = false): void => {
-    if (known.length === 0 || id === SYSTEM_ACTOR) return;
+    if (known.length === 0 || id === SYSTEM_ACTOR || flagged.has(id)) return;
     const kind = participantKind(id, pools);
     if (kind === undefined || (actor && kind === "entity")) return; // an entity actor is entity_as_actor already
     if (known.some((c) => membersOf(c).has(id))) return;
+    flagged.add(id);
     const names = known.map((c) => `"${c.id}"`).join(", ");
     warnings.push({ kind: "outside_constellation", target, message: `"${id}" is not a member of ${known.length === 1 ? "constellation" : "any of the constellations"} ${names}`, suggestion: `add a relationship naming "${id}" to ${known.length === 1 ? "it" : "one of them"}` });
   };
@@ -227,11 +229,12 @@ export function caseWorldWarnings(effective: EffectiveUseCase, pools: Validation
 
   // Every warning gets a target of its own subject, because a base warning suppresses a variant's of the same kind and target.
   const stateAt = (base: string, entry: Subject): string => `${base}/state:${entry.subject}.${entry.property}`;
+  // Actors first (trigger, main flow, branches), so a participant that is also a state subject is reported once, on its first step.
+  if (effective.trigger?.actor !== undefined) checkMember(effective.trigger.actor, `${at}/trigger`, true);
+  for (const step of [...effective.steps, ...(effective.branches ?? []).flatMap((b) => b.steps)]) checkMember(step.actor, `${at}/${step.id}`, true);
   for (const entry of effective.state ?? []) checkSubject(entry, stateAt(at, entry));
   for (const condition of effective.trigger?.state ?? []) checkSubject(condition, stateAt(`${at}/trigger`, condition));
   for (const branch of effective.branches ?? []) for (const condition of branch.when) checkSubject(condition, stateAt(`${at}/branch:${branch.id}`, condition));
-  if (effective.trigger?.actor !== undefined) checkMember(effective.trigger.actor, `${at}/trigger`, true);
-  for (const step of [...effective.steps, ...(effective.branches ?? []).flatMap((b) => b.steps)]) checkMember(step.actor, `${at}/${step.id}`, true);
 
   // (3) a variant `when` on a constellation-scoped dimension must cover the traits of the constellations it uses
   for (const [dimId, valueIds] of Object.entries(when ?? {})) {

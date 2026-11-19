@@ -85,7 +85,7 @@ describe("world consistency warnings (CHR-1149)", () => {
 
     await setUseCases(fx.store, { data_objects: [BOOK_COPY] });
     const read = await getUseCase(fx.store, { id: "borrow-a-book" });
-    expect(kindsOf(read).filter((k) => k === "unknown_data_object")).toEqual(["unknown_data_object"]); // the input; the entity's missing object is reported on the entity
+    expect(kindsOf(read).filter((k) => k === "unknown_data_object")).toEqual(["unknown_data_object", "unknown_data_object"]); // the input, and the bundle's entity with its missing object
     const res = await setUseCases(fx.store, { entities: [{ id: "copy-42", name: "Copy 42", object: "missing" }], relationship_types: [{ id: "holds", label: "holds", field: { object: "missing", name: "x" } }] });
     expect(kindsOf(res).filter((k) => k === "unknown_data_object")).toHaveLength(2);
   });
@@ -95,6 +95,47 @@ describe("world consistency warnings (CHR-1149)", () => {
     await deleteEntity(fx.store, { kind: "data_object", name: "book-copy" });
     expect(await hasFile("data-objects.json")).toBe(true);
     expect(kindsOf(await getUseCase(fx.store, { id: "borrow-a-book" }))).toContain("unknown_data_object");
+  });
+
+  describe("after a member changes", () => {
+    const household = [{ id: "household", label: "Household", values: [{ id: "red", label: "Red" }, { id: "blue", label: "Blue" }] }];
+    const pair = (traitOfB: string) => [
+      { id: "ann", name: "Ann", traits: { household: "red" } },
+      { id: "bob", name: "Bob", traits: { household: traitOfB } },
+    ];
+
+    it("re-checks the constellations a written persona belongs to, on write and on read", async () => {
+      const first = await setUseCases(fx.store, {
+        dimensions: household,
+        personas: pair("red"),
+        relationship_types: [{ id: "partner-of", label: "partner of", same_traits: ["household"] }],
+        constellations: [{ id: "pair", name: "Pair", relationships: [{ from: "ann", type: "partner-of", to: "bob" }] }],
+        use_cases: [borrowCase({ constellations: ["pair"], steps: [{ id: "pick", actor: "ann", action: "x" }], inputs: [{ object: "any", example: { a: 1 } }], outputs: [{ object: "any", example: { a: 1 } }] })],
+      });
+      expect(kindsOf(first)).not.toContain("trait_conflict");
+
+      const res = await setUseCases(fx.store, { personas: [{ id: "bob", name: "Bob", traits: { household: "blue" } }] });
+      expect((res.warnings as Warning[]).filter((w) => w.kind === "trait_conflict").map((w) => w.target)).toEqual(["constellation:pair"]);
+      expect((await getUseCase(fx.store, { id: "borrow-a-book" })).warnings as Warning[]).toEqual(expect.arrayContaining([expect.objectContaining({ kind: "trait_conflict", target: "constellation:pair" })]));
+    });
+
+    it("re-checks the constellations that use a written relationship type", async () => {
+      await setUseCases(fx.store, {
+        dimensions: household,
+        personas: pair("blue"),
+        relationship_types: [{ id: "partner-of", label: "partner of" }],
+        constellations: [{ id: "pair", name: "Pair", relationships: [{ from: "ann", type: "partner-of", to: "bob" }] }],
+      });
+      const res = await setUseCases(fx.store, { relationship_types: [{ id: "partner-of", label: "partner of", same_traits: ["household"] }] });
+      expect(kindsOf(res)).toEqual(["trait_conflict"]);
+    });
+  });
+
+  it("raises outside_constellation once per actor, not per step", async () => {
+    await setUseCases(fx.store, { dimensions: DIMENSIONS, personas: PERSONAS, ...WORLD, data_objects: [BOOK_COPY] });
+    const steps = ["a", "b", "c"].map((id) => ({ id, actor: "ben", action: id }));
+    const res = await setUseCases(fx.store, { use_cases: [borrowCase({ steps })] });
+    expect((res.warnings as Warning[]).filter((w) => w.kind === "outside_constellation").map((w) => w.target)).toEqual(["use_case:borrow-a-book/a"]);
   });
 
   it("lists use cases without reading world.json", async () => {

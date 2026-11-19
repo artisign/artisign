@@ -261,7 +261,7 @@ describe("queries see branch steps", () => {
 });
 
 describe("branch warnings", () => {
-  const pools = buildPools([], [], []);
+  const pools = buildPools([], [], [], { entities: [], relationship_types: [], constellations: [] }, false);
   const warningsOf = async (c: UseCase) => (await validateUseCase(c, pools)).filter((w) => w.kind.startsWith("branch_"));
 
   it("is silent for a consistent case", async () => {
@@ -342,7 +342,7 @@ describe("replace_branch keeps what the variant added itself `added` (review fix
 });
 
 describe("base branch warnings are not repeated per variant (review)", () => {
-  const pools = buildPools([], [], []);
+  const pools = buildPools([], [], [], { entities: [], relationship_types: [], constellations: [] }, false);
   const warningsOf = async (c: UseCase) => (await validateUseCase(c, pools)).filter((w) => w.kind.startsWith("branch_"));
 
   it("matches by kind and target without the variant, so a base problem shows once however many variants there are", async () => {

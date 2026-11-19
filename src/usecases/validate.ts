@@ -17,11 +17,11 @@ export type ValidationPools = {
   dataModel: boolean;
 };
 
-/** `world` defaults to an empty world; `dataModel` to "the model lists at least one object" — a caller that knows the file state passes it. */
-export function buildPools(dimensions: Dimension[], personas: Persona[], objects: DataObject[], world?: World, dataModel?: boolean): ValidationPools {
+/** `dataModel` is whether `usecases/data-objects.json` exists; the caller knows (`Store.dataModelExists`), there is no second definition here. */
+export function buildPools(dimensions: Dimension[], personas: Persona[], objects: DataObject[], world: World, dataModel: boolean): ValidationPools {
   return {
-    world: world ?? { entities: [], relationship_types: [], constellations: [] },
-    dataModel: dataModel ?? objects.length > 0,
+    world,
+    dataModel,
     dimensions: new Map(dimensions.map((d) => [d.id, d])),
     personas: new Map(personas.map((p) => [p.id, p])),
     objects: new Map(objects.map((o) => [o.id, o])),

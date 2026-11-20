@@ -51,9 +51,15 @@ class FakeStore implements Store {
   async readPersonaPool(): Promise<PersonaPool> {
     return { dimensions: [], personas: [] };
   }
+  async readPersonaPoolLenient() {
+    return { pool: { dimensions: [], personas: [] }, invalid: [] };
+  }
   async writePersonaPool() {}
   async readWorld(): Promise<World> {
     return { entities: [], relationship_types: [], constellations: [] };
+  }
+  async readWorldLenient() {
+    return { world: { entities: [], relationship_types: [], constellations: [] }, invalid: [] };
   }
   async writeWorld() {}
   async dataModelExists(): Promise<boolean> {
@@ -61,6 +67,9 @@ class FakeStore implements Store {
   }
   async readDataObjects(): Promise<DataObject[]> {
     return [];
+  }
+  async readDataObjectsLenient() {
+    return { objects: [], invalid: [] };
   }
   async writeDataObjects() {}
   async listUseCaseIds(): Promise<string[]> {

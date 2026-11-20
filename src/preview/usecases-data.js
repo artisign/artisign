@@ -649,3 +649,28 @@ export function warningSummary(warnings, count) {
 export function errorMessage(error) {
   return error?.message || error?.code || "Something went wrong.";
 }
+
+/**
+ * The reasons a failed read gives are written for agents ("invalid usecases/personas.json: personas.0.name: … — repair or remove the file by hand
+ * (the one case where usecases/ may be edited directly)"). For the person looking at the tab: the file the read stopped at and what is wrong with it,
+ * without the agent remedy. `file` is null when the message names none (daemon unreachable, an I/O failure).
+ * @returns {{ file: string | null, detail: string }}
+ */
+export function describeLoadProblem(message) {
+  const text = String(message ?? "").trim();
+  const file = /usecases\/[\w./-]+\.json/.exec(text)?.[0] ?? null;
+  const withoutRemedy = text.split(" — ")[0];
+  const detail = file ? withoutRemedy.replace(new RegExp(`^invalid ${file.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}:\\s*`), "").replace(/^refusing to write:\s*/, "") : withoutRemedy;
+  return { file, detail: detail || text };
+}
+
+/**
+ * list_use_cases / GET /api/world answer one invalid_file warning per unreadable file or skipped pool entry. A case file is `use_case:<id>` (or has no
+ * target); anything else is an entry of personas.json, world.json or data-objects.json.
+ */
+export function splitInvalidWarnings(warnings) {
+  const entries = [];
+  const files = [];
+  for (const warning of warnings ?? []) (warning?.target && !String(warning.target).startsWith("use_case:") ? entries : files).push(warning);
+  return { entries, files };
+}

@@ -4,7 +4,7 @@
 // warnings, only a malformed shape blocks.
 
 import type { ZodError } from "zod";
-import type { Store } from "../store/index.js";
+import type { PoolEntryIssue, Store, UseCaseFileIssue } from "../store/index.js";
 import {
   ScreenLookup,
   SORT_KEYS,
@@ -81,15 +81,38 @@ function reportWarnings(warnings: Warning[]): { warnings: Warning[]; warning_cou
 
 const EMPTY_WORLD: World = { entities: [], relationship_types: [], constellations: [] };
 
-/** `validating`: the world and the data-model flag are read only for the paths that validate a case; a listing must not depend on `world.json`. */
-async function loadPools(store: Store, validating: boolean): Promise<{ pools: ValidationPools; dimensions: Dimension[]; personas: Persona[]; objects: DataObject[] }> {
-  const [pool, objects, world, dataModel] = await Promise.all([
-    store.readPersonaPool(),
-    store.readDataObjects(),
-    validating ? store.readWorld() : undefined,
+/**
+ * The read path of the pools: invalid entries are skipped and returned in `issues` (the writers read strictly, so a bad entry is never dropped by a write).
+ * `validating`: the world and the data-model flag are read only for the paths that validate a case; a listing must not depend on `world.json`.
+ */
+async function loadPools(store: Store, validating: boolean): Promise<{ pools: ValidationPools; dimensions: Dimension[]; personas: Persona[]; objects: DataObject[]; issues: PoolEntryIssue[] }> {
+  const [{ pool, invalid: poolIssues }, { objects, invalid: objectIssues }, world, dataModel] = await Promise.all([
+    store.readPersonaPoolLenient(),
+    store.readDataObjectsLenient(),
+    validating ? store.readWorldLenient() : undefined,
     validating ? store.dataModelExists() : undefined,
   ]);
-  return { pools: buildPools(pool.dimensions, pool.personas, objects, world ?? EMPTY_WORLD, dataModel ?? false), dimensions: pool.dimensions, personas: pool.personas, objects };
+  return {
+    pools: buildPools(pool.dimensions, pool.personas, objects, world?.world ?? EMPTY_WORLD, dataModel ?? false),
+    dimensions: pool.dimensions,
+    personas: pool.personas,
+    objects,
+    issues: [...poolIssues, ...objectIssues, ...(world?.invalid ?? [])],
+  };
+}
+
+const POOL_ENTRY_KINDS: Record<PoolEntryIssue["list"], string> = { dimensions: "dimension", personas: "persona", entities: "entity", relationship_types: "relationship_type", constellations: "constellation", objects: "data_object" };
+
+/** One `invalid_file` warning per skipped pool entry: `target` is `<kind>:<id>` (`<kind>:#<index>` for an entry without an id), the message names the file and where the entry sits. */
+export function poolEntryWarnings(issues: PoolEntryIssue[]): Warning[] {
+  return issues.map((issue): Warning => {
+    const kind = POOL_ENTRY_KINDS[issue.list];
+    return {
+      kind: "invalid_file",
+      target: `${kind}:${issue.id ?? `#${issue.index}`}`,
+      message: `${issue.file} ${issue.list}[${issue.index}]${issue.id !== undefined ? ` (${issue.id})` : ""} is not loaded: ${issue.error}`,
+    };
+  });
 }
 
 /**
@@ -178,6 +201,21 @@ export type ListUseCasesInput = UseCaseFilter & {
   include?: ("personas" | "dimensions" | "data_objects")[];
 };
 
+function invalidCaseWarnings(invalid: UseCaseFileIssue[]): Warning[] {
+  return invalid.map((file): Warning => ({ kind: "invalid_file", target: `use_case:${file.id}`, message: `usecases/cases/${file.id}.json is not loaded: ${file.error}` }));
+}
+
+/** A pool read twice in one call (the entity filter and the pools) reports each entry once. */
+function uniqueIssues(issues: PoolEntryIssue[]): PoolEntryIssue[] {
+  const seen = new Set<string>();
+  return issues.filter((issue) => {
+    const key = `${issue.file}|${issue.list}|${issue.index}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promise<Record<string, unknown>> {
   const limit = input.limit ?? 50;
   let offset = 0;
@@ -189,11 +227,13 @@ async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promis
   if (!SORT_KEYS.includes(sort)) throw new ToolError("validation_failed", `sort must be one of ${SORT_KEYS.join(", ")}`);
 
   const { useCases, invalid } = await store.readUseCases();
+  const poolIssues: PoolEntryIssue[] = [];
   // The world is read only for the `entity` filter, so a project without one pays nothing.
   let world: WorldLookup | undefined;
   if ((input.entity ?? "").trim() !== "") {
-    const [{ constellations, entities }, pool] = await Promise.all([store.readWorld(), store.readPersonaPool()]);
-    world = { constellations, isEntity: (id) => resolveParticipant(id, pool.personas, entities) === "entity" };
+    const [{ world: stored, invalid: worldIssues }, { pool, invalid: personaIssues }] = await Promise.all([store.readWorldLenient(), store.readPersonaPoolLenient()]);
+    poolIssues.push(...worldIssues, ...personaIssues);
+    world = { constellations: stored.constellations, isEntity: (id) => resolveParticipant(id, pool.personas, stored.entities) === "entity" };
   }
   const matches = useCases.filter((useCase) => matchesFilter(useCase, input, world));
   matches.sort(compareUseCases(sort));
@@ -206,7 +246,8 @@ async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promis
 
   const wantsPools = (input.include ?? []).length > 0;
   if (input.cursor === undefined || wantsPools) {
-    const { dimensions, personas, objects } = await loadPools(store, false);
+    const { dimensions, personas, objects, issues } = await loadPools(store, false);
+    poolIssues.push(...issues);
     if (input.cursor === undefined) {
       response.counts = { use_cases: useCases.length, personas: personas.length, dimensions: dimensions.length, data_objects: objects.length };
       const { facets, truncated } = facetCounts(matches);
@@ -217,9 +258,11 @@ async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promis
     if (input.include?.includes("dimensions")) response.dimensions = dimensions;
     if (input.include?.includes("data_objects")) response.data_objects = objects;
   }
-  if (invalid.length > 0) {
-    response.warnings = invalid.slice(0, 10).map((file): Warning => ({ kind: "invalid_file", target: `use_case:${file.id}`, message: `usecases/cases/${file.id}.json is not loaded: ${file.error}` }));
-    if (invalid.length > 10) response.invalid_file_count = invalid.length;
+  // Skipped pool entries first: they affect every case, and the cap must not drop them behind a long list of case files.
+  const unreadable = [...poolEntryWarnings(uniqueIssues(poolIssues)), ...invalidCaseWarnings(invalid)];
+  if (unreadable.length > 0) {
+    response.warnings = unreadable.slice(0, 10);
+    if (unreadable.length > 10) response.invalid_file_count = unreadable.length;
   }
   return response;
 }
@@ -242,7 +285,7 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
 
   const resolved = resolveUseCase(useCase, variant);
   const effective = resolved.use_case;
-  const { pools, dimensions, personas, objects } = await loadPools(store, true);
+  const { pools, dimensions, personas, objects, issues } = await loadPools(store, true);
   const world = pools.world; // read once with the pools
 
   // The world the bundle names (ADR-011): with a variant the effective case's constellations, otherwise the case's and every variant's.
@@ -338,7 +381,8 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
     });
   }
 
-  const warnings = await validateUseCase(useCase, pools, lookup);
+  // Skipped pool entries come first, so the cap of the list never drops them.
+  const warnings = [...poolEntryWarnings(issues), ...(await validateUseCase(useCase, pools, lookup))];
   warnings.push(...ambiguousIds(bundlePersonas, world.entities));
   // The world the bundle shows is checked on read too: a member's change after the constellation was written shows up here.
   for (const entity of bundleEntities) warnings.push(...validateEntity(entity, pools));
@@ -653,15 +697,16 @@ export type SuggestVariantsInput = { id: string; limit?: number };
 
 async function suggestVariantsInner(store: Store, input: SuggestVariantsInput): Promise<Record<string, unknown>> {
   const useCase = await loadUseCase(store, input.id);
-  const pool = await store.readPersonaPool();
-  const world = await store.readWorld();
+  const [{ pool, invalid: personaIssues }, { world, invalid: worldIssues }] = await Promise.all([store.readPersonaPoolLenient(), store.readWorldLenient()]);
   const { coverage, suggestions } = suggestVariantGaps(useCase, pool.dimensions, pool.personas, world.constellations);
+  const skipped = poolEntryWarnings([...personaIssues, ...worldIssues]);
   const limit = input.limit ?? 20;
   return {
     coverage,
     suggestions: suggestions.slice(0, limit),
     ...(suggestions.length > limit ? { suggestion_count: suggestions.length } : {}),
     ...(coverage.length === 0 && (pool.dimensions.length === 0 || pool.personas.length === 0) ? { hint: "define dimensions and personas first (set_use_cases), traits drive the suggestions" } : {}),
+    ...(skipped.length > 0 ? reportWarnings(skipped) : {}),
   };
 }
 

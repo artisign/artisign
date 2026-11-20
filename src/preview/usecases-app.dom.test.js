@@ -35,6 +35,7 @@ function summarize(u) {
 function listUseCases(input) {
   if (store?.failCursor && input.cursor !== undefined) return { __fail: true };
   if (store?.failFlatFirst && input.sort === "group" && input.limit === 100 && input.cursor === undefined) return { __fail: true };
+  if (store?.failAll) return { __fail: true, status: 422, code: "invalid_state", message: store.failAll };
   if (store?.failInclude && input.include) return { __fail: true, status: 422, code: "invalid_state", message: "invalid usecases/personas.json: not valid JSON" };
   const all = store?.cases ?? [];
   let list = all.filter((u) => (!input.screen || u.steps.some((s) => s.target?.screen === input.screen)) && (!input.group || u.group === input.group || u.group?.startsWith(`${input.group}/`)) && (!input.status || u.status === input.status) && (!input.query || u.title.toLowerCase().includes(input.query.toLowerCase())));
@@ -278,12 +279,81 @@ describe("with use cases", () => {
     expect($(".uc-result-text").textContent).toBe("3 use cases");
   });
 
-  it("an invalid pool file (invalid_state) is reported with the server message", async () => {
+  it("a pool file that cannot be read shows a state for people with the file, what to do and Retry, not an empty tab", async () => {
     store.failInclude = true;
     await import("./app.js");
     await flush();
     await openTab();
-    expect($(".uc-toast").textContent).toContain("invalid usecases/personas.json");
+    const problem = $(".uc-problem");
+    expect(problem).not.toBeNull();
+    expect(problem.textContent).toContain("A use case file could not be read");
+    expect(problem.querySelector("code").textContent).toBe("usecases/personas.json");
+    expect(problem.textContent).toContain("not valid JSON");
+    expect(problem.textContent).toContain("press Retry");
+    expect(problem.textContent).not.toContain("invalid usecases/");
+    expect($(".uc-content").textContent).not.toContain("Select a use case.");
+    expect($(".uc-toast").hidden).toBe(true);
+    // The pool sections do not look empty either.
+    $$(".uc-subtab")[1].click();
+    await flush();
+    expect($(".uc-problem")).not.toBeNull();
+    expect($(".uc-content").textContent).not.toContain("No personas yet.");
+    // Repaired: Retry reads again and the problem gives way to the tab.
+    store.failInclude = false;
+    $(".uc-problem [data-action=retry]").click();
+    await flush();
+    expect($(".uc-problem")).toBeNull();
+  });
+
+  it("a list read that fails with an agent-oriented message is translated: no remedy text, the sidebar only says it could not load", async () => {
+    store.failAll = "invalid usecases/personas.json: personas.0.name: Invalid input: expected string, received undefined — repair or remove the file by hand (the one case where usecases/ may be edited directly)";
+    await import("./app.js");
+    await flush();
+    await openTab();
+    expect($(".uc-problem-detail").textContent).toBe("personas.0.name: Invalid input: expected string, received undefined");
+    expect($(".uc-content").textContent).not.toContain("by hand");
+    expect($(".uc-content").textContent).not.toContain("Select a use case.");
+    expect($(".uc-list-status").textContent).toBe("Use cases could not be loaded.");
+    // A failure without a file (daemon unreachable) says so in plain words.
+    store.failAll = "disk on fire";
+    $(".uc-problem [data-action=retry]").click();
+    await flush();
+    expect($(".uc-problem-title").textContent).toBe("Use cases could not be loaded");
+    expect($(".uc-problem code")).toBeNull();
+    store.failAll = undefined;
+    $(".uc-problem [data-action=retry]").click();
+    await flush();
+    expect($(".uc-problem")).toBeNull();
+    expect($(".uc-result-text").textContent).toBe("3 use cases");
+  });
+
+  it("skipped pool entries show a notice with Retry above the content while the rest of the tab keeps working", async () => {
+    const entry = { kind: "invalid_file", target: "persona:x", message: "usecases/personas.json personas[0] (x) is not loaded: name: Invalid input" };
+    store.invalid = { warnings: [entry], invalid_file_count: 1 };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    const notice = $(".uc-notice");
+    expect(notice.hidden).toBe(false);
+    expect(notice.textContent).toContain("1 entry in usecases/personas.json could not be loaded and is left out.");
+    expect(notice.textContent).toContain("personas[0] (x)");
+    expect(notice.textContent).toContain("press Retry");
+    expect($(".uc-toast:not(.uc-notice)").hidden).toBe(true); // an entry is not an unreadable case file
+    expect($(".uc-problem")).toBeNull();
+    expect($(".uc-result-text").textContent).toBe("3 use cases");
+    store.invalid = undefined;
+    notice.querySelector("[data-action=retry]").click();
+    await flush();
+    expect($(".uc-notice").hidden).toBe(true);
+  });
+
+  it("a world with skipped entries is named in the same notice", async () => {
+    store.world = { entities: [], relationship_types: [], constellations: [], warnings: [{ kind: "invalid_file", target: "entity:oops", message: "usecases/world.json entities[1] (oops) is not loaded: name: Invalid input" }] };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    expect($(".uc-notice").hidden).toBe(false);
+    expect($(".uc-notice").textContent).toContain("usecases/world.json");
   });
 
   it("the folder-level events of usecases/ and usecases/cases reload too (a case written with its new folder has no file event)", async () => {

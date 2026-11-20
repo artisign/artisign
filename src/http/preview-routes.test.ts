@@ -144,6 +144,15 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
       expect(stored.json).toEqual(await store.readWorld());
     });
 
+    it("skips an invalid entry and names it in warnings, keeping the rest", async () => {
+      await mkdir(join(dir, "usecases"), { recursive: true });
+      await writeFile(join(dir, "usecases", "world.json"), JSON.stringify({ entities: [{ id: "branch", name: "Branch" }, { id: "oops" }] }));
+      const res = await getJson("/api/world");
+      expect(res.status).toBe(200);
+      expect(res.json.entities).toEqual([expect.objectContaining({ id: "branch" })]);
+      expect(res.json.warnings).toEqual([expect.objectContaining({ kind: "invalid_file", target: "entity:oops", message: expect.stringContaining("usecases/world.json entities[1]") })]);
+    });
+
     it("answers 422 invalid_state for a file that no longer validates", async () => {
       await mkdir(join(dir, "usecases"), { recursive: true });
       await writeFile(join(dir, "usecases", "world.json"), "{ not json");

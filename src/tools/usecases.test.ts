@@ -1070,7 +1070,8 @@ describe("use case tools", () => {
       await expect(deleteEntity(fx.store, { kind: "use_case", name: "borrow-book" })).resolves.toMatchObject({ kind: "use_case" });
 
       await writeFile(join(fx.dir, "usecases", "personas.json"), `{ "personas": [{ "id": "BAD" }] }`);
-      for (const run of [() => setUseCases(fx.store, { personas: [{ id: "ok", name: "Ok" }] }), () => listUseCases(fx.store, {}), () => generatePersonas(fx.store, {})]) {
+      // A write never starts from a file with a bad entry (the read path skips it, see usecases-pool-entries.test.ts).
+      for (const run of [() => setUseCases(fx.store, { personas: [{ id: "ok", name: "Ok" }] }), () => generatePersonas(fx.store, {})]) {
         await expect(run()).rejects.toMatchObject({ code: "invalid_state", message: expect.stringContaining("usecases/personas.json") });
       }
     });

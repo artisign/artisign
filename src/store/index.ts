@@ -16,6 +16,7 @@ export type {
   HeadCommitResult,
   HeadReason,
   UseCaseFileIssue,
+  PoolEntryIssue,
 } from "./types.js";
 export { FsStore } from "./fs-store.js";
 export { atomicWrite, ensureCacheGitignore } from "./atomic-write.js";

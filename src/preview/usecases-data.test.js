@@ -39,6 +39,8 @@ import {
   parseOrKeep,
   isCanonicalGroup,
   removeStepTarget,
+  describeLoadProblem,
+  splitInvalidWarnings,
 } from "./usecases-data.js";
 
 describe("ids and text", () => {
@@ -504,5 +506,29 @@ describe("review fixes", () => {
     // the effective step has no target: nothing to change, and the earlier op is not touched
     const bare = { ...source, variants: [{ ...source.variants[0], steps: [source.variants[0].steps[0], { op: "replace", step_id: "t", step: { id: "t", actor: "x", action: "second" } }] }] };
     expect(removeStepTarget(bare, "t", "v")).toEqual({ changed: false });
+  });
+});
+
+describe("load problems (CHR-1124)", () => {
+  it("names the file and the problem and drops the agent remedy", () => {
+    expect(describeLoadProblem("invalid usecases/personas.json: personas.0.name: Invalid input: expected string, received undefined — repair or remove the file by hand (the one case where usecases/ may be edited directly)")).toEqual({
+      file: "usecases/personas.json",
+      detail: "personas.0.name: Invalid input: expected string, received undefined",
+    });
+    expect(describeLoadProblem("invalid usecases/world.json: not valid JSON — repair or remove the file by hand")).toEqual({ file: "usecases/world.json", detail: "not valid JSON" });
+    expect(describeLoadProblem("invalid usecases/data-objects.json: (root): expected an object")).toEqual({ file: "usecases/data-objects.json", detail: "(root): expected an object" });
+  });
+
+  it("has no file for a failure that names none", () => {
+    expect(describeLoadProblem("disk on fire")).toEqual({ file: null, detail: "disk on fire" });
+    expect(describeLoadProblem(undefined)).toEqual({ file: null, detail: "" });
+  });
+
+  it("splits pool entries from unreadable case files", () => {
+    const caseFile = { kind: "invalid_file", target: "use_case:a", message: "usecases/cases/a.json is not loaded" };
+    const entry = { kind: "invalid_file", target: "persona:x", message: "usecases/personas.json personas[0] (x) is not loaded" };
+    const bare = { kind: "invalid_file", message: "no target" };
+    expect(splitInvalidWarnings([caseFile, entry, bare])).toEqual({ entries: [entry], files: [caseFile, bare] });
+    expect(splitInvalidWarnings(undefined)).toEqual({ entries: [], files: [] });
   });
 });

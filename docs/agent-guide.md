@@ -651,9 +651,16 @@ response gives `created` and `updated` counts per kind, not the ids. Delete with
 warns about references left dangling and does not repair them. Like design
 files, `usecases/` changes only through these tools. The one exception: a file
 under `usecases/` that no longer validates (hand edit, merge conflict, a newer
-version's key) makes the tools fail with `invalid_state` naming it; then you may
-repair that file by hand, or remove a case with a valid id via `delete_entity` and
-write it again with `set_use_cases` (the full case).
+version's key) is repaired by hand, or a case with a valid id is removed via
+`delete_entity` and written again with `set_use_cases` (the full case). How the
+tools say so depends on the file. An invalid case file, and an invalid entry in
+`personas.json`, `world.json` or `data-objects.json`, is skipped on reads and
+reported as an `invalid_file` warning (`target` `<kind>:<id>`, `<kind>:#<index>`
+for an entry without an id; `use_case:<id>` for a case file) naming the file
+and the problem; everything else still loads. Writes that start from such a pool
+(`set_use_cases`, `generate_personas`, `delete_entity`) fail with `invalid_state`
+until the entry is repaired, so nothing is dropped silently. A file that is not
+JSON or has the wrong top level fails every read of it with `invalid_state`.
 
 World problems only warn and never block a write; the message names the fix:
 unknown participants, relationship types or constellations, an entity as actor

@@ -67,7 +67,7 @@ describe("usecases-api", () => {
     const res = await api.fetchWorldSource("/p");
     expect(sent[0].url).toBe("/api/world?project=%2Fp");
     expect(sent[0].method).toBe("GET");
-    expect(res).toEqual({ ok: true, world: { entities: [], relationship_types: [], constellations: [] } });
+    expect(res).toEqual({ ok: true, world: { entities: [], relationship_types: [], constellations: [] }, warnings: [] });
     vi.stubGlobal("fetch", async () => ({ ok: false, status: 422, statusText: "x", json: async () => ({ code: "invalid_state", message: "bad file" }) }));
     expect(await api.fetchWorldSource("/p")).toEqual({ ok: false, status: 422, code: "invalid_state", message: "bad file" });
   });

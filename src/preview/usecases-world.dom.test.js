@@ -171,7 +171,7 @@ describe("branch lanes", () => {
 
   it("people row and persona kinds: the kind label leads the line, the icon follows the name", () => {
     render();
-    expect(text($(".uc-person-sub"))).toBe("Human · Policyholder · App");
+    expect(text($(".uc-person-sub"))).toBe("Human · Policyholder · Channel App");
     expect($(".uc-person-name .uc-kind").getAttribute("aria-label")).toBe("Human");
   });
 });
@@ -184,8 +184,9 @@ describe("variant view", () => {
     const trigger = $(".uc-trigger");
     expect(trigger.dataset.change).toBe("changed");
     expect(text(trigger)).toContain("vialetter");
-    expect(text($(".uc-step-was", trigger))).toBe("Base: sends the renewal notice · via webhook");
-    expect(trigger.querySelector(".uc-step-was s")).not.toBeNull();
+    // only what the variant changed is struck: the via, not the text it kept
+    expect(text($(".uc-step-was", trigger))).toBe("Base: via webhook");
+    expect([...trigger.querySelectorAll(".uc-step-was s")].map((n) => n.textContent)).toEqual(["webhook"]);
   });
 
   it("starting state: changed with the struck base value, added, unset from removed_state, the rest from base", () => {
@@ -214,6 +215,34 @@ describe("variant view", () => {
     renderVariant({ bundle, base });
     expect($(".uc-lane-card[data-branch=adult]").dataset.change).toBe("");
     expect($(".uc-lane-card[data-branch=rise]").dataset.change).toBe("emptied");
+  });
+
+  it("the Base chip counts the branches; a variant's branch cards list compact steps; the variant table draws names only", () => {
+    renderVariant();
+    expect(text($(".uc-variant-chip[aria-pressed=false] .uc-variant-meta"))).toBe("3 steps · 3 branches");
+    const card = $(".uc-lane-card[data-branch=rise]");
+    expect(card.classList.contains("is-compact")).toBe(true);
+    expect($$(".uc-lane-compact", card).map(text)).toEqual(["2A.1SystemOffers a lower cover", "2A.2JonCo-signs"]);
+    expect($(".uc-target", card)).toBeNull();
+    expect(text($(".uc-lane-where", card))).toBe("after step 2 · continues at step 3");
+    expect($(".uc-state .uc-avatar")).toBeNull();
+    render();
+    expect($(".uc-state .uc-avatar")).not.toBeNull();
+  });
+
+  it("an emptied branch says how many steps the variant took out", () => {
+    const wide = { ...baseCase.branches[2], steps: [...baseCase.branches[2].steps, { id: "more", actor: "system", action: "More", target: { screen: "ends" } }] };
+    const base = { ...worldBundle, use_case: { ...baseCase, branches: [baseCase.branches[0], baseCase.branches[1], wide] } };
+    renderVariant({ base });
+    expect(text($(".uc-lane-card[data-branch=adult] .uc-warn"))).toContain("removes all 2 steps of the branch (2B.1 to 2B.2)");
+    renderVariant();
+    expect(text($(".uc-lane-card[data-branch=adult] .uc-warn"))).toContain("removes the only step of the branch (2B.1)");
+  });
+
+  it("the visible text says artisign in lower case", () => {
+    render();
+    expect(document.body.textContent).not.toContain("Artisign");
+    expect(text($(".uc-flow").parentElement)).toContain("never chosen by artisign");
   });
 
   it("an inherited row keeps showing and a variant repeats no base warning", () => {

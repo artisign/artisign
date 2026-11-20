@@ -9725,3 +9725,41 @@ button.uc-target:hover {
   padding-left: var(--space-3xl);
   font-size: var(--ui-base);
 }
+
+/* Type size of the world views: the design's screen text is 13px (--ui-base); branch and diff content must not fall back to the browser default */
+.uc-world-page,
+.uc-cst,
+.uc-lane-card,
+.uc-diff-row {
+  font-size: var(--ui-base);
+}
+
+.uc-lane-name,
+.uc-lane-branch-title,
+.uc-lane-step-action,
+.uc-diff-row-name {
+  font-size: var(--ui-base);
+}
+
+/* A variant's branch card lists compact steps: number, actor, action */
+.uc-lane-steps.is-compact {
+  gap: var(--space-sm);
+}
+
+.uc-lane-compact {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  font-size: var(--ui-base);
+}
+
+.uc-lane-compact-no,
+.uc-lane-compact-actor {
+  flex: none;
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.uc-lane-card.is-compact > .uc-branch-end {
+  margin-left: 0;
+}

@@ -129,7 +129,7 @@ export function branchStepNumber(label, position) {
 
 /** Where the branch leaves the main flow, as the lane header says it. */
 export function forkText(entry, steps) {
-  if (entry.branch.from === undefined) return "before the first step";
+  if (entry.branch.from === undefined) return "before the first step · another starting state";
   if (entry.dangling) return `after ${entry.branch.from}`;
   return `after step ${steps.findIndex((s) => s.id === entry.branch.from) + 1}`;
 }
@@ -316,4 +316,20 @@ export function whenScopeText(when, dimensionsById) {
   const scopes = new Set(Object.keys(when ?? {}).map((d) => scopeOf(dimensionsById.get(d))));
   if (scopes.has("constellations") && scopes.has("personas")) return "world and persona traits";
   return scopes.has("constellations") ? "a world trait" : "a persona trait";
+}
+
+/**
+ * What the base trigger said that the variant's does not, as `[label, value]` pairs (`["via", "webhook"]`): only the parts that
+ * differ, so the card can strike just those. A trigger the variant drops altogether gives every part the base had.
+ */
+export function triggerBaseParts(baseTrigger, trigger) {
+  const base = triggerObject(baseTrigger);
+  const now = triggerObject(trigger);
+  const parts = [];
+  if ((base.text ?? "") !== (now.text ?? "") && base.text) parts.push(["", base.text]);
+  if (base.actor !== undefined && base.actor !== now.actor) parts.push(["actor", base.actor]);
+  if (base.via !== undefined && base.via !== now.via) parts.push(["via", base.via]);
+  if ((base.state ?? []).length > 0 && JSON.stringify(base.state) !== JSON.stringify(now.state ?? [])) parts.push(["when", base.state.map((c) => conditionParts(c).key).join(", ")]);
+  if (base.at !== undefined && base.at !== now.at) parts.push(["from", base.at]);
+  return parts;
 }

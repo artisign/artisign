@@ -96,5 +96,5 @@ export function stepDataBlock(step, objectsById) {
 
 /** "Branch 2A · Premium rises by more than 15 %": a branch's number and title. */
 export function branchLabel(entry) {
-  return `Branch ${entry.label} · ${entry.branch.title}`;
+  return entry.branch.from === undefined ? `Branch ${entry.label} · before the first step · ${entry.branch.title}` : `Branch ${entry.label} · ${entry.branch.title}`;
 }

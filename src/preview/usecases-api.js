@@ -1,6 +1,7 @@
 // Use Cases tab — the preview's calls to the daemon. Every use-case tool call goes through one of the fixed wrappers
 // below; `callTool` is private, so no caller can name a tool or a delete kind (ADR-010). The one extra read,
-// GET /api/use-case (`fetchUseCaseSource`), is an internal route, not a tool: it returns the stored case for the edit form.
+// GET /api/use-case (`fetchUseCaseSource`) and GET /api/world (`fetchWorldSource`), are internal routes, not tools: the stored case
+// for the edit form, and the stored world pool (entities, relationship types, constellations) for the World tab and the filter.
 // Every call names its project (see api.js fetchScreens).
 
 /** @typedef {{ ok: true, data: Record<string, any> } | { ok: false, status: number, code?: string, message: string }} ToolResult */

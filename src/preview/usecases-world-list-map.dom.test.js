@@ -94,6 +94,7 @@ describe("mapping view", () => {
       expect(order).toEqual(["offline", "open", "compare", "rise", "adult", "accept"]);
       const rise = $(".uc-map-branch[data-branch=rise]");
       expect($(".uc-map-branch-head", rise).textContent).toContain("Branch 2A · Premium rises by more than 15 %");
+      expect($(".uc-map-branch-head", $(".uc-map-branch[data-branch=offline]")).textContent).toContain("Branch A · before the first step · Device is offline");
       expect($$(".uc-frame-no", rise).map((n) => n.textContent)).toEqual(["2A.1", "2A.2"]);
       expect($$(".uc-frame-no.is-branch", rise)).toHaveLength(2);
       expect($(".uc-map-branch-end", rise).textContent).toBe("continues at 3");

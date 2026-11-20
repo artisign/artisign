@@ -84,6 +84,7 @@ export function createUseCasesView(options) {
   let coverageOpen = false;
   let selectedStep = null; // the mapping view's focused step: survives a reload while the step still exists
   let shownInvalid = ""; // key of the set of unreadable files the toast last reported
+  let pendingWorldError = ""; // a world-read error held back while a confirmation was visible
   let shownWorldError = ""; // the world-read error the toast last said, so a reload does not repeat it
   let writeToast = false; // the visible toast is a write's confirmation
   let pendingInvalid = null; // an invalid-files report held back while a confirmation was visible
@@ -196,8 +197,7 @@ export function createUseCasesView(options) {
     // The world pool has its own read; a failed one never blocks the rest, and is said where the world shows (the World tab, the filter menu, a toast).
     pool.world = worldRes.ok ? worldRes.world : { entities: [], relationship_types: [], constellations: [] };
     pool.worldError = worldRes.ok ? "" : errorMessage(worldRes);
-    if (pool.worldError && pool.worldError !== shownWorldError) showToast(`The world could not be read: ${pool.worldError}`, []);
-    shownWorldError = pool.worldError;
+    reportWorldError(pool.worldError);
     pool.constellations = new Map(pool.world.constellations.map((c) => [c.id, c.name]));
     pool.personas = data.personas ?? [];
     pool.dimensions = data.dimensions ?? [];
@@ -260,7 +260,24 @@ export function createUseCasesView(options) {
     if (writeToast) {
       writeToast = false;
       if (pendingInvalid) showInvalid(pendingInvalid);
+      else if (pendingWorldError) reportWorldError(pendingWorldError);
     }
+  }
+
+  /** The world-read error toast: said once per message, and held back while a write's confirmation is visible. */
+  function reportWorldError(message) {
+    if (message === "" || message === shownWorldError) {
+      pendingWorldError = "";
+      if (message === "") shownWorldError = "";
+      return;
+    }
+    if (writeToast && !toast.hidden) {
+      pendingWorldError = message;
+      return;
+    }
+    shownWorldError = message;
+    pendingWorldError = "";
+    showToast(`The world could not be read: ${message}`, []);
   }
 
   async function loadList() {

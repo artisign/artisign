@@ -28,7 +28,7 @@ import {
 /** "Small project · Human" — a persona's trait values as labels. */
 function traitSummary(persona, dimensionsById) {
   return Object.entries(persona.traits ?? {})
-    .map(([dimension, value]) => dimensionsById.get(dimension)?.values.find((v) => v.id === value)?.label ?? value)
+    .map(([dimension, value]) => `${dimensionsById.get(dimension)?.label ?? dimension} ${dimensionsById.get(dimension)?.values.find((v) => v.id === value)?.label ?? value}`)
     .join(" · ");
 }
 
@@ -117,7 +117,7 @@ function header(ctx, useCase, w) {
 function variantBar(ctx, variants, source, matrix) {
   const { handlers, variantId } = ctx;
   const baseCase = ctx.base.use_case;
-  const chips = [variantChip({ label: "Base", meta: plural(baseCase.steps.length, "step"), selected: !variantId, onClick: () => handlers.onVariant(null) })];
+  const chips = [variantChip({ label: "Base", meta: [plural(baseCase.steps.length, "step"), (baseCase.branches ?? []).length > 0 ? plural(baseCase.branches.length, "branch", "branches") : null].filter(Boolean).join(" · "), selected: !variantId, onClick: () => handlers.onVariant(null) })];
   for (const variant of variants) {
     const raw = (source?.variants ?? []).find((v) => v.id === variant.id);
     const changes = raw ? variantChangeCount(raw, baseCase.steps, baseCase) : 0;
@@ -195,7 +195,7 @@ function people(ctx, useCase) {
   );
 }
 
-/** What a variant overrides compared to the base: a trigger is a string in a stored variant and an object in a read bundle, so it is compared by what it says. */
+/** Goal and outcome are plain text: a variant's differs from the base when the strings differ. (The trigger is compared by what it says, in `triggerChanged`.) */
 const differs = (a, b) => a !== b;
 
 /**
@@ -226,7 +226,7 @@ function flowSummary(rows, variantSelected, branchCount) {
   const screens = new Set(steps.map((r) => r.step.target?.screen).filter(Boolean));
   const elements = steps.filter((r) => r.step.target?.node).length;
   if (!variantSelected) {
-    if (branchCount > 0) return `${plural(steps.length, "step")} · ${plural(branchCount, "branch", "branches")} · branches are never chosen by Artisign, every lane is shown`;
+    if (branchCount > 0) return `${plural(steps.length, "step")} · ${plural(branchCount, "branch", "branches")} · branches are never chosen by artisign, every lane is shown`;
     return `${plural(steps.length, "step")} · ${plural(screens.size, "screen")} · ${plural(elements, "element")}`;
   }
   const count = (kind) => steps.filter((r) => r.change === kind).length;

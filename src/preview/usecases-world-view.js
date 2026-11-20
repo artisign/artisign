@@ -27,6 +27,7 @@ import {
   triggerChanged,
   warningLine,
   conditionParts,
+  triggerBaseParts,
   conditionValueText,
   lanesAtStep,
 } from "./usecases-world-data.js";
@@ -72,7 +73,7 @@ export function triggerRow(ctx, { trigger, baseTrigger, changed, w }) {
   const kind = triggerKind(trigger);
   const wl = warningLine(w.trigger);
   const stateLines = [...w.triggerState.values()].flat().map((x) => x.message);
-  const baseNote = changed && baseTrigger !== undefined ? baseTriggerLine(baseTrigger) : null;
+  const baseNote = changed && baseTrigger !== undefined ? baseTriggerLine(ctx, baseTrigger, trigger) : null;
   return h(
     "div",
     { class: "uc-trigger", dataset: { change: changed ? "changed" : "" } },
@@ -84,15 +85,11 @@ export function triggerRow(ctx, { trigger, baseTrigger, changed, w }) {
   );
 }
 
-/** "Base: via webhook": what the base trigger said that the variant's does not. */
-function baseTriggerLine(trigger) {
-  const t = triggerObject(trigger);
-  const parts = [];
-  if (t.text) parts.push(t.text);
-  if (t.via !== undefined) parts.push(`via ${t.via}`);
-  if ((t.state ?? []).length > 0) parts.push(`when ${t.state.map((c) => conditionParts(c).key).join(", ")}`);
-  if (t.at !== undefined) parts.push(`from ${t.at}`);
-  return h("p", { class: "uc-step-was" }, "Base: ", h("s", null, parts.join(" · ") || "no trigger"));
+/** "Base: via ~~webhook~~": only the parts the variant's trigger changed are struck. */
+function baseTriggerLine(ctx, baseTrigger, trigger) {
+  const parts = triggerBaseParts(baseTrigger, trigger);
+  const shown = parts.length > 0 ? parts : [["", "no trigger"]];
+  return h("p", { class: "uc-step-was" }, "Base: ", shown.flatMap(([label, value], i) => [i > 0 ? " · " : null, label ? `${label} ` : null, h("s", null, label === "actor" ? participant(value, ctx).name : value)]));
 }
 
 // --- World -----------------------------------------------------------------------------------------------------
@@ -168,8 +165,10 @@ function constellationDiffRow(ctx, row, w) {
 
 // --- Starting state -----------------------------------------------------------------------------------------------
 
-function subjectCell(ctx, id, change, flagged) {
+function subjectCell(ctx, id, change, flagged, plain) {
   const p = participant(id, ctx);
+  // The variant table draws names only (the design keeps the avatars to the base table).
+  if (plain && p.kind !== "unknown") return h("span", { class: "uc-subject" }, change === "removed" ? h("s", null, p.name) : p.name);
   // An unknown id is a mono id; it carries the warning mark only where the warning itself is shown (a variant repeats no base warning).
   if (p.kind === "unknown") return h("span", { class: flagged ? "uc-subject is-unknown" : "uc-subject" }, flagged ? icon("warning") : null, h("span", { class: "uc-mono" }, id));
   const body = h("span", { class: "uc-subject" }, participantAvatar(p, "sm"), change === "removed" ? h("s", null, p.name) : p.name);
@@ -179,7 +178,7 @@ function subjectCell(ctx, id, change, flagged) {
 /** The Starting state table (`uc-state-table`); with a variant an "Against base" column and its row markers. */
 export function stateSection(ctx, { rows, w, variantSelected }) {
   if (rows.length === 0) return null;
-  const summary = variantSelected ? stateSummary(rows) : "Values at the start of the case. Artisign stores them, it never evaluates them.";
+  const summary = variantSelected ? stateSummary(rows) : "Values at the start of the case. artisign stores them, it never evaluates them.";
   const head = ["Subject", "Property", "Value", variantSelected ? "Against base" : null].filter(Boolean);
   const body = rows.map(({ entry, change, was }) => {
     const key = `${entry.subject}.${entry.property}`;
@@ -195,7 +194,7 @@ export function stateSection(ctx, { rows, w, variantSelected }) {
     return h(
       "tr",
       { class: unknown || warnings.length > 0 ? "has-warning" : "", dataset: { change: change ?? "", key } },
-      h("th", { scope: "row" }, subjectCell(ctx, entry.subject, change, unknown)),
+      h("th", { scope: "row" }, subjectCell(ctx, entry.subject, change, unknown, variantSelected)),
       h("td", { class: "uc-mono" }, struck(entry.property)),
       h("td", null, value, message ? h("span", { class: "uc-state-warn" }, message) : null),
       variantSelected ? h("td", { class: "uc-state-diff" }, change === "changed" ? diffBadge("changed") : change === "added" ? diffBadge("added") : change === "removed" ? diffBadge("removed") : diffBadge("base")) : null,
@@ -238,13 +237,13 @@ function laneStep(ctx, branchEntry, step, position, w) {
   );
 }
 
-function laneHead(ctx, entry, steps, change, w) {
+function laneHead(ctx, entry, steps, change, w, where = forkText(entry, steps)) {
   const { branch } = entry;
   const branchWarnings = w.branch.get(branch.id) ?? [];
   return h(
     "div",
     { class: "uc-lane-head" },
-    h("div", { class: "uc-lane-title" }, icon("call_split", "uc-lane-icon"), h("span", { class: "uc-lane-name" }, `Branch ${entry.label}`), h("span", { class: "uc-lane-branch-title" }, branch.title), change === "changed" ? diffBadge("changed") : change === "added" ? diffBadge("added") : change === "emptied" ? diffBadge("emptied") : null, h("span", { class: "uc-lane-where" }, forkText(entry, steps))),
+    h("div", { class: "uc-lane-title" }, icon("call_split", "uc-lane-icon"), h("span", { class: "uc-lane-name" }, `Branch ${entry.label}`), h("span", { class: "uc-lane-branch-title" }, branch.title), change === "changed" ? diffBadge("changed") : change === "added" ? diffBadge("added") : change === "emptied" ? diffBadge("emptied") : null, h("span", { class: "uc-lane-where" }, where)),
     // An emptied branch says it in the lane's own words; the tool's branch_empty line would repeat it.
     branchWarnings.filter((x) => !(change === "emptied" && x.kind === "branch_empty")).map((x) => warnLine(x.message)),
   );
@@ -266,11 +265,23 @@ function whenLine(branch, w, was) {
   );
 }
 
+/** A compact step row of a variant's branch card: number, actor, action (no target chip, no avatar). */
+function compactStep(ctx, entry, step, position) {
+  return h("li", { class: "uc-lane-compact", dataset: { step: step.id, change: step.change ?? "" } }, h("span", { class: "uc-lane-compact-no" }, branchStepNumber(entry.label, position)), h("span", { class: "uc-lane-compact-actor" }, participant(step.actor, ctx).name), h("span", null, step.action));
+}
+
+/** The "removes the only step" message of an emptied branch, in the number of steps the base branch had. */
+function emptiedText(entry, baseStepCount) {
+  const n = baseStepCount;
+  const which = n === 1 ? `the only step of the branch (${branchStepNumber(entry.label, 1)})` : `all ${n} steps of the branch (${branchStepNumber(entry.label, 1)} to ${branchStepNumber(entry.label, n)})`;
+  return `This variant removes ${which}. Remove the branch too, or give it a step.`;
+}
+
 /**
- * One branch lane (`uc-branch-lane`). Base view: the lane inside the flow list. Variant view (`diff`): a card of the Branches section
- * with its marker, what the base had, and the emptied message.
+ * One branch lane (`uc-branch-lane`). Base view: the lane inside the flow list, with avatars and target chips. Variant view
+ * (`compact`): a card of the Branches section with its marker, compact step rows, what the base had, and the emptied message.
  */
-export function branchLane(ctx, entry, w, { change = null, base = null } = {}) {
+export function branchLane(ctx, entry, w, { change = null, base = null, compact = false } = {}) {
   const { bundle } = ctx;
   const steps = bundle.use_case.steps ?? [];
   const { branch } = entry;
@@ -278,16 +289,20 @@ export function branchLane(ctx, entry, w, { change = null, base = null } = {}) {
   const emptied = change === "emptied";
   const dropped = droppedBranchSteps(branch, base);
   const was = whenWas(branch, base);
+  const baseBranch = (ctx.base.use_case.branches ?? []).find((b) => b.id === branch.id);
+  // A compact card says where the branch goes on in its header; only an end (with its outcome) or a broken rejoin keeps its chip.
+  const showEnd = !compact || end.kind !== "rejoin";
   const body = emptied
-    ? [h("p", { class: "uc-warn" }, icon("warning"), `This variant removes the only step of the branch (${branchStepNumber(entry.label, 1)}). Remove the branch too, or give it a step.`)]
+    ? [h("p", { class: "uc-warn" }, icon("warning"), emptiedText(entry, (baseBranch?.steps ?? []).length))]
     : [
         whenLine(branch, w, was),
-        h("ol", { class: "uc-lane-steps" }, (branch.steps ?? []).map((step, i) => laneStep(ctx, entry, step, i + 1, w))),
+        h("ol", { class: compact ? "uc-lane-steps is-compact" : "uc-lane-steps" }, (branch.steps ?? []).map((step, i) => (compact ? compactStep(ctx, entry, step, i + 1) : laneStep(ctx, entry, step, i + 1, w)))),
         dropped.map((s) => h("p", { class: "uc-step-was" }, "Base: ", h("s", null, `${participant(s.actor, ctx).name} ${s.action}`.trim()))),
-        branchEndChip(end.kind, end.text),
+        showEnd ? branchEndChip(end.kind, end.text) : null,
       ];
   const label = `Branch ${entry.label}, ${forkText(entry, steps)}`;
-  return h("div", { class: "uc-lane-card", dataset: { branch: branch.id, change: change ?? "" }, role: "group", "aria-label": label }, laneHead(ctx, entry, steps, change, w), body);
+  const where = compact && end.kind === "rejoin" ? `${forkText(entry, steps)} · continues at step ${steps.findIndex((s) => s.id === branch.rejoin) + 1}` : forkText(entry, steps);
+  return h("div", { class: `uc-lane-card${compact ? " is-compact" : ""}`, dataset: { branch: branch.id, change: change ?? "" }, role: "group", "aria-label": label }, laneHead(ctx, entry, steps, change, w, where), body);
 }
 
 /** The lanes forking after a main-flow step (or before the first one, `stepId` null) as `<li>`s of the flow list. */
@@ -317,7 +332,7 @@ export function branchesDiffSection(ctx, w, mainDifferences) {
       const label = baseNumbered.find((e) => e.branch.id === row.removed.id)?.label;
       return h("li", { class: "uc-diff-row", dataset: { change: "removed", branch: row.removed.id } }, icon("call_split", "uc-diff-row-icon"), h("s", { class: "uc-diff-row-name" }, label ? `Branch ${label} · ${row.removed.title}` : `Branch · ${row.removed.title}`), diffBadge("removed"));
     }
-    return h("li", { class: "uc-lane-li" }, branchLane(ctx, row.entry, w, { change: row.change === "base" ? null : row.change, base: row.base }));
+    return h("li", { class: "uc-lane-li" }, branchLane(ctx, row.entry, w, { change: row.change === "base" ? null : row.change, base: row.base, compact: true }));
   });
   return h(
     "section",

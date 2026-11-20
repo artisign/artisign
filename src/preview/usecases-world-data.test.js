@@ -1,7 +1,7 @@
 // The pure logic of the world model views: conditions, branch numbering, the warning grammar, the variant differences and the
 // constellation-aware coverage matrix. Neutral insurance fixtures.
 import { describe, it, expect } from "vitest";
-import { conditionParts, numberBranches, flowSequence, forkText, branchEnd, warningsByTarget, stateRows, stateSummary, constellationRows, orphanText, whenWas, participant, branchLetter, lanesAtStep, matchingConstellations, whenScopeText } from "./usecases-world-data.js";
+import { conditionParts, numberBranches, flowSequence, forkText, branchEnd, warningsByTarget, stateRows, stateSummary, constellationRows, orphanText, whenWas, participant, triggerBaseParts, branchLetter, lanesAtStep, matchingConstellations, whenScopeText } from "./usecases-world-data.js";
 import { coverageMatrix, variantChangeCount } from "./usecases-data.js";
 import { baseCase, constellations, dimensions, personas, entities, worldBundle, makeWorldPool } from "./usecases-world.test-helper.js";
 
@@ -18,7 +18,7 @@ describe("branch numbering", () => {
   it("numbers by fork step and letter, letters restart per fork, no fork number before the first step", () => {
     const numbered = numberBranches(baseCase);
     expect(numbered.map((e) => e.label)).toEqual(["A", "2A", "2B"]);
-    expect(numbered.map((e) => forkText(e, baseCase.steps))).toEqual(["before the first step", "after step 2", "after step 2"]);
+    expect(numbered.map((e) => forkText(e, baseCase.steps))).toEqual(["before the first step · another starting state", "after step 2", "after step 2"]);
   });
 
   it("a fork that is not a main-flow step leads, numbered with a question mark", () => {
@@ -147,6 +147,13 @@ describe("variant differences", () => {
     expect(variantChangeCount(variant, [], { constellations: ["a", "b"] })).toBe(1 + 2 + 2 + 1);
     expect(variantChangeCount({ constellations: ["a"] }, [], { constellations: ["a"] })).toBe(0);
     expect(variantChangeCount({ steps: [{}, {}], outputs: [] })).toBe(3);
+  });
+
+  it("the base trigger line strikes only the parts the variant changed", () => {
+    const base = { text: "Sends the notice", actor: "insurer", via: "webhook" };
+    expect(triggerBaseParts(base, { text: "Sends the notice", actor: "insurer", via: "letter" })).toEqual([["via", "webhook"]]);
+    expect(triggerBaseParts(base, { text: "Sends it", actor: "jon" })).toEqual([["", "Sends the notice"], ["actor", "insurer"], ["via", "webhook"]]);
+    expect(triggerBaseParts("Plain", "Plain")).toEqual([]);
   });
 
   it("applies-when: the scope of the dimensions and the constellations that match", () => {

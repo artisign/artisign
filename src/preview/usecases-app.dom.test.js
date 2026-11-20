@@ -219,6 +219,10 @@ describe("with use cases", () => {
     expect(query.length).toBeGreaterThan(0);
     expect(query.every((b) => b.query === "Case 3")).toBe(true);
     expect($(".uc-result-text").textContent).toBe("1 of 3 use cases");
+    // the hit sits in a group the search opens, and the detail moves to it
+    expect($$(".uc-list-row .uc-list-title").map((el) => el.textContent)).toEqual(["Case 3"]);
+    expect($(".uc-list-row.is-selected .uc-list-title").textContent).toBe("Case 3");
+    expect($(".uc-title").textContent).toBe("Case 3");
   });
 
   it("an SSE usecases event reloads the list and the open detail", async () => {

@@ -7146,7 +7146,32 @@ button.uc-target:hover {
   min-width: 0;
   overflow: auto;
   padding: var(--space-3xl);
+  /* Room after the last card, so the end of the track reads as an end; the scrollbar stays visible (an overlay scrollbar hides until the pointer moves, and a card cut by the edge looked cut off). */
+  padding-inline-end: calc(var(--space-3xl) * 3);
   background: var(--chrome-canvas);
+}
+
+.uc-map-canvas {
+  --scrollbar-thumb: var(--chrome-text-tertiary);
+  --scrollbar-track: var(--chrome-border);
+
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* Legacy fallback for WebKit/Blink without scrollbar-color. */
+@supports not (scrollbar-color: auto) {
+  .uc-map-canvas::-webkit-scrollbar {
+    height: 12px;
+    width: 12px;
+  }
+
+  .uc-map-canvas::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+
+  .uc-map-canvas::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+  }
 }
 
 .uc-map-track {

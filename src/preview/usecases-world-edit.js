@@ -307,7 +307,7 @@ export function buildBranch(draft, { taken, ids, errors, fieldErrors, label = "B
       fieldErrors.push({ path: `branch.step.${i}.id`, message });
     }
     used.set(stepId, `step ${i + 1} of this branch`);
-    return buildStepObject(step, stepId, `${label} step ${i + 1}`, errors);
+    return buildStepObject(step, stepId, `${label} step ${i + 1}`, errors, { path: `branch.step.${i}.node`, fieldErrors });
   });
   const out = { ...draft.extra, id, title, ...(draft.from !== "" ? { from: draft.from } : {}), when, steps };
   if (!draft.ends && draft.rejoin !== "") out.rejoin = draft.rejoin;

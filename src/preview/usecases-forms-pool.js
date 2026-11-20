@@ -5,7 +5,7 @@
 
 import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
-import { segmented, avatar } from "./usecases-parts.js";
+import { segmented, avatar, saveErrorText } from "./usecases-parts.js";
 import { KIND_ICONS } from "./usecases-world-data.js";
 import { AVATAR_COLORS, AVATAR_EMOJIS, FIELD_TYPES, slugify, uniqueId, isValidId, initials, formatExampleValue, parseExampleValue, plural, formatCount } from "./usecases-data.js";
 
@@ -143,7 +143,7 @@ export function confirmDeleteInline(dialog, { name, remove, done, used = "" }) {
     const response = await remove(force);
     if (!response.ok) {
       if (!force && response.code === "conflict") return offerForce(response.message);
-      return dialog.setMessage(response.message, "error");
+      return dialog.setMessage(saveErrorText(response.message), "error");
     }
     dialog.setDirty(false);
     dialog.close(done(response));
@@ -209,7 +209,7 @@ export async function openPersonaDialog(options) {
   const nameInput = textInput({ value: draft.name, autofocus: true, onInput: (value) => { draft.name = value; if (!idTouched) { id = uniqueId(slugify(value), options.takenIds()); idInput.value = id; } if (!draft.emoji) drawAvatar(); touch(); } });
   const roleListId = nextId("uc-roles");
   const roles = [...new Set(pool.personas.map((p) => p.role).filter(Boolean))];
-  const roleInput = textInput({ value: draft.role, list: roleListId, placeholder: "Designer", onInput: (value) => { draft.role = value; touch(); } });
+  const roleInput = textInput({ value: draft.role, list: roleListId, placeholder: "Member", onInput: (value) => { draft.role = value; touch(); } });
   const idInput = textInput({ value: id, mono: true, readonly: mode === "edit", placeholder: "derived from the name", onInput: (value) => { id = value; idTouched = true; touch(); } });
   const kindIcon = h("span", { class: "uc-kind-preview" });
   const drawKind = () => kindIcon.replaceChildren(...(KIND_ICONS[draft.kind] ? [icon(KIND_ICONS[draft.kind].icon)] : []));
@@ -223,8 +223,8 @@ export async function openPersonaDialog(options) {
       const select = selectInput({ options: [{ value: "", label: "Any" }, ...dimension.values.map((v) => ({ value: v.id, label: v.label }))], value: draft.traits[dimension.id] ?? "", ariaLabel: dimension.label, onChange: (value) => { draft.traits[dimension.id] = value; touch(); } });
       return h("div", { class: "uc-trait-row" }, h("span", { class: "uc-trait-label" }, dimension.label, (dimension.scope ?? "personas") === "personas" ? null : h("span", { class: "uc-label-hint" }, " · constellations")), select);
     });
-  const goalsArea = textArea({ value: draft.goals, rows: 4, placeholder: "Find the screen a step maps to", onInput: (value) => { draft.goals = value; touch(); } });
-  const descArea = textArea({ value: draft.description, rows: 2, placeholder: "Designs screens and writes use cases for them.", onInput: (value) => { draft.description = value; touch(); } });
+  const goalsArea = textArea({ value: draft.goals, rows: 4, placeholder: "Find a book to borrow", onInput: (value) => { draft.goals = value; touch(); } });
+  const descArea = textArea({ value: draft.description, rows: 2, placeholder: "Borrows books and returns them on time.", onInput: (value) => { draft.description = value; touch(); } });
   const generatedBox = source?.generated ? h("label", { class: "uc-check" }, h("input", { type: "checkbox", checked: true, onChange: (e) => { draft.generated = e.target.checked; touch(); } }), "Mark as generated from dimensions") : null;
 
   function refresh() {
@@ -248,7 +248,7 @@ export async function openPersonaDialog(options) {
     const response = await options.save(built.payload);
     if (!response.ok) {
       saveButton.disabled = false;
-      return dialog.setMessage(response.message, "error");
+      return dialog.setMessage(saveErrorText(response.message), "error");
     }
     result = { id: finalId, data: response.data };
     dialog.setDirty(false);
@@ -330,7 +330,7 @@ export async function openDimensionDialog(options) {
     const response = await options.save(built.payload);
     if (!response.ok) {
       saveButton.disabled = false;
-      return dialog.setMessage(response.message, "error");
+      return dialog.setMessage(saveErrorText(response.message), "error");
     }
     result = { id: finalId, data: response.data };
     dialog.setDirty(false);
@@ -367,7 +367,7 @@ export async function openObjectDialog(options) {
     dialog.setDirty(true);
     refresh();
   };
-  const nameInput = textInput({ value: draft.name, autofocus: true, placeholder: "Mapping", onInput: (value) => { draft.name = value; if (!idTouched) { id = uniqueId(slugify(value), options.takenIds()); idInput.value = id; } touch(); } });
+  const nameInput = textInput({ value: draft.name, autofocus: true, placeholder: "Book", onInput: (value) => { draft.name = value; if (!idTouched) { id = uniqueId(slugify(value), options.takenIds()); idInput.value = id; } touch(); } });
   const idInput = textInput({ value: id, mono: true, readonly: mode === "edit", placeholder: "derived from the name", onInput: (value) => { id = value; idTouched = true; touch(); } });
   const descInput = textInput({ value: draft.description, onInput: (value) => { draft.description = value; touch(); } });
   const fieldsBox = h("div", { class: "uc-fields-edit" });
@@ -411,7 +411,7 @@ export async function openObjectDialog(options) {
     const response = await options.save(built.payload);
     if (!response.ok) {
       saveButton.disabled = false;
-      return dialog.setMessage(response.message, "error");
+      return dialog.setMessage(saveErrorText(response.message), "error");
     }
     result = { id: finalId, data: response.data };
     dialog.setDirty(false);
@@ -498,7 +498,7 @@ export async function openGenerateDialog(options) {
     dialog.setMessage("Working out the combinations…");
     const response = await options.generate(input(true));
     previewButton.disabled = state.dimensions.size === 0;
-    if (!response.ok) return dialog.setMessage(response.message, "error");
+    if (!response.ok) return dialog.setMessage(saveErrorText(response.message), "error");
     const data = response.data;
     state.preview = data;
     dialog.setMessage("");
@@ -520,7 +520,7 @@ export async function openGenerateDialog(options) {
     const response = await options.generate(input(false));
     if (!response.ok) {
       createButton.disabled = false;
-      return dialog.setMessage(response.message, "error");
+      return dialog.setMessage(saveErrorText(response.message), "error");
     }
     result = { created: response.data.created ?? 0, target: state.target, data: response.data };
     dialog.close(result);

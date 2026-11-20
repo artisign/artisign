@@ -78,6 +78,31 @@ describe("draft and payload", () => {
     expect(payload.steps.slice(3).map((s) => s.id)).toEqual(["same-action", "same-action-2"]);
   });
 
+  it("an element target without an element id is an error on the node field, not a silent screen mapping", () => {
+    const draft = draftFromSource(rawUseCase);
+    draft.steps[0].kind = "element";
+    draft.steps[0].screen = "editor";
+    draft.steps[0].node = "  ";
+    const built = buildPayload({ id: "map-step", draft, source: rawUseCase });
+    expect(built.errors.join(" ")).toContain("Element id required");
+    expect(built.fieldErrors).toContainEqual(expect.objectContaining({ path: "step.0.node", message: "Element id required" }));
+    expect(built.payload).toBeUndefined();
+  });
+
+  it("a step or trigger actor that is a pool persona joins the case personas once, in order; the system and unknown actors do not", () => {
+    const pool = makePool();
+    const ids = [...pool.personasById.keys()];
+    expect(ids.length).toBeGreaterThan(1);
+    const [first, second] = ids;
+    const draft = draftFromSource(rawUseCase);
+    draft.personas = [second];
+    draft.steps[0].actor = first;
+    draft.steps[1].actor = "system";
+    draft.steps.push({ id: "", actor: first, action: "Again", kind: "none", screen: "", node: "", data: [] }, { id: "", actor: "ghost", action: "Who", kind: "none", screen: "", node: "", data: [] });
+    const { payload } = buildPayload({ id: "map-step", draft, source: rawUseCase, personaIds: new Set(ids) });
+    expect(payload.personas).toEqual([second, first]);
+  });
+
   it("keeps an empty before/after of a step's data through open and save", () => {
     const source = { ...rawUseCase, steps: [{ id: "s1", actor: "dana", action: "Check", data: [{ object: "mapping", before: {}, after: {} }, { object: "mapping", before: {}, after: { status: "ready" } }] }] };
     const draft = draftFromSource(source);
@@ -135,8 +160,8 @@ describe("live warnings", () => {
     const text = warnings.map((w) => `${w.path}: ${w.message}`).join("\n");
     expect(text).toContain("output.0: color is not a field of Mapping.");
     expect(text).toContain("persona.ghost: Persona ghost does not exist.");
-    expect(text).toContain("step.2.screen: This screen no longer exists. Pick another one.");
-    expect(text).toContain("step.0.node: not-there is not an element of editor.");
+    expect(text).toContain(`step.2.screen: Screen "gone-screen" not found.`);
+    expect(text).toContain(`step.0.node: Element "not-there" not found on screen "editor".`);
   });
 
   it("flags example values that do not fit the field, next to the key warnings", () => {
@@ -247,6 +272,28 @@ describe("use case dialog", () => {
     expect(payload).toMatchObject({ id: "map-step", title: "Assign it faster" });
     expect(payload.variants).toBeUndefined();
     expect(result).toEqual({ id: "map-step", data: { warnings: [] } });
+  });
+
+  it("a rejected save shows the problem without the agent's remedy", async () => {
+    const opts = options({ save: vi.fn(async () => ({ ok: false, message: "invalid usecases/personas.json: personas.0.name: required — repair or remove the file by hand (the one case where usecases/ may be edited directly)" })) });
+    openUseCaseDialog(opts);
+    await flush();
+    type($("dialog input[autofocus]"), "x");
+    button("Save use case").click();
+    await flush();
+    const text = $(".uc-foot-msg").textContent;
+    expect(text).toContain("personas.0.name: required");
+    expect(text).not.toContain("by hand");
+    expect(text).not.toContain("may be edited directly");
+  });
+
+  it("the placeholders are neutral library examples", async () => {
+    openUseCaseDialog(options({ mode: "new", source: null }));
+    await flush();
+    const placeholders = $$("dialog input").map((el) => el.placeholder).join("|");
+    expect(placeholders).toContain("Borrow a book");
+    expect(placeholders).toContain("lending/loans");
+    expect(placeholders).not.toMatch(/mapping|Use case editor|design/i);
   });
 
   it("a rejected save keeps the dialog open with the message", async () => {

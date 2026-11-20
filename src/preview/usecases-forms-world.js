@@ -4,7 +4,7 @@
 
 import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
-import { avatar } from "./usecases-parts.js";
+import { avatar, saveErrorText } from "./usecases-parts.js";
 import { entityAvatar } from "./usecases-world-parts.js";
 import { footer, confirmDeleteInline } from "./usecases-forms-pool.js";
 import { participantName, participantOptions, entitiesOf } from "./usecases-forms-rows.js";
@@ -77,7 +77,7 @@ export async function openEntityDialog(options) {
     const response = await options.save(built.payload);
     if (!response.ok) {
       saveButton.disabled = false;
-      return dialog.setMessage(response.message, "error");
+      return dialog.setMessage(saveErrorText(response.message), "error");
     }
     result = { id: finalId, data: response.data };
     dialog.setDirty(false);
@@ -185,7 +185,7 @@ export async function openRelationshipTypeDialog(options) {
     const response = await options.save(built.payload);
     if (!response.ok) {
       saveButton.disabled = false;
-      return dialog.setMessage(response.message, "error");
+      return dialog.setMessage(saveErrorText(response.message), "error");
     }
     result = { id: finalId, data: response.data };
     dialog.setDirty(false);
@@ -350,7 +350,7 @@ export async function openConstellationDialog(options) {
     const response = await options.save(built.payload);
     if (!response.ok) {
       saveButton.disabled = false;
-      return dialog.setMessage(response.message, "error");
+      return dialog.setMessage(saveErrorText(response.message), "error");
     }
     result = { id: finalId, data: response.data };
     dialog.setDirty(false);

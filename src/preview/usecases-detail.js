@@ -243,13 +243,15 @@ function story(ctx, w, rawVariant) {
   );
 }
 
-function flowSummary(rows, variantSelected, branchCount) {
+function flowSummary(rows, variantSelected, branchCount, bundle = null) {
   const steps = rows.filter((r) => r.kind === "step");
   const screens = new Set(steps.map((r) => r.step.target?.screen).filter(Boolean));
   const elements = steps.filter((r) => r.step.target?.node).length;
+  const missing = [...screens].filter((screen) => (bundle?.screens ?? []).some((entry) => entry.screen === screen && entry.exists === false)).length;
+  const screenCount = missing > 0 ? `${plural(screens.size, "screen")} (${missing} missing)` : plural(screens.size, "screen");
   if (!variantSelected) {
     if (branchCount > 0) return `${plural(steps.length, "step")} · ${plural(branchCount, "branch", "branches")} · branches are never chosen by artisign, every lane is shown`;
-    return `${plural(steps.length, "step")} · ${plural(screens.size, "screen")} · ${plural(elements, "element")}`;
+    return `${plural(steps.length, "step")} · ${screenCount} · ${plural(elements, "element")}`;
   }
   const count = (kind) => steps.filter((r) => r.change === kind).length;
   const removed = rows.filter((r) => r.kind === "removed").length;
@@ -279,7 +281,7 @@ function flow(ctx, useCase, w) {
     list.append(stepRow(ctx, row, numbered, w));
     list.append(...lanesAt(ctx, numbered, row.step.id, w));
   }
-  return h("section", { class: "uc-section" }, h("h2", { class: "uc-h2" }, "Flow", h("span", { class: "uc-h2-meta" }, flowSummary(rows, Boolean(variantId), numbered.length))), rows.length === 0 ? h("p", { class: "uc-muted" }, "No steps yet.") : list);
+  return h("section", { class: "uc-section" }, h("h2", { class: "uc-h2" }, "Flow", h("span", { class: "uc-h2-meta" }, flowSummary(rows, Boolean(variantId), numbered.length, bundle))), rows.length === 0 ? h("p", { class: "uc-muted" }, "No steps yet.") : list);
 }
 
 function stepRow(ctx, row, numbered, w) {

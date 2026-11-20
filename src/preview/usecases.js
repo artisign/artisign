@@ -362,12 +362,15 @@ export function createUseCasesView(options) {
       const grouped = Object.values(list.facets.group ?? {}).reduce((sum, n) => sum + n, 0);
       const keep = new Set([...list.expanded].filter((path) => path === "" || list.tree.byPath.has(path)));
       if (detail?.view?.use_case) for (const path of groupAncestors(detail.view.use_case.group)) if (list.tree.byPath.has(path)) keep.add(path);
+      // A search opens every group that holds a hit (the facets are those of the filtered result), so a hit is never hidden in a collapsed group.
+      if (filters.query?.trim()) for (const group of Object.keys(list.facets.group ?? {})) for (const path of groupAncestors(group)) if (list.tree.byPath.has(path)) keep.add(path);
       list.expanded = keep;
       // A reload keeps the rows already loaded (so the list does not collapse and the scroll position stays) and
       // refetches the same number of rows per expanded group and for "No group".
       const previous = list.groupState;
       const previousUngrouped = list.ungrouped.rows;
       const ungroupedCount = Math.max(0, list.total - grouped);
+      if (filters.query?.trim() && ungroupedCount > 0) list.expanded.add("");
       list.groupState = new Map([...previous].filter(([path]) => path !== "" && list.expanded.has(path)));
       list.ungrouped = { count: ungroupedCount, rows: previousUngrouped.slice(0, ungroupedCount), loading: false };
       renderList();
@@ -395,6 +398,15 @@ export function createUseCasesView(options) {
     renderList();
     renderAll();
     if (!autoSelected && !detail) await autoSelectFirst(req);
+    if (filters.query?.trim()) await selectFirstHit(req);
+  }
+
+  /** After a search: when the open case is not among the hits, the detail moves to the first hit (the open case stays when it is one of them). */
+  async function selectFirstHit(req) {
+    if (req !== list.req) return;
+    const hits = (list.mode === "flat" ? list.flat.items : listRows().filter((row) => row.kind === "case").map((row) => row.u)).map((u) => u.id);
+    if (hits.length === 0 || (detail?.id && hits.includes(detail.id))) return;
+    await openCase(hits[0]);
   }
 
   /** Pages through `limit`-sized requests (never above PAGE_MAX, the most the tool returns) by cursor until `want` rows are in. */

@@ -9,7 +9,12 @@ import { field, textInput, textArea, selectInput, removeButton, nextId } from ".
 import { segmented, avatar, diffBadge } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
 import { createReorder, renumberRow } from "./usecases-reorder.js";
-import { triggerText, triggerWithText, slugify, uniqueId, isValidId, formatExample, parseOrKeep, avatarOf, actorName } from "./usecases-data.js";
+import { triggerText, slugify, uniqueId, isValidId, formatExample, parseOrKeep, avatarOf, actorName, plural } from "./usecases-data.js";
+import { numberBranches } from "./usecases-world-data.js";
+import { triggerShape, blankTriggerShape, buildTrigger, stateDraft, buildState, branchDraft, buildBranch, blankBranch } from "./usecases-world-edit.js";
+import { openBranchDialog, cloneBranchDraft } from "./usecases-forms-branch.js";
+import { createTriggerEditor, constellationChips } from "./usecases-forms-case-world.js";
+import { stateRows } from "./usecases-forms-rows.js";
 
 // --- Draft <-> payload (pure) ---------------------------------------------------------------------------------------
 
@@ -30,12 +35,9 @@ function unmanaged(stored, managed) {
   return Object.fromEntries(Object.entries(stored).filter(([key]) => !managed.includes(key)));
 }
 
-const STEP_KEYS = ["id", "actor", "action", "target", "data", "note"];
-const OP_KEYS = ["op", "step_id", "step"];
-/** The ops that add, rewrite or remove a whole branch (no `step_id`). The editor does not edit them yet: they are written back as stored. */
-const BRANCH_OPS = ["add_branch", "replace_branch", "remove_branch"];
-const isBranchOp = (op) => BRANCH_OPS.includes(op.op);
-const VARIANT_KEYS = ["id", "title", "description", "when", "personas", "actors", "trigger", "goal", "outcome", "inputs", "outputs", "steps"];
+const STEP_KEYS = ["id", "actor", "action", "target", "data", "note", "via"];
+const OP_KEYS = ["op", "step_id", "step", "branch", "branch_id"];
+const VARIANT_KEYS = ["id", "title", "description", "when", "personas", "constellations", "state", "actors", "trigger", "goal", "outcome", "inputs", "outputs", "steps"];
 
 /** The draft rows of an inputs / outputs list. `orig` keeps the stored example: one the user does not touch is saved exactly as it was. */
 export function ioDraft(list, sideKey) {
@@ -53,13 +55,15 @@ export function stepDraft(step) {
     screen: step.target?.screen ?? "",
     node: step.target?.node ?? "",
     note: step.note,
+    via: step.via ?? "",
+    origVia: step.via ?? "",
     data: (step.data ?? []).map((d) => ({ object: d.object, before: formatExample(d.before), after: formatExample(d.after), origBefore: d.before, origAfter: d.after })),
     extra: unmanaged(step, STEP_KEYS),
   };
 }
 
 export function emptyStep(actor = "system") {
-  return { id: "", actor, action: "", kind: "screen", screen: "", node: "", data: [] };
+  return { id: "", actor, action: "", kind: "screen", screen: "", node: "", via: "", origVia: "", data: [] };
 }
 
 /** A step body nothing was typed into yet (what Insert after / Append start with). */
@@ -71,9 +75,18 @@ function cloneStep(step) {
   return { ...step, data: step.data.map((d) => ({ ...d })) };
 }
 
-/** A new variant: nothing overridden, no swaps, no changes. */
+/** A new variant: nothing overridden, no swaps, no changes, no state rows. */
 export function blankVariant() {
-  return { id: "", title: "", description: "", when: {}, overrides: {}, swaps: [], ops: [] };
+  return { id: "", title: "", description: "", when: {}, overrides: {}, swaps: [], ops: [], state: [], hadState: false, triggerShape: blankTriggerShape(), extra: {} };
+}
+
+/** The draft of a stored branch op: the branch ops carry their branch as an editable draft, a step op its step, an append its branch id. */
+function opDraft(op) {
+  const extra = unmanaged(op, OP_KEYS);
+  if (op.op === "add_branch") return { op: "add_branch", stepId: "", step: null, branchId: "", branch: branchDraft(op.branch), extra };
+  if (op.op === "replace_branch") return { op: "replace_branch", stepId: "", step: null, branchId: op.branch_id, branch: branchDraft(op.branch), extra };
+  if (op.op === "remove_branch") return { op: "remove_branch", stepId: "", step: null, branchId: op.branch_id, branch: null, extra };
+  return { op: op.op, stepId: op.step_id ?? "", step: op.step ? stepDraft(op.step) : null, branchId: op.branch ?? "", branch: null, extra };
 }
 
 /** The draft of a stored variant. An optional key that is present becomes an override; absent keys stay absent. */
@@ -81,9 +94,10 @@ export function variantDraft(variant) {
   const overrides = {};
   for (const [key] of TEXT_OVERRIDES) if (variant[key] !== undefined) overrides[key] = key === "trigger" ? triggerText(variant[key]) : variant[key];
   const origOverrides = { ...overrides };
-  // A structured trigger override keeps its actor / via / state / at: only its text is edited here.
+  // A structured trigger override keeps its shape (actor / via / state / at) in `triggerShape`; `origTrigger` is what was stored.
   const origTrigger = variant.trigger;
   if (variant.personas !== undefined) overrides.personas = [...variant.personas];
+  if (variant.constellations !== undefined) overrides.constellations = [...variant.constellations];
   if (variant.inputs !== undefined) overrides.inputs = ioDraft(variant.inputs, "source");
   if (variant.outputs !== undefined) overrides.outputs = ioDraft(variant.outputs, "target");
   return {
@@ -93,16 +107,18 @@ export function variantDraft(variant) {
     description: variant.description ?? "",
     origDescription: variant.description ?? "",
     when: { ...variant.when },
-    // A key stored empty (`steps: []`, `actors: {}`) stays empty while it is empty; one the user emptied is removed.
+    // A key stored empty (`steps: []`, `actors: {}`, `state: []`) stays empty while it is empty; one the user emptied is removed.
     hadSteps: variant.steps !== undefined && variant.steps.length === 0,
     hadActors: variant.actors !== undefined && Object.keys(variant.actors).length === 0,
+    hadState: variant.state !== undefined && variant.state.length === 0,
     extra: unmanaged(variant, VARIANT_KEYS),
     overrides,
     origTrigger,
+    triggerShape: triggerShape(variant.trigger),
     origOverrides, // the stored override texts: an untouched one is written back as it is, an edited one is trimmed
     swaps: Object.entries(variant.actors ?? {}).map(([from, to]) => ({ from, to })),
-    // A branch op keeps its stored object (`raw`): it is shown read-only and written back exactly as it was.
-    ops: (variant.steps ?? []).map((op) => (isBranchOp(op) ? { op: op.op, stepId: "", step: null, extra: {}, raw: op } : { op: op.op, stepId: op.step_id ?? "", step: op.step ? stepDraft(op.step) : null, extra: unmanaged(op, OP_KEYS) })),
+    state: (variant.state ?? []).map(stateDraft),
+    ops: (variant.steps ?? []).map(opDraft),
   };
 }
 
@@ -136,30 +152,27 @@ export function buildStepObject(step, id, label, errors) {
     });
   if (data.length > 0) out.data = data;
   if (step.note) out.note = step.note;
+  const via = written(step.via ?? "", step.origVia ?? "");
+  if (via !== "") out.via = via;
   return out;
 }
 
 /** The ids the changes of all variants write by hand: a generated id must not collide with them. */
 export function variantStepIds(variants) {
-  return variants.flatMap((variant) => variant.ops.filter((op) => op.op !== "remove").flatMap((op) => (op.raw ? branchOpStepIds(op.raw) : [op.step?.id])).filter(Boolean));
+  return variants.flatMap((variant) => variant.ops.filter((op) => op.op !== "remove").flatMap((op) => (op.branch ? op.branch.steps.map((step) => step.id) : [op.step?.id])).filter(Boolean));
 }
 
-/** Every step id that lives in a branch: those of the case's branches and those of stored branch ops of any variant. */
+/** Every step id that lives in a branch: those of the case's branches and those of the branch ops of any variant. */
 export function allBranchStepIds(draft) {
-  return new Set([...(draft.branchStepIds ?? []), ...draft.variants.flatMap((variant) => variant.ops.flatMap((op) => (op.raw ? branchOpStepIds(op.raw) : [])))]);
+  return new Set([...(draft.branches ?? []).flatMap((branch) => branch.steps.map((step) => step.id)), ...(draft.branchStepIds ?? []), ...draft.variants.flatMap((variant) => variant.ops.flatMap((op) => (op.branch ? op.branch.steps.map((step) => step.id) : [])))].filter(Boolean));
 }
 
-/** The step ids a stored branch op writes (the steps of the branch it adds or replaces). */
-export function branchOpStepIds(op) {
-  return (op.branch?.steps ?? []).map((step) => step.id);
-}
-
-/** A one-line description of a stored branch op, for the read-only row. */
-export function branchOpSummary(op) {
-  if (op.op === "remove_branch") return `Remove branch ${op.branch_id}`;
+/** A one-line description of a branch op, for its row: "Add branch 3A · Discount ends (1 step)". */
+export function branchOpSummary(op, label = "") {
+  if (op.op === "remove_branch") return `Remove branch ${op.branchId}`;
   const steps = op.branch?.steps?.length ?? 0;
-  const what = `${op.branch?.title || op.branch?.id || "branch"} (${steps} ${steps === 1 ? "step" : "steps"})`;
-  return op.op === "add_branch" ? `Add branch ${what}` : `Replace branch ${op.branch_id} with ${what}`;
+  const what = `${label ? `${label} · ` : ""}${op.branch?.title || op.branch?.id || "new branch"} (${steps} ${steps === 1 ? "step" : "steps"})`;
+  return op.op === "add_branch" ? `Add branch ${what}` : `Replace branch ${op.branchId} with ${what}`;
 }
 
 /** The swaps as the stored `actors` map (complete rows only; a later row wins over an earlier one with the same "from"). */
@@ -180,29 +193,106 @@ function entryOf(step) {
   return { id: step.id, baseActor: step.actor, actor: step.actor, action: step.action, step };
 }
 
-/** Applies one change to a flow the way the resolver does; a change naming a step that is not there is skipped. Returns whether it applied. */
-function applyOp(flow, op, step) {
-  if (op.raw) return false; // a branch op leaves the main flow as it is
-  if (op.op === "append") {
-    flow.push(entryOf(step));
+/** A branch as the flow model holds it: its id, title, fork step and the steps as flow entries. `draft` may be a branch draft or a built branch. */
+function branchEntry(draft) {
+  return { id: draft.id, title: draft.title, from: draft.from === "" ? undefined : draft.from, steps: draft.steps.map(entryOf), source: draft };
+}
+
+/**
+ * The flow a variant's changes start from: the base steps and the base branches, each step already carrying the actor the swaps give
+ * it (applied once, not chained; spec §4). `base` is `{ steps, branches }` of the dialog's draft.
+ */
+export function baseModel(base, swaps) {
+  const map = actorsMap(swaps);
+  const swapped = (step) => ({ id: step.id, baseActor: step.actor, actor: Object.hasOwn(map, step.actor) ? map[step.actor] : step.actor, action: step.action, step });
+  return { main: base.steps.map(swapped), branches: (base.branches ?? []).map((branch) => ({ id: branch.id, title: branch.title, from: branch.from === "" ? undefined : branch.from, steps: branch.steps.map(swapped), source: branch })) };
+}
+
+/** Where a step id lives: the main flow or one branch (step ids are one namespace, spec §2). */
+function locateStep(model, stepId) {
+  const at = model.main.findIndex((entry) => entry.id === stepId);
+  if (at >= 0) return { list: model.main, index: at };
+  for (const branch of model.branches) {
+    const index = branch.steps.findIndex((entry) => entry.id === stepId);
+    if (index >= 0) return { list: branch.steps, index, branch };
+  }
+  return null;
+}
+
+/**
+ * Applies one change to the model the way the resolver does; a change naming a step or branch that is not there is skipped.
+ * `step` is the step the change writes (a draft or a built step). Returns whether it applied.
+ */
+function applyOp(model, op, step = op.step) {
+  if (op.op === "add_branch") {
+    if (!op.branch || (op.branch.id !== "" && model.branches.some((b) => b.id === op.branch.id))) return false;
+    model.branches.push(branchEntry(op.branch));
     return true;
   }
-  const at = op.stepId === "" ? -1 : flow.findIndex((entry) => entry.id === op.stepId);
-  if (at < 0) return false;
-  if (op.op === "remove") flow.splice(at, 1);
-  else if (op.op === "replace") flow[at] = entryOf(step);
-  else flow.splice(at + 1, 0, entryOf(step));
+  if (op.op === "replace_branch") {
+    const at = model.branches.findIndex((b) => b.id === op.branchId);
+    if (at < 0 || !op.branch) return false;
+    model.branches[at] = branchEntry({ ...op.branch, id: op.branchId });
+    return true;
+  }
+  if (op.op === "remove_branch") {
+    const at = model.branches.findIndex((b) => b.id === op.branchId);
+    if (at < 0) return false;
+    model.branches.splice(at, 1);
+    return true;
+  }
+  if (op.op === "append") {
+    const list = op.branchId === "" || op.branchId === undefined ? model.main : model.branches.find((b) => b.id === op.branchId)?.steps;
+    if (!list) return false;
+    list.push(entryOf(step));
+    return true;
+  }
+  const found = op.stepId === "" ? null : locateStep(model, op.stepId);
+  if (!found) return false;
+  if (op.op === "remove") found.list.splice(found.index, 1);
+  else if (op.op === "replace") found.list[found.index] = entryOf(step);
+  else found.list.splice(found.index + 1, 0, entryOf(step));
   return true;
 }
 
-/** The flow as it stands before change `count` (0-based): what its step select lists. */
-export function flowBefore(baseSteps, variant, count) {
-  const flow = baseFlow(baseSteps, variant.swaps);
+/** The model as it stands before change `count` (0-based): every flow entry the later changes can name. */
+export function modelBefore(base, variant, count) {
+  const model = baseModel(base, variant.swaps);
   variant.ops.slice(0, count).forEach((op) => {
-    if (op.op !== "remove" && !op.step) return;
-    applyOp(flow, op, op.step);
+    if ((op.op === "replace" || op.op === "insert_after" || op.op === "append") && !op.step) return;
+    applyOp(model, op);
   });
-  return flow;
+  return model;
+}
+
+/** The main flow as it stands before change `count`: what a step select lists first. */
+export function flowBefore(baseSteps, variant, count) {
+  return modelBefore({ steps: baseSteps, branches: [] }, variant, count).main;
+}
+
+/**
+ * Every step id of the model with the place it lives in ("step 3 of the main flow", "step 2B.1 of branch 2B"), the steps of
+ * `ignoreBranch` left out (a replaced branch gives its ids back).
+ */
+export function placesIn(model, ignoreBranch = null) {
+  const places = new Map();
+  model.main.forEach((entry, i) => {
+    if (entry.id !== "" && !places.has(entry.id)) places.set(entry.id, `step ${i + 1} of the main flow`);
+  });
+  const numbered = numberBranches({ steps: model.main.map((entry) => ({ id: entry.id })), branches: model.branches.map((branch) => ({ id: branch.id, from: branch.from })) });
+  numbered.forEach(({ label }, k) => {
+    const branch = model.branches[k];
+    if (branch.id === ignoreBranch) return;
+    branch.steps.forEach((entry, i) => {
+      if (entry.id !== "" && !places.has(entry.id)) places.set(entry.id, `step ${label}.${i + 1} of branch ${label}`);
+    });
+  });
+  return places;
+}
+
+/** The design number of each branch of the model (2A, A, …), in the model's order. */
+export function branchLabels(model) {
+  return numberBranches({ steps: model.main.map((entry) => ({ id: entry.id })), branches: model.branches.map((branch) => ({ id: branch.id, from: branch.from })) }).map((entry) => entry.label);
 }
 
 /**
@@ -228,11 +318,12 @@ export function inheritedPersonas(basePersonas, swaps) {
 }
 
 /**
- * One variant as its payload object, with the problems that block Save. `baseSteps` are the draft's base steps, `usedStepIds` the ids
- * a generated step id must avoid. `errors` are the messages (the footer shows the first), `fieldErrors` the ones that belong to a field
- * (`path`), shown under it.
+ * One variant as its payload object, with the problems that block Save. `baseSteps` / `baseBranches` / `baseState` are the draft's base
+ * parts, `usedStepIds` the ids a generated step id must avoid. A step id the variant itself freed (a step or branch it removed) is
+ * free again for its later changes: the check follows the flow as the resolver builds it, change by change (spec §4, §6). `errors`
+ * are the messages (the footer shows the first), `fieldErrors` the ones that belong to a field (`path`), shown under it.
  */
-export function buildVariant(variant, index, { baseSteps, usedStepIds, variantIds, branchStepIds = new Set() }) {
+export function buildVariant(variant, index, { baseSteps, baseBranches = [], usedStepIds, variantIds, nameOf = (id) => id }) {
   const errors = [];
   const fieldErrors = [];
   const vid = variant.id || uniqueId(slugify(variant.title) || `variant-${index + 1}`, variantIds);
@@ -246,14 +337,25 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
   // A stored value the user did not touch is written back exactly as it is; one they edited is trimmed (`written`). An override that is empty is an error, not a silent removal.
   for (const [key, label] of TEXT_OVERRIDES) {
     if (overrides[key] === undefined) continue;
+    if (key === "trigger") {
+      // The trigger override replaces the trigger whole. Text only and empty is an empty override; a structured one (actor, conditions) keeps its structure when its text is cleared.
+      const value = buildTrigger({ text: overrides.trigger, origText: variant.origOverrides?.trigger, shape: variant.triggerShape, orig: variant.origTrigger }, { path: `variant.${index}.trigger`, label: `Variant "${name}" trigger`, errors, fieldErrors });
+      if (value === undefined) {
+        errors.push(`Variant "${name}": the trigger override is empty.`);
+        fieldErrors.push({ path: `variant.${index}.override.trigger`, message: "The trigger override is empty. Enter text or use the base." });
+      } else out.trigger = value;
+      continue;
+    }
     out[key] = written(overrides[key], variant.origOverrides?.[key]);
-    if (key === "trigger") out[key] = triggerWithText(variant.origTrigger, out[key], variant.origOverrides?.[key]);
     if (overrides[key].trim() === "") {
       errors.push(`Variant "${name}": the ${label.toLowerCase()} override is empty.`);
       fieldErrors.push({ path: `variant.${index}.override.${key}`, message: `The ${label.toLowerCase()} override is empty. Enter text or use the base.` });
     }
   }
   if (overrides.personas !== undefined) out.personas = [...overrides.personas];
+  if (overrides.constellations !== undefined) out.constellations = [...overrides.constellations];
+  const state = buildState(variant.state, { path: `variant.${index}.state`, label: `Variant "${name}" state`, errors, fieldErrors, nameOf });
+  if (state.length > 0 || variant.hadState) out.state = state;
   const actors = actorsMap(variant.swaps);
   // A stored empty `actors: {}` stays, like `steps: []`.
   if (Object.keys(actors).length > 0 || variant.hadActors) out.actors = actors;
@@ -273,21 +375,37 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
     out[key] = rows;
   }
 
-  const flow = baseFlow(baseSteps, variant.swaps);
+  const model = baseModel({ steps: baseSteps, branches: baseBranches }, variant.swaps);
   const ops = [];
   variant.ops.forEach((op, i) => {
     const where = `Variant "${name}", change ${i + 1}`;
     const path = `variant.${index}.op.${i}`;
-    if (op.raw) {
-      ops.push(op.raw);
+    const pick = (what) => {
+      errors.push(`${where}: pick the ${what} it changes.`);
+      fieldErrors.push({ path: `${path}.pick`, message: `Pick the ${what} this change applies to.`, untilTouched: true });
+    };
+    if (op.op === "add_branch" || op.op === "replace_branch" || op.op === "remove_branch") {
+      if (op.op !== "add_branch" && (op.branchId ?? "") === "") pick("branch");
+      if (op.op === "remove_branch") {
+        ops.push({ ...op.extra, op: "remove_branch", branch_id: op.branchId });
+        applyOp(model, op);
+        return;
+      }
+      const replaced = op.op === "replace_branch" ? model.branches.find((b) => b.id === op.branchId) : undefined;
+      const problems = [];
+      const built = buildBranch(op.branch ?? blankBranch(), { taken: placesIn(model, replaced?.id), ids: new Set(model.branches.filter((b) => b !== replaced).map((b) => b.id)), errors: problems, fieldErrors: [], label: "The branch", lockId: op.op === "replace_branch" });
+      if (op.op === "add_branch" && model.branches.some((b) => b.id === built.id)) problems.push(`${built.id} is already a branch of this case. Give the new branch another id.`);
+      if (problems.length > 0) {
+        errors.push(`${where}: ${problems[0]}`);
+        fieldErrors.push({ path: `${path}.edit`, message: problems[0], untilTouched: true });
+      }
+      ops.push(op.op === "add_branch" ? { ...op.extra, op: "add_branch", branch: built } : { ...op.extra, op: "replace_branch", branch_id: op.branchId, branch: { ...built, id: op.branchId } });
+      applyOp(model, { ...op, branch: { id: op.op === "replace_branch" ? op.branchId : built.id, title: built.title, from: built.from ?? "", steps: built.steps } });
       return;
     }
-    if (op.op !== "append" && op.stepId === "") {
-      errors.push(`${where}: pick the step it changes.`);
-      fieldErrors.push({ path: `${path}.pick`, message: "Pick the step this change applies to.", untilTouched: true });
-    }
+    if (op.op !== "append" && op.stepId === "") pick("step");
     if (op.op === "remove") {
-      applyOp(flow, op);
+      applyOp(model, op);
       ops.push({ ...op.extra, op: "remove", step_id: op.stepId });
       return;
     }
@@ -304,32 +422,56 @@ export function buildVariant(variant, index, { baseSteps, usedStepIds, variantId
       errors.push(`${where}: ${message}`);
       fieldErrors.push({ path: `${path}.id`, message });
     }
-    const at = op.stepId === "" ? -1 : flow.findIndex((entry) => entry.id === op.stepId);
-    // A step of a branch is not in the modelled flow, but its id is taken all the same (one step namespace, spec §2).
-    const inBranch = op.stepId !== "" && branchStepIds.has(op.stepId);
-    const applies = op.op === "append" || at >= 0 || inBranch;
-    // The effective flow must not hold a second step with this id (spec §6); a replace may keep the id of the step it replaces.
-    const ownBranchId = op.op === "replace" && inBranch && op.stepId === id;
-    if (applies && (flow.some((entry, j) => entry.id === id && !(op.op === "replace" && j === at)) || (branchStepIds.has(id) && !ownBranchId))) {
-      const message = `${id} is already a step in this flow. Give the new step another id.`;
-      errors.push(`${where}: ${id} is already a step in this flow.`);
+    // The effective flow must not hold a second step with this id, in the main flow or in any branch (one namespace, spec §2 and §6);
+    // a replace may keep the id of the step it replaces. What this variant removed earlier is gone from the model, so it is free again.
+    const applies = op.op === "append" ? (op.branchId ?? "") === "" || model.branches.some((b) => b.id === op.branchId) : locateStep(model, op.stepId) !== null;
+    const places = placesIn(model);
+    if (applies && id !== (op.op === "replace" ? op.stepId : undefined) && places.has(id)) {
+      const message = `${id} is already ${places.get(id)}. Give the new step another id.`;
+      errors.push(`${where}: ${message}`);
       fieldErrors.push({ path: `${path}.id`, message });
     }
     const built = buildStepObject(step, id, where, errors);
-    applyOp(flow, op, built);
-    ops.push(op.op === "append" ? { ...op.extra, op: "append", step: built } : { ...op.extra, op: op.op, step_id: op.stepId, step: built });
+    applyOp(model, op, built);
+    ops.push(op.op === "append" ? { ...op.extra, op: "append", step: built, ...((op.branchId ?? "") !== "" ? { branch: op.branchId } : {}) } : { ...op.extra, op: op.op, step_id: op.stepId, step: built });
   });
   if (ops.length > 0 || variant.hadSteps) out.steps = ops;
   return { out, errors, fieldErrors };
 }
 
-/** Reference problems of one variant (warnings, never blocking): a change naming a step that is not in the flow at that point, an unknown persona in a swap. */
-export function variantWarnings({ variant, index, baseSteps, pool, branchStepIds = new Set() }) {
+/**
+ * Reference problems of one variant (warnings, never blocking): a change naming a step or branch that is not in the flow at that
+ * point, a change that leaves a branch without steps (`branch_empty`), an unset that names a key the base state lacks
+ * (`variant_state_missing`), an unknown persona in a swap.
+ */
+export function variantWarnings({ variant, index, baseSteps, baseBranches = [], baseState = [], pool, nameOf = (id) => id }) {
   const warnings = [];
+  const model = baseModel({ steps: baseSteps, branches: baseBranches }, variant.swaps);
+  const warned = new Set();
   variant.ops.forEach((op, i) => {
-    if (op.raw || op.op === "append" || op.stepId === "" || branchStepIds.has(op.stepId)) return; // a branch step is outside the modelled flow, not missing
-    if (!flowBefore(baseSteps, variant, i).some((entry) => entry.id === op.stepId)) {
-      warnings.push({ path: `variant.${index}.op.${i}.step`, message: `${op.stepId} is not a step of the flow at this point. This change is skipped; you can still save.` });
+    const path = `variant.${index}.op.${i}.step`;
+    const isBranchOp = op.op === "add_branch" || op.op === "replace_branch" || op.op === "remove_branch";
+    const branchNamed = op.op === "replace_branch" || op.op === "remove_branch" || (op.op === "append" && (op.branchId ?? "") !== "");
+    if (branchNamed && (op.branchId ?? "") !== "" && !model.branches.some((b) => b.id === op.branchId)) {
+      warnings.push({ path, message: `Branch ${op.branchId} is not a branch of the case at this point. This change is skipped; you can still save.` });
+      return;
+    }
+    if (!isBranchOp && op.op !== "append" && op.stepId !== "" && !locateStep(model, op.stepId)) {
+      warnings.push({ path, message: `${op.stepId} is not a step of the flow at this point. This change is skipped; you can still save.` });
+      return;
+    }
+    if ((op.op === "replace" || op.op === "insert_after" || op.op === "append") && !op.step) return;
+    applyOp(model, op);
+    const labels = branchLabels(model);
+    model.branches.forEach((branch, k) => {
+      if (branch.steps.length > 0 || warned.has(branch.id)) return;
+      warned.add(branch.id);
+      warnings.push({ path, message: `Branch ${labels[k]} has no steps left in this variant. Remove the branch too, or keep a step.` });
+    });
+  });
+  variant.state.forEach((row, j) => {
+    if (row.unset && row.subject !== "" && row.property.trim() !== "" && !baseState.some((entry) => entry.subject === row.subject && entry.property.trim() === row.property.trim())) {
+      warnings.push({ path: `variant.${index}.state.${j}`, message: `${nameOf(row.subject)} · ${row.property.trim()} is not in the base state, so there is nothing to unset.` });
     }
   });
   variant.swaps.forEach((swap, j) => {
@@ -407,7 +549,8 @@ export function touchScope(el, model, refresh) {
 
 // --- The editor (DOM) -------------------------------------------------------------------------------------------------
 
-const OP_LABELS = { replace: "Replace", insert_after: "Insert after", remove: "Remove", append: "Append" };
+const OP_LABELS = { replace: "Replace", insert_after: "Insert after", remove: "Remove", append: "Append", add_branch: "Add branch", replace_branch: "Replace branch", remove_branch: "Remove branch" };
+const BRANCH_KINDS = ["add_branch", "replace_branch", "remove_branch"];
 
 /**
  * @param {{
@@ -508,11 +651,11 @@ export function createVariantEditor(env) {
     const whenBox = h("div", { class: "uc-when-edit" });
     const drawWhen = () => {
       fill(whenBox,
-        ...pool.dimensions.map((dimension) =>
+        ...[...pool.dimensions].sort((a, b) => Number((a.scope ?? "personas") === "personas") - Number((b.scope ?? "personas") === "personas")).map((dimension) =>
           h(
             "div",
             { class: "uc-when-dim-edit" },
-            h("span", { class: "uc-when-dim" }, dimension.label),
+            h("span", { class: "uc-when-dim" }, dimension.label, h("span", { class: "uc-when-scope" }, (dimension.scope ?? "personas") === "constellations" ? " world" : " personas")),
             dimension.values.map((value) => {
               const on = (variant.when[dimension.id] ?? []).includes(value.id);
               return h("button", { type: "button", class: "uc-value-toggle", "aria-pressed": on ? "true" : "false", onClick: () => {
@@ -595,14 +738,33 @@ export function createVariantEditor(env) {
       return wrap;
     };
 
+    const triggerSummary = () => {
+      const shape = draft.triggerShape;
+      const text = baseText(draft.trigger);
+      if (shape.kind === "action" && shape.actor !== "") return `${actorName(shape.actor, pool.personasById)} · ${text}${shape.via.trim() !== "" ? ` · via ${shape.via.trim()}` : ""}`;
+      if (shape.kind === "state") return `${text}${shape.conditions.length > 0 ? ` · ${plural(shape.conditions.length, "condition")}` : ""}${shape.at.trim() !== "" ? ` · from ${shape.at.trim()}` : ""}`;
+      return text;
+    };
+    const constellationText = () => {
+      const known = new Map((pool.world?.constellations ?? []).map((c) => [c.id, c.name]));
+      return draft.constellations.length === 0 ? "none" : draft.constellations.map((id) => known.get(id) ?? id).join(", ");
+    };
     const ROWS = [
-      ...TEXT_OVERRIDES.map(([key, label]) => ({ key, label, baseText: () => baseText(draft[key]) })),
+      ...TEXT_OVERRIDES.map(([key, label]) => ({ key, label, baseText: key === "trigger" ? triggerSummary : () => baseText(draft[key]) })),
       { key: "personas", label: "Personas", baseText: personaText },
+      { key: "constellations", label: "Constellations", baseText: constellationText },
       { key: "inputs", label: "Inputs", baseText: () => ioSummary(draft.inputs) },
       { key: "outputs", label: "Outputs", baseText: () => ioSummary(draft.outputs) },
     ];
 
     function editorFor(spec) {
+      if (spec.key === "trigger") {
+        // The variant replaces the trigger whole: overriding one part writes the complete trigger object (the base copied in, then edited).
+        const emptyHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `variant.${index}.override.trigger` } });
+        const editor = createTriggerEditor({ read: () => variant.overrides.trigger, write: (value) => { variant.overrides.trigger = value; }, shape: variant.triggerShape, pool: env.pool, actorOptions: env.actorOptions, path: `variant.${index}.trigger`, label: `Variant ${n} trigger`, markDirty, refresh: env.refresh, empty: { path: `variant.${index}.override.trigger`, hint: emptyHint } });
+        return h("div", { class: "uc-override-edit" }, editor.el, emptyHint);
+      }
+      if (spec.key === "constellations") return constellationChips({ list: variant.overrides.constellations, pool: env.pool, path: `variant.${index}.constellation`, markDirty, label: `variant ${n}` }).el;
       if (TEXT_OVERRIDES.some(([key]) => key === spec.key)) {
         const hint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `variant.${index}.override.${spec.key}` } });
         const area = textArea({ value: variant.overrides[spec.key], rows: 2, ariaLabel: `Variant ${n} ${spec.label.toLowerCase()}`, onInput: (value) => { variant.overrides[spec.key] = value; markDirty(); } });
@@ -616,7 +778,11 @@ export function createVariantEditor(env) {
 
     /** Copies what the base holds into the new override (an override starts as the base value), then shows its editor. */
     function override(key) {
-      if (TEXT_OVERRIDES.some(([k]) => k === key)) variant.overrides[key] = draft[key];
+      if (key === "trigger") {
+        variant.overrides.trigger = draft.trigger;
+        variant.triggerShape = { ...draft.triggerShape, conditions: draft.triggerShape.conditions.map((c) => ({ ...c })) };
+      } else if (key === "constellations") variant.overrides.constellations = [...draft.constellations];
+      else if (TEXT_OVERRIDES.some(([k]) => k === key)) variant.overrides[key] = draft[key];
       else if (key === "personas") variant.overrides.personas = inheritedPersonas(draft.personas, variant.swaps).ids;
       else variant.overrides[key] = draft[key].map((row) => ({ ...row }));
       markDirty();
@@ -695,23 +861,46 @@ export function createVariantEditor(env) {
     };
     drawSwaps();
 
-    // --- Step changes ---
+    // --- Step and branch changes ---
     const opsBox = h("div", { class: "uc-ops-edit" });
+    const baseOf = () => ({ steps: baseSteps(), branches: draft.branches });
+    /** The flow before change `i`, main flow and branches: what its step select lists. */
+    const modelAt = (i) => modelBefore(baseOf(), variant, i);
+    const entryById = (model, id) => model.main.find((e) => e.id === id) ?? model.branches.flatMap((b) => b.steps).find((e) => e.id === id);
     const fillStepOptions = (select, op, i) => {
-      const flow = flowBefore(baseSteps(), variant, i);
-      const options = [{ value: "", label: "Step…" }, ...flow.flatMap((entry, k) => (entry.id === "" ? [] : [{ value: entry.id, label: `${k + 1} · ${entry.action || "(no action yet)"}` }]))];
-      if (op.stepId !== "" && !options.some((o) => o.value === op.stepId)) options.push({ value: op.stepId, label: `${op.stepId} (${allBranchStepIds(draft).has(op.stepId) ? "branch step" : "unknown"})` });
+      const model = modelAt(i);
+      const labels = branchLabels(model);
+      const listed = (entries, tag) => entries.flatMap((entry, k) => (entry.id === "" ? [] : [{ value: entry.id, label: `${tag(k)} · ${entry.action || "(no action yet)"}` }]));
+      const options = [{ value: "", label: "Step…" }, ...listed(model.main, (k) => String(k + 1)), ...model.branches.flatMap((branch, b) => listed(branch.steps, (k) => `${labels[b]}.${k + 1}`))];
+      if (op.stepId !== "" && !options.some((o) => o.value === op.stepId)) options.push({ value: op.stepId, label: `${op.stepId} (unknown)` });
       select.replaceChildren(...options.map((o) => h("option", { value: o.value }, o.label)));
       select.value = op.stepId;
     };
+    /** A branch select (the branch a change names): every branch of the flow at that point. */
+    const fillBranchOptions = (select, op, i, { none = null } = {}) => {
+      const model = modelAt(i);
+      const labels = branchLabels(model);
+      const options = [...(none ? [{ value: "", label: none }] : [{ value: "", label: "Branch…" }]), ...model.branches.map((b, k) => ({ value: b.id, label: `${labels[k]} · ${b.title || b.id}` }))];
+      if (op.branchId !== "" && !options.some((o) => o.value === op.branchId)) options.push({ value: op.branchId, label: `${op.branchId} (unknown)` });
+      select.replaceChildren(...options.map((o) => h("option", { value: o.value }, o.label)));
+      select.value = op.branchId;
+    };
     let stepSelects = [];
-    /** Re-lists the flow in every change's step select. Called when the changes or the base change, never on focus (that would rewrite an open select). */
-    const refreshOptions = () => stepSelects.forEach(({ select, op }) => fillStepOptions(select, op, variant.ops.indexOf(op)));
+    let branchSelects = [];
+    /** Re-lists the flow in every change's step and branch select. Called when the changes or the base change, never on focus (that would rewrite an open select). */
+    const refreshOptions = () => {
+      stepSelects.forEach(({ select, op }) => fillStepOptions(select, op, variant.ops.indexOf(op)));
+      branchSelects.forEach(({ select, op, none }) => fillBranchOptions(select, op, variant.ops.indexOf(op), { none }));
+    };
     const removedBody = (op) => {
-      const entry = flowBefore(baseSteps(), variant, variant.ops.indexOf(op)).find((e) => e.id === op.stepId);
+      const entry = entryById(modelAt(variant.ops.indexOf(op)), op.stepId);
       return [diffBadge("removed"), entry ? h("span", { class: "uc-op-struck" }, [actorName(entry.baseActor, pool.personasById), entry.action, entry.step.screen].filter(Boolean).join(" · ")) : h("span", { class: "uc-muted" }, "Pick the step to remove.")];
     };
-    const opName = (i) => (variant.ops[i]?.raw ? branchOpSummary(variant.ops[i].raw) : null) || variant.ops[i]?.step?.action.trim() || (variant.ops[i]?.op === "remove" && variant.ops[i].stepId ? `Remove ${variant.ops[i].stepId}` : `Change ${i + 1}`);
+    const opName = (i) => {
+      const op = variant.ops[i];
+      if (BRANCH_KINDS.includes(op?.op)) return branchOpSummary(op);
+      return op?.step?.action.trim() || (op?.op === "remove" && op.stepId ? `Remove ${op.stepId}` : `Change ${i + 1}`);
+    };
     // The change rows move in the DOM, not through drawOps, so focus and typed values survive. The model follows (onReorder); what
     // was drawn from a position (labels, field paths, the flow each step select lists, the struck line of a removal) is brought up to date.
     const reorder = createReorder({
@@ -734,47 +923,99 @@ export function createVariantEditor(env) {
       },
       onCommit: env.setDirty, // the refresh above already covers this move
     });
+
+    /** The branch dialog's view of the flow before change `i`: the other branches, where this one sits, which step ids are taken. */
+    const branchContext = (op, i) => {
+      const model = modelAt(i);
+      const replaced = op.op === "replace_branch" ? model.branches.find((b) => b.id === op.branchId) : undefined;
+      const others = model.branches.filter((b) => b !== replaced);
+      return {
+        context: `in variant ${variant.title.trim() || variant.id || n}`,
+        mainSteps: () => model.main.filter((e) => e.id !== "").map((e) => ({ id: e.id, action: e.action })),
+        siblings: () => others.map((b) => ({ id: b.id, from: b.from })),
+        position: replaced ? model.branches.indexOf(replaced) : others.length,
+        taken: () => placesIn(model, replaced?.id ?? null),
+        ids: () => new Set(others.map((b) => b.id)),
+        pool: env.pool,
+        screens: env.screens,
+        actorOptions: env.actorOptions,
+        ensureNodes: env.ensureNodes,
+      };
+    };
+    async function editBranch(op, i) {
+      const answer = await openBranchDialog({ ...branchContext(op, i), mode: op.op === "add_branch" ? "add" : "replace", branch: op.branch, canRemove: false });
+      if (!answer || answer.removed) return;
+      op.branch = answer.branch;
+      markDirty();
+      drawOps({ index: i });
+    }
+    /** The branch a replace starts from: the branch as the flow has it at that point, its steps carrying the actors the swaps give them. */
+    const branchPrefill = (id, i) => {
+      const entry = modelAt(i).branches.find((b) => b.id === id);
+      if (!entry?.source) return null;
+      const copy = cloneBranchDraft(entry.source);
+      copy.id = id;
+      copy.steps = entry.steps.map((e) => ({ ...cloneStep(e.step), actor: e.actor }));
+      return copy;
+    };
+    const lastMainId = (i) => modelAt(i).main.filter((e) => e.id !== "").at(-1)?.id ?? "";
+
     const drawOps = (focus = null) => {
       stepSelects = [];
+      branchSelects = [];
       fill(opsBox,
         variant.ops.length === 0 ? h("p", { class: "uc-muted uc-var-empty" }, `None. This variant runs the ${baseSteps().length} base steps as they are.`) : null,
         ...variant.ops.map((op, i) => {
           const at = () => variant.ops.indexOf(op);
           const label = `Variant ${n} change ${i + 1}`;
-          if (op.raw) {
-            // A branch op is not editable here yet: it is listed, can be moved or removed, and is saved as it was stored.
-            const rawRow = h(
-              "div",
-              { class: "uc-step-op", dataset: { op: op.op, index: String(i) } },
-              h("div", { class: "uc-op-top" }, reorder.handle(() => rawRow), h("span", { class: "uc-label-hint" }, "Branch change"), h("span", { class: "uc-op-after-last" }, branchOpSummary(op.raw)), h("span", { class: "uc-step-edit-tools" }, reorder.moreButton(() => rawRow), removeButton(`Remove change ${i + 1} of variant ${n}`, () => { variant.ops.splice(at(), 1); markDirty(); drawOps(); }))),
-              h("p", { class: "uc-muted uc-op-hint" }, "Kept exactly as stored. Editing branches comes later."),
-              reorder.keyHint(),
-            );
-            return rawRow;
-          }
           const kindSel = selectInput({ options: Object.entries(OP_LABELS).map(([value, text]) => ({ value, label: text })), value: op.op, ariaLabel: `${label} operation`, onChange: (value) => changeKind(op, at(), value) });
-          let stepControl;
-          if (op.op === "append") stepControl = h("span", { class: "uc-op-after-last" }, "after the last step");
-          else {
-            stepControl = h("select", { class: "chrome-field uc-select", "aria-label": `${label} step`, dataset: { path: `variant.${index}.op.${i}.step`, role: "step" } });
-            fillStepOptions(stepControl, op, i);
-            stepSelects.push({ select: stepControl, op });
-            stepControl.dataset.errorPath = `variant.${index}.op.${i}.pick`;
-            stepControl.addEventListener("change", () => pickStep(op, at(), stepControl.value));
-          }
           const warn = h("p", { class: "uc-field-warn", id: nextId("uc-warn"), hidden: true, dataset: { path: `variant.${index}.op.${i}.step` } });
           const pickErr = h("p", { class: "uc-field-error uc-op-hint", id: nextId("uc-err"), hidden: true, dataset: { path: `variant.${index}.op.${i}.pick` } });
+          const editErr = h("p", { class: "uc-field-error uc-op-hint", id: nextId("uc-err"), hidden: true, dataset: { path: `variant.${index}.op.${i}.edit` } });
           warn.classList.add("uc-op-hint");
-          if (stepControl.tagName === "SELECT") stepControl.dataset.hint = `${pickErr.id} ${warn.id}`;
+          let control;
           let body = null;
-          if (op.op === "remove") {
-            body = h("div", { class: "uc-op-removed" }, removedBody(op));
-          } else if (op.step) body = stepBody(op.step, index, at, refreshOptions);
+          if (BRANCH_KINDS.includes(op.op)) {
+            // A branch change: add (the new branch), replace (pick one, then edit the whole branch), remove (pick one).
+            if (op.op === "add_branch") control = h("span", { class: "uc-op-after-last" }, "a new branch");
+            else {
+              control = h("select", { class: "chrome-field uc-select", "aria-label": `${label} branch`, dataset: { role: "branch" } });
+              fillBranchOptions(control, op, i);
+              branchSelects.push({ select: control, op, none: null });
+              control.dataset.errorPath = `variant.${index}.op.${i}.pick`;
+              control.dataset.hint = `${pickErr.id} ${warn.id}`;
+              control.addEventListener("change", () => pickBranch(op, at(), control.value));
+            }
+            if (op.op !== "remove_branch") {
+              const text = op.branch ? `${op.branch.title.trim() || op.branch.id || "Untitled branch"} · ${plural(op.branch.steps.length, "step")}${op.branch.when.length > 0 ? ` · ${plural(op.branch.when.length, "condition")}` : ""}` : "Pick the branch to replace.";
+              body = h("div", { class: "uc-op-branch" }, h("span", { class: "uc-op-branch-summary", dataset: { role: "branch-summary" } }, text), h("button", { type: "button", class: "chrome-btn chrome-btn--compact", disabled: !op.branch, "aria-label": `Edit the branch of ${label.toLowerCase()}`, onClick: () => editBranch(op, at()) }, "Edit"));
+            }
+          } else if (op.op === "append") {
+            // Append goes to the end of the main flow, or of one branch.
+            const hasBranches = modelAt(i).branches.length > 0 || op.branchId !== "";
+            if (hasBranches) {
+              control = h("select", { class: "chrome-field uc-select", "aria-label": `${label} branch`, dataset: { role: "append-branch" } });
+              fillBranchOptions(control, op, i, { none: "to the main flow" });
+              branchSelects.push({ select: control, op, none: "to the main flow" });
+              control.addEventListener("change", () => { op.branchId = control.value; markDirty(); refreshOptions(); env.refresh(); });
+            } else control = h("span", { class: "uc-op-after-last" }, "after the last step");
+            if (op.step) body = stepBody(op.step, index, at, refreshOptions);
+          } else {
+            control = h("select", { class: "chrome-field uc-select", "aria-label": `${label} step`, dataset: { path: `variant.${index}.op.${i}.step`, role: "step" } });
+            fillStepOptions(control, op, i);
+            stepSelects.push({ select: control, op });
+            control.dataset.errorPath = `variant.${index}.op.${i}.pick`;
+            control.dataset.hint = `${pickErr.id} ${warn.id}`;
+            control.addEventListener("change", () => pickStep(op, at(), control.value));
+            if (op.op === "remove") body = h("div", { class: "uc-op-removed" }, removedBody(op));
+            else if (op.step) body = stepBody(op.step, index, at, refreshOptions);
+          }
           const opRow = h(
             "div",
             { class: "uc-step-op", dataset: { op: op.op, index: String(i) } },
-            h("div", { class: "uc-op-top" }, reorder.handle(() => opRow), kindSel, stepControl, h("span", { class: "uc-step-edit-tools" }, reorder.moreButton(() => opRow), removeButton(`Remove change ${i + 1} of variant ${n}`, () => { variant.ops.splice(at(), 1); markDirty(); drawOps(); }))),
+            h("div", { class: "uc-op-top" }, reorder.handle(() => opRow), kindSel, control, h("span", { class: "uc-step-edit-tools" }, reorder.moreButton(() => opRow), removeButton(`Remove change ${i + 1} of variant ${n}`, () => { variant.ops.splice(at(), 1); markDirty(); drawOps(); }))),
             pickErr,
+            editErr,
             warn,
             body,
             reorder.keyHint(),
@@ -782,24 +1023,26 @@ export function createVariantEditor(env) {
           touchScope(opRow, op, env.refresh);
           return opRow;
         }),
-        h("button", { type: "button", class: "uc-link-btn", onClick: () => { variant.ops.push({ op: "replace", stepId: "", step: null }); markDirty(); drawOps({ index: variant.ops.length - 1 }); } }, icon("add"), "Step change"),
+        h("button", { type: "button", class: "uc-link-btn", onClick: () => { variant.ops.push({ op: "replace", stepId: "", step: null, branchId: "", branch: null, extra: {} }); markDirty(); drawOps({ index: variant.ops.length - 1 }); } }, icon("add"), "Step change"),
+        h("button", { type: "button", class: "uc-link-btn", onClick: () => { variant.ops.push({ op: "add_branch", stepId: "", step: null, branchId: "", branch: blankBranch({ from: lastMainId(variant.ops.length) }), extra: {} }); markDirty(); drawOps({ index: variant.ops.length - 1 }); } }, icon("add"), "Branch change"),
       );
       opsBox.querySelectorAll(":scope > .uc-step-op").forEach((row) => {
         row.querySelector(".uc-drag-handle").relabel();
         row.querySelector("[aria-haspopup='menu']").relabel();
       });
-      if (focus) opsBox.querySelectorAll(".uc-step-op")[focus.index]?.querySelector(focus.part === "step" ? "[data-role=step]" : "select")?.focus();
+      if (focus) opsBox.querySelectorAll(".uc-step-op")[focus.index]?.querySelector(focus.part === "step" ? "[data-role=step]" : focus.part === "branch" ? "[data-role=branch]" : "select")?.focus();
       env.refresh();
     };
     /** A new id for a step a change adds: unique in the flow at that point and among every id the case already has. */
     const freshId = (i) => {
-      const taken = new Set([...flowBefore(baseSteps(), variant, i).map((e) => e.id), ...baseSteps().map((s) => s.id), ...(draft.branchStepIds ?? []), ...variantStepIds(draft.variants)].filter(Boolean));
+      const model = modelAt(i);
+      const taken = new Set([...model.main.map((e) => e.id), ...model.branches.flatMap((b) => b.steps.map((e) => e.id)), ...baseSteps().map((s) => s.id), ...allBranchStepIds(draft), ...variantStepIds(draft.variants)].filter(Boolean));
       return uniqueId("new-step", taken);
     };
     const newBody = (i) => ({ ...emptyStep(draft.personas[0] ?? "system"), id: freshId(i) });
-    /** The flow entry a replace starts from: its whole step, carrying the actor the swaps give it. */
+    /** The flow entry a replace starts from: its whole step (in the main flow or a branch), carrying the actor the swaps give it. */
     const prefill = (op, i) => {
-      const entry = flowBefore(baseSteps(), variant, i).find((e) => e.id === op.stepId);
+      const entry = entryById(modelAt(i), op.stepId);
       return entry ? { ...cloneStep(entry.step), actor: entry.actor, prefilledId: entry.id } : null;
     };
     function pickStep(op, i, value) {
@@ -809,25 +1052,51 @@ export function createVariantEditor(env) {
       markDirty();
       drawOps({ index: i, part: "step" });
     }
+    function pickBranch(op, i, value) {
+      op.branchId = value;
+      if (op.op === "replace_branch") op.branch = value === "" ? null : branchPrefill(value, i);
+      markDirty();
+      drawOps({ index: i, part: "branch" });
+    }
     function changeKind(op, i, value) {
+      const was = op.op;
       op.op = value;
-      if (value !== "append" && op.extra) delete op.extra.branch; // `branch` belongs to append only; any other op carrying it fails validation
-      if (value === "replace") {
-        if (!op.step || isUntouched(op.step)) op.step = op.stepId !== "" ? prefill(op, i) : null;
-      } else if (value === "insert_after" || value === "append") {
-        if (!op.step) op.step = newBody(i);
-        else if (op.step.prefilledId !== undefined && op.step.id === op.step.prefilledId) {
-          // The id is still the one the Replace copied from the base: an added step with it would duplicate that step.
-          op.step.id = freshId(i);
-          delete op.step.prefilledId;
+      // The keys of the old kind that the new one does not allow go with it: the tool refuses a `branch` on anything but append, a `step_id` on a branch change, and so on.
+      if (BRANCH_KINDS.includes(value)) {
+        op.stepId = "";
+        op.step = null;
+        const keepsBranch = (value === "replace_branch" || value === "remove_branch") && (was === "replace_branch" || was === "remove_branch");
+        if (!keepsBranch) op.branchId = "";
+        if (value === "add_branch") op.branch = was === "add_branch" ? op.branch : blankBranch({ from: lastMainId(i) });
+        else if (value === "replace_branch") op.branch = keepsBranch && op.branchId !== "" ? (op.branch ?? branchPrefill(op.branchId, i)) : null;
+        else op.branch = null;
+      } else {
+        op.branch = null;
+        if (value !== "append" || was !== "append") op.branchId = "";
+        if (BRANCH_KINDS.includes(was)) {
+          op.step = null;
+          op.stepId = "";
+        }
+        if (value === "replace") {
+          if (!op.step || isUntouched(op.step)) op.step = op.stepId !== "" ? prefill(op, i) : null;
+        } else if (value === "insert_after" || value === "append") {
+          if (!op.step) op.step = newBody(i);
+          else if (op.step.prefilledId !== undefined && op.step.id === op.step.prefilledId) {
+            // The id is still the one the Replace copied from the base: an added step with it would duplicate that step.
+            op.step.id = freshId(i);
+            delete op.step.prefilledId;
+          }
         }
       }
       markDirty();
       drawOps({ index: i });
     }
     drawOps();
+    // --- Starting state (merged into the base by subject and property) ---
+    const stateEditor = stateRows({ rows: variant.state, baseRows: () => draft.state, pool: env.pool, path: `variant.${index}.state`, label: `Variant ${n} state row`, markDirty, refresh: env.refresh });
     syncers.push(() => {
       for (const spec of ROWS) if (variant.overrides[spec.key] === undefined) drawRow(spec.key);
+      stateEditor.redraw();
       drawOps();
     });
 
@@ -841,8 +1110,9 @@ export function createVariantEditor(env) {
       field("Description", textInput({ value: variant.description, placeholder: "What is different in this variant", ariaLabel: `Variant ${n} description`, onInput: (value) => { variant.description = value; markDirty(); } })),
       field("Applies when", whenBox, { hint: "any of the chosen values per dimension; every listed dimension must match" }),
       section("Overrides", "what you do not override comes from the base", overrideGrid),
+      section("Starting state", "merged into the base by subject and property", stateEditor.el),
       section("Actor swaps", "applied once to the inherited base steps, before the step changes; not chained", swapBox),
-      section("Step changes", "applied in order, top to bottom; drag a handle to reorder, or focus it and press Space", opsBox, reorder.live),
+      section("Step and branch changes", "applied in order, top to bottom; drag a handle to reorder, or focus it and press Space", opsBox, h("p", { class: "uc-form-note" }, "Step changes (replace, insert after, append, remove) work on branch steps too; Append asks for the branch."), reorder.live),
     );
   }
 

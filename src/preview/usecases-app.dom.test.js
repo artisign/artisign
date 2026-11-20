@@ -534,7 +534,7 @@ describe("world pool", () => {
     expect($$(".uc-filter-chip").some((c) => c.textContent.includes("Constellation: Couple without children"))).toBe(true);
   });
 
-  it("the World tab reads the pool: counts in the side panel, three sections, no editors", async () => {
+  it("the World tab reads the pool: counts in the side panel, three sections, each with its New button", async () => {
     await import("./app.js");
     await flush();
     await openTab();
@@ -545,7 +545,7 @@ describe("world pool", () => {
     expect($(".uc-world-page tr[data-id=leo]").textContent).toContain("Child");
     expect($$(".uc-cst").map((c) => c.querySelector(".uc-cst-name").textContent)).toEqual(["Single parent, one child", "Couple without children"]);
     expect($("#uc-add").hidden).toBe(true);
-    expect($$("#usecases-view .uc-world-page button")).toHaveLength(0);
+    expect($$("#usecases-view .uc-world-page .uc-h2-row button").map((b) => b.textContent)).toEqual(["New entity", "New relationship type", "Generate…", "New constellation"]);
   });
 
   it("a world that cannot be read says so in the World tab, the filter menu and a toast, never an empty world", async () => {

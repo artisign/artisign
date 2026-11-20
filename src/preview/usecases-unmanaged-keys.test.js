@@ -1,5 +1,5 @@
-// Keys the preview editor does not manage (a variant's `state` and `constellations`, a step's `via`, an op's `branch`, a case's
-// `state` and `constellations`) are written back untouched: a save must never drop data it does not know.
+// A save writes back what the editor did not touch, byte for byte: a variant's `state` and `constellations`, a step's `via`, an append's
+// `branch`, a case's `state` and `constellations`, and keys the editor does not know at all (CHR-1154 made the first ones editable).
 import { describe, it, expect } from "vitest";
 import { draftFromSource, buildPayload } from "./usecases-forms.js";
 import { rawUseCase } from "./usecases.test-helper.js";
@@ -18,7 +18,7 @@ const stored = {
       steps: [
         { op: "append", step: { id: "later", actor: "dex", action: "Later", via: "webhook" }, branch: "limit" },
         { op: "replace", step_id: "pick", step: { id: "pick", actor: "dex", action: "Picks", via: "email" }, extra_flag: true },
-        { op: "remove", step_id: "notify", branch: "limit" },
+        { op: "remove", step_id: "notify", extra_flag: 2 },
       ],
     },
     { ...rawUseCase.variants[1], constellations: [], state: [{ subject: "a", property: "b", value: null }] },

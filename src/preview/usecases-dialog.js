@@ -11,9 +11,9 @@ export function nextId(prefix = "uc-f") {
 }
 
 /**
- * @param {{ title: string, chip?: string, wide?: boolean, marker?: string }} spec `chip`: the entity id shown next to the title; `marker`: a small badge ("Generated")
+ * @param {{ title: string, chip?: string, wide?: boolean, marker?: string, context?: string, back?: boolean }} spec `chip`: the entity id shown next to the title; `marker`: a small badge ("Generated"); `context`: a quiet line after the title ("in <use case>"); `back`: a back arrow before the title (a dialog opened from another one)
  */
-export function createDialog({ title, chip, wide = false, marker }) {
+export function createDialog({ title, chip, wide = false, marker, context, back = false }) {
   const titleId = nextId("uc-dialog-title");
   const dialog = h("dialog", { class: wide ? "uc-dialog is-wide" : "uc-dialog", "aria-labelledby": titleId });
   const body = h("div", { class: "uc-dialog-body" });
@@ -29,7 +29,8 @@ export function createDialog({ title, chip, wide = false, marker }) {
   });
 
   const closeButton = h("button", { type: "button", class: "chrome-icon-btn chrome-icon-btn--sm", "aria-label": "Close", title: "Close", onClick: () => api.requestClose() }, icon("close"));
-  dialog.append(h("header", { class: "uc-dialog-head" }, h("h1", { class: "uc-dialog-title", id: titleId }, title), chip ? h("span", { class: "uc-id-chip is-static" }, chip) : null, marker ? h("span", { class: "uc-generated" }, icon("auto_awesome"), marker) : null, h("span", { class: "uc-map-spacer" }), closeButton), body, foot);
+  const backButton = back ? h("button", { type: "button", class: "chrome-icon-btn chrome-icon-btn--sm", "aria-label": "Back", title: "Back", onClick: () => api.requestClose() }, icon("arrow_back")) : null;
+  dialog.append(h("header", { class: "uc-dialog-head" }, backButton, h("h1", { class: "uc-dialog-title", id: titleId }, title), context ? h("span", { class: "uc-dialog-context" }, context) : null, chip ? h("span", { class: "uc-id-chip is-static" }, chip) : null, marker ? h("span", { class: "uc-generated" }, icon("auto_awesome"), marker) : null, h("span", { class: "uc-map-spacer" }), closeButton), body, foot);
 
   dialog.addEventListener("cancel", (event) => {
     event.preventDefault();

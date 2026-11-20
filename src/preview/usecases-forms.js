@@ -8,11 +8,13 @@ import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
 import { segmented, avatar } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
-import { createVariantEditor, touchScope, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, allBranchStepIds, variantWarnings, showFieldErrors } from "./usecases-variant-edit.js";
+import { createVariantEditor, emptyStep, touchScope, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, allBranchStepIds, variantWarnings, showFieldErrors, baseModel, placesIn } from "./usecases-variant-edit.js";
+import { createTriggerEditor, constellationChips, createBranchList } from "./usecases-forms-case-world.js";
+import { stateRows, participantName, entitiesOf } from "./usecases-forms-rows.js";
+import { triggerShape, buildTrigger, stateDraft, buildState, branchDraft, buildBranch, canonical, participantWarning } from "./usecases-world-edit.js";
 import { createReorder, renumberRow } from "./usecases-reorder.js";
 import {
   triggerText,
-  triggerWithText,
   STATUSES,
   STATUS_LABELS,
   slugify,
@@ -36,30 +38,28 @@ export function draftFromSource(source) {
     status: s.status ?? "draft",
     tags: (s.tags ?? []).join(", "),
     personas: [...(s.personas ?? [])],
-    // The edit form changes the trigger's text only; a structured trigger keeps its other parts (see buildPayload).
+    // `trigger` is the trigger's text in every form; its other parts (actor, via, conditions, at) are `triggerShape` (see buildTrigger).
     trigger: triggerText(s.trigger),
+    triggerShape: triggerShape(s.trigger),
+    constellations: [...(s.constellations ?? [])],
+    state: (s.state ?? []).map(stateDraft),
+    branches: (s.branches ?? []).map(branchDraft),
     goal: s.goal ?? "",
     outcome: s.outcome ?? "",
     // `orig` keeps the stored object: an example the user does not touch is saved exactly as it was, never re-read from text.
     inputs: ioDraft(s.inputs, "source"),
     outputs: ioDraft(s.outputs, "target"),
     steps: (s.steps ?? []).map(stepDraft),
-    // Branches are not edited here and are never sent (the save merges into the stored case); their step ids stay taken.
-    branchStepIds: (s.branches ?? []).flatMap((branch) => (branch.steps ?? []).map((step) => step.id)),
     variants: (s.variants ?? []).map(variantDraft),
   };
 }
 
-/** JSON with object keys sorted, so two values that differ only in key order compare equal (array order still counts). */
-function canonical(value) {
-  return JSON.stringify(value, (_key, v) => (v !== null && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v));
-}
-
 /**
  * The set_use_cases entity for a draft. `source` is the stored case when editing: cleared optional fields become null (the tool's
- * "remove this key"), `variants` is only sent when it changed. Returns { errors } when the draft cannot be sent at all.
+ * "remove this key"), `variants`, `state`, `constellations` and `branches` are only sent when they changed. `nameOf` names a participant
+ * for the messages. Returns { errors } when the draft cannot be sent at all.
  */
-export function buildPayload({ id, draft, source }) {
+export function buildPayload({ id, draft, source, nameOf = (participant) => participant }) {
   const errors = [];
   if (draft.title.trim() === "") errors.push("A title is required.");
   if (!isValidId(id)) errors.push("The id must be lowercase kebab-case (a-z, 0-9, -).");
@@ -68,8 +68,8 @@ export function buildPayload({ id, draft, source }) {
   if (inputs.length === 0) errors.push("Add at least one input with an example.");
   if (outputs.length === 0) errors.push("Add at least one output with an example.");
 
-  // Generated ids must not collide with ANY id the case already has: every step, every variant, and the steps variants add.
-  const usedStepIds = new Set([...draft.steps.map((s) => s.id).filter(Boolean), ...(draft.branchStepIds ?? []), ...variantStepIds(draft.variants)]);
+  // Generated ids must not collide with ANY id the case already has: every step, every branch step, every variant, and the steps variants add.
+  const usedStepIds = new Set([...draft.steps.map((s) => s.id).filter(Boolean), ...allBranchStepIds(draft), ...variantStepIds(draft.variants)]);
   const fieldErrors = [];
   const steps = draft.steps.map((step, index) => {
     const stepId = step.id || uniqueId(slugify(step.action) || `step-${index + 1}`, usedStepIds);
@@ -81,9 +81,26 @@ export function buildPayload({ id, draft, source }) {
     return buildStepObject(step, stepId, `Step ${index + 1}`, errors);
   });
 
+  const trigger = buildTrigger({ text: draft.trigger, origText: triggerText(source?.trigger), shape: draft.triggerShape, orig: source?.trigger }, { path: "trigger", label: "Trigger", errors, fieldErrors });
+  const state = buildState(draft.state, { path: "state", label: "Starting state", errors, fieldErrors, nameOf });
+
+  // The base flow with its generated ids, as the variants and the branches see it.
+  const baseSteps = draft.steps.map((step, i) => ({ ...step, id: steps[i].id }));
+  const branchIds = new Set(draft.branches.map((b) => b.id).filter(Boolean));
+  const branches = draft.branches.map((branch, index) => {
+    const others = draft.branches.filter((b) => b !== branch);
+    const problems = [];
+    const built = buildBranch(branch, { taken: placesIn(baseModel({ steps: baseSteps, branches: others }, []), null), ids: branchIds, errors: problems, fieldErrors: [], label: `Branch ${index + 1}`, lockId: branch.id !== "" });
+    if (problems.length > 0) {
+      errors.push(`Branch ${built.title || built.id}: ${problems[0]}`);
+      fieldErrors.push({ path: `branch.${index}`, message: problems[0] });
+    }
+    return built;
+  });
+
   const variantIds = new Set(draft.variants.map((v) => v.id).filter(Boolean));
   const variants = draft.variants.map((variant, index) => {
-    const built = buildVariant(variant, index, { baseSteps: draft.steps, usedStepIds, variantIds, branchStepIds: allBranchStepIds(draft) });
+    const built = buildVariant(variant, index, { baseSteps, baseBranches: draft.branches, usedStepIds, variantIds, nameOf });
     errors.push(...built.errors);
     fieldErrors.push(...built.fieldErrors);
     return built.out;
@@ -93,11 +110,6 @@ export function buildPayload({ id, draft, source }) {
 
   const text = (value) => (value.trim() === "" ? undefined : value.trim());
   const tags = draft.tags.split(",").map((t) => t.trim()).filter(Boolean);
-  const triggerValue = (d, src) => {
-    const edited = text(d.trigger);
-    if (src?.trigger !== null && typeof src?.trigger === "object") return triggerWithText(src.trigger, edited ?? "", triggerText(src.trigger).trim());
-    return edited;
-  };
   const optional = (key, value, had) => (value !== undefined ? { [key]: value } : had ? { [key]: null } : {});
   const payload = {
     id,
@@ -109,14 +121,20 @@ export function buildPayload({ id, draft, source }) {
     steps,
     ...optional("group", text(draft.group), source?.group !== undefined),
     ...optional("tags", tags.length > 0 ? tags : undefined, source?.tags !== undefined),
-    ...optional("trigger", triggerValue(draft, source), source?.trigger !== undefined),
+    ...optional("trigger", trigger, source?.trigger !== undefined),
     ...optional("goal", text(draft.goal), source?.goal !== undefined),
     ...optional("outcome", text(draft.outcome), source?.outcome !== undefined),
   };
-  if (canonical(variants) !== canonical(source?.variants ?? [])) {
-    if (variants.length > 0) payload.variants = variants;
-    else if (source?.variants !== undefined) payload.variants = null;
-  }
+  // A list is sent only when it changed (a save never rewrites what it did not touch); emptied, it removes the key.
+  const sendList = (key, list) => {
+    if (canonical(list) === canonical(source?.[key] ?? [])) return;
+    if (list.length > 0) payload[key] = list;
+    else if (source?.[key] !== undefined) payload[key] = null;
+  };
+  sendList("constellations", draft.constellations);
+  sendList("state", state);
+  sendList("branches", branches);
+  sendList("variants", variants);
   return { payload };
 }
 
@@ -148,7 +166,36 @@ export function draftWarnings({ draft, pool, screens, nodes }) {
       check(`step.${i}.data.${j}.after`, d.object, d.after);
     });
   });
-  draft.variants.forEach((variant, index) => warnings.push(...variantWarnings({ variant, index, baseSteps: draft.steps, pool, branchStepIds: allBranchStepIds(draft) })));
+  // The world: a trigger actor, a constellation, a state or condition subject, a branch fork that does not exist (spec §6, warnings only).
+  const ends = { personasById: pool.personasById ?? new Map(), entitiesById: new Map(entitiesOf(pool).map((e) => [e.id, e])) };
+  const known = new Set((pool.world?.constellations ?? []).map((c) => c.id));
+  const subjectWarnings = (rows, path) => rows.forEach((row, j) => {
+    const message = participantWarning(row.subject, ends);
+    if (message) warnings.push({ path: `${path}.${j}.subject`, message });
+  });
+  const { triggerShape: shape } = draft;
+  if (shape.kind === "action" && shape.actor !== "" && !ends.personasById.has(shape.actor)) warnings.push({ path: "trigger.actor", message: `Persona ${shape.actor} does not exist.` });
+  if (shape.kind === "state") subjectWarnings(shape.conditions, "trigger.state");
+  for (const id of draft.constellations) if (!known.has(id)) warnings.push({ path: `constellation.${id}`, message: `${id} is not in the world pool. Create it in World or remove it here.` });
+  subjectWarnings(draft.state, "state");
+  const mainIds = new Set(draft.steps.map((s) => s.id).filter(Boolean));
+  draft.branches.forEach((branch, i) => {
+    const problems = [];
+    if (branch.from !== "" && !mainIds.has(branch.from)) problems.push(`it forks after ${branch.from}, which is not a main-flow step, so it runs before the first step`);
+    if (!branch.ends && branch.rejoin !== "" && !mainIds.has(branch.rejoin)) problems.push(`it continues at ${branch.rejoin}, which is not a main-flow step`);
+    for (const row of branch.when) {
+      const message = participantWarning(row.subject, ends);
+      if (message) problems.push(message.replace(/\.$/, ""));
+    }
+    if (problems.length > 0) warnings.push({ path: `branch.${i}`, message: `${branch.title || branch.id}: ${problems.join("; ")}.` });
+  });
+  const nameOf = (id) => participantName(pool, id);
+  draft.variants.forEach((variant, index) => {
+    warnings.push(...variantWarnings({ variant, index, baseSteps: draft.steps, baseBranches: draft.branches, baseState: draft.state, pool, nameOf }));
+    for (const id of variant.overrides.constellations ?? []) if (!known.has(id)) warnings.push({ path: `variant.${index}.constellation.${id}`, message: `${id} is not in the world pool. Create it in World or remove it here.` });
+    subjectWarnings(variant.state, `variant.${index}.state`);
+    if (variant.overrides.trigger !== undefined && variant.triggerShape.kind === "action" && variant.triggerShape.actor !== "" && !ends.personasById.has(variant.triggerShape.actor)) warnings.push({ path: `variant.${index}.trigger.actor`, message: `Persona ${variant.triggerShape.actor} does not exist.` });
+  });
   return warnings;
 }
 
@@ -316,6 +363,7 @@ export async function openUseCaseDialog(options) {
       const warnNode = h("p", { class: "uc-field-warn", hidden: true, dataset: { path: `step.${at()}.node` } });
       const screenInput = textInput({ value: step.screen, list: screenListId, placeholder: "screen", mono: true, ariaLabel: `Step ${at() + 1} screen`, onInput: (value) => { step.screen = value; markDirty(); if (options.screens().includes(value.trim())) fillNodes(value.trim()); } });
       const nodeInput = textInput({ value: step.node, list: nodeListId, placeholder: "element id", mono: true, ariaLabel: `Step ${at() + 1} element`, onInput: (value) => { step.node = value; markDirty(); } });
+      const viaInput = textInput({ value: step.via ?? "", placeholder: "Via", ariaLabel: `Step ${at() + 1} via`, onInput: (value) => { step.via = value; markDirty(); } });
       screenInput.dataset.path = `step.${at()}.screen`;
       nodeInput.dataset.path = `step.${at()}.node`;
       const targetRow = h("div", { class: "uc-target-edit" });
@@ -326,6 +374,7 @@ export async function openUseCaseDialog(options) {
           step.kind === "element" ? nodeInput : null,
           step.kind !== "none" ? h("datalist", { id: screenListId }, options.screens().map((s) => h("option", { value: s }))) : null,
           step.kind === "element" ? nodeList : null,
+          viaInput,
         );
       };
       drawTarget();
@@ -375,10 +424,20 @@ export async function openUseCaseDialog(options) {
       rowEl.querySelector("[aria-haspopup='menu']").relabel();
       rowEl.querySelector(".uc-drag-handle").relabel();
     });
-    stepsBox.append(h("button", { type: "button", class: "uc-link-btn", onClick: () => { draft.steps.push({ id: "", actor: draft.personas[0] ?? "system", action: "", kind: "screen", screen: "", node: "", data: [] }); markDirty(); drawSteps(draft.steps.length - 1); } }, icon("add"), "Step"));
+    stepsBox.append(h("button", { type: "button", class: "uc-link-btn", onClick: () => { draft.steps.push(emptyStep(draft.personas[0] ?? "system")); markDirty(); drawSteps(draft.steps.length - 1); } }, icon("add"), "Step"));
     if (focusIndex !== null) stepsBox.querySelectorAll(".uc-step-edit")[focusIndex]?.querySelector("input")?.focus();
     refreshWarnings(); // redrawn fields start without their hints and error states
   };
+
+  // --- The world: trigger, constellations, starting state, branches (CHR-1154) ------------------------------------------
+  const nameOf = (participant) => participantName(options.pool(), participant);
+  const refreshAfterDraw = () => { if (ready) refreshWarnings(); }; // the editors draw before the footer exists
+  let ready = false;
+  const triggerEditor = createTriggerEditor({ read: () => draft.trigger, write: (value) => { draft.trigger = value; }, shape: draft.triggerShape, pool: options.pool, actorOptions, path: "trigger", label: "Trigger", markDirty, refresh: refreshAfterDraw });
+  const constellations = constellationChips({ list: draft.constellations, pool: options.pool, path: "constellation", markDirty });
+  const stateEditor = stateRows({ rows: draft.state, pool: options.pool, path: "state", label: "State row", markDirty, refresh: refreshAfterDraw });
+  const branchList = createBranchList({ draft, pool: options.pool, screens: options.screens, actorOptions, ensureNodes, markDirty, refresh: refreshAfterDraw });
+  branchList.redraw();
 
   // --- Variants (usecases-variant-edit.js) -----------------------------------------------------------------------
   variantEditor = createVariantEditor({ draft, pool: options.pool, screens: options.screens, ensureNodes, objectOptions, actorOptions, markDirty: touch, setDirty: () => dialog.setDirty(true), refresh: () => { if (!quiet) refreshWarnings(); } });
@@ -397,7 +456,7 @@ export async function openUseCaseDialog(options) {
       if (el.classList.contains("uc-field-warn")) continue;
       el.classList.toggle("is-warning", currentWarnings.some((w) => w.path === el.dataset.path));
     }
-    const built = buildPayload({ id: id || uniqueId(slugify(draft.title), options.takenIds()), draft, source });
+    const built = buildPayload({ id: id || uniqueId(slugify(draft.title), options.takenIds()), draft, source, nameOf });
     showFieldErrors(dialog.body, built.fieldErrors ?? []);
     saveButton.disabled = saving || Boolean(built.errors);
     dialog.setMessage(built.errors ? built.errors[0] : warningSummary(currentWarnings), built.errors ? "error" : "warning");
@@ -421,7 +480,7 @@ export async function openUseCaseDialog(options) {
         return;
       }
     }
-    const built = buildPayload({ id: finalId, draft, source });
+    const built = buildPayload({ id: finalId, draft, source, nameOf });
     if (built.errors) {
       saving = false;
       saveButton.disabled = false;
@@ -445,9 +504,13 @@ export async function openUseCaseDialog(options) {
       h("div", { class: "uc-form-row" }, field("Group", groupInput), groupList, field("ID", idInput, { hint: mode === "edit" ? "fixed once used" : undefined })),
       h("div", { class: "uc-form-row" }, field("Status", statusControl), field("Tags", tagsInput, { hint: "comma separated" })),
       h("div", { class: "uc-field" }, h("span", { class: "uc-label" }, "Personas"), personaRow),
-      h("div", { class: "uc-form-row is-three" }, storyArea("trigger", "Trigger"), storyArea("goal", "Goal"), storyArea("outcome", "Outcome")),
+      triggerEditor.el,
+      h("div", { class: "uc-form-row" }, storyArea("goal", "Goal"), storyArea("outcome", "Outcome")),
+      h("section", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "World"), constellations.el, h("p", { class: "uc-form-note" }, "The case holds in any of these constellations. Every actor and state subject should be a member of at least one.")),
+      h("section", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Starting state", h("span", { class: "uc-label-hint" }, " · values at the start of the case")), stateEditor.el),
       h("section", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Inputs and outputs", h("span", { class: "uc-label-hint" }, " · at least one of each, each with an example")), ioBox),
       h("section", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Steps", h("span", { class: "uc-form-h-hint" }, " · drag a handle to reorder, or focus it and press Space")), stepsBox, reorder.live),
+      h("section", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Branches", h("span", { class: "uc-label-hint" }, " · alternative paths that fork from a step")), branchList.el),
       h("section", { class: "uc-form-section", id: "uc-variants-section" }, h("h2", { class: "uc-form-h" }, "Variants", h("span", { class: "uc-label-hint" }, " · shown as a difference against the base")), variantsBox),
     ),
   );
@@ -458,6 +521,7 @@ export async function openUseCaseDialog(options) {
   variantEditor.draw();
   for (const step of draft.steps) if (step.kind !== "none" && options.screens().includes(step.screen)) ensureNodes(step.screen);
   const closed = dialog.open();
+  ready = true;
   refreshWarnings();
   if (options.focus?.variantId) {
     const at = draft.variants.findIndex((v) => v.id === options.focus.variantId);

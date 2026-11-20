@@ -1,7 +1,7 @@
-// Use Cases tab — the World pool as a read view (ADR-011, design usecases-world / usecases-world-empty): entities, relationship
-// types and constellations from GET /api/world. The editors (new / edit / delete / generate) are CHR-1154 and not drawn here.
+// Use Cases tab — the World pool (ADR-011, design usecases-world / usecases-world-empty): entities, relationship types and
+// constellations from GET /api/world, each section with its New button and each entry opening its dialog (CHR-1154).
 
-import { h } from "./usecases-dom.js";
+import { h, icon } from "./usecases-dom.js";
 import { traitChip } from "./usecases-parts.js";
 import { entityAvatar } from "./usecases-world-parts.js";
 import { initials, plural } from "./usecases-data.js";
@@ -43,13 +43,17 @@ function table(label, columns, rows) {
   return h("div", { class: "uc-state-wrap uc-world-table", role: "region", "aria-label": label, tabindex: "0" }, h("table", { class: "uc-state" }, h("thead", null, h("tr", null, columns.map((c) => h("th", { scope: "col" }, c)))), h("tbody", null, rows)));
 }
 
-function section(part, sub, body) {
+function section(part, sub, body, ...actions) {
   const meta = WORLD_PARTS.find((p) => p.id === part);
-  return h("section", { class: "uc-section", id: `uc-world-${part}`, "aria-labelledby": `uc-world-${part}-h` }, h("div", { class: "uc-h2-row" }, h("h2", { class: "uc-h2", id: `uc-world-${part}-h` }, meta.label, h("span", { class: "uc-h2-meta" }, sub))), body);
+  return h("section", { class: "uc-section", id: `uc-world-${part}`, "aria-labelledby": `uc-world-${part}-h` }, h("div", { class: "uc-h2-row" }, h("h2", { class: "uc-h2", id: `uc-world-${part}-h` }, meta.label, h("span", { class: "uc-h2-meta" }, sub)), h("span", { class: "uc-map-spacer" }), ...actions), body);
 }
 
+const newButton = (label, onClick) => h("button", { type: "button", class: "chrome-btn", onClick }, label);
+/** An entry's name as the button that opens its dialog. */
+const editName = (text, label, onClick) => h("button", { type: "button", class: "uc-link-row", "aria-label": `Edit ${label} ${text}`, onClick }, text);
+
 /** The page: the empty guide for an empty world, else the three sections. */
-export function renderWorldPage(root, { world, pool, selected, error = "" }) {
+export function renderWorldPage(root, { world, pool, selected, error = "", handlers }) {
   if (error) {
     root.replaceChildren(h("div", { class: "uc-guide" }, h("h1", { class: "uc-guide-title" }, "The world could not be read"), h("p", { class: "uc-warn", role: "alert" }, error), h("p", { class: "uc-guide-lede" }, "Fix usecases/world.json or ask your agent to rewrite it.")));
     return;
@@ -64,7 +68,9 @@ export function renderWorldPage(root, { world, pool, selected, error = "" }) {
         h(
           "ol",
           { class: "uc-guide-steps" },
-          ["Add the things that are not actors, such as a child or a policy.", "Name how participants relate to each other.", "Group personas and entities into constellations, by hand or from dimensions that describe constellations."].map((line, i) => h("li", null, h("span", { class: "uc-guide-num" }, String(i + 1)), h("div", null, h("p", null, line)))),
+          h("li", null, h("span", { class: "uc-guide-num" }, "1"), h("div", null, h("p", null, "Add the things that are not actors, such as a child or a policy."), h("div", { class: "uc-guide-actions" }, h("button", { type: "button", class: "chrome-btn", onClick: () => handlers.onNewEntity() }, icon("add"), "New entity")))),
+          h("li", null, h("span", { class: "uc-guide-num" }, "2"), h("div", null, h("p", null, "Name how participants relate to each other."), h("div", { class: "uc-guide-actions" }, h("button", { type: "button", class: "chrome-btn", onClick: () => handlers.onNewRelationshipType() }, icon("add"), "New relationship type")))),
+          h("li", null, h("span", { class: "uc-guide-num" }, "3"), h("div", null, h("p", null, "Group personas and entities into constellations, by hand or from dimensions that describe constellations."), h("div", { class: "uc-guide-actions" }, h("button", { type: "button", class: "chrome-btn", onClick: () => handlers.onNewConstellation() }, icon("add"), "New constellation"), h("button", { type: "button", class: "chrome-btn chrome-btn--ghost", onClick: () => handlers.onGenerate() }, "Generate constellations")))),
         ),
         h("p", { class: "uc-guide-lede uc-world-guide-note" }, "Ask your agent to create them with set_use_cases."),
       ),
@@ -75,7 +81,7 @@ export function renderWorldPage(root, { world, pool, selected, error = "" }) {
     h(
       "tr",
       { dataset: { id: e.id } },
-      h("th", { scope: "row" }, h("span", { class: "uc-subject" }, entityAvatar({ text: e.avatar?.emoji || initials(e.name) }, "sm", e.name), e.name)),
+      h("th", { scope: "row" }, h("span", { class: "uc-subject" }, entityAvatar({ text: e.avatar?.emoji || initials(e.name) }, "sm", e.name), editName(e.name, "entity", () => handlers.onEditEntity(e.id)))),
       h("td", null, e.type ?? none()),
       h("td", { class: "uc-mono" }, e.id),
       h("td", null, traits(pool, e.traits)),
@@ -86,7 +92,7 @@ export function renderWorldPage(root, { world, pool, selected, error = "" }) {
     h(
       "tr",
       { dataset: { id: t.id } },
-      h("th", { scope: "row" }, t.label),
+      h("th", { scope: "row" }, editName(t.label, "relationship type", () => handlers.onEditRelationshipType(t.id))),
       h("td", null, t.inverse_label ?? none()),
       h("td", { class: "uc-mono" }, t.id),
       h("td", null, (t.same_traits ?? []).length > 0 ? h("span", { class: "uc-cst-traits" }, t.same_traits.map((id) => h("span", { class: "uc-trait" }, h("span", { class: "uc-trait-value uc-world-share" }, dimensionOf(pool, id)?.label ?? id)))) : none()),
@@ -99,7 +105,7 @@ export function renderWorldPage(root, { world, pool, selected, error = "" }) {
     return h(
       "article",
       { class: `uc-cst${c.generated ? " is-generated" : ""}`, dataset: { constellation: c.id } },
-      h("header", { class: "uc-cst-head" }, h("h3", { class: "uc-cst-name" }, c.name, c.generated ? h("span", { class: "uc-chip uc-world-generated" }, "Generated") : null), Object.keys(c.traits ?? {}).length > 0 ? traits(pool, c.traits) : h("span", { class: "uc-muted" }, "No traits")),
+      h("header", { class: "uc-cst-head" }, h("h3", { class: "uc-cst-name" }, editName(c.name, "constellation", () => handlers.onEditConstellation(c.id)), c.generated ? h("span", { class: "uc-chip uc-world-generated" }, "Generated") : null), Object.keys(c.traits ?? {}).length > 0 ? traits(pool, c.traits) : h("span", { class: "uc-muted" }, "No traits")),
       h("p", { class: "uc-muted uc-world-card-sub" }, c.relationships.length === 0 ? "No relationships yet. Add them to give the world its members." : `${plural(c.relationships.length, "relationship")} · ${members.join(", ")}`),
     );
   });
@@ -107,9 +113,9 @@ export function renderWorldPage(root, { world, pool, selected, error = "" }) {
     h(
       "div",
       { class: "uc-world-page", dataset: { selected } },
-      section("entities", "Things in the domain that are not actors: a child, a policy", world.entities.length > 0 ? table("Entities", ["Name", "Type", "ID", "Traits", "Data object"], entities) : h("p", { class: "uc-muted" }, "No entities yet.")),
-      section("relationship_types", "Read from left to right: Maria is parent of Leo", world.relationship_types.length > 0 ? table("Relationship types", ["Label", "Inverse label", "ID", "Both ends share", "Data field"], types) : h("p", { class: "uc-muted" }, "No relationship types yet.")),
-      section("constellations", "Starting worlds. Members come from the relationship ends.", cards.length > 0 ? h("div", { class: "uc-cst-grid" }, cards) : h("p", { class: "uc-muted" }, "No constellations yet.")),
+      section("entities", "Things in the domain that are not actors: a child, a policy", world.entities.length > 0 ? table("Entities", ["Name", "Type", "ID", "Traits", "Data object"], entities) : h("p", { class: "uc-muted" }, "No entities yet."), newButton("New entity", () => handlers.onNewEntity())),
+      section("relationship_types", "Read from left to right: Maria is parent of Leo", world.relationship_types.length > 0 ? table("Relationship types", ["Label", "Inverse label", "ID", "Both ends share", "Data field"], types) : h("p", { class: "uc-muted" }, "No relationship types yet."), newButton("New relationship type", () => handlers.onNewRelationshipType())),
+      section("constellations", "Starting worlds. Members come from the relationship ends.", cards.length > 0 ? h("div", { class: "uc-cst-grid" }, cards) : h("p", { class: "uc-muted" }, "No constellations yet."), newButton("Generate…", () => handlers.onGenerate()), newButton("New constellation", () => handlers.onNewConstellation())),
     ),
   );
 }

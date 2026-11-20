@@ -102,11 +102,16 @@ describe("variant trigger override", () => {
     expect(out.trigger).toEqual(trigger);
   });
 
-  it("edits the text only, keeping actor and via, and still rejects an empty override", () => {
+  it("edits the text only, keeping actor and via; clearing the text keeps the structure (N5), a text-only override stays an error", () => {
     const draft = variantDraft(stored);
     draft.overrides.trigger = "  The insurer writes ";
     expect(build(draft).out.trigger).toEqual({ ...trigger, text: "The insurer writes" });
     draft.overrides.trigger = " ";
+    // The override still says who acts and how: the empty text is not an empty override.
+    expect(build(draft).errors).toEqual([]);
+    expect(build(draft).out.trigger).toEqual({ ...trigger, text: "" });
+    // Switching to the text form is the explicit way to drop the structure; then an empty text is an empty override.
+    draft.triggerShape.kind = "text";
     expect(build(draft).errors).toEqual(['Variant "T": the trigger override is empty.']);
   });
 

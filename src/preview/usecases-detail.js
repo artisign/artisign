@@ -29,7 +29,9 @@ import {
 
 /** "Small project · Human" — a persona's trait values as labels. */
 function traitSummary(persona, dimensionsById) {
+  const role = String(persona.role ?? "").toLowerCase();
   return Object.entries(persona.traits ?? {})
+    .filter(([dimension, value]) => !role || String(dimensionsById.get(dimension)?.values.find((v) => v.id === value)?.label ?? value).toLowerCase() !== role)
     .map(([dimension, value]) => `${dimensionsById.get(dimension)?.label ?? dimension} ${dimensionsById.get(dimension)?.values.find((v) => v.id === value)?.label ?? value}`)
     .join(" · ");
 }

@@ -34,6 +34,7 @@ import {
   GROUP_PAGE,
   FLAT_PAGE,
   PAGE_MAX,
+  pageSize,
   warningSummary,
   plural,
   errorMessage,
@@ -431,7 +432,7 @@ export function createUseCasesView(options) {
       list.groupState.set(path, { rows: [], cursor: undefined, loading: false });
       return;
     }
-    const want = Math.min(node.direct, Math.max(GROUP_FIRST_PAGE, count));
+    const want = Math.min(node.direct, pageSize(node.direct, Math.max(GROUP_FIRST_PAGE, count)));
     list.groupState.set(path, { rows: list.groupState.get(path)?.rows ?? [], cursor: undefined, loading: true });
     renderList();
     const result = await pageRows({ ...buildQuery(filters), group: path, sort: "group" }, want, undefined, (u) => u.group === path);
@@ -444,7 +445,7 @@ export function createUseCasesView(options) {
 
   async function reloadUngrouped(count, req) {
     const offset = list.total - list.ungrouped.count;
-    const want = Math.min(list.ungrouped.count, Math.max(GROUP_FIRST_PAGE, count));
+    const want = Math.min(list.ungrouped.count, pageSize(list.ungrouped.count, Math.max(GROUP_FIRST_PAGE, count)));
     list.ungrouped.loading = true;
     renderList();
     const result = await pageRows({ ...buildQuery(filters), sort: "group" }, want, String(offset), () => true);
@@ -492,7 +493,7 @@ export function createUseCasesView(options) {
       list.ungrouped.loading = true;
       list.groupErrors.delete("");
       renderList();
-      const result = await pageRows({ ...buildQuery(filters), sort: "group" }, Math.min(GROUP_PAGE, list.ungrouped.count - list.ungrouped.rows.length), String(offset), () => true);
+      const result = await pageRows({ ...buildQuery(filters), sort: "group" }, pageSize(list.ungrouped.count - list.ungrouped.rows.length, GROUP_PAGE), String(offset), () => true);
       if (req !== list.req) return;
       list.ungrouped.loading = false;
       list.ungrouped.rows = list.ungrouped.rows.concat(result.rows);
@@ -506,7 +507,7 @@ export function createUseCasesView(options) {
     state.loading = true;
     list.groupErrors.delete(path);
     renderList();
-    const result = await pageRows({ ...buildQuery(filters), group: path, sort: "group" }, Math.min(GROUP_PAGE, node.direct - state.rows.length), state.cursor, (u) => u.group === path);
+    const result = await pageRows({ ...buildQuery(filters), group: path, sort: "group" }, pageSize(node.direct - state.rows.length, GROUP_PAGE), state.cursor, (u) => u.group === path);
     if (req !== list.req) return;
     if (!result.ok) list.groupErrors.set(path, result.message);
     list.groupState.set(path, { rows: state.rows.concat(result.rows), cursor: result.cursor, loading: false });

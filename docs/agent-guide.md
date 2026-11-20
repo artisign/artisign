@@ -723,7 +723,7 @@ For `persona`, `dimension`, `data_object`, `constellation` and `entity` (an enti
 while no persona has the same id) the delete is then refused with `conflict` even when
 nothing is referenced, naming up to 5 files; repair them, or pass `force: true`. With
 `force` the response adds one `invalid_file` warning per unreadable case file (target
-`use_case:<id>`, at most 10) and `invalid_file_count` with the total when there are more:
+`use_case:<id>`, at most 10) and `invalid_file_count` with the total plus `invalid_file_omitted_count` with the number not listed when there are more:
 the referrer list may be incomplete. `relationship_type` never fails closed, its scan reads
 no case file. `delete_entity` reads the pools strictly: a pool file with one invalid entry is
 `invalid_state`, before any scan, for the files the kind reads. Per kind: `use_case` reads no
@@ -744,7 +744,7 @@ for an entry without an id; `use_case:<id>` for a case file) naming the file
 and the problem; everything else still loads. `list_use_cases` lists at most 10 of each
 kind; `invalid_file_count` is the real number of unreadable case files and
 `invalid_pool_entry_count` the real number of skipped pool entries (each present only
-above 10). `get_use_case` lists the skipped pool entries after the case's own
+above 10, each with an `invalid_file_omitted_count` / `invalid_pool_entry_omitted_count` beside it: the total minus the 10 listed). `get_use_case` lists the skipped pool entries after the case's own
 warnings, under its usual cap of 50 (`warning_count` is the true total), and words a reference to a skipped id as unreadable, not
 missing. Writes that start from such a pool
 (`set_use_cases`, `generate_personas`, `delete_entity`) fail with `invalid_state`

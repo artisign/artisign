@@ -12,6 +12,8 @@ import {
   buildGroupTree,
   groupAncestors,
   flattenTree,
+  pageSize,
+  formatValue,
   flattenFlat,
   rowTops,
   visibleWindow,
@@ -555,5 +557,21 @@ describe("load problems (CHR-1124)", () => {
     const bare = { kind: "invalid_file", message: "no target" };
     expect(splitInvalidWarnings([caseFile, entry, bare])).toEqual({ entries: [entry], files: [caseFile, bare] });
     expect(splitInvalidWarnings(undefined)).toEqual({ entries: [], files: [] });
+  });
+});
+
+describe("single leftover rows and empty strings", () => {
+  it("pageSize takes a single leftover row along but keeps paging for more", () => {
+    expect(pageSize(5, 4)).toBe(5);
+    expect(pageSize(4, 4)).toBe(4);
+    expect(pageSize(6, 4)).toBe(4);
+    expect(pageSize(26, 25)).toBe(26);
+    expect(pageSize(27, 25)).toBe(25);
+  });
+
+  it("formatValue renders an empty string visibly, in example lines too", () => {
+    expect(formatValue("")).toBe('""');
+    expect(formatValue("x")).toBe("x");
+    expect(exampleLines({ a: "" }, new Set(["a"]))).toEqual([{ key: "a", text: '""', changed: true }]);
   });
 });

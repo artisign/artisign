@@ -23,7 +23,7 @@ const BORROW = {
   steps: [{ id: "tap", actor: "member-ana", action: "Taps the book" }],
 };
 
-type ListRes = { total: number; use_cases: { id: string }[]; counts: Record<string, number>; personas?: { id: string }[]; dimensions?: { id: string }[]; data_objects?: { id: string }[]; warnings?: Warning[]; invalid_file_count?: number; invalid_pool_entry_count?: number };
+type ListRes = { total: number; use_cases: { id: string }[]; counts: Record<string, number>; personas?: { id: string }[]; dimensions?: { id: string }[]; data_objects?: { id: string }[]; warnings?: Warning[]; invalid_file_count?: number; invalid_pool_entry_count?: number; invalid_file_omitted_count?: number; invalid_pool_entry_omitted_count?: number };
 type GetRes = { personas: { id: string }[]; warnings: Warning[] };
 
 describe("use-case pool files — invalid entries on the read path", () => {
@@ -93,11 +93,14 @@ describe("use-case pool files — invalid entries on the read path", () => {
     expect(list.warnings).toHaveLength(11);
     expect(list.warnings?.map((w) => w.target)).toEqual([...Array.from({ length: 10 }, (_, i) => `persona:p-${i}`), "use_case:broken"]);
     expect(list.invalid_pool_entry_count).toBe(12);
+    expect(list.invalid_pool_entry_omitted_count).toBe(2);
+    expect(list.invalid_file_omitted_count).toBeUndefined();
     expect(list.invalid_file_count).toBeUndefined(); // counts case files only, as before
     for (let i = 0; i < 11; i++) await writeFile(file(`cases/broken-${String(i).padStart(2, "0")}.json`), "{ nope");
     const more = (await listUseCases(fx.store, {})) as ListRes;
     expect(more.warnings?.filter((w) => w.target?.startsWith("use_case:"))).toHaveLength(10);
     expect(more.invalid_file_count).toBe(12);
+    expect(more.invalid_file_omitted_count).toBe(2);
     expect(more.invalid_pool_entry_count).toBe(12);
   });
 

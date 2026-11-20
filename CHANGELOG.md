@@ -22,6 +22,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the detail with personas, flow and before/after data, variants shown as a difference with a coverage matrix, a mapping view that
   places each step on the live screen, the persona, dimension and data-object pools, and dialogs to create, edit and delete them. The Screens
   tab lists the use cases that map onto the open screen. A project without `usecases/` shows an empty guide and nothing is written.
+- **World model for use cases:** a use case can say who and what is there and what it starts from. Pool entries
+  `entities` (things with identity that relate to a persona or another entity), `relationship_types` and
+  `constellations` (one fixed starting world each) are written with `set_use_cases`; a persona takes a `kind`
+  (`human`, `agent`, `service`, `organization`) and a dimension a `scope` (`personas` or `constellations`). A use
+  case gains `constellations`, a `trigger` (an action of a persona, or a state or point in time), a starting
+  `state` and `branches` (alternative paths that fork after a main-flow step and rejoin or end the case);
+  variants can override constellations, merge state and add, replace or remove branches. `get_use_case` returns
+  the world of the case, `list_use_cases` filters by `constellation` and `entity`, `generate_personas` takes
+  `target: "constellations"` and `suggest_use_case_variants` covers constellation-scoped dimensions. `delete_entity`
+  takes three more kinds (`entity`, `constellation`, `relationship_type`), seven use-case kinds in all. World
+  problems are warnings and never block a write; states and conditions are stored and shown, never evaluated.
+  The Use Cases tab has read views and editors for the world.
 
 ## [2.2.1] - 2026-11-14
 

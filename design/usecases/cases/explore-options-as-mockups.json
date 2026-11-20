@@ -3,14 +3,22 @@
   "title": "Explore several options as mockups",
   "group": "mockups",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "design-agent-dex",
     "designer-dana"
   ],
-  "trigger": "The interaction model of a screen is still open.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "The interaction model of a screen is still open, so Dana asks for options.",
+    "actor": "designer-dana",
+    "via": "AI tool chat"
+  },
   "goal": "Dana sees two to four options side by side.",
   "outcome": "A mockup with one variant per option, each with a title and description.",
   "inputs": [
@@ -39,12 +47,14 @@
     {
       "id": "write-variants",
       "actor": "design-agent-dex",
-      "action": "Writes one mockup variant per option with write_mockup"
+      "action": "Writes one mockup variant per option with write_mockup",
+      "via": "MCP"
     },
     {
       "id": "look",
       "actor": "design-agent-dex",
-      "action": "Screenshots each variant"
+      "action": "Screenshots each variant",
+      "via": "MCP"
     },
     {
       "id": "compare",

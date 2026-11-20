@@ -3,15 +3,35 @@
   "title": "Switch the project of one tab",
   "group": "setup",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "designer-dana"
   ],
-  "trigger": "Dana works on two projects and wants the other one in this tab.",
+  "constellations": [
+    "designer-two-projects"
+  ],
+  "trigger": {
+    "text": "Dana works on two projects and wants the other one in this tab.",
+    "actor": "designer-dana",
+    "via": "browser preview"
+  },
   "goal": "The tab shows the other project without changing other tabs.",
   "outcome": "Only this tab switched; the daemon's default project stays.",
+  "state": [
+    {
+      "subject": "project-shop",
+      "property": "open",
+      "value": true
+    },
+    {
+      "subject": "project-website",
+      "property": "open",
+      "value": true
+    }
+  ],
   "inputs": [
     {
       "object": "project",

@@ -3,13 +3,21 @@
   "title": "Coding agent reads a screen spec for implementation",
   "group": "handoff",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "coding-agent-coda"
   ],
-  "trigger": "Coda implements a screen from the design.",
+  "constellations": [
+    "coding-agent-ready-project"
+  ],
+  "trigger": {
+    "text": "Coda picks up a ticket to implement a screen from the design.",
+    "actor": "coding-agent-coda",
+    "via": "ticket"
+  },
   "goal": "Exact values, refs and notes without reading screenshots.",
   "outcome": "Code matches the design tokens and component usage.",
   "inputs": [
@@ -37,7 +45,8 @@
     {
       "id": "find",
       "actor": "coding-agent-coda",
-      "action": "Finds the ticket's screens with get_project tags"
+      "action": "Finds the ticket's screens with get_project tags",
+      "via": "MCP"
     },
     {
       "id": "read",
@@ -45,7 +54,8 @@
       "action": "Reads screen, notes and tag notes with get_screen",
       "target": {
         "screen": "app-shell"
-      }
+      },
+      "via": "MCP"
     },
     {
       "id": "tokens",
@@ -53,7 +63,8 @@
       "action": "Reads the design system and inspects nodes for computed values",
       "target": {
         "screen": "design-system-view"
-      }
+      },
+      "via": "MCP"
     }
   ]
 }

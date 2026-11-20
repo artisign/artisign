@@ -3,15 +3,30 @@
   "title": "Open an existing project",
   "group": "setup",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "designer-dana"
   ],
-  "trigger": "Dana wants to continue on a project that is not open.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana wants to continue on a project that is not open.",
+    "actor": "designer-dana",
+    "via": "browser preview"
+  },
   "goal": "The project is open in this browser tab.",
   "outcome": "Screens, design system and board of the project are shown.",
+  "state": [
+    {
+      "subject": "project-shop",
+      "property": "open",
+      "value": false
+    }
+  ],
   "inputs": [
     {
       "object": "project",

@@ -24,6 +24,16 @@
           "name": "screen_count",
           "type": "number",
           "example": 12
+        },
+        {
+          "name": "token_count",
+          "type": "number",
+          "example": 24
+        },
+        {
+          "name": "open_comment_count",
+          "type": "number",
+          "example": 3
         }
       ]
     },
@@ -283,6 +293,11 @@
           "name": "pinned_version",
           "type": "string",
           "example": "2.2.1"
+        },
+        {
+          "name": "skill_installed",
+          "type": "boolean",
+          "example": true
         }
       ]
     },

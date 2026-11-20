@@ -3,15 +3,30 @@
   "title": "Change theme and preview preferences",
   "group": "settings",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "designer-dana"
   ],
-  "trigger": "Dana prefers a dark preview.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana prefers a dark preview.",
+    "actor": "designer-dana",
+    "via": "browser preview"
+  },
   "goal": "The preference applies to every browser and reload.",
   "outcome": "The chrome is dark and the choice is stored by the daemon.",
+  "state": [
+    {
+      "subject": "system",
+      "property": "theme",
+      "value": "system"
+    }
+  ],
   "inputs": [
     {
       "object": "settings",

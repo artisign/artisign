@@ -3,13 +3,21 @@
   "title": "Inspect an element's tokens and geometry",
   "group": "review",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "designer-dana"
   ],
-  "trigger": "Dana wants to know which token an element uses.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana wants to know which token an element uses.",
+    "actor": "designer-dana",
+    "via": "browser preview"
+  },
   "goal": "See refs, computed values and size of one element.",
   "outcome": "The Elements panel shows the selected node's details.",
   "inputs": [
@@ -47,14 +55,31 @@
       "target": {
         "screen": "inspector-selected"
       }
-    },
+    }
+  ],
+  "branches": [
     {
-      "id": "variant-card",
-      "actor": "system",
-      "action": "Shows the Variant card and Also reached from for a variant screen",
-      "target": {
-        "screen": "inspector-variant-reached-from"
-      }
+      "id": "variant-screen",
+      "title": "The element is on a variant screen",
+      "from": "select",
+      "when": [
+        {
+          "subject": "system",
+          "property": "selected-screen-is-variant",
+          "value": true
+        }
+      ],
+      "steps": [
+        {
+          "id": "variant-card",
+          "actor": "system",
+          "action": "Shows the Variant card and Also reached from for a variant screen",
+          "target": {
+            "screen": "inspector-variant-reached-from"
+          }
+        }
+      ],
+      "outcome": "Dana also sees the variant's parent and the screens that lead to it."
     }
   ]
 }

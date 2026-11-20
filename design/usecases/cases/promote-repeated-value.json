@@ -3,13 +3,26 @@
   "title": "Promote a repeated value into the system",
   "group": "design",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "design-agent-dex"
   ],
-  "trigger": "A write returns a repeated_pattern warning.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "A write returns a repeated_pattern warning.",
+    "state": [
+      {
+        "subject": "system",
+        "property": "last-write-warning",
+        "value": "repeated_pattern"
+      }
+    ]
+  },
   "goal": "The second occurrence becomes a token or component ref.",
   "outcome": "All identical occurrences now reference the promoted entity.",
   "inputs": [
@@ -39,7 +52,8 @@
     {
       "id": "promote",
       "actor": "design-agent-dex",
-      "action": "Calls promote_to_system and names the entity by role"
+      "action": "Calls promote_to_system and names the entity by role",
+      "via": "MCP"
     },
     {
       "id": "check",
@@ -47,7 +61,8 @@
       "action": "Checks reuse coverage with get_project fields reuse",
       "target": {
         "screen": "design-system-view"
-      }
+      },
+      "via": "MCP"
     }
   ]
 }

@@ -3,13 +3,21 @@
   "title": "Wire click flows between screens",
   "group": "board",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "design-agent-dex"
   ],
-  "trigger": "A CTA on a screen goes nowhere.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana finds a CTA on a screen that goes nowhere.",
+    "actor": "designer-dana",
+    "via": "comment"
+  },
   "goal": "Every interactive element leads to its target.",
   "outcome": "Flows show as edges on the Board and work in Flow mode.",
   "inputs": [
@@ -36,7 +44,8 @@
     {
       "id": "wire",
       "actor": "design-agent-dex",
-      "action": "Adds data-flow-target or calls set_flow"
+      "action": "Adds data-flow-target or calls set_flow",
+      "via": "MCP"
     },
     {
       "id": "edges",

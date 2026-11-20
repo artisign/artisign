@@ -3,13 +3,21 @@
   "title": "Restyle the whole product through tokens",
   "group": "design",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "design-agent-dex"
   ],
-  "trigger": "Dana wants a different accent colour across all screens.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana wants a different accent colour across all screens.",
+    "actor": "designer-dana",
+    "via": "AI tool chat"
+  },
   "goal": "Every screen, component and pattern follows the new value.",
   "outcome": "One set_tokens call changed the look of the whole project.",
   "inputs": [
@@ -55,7 +63,8 @@
             "value": "#C8553D"
           }
         }
-      ]
+      ],
+      "via": "MCP"
     },
     {
       "id": "reload",

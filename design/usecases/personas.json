@@ -4,6 +4,7 @@
       "id": "actor-type",
       "label": "Actor type",
       "description": "Who performs the flow: a person in the browser preview, or an agent through MCP.",
+      "scope": "personas",
       "values": [
         {
           "id": "human",
@@ -19,6 +20,7 @@
       "id": "role",
       "label": "Role",
       "description": "What the actor is responsible for in the project.",
+      "scope": "personas",
       "values": [
         {
           "id": "designer",
@@ -46,6 +48,7 @@
       "id": "experience",
       "label": "Experience",
       "description": "How familiar the actor is with Artisign.",
+      "scope": "personas",
       "values": [
         {
           "id": "first-run",
@@ -60,7 +63,8 @@
     {
       "id": "project-size",
       "label": "Project size",
-      "description": "How many screens and use cases the project holds. Decides whether lists need filters and paging.",
+      "description": "How many screens and use cases the project of a constellation holds. Decides whether lists need filters and paging.",
+      "scope": "constellations",
       "values": [
         {
           "id": "small",
@@ -77,6 +81,7 @@
     {
       "id": "designer-dana",
       "name": "Dana",
+      "kind": "human",
       "role": "Designer",
       "description": "Reviews and steers the design in the browser preview while agents write the screens.",
       "avatar": {
@@ -97,6 +102,7 @@
     {
       "id": "product-owner-pablo",
       "name": "Pablo",
+      "kind": "human",
       "role": "Product owner",
       "description": "Owns the spec of a large product and maintains use cases before they become tickets.",
       "avatar": {
@@ -106,8 +112,7 @@
       "traits": {
         "actor-type": "human",
         "role": "product-owner",
-        "experience": "regular",
-        "project-size": "large"
+        "experience": "regular"
       },
       "goals": [
         "Find one use case among thousands in seconds",
@@ -117,6 +122,7 @@
     {
       "id": "solo-founder-sol",
       "name": "Sol",
+      "kind": "human",
       "role": "Solo founder",
       "description": "Builds a product alone with AI tools. Installs Artisign for the first time and has no design system yet.",
       "avatar": {
@@ -126,8 +132,7 @@
       "traits": {
         "actor-type": "human",
         "role": "solo-founder",
-        "experience": "first-run",
-        "project-size": "small"
+        "experience": "first-run"
       },
       "goals": [
         "Get from install to a first screen in minutes",
@@ -137,6 +142,7 @@
     {
       "id": "design-agent-dex",
       "name": "Dex",
+      "kind": "agent",
       "role": "Design agent",
       "description": "An AI agent that writes tokens, components and screens through the MCP tools and checks every write with a screenshot.",
       "avatar": {
@@ -156,6 +162,7 @@
     {
       "id": "coding-agent-coda",
       "name": "Coda",
+      "kind": "agent",
       "role": "Coding agent",
       "description": "An AI agent that implements screens in a codebase from the design and the use cases. Reads, never writes the design.",
       "avatar": {
@@ -171,6 +178,18 @@
         "Get a screen or use case with everything attached in one call",
         "Be told when a mapping is stale"
       ]
+    },
+    {
+      "id": "npm-registry",
+      "name": "npm registry",
+      "kind": "service",
+      "role": "Package registry",
+      "description": "Publishes new Artisign versions. The daemon's daily update check and every pinned npx client entry read from it.",
+      "avatar": {
+        "emoji": "📦",
+        "color": "#B5533C"
+      },
+      "traits": {}
     }
   ]
 }

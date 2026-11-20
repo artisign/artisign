@@ -3,15 +3,30 @@
   "title": "Update Artisign and read what's new",
   "group": "settings",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "solo-founder-sol"
   ],
-  "trigger": "The daemon's daily check finds a newer version.",
+  "constellations": [
+    "solo-founder-empty-project"
+  ],
+  "trigger": {
+    "text": "A newer Artisign version is published; the daemon's daily check finds it.",
+    "actor": "npm-registry",
+    "via": "registry metadata (daily update check)"
+  },
   "goal": "Sol runs the new version and knows what changed.",
   "outcome": "The client entries are re-pinned and the release notes were shown once.",
+  "state": [
+    {
+      "subject": "ai-tool-sol",
+      "property": "pinned_version",
+      "value": "2.2.1"
+    }
+  ],
   "inputs": [
     {
       "object": "settings",
@@ -42,7 +57,8 @@
     {
       "id": "run",
       "actor": "solo-founder-sol",
-      "action": "Copies and runs artisign update"
+      "action": "Copies and runs artisign update",
+      "via": "terminal"
     },
     {
       "id": "whats-new",

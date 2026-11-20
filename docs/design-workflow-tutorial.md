@@ -17,7 +17,8 @@ Who this is for:
 - **Agents** with room to spare that want the reasoning behind the rules.
 
 Throughout we design a fictional note-taking app, *Notely*, with three screens:
-a note list, a note editor, and settings.
+a note list, a note editor, and settings. Section 8 (use cases) uses its own
+small example, a library app called *Shelf*.
 
 ---
 
@@ -373,7 +374,8 @@ reliably produces vague metadata, because the reasoning is gone.
 
 Screens say what the product looks like. Use cases say what it must do, for
 whom, with which data. They are optional: a project without a `usecases/`
-folder is unaffected, and nothing is created until the first `set_use_cases`.
+folder is unaffected, and nothing is created until the first use-case write (`set_use_cases`,
+`generate_personas` or an edit in the preview).
 The normative rules are in the Agent Guide (section "Use cases"); this section
 shows the idea with a small library app, *Shelf*.
 
@@ -381,26 +383,32 @@ shows the idea with a small library app, *Shelf*.
 personas with traits (`member-ana`, a student; `staff-lee`). A missing trait
 means "any value".
 
-**Add the world only when the situation matters.** Say a loan depends on a
-member's household, the copy and the branch library. Then:
+**Add the world only when the situation matters.** Say a loan depends on the
+member, the copy and the branch library. Then:
 
 - a *main entity* is a thing with identity that relates to a persona or another
   entity: the book copy `copy-0042`. A value without identity (the number of
   open loans) is a *property state*, not an entity;
-- a *relationship type* names how two participants relate (`borrows`,
+- a *relationship type* names how two participants relate (`member-of`,
   `held-by`);
 - a *constellation* is one fixed starting world: Ana, the copy and the branch,
-  joined by `member-ana borrows copy-0042` and `copy-0042 held-by north-branch`.
+  joined by relationships that hold before the case starts,
+  `member-ana member-of north-branch` and `copy-0042 held-by north-branch`.
+  A `borrows` relationship would be the result of the case, not part of its
+  start.
   Relationships exist only inside a constellation.
 
 **Write the case.** "Borrow a book" has a `trigger` (Ana scans the copy at the
-kiosk: an action of a persona with `via: "kiosk"`; or a state, such as a due
-date, never both), a starting `state` (`member-ana.open-loans = 4`) and the
-main flow. Where the flow forks, add a **branch**: when `member-ana.open-loans`
-is at least 5, the system explains the loan limit, then the case ends with that
-outcome (or `rejoin` continues the main flow at a later step). A branch forks
-after a main-flow step and does not nest; a deeper alternative is a second
-branch with a narrower condition.
+kiosk: an action of a persona with `via: "kiosk"`; or a state or a point in
+time such as a due date (`at`), never both), a starting `state`
+(`copy-0042.status = "available"`) and the main flow. Where the flow forks, add
+a **branch**. The loan limit is a state any member can meet, so it is a branch
+without `from` (it forks before the first step) with the condition
+`member-ana.open-loans` at least 5 (`gte`), and no fixed starting value that
+contradicts it. The system explains the limit, then the case ends with that
+outcome (or `rejoin` continues the main flow at a later step). A branch that
+forks after a main-flow step (`from`) does not nest; a deeper alternative is a
+second branch with a narrower condition.
 
 **Which mechanism for which difference?**
 

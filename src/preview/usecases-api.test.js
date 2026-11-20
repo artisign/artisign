@@ -55,6 +55,28 @@ describe("usecases-api", () => {
     ]);
   });
 
+  it("sends force: true only when asked, and only from the six pool wrappers (deleteUseCase never sends it)", async () => {
+    const sent = stubFetch();
+    await api.deletePersona("/p", "x", true);
+    await api.deleteDimension("/p", "x", true);
+    await api.deleteDataObject("/p", "x", true);
+    await api.deleteMainEntity("/p", "x", true);
+    await api.deleteConstellation("/p", "x", true);
+    await api.deleteRelationshipType("/p", "x", true);
+    await api.deletePersona("/p", "y", false);
+    await api.deleteUseCase("/p", "x", true);
+    expect(sent.map((s) => s.body)).toEqual([
+      { kind: "persona", name: "x", force: true },
+      { kind: "dimension", name: "x", force: true },
+      { kind: "data_object", name: "x", force: true },
+      { kind: "entity", name: "x", force: true },
+      { kind: "constellation", name: "x", force: true },
+      { kind: "relationship_type", name: "x", force: true },
+      { kind: "persona", name: "y" },
+      { kind: "use_case", name: "x" },
+    ]);
+  });
+
   it("reads the stored case from the internal route, not from a tool", async () => {
     const sent = stubFetch();
     await api.fetchUseCaseSource("/p", "a b");

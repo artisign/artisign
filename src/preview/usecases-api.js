@@ -40,20 +40,21 @@ export const setUseCases = (project, payload) => callTool(project, "set_use_case
 
 export const generatePersonas = (project, input) => callTool(project, "generate_personas", input);
 
-export const deletePersona = (project, id) => callTool(project, "delete_entity", { kind: "persona", name: id });
+// The six pool kinds take an optional `force` (true only after the human chose "Delete anyway"); deleteUseCase never sends it.
+export const deletePersona = (project, id, force) => callTool(project, "delete_entity", force === true ? { kind: "persona", name: id, force: true } : { kind: "persona", name: id });
 
-export const deleteDimension = (project, id) => callTool(project, "delete_entity", { kind: "dimension", name: id });
+export const deleteDimension = (project, id, force) => callTool(project, "delete_entity", force === true ? { kind: "dimension", name: id, force: true } : { kind: "dimension", name: id });
 
-export const deleteDataObject = (project, id) => callTool(project, "delete_entity", { kind: "data_object", name: id });
+export const deleteDataObject = (project, id, force) => callTool(project, "delete_entity", force === true ? { kind: "data_object", name: id, force: true } : { kind: "data_object", name: id });
 
 export const deleteUseCase = (project, id) => callTool(project, "delete_entity", { kind: "use_case", name: id });
 
 // The three world kinds (ADR-011): fixed wrappers like the four above, so the seven kinds stay the only ones the preview can name.
-export const deleteMainEntity = (project, id) => callTool(project, "delete_entity", { kind: "entity", name: id });
+export const deleteMainEntity = (project, id, force) => callTool(project, "delete_entity", force === true ? { kind: "entity", name: id, force: true } : { kind: "entity", name: id });
 
-export const deleteConstellation = (project, id) => callTool(project, "delete_entity", { kind: "constellation", name: id });
+export const deleteConstellation = (project, id, force) => callTool(project, "delete_entity", force === true ? { kind: "constellation", name: id, force: true } : { kind: "constellation", name: id });
 
-export const deleteRelationshipType = (project, id) => callTool(project, "delete_entity", { kind: "relationship_type", name: id });
+export const deleteRelationshipType = (project, id, force) => callTool(project, "delete_entity", force === true ? { kind: "relationship_type", name: id, force: true } : { kind: "relationship_type", name: id });
 
 /**
  * The stored use case as written (variants with their step ops included).

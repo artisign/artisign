@@ -35,6 +35,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   problems are warnings and never block a write; states and conditions are stored and shown, never evaluated.
   The Use Cases tab has read views and editors for the world.
 
+### Improvements
+
+- **`delete_entity` refuses a referenced use-case pool entry unless `force: true`:** a `persona`, `dimension`,
+  `data_object`, `entity`, `constellation` or `relationship_type` that a use case or another pool entry still names
+  is refused with `conflict` and the references listed (at most 5 ids per group); nothing is written. `force: true`
+  deletes as before, with the `dangling_reference` warnings. When a case file cannot be read, the reference check is
+  incomplete: the delete is refused without `force` (not for `relationship_type`), and with `force` the response adds
+  `invalid_file` warnings and `invalid_file_count`. `force` on any other kind is `validation_failed`. A referenced
+  component stays refused without an override. In the preview, a refused delete lists the references and offers
+  "Delete anyway"; the detail view marks personas and conditions the pools no longer have, and the coverage card no
+  longer reports full coverage while they exist. The `delete_entity` description is reworded to stay within 500 characters.
+
 ### Bugfixes
 
 - `delete_entity` with `variant` on any kind other than `mockup` now fails with `validation_failed` and deletes

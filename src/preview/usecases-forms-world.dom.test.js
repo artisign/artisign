@@ -95,7 +95,8 @@ describe("entity dialog", () => {
     button("Delete").click();
     await flush();
     expect(remove).not.toHaveBeenCalled();
-    expect($(".uc-foot-msg").textContent).toContain("Delete Leo? Used by 3 use cases. Nothing is repaired");
+    expect($(".uc-foot-msg").textContent).toContain("Delete Leo? Used by 3 use cases. If something still refers to it");
+    expect($(".uc-foot-msg").textContent).toContain("Nothing is repaired");
     button("Delete Leo").click();
     await flush();
     expect(remove).toHaveBeenCalledWith("leo");

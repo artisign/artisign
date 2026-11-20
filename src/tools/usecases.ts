@@ -759,7 +759,7 @@ function dangling(kind: string, name: string, referrers: string[], by: string): 
   if (referrers.length === 0) return [];
   const shown = referrers.slice(0, EXAMPLE_IDS).join(", ");
   const more = referrers.length > EXAMPLE_IDS ? `, +${referrers.length - EXAMPLE_IDS} more` : "";
-  return [{ kind: "dangling_reference", target: `${kind}:${name}`, message: `${kind} "${name}" is still referenced by ${referrers.length} ${by}: ${shown}${more}` }];
+  return [{ kind: "dangling_reference", target: `${kind}:${name}`, message: `${kind.replace("_", " ")} "${name}" is still referenced by ${referrers.length} ${by}: ${shown}${more}` }];
 }
 
 /** A constellation names a participant when it is an end of one of its relationships. */
@@ -767,10 +767,37 @@ function namesParticipant(constellation: World["constellations"][number], id: st
   return constellation.relationships.some((r) => r.from === id || r.to === id);
 }
 
-async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, name: string, ctx: ToolHandlerContext | undefined): Promise<Record<string, unknown>> {
+/** The kinds whose delete is refused while referenced (use_case is referenced by nothing). */
+export const FORCE_ENTITY_KINDS = ["persona", "dimension", "data_object", "entity", "constellation", "relationship_type"] as const;
+
+export function acceptsForce(kind: string): boolean {
+  return (FORCE_ENTITY_KINDS as readonly string[]).includes(kind);
+}
+
+async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, name: string, force: boolean, ctx: ToolHandlerContext | undefined): Promise<Record<string, unknown>> {
   const notFound = (): ToolError => new ToolError("not_found", `${kind.replace("_", " ")} "${name}" was not found`);
   let path: string;
   let warnings: Warning[] = [];
+  let invalidCases: { id: string; error: string }[] = [];
+
+  // Called after the scan and before the write: refuses a referenced entry or an incomplete check unless forced.
+  // `scansCases` is true when this delete's scan reads the case files (relationship_type never does).
+  const gate = (scansCases: boolean, scanned: Warning[]): void => {
+    if (force) return;
+    const referenced = scanned.filter((w) => w.kind === "dangling_reference");
+    if (referenced.length > 0) {
+      throw new ToolError("conflict", `${referenced.map((w) => w.message).join("; ")} — remove these references first (set_use_cases), or pass force: true to delete anyway`);
+    }
+    if (scansCases && invalidCases.length > 0) {
+      const files = invalidCases.slice(0, EXAMPLE_IDS).map((f) => `usecases/cases/${f.id}.json`).join(", ");
+      const more = invalidCases.length > EXAMPLE_IDS ? `, +${invalidCases.length - EXAMPLE_IDS} more` : "";
+      throw new ToolError(
+        "conflict",
+        `cannot safely delete ${kind.replace("_", " ")} "${name}" — reference check is incomplete because the following case file(s) failed to load: ${files}${more} — repair them, or pass force: true to delete anyway`,
+      );
+    }
+  };
+  let casesScanned = false;
 
   if (kind === "use_case") {
     path = caseFile(name);
@@ -781,7 +808,8 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
     const world = await store.readWorld();
     if (kind === "entity") {
       if (!world.entities.some((e) => e.id === name)) throw notFound();
-      const [pool, { useCases }] = await Promise.all([store.readPersonaPool(), store.readUseCases()]);
+      const [pool, { useCases, invalid }] = await Promise.all([store.readPersonaPool(), store.readUseCases()]);
+      invalidCases = invalid;
       const entitiesAfter = world.entities.filter((e) => e.id !== name);
       // A persona with the same id still resolves the reference: nothing dangles then.
       const stillResolves = resolveParticipant(name, pool.personas, entitiesAfter) !== undefined;
@@ -790,20 +818,26 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
           ...dangling("entity", name, world.constellations.filter((c) => namesParticipant(c, name)).map((c) => c.id), "constellation(s)"),
           ...dangling("entity", name, useCases.filter((u) => stateSubjectsOf(u).has(name)).map((u) => u.id), "use case(s) as a state, condition or trigger subject"),
         ];
+        casesScanned = true;
       }
+      gate(casesScanned, warnings);
       await store.writeWorld({ ...world, entities: entitiesAfter });
     } else if (kind === "constellation") {
       if (!world.constellations.some((c) => c.id === name)) throw notFound();
-      const { useCases } = await store.readUseCases();
+      const { useCases, invalid } = await store.readUseCases();
+      invalidCases = invalid;
+      casesScanned = true;
       const referrers = useCases.flatMap((u) => [
         ...(u.constellations.includes(name) ? [u.id] : []),
         ...(u.variants ?? []).filter((v) => v.constellations?.includes(name)).map((v) => `${u.id}#${v.id}`),
       ]);
       warnings = dangling("constellation", name, referrers, "use case(s) or variant(s)");
+      gate(casesScanned, warnings);
       await store.writeWorld({ ...world, constellations: world.constellations.filter((c) => c.id !== name) });
     } else {
       if (!world.relationship_types.some((t) => t.id === name)) throw notFound();
       warnings = dangling("relationship_type", name, world.constellations.filter((c) => c.relationships.some((r) => r.type === name)).map((c) => c.id), "constellation(s)");
+      gate(false, warnings);
       await store.writeWorld({ ...world, relationship_types: world.relationship_types.filter((t) => t.id !== name) });
     }
   } else if (kind === "persona" || kind === "dimension") {
@@ -811,7 +845,9 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
     const pool = await store.readPersonaPool();
     const list: { id: string }[] = kind === "persona" ? pool.personas : pool.dimensions;
     if (!list.some((item) => item.id === name)) throw notFound();
-    const { useCases } = await store.readUseCases();
+    const { useCases, invalid } = await store.readUseCases();
+    invalidCases = invalid;
+    casesScanned = true;
     const world = await store.readWorld();
     if (kind === "persona") {
       const personasAfter = pool.personas.filter((p) => p.id !== name);
@@ -822,6 +858,7 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
         ...(stillResolves ? [] : dangling("persona", name, useCases.filter((u) => stateSubjectsOf(u).has(name)).map((u) => u.id), "use case(s) as a state, condition or trigger subject")),
         ...(stillResolves ? [] : dangling("persona", name, world.constellations.filter((c) => namesParticipant(c, name)).map((c) => c.id), "constellation(s)")),
       ];
+      gate(casesScanned, warnings);
       await store.writePersonaPool({ dimensions: pool.dimensions, personas: personasAfter });
     } else {
       warnings = [
@@ -831,13 +868,16 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
         ...dangling("dimension", name, world.constellations.filter((c) => ownValue(c.traits, name) !== undefined).map((c) => c.id), "constellation(s)"),
         ...dangling("dimension", name, world.relationship_types.filter((t) => t.same_traits?.includes(name)).map((t) => t.id), "relationship type(s) via same_traits"),
       ];
+      gate(casesScanned, warnings);
       await store.writePersonaPool({ dimensions: pool.dimensions.filter((d) => d.id !== name), personas: pool.personas });
     }
   } else {
     path = OBJECTS_FILE;
     const objects = await store.readDataObjects();
     if (!objects.some((o) => o.id === name)) throw notFound();
-    const { useCases } = await store.readUseCases();
+    const { useCases, invalid } = await store.readUseCases();
+    invalidCases = invalid;
+    casesScanned = true;
     const world = await store.readWorld();
     warnings = [
       ...dangling("data_object", name, useCases.filter((u) => objectIdsOf(u).has(name)).map((u) => u.id), "use case(s)"),
@@ -845,11 +885,21 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
       ...dangling("data_object", name, world.entities.filter((e) => e.object === name).map((e) => e.id), "entity(ies)"),
       ...dangling("data_object", name, world.relationship_types.filter((t) => t.field?.object === name).map((t) => t.id), "relationship type(s) via field"),
     ];
+    gate(casesScanned, warnings);
     await store.writeDataObjects(objects.filter((o) => o.id !== name));
   }
 
+  // Only reached with force (or nothing wrong): an incomplete check is reported like list_use_cases does.
+  let invalidCount: number | undefined;
+  if (casesScanned && invalidCases.length > 0) {
+    warnings = [
+      ...warnings,
+      ...invalidCases.slice(0, 10).map((file): Warning => ({ kind: "invalid_file", target: `use_case:${file.id}`, message: `usecases/cases/${file.id}.json is not loaded: ${file.error}` })),
+    ];
+    if (invalidCases.length > 10) invalidCount = invalidCases.length;
+  }
   const commitResult = await commitUseCaseWrite(store, ctx, "delete_entity", `${kind}:${name}`, [path]);
-  return { kind, name, path, ...commitFields(commitResult), warnings };
+  return { kind, name, path, ...commitFields(commitResult), warnings, ...(invalidCount !== undefined ? { invalid_file_count: invalidCount } : {}) };
 }
 
 // Public entry points: invalid files become invalid_state; every writer runs one at a time per store.
@@ -861,5 +911,5 @@ export const setUseCases = (store: Store, input: SetUseCasesInput, ctx?: ToolHan
   guarded(() => serialized(store, () => setUseCasesInner(store, input, ctx)));
 export const generatePersonas = (store: Store, input: GeneratePersonasInput, ctx?: ToolHandlerContext): Promise<Record<string, unknown>> =>
   guarded(() => serialized(store, () => generatePersonasInner(store, input, ctx)));
-export const deleteUseCaseEntity = (store: Store, kind: UseCaseEntityKind, name: string, ctx?: ToolHandlerContext): Promise<Record<string, unknown>> =>
-  guarded(() => serialized(store, () => deleteUseCaseEntityInner(store, kind, name, ctx)));
+export const deleteUseCaseEntity = (store: Store, kind: UseCaseEntityKind, name: string, force: boolean, ctx?: ToolHandlerContext): Promise<Record<string, unknown>> =>
+  guarded(() => serialized(store, () => deleteUseCaseEntityInner(store, kind, name, force, ctx)));

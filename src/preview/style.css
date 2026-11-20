@@ -6300,6 +6300,71 @@ body:has(#settings-menu:not([hidden])) #update-notice {
   font-weight: 500;
 }
 
+.uc-person.is-orphan .uc-person-name {
+  color: var(--chrome-warning);
+}
+
+.uc-orphan-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--ui-xs);
+  color: var(--chrome-warning);
+}
+
+.uc-orphan-note .icon,
+.uc-trait.is-orphan .icon {
+  font-size: var(--size-icon-sm);
+}
+
+.uc-trait.is-orphan {
+  align-items: center;
+  border: 1px dashed var(--chrome-warning);
+  color: var(--chrome-warning);
+}
+
+.uc-relation-end.is-orphan,
+.uc-relation-type .is-orphan,
+.uc-participant.is-orphan,
+.uc-trigger-actor.is-orphan,
+.uc-step-data.is-orphan,
+.uc-io-head .uc-orphan-note {
+  color: var(--chrome-warning);
+}
+
+.uc-relation-end.is-orphan,
+.uc-relation-type .is-orphan {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}
+
+.uc-relation-end.is-orphan .icon {
+  font-size: var(--size-icon-sm);
+}
+
+.uc-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.uc-gap-box.uc-orphan-box {
+  border-color: var(--chrome-warning);
+}
+
+/* The note sits in the 3-column data grid: it spans the row instead of taking the first cell. */
+.uc-step-data.is-orphan > .uc-orphan-note {
+  grid-column: 1 / -1;
+}
+
 .uc-person-sub {
   font-size: var(--ui-xs);
   color: var(--chrome-text-tertiary);

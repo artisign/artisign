@@ -6,6 +6,19 @@ import { traitChip } from "./usecases-parts.js";
 import { entityAvatar } from "./usecases-world-parts.js";
 import { initials, plural } from "./usecases-data.js";
 import { constellationMembers } from "./usecases-world-data.js";
+import { hiddenNote } from "./usecases-orphans.js";
+
+/**
+ * An entity's data object. One the pool no longer has is marked as missing; that is only said while the pool has data objects at all
+ * (the tool raises it only while data-objects.json exists, and the preview cannot tell an absent file from an empty list otherwise).
+ */
+function objectCell(entity, pool) {
+  if (entity.object === undefined) return none();
+  if (pool.objectsById?.size > 0 && !pool.objectsById.has(entity.object)) {
+    return h("span", { class: "uc-orphan-note", dataset: { orphan: "entity_object" }, title: "This data object no longer exists" }, entity.object, icon("warning"), hiddenNote("this data object no longer exists"));
+  }
+  return entity.object;
+}
 
 export const WORLD_PARTS = [
   { id: "entities", label: "Entities", hint: "things with identity" },
@@ -85,7 +98,7 @@ export function renderWorldPage(root, { world, pool, selected, error = "", handl
       h("td", null, e.type ?? none()),
       h("td", { class: "uc-mono" }, e.id),
       h("td", null, traits(pool, e.traits)),
-      h("td", { class: "uc-mono" }, e.object ?? none()),
+      h("td", { class: "uc-mono" }, objectCell(e, pool)),
     ),
   );
   const types = world.relationship_types.map((t) =>

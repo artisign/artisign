@@ -696,10 +696,10 @@ export function matchesPersonaQuery(persona, query) {
 
 // --- Messages -----------------------------------------------------------------------------------------------------
 
-/** One short line for a write response's warnings: "2 warnings. Saving is never blocked." */
-export function warningSummary(warnings, count) {
+/** One short line for a write response's warnings: "2 warnings. Saving is never blocked." (a delete says just "2 warnings.") */
+export function warningSummary(warnings, count, { deleted = false } = {}) {
   const n = count ?? warnings?.length ?? 0;
-  return n === 0 ? "" : `${plural(n, "warning")}. Saving is never blocked.`;
+  return n === 0 ? "" : deleted ? `${plural(n, "warning")}.` : `${plural(n, "warning")}. Saving is never blocked.`;
 }
 
 export function errorMessage(error) {

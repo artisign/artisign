@@ -92,7 +92,7 @@ describe("world consistency warnings (CHR-1149)", () => {
 
   it("keeps the data model on when the last data object is deleted (the file stays)", async () => {
     await setUseCases(fx.store, { dimensions: DIMENSIONS, personas: PERSONAS, ...WORLD, data_objects: [BOOK_COPY], use_cases: [borrowCase()] });
-    await deleteEntity(fx.store, { kind: "data_object", name: "book-copy" });
+    await deleteEntity(fx.store, { kind: "data_object", name: "book-copy", force: true });
     expect(await hasFile("data-objects.json")).toBe(true);
     expect(kindsOf(await getUseCase(fx.store, { id: "borrow-a-book" }))).toContain("unknown_data_object");
   });

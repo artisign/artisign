@@ -194,3 +194,52 @@ describe("text safety", () => {
     expect($(".uc-story-cell p b")).toBeNull();
   });
 });
+
+describe("orphans (CHR-1125): what the case names but the pools lack", () => {
+  const ORPHAN_WARNINGS = [
+    { kind: "unknown_dimension", target: "use_case:map-step#agent", message: '"when" names unknown dimension "actor"' },
+    { kind: "unknown_persona", target: "use_case:map-step", message: 'persona "dana" does not exist' },
+  ];
+  const variantCtx = { bundle: { ...variantBundle, warnings: ORPHAN_WARNINGS }, base: { ...baseBundle, warnings: ORPHAN_WARNINGS }, variantId: "agent" };
+  const pool = () => {
+    const full = makePool();
+    const dimensionsById = new Map(full.dimensionsById);
+    dimensionsById.delete("actor");
+    return { ...full, dimensions: full.dimensions.filter((d) => d.id !== "actor"), dimensionsById };
+  };
+
+  it("marks a condition on a deleted dimension and says why it matches nobody", () => {
+    render({ ...variantCtx, pool: pool() });
+    const chip = $(".uc-applies .uc-trait.is-orphan");
+    expect(chip.dataset.orphan).toBe("dimension");
+    expect(chip.title).toBe("This dimension no longer exists");
+    expect($(".uc-visually-hidden", chip).textContent).toContain("no longer exists");
+    expect($(".uc-applies").textContent).toContain("a condition names a dimension that no longer exists");
+  });
+
+  it("marks a persona missing from the pool", () => {
+    const full = makePool();
+    const personasById = new Map(full.personasById);
+    personasById.delete("dana");
+    render({ ...variantCtx, pool: { ...full, personas: full.personas.filter((p) => p.id !== "dana"), personasById } });
+    const orphan = $(".uc-person.is-orphan");
+    expect(orphan.dataset.orphan).toBe("persona");
+    expect(orphan.textContent).toContain("Missing from the persona pool");
+  });
+
+  it("the coverage card never says every trait value is covered while such warnings exist, and names what is orphaned", () => {
+    render({ ...variantCtx, pool: pool(), suggest: { coverage: [] } });
+    const panel = $(".uc-coverage");
+    expect(panel.textContent).not.toContain("Every trait value the persona pool uses is covered");
+    const box = $(".uc-orphan-box", panel);
+    expect(box.textContent).toContain("agent: actor");
+    expect(box.textContent).toContain("dana");
+    expect($("code", box).textContent).toBe("Repair the missing references in map-step");
+  });
+
+  it("without those warnings the card still reports full coverage", () => {
+    render({ bundle: variantBundle, base: baseBundle, variantId: "agent", suggest: { coverage: [{ dimension: "size", covered: ["small", "medium", "large"], uncovered: [] }, { dimension: "actor", covered: ["human", "agent"], uncovered: [] }] } });
+    expect($(".uc-coverage").textContent).toContain("Every trait value the persona pool uses is covered");
+    expect($(".uc-orphan-box")).toBeNull();
+  });
+});

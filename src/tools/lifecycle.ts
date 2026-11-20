@@ -23,7 +23,7 @@ import { danglingBackdropWarnings } from "./backdrop.js";
 import { readVariantLinks } from "./variants.js";
 import { nodeToSubtree, convertToComponentInstance, subtreesStructurallyEqual } from "./node-convert.js";
 import { deleteMockupEntity } from "./mockups.js";
-import { deleteUseCaseEntity, isUseCaseEntityKind, type UseCaseEntityKind } from "./usecases.js";
+import { acceptsForce, deleteUseCaseEntity, isUseCaseEntityKind, type UseCaseEntityKind } from "./usecases.js";
 import { slotStylingWarnings } from "./definition-checks.js";
 import { checkNewTokenMembers, checkNewComponentName } from "./name-collision.js";
 import { assertValidEntityName, assertValidVariantName } from "./name-validation.js";
@@ -541,7 +541,7 @@ export async function promoteToSystem(store: Store, input: PromoteToSystemInput)
 // L4 delete_entity
 // ---------------------------------------------------------------------------
 
-export type DeleteEntityInput = { kind: "screen" | "component" | "pattern" | "mockup" | UseCaseEntityKind; name: string; variant?: string; cascade?: boolean };
+export type DeleteEntityInput = { kind: "screen" | "component" | "pattern" | "mockup" | UseCaseEntityKind; name: string; variant?: string; cascade?: boolean; force?: boolean };
 
 /** Drops a deleted component's/pattern's `set_meta` usage text so a later same-name entity doesn't inherit it. Writes nothing when there is none. */
 async function dropUsageMeta(store: Store, kind: "component" | "pattern", name: string): Promise<void> {
@@ -707,8 +707,11 @@ export async function deleteEntity(store: Store, input: DeleteEntityInput, ctx?:
   if (input.cascade === true && input.kind !== "screen") {
     throw new ToolError("validation_failed", "cascade only applies to kind \"screen\"");
   }
+  if (input.force === true && !acceptsForce(input.kind)) {
+    throw new ToolError("validation_failed", "force only applies to kinds persona, dimension, data_object, entity, constellation, relationship_type");
+  }
   if (isUseCaseEntityKind(input.kind)) {
-    return deleteUseCaseEntity(store, input.kind, input.name, ctx);
+    return deleteUseCaseEntity(store, input.kind, input.name, input.force === true, ctx);
   }
   if (input.kind === "component") return deleteComponent(store, input.name);
   if (input.kind === "pattern") return deletePattern(store, input.name);

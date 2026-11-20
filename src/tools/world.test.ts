@@ -210,7 +210,7 @@ describe("world pool (ADR-011)", () => {
     });
 
     it("deletes an entity from world.json and warns about the constellations naming it", async () => {
-      const res = await deleteEntity(fx.store, { kind: "entity", name: "leo" });
+      const res = await deleteEntity(fx.store, { kind: "entity", name: "leo", force: true });
       expect(res).toMatchObject({ kind: "entity", name: "leo", path: "usecases/world.json" });
       expect(res.warnings).toEqual([expect.objectContaining({ kind: "dangling_reference", target: "entity:leo", message: expect.stringContaining("one-parent-one-child") })]);
       expect((await fx.store.readWorld()).entities.map((e) => e.id)).toEqual(["policy-liability"]);
@@ -218,13 +218,13 @@ describe("world pool (ADR-011)", () => {
     });
 
     it("deletes a relationship type and warns about the constellations using it", async () => {
-      const res = await deleteEntity(fx.store, { kind: "relationship_type", name: "parent-of" });
+      const res = await deleteEntity(fx.store, { kind: "relationship_type", name: "parent-of", force: true });
       expect(res.warnings).toEqual([expect.objectContaining({ kind: "dangling_reference", target: "relationship_type:parent-of", message: expect.stringContaining("one-parent-one-child") })]);
       expect((await fx.store.readWorld()).relationship_types.map((t) => t.id)).toEqual(["holds", "insures"]);
     });
 
     it("deletes a constellation without a warning", async () => {
-      const res = await deleteEntity(fx.store, { kind: "constellation", name: "one-parent-one-child" });
+      const res = await deleteEntity(fx.store, { kind: "constellation", name: "one-parent-one-child", force: true });
       expect(res).toMatchObject({ kind: "constellation", path: "usecases/world.json", warnings: [] });
       expect((await fx.store.readWorld()).constellations).toEqual([]);
     });
@@ -238,18 +238,18 @@ describe("world pool (ADR-011)", () => {
     });
 
     it("extends the persona, dimension and data_object scans to the world", async () => {
-      const persona = await deleteEntity(fx.store, { kind: "persona", name: "maria" });
+      const persona = await deleteEntity(fx.store, { kind: "persona", name: "maria", force: true });
       expect(persona.warnings).toEqual([expect.objectContaining({ target: "persona:maria", message: expect.stringContaining("constellation") })]);
 
-      const dimension = await deleteEntity(fx.store, { kind: "dimension", name: "household" });
+      const dimension = await deleteEntity(fx.store, { kind: "dimension", name: "household", force: true });
       const messages = (dimension.warnings as { message: string }[]).map((w) => w.message).join("\n");
       expect(messages).toContain("constellation(s)"); // constellation trait
       expect(messages).toContain("relationship type(s) via same_traits");
 
-      const age = await deleteEntity(fx.store, { kind: "dimension", name: "age-group" });
+      const age = await deleteEntity(fx.store, { kind: "dimension", name: "age-group", force: true });
       expect((age.warnings as { message: string }[])[0]!.message).toContain("entity(ies)");
 
-      const object = await deleteEntity(fx.store, { kind: "data_object", name: "policy" });
+      const object = await deleteEntity(fx.store, { kind: "data_object", name: "policy", force: true });
       const objectMessages = (object.warnings as { message: string }[]).map((w) => w.message).join("\n");
       expect(objectMessages).toContain("entity(ies)");
       expect(objectMessages).toContain("relationship type(s) via field");
@@ -313,7 +313,7 @@ describe("world.json in preview commits (ctx.source: human)", () => {
 
   it("commits the world.json a world delete rewrote", async () => {
     await setUseCases(store, WORLD);
-    await deleteEntity(store, { kind: "relationship_type", name: "insures" }, human);
+    await deleteEntity(store, { kind: "relationship_type", name: "insures", force: true }, human);
     expect(await git("log", "-1", "--format=%s")).toBe("delete_entity (preview): relationship_type:insures");
     expect(await lastFiles()).toEqual(["usecases/world.json"]);
   });

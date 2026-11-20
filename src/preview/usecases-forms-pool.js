@@ -1,6 +1,7 @@
 // Use Cases tab — the small forms: persona, dimension, data object, and "Generate from dimensions" (dry-run preview, then
 // create). All write through set_use_cases / generate_personas / delete_entity, the same tools the MCP server offers;
-// reference problems come back as warnings and never block. Payload builders are exported for the tests.
+// a save's reference problems come back as warnings; a delete of an entry that is still referenced is refused until the human chooses
+// "Delete anyway". Payload builders are exported for the tests.
 
 import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
@@ -9,6 +10,7 @@ import { KIND_ICONS } from "./usecases-world-data.js";
 import { AVATAR_COLORS, AVATAR_EMOJIS, FIELD_TYPES, slugify, uniqueId, isValidId, initials, formatExampleValue, parseExampleValue, plural, formatCount } from "./usecases-data.js";
 
 const REMOVE_NOTE = "Nothing is repaired: use cases that still name it keep a warning.";
+const REFUSE_NOTE = "If something still refers to it, the delete is refused and you can review what first.";
 
 // --- Pure payload builders --------------------------------------------------------------------------------------------
 
@@ -98,21 +100,65 @@ export function footer(dialog, { saveLabel, onSave, onDelete, deleteLabel, note 
   return save;
 }
 
-/** Delete with an inline confirm line in the footer; the entity's referrers come back as warnings, nothing blocks. */
+const humanize = (id) => {
+  const words = String(id).replace(/[-_]+/g, " ").trim();
+  return words ? words[0].toUpperCase() + words.slice(1) : String(id);
+};
+/** "borrow-book" -> "Borrow book"; "borrow-book#staff-lee" -> "Borrow book, variant staff lee". */
+const humanRef = (ref) => {
+  const [base, variant] = ref.split("#");
+  return variant ? `${humanize(base)}, variant ${variant.replace(/[-_]+/g, " ")}` : humanize(base);
+};
+const noun = (text, n) => text.replace(/y\(ies\)/g, n === 1 ? "y" : "ies").replace(/\(s\)/g, n === 1 ? "" : "s");
+
+/**
+ * The human sentence for a refused delete (`conflict` of delete_entity), built from the groups of the server message
+ * (`<kind> "<id>" is still referenced by <n> <what>: <ids>`): "Staff lee is still used by 1 use case: Borrow book." The server message
+ * itself, written for agents, is unchanged. `name` is the entry's display name; without it the id is made readable.
+ */
+export function refusalText(message, name) {
+  const files = /failed to load: (.*?) — repair/.exec(message);
+  if (message.startsWith("cannot safely delete") && files) return `The reference check is incomplete: ${files[1]} could not be read.`;
+  const groups = message.split(" — ")[0].split("; ");
+  const sentences = groups.map((group, index) => {
+    const m = /^\S+(?: \S+)? "(.+?)" is still referenced by (\d+) (.+?): (.+)$/.exec(group);
+    if (!m) return `${group.charAt(0).toUpperCase()}${group.slice(1)}.`;
+    const [, id, count, what, refs] = m;
+    const n = Number(count);
+    const more = /, \+(\d+) more$/.exec(refs);
+    const list = refs.replace(/, \+\d+ more$/, "").split(", ").map(humanRef).join(", ") + (more ? ` and ${more[1]} more` : "");
+    const subject = index === 0 ? humanize(name ?? id) : "It";
+    return `${subject} ${index === 0 ? "is" : "is also"} still used by ${n} ${noun(what, n)}: ${list}.`;
+  });
+  return sentences.join(" ");
+}
+
+/**
+ * Delete with an inline confirm line in the footer. A referenced entry is refused by the server (`conflict`): the dialog then
+ * lists what refers to it and offers "Delete anyway", which repeats the delete with force; without that second choice
+ * `remove` is never called with force.
+ */
 export function confirmDeleteInline(dialog, { name, remove, done, used = "" }) {
-  dialog.setMessage(`Delete ${name}? ${used ? `${used} ` : ""}${REMOVE_NOTE}`, "warning");
+  const finish = async (force) => {
+    const response = await remove(force);
+    if (!response.ok) {
+      if (!force && response.code === "conflict") return offerForce(response.message);
+      return dialog.setMessage(response.message, "error");
+    }
+    dialog.setDirty(false);
+    dialog.close(done(response));
+  };
+  const offerForce = (message) => {
+    dialog.setMessage(`${refusalText(message, name)} Delete anyway leaves these references broken. ${REMOVE_NOTE}`, "warning");
+    dialog.showActions([
+      { label: "Keep it", autofocus: true, onClick: () => dialog.restoreActions() },
+      { label: "Delete anyway", id: "delete-anyway", danger: true, onClick: () => finish(true) },
+    ]);
+  };
+  dialog.setMessage(`Delete ${name}? ${used ? `${used} ` : ""}${REFUSE_NOTE} ${REMOVE_NOTE}`, "warning");
   dialog.showActions([
     { label: "Keep it", autofocus: true, onClick: () => dialog.restoreActions() },
-    {
-      label: `Delete ${name}`,
-      danger: true,
-      onClick: async () => {
-        const response = await remove();
-        if (!response.ok) return dialog.setMessage(response.message, "error");
-        dialog.setDirty(false);
-        dialog.close(done(response));
-      },
-    },
+    { label: `Delete ${name}`, danger: true, onClick: () => finish(false) },
   ]);
 }
 
@@ -225,7 +271,7 @@ export async function openPersonaDialog(options) {
     saveLabel: mode === "new" ? "Create persona" : "Save persona",
     onSave: save,
     deleteLabel: "Delete",
-    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.name, remove: () => options.remove(source.id), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
+    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.name, remove: (force) => (force ? options.remove(source.id, true) : options.remove(source.id)), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
   });
   drawAvatar();
   drawSwatches();
@@ -295,7 +341,7 @@ export async function openDimensionDialog(options) {
     saveLabel: mode === "new" ? "Create dimension" : "Save dimension",
     onSave: save,
     deleteLabel: "Delete",
-    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.label, remove: () => options.remove(source.id), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
+    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.label, remove: (force) => (force ? options.remove(source.id, true) : options.remove(source.id)), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
   });
   drawValues();
   const closed = dialog.open();
@@ -376,7 +422,7 @@ export async function openObjectDialog(options) {
     saveLabel: mode === "new" ? "Create data object" : "Save data object",
     onSave: save,
     deleteLabel: "Delete",
-    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.name, remove: () => options.remove(source.id), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
+    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.name, remove: (force) => (force ? options.remove(source.id, true) : options.remove(source.id)), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
   });
   drawFields();
   const closed = dialog.open();

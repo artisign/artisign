@@ -35,6 +35,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   problems are warnings and never block a write; states and conditions are stored and shown, never evaluated.
   The Use Cases tab has read views and editors for the world.
 
+### Bugfixes
+
+- `delete_entity` with `variant` on any kind other than `mockup` now fails with `validation_failed` and deletes
+  nothing; before, the parameter was ignored for the use-case kinds and the whole entity was deleted.
+
 ## [2.2.1] - 2026-11-14
 
 An agent skill on how to design with artisign, mockup variants in `patch_html` and `inspect_node`,

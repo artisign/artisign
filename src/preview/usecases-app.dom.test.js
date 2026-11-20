@@ -631,8 +631,8 @@ describe("world pool", () => {
     await openTab();
     $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
     await flush();
-    expect($$(".uc-world-steps button").map((b) => b.textContent)).toEqual(["addNew entity", "addNew relationship type", "addNew constellation", "Generate constellations"]);
-    $$(".uc-world-steps button").find((b) => b.textContent.endsWith("New constellation")).click();
+    expect($$(".uc-guide-steps button").map((b) => b.textContent)).toEqual(["addNew entity", "addNew relationship type", "addNew constellation", "Generate constellations"]);
+    $$(".uc-guide-steps button").find((b) => b.textContent.endsWith("New constellation")).click();
     await flush();
     expect(document.querySelector("dialog h1").textContent).toBe("New constellation");
   });

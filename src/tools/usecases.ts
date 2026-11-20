@@ -205,14 +205,30 @@ function invalidCaseWarnings(invalid: UseCaseFileIssue[]): Warning[] {
   return invalid.map((file): Warning => ({ kind: "invalid_file", target: `use_case:${file.id}`, message: `usecases/cases/${file.id}.json is not loaded: ${file.error}` }));
 }
 
-/** A reference to an id whose entry was skipped is not "missing": say the entry is unreadable, so nobody re-creates it blindly. */
+/** The messages of the "unknown …" warnings, each with the id they quote and the pool lists that id would have lived in. */
+const UNKNOWN_REFERENCES: { pattern: RegExp; lists: PoolEntryIssue["list"][] }[] = [
+  { pattern: /^persona "([^"]+)" does not exist$/, lists: ["personas"] },
+  { pattern: /^data object "([^"]+)" does not exist$/, lists: ["objects"] },
+  { pattern: /^constellation "([^"]+)" does not exist$/, lists: ["constellations"] },
+  { pattern: /^"([^"]+)" in relationship ".*" is neither a persona nor an entity$/, lists: ["personas", "entities"] },
+  { pattern: /^state subject "([^"]+)" is neither a persona, an entity nor "system"$/, lists: ["personas", "entities"] },
+  { pattern: /^trait "([^"]+)" is not a defined dimension$/, lists: ["dimensions"] },
+  { pattern: /^"when" names unknown dimension "([^"]+)"$/, lists: ["dimensions"] },
+  { pattern: /^same_traits names "([^"]+)", which is not a defined dimension$/, lists: ["dimensions"] },
+];
+
+/** A reference to an id whose entry was skipped is not "missing": say the entry is unreadable, so nobody re-creates it blindly. Exact id and list, never a substring of the message. */
 function markSkipped(warnings: Warning[], issues: PoolEntryIssue[]): Warning[] {
-  const skipped = issues.filter((issue) => issue.id !== undefined);
-  if (skipped.length === 0) return warnings;
+  if (!issues.some((issue) => issue.id !== undefined)) return warnings;
   return warnings.map((warning) => {
-    if (!/^unknown_/.test(warning.kind)) return warning;
-    const hit = skipped.find((issue) => warning.message.includes(`"${issue.id}"`));
-    return hit ? { ...warning, message: `${warning.message} (its entry in ${hit.file} is invalid and not loaded)` } : warning;
+    if (!warning.kind.startsWith("unknown_")) return warning;
+    for (const { pattern, lists } of UNKNOWN_REFERENCES) {
+      const id = pattern.exec(warning.message)?.[1];
+      if (id === undefined) continue;
+      const hit = issues.find((issue) => issue.id === id && lists.includes(issue.list));
+      return hit ? { ...warning, message: `${warning.message} (its entry in ${hit.file} is invalid and not loaded)` } : warning;
+    }
+    return warning;
   });
 }
 

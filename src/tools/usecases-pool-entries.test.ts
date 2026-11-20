@@ -101,6 +101,18 @@ describe("use-case pool files — invalid entries on the read path", () => {
     expect(more.invalid_pool_entry_count).toBe(12);
   });
 
+  it("marks only the exact skipped id, not an id it is a prefix of", async () => {
+    await setUseCases(fx.store, { use_cases: [{ ...BORROW, id: "prefix", personas: ["ana", "ana-staff"], steps: [{ id: "tap", actor: "ana", action: "Taps" }] }] });
+    await poolJson({ dimensions: DIMENSIONS, personas: [{ id: "ana" }] });
+    const bundle = (await getUseCase(fx.store, { id: "prefix" })) as GetRes;
+    const unknown = bundle.warnings.filter((w) => w.kind === "unknown_persona");
+    const marked = (id: string): boolean => unknown.filter((w) => w.message.startsWith(`persona "${id}" does not exist`)).every((w) => w.message.includes("is invalid and not loaded"));
+    expect(unknown.some((w) => w.message.startsWith('persona "ana" does not exist'))).toBe(true);
+    expect(unknown.some((w) => w.message.startsWith('persona "ana-staff" does not exist'))).toBe(true);
+    expect(marked("ana")).toBe(true);
+    expect(unknown.filter((w) => w.message.startsWith('persona "ana-staff" does not exist')).some((w) => w.message.includes("is invalid and not loaded"))).toBe(false);
+  });
+
   it("says a skipped entry is unreadable where a case refers to it", async () => {
     await poolJson({ dimensions: DIMENSIONS, personas: [{ id: "member-ana" }] });
     const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as GetRes;

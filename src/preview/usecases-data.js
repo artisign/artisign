@@ -34,15 +34,6 @@ export function triggerKey(trigger) {
   return JSON.stringify([t.text ?? "", t.actor ?? null, t.via ?? null, t.at ?? null, t.state ?? null]);
 }
 
-/**
- * The trigger to store after the text was edited. A stored structured trigger keeps actor / via / state / at and only its
- * text changes (never overwritten by a string); an untouched trigger is written back exactly as stored.
- */
-export function triggerWithText(stored, text, original) {
-  if (stored !== null && typeof stored === "object") return text === original ? stored : { ...stored, text };
-  return text;
-}
-
 /** Lowercase kebab-case id from free text ("Map a Step!" -> "map-a-step"); "" when nothing usable is left. */
 export function slugify(text) {
   return String(text ?? "")

@@ -5,6 +5,7 @@
 import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
 import { segmented, avatar } from "./usecases-parts.js";
+import { KIND_ICONS } from "./usecases-world-data.js";
 import { AVATAR_COLORS, AVATAR_EMOJIS, FIELD_TYPES, slugify, uniqueId, isValidId, initials, formatExampleValue, parseExampleValue, plural, formatCount } from "./usecases-data.js";
 
 const REMOVE_NOTE = "Nothing is repaired: use cases that still name it keep a warning.";
@@ -23,6 +24,7 @@ export function buildPersonaPayload({ id, draft, source }) {
   const payload = {
     id,
     name: draft.name.trim(),
+    ...(draft.kind !== "" ? { kind: draft.kind } : source?.kind !== undefined ? { kind: null } : {}),
     ...(Object.keys(avatar).length > 0 || source?.avatar !== undefined ? { avatar } : {}),
     traits,
     ...(draft.role.trim() !== "" ? { role: draft.role.trim() } : source?.role !== undefined ? { role: null } : {}),
@@ -50,7 +52,14 @@ export function buildDimensionPayload({ id, draft, source }) {
   if (new Set(values.map((v) => v.id)).size !== values.length) errors.push("Two values share an id.");
   if (errors.length > 0) return { errors };
   return {
-    payload: { id, label: draft.label.trim(), values, ...(draft.description.trim() !== "" ? { description: draft.description.trim() } : source?.description !== undefined ? { description: null } : {}) },
+    payload: {
+      id,
+      label: draft.label.trim(),
+      values,
+      // `scope` is written when it is not the default or the dimension already stores one: a stored file never gains a key by accident.
+      ...(draft.scope === "constellations" || source?.scope !== undefined ? { scope: draft.scope } : {}),
+      ...(draft.description.trim() !== "" ? { description: draft.description.trim() } : source?.description !== undefined ? { description: null } : {}),
+    },
   };
 }
 
@@ -81,17 +90,17 @@ export function buildObjectPayload({ id, draft, source }) {
 
 // --- Shared bits ------------------------------------------------------------------------------------------------------
 
-function footer(dialog, { saveLabel, onSave, onDelete, deleteLabel }) {
+export function footer(dialog, { saveLabel, onSave, onDelete, deleteLabel, note }) {
   const save = h("button", { type: "button", class: "chrome-btn chrome-btn--primary", onClick: onSave }, saveLabel);
   const list = [{ label: "Cancel", onClick: () => dialog.requestClose() }, save];
-  if (onDelete) list.unshift(h("button", { type: "button", class: "chrome-btn uc-btn-danger uc-btn-start", onClick: onDelete }, deleteLabel));
+  if (onDelete) list.unshift(h("button", { type: "button", class: "chrome-btn uc-btn-danger uc-btn-start", onClick: onDelete }, deleteLabel), ...(note ? [note] : []));
   dialog.setActions(list);
   return save;
 }
 
 /** Delete with an inline confirm line in the footer; the entity's referrers come back as warnings, nothing blocks. */
-function confirmDeleteInline(dialog, { name, remove, done }) {
-  dialog.setMessage(`Delete ${name}? ${REMOVE_NOTE}`, "warning");
+export function confirmDeleteInline(dialog, { name, remove, done, used = "" }) {
+  dialog.setMessage(`Delete ${name}? ${used ? `${used} ` : ""}${REMOVE_NOTE}`, "warning");
   dialog.showActions([
     { label: "Keep it", autofocus: true, onClick: () => dialog.restoreActions() },
     {
@@ -119,6 +128,8 @@ export async function openPersonaDialog(options) {
   const draft = {
     name: source?.name ?? "",
     role: source?.role ?? "",
+    // A persona stored without a kind stays without one until the select is used; a new one starts as a human (the design's default).
+    kind: source?.kind ?? (mode === "new" ? "human" : ""),
     emoji: source?.avatar?.emoji ?? (mode === "new" ? "🧑" : ""),
     // Edit mode keeps the stored colour as stored (a named colour included, "" when there is none); only a swatch click changes it.
     color: mode === "edit" ? source?.avatar?.color ?? "" : source?.avatar?.color || AVATAR_COLORS[pool.personas.length % AVATAR_COLORS.length],
@@ -154,12 +165,18 @@ export async function openPersonaDialog(options) {
   const roles = [...new Set(pool.personas.map((p) => p.role).filter(Boolean))];
   const roleInput = textInput({ value: draft.role, list: roleListId, placeholder: "Designer", onInput: (value) => { draft.role = value; touch(); } });
   const idInput = textInput({ value: id, mono: true, readonly: mode === "edit", placeholder: "derived from the name", onInput: (value) => { id = value; idTouched = true; touch(); } });
+  const kindIcon = h("span", { class: "uc-kind-preview" });
+  const drawKind = () => kindIcon.replaceChildren(...(KIND_ICONS[draft.kind] ? [icon(KIND_ICONS[draft.kind].icon)] : []));
+  const kindSelect = selectInput({ options: [{ value: "", label: "Not stated" }, ...Object.entries(KIND_ICONS).map(([value, spec]) => ({ value, label: spec.label }))], value: draft.kind, ariaLabel: "Kind", onChange: (value) => { draft.kind = value; drawKind(); touch(); } });
   const hint = h("p", { class: "uc-hint", role: "status" });
 
-  const traitRows = pool.dimensions.map((dimension) => {
-    const select = selectInput({ options: [{ value: "", label: "Any" }, ...dimension.values.map((v) => ({ value: v.id, label: v.label }))], value: draft.traits[dimension.id] ?? "", ariaLabel: dimension.label, onChange: (value) => { draft.traits[dimension.id] = value; touch(); } });
-    return h("div", { class: "uc-trait-row" }, h("span", { class: "uc-trait-label" }, dimension.label), select);
-  });
+  // Personas are described by persona-scoped dimensions; a trait on a dimension of the other scope that is already stored still shows, labelled with its scope.
+  const traitRows = pool.dimensions
+    .filter((dimension) => (dimension.scope ?? "personas") === "personas" || draft.traits[dimension.id] !== undefined)
+    .map((dimension) => {
+      const select = selectInput({ options: [{ value: "", label: "Any" }, ...dimension.values.map((v) => ({ value: v.id, label: v.label }))], value: draft.traits[dimension.id] ?? "", ariaLabel: dimension.label, onChange: (value) => { draft.traits[dimension.id] = value; touch(); } });
+      return h("div", { class: "uc-trait-row" }, h("span", { class: "uc-trait-label" }, dimension.label, (dimension.scope ?? "personas") === "personas" ? null : h("span", { class: "uc-label-hint" }, " · constellations")), select);
+    });
   const goalsArea = textArea({ value: draft.goals, rows: 4, placeholder: "Find the screen a step maps to", onInput: (value) => { draft.goals = value; touch(); } });
   const descArea = textArea({ value: draft.description, rows: 2, placeholder: "Designs screens and writes use cases for them.", onInput: (value) => { draft.description = value; touch(); } });
   const generatedBox = source?.generated ? h("label", { class: "uc-check" }, h("input", { type: "checkbox", checked: true, onChange: (e) => { draft.generated = e.target.checked; touch(); } }), "Mark as generated from dimensions") : null;
@@ -196,9 +213,9 @@ export async function openPersonaDialog(options) {
     h(
       "div",
       { class: "uc-form" },
-      h("div", { class: "uc-persona-form-top" }, h("div", { class: "uc-avatar-edit" }, avatarButton, swatches), h("div", { class: "uc-persona-form-fields" }, h("div", { class: "uc-form-row" }, field("Name", nameInput), field("Role", roleInput), h("datalist", { id: roleListId }, roles.map((r) => h("option", { value: r })))), field("ID", idInput, { hint: mode === "edit" ? "fixed once used" : "from the name, stable once used" }))),
+      h("div", { class: "uc-persona-form-top" }, h("div", { class: "uc-avatar-edit" }, avatarButton, swatches), h("div", { class: "uc-persona-form-fields" }, h("div", { class: "uc-form-row" }, field("Name", nameInput), field("Role", roleInput), h("datalist", { id: roleListId }, roles.map((r) => h("option", { value: r })))), h("div", { class: "uc-kind-row" }, field("Kind", kindSelect, { hint: "optional, shown as an icon next to the name" }), kindIcon), field("ID", idInput, { hint: mode === "edit" ? "fixed once used" : "from the name, stable once used" }))),
       picker,
-      h("div", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Traits", h("span", { class: "uc-label-hint" }, " · leave a dimension on Any to stand for all its values")), pool.dimensions.length === 0 ? h("p", { class: "uc-muted" }, "No dimensions yet. Add some in the Personas view to give personas traits.") : traitRows, hint),
+      h("div", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Traits", h("span", { class: "uc-label-hint" }, " · leave a dimension on Any to stand for all its values")), traitRows.length === 0 ? h("p", { class: "uc-muted" }, "No dimensions yet. Add some in the Personas view to give personas traits.") : traitRows, hint),
       field("Description", descArea),
       field("Goals", goalsArea, { hint: "one per line" }),
       generatedBox,
@@ -212,6 +229,7 @@ export async function openPersonaDialog(options) {
   });
   drawAvatar();
   drawSwatches();
+  drawKind();
   const closed = dialog.open();
   refresh();
   await closed;
@@ -222,7 +240,7 @@ export async function openPersonaDialog(options) {
 
 export async function openDimensionDialog(options) {
   const { mode, source } = options;
-  const draft = { label: source?.label ?? "", description: source?.description ?? "", values: (source?.values ?? [{ id: "", label: "" }, { id: "", label: "" }]).map((v) => ({ id: v.id, label: v.label, fixed: Boolean(v.id) })) };
+  const draft = { label: source?.label ?? "", description: source?.description ?? "", scope: source?.scope ?? "personas", values: (source?.values ?? [{ id: "", label: "" }, { id: "", label: "" }]).map((v) => ({ id: v.id, label: v.label, fixed: Boolean(v.id) })) };
   const dialog = createDialog({ title: mode === "new" ? "New dimension" : "Edit dimension", chip: source?.id });
   let id = source?.id ?? "";
   let idTouched = mode === "edit";
@@ -234,6 +252,7 @@ export async function openDimensionDialog(options) {
   const labelInput = textInput({ value: draft.label, autofocus: true, placeholder: "Project size", onInput: (value) => { draft.label = value; if (!idTouched) { id = uniqueId(slugify(value), options.takenIds()); idInput.value = id; } touch(); } });
   const idInput = textInput({ value: id, mono: true, readonly: mode === "edit", placeholder: "derived from the label", onInput: (value) => { id = value; idTouched = true; touch(); } });
   const descInput = textInput({ value: draft.description, onInput: (value) => { draft.description = value; touch(); } });
+  const scopeControl = segmented({ label: "Describes", name: "scope", value: draft.scope, options: [{ value: "personas", label: "Personas" }, { value: "constellations", label: "Constellations" }], onChange: (value) => { draft.scope = value; touch(); } });
   const valuesBox = h("div", { class: "uc-values-edit" });
   const drawValues = (focus = null) => {
     valuesBox.replaceChildren(
@@ -271,7 +290,7 @@ export async function openDimensionDialog(options) {
     dialog.setDirty(false);
     dialog.close(result);
   }
-  dialog.body.append(h("div", { class: "uc-form" }, h("div", { class: "uc-form-row" }, field("Label", labelInput), field("ID", idInput, { hint: mode === "edit" ? "fixed once used" : undefined })), field("Description", descInput), h("div", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Values", h("span", { class: "uc-label-hint" }, " · the ways users differ along this dimension")), valuesBox)));
+  dialog.body.append(h("div", { class: "uc-form" }, h("div", { class: "uc-form-row" }, field("Label", labelInput), field("ID", idInput, { hint: mode === "edit" ? "fixed once used" : undefined })), field("Description", descInput), field("Describes", scopeControl, { hint: "personas are people and actors, constellations are starting worlds" }), h("div", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Values", h("span", { class: "uc-label-hint" }, " · the ways users differ along this dimension")), valuesBox)));
   const saveButton = footer(dialog, {
     saveLabel: mode === "new" ? "Create dimension" : "Save dimension",
     onSave: save,
@@ -366,38 +385,66 @@ export async function openObjectDialog(options) {
   return result;
 }
 
-// --- Generate personas ------------------------------------------------------------------------------------------------
+// --- Generate from dimensions -----------------------------------------------------------------------------------------
+
+const TARGETS = {
+  personas: { noun: "persona", plural: "personas", scopeText: "traits on other dimensions are ignored", lede: "Expands your dimensions into generic personas. Existing personas that already cover a combination are skipped. Preview first: nothing is written until you create.", none: "No persona-scoped dimensions. Only persona-scoped dimensions apply here.", covered: "personas" },
+  constellations: { noun: "constellation", plural: "constellations", scopeText: "only those with the scope Constellations", lede: "Expands the dimensions with the scope Constellations into starting worlds. A combination an existing constellation already covers is skipped. Nothing is written until you create.", none: "No constellation-scoped dimensions. Give a dimension the scope Constellations first.", covered: "constellations" },
+};
 
 /**
- * "Generate from dimensions": strategy, which dimensions, a limit; a dry run lists what would be created before anything is written.
- * @param {{ pool: () => any, generate: (input: Record<string, any>) => Promise<any> }} options
- * @returns {Promise<{ created: number, data: any } | null>}
+ * "Generate from dimensions": personas or constellations (the target switch), strategy, which dimensions, a limit; a dry run lists what
+ * would be created before anything is written. Only the dimensions whose scope matches the target are offered.
+ * @param {{ pool: () => any, generate: (input: Record<string, any>) => Promise<any>, target?: "personas" | "constellations" }} options
+ * @returns {Promise<{ created: number, target: string, data: any } | null>}
  */
 export async function openGenerateDialog(options) {
-  // Persona generation expands persona-scoped dimensions only (constellation-scoped ones belong to target "constellations").
   const full = options.pool();
-  const pool = { ...full, dimensions: full.dimensions.filter((d) => (d.scope ?? "personas") === "personas") };
-  const state = { strategy: "pairwise", dimensions: new Set(pool.dimensions.map((d) => d.id)), limit: "100", preview: null };
-  const dialog = createDialog({ title: "Generate personas from dimensions" });
+  const scoped = (target) => full.dimensions.filter((d) => (d.scope ?? "personas") === target);
+  const state = { target: options.target ?? "personas", strategy: "pairwise", dimensions: new Set(), limit: "100", preview: null };
+  state.dimensions = new Set(scoped(state.target).map((d) => d.id));
+  const dialog = createDialog({ title: "Generate from dimensions" });
   let result = null;
   const previewBox = h("div", { class: "uc-preview", "aria-live": "polite" });
+  const text = () => TARGETS[state.target];
   const invalidate = () => {
     state.preview = null;
     previewBox.replaceChildren();
     createButton.disabled = true;
+    createButton.textContent = `Create ${text().plural}`;
     dialog.setMessage("");
   };
-  const input = (dryRun) => ({ strategy: state.strategy, ...(state.dimensions.size < pool.dimensions.length ? { dimensions: [...state.dimensions] } : {}), limit: Math.max(1, Math.min(5000, Number.parseInt(state.limit, 10) || 100)), ...(dryRun ? { dry_run: true } : {}) });
+  const input = (dryRun) => ({
+    strategy: state.strategy,
+    ...(state.target === "constellations" ? { target: "constellations" } : {}),
+    ...(state.dimensions.size < scoped(state.target).length ? { dimensions: [...state.dimensions] } : {}),
+    limit: Math.max(1, Math.min(5000, Number.parseInt(state.limit, 10) || 100)),
+    ...(dryRun ? { dry_run: true } : {}),
+  });
 
+  const targetControl = segmented({ label: "Generate", name: "target", value: state.target, options: [{ value: "personas", label: "Personas" }, { value: "constellations", label: "Constellations" }], onChange: (value) => { state.target = value; state.dimensions = new Set(scoped(value).map((d) => d.id)); drawDimensions(); invalidate(); } });
+  const lede = h("p", { class: "uc-page-lede" });
   const strategy = segmented({ label: "Strategy", name: "strategy", value: state.strategy, options: [{ value: "pairwise", label: "Pairwise (recommended)" }, { value: "all", label: "All combinations" }], onChange: (value) => { state.strategy = value; invalidate(); } });
   const limit = textInput({ value: state.limit, ariaLabel: "Limit", onInput: (value) => { state.limit = value; invalidate(); } });
   limit.type = "number";
   limit.min = "1";
   limit.max = "5000";
-  const dims = h("div", { class: "uc-gen-dims" }, pool.dimensions.map((d) => h("label", { class: "uc-check" }, h("input", { type: "checkbox", checked: true, onChange: (e) => { if (e.target.checked) state.dimensions.add(d.id); else state.dimensions.delete(d.id); invalidate(); previewButton.disabled = state.dimensions.size === 0; } }), `${d.label} (${d.values.length})`)));
+  const dims = h("div", { class: "uc-gen-dims" });
+  const dimsField = h("div", { class: "uc-field" });
+  const drawDimensions = () => {
+    const list = scoped(state.target);
+    const other = full.dimensions.filter((d) => !list.includes(d));
+    fill(
+      dims,
+      ...list.map((d) => h("label", { class: "uc-check" }, h("input", { type: "checkbox", checked: true, onChange: (e) => { if (e.target.checked) state.dimensions.add(d.id); else state.dimensions.delete(d.id); invalidate(); previewButton.disabled = state.dimensions.size === 0; } }), `${d.label} (${d.values.length})`)),
+      list.length === 0 ? h("p", { class: "uc-muted", role: "status" }, text().none) : null,
+      other.length > 0 ? h("p", { class: "uc-form-note" }, `${other.map((d) => d.label).join(", ")} ${other.length === 1 ? "has" : "have"} the scope ${state.target === "personas" ? "Constellations" : "Personas"} and ${other.length === 1 ? "is" : "are"} not offered here.`) : null,
+    );
+    fill(dimsField, h("span", { class: "uc-label" }, "Dimensions", h("span", { class: "uc-label-hint" }, ` · ${text().scopeText}`)), dims);
+    lede.textContent = text().lede;
+    previewButton.disabled = state.dimensions.size === 0;
+  };
   const previewButton = h("button", { type: "button", class: "chrome-btn", onClick: runPreview }, icon("visibility"), "Preview");
-  previewButton.disabled = state.dimensions.size === 0;
-  const noDimensions = pool.dimensions.length === 0 ? h("p", { class: "uc-muted", role: "status" }, "No persona-scoped dimensions. Only persona-scoped dimensions apply here.") : null;
   const createButton = h("button", { type: "button", class: "chrome-btn chrome-btn--primary", disabled: true, onClick: create }, "Create personas");
 
   async function runPreview() {
@@ -409,15 +456,17 @@ export async function openGenerateDialog(options) {
     const data = response.data;
     state.preview = data;
     dialog.setMessage("");
-    const list = data.personas ?? [];
+    const list = data.constellations ?? data.personas ?? [];
+    const noun = text();
     fill(
       previewBox,
-      h("p", { class: "uc-preview-summary" }, h("strong", null, `${formatCount(data.would_create ?? 0)} would be created`), ` · ${formatCount(data.total ?? 0)} ${data.strategy === "all" ? "combinations" : "value pairs"} in total · ${formatCount(data.skipped_covered ?? 0)} already covered by existing personas${data.truncated ? " · cut off by the limit" : ""}`),
+      h("p", { class: "uc-preview-summary" }, h("strong", null, `${formatCount(data.would_create ?? 0)} would be created`), ` · ${formatCount(data.total ?? 0)} ${data.strategy === "all" ? "combinations" : "value pairs"} in total · ${formatCount(data.skipped_covered ?? 0)} already covered by existing ${noun.covered}${data.truncated ? " · cut off by the limit" : ""}`),
       data.partial ? h("p", { class: "uc-field-warn", role: "status" }, (data.warnings ?? []).find((w) => w.kind === "partial_result")?.message ?? "This is only part of the full result: narrow the dimensions and preview again.") : null,
       list.length === 0 ? h("p", { class: "uc-muted" }, "Nothing to create: every combination is already covered.") : h("ul", { class: "uc-preview-list" }, list.slice(0, 12).map((p) => h("li", null, h("span", { class: "uc-preview-name" }, p.name), h("span", { class: "uc-muted uc-mono" }, Object.entries(p.traits ?? {}).map(([k, v]) => `${k}=${v}`).join(" ")))), list.length > 12 ? h("li", { class: "uc-muted" }, `… and ${formatCount((data.would_create ?? list.length) - 12)} more`) : null),
+      state.target === "constellations" && list.length > 0 ? h("p", { class: "uc-form-note" }, icon("info"), "Generated constellations start without relationships. Add them in each constellation.") : null,
     );
     createButton.disabled = (data.would_create ?? list.length) === 0;
-    createButton.textContent = `Create ${plural(data.would_create ?? list.length, "persona")}`;
+    createButton.textContent = `Create ${plural(data.would_create ?? list.length, noun.noun)}`;
   }
 
   async function create() {
@@ -427,14 +476,14 @@ export async function openGenerateDialog(options) {
       createButton.disabled = false;
       return dialog.setMessage(response.message, "error");
     }
-    result = { created: response.data.created ?? 0, data: response.data };
+    result = { created: response.data.created ?? 0, target: state.target, data: response.data };
     dialog.close(result);
   }
 
-  dialog.body.append(
-    h("div", { class: "uc-form" }, h("p", { class: "uc-page-lede" }, "Expands your dimensions into generic personas. Existing personas that already cover a combination are skipped. Preview first: nothing is written until you create."), field("Strategy", strategy), field("Dimensions", pool.dimensions.length === 0 ? noDimensions : dims, { hint: "traits on other dimensions are ignored" }), field("Limit", limit, { hint: "at most 5,000" }), h("div", { class: "uc-gen-preview-row" }, previewButton), previewBox),
-  );
+  dialog.body.append(h("div", { class: "uc-form" }, field("Generate", targetControl), lede, field("Strategy", strategy), dimsField, field("Limit", limit, { hint: "at most 5,000" }), h("div", { class: "uc-gen-preview-row" }, previewButton), previewBox));
   dialog.setActions([{ label: "Close", onClick: () => dialog.close(null) }, createButton]);
+  drawDimensions();
+  invalidate();
   const closed = dialog.open();
   await closed;
   return result;

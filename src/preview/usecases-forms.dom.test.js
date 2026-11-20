@@ -381,14 +381,16 @@ describe("persona dialog", () => {
     expect(button("Create persona").disabled).toBe(true);
     type($("dialog input[autofocus]"), "Sol");
     const selects = $$("dialog select");
-    type(selects[0], "large"); // size: Large project (Dex has it) ...
-    type(selects[1], "3plus".replace("3plus", "")); // ... children stays Any
+    expect(selects[0].getAttribute("aria-label")).toBe("Kind"); // a new persona starts as a human
+    expect(selects[0].value).toBe("human");
+    type(selects[1], "large"); // size: Large project (Dex has it) ...
+    type(selects[2], ""); // ... the next dimension stays Any
     expect($(".uc-hint").hidden).toBe(true);
     type(document.querySelectorAll("dialog textarea")[1], "Find cover\nNever ask twice"); // [0] is the description
     button("Create persona").click();
     const result = await closed;
     expect(result.id).toBe("sol");
-    expect(save.mock.calls[0][0]).toMatchObject({ id: "sol", name: "Sol", traits: { size: "large" }, goals: ["Find cover", "Never ask twice"] });
+    expect(save.mock.calls[0][0]).toMatchObject({ id: "sol", name: "Sol", kind: "human", traits: { size: "large" }, goals: ["Find cover", "Never ask twice"] });
   });
 
   it("keeps a stored named colour byte-identical on save, and a swatch click still sets the colour", async () => {

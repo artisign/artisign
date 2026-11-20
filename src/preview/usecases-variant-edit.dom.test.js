@@ -52,13 +52,13 @@ beforeEach(() => {
 });
 
 describe("structure", () => {
-  it("has no JSON field: three sections below the condition, six override rows, every row inherited when nothing is overridden", async () => {
+  it("has no JSON field: four sections below the condition, seven override rows, every row inherited when nothing is overridden", async () => {
     await open();
     const card = variantCard(1); // "large": nothing overridden
     expect($$("textarea", card)).toHaveLength(0);
     expect(card.textContent).not.toContain("null"); // an absent child must never be drawn as the text "null"
-    expect($$(".uc-var-h", card).map((h) => h.firstChild.textContent)).toEqual(["Overrides", "Actor swaps", "Step changes"]);
-    expect($$(".uc-override-row", card).map((r) => r.querySelector(".uc-label").textContent)).toEqual(["Trigger", "Goal", "Outcome", "Personas", "Inputs", "Outputs"]);
+    expect($$(".uc-var-h", card).map((h) => h.firstChild.textContent)).toEqual(["Overrides", "Starting state", "Actor swaps", "Step and branch changes"]);
+    expect($$(".uc-override-row", card).map((r) => r.querySelector(".uc-label").textContent)).toEqual(["Trigger", "Goal", "Outcome", "Personas", "Constellations", "Inputs", "Outputs"]);
     expect($$(".uc-override-row", card).every((r) => r.dataset.state === "base")).toBe(true);
     expect($(".uc-inherited-value", row(card, "trigger")).textContent).toBe("Step has no target");
     expect($(".uc-inherited-from", row(card, "trigger")).textContent).toBe("From base");
@@ -311,8 +311,8 @@ describe("problems", () => {
     expect(id.getAttribute("aria-invalid")).toBe("true");
     const hint = document.getElementById(id.getAttribute("aria-describedby"));
     expect(hint.hidden).toBe(false);
-    expect(hint.textContent).toBe("pick is already a step in this flow. Give the new step another id.");
-    expect($(".uc-foot-msg").textContent).toBe('Variant "Large project", change 1: pick is already a step in this flow.');
+    expect(hint.textContent).toBe("pick is already step 2 of the main flow. Give the new step another id.");
+    expect($(".uc-foot-msg").textContent).toBe('Variant "Large project", change 1: pick is already step 2 of the main flow. Give the new step another id.');
     expect($(".uc-foot-msg").dataset.tone).toBe("error");
     expect(button("Save use case").disabled).toBe(true);
     type(id, "opens-it");

@@ -1,5 +1,5 @@
-// Branches (ADR-011) in the preview editors: the case's `branches` are never part of a save payload (the merge in set_use_cases
-// leaves them), and a variant's branch ops (no step_id) are written back exactly as stored, so such a case can still be saved.
+// Branches (ADR-011) in the preview editors: an untouched case sends no `branches` (the merge in set_use_cases leaves them), and a
+// variant's branch ops (no step_id) are written back as stored while nothing about them was edited, so such a case can still be saved.
 import { describe, it, expect } from "vitest";
 import { draftFromSource, buildPayload } from "./usecases-forms.js";
 import { rawUseCase } from "./usecases.test-helper.js";
@@ -55,7 +55,7 @@ describe("a save keeps branches", () => {
     const draft = draftFromSource(stored);
     const rows = draft.variants[0].ops.slice(firstBranchOp, firstBranchOp + 3);
     expect(rows.map((op) => [op.op, op.stepId, op.step])).toEqual([["add_branch", "", null], ["replace_branch", "", null], ["remove_branch", "", null]]);
-    expect(draft.branchStepIds).toEqual(["base-limit"]);
+    expect(draft.branches.flatMap((b) => b.steps.map((s) => s.id))).toEqual(["base-limit"]);
     draft.steps.push({ ...draft.steps[0], id: "", action: "base limit" });
     const built = buildPayload({ id: stored.id, draft, source: stored });
     expect(built.errors).toBeUndefined();

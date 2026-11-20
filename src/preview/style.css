@@ -10237,9 +10237,6 @@ button.uc-target:hover {
   color: var(--chrome-warning);
 }
 
-.uc-world-steps .uc-guide-actions {
-  margin-top: var(--space-md);
-}
 
 .uc-entity-usage {
   display: flex;

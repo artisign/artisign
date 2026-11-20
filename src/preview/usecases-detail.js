@@ -142,6 +142,7 @@ function variantPanel(ctx, variant, raw) {
   const conditions = whenEntries(variant.when, pool.dimensionsById);
   const personaWhen = Object.fromEntries(Object.entries(variant.when ?? {}).filter(([dimension]) => scopeOf(pool.dimensionsById.get(dimension)) !== "constellations"));
   const matches = matchingPersonas(personaWhen, pool.personas);
+  // Neither the spec (§11) nor the design says which constellations "matches N" counts. A variant only takes effect in the constellations of its own case, so the count is case-scoped: the constellations the case and its variants list (persona matches count against the whole persona pool, which is every persona that could play it).
   const worldMatches = matchingConstellations(variant.when, [...(ctx.base.constellations ?? []), ...(bundle.constellations ?? [])].filter((c, i, all) => all.findIndex((x) => x.id === c.id) === i), pool.dimensionsById);
   const hasWorldWhen = Object.keys(variant.when ?? {}).some((dimension) => scopeOf(pool.dimensionsById.get(dimension)) === "constellations");
   const matchText = [hasWorldWhen ? plural(worldMatches.length, "constellation") : null, matches.length > 0 || !hasWorldWhen ? plural(matches.length, "persona") : null].filter(Boolean).join(" and ");

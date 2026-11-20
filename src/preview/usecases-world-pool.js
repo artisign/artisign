@@ -49,7 +49,11 @@ function section(part, sub, body) {
 }
 
 /** The page: the empty guide for an empty world, else the three sections. */
-export function renderWorldPage(root, { world, pool, selected }) {
+export function renderWorldPage(root, { world, pool, selected, error = "" }) {
+  if (error) {
+    root.replaceChildren(h("div", { class: "uc-guide" }, h("h1", { class: "uc-guide-title" }, "The world could not be read"), h("p", { class: "uc-warn", role: "alert" }, error), h("p", { class: "uc-guide-lede" }, "Fix usecases/world.json or ask your agent to rewrite it.")));
+    return;
+  }
   if (isWorldEmpty(world)) {
     root.replaceChildren(
       h(

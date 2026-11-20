@@ -90,6 +90,7 @@ function stubDaemon() {
       return json(found ? { ...baseBundle, use_case: { ...baseBundle.use_case, id: found.id, title: found.title, group: found.group } } : baseBundle);
     }
     if (path === "/api/use-case") return json({ use_case: rawUseCase });
+    if (path === "/api/world" && store?.worldFail) return { ok: false, status: 422, json: async () => ({ code: "invalid_state", message: "usecases/world.json is not valid JSON" }) };
     if (path === "/api/world") return json(store?.world ?? { entities: [], relationship_types: [], constellations: [] });
     return json({});
   });
@@ -545,6 +546,22 @@ describe("world pool", () => {
     expect($$(".uc-cst").map((c) => c.querySelector(".uc-cst-name").textContent)).toEqual(["Single parent, one child", "Couple without children"]);
     expect($("#uc-add").hidden).toBe(true);
     expect($$("#usecases-view .uc-world-page button")).toHaveLength(0);
+  });
+
+  it("a world that cannot be read says so in the World tab, the filter menu and a toast, never an empty world", async () => {
+    store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements")], worldFail: true };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    expect($(".uc-toast").textContent).toContain("The world could not be read: usecases/world.json is not valid JSON");
+    $$(".uc-filter-chip-main").find((b) => b.textContent.startsWith("Constellation")).click();
+    await flush();
+    expect($(".uc-menu").textContent).toContain("The world could not be read");
+    expect($(".uc-menu").textContent).not.toContain("No constellations in the world yet.");
+    $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
+    await flush();
+    expect($(".uc-guide-title").textContent).toBe("The world could not be read");
+    expect($("[role=alert]").textContent).toBe("usecases/world.json is not valid JSON");
   });
 
   it("an empty world shows the guide instead of tables", async () => {

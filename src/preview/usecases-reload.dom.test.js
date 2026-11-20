@@ -173,6 +173,22 @@ describe("the selected mapping step", () => {
     expect($(".uc-mapping")).not.toBeNull();
     expect(selectedStep()).toBeNull();
   });
+
+  it("a focused branch step survives a reload too, and falls back when its branch is gone", async () => {
+    const branch = { id: "late", title: "Late", from: "tap", when: [{ subject: "system", property: "x", value: 1 }], steps: [{ id: "late-1", actor: "system", action: "Says it is late", target: { screen: "picker" } }] };
+    bundle = { ...baseBundle, use_case: { ...baseBundle.use_case, branches: [branch] } };
+    const view = await openView();
+    await toMapping();
+    $(".uc-map-step[data-step='late-1'] .uc-map-step-btn").click();
+    expect(selectedStep()).toBe("late-1");
+    view.onChange();
+    await settle();
+    expect(selectedStep()).toBe("late-1");
+    bundle = baseBundle;
+    view.onChange();
+    await settle();
+    expect(selectedStep()).toBeNull();
+  });
 });
 
 describe("a failed reload of a group", () => {

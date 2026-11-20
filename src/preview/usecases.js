@@ -41,6 +41,7 @@ import {
 import { avatar, statusDot } from "./usecases-parts.js";
 import { actorKind } from "./usecases-world-parts.js";
 import { renderWorldNav, renderWorldPage } from "./usecases-world-pool.js";
+import { flowSequence } from "./usecases-world-data.js";
 import { avatarOf } from "./usecases-data.js";
 
 const SECTIONS = [
@@ -83,6 +84,7 @@ export function createUseCasesView(options) {
   let coverageOpen = false;
   let selectedStep = null; // the mapping view's focused step: survives a reload while the step still exists
   let shownInvalid = ""; // key of the set of unreadable files the toast last reported
+  let shownWorldError = ""; // the world-read error the toast last said, so a reload does not repeat it
   let writeToast = false; // the visible toast is a write's confirmation
   let pendingInvalid = null; // an invalid-files report held back while a confirmation was visible
 
@@ -179,7 +181,7 @@ export function createUseCasesView(options) {
 
   function emptyPool() {
     // `world`: the stored world pool (GET /api/world); `constellations`: id -> name for the filter menu.
-    return { world: { entities: [], relationship_types: [], constellations: [] }, constellations: new Map(), personas: [], dimensions: [], objects: [], personasById: new Map(), dimensionsById: new Map(), objectsById: new Map(), counts: null, usage: Object.assign(new Map(), { complete: false }), loaded: false };
+    return { worldError: "", world: { entities: [], relationship_types: [], constellations: [] }, constellations: new Map(), personas: [], dimensions: [], objects: [], personasById: new Map(), dimensionsById: new Map(), objectsById: new Map(), counts: null, usage: Object.assign(new Map(), { complete: false }), loaded: false };
   }
 
   async function loadPool() {
@@ -191,8 +193,11 @@ export function createUseCasesView(options) {
       return;
     }
     const data = res.data;
-    // The world pool has its own read; a failed one leaves the pool empty and never blocks the rest.
+    // The world pool has its own read; a failed one never blocks the rest, and is said where the world shows (the World tab, the filter menu, a toast).
     pool.world = worldRes.ok ? worldRes.world : { entities: [], relationship_types: [], constellations: [] };
+    pool.worldError = worldRes.ok ? "" : errorMessage(worldRes);
+    if (pool.worldError && pool.worldError !== shownWorldError) showToast(`The world could not be read: ${pool.worldError}`, []);
+    shownWorldError = pool.worldError;
     pool.constellations = new Map(pool.world.constellations.map((c) => [c.id, c.name]));
     pool.personas = data.personas ?? [];
     pool.dimensions = data.dimensions ?? [];
@@ -504,7 +509,7 @@ export function createUseCasesView(options) {
         title: "Constellation · from the world pool",
         items: [...known].map(([value, label]) => ({ value, label, checked: filters.constellation === value })),
         filterable: true,
-        emptyText: "No constellations in the world yet.",
+        emptyText: pool.worldError ? `The world could not be read: ${pool.worldError}` : "No constellations in the world yet.",
         note: "Matches the case and its variants. No counts: a case can hold in several worlds.",
         onPick: (value) => {
           filters = { ...filters, constellation: value };
@@ -593,7 +598,7 @@ export function createUseCasesView(options) {
     const { id, variantId } = detail;
     const hadMapping = mode === "mapping";
     await openCase(id, variantId, { keepMode: true });
-    if (hadMapping && detail?.view) showMapping(detail.view.use_case.steps?.some((s) => s.id === selectedStep) ? selectedStep : null);
+    if (hadMapping && detail?.view) showMapping(flowSequence(detail.view.use_case.steps ?? [], detail.view.use_case.branches ?? []).some((item) => item.step.id === selectedStep) ? selectedStep : null);
   }
 
   function showMapping(stepId) {
@@ -702,7 +707,7 @@ export function createUseCasesView(options) {
 
   function renderWorld() {
     renderWorldNav(worldPanelEl, { world: pool.world, selected: selectedWorldPart, onSelect: (part) => { selectedWorldPart = part; renderWorld(); document.getElementById(`uc-world-${part}`)?.scrollIntoView?.({ block: "start" }); } });
-    if (section === "world" && mode !== "mapping") renderWorldPage(content, { world: pool.world, pool, selected: selectedWorldPart });
+    if (section === "world" && mode !== "mapping") renderWorldPage(content, { world: pool.world, pool, selected: selectedWorldPart, error: pool.worldError });
   }
 
   function renderPools() {

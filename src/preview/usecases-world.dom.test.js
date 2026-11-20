@@ -191,11 +191,29 @@ describe("variant view", () => {
   it("starting state: changed with the struck base value, added, unset from removed_state, the rest from base", () => {
     renderVariant();
     const rows = $$(".uc-state tbody tr");
-    expect(rows.map((r) => [r.dataset.key, r.dataset.change])).toEqual([["policy.premium", "changed"], ["system.connectivity", "base"], ["grandma.lives-in-household", "base"], ["maria.discount", "added"], ["leo.age", "removed"]]);
+    expect(rows.map((r) => [r.dataset.key, r.dataset.change])).toEqual([["policy.premium", "changed"], ["leo.age", "removed"], ["system.connectivity", "base"], ["grandma.lives-in-household", "base"], ["maria.discount", "added"]]);
     expect(text($$("td", rows[0])[1])).toBe("98 120");
     expect($("s", $$("td", rows[0])[1]).textContent).toBe("120");
-    expect(text($$("td", rows[4])[1])).toBe("Unset · base was 17");
+    expect(text($$("td", rows[1])[1])).toBe("Unset · base was 17");
     expect(text($("#uc-state-h").parentElement)).toContain("1 changed · 1 added · 1 unset · 2 from base");
+  });
+
+  it("object values of state entries read as JSON, never [object Object]", () => {
+    const bundle = { ...worldVariantBundle, use_case: { ...worldVariantBundle.use_case, state: [{ subject: "policy", property: "limits", value: { max: 5 }, change: "changed" }] }, removed_state: [{ subject: "leo", property: "tags", value: ["a", "b"], change: "removed" }] };
+    const base = { ...worldBundle, use_case: { ...baseCase, state: [{ subject: "policy", property: "limits", value: { max: 3 } }] } };
+    renderVariant({ bundle, base });
+    expect(text($(".uc-state tr[data-key='policy.limits'] td:nth-child(3)"))).toBe('{"max":5} {"max":3}');
+    expect(text($(".uc-state tr[data-key='leo.tags'] td:nth-child(3)"))).toBe("Unset · base was a, b");
+    expect(document.body.textContent).not.toContain("[object Object]");
+  });
+
+  it("a branch that is empty in the base is no emptied branch in a variant; one the variant emptied is", () => {
+    const emptyBase = { ...baseCase.branches[2], steps: [] };
+    const base = { ...worldBundle, use_case: { ...baseCase, branches: [baseCase.branches[0], baseCase.branches[1], emptyBase] } };
+    const bundle = { ...worldVariantBundle, use_case: { ...worldVariantBundle.use_case, branches: [baseCase.branches[0], { ...baseCase.branches[1], steps: [] }, { ...emptyBase }] }, removed_branches: [] };
+    renderVariant({ bundle, base });
+    expect($(".uc-lane-card[data-branch=adult]").dataset.change).toBe("");
+    expect($(".uc-lane-card[data-branch=rise]").dataset.change).toBe("emptied");
   });
 
   it("an inherited row keeps showing and a variant repeats no base warning", () => {

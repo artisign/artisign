@@ -27,6 +27,8 @@ import {
   triggerChanged,
   warningLine,
   conditionParts,
+  conditionValueText,
+  lanesAtStep,
 } from "./usecases-world-data.js";
 
 const dimensionOf = (ctx, id) => (ctx.bundle.dimensions ?? []).find((d) => d.id === id) ?? ctx.pool.dimensionsById.get(id);
@@ -187,8 +189,8 @@ export function stateSection(ctx, { rows, w, variantSelected }) {
     const message = unknown ? `${entry.subject} is neither a persona nor an entity. Add it to the world or correct the id.` : warningLine(warnings);
     const value =
       change === "removed"
-        ? h("span", null, "Unset · base was ", h("s", { class: "uc-mono" }, String(entry.value)))
-        : h("span", { class: "uc-mono" }, was ? [String(entry.value), " ", h("s", { class: "uc-old" }, String(was.value))] : String(entry.value));
+        ? h("span", null, "Unset · base was ", h("s", { class: "uc-mono" }, conditionValueText(entry.value)))
+        : h("span", { class: "uc-mono" }, was ? [conditionValueText(entry.value), " ", h("s", { class: "uc-old" }, conditionValueText(was.value))] : conditionValueText(entry.value));
     const struck = (text) => (change === "removed" ? h("s", null, text) : text);
     return h(
       "tr",
@@ -290,8 +292,7 @@ export function branchLane(ctx, entry, w, { change = null, base = null } = {}) {
 
 /** The lanes forking after a main-flow step (or before the first one, `stepId` null) as `<li>`s of the flow list. */
 export function lanesAt(ctx, numbered, stepId, w) {
-  const here = numbered.filter((e) => (stepId === null ? e.branch.from === undefined || e.dangling : e.branch.from === stepId && !e.dangling));
-  return here.map((entry) => h("li", { class: "uc-lane", dataset: { branch: entry.branch.id } }, branchLane(ctx, entry, w)));
+  return lanesAtStep(numbered, stepId).map((entry) => h("li", { class: "uc-lane", dataset: { branch: entry.branch.id } }, branchLane(ctx, entry, w)));
 }
 
 /** The lines under a main-flow step row: which branches fork here and which continue here. */

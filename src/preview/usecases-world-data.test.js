@@ -1,7 +1,7 @@
 // The pure logic of the world model views: conditions, branch numbering, the warning grammar, the variant differences and the
 // constellation-aware coverage matrix. Neutral insurance fixtures.
 import { describe, it, expect } from "vitest";
-import { conditionParts, numberBranches, flowSequence, forkText, branchEnd, warningsByTarget, stateRows, stateSummary, constellationRows, orphanText, whenWas, participant, matchingConstellations, whenScopeText } from "./usecases-world-data.js";
+import { conditionParts, numberBranches, flowSequence, forkText, branchEnd, warningsByTarget, stateRows, stateSummary, constellationRows, orphanText, whenWas, participant, branchLetter, lanesAtStep, matchingConstellations, whenScopeText } from "./usecases-world-data.js";
 import { coverageMatrix, variantChangeCount } from "./usecases-data.js";
 import { baseCase, constellations, dimensions, personas, entities, worldBundle, makeWorldPool } from "./usecases-world.test-helper.js";
 
@@ -32,6 +32,25 @@ describe("branch numbering", () => {
     expect(branchEnd(adult, baseCase.steps)).toEqual({ kind: "end", text: "Ends: The policy renews without Leo" });
     expect(branchEnd({ ...adult, outcome: undefined }, baseCase.steps).text).toBe("Ends the case");
     expect(branchEnd({ ...offline, rejoin: "gone" }, baseCase.steps).kind).toBe("warning");
+  });
+
+  it("every dangling fork shares one letter group, and letters continue after Z instead of wrapping", () => {
+    const dangling = (id, from) => ({ id, title: id, from, when: [], steps: [] });
+    const labels = numberBranches({ steps: baseCase.steps, branches: [dangling("a", "gone"), dangling("b", "other")] }).map((e) => e.label);
+    expect(labels).toEqual(["?A", "?B"]);
+    const many = Array.from({ length: 28 }, (_, i) => dangling(`b${i}`, "compare"));
+    const letters = numberBranches({ steps: baseCase.steps, branches: many }).map((e) => e.label);
+    expect(letters[25]).toBe("2Z");
+    expect(letters[26]).toBe("2AA");
+    expect(new Set(letters).size).toBe(28);
+    expect([0, 25, 26, 27, 51, 52].map(branchLetter)).toEqual(["A", "Z", "AA", "AB", "AZ", "BA"]);
+  });
+
+  it("lanesAtStep is the one placement rule: top for no or dangling fork, else after the fork step", () => {
+    const numbered = numberBranches({ steps: baseCase.steps, branches: [...baseCase.branches, { id: "x", title: "x", from: "gone", when: [], steps: [] }] });
+    expect(lanesAtStep(numbered, null).map((e) => e.branch.id)).toEqual(["offline", "x"]);
+    expect(lanesAtStep(numbered, "compare").map((e) => e.branch.id)).toEqual(["rise", "adult"]);
+    expect(lanesAtStep(numbered, "open")).toEqual([]);
   });
 
   it("flowSequence puts the leading branches first and each branch after its fork step", () => {
@@ -88,11 +107,22 @@ describe("participants", () => {
 
 describe("variant differences", () => {
   it("state rows: changed with the base entry, added, from base, and the unset ones after", () => {
-    const rows = stateRows({ state: [{ subject: "a", property: "p", value: 2, change: "changed" }, { subject: "b", property: "q", value: 1 }, { subject: "c", property: "r", value: 3, change: "added" }], removedState: [{ subject: "d", property: "s", value: 4, change: "removed" }], baseState: [{ subject: "a", property: "p", value: 1 }], variantSelected: true });
-    expect(rows.map((r) => r.change)).toEqual(["changed", "base", "added", "removed"]);
+    const rows = stateRows({ state: [{ subject: "a", property: "p", value: 2, change: "changed" }, { subject: "b", property: "q", value: 1 }, { subject: "c", property: "r", value: 3, change: "added" }], removedState: [{ subject: "d", property: "s", value: 4, change: "removed" }], baseState: [{ subject: "a", property: "p", value: 1 }, { subject: "d", property: "s", value: 4 }], variantSelected: true });
+    expect(rows.map((r) => r.change)).toEqual(["changed", "removed", "base", "added"]);
     expect(rows[0].was.value).toBe(1);
     expect(stateSummary(rows)).toBe("1 changed · 1 added · 1 unset · 1 from base");
     expect(stateRows({ state: [{ subject: "a", property: "p", value: 1 }], variantSelected: false })[0].change).toBeNull();
+  });
+
+  it("an unset row stands right after the base entry that preceded it, at the top when none of those is shown", () => {
+    const baseState = [{ subject: "a", property: "p", value: 1 }, { subject: "b", property: "q", value: 2 }, { subject: "c", property: "r", value: 3 }, { subject: "d", property: "s", value: 4 }];
+    const gone = (e) => ({ ...e, change: "removed" });
+    const rows = stateRows({ state: [baseState[0], baseState[2], baseState[3]], removedState: [gone(baseState[1])], baseState, variantSelected: true });
+    expect(rows.map((r) => [r.entry.subject, r.change])).toEqual([["a", "base"], ["b", "removed"], ["c", "base"], ["d", "base"]]);
+    const first = stateRows({ state: [baseState[1]], removedState: [gone(baseState[0])], baseState, variantSelected: true });
+    expect(first.map((r) => r.entry.subject)).toEqual(["a", "b"]);
+    const both = stateRows({ state: [baseState[3]], removedState: [gone(baseState[1]), gone(baseState[2])], baseState, variantSelected: true });
+    expect(both.map((r) => r.entry.subject)).toEqual(["b", "c", "d"]);
   });
 
   it("constellation rows: kept from base, added, removed with the members only the removed one had", () => {

@@ -32,12 +32,6 @@ export function conditionParts(condition) {
 
 const conditionKey = (c) => `${c.subject}.${c.property}`;
 
-/** Two condition lists say the same (same keys, operators and values, in any order). */
-export function sameConditions(a = [], b = []) {
-  const flat = (list) => list.map((c) => JSON.stringify([conditionKey(c), c.op ?? "eq", c.value])).sort().join("|");
-  return flat(a) === flat(b);
-}
-
 // --- Participants ---------------------------------------------------------------------------------------------
 
 export const KIND_ICONS = {
@@ -75,6 +69,13 @@ export function relationLabel(typeId, bundle) {
 
 // --- Branch numbering and placement -------------------------------------------------------------------------------
 
+/** A, B, … Z, then AA, AB, … (a spreadsheet's columns): the letters never wrap around to a used one. */
+export function branchLetter(n) {
+  let out = "";
+  for (let i = n + 1; i > 0; i = Math.floor((i - 1) / 26)) out = String.fromCharCode(65 + ((i - 1) % 26)) + out;
+  return out;
+}
+
 /**
  * The branches of an effective case with their design numbers: `<fork step number><letter>` (2A), no fork number before the first
  * step (A); the letters restart at every fork. A fork that is not a main-flow step (a dangling `from`) leads like "before the first
@@ -87,13 +88,19 @@ export function numberBranches(useCase) {
   return (useCase.branches ?? []).map((branch) => {
     const forkIndex = branch.from === undefined ? null : steps.findIndex((s) => s.id === branch.from);
     const dangling = branch.from !== undefined && forkIndex === -1;
-    const groupKey = branch.from === undefined ? "" : branch.from;
+    // One letter group per fork step; every branch with a dangling fork shares one group (they all lead, numbered "?A", "?B", …).
+    const groupKey = branch.from === undefined ? "" : dangling ? "?" : branch.from;
     const n = letters.get(groupKey) ?? 0;
     letters.set(groupKey, n + 1);
-    const letter = String.fromCharCode(65 + (n % 26));
+    const letter = branchLetter(n);
     const prefix = branch.from === undefined ? "" : dangling ? "?" : String(forkIndex + 1);
     return { branch, label: `${prefix}${letter}`, forkIndex: dangling ? null : forkIndex, forkStep: dangling || branch.from === undefined ? null : steps[forkIndex], dangling };
   });
+}
+
+/** The branches that sit at one place of the flow: after the main step `stepId`, or (`null`) at the top, before the first step (no `from`, or a `from` that is no main step). The one placement rule of the detail, the mapping view and the numbering. */
+export function lanesAtStep(numbered, stepId) {
+  return numbered.filter((e) => (stepId === null ? e.branch.from === undefined || e.dangling : e.branch.from === stepId && !e.dangling));
 }
 
 /**
@@ -104,14 +111,13 @@ export function numberBranches(useCase) {
 export function flowSequence(steps, branches = []) {
   const numbered = numberBranches({ steps, branches });
   const out = [];
-  const lanes = (stepId) => numbered.filter((e) => (stepId === null ? e.branch.from === undefined || e.dangling : e.branch.from === stepId && !e.dangling));
   const addLanes = (entries) => {
     for (const entry of entries) (entry.branch.steps ?? []).forEach((step, i) => out.push({ step, number: branchStepNumber(entry.label, i + 1), branch: entry }));
   };
-  addLanes(lanes(null));
+  addLanes(lanesAtStep(numbered, null));
   steps.forEach((step, i) => {
     out.push({ step, number: i + 1, branch: null });
-    addLanes(lanes(step.id));
+    addLanes(lanesAtStep(numbered, step.id));
   });
   return out;
 }
@@ -134,14 +140,6 @@ export function branchEnd(branch, steps) {
   const index = steps.findIndex((s) => s.id === branch.rejoin);
   if (index === -1) return { kind: "warning", text: `Continues at ${branch.rejoin}, which is not a main-flow step` };
   return { kind: "rejoin", text: `Continues at step ${index + 1} · ${steps[index].action}` };
-}
-
-/** Everything the main-flow step row says about branches: which fork here and which rejoin here. */
-export function branchesAtStep(numbered, stepId) {
-  return {
-    forks: numbered.filter((e) => e.branch.from === stepId && !e.dangling),
-    rejoins: numbered.filter((e) => e.branch.rejoin === stepId),
-  };
 }
 
 // --- Warnings at their targets (spec §6 grammar) ----------------------------------------------------------------
@@ -178,7 +176,7 @@ export function warningsByTarget(warnings, useCaseId, variantId) {
   return out;
 }
 
-/** The first warning of a list as one line, `null` when there is none. */
+/** The messages of a list of warnings joined into one line (a space between them); `null` when there are none. */
 export const warningLine = (list) => (list && list.length > 0 ? list.map((w) => w.message).join(" ") : null);
 
 // --- Starting state ---------------------------------------------------------------------------------------------
@@ -187,14 +185,25 @@ const stateKey = (e) => `${e.subject}.${e.property}`;
 
 /**
  * The rows of the starting-state table. Base: the entries as stored. A variant: the effective entries each flagged `changed`,
- * `added` or `base` (from base, with the base value of a changed one), plus the unset ones from `removed_state` after the entry they
- * followed in the base (or at the end).
+ * `added` or `base` (from base, with the base value of a changed one), plus the unset ones from `removed_state`, each right after the
+ * base entry that preceded it (at the top when none of its predecessors is shown).
  */
 export function stateRows({ state = [], removedState = [], baseState = [], variantSelected }) {
   if (!variantSelected) return state.map((entry) => ({ entry, change: null }));
   const baseByKey = new Map(baseState.map((e) => [stateKey(e), e]));
   const rows = state.map((entry) => ({ entry, change: entry.change ?? "base", was: entry.change === "changed" ? baseByKey.get(stateKey(entry)) : undefined }));
-  for (const entry of removedState) rows.push({ entry, change: "removed" });
+  const baseKeys = baseState.map(stateKey);
+  for (const entry of removedState) {
+    let at = 0;
+    for (let i = baseKeys.indexOf(stateKey(entry)) - 1; i >= 0; i--) {
+      const found = rows.findIndex((row) => stateKey(row.entry) === baseKeys[i]);
+      if (found >= 0) {
+        at = found + 1;
+        break;
+      }
+    }
+    rows.splice(at, 0, { entry, change: "removed" });
+  }
   return rows;
 }
 
@@ -241,7 +250,8 @@ export function branchRows({ numbered, baseBranches = [], removedBranches = [] }
   const rows = numbered.map((entry) => {
     const { branch } = entry;
     const base = baseById.get(branch.id);
-    const emptied = (branch.steps ?? []).length === 0;
+    // Emptied is something a variant did: the branch is empty now and had steps in the base (one that is empty in the base is not the variant's doing).
+    const emptied = (branch.steps ?? []).length === 0 && (base?.steps ?? []).length > 0;
     const change = emptied ? "emptied" : branch.change ?? "base";
     return { entry, change, base: change === "changed" ? base : undefined };
   });

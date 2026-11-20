@@ -9,7 +9,7 @@ import { avatar, targetChip, filterChip } from "./usecases-parts.js";
 import { createFittingIframe } from "./iframe-fit.js";
 import { updateInspectOverlay } from "./inspector.js";
 import { avatarOf, actorName, mappingFor, stepScope, changedKeys, formatValue, plural } from "./usecases-data.js";
-import { flowSequence, numberBranches } from "./usecases-world-data.js";
+import { flowSequence, lanesAtStep, numberBranches } from "./usecases-world-data.js";
 import { branchLabel } from "./usecases-world-parts.js";
 
 const FRAME_WIDTH = 240;
@@ -248,11 +248,10 @@ export function createMappingView({ root, fetchRender, handlers }) {
       );
     };
     const numbered = numberBranches(useCase);
-    const lanesAt = (stepId) => numbered.filter((e) => (stepId === null ? e.branch.from === undefined || e.dangling : e.branch.from === stepId && !e.dangling));
-    flowList.append(...lanesAt(null).map(branchBlock));
+    flowList.append(...lanesAtStep(numbered, null).map(branchBlock));
     sequence.filter((item) => !item.branch).forEach((item) => {
       flowList.append(stepItem(item));
-      flowList.append(...lanesAt(item.step.id).map(branchBlock));
+      flowList.append(...lanesAtStep(numbered, item.step.id).map(branchBlock));
     });
 
     const canvas = h("div", { class: "uc-map-canvas", tabindex: "0", "aria-label": "Mapped screens in flow order" });

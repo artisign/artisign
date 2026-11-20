@@ -87,12 +87,13 @@ export function buildPayload({ id, draft, source, nameOf = (participant) => part
   // The base flow with its generated ids, as the variants and the branches see it.
   const baseSteps = draft.steps.map((step, i) => ({ ...step, id: steps[i].id }));
   const branchIds = new Set(draft.branches.map((b) => b.id).filter(Boolean));
+  const variantIdsTaken = new Set(variantStepIds(draft.variants)); // a generated branch step id also avoids the steps the variants write
   const generated = new Map(); // the step ids of the branches built so far: a generated id never repeats one (one namespace, spec §2)
   const branches = draft.branches.map((branch, index) => {
     const others = draft.branches.filter((b) => b !== branch);
     const problems = [];
     const taken = new Map([...placesIn(baseModel({ steps: baseSteps, branches: others }, []), null), ...generated]);
-    const built = buildBranch(branch, { taken, ids: branchIds, errors: problems, fieldErrors: [], label: `Branch ${index + 1}`, lockId: branch.id !== "" });
+    const built = buildBranch(branch, { taken, ids: branchIds, errors: problems, fieldErrors: [], label: `Branch ${index + 1}`, lockId: branch.id !== "", avoid: variantIdsTaken });
     if (problems.length > 0) {
       errors.push(`Branch ${built.title || built.id}: ${problems[0]}`);
       fieldErrors.push({ path: `branch.${index}`, message: problems[0] });
@@ -100,10 +101,12 @@ export function buildPayload({ id, draft, source, nameOf = (participant) => part
     for (const step of built.steps) if (!taken.has(step.id)) generated.set(step.id, `a step of branch ${built.title || built.id}`);
     return built;
   });
+  // Variants see the built branches (their generated ids), and what they generate avoids those ids.
+  for (const built of branches) for (const step of built.steps) usedStepIds.add(step.id);
 
   const variantIds = new Set(draft.variants.map((v) => v.id).filter(Boolean));
   const variants = draft.variants.map((variant, index) => {
-    const built = buildVariant(variant, index, { baseSteps, baseBranches: draft.branches, usedStepIds, variantIds, nameOf });
+    const built = buildVariant(variant, index, { baseSteps, baseBranches: branches, usedStepIds, variantIds, nameOf });
     errors.push(...built.errors);
     fieldErrors.push(...built.fieldErrors);
     return built.out;

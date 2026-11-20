@@ -208,7 +208,8 @@ export function buildTrigger({ text, origText, shape, orig }, { path, label, err
   const t = text === origText ? text : text.trim();
   let value;
   if (shape.kind === "action" && shape.actor !== "") {
-    value = { text: t, actor: shape.actor, ...(shape.via.trim() !== "" ? { via: shape.via.trim() } : {}) };
+    const via = shape.via === orig?.via ? shape.via : shape.via.trim(); // an untouched via is written as stored
+    value = { text: t, actor: shape.actor, ...(via.trim() !== "" ? { via } : {}) };
   } else if (shape.kind === "state") {
     const conditions = buildConditions(shape.conditions, { path: `${path}.state`, label: `${label} condition`, errors, fieldErrors });
     const at = shape.at.trim();
@@ -246,6 +247,7 @@ export function branchDraft(branch) {
     outcome: outcome ?? "",
     origOutcome: outcome ?? "",
     origEnds: rejoin === undefined,
+    hadOutcome: outcome !== undefined,
     extra,
   };
 }
@@ -262,7 +264,7 @@ const written = (value, orig) => (value === orig ? value : value.trim());
  * place it lives in ("step 3 of the main flow", "step 2B.1 of branch 2B"); the branch's own steps share that one namespace
  * (spec §2). `ids` is the case's branch ids (a new branch needs a free one unless `lockId`).
  */
-export function buildBranch(draft, { taken, ids, errors, fieldErrors, label = "Branch", lockId = false }) {
+export function buildBranch(draft, { taken, ids, errors, fieldErrors, label = "Branch", lockId = false, avoid = new Set() }) {
   const title = written(draft.title, draft.origTitle);
   if (title.trim() === "") {
     errors.push(`${label} needs a title.`);
@@ -294,7 +296,7 @@ export function buildBranch(draft, { taken, ids, errors, fieldErrors, label = "B
       fieldErrors.push({ path: `branch.step.${i}.action`, message: "The step needs an action.", untilTouched: true });
     }
     const typed = step.id.trim();
-    const stepId = typed || uniqueId(slugify(step.action) || `step-${i + 1}`, new Set(used.keys()));
+    const stepId = typed || uniqueId(slugify(step.action) || `step-${i + 1}`, new Set([...used.keys(), ...avoid]));
     if (typed !== "" && !isValidId(typed)) {
       const message = `${typed} is not a valid id. Use lowercase letters, digits and dashes.`;
       errors.push(`${label} step ${i + 1}: ${message}`);
@@ -311,7 +313,9 @@ export function buildBranch(draft, { taken, ids, errors, fieldErrors, label = "B
   if (!draft.ends && draft.rejoin !== "") out.rejoin = draft.rejoin;
   const outcome = written(draft.outcome, draft.origOutcome);
   // An untouched end mode writes a stored outcome back as stored (even next to a rejoin); it only falls away when the user changed the mode.
-  if ((draft.ends || (draft.ends === draft.origEnds && draft.origOutcome !== "")) && outcome.trim() !== "") out.outcome = outcome;
+  const untouched = draft.ends === draft.origEnds && draft.outcome === draft.origOutcome;
+  if (untouched && draft.hadOutcome) out.outcome = draft.origOutcome; // a stored `outcome: ""` stays as stored
+  else if ((draft.ends || (draft.ends === draft.origEnds && draft.origOutcome !== "")) && outcome.trim() !== "") out.outcome = outcome;
   return out;
 }
 
@@ -339,6 +343,14 @@ function avatarPart(emoji, stored) {
   return Object.keys(rest).length > 0 ? { avatar: rest } : { avatar: null };
 }
 
+/** Like `optional`, but a stored empty value ("", {}, []) that the user left empty stays as stored instead of being removed. */
+const optionalKeep = (key, value, stored) => {
+  if (value !== undefined) return { [key]: value };
+  if (stored === undefined) return {};
+  const empty = stored === "" || (Array.isArray(stored) && stored.length === 0) || (stored !== null && typeof stored === "object" && Object.keys(stored).length === 0);
+  return empty ? {} : { [key]: null };
+};
+
 const optional = (key, value, had) => (value !== undefined ? { [key]: value } : had ? { [key]: null } : {});
 const text = (value) => (value.trim() === "" ? undefined : value.trim());
 
@@ -352,10 +364,10 @@ export function buildEntityPayload({ id, draft, source }) {
     payload: {
       id,
       name: draft.name.trim(),
-      ...optional("type", text(draft.type), source?.type !== undefined),
-      ...optional("description", text(draft.description), source?.description !== undefined),
+      ...optionalKeep("type", text(draft.type), source?.type),
+      ...optionalKeep("description", text(draft.description), source?.description),
       ...avatarPart(draft.emoji, source?.avatar),
-      ...optional("traits", Object.keys(traits).length > 0 ? traits : undefined, source?.traits !== undefined),
+      ...optionalKeep("traits", Object.keys(traits).length > 0 ? traits : undefined, source?.traits),
       ...optional("object", draft.object !== "" ? draft.object : undefined, source?.object !== undefined),
     },
   };
@@ -371,9 +383,9 @@ export function buildRelationshipTypePayload({ id, draft, source }) {
     payload: {
       id,
       label: draft.label.trim(),
-      ...optional("inverse_label", text(draft.inverse), source?.inverse_label !== undefined),
-      ...optional("description", text(draft.description), source?.description !== undefined),
-      ...optional("same_traits", draft.sameTraits.length > 0 ? [...draft.sameTraits] : undefined, source?.same_traits !== undefined),
+      ...optionalKeep("inverse_label", text(draft.inverse), source?.inverse_label),
+      ...optionalKeep("description", text(draft.description), source?.description),
+      ...optionalKeep("same_traits", draft.sameTraits.length > 0 ? [...draft.sameTraits] : undefined, source?.same_traits),
       ...optional("field", draft.fieldObject !== "" ? { object: draft.fieldObject, name: draft.fieldName } : undefined, source?.field !== undefined),
     },
   };
@@ -405,8 +417,8 @@ export function buildConstellationPayload({ id, draft, source }) {
       id,
       name: draft.name.trim(),
       relationships,
-      ...optional("description", text(draft.description), source?.description !== undefined),
-      ...optional("traits", Object.keys(traits).length > 0 ? traits : undefined, source?.traits !== undefined),
+      ...optionalKeep("description", text(draft.description), source?.description),
+      ...optionalKeep("traits", Object.keys(traits).length > 0 ? traits : undefined, source?.traits),
       ...(draft.generated ? { generated: true } : source?.generated ? { generated: null } : {}),
     },
     fieldErrors,

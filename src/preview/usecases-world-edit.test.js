@@ -337,3 +337,26 @@ describe("review fixes (PR #191)", () => {
     expect(buildConstellationPayload({ id: "c", draft, source: null }).payload.relationships).toEqual([{ from: "a", type: "t", to: "b", note: "new" }]);
   });
 });
+
+describe("saved empty values stay as stored (PR #191, N1)", () => {
+  it("entity and relationship type: empty description, type, traits, same_traits are not sent as null while untouched", () => {
+    const e = { id: "leo", name: "Leo", type: "", description: "", traits: {} };
+    expect(buildEntityPayload({ id: "leo", draft: { name: "Leo", type: "", description: "", emoji: "", traits: {}, object: "" }, source: e }).payload).toEqual({ id: "leo", name: "Leo" });
+    const t = { id: "t", label: "L", description: "", same_traits: [], inverse_label: "" };
+    expect(buildRelationshipTypePayload({ id: "t", draft: { label: "L", inverse: "", description: "", sameTraits: [], fieldObject: "", fieldName: "" }, source: t }).payload).toEqual({ id: "t", label: "L" });
+    // a stored non-empty value that the user clears is still removed
+    expect(buildEntityPayload({ id: "leo", draft: { name: "Leo", type: "", description: "", emoji: "", traits: {}, object: "" }, source: { ...e, type: "Child" } }).payload.type).toBeNull();
+  });
+
+  it("an untouched via of a trigger is not trimmed when another part changes", () => {
+    const orig = { text: "x", actor: "a", via: " web hook " };
+    const shape = triggerShape(orig);
+    const out = buildTrigger({ text: "changed", origText: "x", shape, orig }, { path: "t", label: "T", errors: [], fieldErrors: [] });
+    expect(out.via).toBe(" web hook ");
+  });
+
+  it("a stored branch outcome of '' is written back as ''", () => {
+    const stored = { id: "b", title: "B", when: [{ subject: "a", property: "p", value: 1 }], steps: [{ id: "s", actor: "system", action: "A" }], outcome: "" };
+    expect(buildBranch(branchDraft(stored), { taken: new Map(), ids: new Set(), lockId: true, errors: [], fieldErrors: [] })).toEqual(stored);
+  });
+});

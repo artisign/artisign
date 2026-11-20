@@ -186,3 +186,37 @@ describe("generated step ids across new branches (PR #191)", () => {
     expect(new Set(ids).size).toBe(2);
   });
 });
+
+describe("generated branch step ids and the variants (PR #191, B1)", () => {
+  const newBranch = (title, action) => ({ id: "", origId: "", title, origTitle: title, from: "", when: [{ subject: "a", property: "p", op: "eq", hadOp: false, value: "1", orig: undefined, origText: undefined, origOp: undefined }], steps: [{ id: "", actor: "system", action, origAction: "", kind: "none", screen: "", node: "", via: "", origVia: "", data: [], extra: {} }], ends: true, rejoin: "", outcome: "", origOutcome: "", extra: {} });
+  const idsOf = (payload) => [...payload.steps.map((s) => s.id), ...(payload.branches ?? []).flatMap((b) => b.steps.map((s) => s.id)), ...(payload.variants ?? []).flatMap((v) => (v.steps ?? []).flatMap((op) => [op.step?.id, ...(op.branch?.steps ?? []).map((s) => s.id)])), ].filter(Boolean);
+
+  it("a new branch step named like a step a stored variant writes gets another id", () => {
+    const stored = { ...source, branches: [], variants: [{ id: "v", title: "V", when: { size: ["small"] }, steps: [{ op: "append", step: { id: "show-limit", actor: "system", action: "Shows the limit" } }] }] };
+    const draft = draftFromSource(stored);
+    draft.branches = [newBranch("Limit", "Show limit")];
+    const built = buildPayload({ id: stored.id, draft, source: stored });
+    expect(built.errors).toBeUndefined();
+    expect(built.payload.branches[0].steps[0].id).toBe("show-limit-2"); // "show-limit" is the variant's (the variants are not resent: unchanged)
+  });
+
+  it("a new branch step and a new variant step with the same action get different ids, and the variant sees the built branch", () => {
+    const stored = { ...source, branches: [], variants: [] };
+    const draft = draftFromSource(stored);
+    draft.branches = [newBranch("Failure", "Retry")];
+    const v = variantDraft({ id: "v", title: "V", when: { size: ["small"] }, steps: [{ op: "append", step: { id: "", actor: "system", action: "Retry" } }, { op: "append", step: { id: "x", actor: "system", action: "In branch" }, branch: "failure" }] });
+    draft.variants = [v];
+    const built = buildPayload({ id: stored.id, draft, source: stored });
+    expect(built.errors).toBeUndefined(); // the append to branch "failure" finds the branch the case dialog just named
+    const ids = idsOf(built.payload);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual(expect.arrayContaining(["retry", "retry-2"]));
+  });
+});
+
+describe("saved empty values stay as stored (PR #191, N1)", () => {
+  it("a stored branch outcome of '' does not resend the branch list", () => {
+    const stored = { ...source, branches: [{ ...source.branches[0], outcome: "" }] };
+    expect(buildPayload({ id: stored.id, draft: draftFromSource(stored), source: stored }).payload).not.toHaveProperty("branches");
+  });
+});

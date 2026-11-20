@@ -77,6 +77,15 @@ describe("world cards", () => {
     expect(text($("#uc-world-h").parentElement)).toContain("3 constellations · the case holds in any of them");
   });
 
+  it("Open in World is plain navigation to the World tab", () => {
+    const onOpenWorld = vi.fn();
+    const { handlers } = render();
+    expect($$(".uc-h2-action").some((b) => b.textContent === "Open in World")).toBe(false);
+    renderDetail(document.body.firstChild, { bundle: worldBundle, base: worldBundle, source: baseCase, variantId: null, pool: makeWorldPool(), coverageOpen: false, handlers: { ...handlers, onOpenWorld } });
+    $$(".uc-h2-action").find((b) => b.textContent === "Open in World").click();
+    expect(onOpenWorld).toHaveBeenCalledTimes(1);
+  });
+
   it("a case without constellations has no World section", () => {
     const bare = { ...worldBundle, use_case: { ...baseCase, constellations: [] }, constellations: [] };
     render({ bundle: bare, base: bare });

@@ -616,6 +616,7 @@ export function createUseCasesView(options) {
       handlers: {
         onVariant: (variantId) => openCase(detail.id, variantId),
         onEdit: () => editUseCase(detail.id),
+        onOpenWorld: () => setSection("world"),
         onMap: (stepId) => showMapping(stepId),
         onCopyId: () => copy(detail.id),
         onCopy: (text) => copy(text),

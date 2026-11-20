@@ -2,7 +2,7 @@
 // variant / filter chip, segmented control). One builder per component so every view draws them identically.
 
 import { h, icon } from "./usecases-dom.js";
-import { STATUS_LABELS, exampleLines, safeColor, describeLoadProblem } from "./usecases-data.js";
+import { STATUS_LABELS, exampleLines, safeColor } from "./usecases-data.js";
 
 /** One wording for a mapping target that is not there (it may have been deleted, renamed or never existed). */
 export function missingScreenText(screen) {
@@ -12,10 +12,21 @@ export function missingElementText(node, screen) {
   return `Element "${node}" not found on screen "${screen}".`;
 }
 
-/** A failed save, written for the person at the dialog: the agent remedy of the tool message ("repair … by hand", "the one case where usecases/ may be edited directly") is left out. */
+/**
+ * A failed save, written for the person at the dialog: the problem text of the tool message stays whole (the files, the paths, the references),
+ * the agent remedy segments ("repair … by hand (the one case where usecases/ may be edited directly)", "remove these references first …",
+ * "pass force: true …") are left out. Tool messages join problem and remedy with " — ".
+ */
 export function saveErrorText(message) {
-  const { file, detail } = describeLoadProblem(message);
-  return file ? `${detail} (${file})` : detail;
+  const text = String(message ?? "").trim();
+  const single = /^invalid (usecases\/[\w./-]+\.json):\s*/.exec(text);
+  const kept = (single ? text.slice(single[0].length) : text)
+    .split(" — ")
+    .filter((part) => !/^(repair|remove (these references|the use case)|pass force)\b/i.test(part.trim()))
+    .join(" — ")
+    .replace(/\s*\(the one case where usecases\/ may be edited directly\)/, "")
+    .trim();
+  return single ? `${kept || text} (${single[1]})` : kept || text;
 }
 
 /** `uc-avatar`: the emoji (or initials) on the persona's own colour — persona data, set as `--avatar-color`, not a token. */

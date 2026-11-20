@@ -7151,19 +7151,27 @@ button.uc-target:hover {
   background: var(--chrome-canvas);
 }
 
-.uc-map-canvas::-webkit-scrollbar {
-  height: 12px;
-  width: 12px;
+.uc-map-canvas {
+  --scrollbar-thumb: var(--chrome-text-tertiary);
+  --scrollbar-track: var(--chrome-border);
+
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
-.uc-map-canvas::-webkit-scrollbar-track {
-  background: var(--chrome-border);
-}
+/* Legacy fallback for WebKit/Blink without scrollbar-color. */
+@supports not (scrollbar-color: auto) {
+  .uc-map-canvas::-webkit-scrollbar {
+    height: 12px;
+    width: 12px;
+  }
 
-.uc-map-canvas::-webkit-scrollbar-thumb {
-  border: 2px solid var(--chrome-border);
-  border-radius: 6px;
-  background: var(--chrome-text-tertiary);
+  .uc-map-canvas::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+
+  .uc-map-canvas::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+  }
 }
 
 .uc-map-track {

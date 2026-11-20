@@ -13,6 +13,7 @@ import {
   type ScreenDocument,
   type TokenRef,
 } from "../model/index.js";
+import { guardMappings } from "../usecases/index.js";
 import { loadScreen } from "./context.js";
 import { loadAllDocuments } from "./definitions.js";
 import { buildStyleOccurrenceIndex } from "./style-index.js";
@@ -233,9 +234,11 @@ export async function writeHtml(store: Store, input: WriteHtmlInput): Promise<Re
 
   await assertValidBackdrop(store, input.screen, doc, { before });
 
+  const mappingGuard = exists ? await guardMappings(store, [input.screen]) : undefined;
   await store.writeScreen(input.screen, serializeScreen(doc));
   await syncScreenFlows(store, doc);
   const commitResult = await store.commit(`write_html: ${input.screen}`);
+  const mappings = await mappingGuard?.broken();
 
   const tokens = await store.readTokens();
   const driftWarnings: Warning[] = computeDriftWarnings(doc, tokens).map((w) => ({
@@ -269,6 +272,7 @@ export async function writeHtml(store: Store, input: WriteHtmlInput): Promise<Re
     ...driftWarnings,
     ...repeatedPatternWarnings,
     ...(backdropWarning ? [backdropWarning] : []),
+    ...(mappings?.warnings ?? []),
   ];
 
   const base = {
@@ -279,6 +283,7 @@ export async function writeHtml(store: Store, input: WriteHtmlInput): Promise<Re
     node_count: Object.keys(doc.nodes).length,
     warnings,
     ...(repeatedPatternOmittedCount > 0 ? { repeated_pattern_omitted_count: repeatedPatternOmittedCount } : {}),
+    ...(mappings && mappings.omitted > 0 ? { mapping_stale_omitted_count: mappings.omitted } : {}),
   };
   return shapeWriteResponse(base, doc, before, responseMode);
 }
@@ -393,9 +398,11 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
 
   await assertValidBackdrop(store, screen, doc, { before, onlyNewMisplaced: true });
 
+  const mappingGuard = input.operation === "set_attr" || input.operation.startsWith("insert") ? undefined : await guardMappings(store, [screen]);
   await store.writeScreen(screen, serializeScreen(doc));
   await syncScreenFlows(store, doc);
   const commitResult = await store.commit(`patch_html: ${screen}`);
+  const mappings = await mappingGuard?.broken();
 
   const tokens = await store.readTokens();
   const allDriftWarnings: Warning[] = computeDriftWarnings(doc, tokens).map((w) => ({
@@ -456,6 +463,7 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
       ...scopedDriftWarnings,
       ...scopedRepeatedPatternWarnings,
       ...(backdropWarning ? [backdropWarning] : []),
+      ...(mappings?.warnings ?? []),
     ],
     preexisting_drift_count: preexistingDriftCount,
     // Only when the index was actually built: absent means "not measured",
@@ -464,6 +472,7 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
     // would grow every ordinary patch response by a field (CHR-635 review).
     ...(hasAffectedCandidate ? { preexisting_repeated_pattern_count: preexistingRepeatedPatternCount } : {}),
     ...(repeatedPatternOmittedCount > 0 ? { repeated_pattern_omitted_count: repeatedPatternOmittedCount } : {}),
+    ...(mappings && mappings.omitted > 0 ? { mapping_stale_omitted_count: mappings.omitted } : {}),
   };
   return shapeWriteResponse(base, doc, before, responseMode);
 }

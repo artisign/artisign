@@ -282,9 +282,11 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   // 24,780 to 24,879 (+99).
   // CHR-1122: delete_entity description says variant is mockup-only:
   // 24,879 to 24,886 (+7).
+  // CHR-1123: delete_entity description names the mapping_stale warning:
+  // 24,886 to 24,938 (+52).
   // The pin is exact (CHR-1143): any change, up or down, shows here.
-  it("pins the measured tools/list size as information, not a limit (24,886 chars, ~6,220 tokens)", () => {
-    expect(JSON.stringify(tools).length).toBe(24_886);
+  it("pins the measured tools/list size as information, not a limit (24,938 chars, ~6,235 tokens)", () => {
+    expect(JSON.stringify(tools).length).toBe(24_938);
   });
 
   it("keeps every advertised tool entry within 2,000 chars", () => {

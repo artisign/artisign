@@ -14,6 +14,7 @@ import {
   type NodeSubtree,
   type ScreenDocument,
 } from "../model/index.js";
+import { guardMappings } from "../usecases/index.js";
 import { loadScreen } from "./context.js";
 import { loadAllDocuments } from "./definitions.js";
 import { parseNodeRef, formatNodeRef, requireScreenNodeRef } from "./node-ref.js";
@@ -651,6 +652,7 @@ async function deleteScreenEntity(store: Store, name: string, cascade: boolean, 
   // Screens first, flows.json last: if a delete fails midway, flows.json
   // still lists the flows of the screens that survived, and what was
   // actually deleted is still pruned and committed before the error goes on.
+  const mappingGuard = await guardMappings(store, subtree);
   const deleted: string[] = [];
   let failure: unknown;
   try {
@@ -683,6 +685,8 @@ async function deleteScreenEntity(store: Store, name: string, cascade: boolean, 
     message: `flow from "${r.from}" still targets deleted screen "${r.to.split(".")[0]}"`,
   }));
   warnings.push(...(await danglingBackdropWarnings(store, deleted)));
+  const mappings = await mappingGuard?.broken();
+  warnings.push(...(mappings?.warnings ?? []));
 
   return {
     kind: "screen",
@@ -691,6 +695,7 @@ async function deleteScreenEntity(store: Store, name: string, cascade: boolean, 
     ...commitFields(commitResult!),
     warnings,
     removed_flow_count: outgoing.length,
+    ...(mappings && mappings.omitted > 0 ? { mapping_stale_omitted_count: mappings.omitted } : {}),
     ...(descendants.length > 0 ? { deleted_screens: subtree } : {}),
   };
 }

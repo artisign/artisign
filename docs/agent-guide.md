@@ -647,7 +647,8 @@ call is validated before anything is written; unknown personas, data objects,
 dimensions, example fields or screens only come back as warnings. The
 response gives `created` and `updated` counts per kind, not the ids. Delete with
 `delete_entity` kinds `persona`, `dimension`, `data_object`, `use_case`,
-`entity`, `constellation`, `relationship_type` — it
+`entity`, `constellation`, `relationship_type` (always the whole entity; `variant` is rejected for them, it only
+applies to `mockup`) — it
 warns about references left dangling and does not repair them. Like design
 files, `usecases/` changes only through these tools. The one exception: a file
 under `usecases/` that no longer validates (hand edit, merge conflict, a newer

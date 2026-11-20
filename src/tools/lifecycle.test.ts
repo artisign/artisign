@@ -8,6 +8,8 @@ import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { initProjectTool, listProjects, importHtml, promoteToSystem, deleteEntity } from "./lifecycle.js";
 import { updateRefs, writeHtml } from "./writes.js";
 import { setMeta } from "./meta.js";
+import { setUseCases } from "./usecases.js";
+import { stat } from "node:fs/promises";
 import { getDesignSystem, listComments } from "./reads.js";
 import { buildRenderContext } from "./render-context.js";
 import { parseScreen, renderScreen, loadRegistry } from "../model/index.js";
@@ -599,6 +601,36 @@ describe("delete_entity", () => {
     fx = await setupProject();
   });
   afterEach(() => fx.cleanup());
+
+  it("rejects variant for every kind except mockup before touching anything (use case, persona)", async () => {
+    await setUseCases(fx.store, {
+      dimensions: [{ id: "membership", label: "Membership", values: [{ id: "student", label: "Student" }] }],
+      personas: [{ id: "member-ana", name: "Ana", traits: { membership: "student" } }],
+      data_objects: [{ id: "loan", name: "Loan", fields: [{ name: "status", type: "enum", values: ["available", "on-loan"] }] }],
+      use_cases: [{
+        id: "borrow-book",
+        title: "Borrow a book",
+        personas: ["member-ana"],
+        trigger: "A member finds a book",
+        goal: "Take it home",
+        inputs: [{ object: "loan", source: "catalog", example: { status: "available" } }],
+        outputs: [{ object: "loan", target: "catalog", example: { status: "on-loan" } }],
+        steps: [{ id: "tap-book", actor: "member-ana", action: "Taps the book" }],
+      }],
+    } as never);
+    const casePath = join(fx.dir, "usecases", "cases", "borrow-book.json");
+    for (const [kind, name] of [["use_case", "borrow-book"], ["persona", "member-ana"], ["data_object", "loan"], ["dimension", "membership"]] as const) {
+      await expect(deleteEntity(fx.store, { kind, name, variant: "staff-for-member" })).rejects.toMatchObject({
+        code: "validation_failed",
+        message: expect.stringContaining('variant only applies to kind "mockup"'),
+      });
+    }
+    await fx.store.writeScreen("home", `<div id="n1"></div>`);
+    await expect(deleteEntity(fx.store, { kind: "screen", name: "home", variant: "x" })).rejects.toMatchObject({ code: "validation_failed" });
+    expect(await fx.store.listScreens()).toEqual(["home"]);
+    await expect(stat(casePath)).resolves.toBeTruthy();
+    expect(await stat(join(fx.dir, "usecases", "personas.json"))).toBeTruthy();
+  });
 
   it("refuses to delete a component still referenced by a screen, listing the referencing nodes", async () => {
     await fx.store.writeComponent("btn-primary", `<button id="btn">Go</button>`);

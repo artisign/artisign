@@ -67,6 +67,13 @@ export async function openBranchDialog(options) {
 
   // --- Where it forks ---------------------------------------------------------------------------------------------
   const forkSelect = h("select", { class: "chrome-field uc-select", "aria-label": "Forks after" });
+  // Where "Continue at" starts: the step after the fork (the first step for a fork before it), none when there is no such step.
+  const defaultRejoin = () => {
+    const mains = options.mainSteps();
+    const next = draft.from === "" ? 0 : mains.findIndex((s) => s.id === draft.from) + 1;
+    return next > 0 || draft.from === "" ? (mains[next]?.id ?? "") : "";
+  };
+  let rejoinChosen = draft.rejoin !== ""; // a stored rejoin, or one the user picks, is never recomputed
   const drawFork = () => {
     const mains = options.mainSteps();
     const choices = [{ value: "", label: "Before the first step" }, ...mains.map((s, i) => ({ value: s.id, label: `After step ${i + 1} · ${s.action || "(no action yet)"}` }))];
@@ -76,6 +83,10 @@ export async function openBranchDialog(options) {
   };
   forkSelect.addEventListener("change", () => {
     draft.from = forkSelect.value;
+    if (!rejoinChosen) {
+      draft.rejoin = defaultRejoin();
+      drawContinue();
+    }
     touch();
     relabelSteps();
   });
@@ -165,8 +176,8 @@ export async function openBranchDialog(options) {
   const continueSelect = h("select", { class: "chrome-field uc-select", "aria-label": "Continue at" });
   const drawContinue = () => {
     const mains = options.mainSteps();
-    fill(continueSelect, ...mains.map((s, i) => h("option", { value: s.id }, `Step ${i + 1} · ${s.action || "(no action yet)"}`)), draft.rejoin !== "" && !mains.some((s) => s.id === draft.rejoin) ? h("option", { value: draft.rejoin }, `${draft.rejoin} (not a main-flow step)`) : null);
-    if (draft.rejoin === "" && mains.length > 0) draft.rejoin = mains.find((s) => s.id === draft.from)?.id ? (mains[mains.findIndex((s) => s.id === draft.from) + 1]?.id ?? mains[0].id) : mains[0].id;
+    if (draft.rejoin === "" && !rejoinChosen) draft.rejoin = defaultRejoin();
+    fill(continueSelect, draft.rejoin === "" ? h("option", { value: "" }, "No step to continue at") : null, ...mains.map((s, i) => h("option", { value: s.id }, `Step ${i + 1} · ${s.action || "(no action yet)"}`)), draft.rejoin !== "" && !mains.some((s) => s.id === draft.rejoin) ? h("option", { value: draft.rejoin }, `${draft.rejoin} (not a main-flow step)`) : null);
     continueSelect.value = draft.rejoin;
     continueSelect.disabled = draft.ends;
   };
@@ -174,6 +185,7 @@ export async function openBranchDialog(options) {
   outcomeInput.disabled = !draft.ends;
   const radio = (value, text) => h("label", { class: "uc-check" }, h("input", { type: "radio", name: radioName, value, checked: (value === "end") === draft.ends, onChange: () => { draft.ends = value === "end"; continueSelect.disabled = draft.ends; outcomeInput.disabled = !draft.ends; touch(); } }), text);
   continueSelect.addEventListener("change", () => {
+    rejoinChosen = true;
     draft.rejoin = continueSelect.value;
     touch();
   });

@@ -174,3 +174,15 @@ describe("the whole case", () => {
     expect(buildPayload({ id: source.id, draft, source }).payload.state).toBeNull();
   });
 });
+
+describe("generated step ids across new branches (PR #191)", () => {
+  it("two new branches with the same step action get different ids", () => {
+    const draft = draftFromSource({ ...source, branches: [] });
+    const mk = (title) => ({ id: title, origId: "", title, origTitle: title, from: "", when: [{ subject: "a", property: "p", op: "eq", hadOp: false, value: "1", orig: undefined, origText: undefined, origOp: undefined }], steps: [{ id: "", actor: "system", action: "Shows the error", origAction: "", kind: "none", screen: "", node: "", via: "", origVia: "", data: [], extra: {} }], ends: true, rejoin: "", outcome: "", origOutcome: "", extra: {} });
+    draft.branches = [mk("one"), mk("two")];
+    const built = buildPayload({ id: source.id, draft, source: { ...source, branches: undefined } });
+    expect(built.errors).toBeUndefined();
+    const ids = built.payload.branches.flatMap((b) => b.steps.map((s) => s.id));
+    expect(new Set(ids).size).toBe(2);
+  });
+});

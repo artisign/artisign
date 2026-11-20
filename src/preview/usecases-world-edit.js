@@ -73,7 +73,9 @@ export function splitList(text) {
 }
 
 export const parseList = (text) => splitList(text).map((part) => part.trim()).filter((part) => part !== "").map(parseStateValue);
-export const formatList = (list) => list.map(formatStateValue).join(", ");
+/** One list item: a string with a comma or a quote is quoted too, or it would read back as two items (or lose its quotes). */
+const formatListItem = (item) => (typeof item === "string" && /[,"]/.test(item) ? JSON.stringify(item) : formatStateValue(item));
+export const formatList = (list) => list.map(formatListItem).join(", ");
 
 const valueText = (value, op) => (op === "in" && Array.isArray(value) ? formatList(value) : formatStateValue(value));
 
@@ -243,6 +245,7 @@ export function branchDraft(branch) {
     rejoin: rejoin ?? "",
     outcome: outcome ?? "",
     origOutcome: outcome ?? "",
+    origEnds: rejoin === undefined,
     extra,
   };
 }
@@ -269,6 +272,11 @@ export function buildBranch(draft, { taken, ids, errors, fieldErrors, label = "B
   if (!lockId && draft.id !== "" && !isValidId(draft.id)) {
     errors.push(`${label}: ${draft.id} is not a valid id.`);
     fieldErrors.push({ path: "branch.id", message: `${draft.id} is not a valid id. Use lowercase letters, digits and dashes.` });
+  }
+  if (!lockId && draft.id !== "" && isValidId(draft.id) && ids.has(draft.id)) {
+    const message = `${draft.id} is already a branch of this case. Give the new branch another id.`;
+    errors.push(`${label}: ${message}`);
+    fieldErrors.push({ path: "branch.id", message });
   }
   const when = buildConditions(draft.when, { path: "branch.when", label: "Condition", errors, fieldErrors });
   if (draft.when.length === 0) {
@@ -302,7 +310,8 @@ export function buildBranch(draft, { taken, ids, errors, fieldErrors, label = "B
   const out = { ...draft.extra, id, title, ...(draft.from !== "" ? { from: draft.from } : {}), when, steps };
   if (!draft.ends && draft.rejoin !== "") out.rejoin = draft.rejoin;
   const outcome = written(draft.outcome, draft.origOutcome);
-  if (draft.ends && outcome.trim() !== "") out.outcome = outcome;
+  // An untouched end mode writes a stored outcome back as stored (even next to a rejoin); it only falls away when the user changed the mode.
+  if ((draft.ends || (draft.ends === draft.origEnds && draft.origOutcome !== "")) && outcome.trim() !== "") out.outcome = outcome;
   return out;
 }
 
@@ -321,6 +330,15 @@ const idError = (id, errors, reservedOk = false) => {
   else if (id === "system" && !reservedOk) errors.push("system is reserved for artisign itself. Pick another id.");
 };
 
+/** The avatar key: untouched emoji leaves the stored avatar (a colour included) alone; a new emoji is merged into it; `null` only when nothing is left. */
+function avatarPart(emoji, stored) {
+  if (emoji === (stored?.emoji ?? "")) return {};
+  if (emoji) return { avatar: { ...(stored ?? {}), emoji } };
+  const rest = { ...(stored ?? {}) };
+  delete rest.emoji;
+  return Object.keys(rest).length > 0 ? { avatar: rest } : { avatar: null };
+}
+
 const optional = (key, value, had) => (value !== undefined ? { [key]: value } : had ? { [key]: null } : {});
 const text = (value) => (value.trim() === "" ? undefined : value.trim());
 
@@ -336,7 +354,7 @@ export function buildEntityPayload({ id, draft, source }) {
       name: draft.name.trim(),
       ...optional("type", text(draft.type), source?.type !== undefined),
       ...optional("description", text(draft.description), source?.description !== undefined),
-      ...optional("avatar", draft.emoji ? { ...(source?.avatar ?? {}), emoji: draft.emoji } : undefined, source?.avatar !== undefined),
+      ...avatarPart(draft.emoji, source?.avatar),
       ...optional("traits", Object.keys(traits).length > 0 ? traits : undefined, source?.traits !== undefined),
       ...optional("object", draft.object !== "" ? draft.object : undefined, source?.object !== undefined),
     },
@@ -361,9 +379,9 @@ export function buildRelationshipTypePayload({ id, draft, source }) {
   };
 }
 
-/** A constellation draft row: `orig` keeps a stored relationship (its note and unknown keys) so an untouched row is written back as it was. */
+/** A constellation draft row: `orig` keeps a stored relationship (its note, untrimmed, and unknown keys) so an untouched row is written back as it was. */
 export function relationshipDraft(relationship) {
-  return { from: relationship.from, type: relationship.type, to: relationship.to, note: relationship.note ?? "" };
+  return { from: relationship.from, type: relationship.type, to: relationship.to, note: relationship.note ?? "", orig: relationship };
 }
 
 export function buildConstellationPayload({ id, draft, source }) {
@@ -376,6 +394,8 @@ export function buildConstellationPayload({ id, draft, source }) {
       errors.push(`Relationship ${i + 1} needs from, a type and to.`);
       fieldErrors.push({ path: `relationship.${i}`, message: "Pick from, a type and to.", untilTouched: true });
     }
+    const o = row.orig;
+    if (o && o.from === row.from && o.type === row.type && o.to === row.to && (o.note ?? "") === row.note) return o;
     return { from: row.from, type: row.type, to: row.to, ...(row.note.trim() !== "" ? { note: row.note.trim() } : {}) };
   });
   if (errors.length > 0) return { errors, fieldErrors };

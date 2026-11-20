@@ -291,7 +291,24 @@ describe("branches", () => {
     await flush();
     expect(rows()).toHaveLength(4);
     const payload = await savePayload(save, closed);
-    expect(payload.branches.at(-1)).toEqual({ id: "payment-fails", title: "Payment fails", from: "accept", when: [{ subject: "system", property: "payment", value: "failed" }], steps: [{ id: "shows-the-failure", actor: "system", action: "Shows the failure", via: "banner" }], rejoin: "open" });
+    expect(payload.branches.at(-1)).toEqual({ id: "payment-fails", title: "Payment fails", from: "accept", when: [{ subject: "system", property: "payment", value: "failed" }], steps: [{ id: "shows-the-failure", actor: "system", action: "Shows the failure", via: "banner" }] });
+    expect(payload.branches.at(-1)).not.toHaveProperty("rejoin"); // nothing follows the last step: no step to continue at, so the branch ends
+  });
+
+  it("the default 'Continue at' follows the fork until the user picks one; after the last step there is none and it never jumps back to step 1 (PR #191)", async () => {
+    await open();
+    $$("button", caseDialog()).find((b) => b.textContent.endsWith("Add branch")).click();
+    await flush();
+    const select = () => $("select[aria-label='Continue at']", top());
+    expect(select().value).toBe(""); // forks after the last step: nothing follows
+    expect(select().textContent).toBe("No step to continue at" + [...select().options].slice(1).map((o) => o.textContent).join(""));
+    pick($("select[aria-label='Forks after']", top()), "open");
+    expect(select().value).toBe("compare"); // the step after the fork
+    pick($("select[aria-label='Forks after']", top()), "");
+    expect(select().value).toBe("open");
+    pick(select(), "accept");
+    pick($("select[aria-label='Forks after']", top()), "compare");
+    expect(select().value).toBe("accept"); // chosen by hand: kept
   });
 
   it("Remove branch (in the branch dialog or with the row's X) takes it out of the list; nothing else changes", async () => {

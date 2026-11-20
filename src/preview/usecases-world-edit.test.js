@@ -257,7 +257,7 @@ describe("pool payloads", () => {
     expect(buildEntityPayload({ id: "x", draft: { ...draft, name: " " }, source: null }).errors).toEqual(["A name is required."]);
     const source = { id: "leo", name: "Leo", type: "Child", description: "d", avatar: { emoji: "🧒" }, traits: { a: "b" }, object: "child" };
     expect(buildEntityPayload({ id: "leo", draft, source }).payload).toEqual({ id: "leo", name: "Leo", type: null, description: null, avatar: null, traits: null, object: null });
-    expect(buildEntityPayload({ id: "leo", draft: { ...draft, type: " Child ", emoji: "🧒", traits: { a: "b" }, object: "child" }, source }).payload).toMatchObject({ type: "Child", avatar: { emoji: "🧒" }, traits: { a: "b" }, object: "child" });
+    expect(buildEntityPayload({ id: "leo", draft: { ...draft, type: " Child ", emoji: "🧒", traits: { a: "b" }, object: "child" }, source }).payload).toMatchObject({ type: "Child", traits: { a: "b" }, object: "child" });
   });
 
   it("relationship type: label required, a field needs its name, inverse is never derived", () => {
@@ -283,5 +283,57 @@ describe("pool payloads", () => {
 
   it("members are the ends of the relationships, in order of first appearance", () => {
     expect(draftMembers([{ from: "a", to: "b" }, { from: "b", to: "c" }, { from: "", to: "a" }])).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("review fixes (PR #191)", () => {
+  const fresh2 = () => ({ errors: [], fieldErrors: [] });
+  const taken = new Map();
+
+  it("a stored branch with a rejoin AND an outcome keeps both when only the title changes; the outcome falls away when the end mode changes", () => {
+    const stored = { id: "b", title: "B", when: [{ subject: "a", property: "p", value: 1 }], steps: [{ id: "s", actor: "system", action: "A" }], rejoin: "done", outcome: "Kept" };
+    const draft = branchDraft(stored);
+    draft.title = "Renamed";
+    const s = fresh2();
+    expect(buildBranch(draft, { taken, ids: new Set(), lockId: true, ...s })).toEqual({ ...stored, title: "Renamed" });
+    draft.ends = true;
+    expect(buildBranch(draft, { taken, ids: new Set(), lockId: true, ...fresh2() })).not.toHaveProperty("rejoin");
+    draft.ends = false;
+    draft.origEnds = true; // the user switched from End to Continue: the old outcome is not carried over
+    expect(buildBranch(draft, { taken, ids: new Set(), lockId: true, ...fresh2() })).not.toHaveProperty("outcome");
+  });
+
+  it("a typed new branch id that another branch has is a field error on branch.id", () => {
+    const draft = blankBranch({ from: "x" });
+    Object.assign(draft, { id: "limit", title: "T" });
+    draft.when = [{ ...blankCondition(), subject: "a", property: "p", value: "1" }];
+    draft.steps[0].action = "Act";
+    const s = fresh2();
+    buildBranch(draft, { taken, ids: new Set(["limit"]), ...s });
+    expect(s.fieldErrors).toEqual([{ path: "branch.id", message: "limit is already a branch of this case. Give the new branch another id." }]);
+  });
+
+  it("an entity avatar with only a colour survives a save; a new emoji is merged; null only when nothing is left", () => {
+    const draft = { name: "Leo", type: "", description: "", emoji: "", traits: {}, object: "" };
+    expect(buildEntityPayload({ id: "leo", draft, source: { name: "Leo", avatar: { color: "#111" } } }).payload).not.toHaveProperty("avatar");
+    expect(buildEntityPayload({ id: "leo", draft: { ...draft, emoji: "🧒" }, source: { name: "Leo", avatar: { color: "#111" } } }).payload.avatar).toEqual({ color: "#111", emoji: "🧒" });
+    expect(buildEntityPayload({ id: "leo", draft, source: { name: "Leo", avatar: { emoji: "🧒" } } }).payload.avatar).toBeNull();
+    expect(buildEntityPayload({ id: "leo", draft, source: { name: "Leo", avatar: { emoji: "🧒", color: "#111" } } }).payload.avatar).toEqual({ color: "#111" });
+  });
+
+  it("an 'is one of' value with a comma or a quote round-trips as one item", () => {
+    const stored = { subject: "a", property: "city", op: "in", value: ["Berlin, Germany", 'say "hi"', "plain", 3] };
+    const row = conditionDraft(stored);
+    expect(parseList(row.value)).toEqual(stored.value);
+    const out = buildConditions([{ ...row, value: `${row.value}, x` }], { path: "c", label: "C", ...fresh2() });
+    expect(out[0].value).toEqual([...stored.value, "x"]);
+  });
+
+  it("an untouched relationship row comes back as stored, note untrimmed; an edited note is trimmed", () => {
+    const rel = { from: "a", type: "t", to: "b", note: " keep  ", extra: 1 };
+    const draft = { name: "C", description: "", traits: {}, relationships: [relationshipDraft(rel)], generated: false };
+    expect(buildConstellationPayload({ id: "c", draft, source: null }).payload.relationships).toEqual([rel]);
+    draft.relationships[0].note = " new ";
+    expect(buildConstellationPayload({ id: "c", draft, source: null }).payload.relationships).toEqual([{ from: "a", type: "t", to: "b", note: "new" }]);
   });
 });

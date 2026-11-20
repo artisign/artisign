@@ -87,14 +87,17 @@ export function buildPayload({ id, draft, source, nameOf = (participant) => part
   // The base flow with its generated ids, as the variants and the branches see it.
   const baseSteps = draft.steps.map((step, i) => ({ ...step, id: steps[i].id }));
   const branchIds = new Set(draft.branches.map((b) => b.id).filter(Boolean));
+  const generated = new Map(); // the step ids of the branches built so far: a generated id never repeats one (one namespace, spec §2)
   const branches = draft.branches.map((branch, index) => {
     const others = draft.branches.filter((b) => b !== branch);
     const problems = [];
-    const built = buildBranch(branch, { taken: placesIn(baseModel({ steps: baseSteps, branches: others }, []), null), ids: branchIds, errors: problems, fieldErrors: [], label: `Branch ${index + 1}`, lockId: branch.id !== "" });
+    const taken = new Map([...placesIn(baseModel({ steps: baseSteps, branches: others }, []), null), ...generated]);
+    const built = buildBranch(branch, { taken, ids: branchIds, errors: problems, fieldErrors: [], label: `Branch ${index + 1}`, lockId: branch.id !== "" });
     if (problems.length > 0) {
       errors.push(`Branch ${built.title || built.id}: ${problems[0]}`);
       fieldErrors.push({ path: `branch.${index}`, message: problems[0] });
     }
+    for (const step of built.steps) if (!taken.has(step.id)) generated.set(step.id, `a step of branch ${built.title || built.id}`);
     return built;
   });
 

@@ -180,15 +180,6 @@ export function actorsMap(swaps) {
   return Object.fromEntries(swaps.filter((swap) => swap.from !== "" && swap.to !== "").map((swap) => [swap.from, swap.to]));
 }
 
-/**
- * The flow a variant's changes start from: the base steps, each already carrying the actor the swaps give it (applied once, not
- * chained; spec §4). An entry keeps its `baseActor` for the struck line of a removed step.
- */
-export function baseFlow(baseSteps, swaps) {
-  const map = actorsMap(swaps);
-  return baseSteps.map((step) => ({ id: step.id, baseActor: step.actor, actor: Object.hasOwn(map, step.actor) ? map[step.actor] : step.actor, action: step.action, step }));
-}
-
 function entryOf(step) {
   return { id: step.id, baseActor: step.actor, actor: step.actor, action: step.action, step };
 }
@@ -263,11 +254,6 @@ export function modelBefore(base, variant, count) {
     applyOp(model, op);
   });
   return model;
-}
-
-/** The main flow as it stands before change `count`: what a step select lists first. */
-export function flowBefore(baseSteps, variant, count) {
-  return modelBefore({ steps: baseSteps, branches: [] }, variant, count).main;
 }
 
 /**

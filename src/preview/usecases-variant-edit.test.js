@@ -2,7 +2,7 @@
 // actor swaps (spec §4) and the validation of step changes (spec §6).
 import { describe, it, expect } from "vitest";
 import { draftFromSource, buildPayload, draftWarnings } from "./usecases-forms.js";
-import { variantDraft, blankVariant, buildVariant, flowBefore, inheritedPersonas, actorsMap, variantWarnings, emptyStep } from "./usecases-variant-edit.js";
+import { variantDraft, blankVariant, buildVariant, modelBefore, inheritedPersonas, actorsMap, variantWarnings, emptyStep } from "./usecases-variant-edit.js";
 import { makePool, rawUseCase } from "./usecases.test-helper.js";
 
 const baseSteps = draftFromSource(rawUseCase).steps; // tap (dana), pick (dana), notify (system)
@@ -142,17 +142,19 @@ describe("variant draft <-> payload", () => {
   });
 });
 
+const flowBefore = (variant, count) => modelBefore({ steps: baseSteps, branches: [] }, variant, count).main;
+
 describe("the flow a change sees", () => {
   it("starts from the base steps with the swaps applied once (not chained), then follows the earlier changes", () => {
     const variant = variantDraft({ id: "v", title: "V", when: { size: ["small"] }, actors: { dana: "dex", dex: "sol" }, steps: [{ op: "append", step: { id: "late", actor: "dex", action: "Late" } }, { op: "remove", step_id: "pick" }] });
-    expect(flowBefore(baseSteps, variant, 0).map((e) => [e.id, e.actor, e.baseActor])).toEqual([["tap", "dex", "dana"], ["pick", "dex", "dana"], ["notify", "system", "system"]]);
-    expect(flowBefore(baseSteps, variant, 1).map((e) => e.id)).toEqual(["tap", "pick", "notify", "late"]);
-    expect(flowBefore(baseSteps, variant, 2).map((e) => e.id)).toEqual(["tap", "notify", "late"]);
+    expect(flowBefore(variant, 0).map((e) => [e.id, e.actor, e.baseActor])).toEqual([["tap", "dex", "dana"], ["pick", "dex", "dana"], ["notify", "system", "system"]]);
+    expect(flowBefore(variant, 1).map((e) => e.id)).toEqual(["tap", "pick", "notify", "late"]);
+    expect(flowBefore(variant, 2).map((e) => e.id)).toEqual(["tap", "notify", "late"]);
   });
 
   it("a change naming a step that is not there is skipped, as the resolver does", () => {
     const variant = variantDraft({ id: "v", title: "V", when: { size: ["small"] }, steps: [{ op: "replace", step_id: "gone", step: { id: "z", actor: "dana", action: "Z" } }, { op: "remove", step_id: "tap" }] });
-    expect(flowBefore(baseSteps, variant, 2).map((e) => e.id)).toEqual(["pick", "notify"]);
+    expect(flowBefore(variant, 2).map((e) => e.id)).toEqual(["pick", "notify"]);
   });
 });
 

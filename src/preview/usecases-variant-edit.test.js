@@ -190,10 +190,10 @@ describe("validation of step changes", () => {
 
   it("a second step with an id the flow already has is a shape error, with a field-level message; a replace may keep its own id", () => {
     const duplicate = build(variant([{ op: "insert_after", step_id: "tap", step: step({ id: "pick" }) }]));
-    expect(duplicate.errors).toEqual(['Variant "V", change 1: pick is already a step in this flow.']);
-    expect(duplicate.fieldErrors).toEqual([{ path: "variant.0.op.0.id", message: "pick is already a step in this flow. Give the new step another id." }]);
+    expect(duplicate.errors).toEqual(['Variant "V", change 1: pick is already step 2 of the main flow. Give the new step another id.']);
+    expect(duplicate.fieldErrors).toEqual([{ path: "variant.0.op.0.id", message: "pick is already step 2 of the main flow. Give the new step another id." }]);
     expect(build(variant([{ op: "replace", step_id: "pick", step: step({ id: "pick" }) }])).errors).toEqual([]);
-    expect(build(variant([{ op: "replace", step_id: "pick", step: step({ id: "tap" }) }])).errors).toEqual(['Variant "V", change 1: tap is already a step in this flow.']);
+    expect(build(variant([{ op: "replace", step_id: "pick", step: step({ id: "tap" }) }])).errors).toEqual(['Variant "V", change 1: tap is already step 1 of the main flow. Give the new step another id.']);
   });
 
   it("a replace may take an id a change above removed, and an append sees steps added above", () => {
@@ -216,7 +216,7 @@ describe("validation of step changes", () => {
     const draft = draftFromSource(rawUseCase);
     draft.variants[1].ops = [{ op: "append", step: { ...emptyStep(), id: "tap", action: "Again" } }];
     const built = buildPayload({ id: "map-step", draft, source: rawUseCase });
-    expect(built.errors).toEqual(['Variant "Large project", change 1: tap is already a step in this flow.']);
+    expect(built.errors).toEqual(['Variant "Large project", change 1: tap is already step 1 of the main flow. Give the new step another id.']);
     expect(built.fieldErrors[0].path).toBe("variant.1.op.0.id");
     draft.variants[1].ops[0].step.id = "again";
     expect(buildPayload({ id: "map-step", draft, source: rawUseCase }).payload.variants[1].steps).toEqual([{ op: "append", step: { id: "again", actor: "system", action: "Again" } }]);

@@ -48,6 +48,13 @@ export const deleteDataObject = (project, id) => callTool(project, "delete_entit
 
 export const deleteUseCase = (project, id) => callTool(project, "delete_entity", { kind: "use_case", name: id });
 
+// The three world kinds (ADR-011): fixed wrappers like the four above, so the seven kinds stay the only ones the preview can name.
+export const deleteMainEntity = (project, id) => callTool(project, "delete_entity", { kind: "entity", name: id });
+
+export const deleteConstellation = (project, id) => callTool(project, "delete_entity", { kind: "constellation", name: id });
+
+export const deleteRelationshipType = (project, id) => callTool(project, "delete_entity", { kind: "relationship_type", name: id });
+
 /**
  * The stored use case as written (variants with their step ops included).
  * @returns {Promise<{ ok: true, useCase: Record<string, any> } | { ok: false, status: number, code?: string, message: string }>}

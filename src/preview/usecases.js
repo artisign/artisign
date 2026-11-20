@@ -13,6 +13,7 @@ import { renderPersonaList, renderPersonaPage, renderObjectList, renderObjectPag
 import { openUseCaseDialog, draftFromSource } from "./usecases-forms.js";
 import { blankVariant } from "./usecases-variant-edit.js";
 import { openPersonaDialog, openDimensionDialog, openObjectDialog, openGenerateDialog } from "./usecases-forms-pool.js";
+import { openEntityDialog, openRelationshipTypeDialog, openConstellationDialog } from "./usecases-forms-world.js";
 import { confirmDialog } from "./usecases-dialog.js";
 import { openMenu, closeMenu } from "./usecases-menu.js";
 import * as api from "./usecases-api.js";
@@ -708,7 +709,7 @@ export function createUseCasesView(options) {
   const personaHandlers = {
     onNew: () => editPersona(null),
     onEdit: (id) => editPersona(id),
-    onGenerate: generate,
+    onGenerate: () => generate("personas"),
     onEditDimension: (id) => editDimension(id),
     onMore: () => {
       personaLimit += CARD_PAGE * 2;
@@ -725,8 +726,18 @@ export function createUseCasesView(options) {
 
   function renderWorld() {
     renderWorldNav(worldPanelEl, { world: pool.world, selected: selectedWorldPart, onSelect: (part) => { selectedWorldPart = part; renderWorld(); document.getElementById(`uc-world-${part}`)?.scrollIntoView?.({ block: "start" }); } });
-    if (section === "world" && mode !== "mapping") renderWorldPage(content, { world: pool.world, pool, selected: selectedWorldPart, error: pool.worldError });
+    if (section === "world" && mode !== "mapping") renderWorldPage(content, { world: pool.world, pool, selected: selectedWorldPart, error: pool.worldError, handlers: worldHandlers });
   }
+
+  const worldHandlers = {
+    onNewEntity: () => editEntity(null),
+    onEditEntity: (id) => editEntity(id),
+    onNewRelationshipType: () => editRelationshipType(null),
+    onEditRelationshipType: (id) => editRelationshipType(id),
+    onNewConstellation: () => editConstellation(null),
+    onEditConstellation: (id) => editConstellation(id),
+    onGenerate: () => generate("constellations"),
+  };
 
   function renderPools() {
     renderPoolPanel();
@@ -782,6 +793,7 @@ export function createUseCasesView(options) {
     if (kind === "use_case") return new Set([...(list.flat.items ?? []).map((u) => u.id), ...[...list.groupState.values()].flatMap((s) => s.rows.map((u) => u.id)), ...(detail?.id ? [detail.id] : [])]);
     if (kind === "persona") return new Set(pool.personas.map((p) => p.id));
     if (kind === "dimension") return new Set(pool.dimensions.map((d) => d.id));
+    if (kind === "entity" || kind === "relationship_type" || kind === "constellation") return new Set((pool.world[kind === "entity" ? "entities" : kind === "constellation" ? "constellations" : "relationship_types"] ?? []).map((x) => x.id));
     return new Set(pool.objects.map((o) => o.id));
   };
 
@@ -888,10 +900,40 @@ export function createUseCasesView(options) {
     if (!saved.deleted) selectedObject = saved.id;
   }
 
-  async function generate() {
-    const saved = await openGenerateDialog({ pool: poolView, generate: (input) => api.generatePersonas(project, input) });
+  async function generate(target = "personas") {
+    const saved = await openGenerateDialog({ pool: poolView, target, generate: (input) => api.generatePersonas(project, input) });
     if (!saved) return;
-    reportWrite(saved.data, `${plural(saved.created, "persona")} generated.`);
+    reportWrite(saved.data, `${plural(saved.created, saved.target === "constellations" ? "constellation" : "persona")} generated.`);
+  }
+
+  /** "Used by 3 use cases." for the footer of a world dialog and its delete question; empty when the read fails. */
+  const usageOf = (filter) => async (id) => {
+    const res = await api.listUseCases(project, { ...filter(id), limit: 1 });
+    return res.ok ? `Used by ${plural(res.data.total ?? 0, "use case")}.` : "";
+  };
+
+  async function editEntity(id) {
+    const source = id ? pool.world.entities.find((e) => e.id === id) : null;
+    if (id && !source) return;
+    const saved = await openEntityDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("entity"), save: (payload) => api.setUseCases(project, { entities: [payload] }), remove: (eid) => api.deleteMainEntity(project, eid), usage: usageOf((eid) => ({ entity: eid })) });
+    if (!saved) return;
+    reportWrite(saved.data, saved.deleted ? "Entity deleted." : "Entity saved.");
+  }
+
+  async function editRelationshipType(id) {
+    const source = id ? pool.world.relationship_types.find((t) => t.id === id) : null;
+    if (id && !source) return;
+    const saved = await openRelationshipTypeDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("relationship_type"), save: (payload) => api.setUseCases(project, { relationship_types: [payload] }), remove: (tid) => api.deleteRelationshipType(project, tid) });
+    if (!saved) return;
+    reportWrite(saved.data, saved.deleted ? "Relationship type deleted." : "Relationship type saved.");
+  }
+
+  async function editConstellation(id) {
+    const source = id ? pool.world.constellations.find((c) => c.id === id) : null;
+    if (id && !source) return;
+    const saved = await openConstellationDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("constellation"), save: (payload) => api.setUseCases(project, { constellations: [payload] }), remove: (cid) => api.deleteConstellation(project, cid), usage: usageOf((cid) => ({ constellation: cid })) });
+    if (!saved) return;
+    reportWrite(saved.data, saved.deleted ? "Constellation deleted." : "Constellation saved.");
   }
 
   function addForSection() {

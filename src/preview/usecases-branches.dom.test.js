@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// Branch changes of a variant in the use-case dialog (ADR-011): listed read-only, movable and removable, saved as stored.
+// Branch changes of a variant in the use-case dialog (ADR-011, CHR-1154): editable rows, movable and removable, saved as stored while untouched.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { openUseCaseDialog } from "./usecases-forms.js";
 import { makePool, rawUseCase } from "./usecases.test-helper.js";
@@ -48,11 +48,12 @@ beforeEach(() => {
 });
 
 describe("branch changes in the variant editor", () => {
-  it("lists a stored branch op read-only and saves it unchanged next to an edited title", async () => {
+  it("lists a stored branch op as a row of its own kind and saves it unchanged next to an edited title", async () => {
     const { opts, closed } = await open();
     const rows = [...branchRows()];
-    expect(rows.map((r) => r.textContent)).toEqual([expect.stringContaining("Add branch Hold (1 step)"), expect.stringContaining("Remove branch offline")]);
-    expect($$("select, textarea, input", rows[0])).toHaveLength(0); // nothing to type into
+    expect(rows.map((r) => r.querySelector("select").value)).toEqual(["add_branch", "remove_branch"]);
+    expect(rows[0].querySelector(".uc-op-branch-summary").textContent).toContain("Hold · 1 step");
+    expect(rows[1].querySelector("select[data-role=branch]").value).toBe("offline");
     type(document.querySelector('input[aria-label="Variant 2 title"]'), "Renamed");
     button("Save use case").click();
     await closed;

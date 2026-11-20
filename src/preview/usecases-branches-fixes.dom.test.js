@@ -49,7 +49,7 @@ describe("variant editor and branch steps", () => {
   it("an op on a branch step lists it as a branch step: no 'unknown' option and no skipped warning", async () => {
     await openWith(withBranch([{ op: "replace", step_id: "show-offline", step: { id: "show-offline", actor: "system", action: "Changed" } }]));
     const select = card().querySelector("select[data-role=step]");
-    expect(select.textContent).toContain("show-offline (branch step)");
+    expect(select.textContent).toContain("A.1 · Shows the saved state"); // listed under its branch number, like the detail view numbers it
     expect(select.textContent).not.toContain("unknown");
     expect(card().textContent).not.toContain("is not a step of the flow");
   });

@@ -178,6 +178,11 @@ export const FLAT_PAGE = 100;
 /** Largest single request the list makes (the most list_use_cases returns). */
 export const PAGE_MAX = 100;
 
+/** Rows to request when `remaining` are left and a page is `page`: a single leftover row is taken along instead of becoming a "Show 1 more" button. */
+export function pageSize(remaining, page) {
+  return remaining <= page + 1 ? remaining : page;
+}
+
 /**
  * One flat array of the rows currently visible in the grouped tree (what the virtual list renders from). `groupState`
  * maps a path to { rows, loading }; `ungrouped` is { count, rows, loading } for cases without a group.
@@ -292,6 +297,7 @@ export function treeKeyNav(rows, activeKey, key) {
 export function formatValue(value) {
   if (value === undefined) return "—";
   if (value === null) return "null";
+  if (value === "") return '""'; // an empty string must stay visible in a data change
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 

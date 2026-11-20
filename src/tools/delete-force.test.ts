@@ -307,6 +307,7 @@ describe("delete_entity refuses a referenced pool entry unless force (CHR-1125)"
       });
       expect((res.warnings as Warning[]).filter((w) => w.kind === "invalid_file")).toHaveLength(10);
       expect(res.invalid_file_count).toBe(12);
+      expect(res.invalid_file_omitted_count).toBe(2);
     });
   });
 });

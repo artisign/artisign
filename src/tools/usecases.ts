@@ -293,8 +293,14 @@ async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promis
   const entries = poolEntryWarnings(uniqueIssues(poolIssues));
   const files = invalidCaseWarnings(invalid);
   if (entries.length + files.length > 0) response.warnings = [...entries.slice(0, 10), ...files.slice(0, 10)];
-  if (files.length > 10) response.invalid_file_count = files.length;
-  if (entries.length > 10) response.invalid_pool_entry_count = entries.length;
+  if (files.length > 10) {
+    response.invalid_file_count = files.length;
+    response.invalid_file_omitted_count = files.length - 10;
+  }
+  if (entries.length > 10) {
+    response.invalid_pool_entry_count = entries.length;
+    response.invalid_pool_entry_omitted_count = entries.length - 10;
+  }
   return response;
 }
 
@@ -911,8 +917,9 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
     ];
     if (invalidCases.length > 10) invalidCount = invalidCases.length;
   }
+  const invalidOmitted = invalidCount !== undefined ? invalidCount - 10 : undefined;
   const commitResult = await commitUseCaseWrite(store, ctx, "delete_entity", `${kind}:${name}`, [path]);
-  return { kind, name, path, ...commitFields(commitResult), warnings, ...(invalidCount !== undefined ? { invalid_file_count: invalidCount } : {}) };
+  return { kind, name, path, ...commitFields(commitResult), warnings, ...(invalidCount !== undefined ? { invalid_file_count: invalidCount, invalid_file_omitted_count: invalidOmitted } : {}) };
 }
 
 // Public entry points: invalid files become invalid_state; every writer runs one at a time per store.

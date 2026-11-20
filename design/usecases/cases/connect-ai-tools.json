@@ -122,7 +122,7 @@
       "when": [
         {
           "subject": "system",
-          "property": "skill-status",
+          "property": "skill_status",
           "value": "unavailable"
         }
       ],

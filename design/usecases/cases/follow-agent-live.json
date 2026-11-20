@@ -98,7 +98,7 @@
       "when": [
         {
           "subject": "system",
-          "property": "activity-feed-length",
+          "property": "activity_feed_length",
           "value": 0
         }
       ],
@@ -121,7 +121,7 @@
       "when": [
         {
           "subject": "system",
-          "property": "touched-kind",
+          "property": "touched_kind",
           "value": "mockup"
         }
       ],

@@ -23,7 +23,7 @@
   "state": [
     {
       "subject": "system",
-      "property": "open-project-count",
+      "property": "open_project_count",
       "value": 0
     }
   ],
@@ -111,7 +111,7 @@
       "when": [
         {
           "subject": "system",
-          "property": "new-folder-exists",
+          "property": "new_folder_exists",
           "value": true
         }
       ],
@@ -134,7 +134,7 @@
       "when": [
         {
           "subject": "system",
-          "property": "new-folder-name-valid",
+          "property": "new_folder_name_valid",
           "value": false
         }
       ],
@@ -157,7 +157,7 @@
       "when": [
         {
           "subject": "system",
-          "property": "parent-folder-writable",
+          "property": "parent_folder_writable",
           "value": false
         }
       ],
@@ -190,7 +190,7 @@
       "state": [
         {
           "subject": "system",
-          "property": "open-project-count",
+          "property": "open_project_count",
           "unset": true
         }
       ],

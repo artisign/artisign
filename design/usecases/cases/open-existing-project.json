@@ -28,7 +28,7 @@
     },
     {
       "subject": "system",
-      "property": "open-project-count",
+      "property": "open_project_count",
       "value": 0
     }
   ],

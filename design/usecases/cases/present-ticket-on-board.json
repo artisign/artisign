@@ -86,7 +86,7 @@
       "when": [
         {
           "subject": "system",
-          "property": "screens-matching-filter",
+          "property": "screens_matching_filter",
           "value": 0
         }
       ],

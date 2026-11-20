@@ -68,7 +68,7 @@
       "when": [
         {
           "subject": "system",
-          "property": "mapped-case-branch-count",
+          "property": "mapped_case_branch_count",
           "op": "gt",
           "value": 0
         }

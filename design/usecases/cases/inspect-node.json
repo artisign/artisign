@@ -65,7 +65,7 @@
       "when": [
         {
           "subject": "system",
-          "property": "selected-screen-is-variant",
+          "property": "selected_screen_is_variant",
           "value": true
         }
       ],

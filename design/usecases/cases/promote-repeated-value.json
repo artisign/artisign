@@ -18,7 +18,7 @@
     "state": [
       {
         "subject": "system",
-        "property": "last-write-warning",
+        "property": "last_write_warning",
         "value": "repeated_pattern"
       }
     ]

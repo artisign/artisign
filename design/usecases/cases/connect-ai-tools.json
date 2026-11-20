@@ -25,11 +25,6 @@
       "subject": "ai-tool-sol",
       "property": "connected",
       "value": false
-    },
-    {
-      "subject": "ai-tool-sol",
-      "property": "skill_installed",
-      "value": false
     }
   ],
   "inputs": [

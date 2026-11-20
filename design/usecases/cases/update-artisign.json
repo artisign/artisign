@@ -57,7 +57,18 @@
     {
       "id": "run",
       "actor": "solo-founder-sol",
-      "action": "Copies and runs artisign update",
+      "action": "Copies and runs artisign update, which re-pins the client entries",
+      "data": [
+        {
+          "object": "mcp-client",
+          "before": {
+            "pinned_version": "2.2.1"
+          },
+          "after": {
+            "pinned_version": "2.3.0"
+          }
+        }
+      ],
       "via": "terminal"
     },
     {

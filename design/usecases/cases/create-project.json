@@ -187,11 +187,27 @@
       "personas": [
         "design-agent-dex"
       ],
+      "state": [
+        {
+          "subject": "system",
+          "property": "open-project-count",
+          "unset": true
+        }
+      ],
       "trigger": {
         "text": "Sol asks the AI tool to create an Artisign project.",
         "actor": "solo-founder-sol",
         "via": "AI tool chat"
       },
+      "inputs": [
+        {
+          "object": "project",
+          "source": "init_project call with the folder the user named",
+          "example": {
+            "root": "/Users/sol/coffee-finder/design"
+          }
+        }
+      ],
       "steps": [
         {
           "op": "replace",

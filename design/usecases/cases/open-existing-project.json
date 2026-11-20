@@ -25,6 +25,11 @@
       "subject": "project-shop",
       "property": "open",
       "value": false
+    },
+    {
+      "subject": "system",
+      "property": "open-project-count",
+      "value": 0
     }
   ],
   "inputs": [

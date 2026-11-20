@@ -14,9 +14,9 @@
     "design-team-large-project"
   ],
   "trigger": {
-    "text": "The agent starts a task and Dana wants to watch.",
-    "actor": "design-agent-dex",
-    "via": "MCP"
+    "text": "Dana hands the agent a task and wants to watch it work.",
+    "actor": "designer-dana",
+    "via": "browser preview"
   },
   "goal": "The preview shows whatever the agent touches.",
   "outcome": "Each tool call navigates and highlights the nodes; Dana's own navigation pauses following.",

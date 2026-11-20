@@ -4,7 +4,7 @@
 // themselves (use case, persona, dimension, data object, generate personas).
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { draftFromSource, buildPayload, draftWarnings, openUseCaseDialog } from "./usecases-forms.js";
-import { buildPersonaPayload, buildDimensionPayload, buildObjectPayload, openPersonaDialog, openDimensionDialog, openObjectDialog, openGenerateDialog } from "./usecases-forms-pool.js";
+import { refusalText, buildPersonaPayload, buildDimensionPayload, buildObjectPayload, openPersonaDialog, openDimensionDialog, openObjectDialog, openGenerateDialog } from "./usecases-forms-pool.js";
 import { blankVariant } from "./usecases-variant-edit.js";
 import { makePool, rawUseCase } from "./usecases.test-helper.js";
 
@@ -618,7 +618,8 @@ describe("menu with typed values", () => {
     button("Delete Medium project").click();
     await flush();
     expect(remove.mock.calls).toEqual([["gen-medium"]]); // the first call never sends force
-    expect($(".uc-foot-msg").textContent).toContain('persona "gen-medium" is still referenced by 1 use case(s): borrow-book');
+    expect($(".uc-foot-msg").textContent).toContain("Medium project is still used by 1 use case: Borrow book.");
+    expect($(".uc-foot-msg").textContent).not.toContain("(s)");
     expect($(".uc-foot-msg").textContent).not.toContain("force: true");
     expect($("dialog")).not.toBeNull(); // still open, nothing deleted
     button("Delete anyway").click();
@@ -639,5 +640,31 @@ describe("menu with typed values", () => {
     expect(button("Delete anyway")).toBeUndefined();
     expect(remove).toHaveBeenCalledTimes(1);
     expect(remove).toHaveBeenCalledWith("gen-medium");
+  });
+});
+
+describe("refusalText: the human sentence of a refused delete", () => {
+  const msg = (text) => `${text} — remove these references first (set_use_cases), or pass force: true to delete anyway`;
+
+  it("singular: one referrer, no (s), uppercase start, the display name", () => {
+    expect(refusalText(msg('persona "staff-lee" is still referenced by 1 use case(s): borrow-book'), "staff Lee")).toBe("Staff Lee is still used by 1 use case: Borrow book.");
+  });
+
+  it("plural: several referrers as a list, the +N more tail kept as words", () => {
+    expect(refusalText(msg('persona "staff-lee" is still referenced by 7 use case(s): borrow-book, return-book, renew-loan, pay-fine, join-library, +2 more'), "Lee")).toBe(
+      "Lee is still used by 7 use cases: Borrow book, Return book, Renew loan, Pay fine, Join library and 2 more.",
+    );
+  });
+
+  it("several groups become several sentences; (ies) and variant ids read naturally", () => {
+    const text = refusalText(msg('entity "copy-42" is still referenced by 1 constellation(s): ana-and-copy; entity "copy-42" is still referenced by 2 use case(s) as a state, condition or trigger subject: borrow-book, return-book'), "Copy 42");
+    expect(text).toBe("Copy 42 is still used by 1 constellation: Ana and copy. It is also still used by 2 use cases as a state, condition or trigger subject: Borrow book, Return book.");
+    expect(refusalText(msg('dimension "membership" is still referenced by 2 entity(ies): a, b'), "Membership")).toContain("2 entities");
+    expect(refusalText(msg('dimension "membership" is still referenced by 1 entity(ies): a'), "Membership")).toContain("1 entity:");
+    expect(refusalText(msg('constellation "x" is still referenced by 1 use case(s) or variant(s): borrow-book#staff-for-member'), "X")).toContain("Borrow book, variant staff for member");
+  });
+
+  it("the unreadable-files refusal keeps its own sentence", () => {
+    expect(refusalText('cannot safely delete persona "x" — reference check is incomplete because the following case file(s) failed to load: usecases/cases/a.json — repair them, or pass force: true to delete anyway', "X")).toBe("The reference check is incomplete: usecases/cases/a.json could not be read.");
   });
 });

@@ -100,11 +100,37 @@ export function footer(dialog, { saveLabel, onSave, onDelete, deleteLabel, note 
   return save;
 }
 
-/** The references (or unreadable files) out of a `conflict` refusal of delete_entity, without the agent-facing way out. */
-export function refusalText(message) {
+const humanize = (id) => {
+  const words = String(id).replace(/[-_]+/g, " ").trim();
+  return words ? words[0].toUpperCase() + words.slice(1) : String(id);
+};
+/** "borrow-book" -> "Borrow book"; "borrow-book#staff-lee" -> "Borrow book, variant staff lee". */
+const humanRef = (ref) => {
+  const [base, variant] = ref.split("#");
+  return variant ? `${humanize(base)}, variant ${variant.replace(/[-_]+/g, " ")}` : humanize(base);
+};
+const noun = (text, n) => text.replace(/y\(ies\)/g, n === 1 ? "y" : "ies").replace(/\(s\)/g, n === 1 ? "" : "s");
+
+/**
+ * The human sentence for a refused delete (`conflict` of delete_entity), built from the groups of the server message
+ * (`<kind> "<id>" is still referenced by <n> <what>: <ids>`): "Staff lee is still used by 1 use case: Borrow book." The server message
+ * itself, written for agents, is unchanged. `name` is the entry's display name; without it the id is made readable.
+ */
+export function refusalText(message, name) {
   const files = /failed to load: (.*?) — repair/.exec(message);
   if (message.startsWith("cannot safely delete") && files) return `The reference check is incomplete: ${files[1]} could not be read.`;
-  return `${message.split(" — ")[0]}.`;
+  const groups = message.split(" — ")[0].split("; ");
+  const sentences = groups.map((group, index) => {
+    const m = /^\S+(?: \S+)? "(.+?)" is still referenced by (\d+) (.+?): (.+)$/.exec(group);
+    if (!m) return `${group.charAt(0).toUpperCase()}${group.slice(1)}.`;
+    const [, id, count, what, refs] = m;
+    const n = Number(count);
+    const more = /, \+(\d+) more$/.exec(refs);
+    const list = refs.replace(/, \+\d+ more$/, "").split(", ").map(humanRef).join(", ") + (more ? ` and ${more[1]} more` : "");
+    const subject = index === 0 ? humanize(name ?? id) : "It";
+    return `${subject} ${index === 0 ? "is" : "is also"} still used by ${n} ${noun(what, n)}: ${list}.`;
+  });
+  return sentences.join(" ");
 }
 
 /**
@@ -123,7 +149,7 @@ export function confirmDeleteInline(dialog, { name, remove, done, used = "" }) {
     dialog.close(done(response));
   };
   const offerForce = (message) => {
-    dialog.setMessage(`${refusalText(message)} Delete anyway leaves these references broken. ${REMOVE_NOTE}`, "warning");
+    dialog.setMessage(`${refusalText(message, name)} Delete anyway leaves these references broken. ${REMOVE_NOTE}`, "warning");
     dialog.showActions([
       { label: "Keep it", autofocus: true, onClick: () => dialog.restoreActions() },
       { label: "Delete anyway", id: "delete-anyway", danger: true, onClick: () => finish(true) },

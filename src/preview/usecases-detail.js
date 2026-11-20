@@ -288,7 +288,14 @@ function stepRow(ctx, row, numbered, w) {
   const scope = stepScope(step, mapping);
   const note = mappingNote(step, mapping, found?.screen);
   const was = row.was;
-  const stepWarnings = (w.step.get(step.id) ?? []).filter((x) => !x.kind.startsWith("mapping_"));
+  // The orphan notes already say it in human words: the raw warning text of the same fact is not shown a second time.
+  const stepObjects = new Set((step.data ?? []).map((d) => d.object));
+  const stepWarnings = (w.step.get(step.id) ?? []).filter(
+    (x) =>
+      !x.kind.startsWith("mapping_") &&
+      !(x.kind === "unknown_persona" && actorMissing(ctx, step.actor) && x.message.includes(`"${step.actor}"`)) &&
+      !(x.kind === "unknown_data_object" && [...stepObjects].some((id) => ctx.orphans?.dataObjects.has(id) && x.message.includes(`"${id}"`))),
+  );
   const card = h(
     "div",
     { class: "uc-step-card", dataset: { change: row.change ?? "" } },

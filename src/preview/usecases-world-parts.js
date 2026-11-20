@@ -66,7 +66,7 @@ export function relationRow({ from, label, to, note, warning = "", fromOrphan = 
   return h(
     "li",
     { class: `uc-relation${warning || fromOrphan || toOrphan || typeOrphan ? " is-warning" : ""}` },
-    h("span", { class: "uc-relation-line" }, end(from, fromOrphan), h("span", { class: "uc-relation-type" }, h("span", { "aria-hidden": "true" }, "—"), h("span", typeOrphan ? { class: "is-orphan", dataset: { orphan: "relationship_type" }, title: "This relationship type is not declared" } : null, label, typeOrphan ? hiddenNote("this relationship type is not declared") : null), typeOrphan ? icon("warning") : icon("arrow_forward")), end(to, toOrphan)),
+    h("span", { class: "uc-relation-line" }, end(from, fromOrphan), h("span", { class: "uc-relation-type" }, h("span", { "aria-hidden": "true" }, "—"), h("span", typeOrphan ? { class: "is-orphan", dataset: { orphan: "relationship_type" }, title: "This relationship type is not declared" } : null, label, typeOrphan ? hiddenNote("this relationship type is not declared") : null), typeOrphan ? icon("warning") : null, icon("arrow_forward")), end(to, toOrphan)),
     note ? h("span", { class: "uc-relation-note" }, note) : null,
   );
 }

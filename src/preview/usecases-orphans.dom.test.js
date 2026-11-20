@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 //
 // CHR-1125 / ADR-010 amendment, item 10: what the case names but the pools lack is marked on the element, one marker per kind.
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderDetail } from "./usecases-detail.js";
 import { orphansOf, orphanSummary } from "./usecases-orphans.js";
@@ -153,4 +155,29 @@ describe("review round (code-review of PR #200)", () => {
     expect($('.uc-participant[data-orphan="participant"] .uc-visually-hidden', card).textContent).toContain("neither a persona nor an entity");
   });
 
+
+  it("the step card says an orphan once: the note replaces the raw persona and data object warnings", () => {
+    const steps = baseCase.steps.map((s) => (s.id === "open" ? { ...s, actor: "ghost", data: [{ object: "premium", before: { amount: 1 }, after: { amount: 2 } }] } : s));
+    const warnings = [
+      { kind: "unknown_persona", target: "use_case:review-premium/open", message: 'persona "ghost" does not exist' },
+      { kind: "unknown_data_object", target: "use_case:review-premium/open", message: 'data object "premium" does not exist' },
+    ];
+    render(withWarnings(worldBundle, warnings, { use_case: { ...baseCase, steps } }));
+    const step = $('.uc-step[data-step="open"]');
+    expect(step.querySelectorAll('[data-orphan="actor"]')).toHaveLength(1);
+    expect(step.textContent).not.toContain("does not exist");
+  });
+
+  it("an orphaned relationship type keeps the direction arrow next to the warning marker", () => {
+    const broken = constellations.map((c) => (c.id === "single-parent" ? { ...c, relationships: [{ from: "maria", type: "mentors", to: "leo" }] } : c));
+    const warnings = [{ kind: "unknown_relationship_type", target: "constellation:single-parent", message: 'relationship "maria mentors leo" names undeclared type "mentors"' }];
+    render(withWarnings(worldBundle, warnings, { constellations: broken }));
+    expect($('.uc-cst[data-constellation="single-parent"] .uc-relation-type').textContent).toContain("arrow_forward");
+  });
+
+  it("the stylesheet lets the data-card note span the grid and the orphan box keep its amber border", () => {
+    const css = readFileSync(resolve(process.cwd(), "src/preview/style.css"), "utf8");
+    expect(css).toMatch(/\.uc-step-data\.is-orphan > \.uc-orphan-note \{\s*grid-column: 1 \/ -1;/);
+    expect(css).toMatch(/\.uc-gap-box\.uc-orphan-box \{\s*border-color: var\(--chrome-warning\);/);
+  });
 });

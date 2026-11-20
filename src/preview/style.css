@@ -6356,8 +6356,13 @@ body:has(#settings-menu:not([hidden])) #update-notice {
   white-space: nowrap;
 }
 
-.uc-orphan-box {
+.uc-gap-box.uc-orphan-box {
   border-color: var(--chrome-warning);
+}
+
+/* The note sits in the 3-column data grid: it spans the row instead of taking the first cell. */
+.uc-step-data.is-orphan > .uc-orphan-note {
+  grid-column: 1 / -1;
 }
 
 .uc-person-sub {

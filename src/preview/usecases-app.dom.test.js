@@ -90,6 +90,8 @@ function stubDaemon() {
       return json(found ? { ...baseBundle, use_case: { ...baseBundle.use_case, id: found.id, title: found.title, group: found.group } } : baseBundle);
     }
     if (path === "/api/use-case") return json({ use_case: rawUseCase });
+    if (path === "/api/world" && store?.worldFail) return { ok: false, status: 422, json: async () => ({ code: "invalid_state", message: "usecases/world.json is not valid JSON" }) };
+    if (path === "/api/world") return json(store?.world ?? { entities: [], relationship_types: [], constellations: [] });
     return json({});
   });
 }
@@ -505,6 +507,161 @@ describe("review fixes", () => {
       .click();
     await flush();
     expect($$(".uc-menu .uc-menu-label").map((l) => l.textContent)).toEqual(["Dana", "Dex", "Medium project"]);
+  });
+});
+
+describe("world pool", () => {
+  const world = {
+    entities: [{ id: "leo", name: "Leo", type: "Child", avatar: { emoji: "🧒" }, traits: {} }],
+    relationship_types: [{ id: "parent-of", label: "is parent of", inverse_label: "is child of" }],
+    constellations: [{ id: "single-parent", name: "Single parent, one child", traits: {}, relationships: [{ from: "dana", type: "parent-of", to: "leo" }] }, { id: "couple", name: "Couple without children", traits: {}, relationships: [] }],
+  };
+  beforeEach(() => {
+    store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements")], world };
+  });
+
+  it("the Constellation filter menu lists the names from the pool and sends the id as the filter", async () => {
+    await import("./app.js");
+    await flush();
+    await openTab();
+    expect(calls.some((c) => c.path === "/api/world" && c.method === "GET")).toBe(true);
+    $$(".uc-filter-chip-main").find((b) => b.textContent.startsWith("Constellation")).click();
+    await flush();
+    expect($$(".uc-menu .uc-menu-label").map((l) => l.textContent)).toEqual(["Single parent, one child", "Couple without children"]);
+    $$(".uc-menu .uc-menu-item").find((b) => b.textContent.includes("Couple")).click();
+    await flush();
+    expect(calls.filter((c) => c.tool === "list_use_cases").at(-1).body.constellation).toBe("couple");
+    expect($$(".uc-filter-chip").some((c) => c.textContent.includes("Constellation: Couple without children"))).toBe(true);
+  });
+
+  it("the World tab reads the pool: counts in the side panel, three sections, each with its New button", async () => {
+    await import("./app.js");
+    await flush();
+    await openTab();
+    $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
+    await flush();
+    expect($$(".uc-world-nav-item .uc-world-nav-hint").map((n) => n.textContent)).toEqual(["1 · things with identity", "1 · how participants relate", "2 · starting worlds"]);
+    expect($$(".uc-world-page .uc-h2").map((h) => h.firstChild.textContent)).toEqual(["Entities", "Relationship types", "Constellations"]);
+    expect($(".uc-world-page tr[data-id=leo]").textContent).toContain("Child");
+    expect($$(".uc-cst").map((c) => c.querySelector(".uc-cst-name").textContent)).toEqual(["Single parent, one child", "Couple without children"]);
+    expect($("#uc-add").hidden).toBe(true);
+    expect($$("#usecases-view .uc-world-page .uc-h2-row button").map((b) => b.textContent)).toEqual(["New entity", "New relationship type", "Generate…", "New constellation"]);
+  });
+
+  it("New entity writes through set_use_cases { entities }; the entry opens its dialog; delete goes through the entity kind", async () => {
+    await import("./app.js");
+    await flush();
+    await openTab();
+    $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
+    await flush();
+    $$("#usecases-view .uc-world-page .uc-h2-row button").find((b) => b.textContent === "New entity").click();
+    await flush();
+    const field = document.querySelector("dialog input[autofocus]");
+    field.value = "Household policy";
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    [...document.querySelectorAll("dialog .uc-foot-actions button")].find((b) => b.textContent === "Create entity").click();
+    await flush();
+    const write = calls.find((c) => c.tool === "set_use_cases");
+    expect(write.body).toEqual({ entities: [{ id: "household-policy", name: "Household policy" }] });
+    expect($(".uc-toast").textContent).toContain("Entity saved.");
+    // an entry opens its dialog, and a delete names the entity kind (and nothing else)
+    $(".uc-world-page tr[data-id=leo] .uc-link-row").click();
+    await flush();
+    expect(document.querySelector("dialog h1").textContent).toBe("Edit entity");
+    [...document.querySelectorAll("dialog .uc-foot-actions button")].find((b) => b.textContent === "Delete").click();
+    await flush();
+    [...document.querySelectorAll("dialog .uc-foot-actions button")].find((b) => b.textContent === "Delete Leo").click();
+    await flush();
+    expect(calls.find((c) => c.tool === "delete_entity").body).toEqual({ kind: "entity", name: "leo" });
+    expect(calls.filter((c) => c.tool === "list_use_cases" && c.body.entity === "leo" && c.body.limit === 1).length).toBeGreaterThan(0); // "Used by …" is a read of the list, not a new route
+  });
+
+  it("the other two pool dialogs write relationship_types and constellations and delete with their own kinds", async () => {
+    await import("./app.js");
+    await flush();
+    await openTab();
+    $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
+    await flush();
+    const dialogButton = (label) => [...document.querySelectorAll("dialog .uc-foot-actions button")].find((b) => b.textContent === label);
+    $$("#usecases-view .uc-world-page .uc-h2-row button").find((b) => b.textContent === "New relationship type").click();
+    await flush();
+    const label = document.querySelector("dialog input[autofocus]");
+    label.value = "holds";
+    label.dispatchEvent(new Event("input", { bubbles: true }));
+    dialogButton("Create relationship type").click();
+    await flush();
+    expect(calls.filter((c) => c.tool === "set_use_cases").at(-1).body).toEqual({ relationship_types: [{ id: "holds", label: "holds" }] });
+    $(".uc-cst[data-constellation=couple] .uc-link-row").click();
+    await flush();
+    expect(document.querySelector("dialog h1").textContent).toBe("Edit constellation");
+    dialogButton("Delete").click();
+    await flush();
+    dialogButton("Delete Couple without children").click();
+    await flush();
+    expect(calls.filter((c) => c.tool === "delete_entity").at(-1).body).toEqual({ kind: "constellation", name: "couple" });
+    $(".uc-world-page tr[data-id=parent-of] .uc-link-row").click();
+    await flush();
+    dialogButton("Delete").click();
+    await flush();
+    dialogButton("Delete is parent of").click();
+    await flush();
+    expect(calls.filter((c) => c.tool === "delete_entity").at(-1).body).toEqual({ kind: "relationship_type", name: "parent-of" });
+  });
+
+  it("Generate… on the World tab opens the constellations target and sends it", async () => {
+    store = { ...store, dimensions: [...dimensions, { id: "household", label: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "couple", label: "Couple" }] }] };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
+    await flush();
+    $$("#usecases-view .uc-world-page .uc-h2-row button").find((b) => b.textContent === "Generate…").click();
+    await flush();
+    expect(document.querySelector("dialog .uc-segmented [aria-checked=true]").textContent).toBe("Constellations");
+    [...document.querySelectorAll("dialog button")].find((b) => b.textContent.includes("Preview")).click();
+    await flush();
+    const dry = calls.find((c) => c.tool === "generate_personas");
+    expect(dry.body).toEqual({ strategy: "pairwise", target: "constellations", limit: 100, dry_run: true });
+  });
+
+  it("the empty World guide has the three steps as buttons, with Generate constellations", async () => {
+    store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements")] };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
+    await flush();
+    expect($$(".uc-guide-steps button").map((b) => b.textContent)).toEqual(["addNew entity", "addNew relationship type", "addNew constellation", "Generate constellations"]);
+    $$(".uc-guide-steps button").find((b) => b.textContent.endsWith("New constellation")).click();
+    await flush();
+    expect(document.querySelector("dialog h1").textContent).toBe("New constellation");
+  });
+
+  it("a world that cannot be read says so in the World tab, the filter menu and a toast, never an empty world", async () => {
+    store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements")], worldFail: true };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    expect($(".uc-toast").textContent).toContain("The world could not be read: usecases/world.json is not valid JSON");
+    $$(".uc-filter-chip-main").find((b) => b.textContent.startsWith("Constellation")).click();
+    await flush();
+    expect($(".uc-menu").textContent).toContain("The world could not be read");
+    expect($(".uc-menu").textContent).not.toContain("No constellations in the world yet.");
+    $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
+    await flush();
+    expect($(".uc-guide-title").textContent).toBe("The world could not be read");
+    expect($("[role=alert]").textContent).toBe("usecases/world.json is not valid JSON");
+  });
+
+  it("an empty world shows the guide instead of tables", async () => {
+    store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements")] };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
+    await flush();
+    expect($(".uc-guide-title").textContent).toBe("Describe the world your use cases start in");
+    expect($(".uc-world-page")).toBeNull();
   });
 });
 

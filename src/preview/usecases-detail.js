@@ -5,10 +5,11 @@
 
 import { h, icon } from "./usecases-dom.js";
 import { openMenu } from "./usecases-menu.js";
-import { avatar, statusBadge, diffBadge, targetChip, dataCard, variantChip } from "./usecases-parts.js";
+import { avatar, statusBadge, diffBadge, targetChip, variantChip, traitChip } from "./usecases-parts.js";
+import { actorKind, mappingNote, stepDataBlock, warnLine } from "./usecases-world-parts.js";
+import { KIND_ICONS, warningsByTarget, numberBranches, scopeOf, matchingConstellations, whenScopeText, triggerChanged, stateRows } from "./usecases-world-data.js";
+import { triggerRow, worldSection, worldDiffSection, stateSection, branchesDiffSection, lanesAt, stepBranchNotes } from "./usecases-world-view.js";
 import {
-  triggerText,
-  triggerKey,
   avatarOf,
   actorName,
   buildFlowRows,
@@ -16,7 +17,6 @@ import {
   stepScope,
   fieldRows,
   ioChangedKeys,
-  changedKeys,
   formatValue,
   whenEntries,
   matchingPersonas,
@@ -28,7 +28,7 @@ import {
 /** "Small project · Human" — a persona's trait values as labels. */
 function traitSummary(persona, dimensionsById) {
   return Object.entries(persona.traits ?? {})
-    .map(([dimension, value]) => dimensionsById.get(dimension)?.values.find((v) => v.id === value)?.label ?? value)
+    .map(([dimension, value]) => `${dimensionsById.get(dimension)?.label ?? dimension} ${dimensionsById.get(dimension)?.values.find((v) => v.id === value)?.label ?? value}`)
     .join(" · ");
 }
 
@@ -49,25 +49,41 @@ export function renderDetail(root, ctx) {
   const sourceVariant = variantId ? (source?.variants ?? []).find((v) => v.id === variantId) : null;
   const variantInfo = variantId ? (bundle.variant ?? variants.find((v) => v.id === variantId)) : null;
   const basePersonas = (baseCase.personas ?? []).map((id) => pool.personasById.get(id)).filter(Boolean);
-  const matrix = coverageMatrix({ dimensions: pool.dimensions, pool: pool.personas, basePersonas, variants, uncovered: ctx.suggest?.coverage });
+  // The world's columns: the constellations the base case lists, and the values the constellation pool uses (from the tool's own coverage).
+  const baseConstellations = (base.constellations ?? []).filter((c) => (baseCase.constellations ?? []).includes(c.id));
+  const usedValues = new Map((ctx.suggest?.coverage ?? []).map((c) => [c.dimension, new Set([...(c.covered ?? []), ...(c.uncovered ?? [])])]));
+  const matrix = coverageMatrix({ dimensions: pool.dimensions, pool: pool.personas, basePersonas, variants, uncovered: ctx.suggest?.coverage, baseConstellations, usedValues });
   const showCoverage = variants.length > 0 || matrix.gaps > 0 ? ctx.coverageOpen || Boolean(variantId) : false;
+  const w = warningsByTarget(bundle.warnings, useCase.id, variantId);
 
   const main = h("div", { class: "uc-detail-main" });
-  main.append(header(ctx, useCase));
+  main.append(header(ctx, useCase, w));
   main.append(variantBar(ctx, variants, source, matrix));
   if (variantInfo) main.append(variantPanel(ctx, variantInfo, sourceVariant));
   const peopleRow = people(ctx, useCase);
   if (peopleRow) main.append(peopleRow); // Node.append(null) would add the text "null"
   // The matrix is a full-width section of the detail column (not a narrow side panel): twelve columns need the room.
   if (showCoverage) main.append(coveragePanel(ctx, matrix));
-  main.append(story(useCase, baseCase, sourceVariant));
-  main.append(flow(ctx, useCase));
+  if (variantId) {
+    // A variant is a difference against the base: its constellations, trigger, state and branches, then the main flow.
+    main.append(story(ctx, w, sourceVariant));
+    for (const section of [worldDiffSection(ctx, sourceVariant, w), stateSection(ctx, { rows: stateRows({ state: useCase.state ?? [], removedState: bundle.removed_state ?? [], baseState: baseCase.state ?? [], variantSelected: true }), w, variantSelected: true }), branchesDiffSection(ctx, w, mainFlowDifferences(bundle))]) if (section) main.append(section);
+  } else {
+    main.append(story(ctx, w, null));
+    for (const section of [worldSection(ctx, w), stateSection(ctx, { rows: stateRows({ state: useCase.state ?? [], variantSelected: false }), w, variantSelected: false })]) if (section) main.append(section);
+  }
+  main.append(flow(ctx, useCase, w));
   main.append(inputsOutputs(ctx, useCase, baseCase, sourceVariant));
 
   root.replaceChildren(h("div", { class: "uc-detail" }, main));
 }
 
-function header(ctx, useCase) {
+/** How many main-flow steps a variant changed or added, plus the base steps it removed (branch removals are the Branches section's). */
+function mainFlowDifferences(bundle) {
+  return (bundle.use_case.steps ?? []).filter((s) => s.change === "changed" || s.change === "added").length + (bundle.removed_steps ?? []).filter((s) => s.branch === undefined).length;
+}
+
+function header(ctx, useCase, w) {
   const { handlers } = ctx;
   const groupPath = (useCase.group ?? "").split("/").filter(Boolean);
   return h(
@@ -93,16 +109,18 @@ function header(ctx, useCase) {
       (useCase.tags ?? []).map((tag) => h("span", { class: "uc-chip" }, tag)),
       h("button", { type: "button", class: "uc-id-chip", title: "Copy id", onClick: handlers.onCopyId }, useCase.id),
     ),
+    // Warnings that belong to the case as a whole (no step, branch or state to put them at).
+    w.case.length > 0 ? h("div", { class: "uc-case-warnings" }, w.case.map((x) => warnLine(x.message))) : null,
   );
 }
 
 function variantBar(ctx, variants, source, matrix) {
   const { handlers, variantId } = ctx;
   const baseCase = ctx.base.use_case;
-  const chips = [variantChip({ label: "Base", meta: plural(baseCase.steps.length, "step"), selected: !variantId, onClick: () => handlers.onVariant(null) })];
+  const chips = [variantChip({ label: "Base", meta: [plural(baseCase.steps.length, "step"), (baseCase.branches ?? []).length > 0 ? plural(baseCase.branches.length, "branch", "branches") : null].filter(Boolean).join(" · "), selected: !variantId, onClick: () => handlers.onVariant(null) })];
   for (const variant of variants) {
     const raw = (source?.variants ?? []).find((v) => v.id === variant.id);
-    const changes = raw ? variantChangeCount(raw, baseCase.steps) : 0;
+    const changes = raw ? variantChangeCount(raw, baseCase.steps, baseCase) : 0;
     chips.push(variantChip({ label: variant.title, meta: raw ? plural(changes, "change") : "", selected: variantId === variant.id, title: variant.description, onClick: () => handlers.onVariant(variant.id) }));
   }
   chips.push(variantChip({ label: "Variant", add: true, onClick: handlers.onAddVariant, title: "Add a variant" }));
@@ -120,10 +138,16 @@ function variantBar(ctx, variants, source, matrix) {
 }
 
 function variantPanel(ctx, variant, raw) {
-  const { pool } = ctx;
+  const { pool, bundle } = ctx;
   const conditions = whenEntries(variant.when, pool.dimensionsById);
-  const matches = matchingPersonas(variant.when, pool.personas);
-  const overrides = ["personas", "trigger", "goal", "outcome", "inputs", "outputs"].filter((key) => raw?.[key] !== undefined);
+  const personaWhen = Object.fromEntries(Object.entries(variant.when ?? {}).filter(([dimension]) => scopeOf(pool.dimensionsById.get(dimension)) !== "constellations"));
+  const matches = matchingPersonas(personaWhen, pool.personas);
+  // Neither the spec (§11) nor the design says which constellations "matches N" counts. A variant only takes effect in the constellations of its own case, so the count is case-scoped: the constellations the case and its variants list (persona matches count against the whole persona pool, which is every persona that could play it).
+  const worldMatches = matchingConstellations(variant.when, [...(ctx.base.constellations ?? []), ...(bundle.constellations ?? [])].filter((c, i, all) => all.findIndex((x) => x.id === c.id) === i), pool.dimensionsById);
+  const hasWorldWhen = Object.keys(variant.when ?? {}).some((dimension) => scopeOf(pool.dimensionsById.get(dimension)) === "constellations");
+  const matchText = [hasWorldWhen ? plural(worldMatches.length, "constellation") : null, matches.length > 0 || !hasWorldWhen ? plural(matches.length, "persona") : null].filter(Boolean).join(" and ");
+  const overrides = ["personas", "constellations", "trigger", "goal", "outcome", "inputs", "outputs"].filter((key) => raw?.[key] !== undefined);
+  const hasBranches = (bundle.use_case.branches ?? []).length > 0 || (bundle.removed_branches ?? []).length > 0;
   return h(
     "div",
     { class: "uc-variant-panel" },
@@ -131,9 +155,9 @@ function variantPanel(ctx, variant, raw) {
       "div",
       { class: "uc-applies" },
       h("span", { class: "uc-muted" }, "Applies when"),
-      conditions.map((entry) => h("span", { class: "uc-when" }, h("span", { class: "uc-when-dim" }, entry.label), h("span", { class: "uc-when-values" }, entry.values.map((v) => v.label).join(" or ")))),
-      h("span", { class: "uc-muted" }, `· matches ${plural(matches.length, "persona")}`),
-      h("span", { class: "uc-avatar-stack" }, matches.slice(0, 5).map((p) => avatar(avatarOf(p.id, pool.personasById), "sm", p.name))),
+      conditions.map((entry) => entry.values.map((v) => traitChip(entry.label, v.label))),
+      h("span", { class: "uc-muted" }, `${whenScopeText(variant.when, pool.dimensionsById)} · matches ${matchText}`),
+      matches.length > 0 ? h("span", { class: "uc-avatar-stack" }, matches.slice(0, 5).map((p) => avatar(avatarOf(p.id, pool.personasById), "sm", p.name))) : null,
     ),
     variant.description ? h("p", { class: "uc-variant-desc" }, variant.description) : null,
     h(
@@ -143,6 +167,7 @@ function variantPanel(ctx, variant, raw) {
       diffBadge("changed"),
       diffBadge("added"),
       diffBadge("removed"),
+      hasBranches ? diffBadge("emptied") : null,
       diffBadge("base"),
       overrides.length > 0 ? h("span", { class: "uc-muted uc-legend-note" }, `Overrides ${overrides.join(", ")}`) : null,
     ),
@@ -159,51 +184,64 @@ function people(ctx, useCase) {
     { class: "uc-people" },
     ids.map((id) => {
       const persona = pool.personasById.get(id);
-      const sub = persona ? [persona.role, traitSummary(persona, pool.dimensionsById)].filter(Boolean).join(" · ") : "Unknown persona";
+      const sub = persona ? [KIND_ICONS[persona.kind]?.label, persona.role, traitSummary(persona, pool.dimensionsById)].filter(Boolean).join(" · ") : "Unknown persona";
       return h(
         "div",
         { class: "uc-person" },
         avatar(avatarOf(id, pool.personasById), "lg"),
-        h("div", { class: "uc-person-text" }, h("span", { class: "uc-person-name" }, actorName(id, pool.personasById)), h("span", { class: "uc-person-sub" }, sub)),
+        h("div", { class: "uc-person-text" }, h("span", { class: "uc-person-name" }, actorName(id, pool.personasById), actorKind(persona?.kind)), h("span", { class: "uc-person-sub" }, sub)),
       );
     }),
   );
 }
 
-/** A trigger is a string in a stored variant and an object in a read bundle: compare what it says, not how it is shaped. */
-const differs = (key, a, b) => (key === "trigger" ? triggerKey(a) !== triggerKey(b) : a !== b);
-const shown = (key, value) => (key === "trigger" ? triggerText(value) : value);
+/** Goal and outcome are plain text: a variant's differs from the base when the strings differ. (The trigger is compared by what it says, in `triggerChanged`.) */
+const differs = (a, b) => a !== b;
 
-function story(useCase, baseCase, rawVariant) {
+/**
+ * The story card: the trigger line on top (full width), Goal and Outcome below in two columns. A variant shows the trigger it
+ * replaces whole (with the base one named) and only the cells it overrides.
+ */
+function story(ctx, w, rawVariant) {
+  const { bundle, base, variantId } = ctx;
+  const useCase = bundle.use_case;
+  const baseCase = base.use_case;
+  const trigger = triggerRow(ctx, { trigger: useCase.trigger, baseTrigger: baseCase.trigger, changed: Boolean(variantId) && rawVariant?.trigger !== undefined && triggerChanged(rawVariant.trigger, baseCase.trigger), w });
   const cells = [
-    ["bolt", "Trigger", "trigger"],
     ["flag", "Goal", "goal"],
     ["task_alt", "Outcome", "outcome"],
-  ];
+  ].filter(([, , key]) => !variantId || rawVariant?.[key] !== undefined);
   return h(
     "div",
-    { class: "uc-story" },
+    { class: "uc-story", dataset: { cells: String(cells.length) } },
+    trigger,
     cells.map(([ic, label, key]) =>
-      h("div", { class: "uc-story-cell" }, h("div", { class: "uc-story-label" }, icon(ic), label, rawVariant?.[key] !== undefined && differs(key, rawVariant[key], baseCase[key]) ? diffBadge("changed") : null), h("p", null, shown(key, useCase[key]) || h("span", { class: "uc-muted" }, "—"))),
+      h("div", { class: "uc-story-cell" }, h("div", { class: "uc-story-label" }, icon(ic), label, rawVariant?.[key] !== undefined && differs(rawVariant[key], baseCase[key]) ? diffBadge("changed") : null), h("p", null, useCase[key] || h("span", { class: "uc-muted" }, "—"))),
     ),
   );
 }
 
-function flowSummary(rows, variantSelected) {
+function flowSummary(rows, variantSelected, branchCount) {
   const steps = rows.filter((r) => r.kind === "step");
   const screens = new Set(steps.map((r) => r.step.target?.screen).filter(Boolean));
   const elements = steps.filter((r) => r.step.target?.node).length;
-  if (!variantSelected) return `${plural(steps.length, "step")} · ${plural(screens.size, "screen")} · ${plural(elements, "element")}`;
+  if (!variantSelected) {
+    if (branchCount > 0) return `${plural(steps.length, "step")} · ${plural(branchCount, "branch", "branches")} · branches are never chosen by artisign, every lane is shown`;
+    return `${plural(steps.length, "step")} · ${plural(screens.size, "screen")} · ${plural(elements, "element")}`;
+  }
   const count = (kind) => steps.filter((r) => r.change === kind).length;
   const removed = rows.filter((r) => r.kind === "removed").length;
   return `${plural(steps.length, "step")} in this variant · ${count("changed")} changed · ${count("added")} added · ${removed} removed`;
 }
 
-function flow(ctx, useCase) {
+function flow(ctx, useCase, w) {
   const { bundle, base, variantId } = ctx;
   // A step removed from a branch is not a main-flow row; branch removals are shown with the branch view.
   const rows = buildFlowRows({ steps: useCase.steps ?? [], removedSteps: (bundle.removed_steps ?? []).filter((r) => r.branch === undefined), baseSteps: base.use_case.steps ?? [], variantSelected: Boolean(variantId) });
+  // Branch lanes sit in the flow after the step they fork from (a base view; a variant lists its branches in their own section).
+  const numbered = variantId ? [] : numberBranches(useCase);
   const list = h("ol", { class: "uc-flow" });
+  list.append(...lanesAt(ctx, numbered, null, w));
   for (const row of rows) {
     if (row.kind === "removed") {
       list.append(
@@ -216,12 +254,13 @@ function flow(ctx, useCase) {
       );
       continue;
     }
-    list.append(stepRow(ctx, row));
+    list.append(stepRow(ctx, row, numbered, w));
+    list.append(...lanesAt(ctx, numbered, row.step.id, w));
   }
-  return h("section", { class: "uc-section" }, h("h2", { class: "uc-h2" }, "Flow", h("span", { class: "uc-h2-meta" }, flowSummary(rows, Boolean(variantId)))), rows.length === 0 ? h("p", { class: "uc-muted" }, "No steps yet.") : list);
+  return h("section", { class: "uc-section" }, h("h2", { class: "uc-h2" }, "Flow", h("span", { class: "uc-h2-meta" }, flowSummary(rows, Boolean(variantId), numbered.length))), rows.length === 0 ? h("p", { class: "uc-muted" }, "No steps yet.") : list);
 }
 
-function stepRow(ctx, row) {
+function stepRow(ctx, row, numbered, w) {
   const { bundle, pool, handlers } = ctx;
   const step = row.step;
   const found = mappingFor(bundle, step.id);
@@ -229,34 +268,21 @@ function stepRow(ctx, row) {
   const scope = stepScope(step, mapping);
   const note = mappingNote(step, mapping, found?.screen);
   const was = row.was;
+  const stepWarnings = (w.step.get(step.id) ?? []).filter((x) => !x.kind.startsWith("mapping_"));
   const card = h(
     "div",
     { class: "uc-step-card", dataset: { change: row.change ?? "" } },
-    h("div", { class: "uc-step-head" }, h("span", { class: "uc-step-no" }, `Step ${row.number} · ${actorName(step.actor, pool.personasById)}`), row.change === "changed" ? diffBadge("changed") : row.change === "added" ? diffBadge("added") : row.change === "base" ? diffBadge("base") : null),
+    h("div", { class: "uc-step-head" }, h("span", { class: "uc-step-no" }, `Step ${row.number} · ${actorName(step.actor, pool.personasById)}${step.via ? ` · via ${step.via}` : ""}`), row.change === "changed" ? diffBadge("changed") : row.change === "added" ? diffBadge("added") : row.change === "base" ? diffBadge("base") : null),
     h("p", { class: "uc-step-action" }, step.action),
     was?.actor ? h("p", { class: "uc-step-was" }, "Actor was ", h("s", null, actorName(was.actor, pool.personasById))) : null,
     was?.action ? h("p", { class: "uc-step-was" }, "Base: ", h("s", null, was.action)) : null,
     was?.target ? h("p", { class: "uc-step-was" }, "Target was ", h("s", null, was.target)) : null,
     step.target ? targetChip(scope, step.target.screen, step.target.node, () => handlers.onMap(step.id)) : h("span", { class: "uc-muted uc-no-target" }, "Not mapped to a screen"),
     note,
+    stepWarnings.map((x) => warnLine(x.message)),
+    stepBranchNotes(numbered, step.id),
   );
-  const data = (step.data ?? []).map((entry) => {
-    const name = pool.objectsById.get(entry.object)?.name ?? entry.object;
-    const changed = changedKeys(entry.before, entry.after);
-    return h("div", { class: "uc-step-data" }, dataCard("before", name, entry.before ?? {}, new Set()), icon("arrow_forward", "uc-data-arrow"), dataCard("after", name, entry.after ?? {}, changed));
-  });
-  return h("li", { class: "uc-step", dataset: { change: row.change ?? "", step: step.id } }, h("span", { class: "uc-step-rail" }, avatar(avatarOf(step.actor, pool.personasById), "lg", actorName(step.actor, pool.personasById))), card, data.length > 0 ? h("div", { class: "uc-step-datas" }, data) : null);
-}
-
-/** The warning line under a target chip: stale screen / stale node / generated node id. */
-function mappingNote(step, mapping, screenEntry) {
-  if (!step.target || !mapping) return null;
-  if (mapping.stale) {
-    const text = screenEntry && screenEntry.exists === false ? `Screen ${step.target.screen} no longer exists. Pick a new target.` : `Element ${step.target.node} no longer exists on ${step.target.screen}. Pick a new target.`;
-    return h("p", { class: "uc-warn" }, icon("warning"), text);
-  }
-  if (mapping.unstable) return h("p", { class: "uc-warn" }, icon("warning"), `${step.target.node} is a generated id: it can point at another element after a rewrite. Give the node an authored id.`);
-  return null;
+  return h("li", { class: "uc-step", dataset: { change: row.change ?? "", step: step.id } }, h("span", { class: "uc-step-rail" }, avatar(avatarOf(step.actor, pool.personasById), "lg", actorName(step.actor, pool.personasById))), card, stepDataBlock(step, pool.objectsById));
 }
 
 function ioCard(ctx, item, kind, compareTo) {
@@ -317,13 +343,26 @@ function coveragePanel(ctx, matrix) {
   const { variantId, handlers } = ctx;
   const useCaseId = ctx.base.use_case.id;
   const table = h("table", { class: "uc-matrix" });
-  const head1 = h("tr", null, h("th", { rowspan: "2", scope: "col", class: "uc-matrix-first" }, "Flow"));
+  // With constellation dimensions the header has three levels: scope group (World · constellations | Personas), dimension, value.
+  const grouped = matrix.columns.some((column) => column.scope === "constellations");
+  const levels = grouped ? 3 : 2;
+  const head0 = h("tr", null, h("th", { rowspan: String(levels), scope: "col", class: "uc-matrix-first" }, "Flow"));
+  const head1 = h("tr");
   const head2 = h("tr");
-  for (const column of matrix.columns) {
-    head1.append(h("th", { colspan: String(column.values.length), scope: "colgroup", class: "uc-matrix-dim" }, column.label));
-    for (const value of column.values) head2.append(h("th", { scope: "col", class: value.gap ? "is-gap" : "", title: value.gap ? `${value.label}: not covered` : value.label }, value.label, value.gap ? h("span", { class: "uc-gap-tag" }, "gap") : null));
+  if (grouped) {
+    for (const scope of ["constellations", "personas"]) {
+      const columns = matrix.columns.filter((column) => column.scope === scope);
+      if (columns.length === 0) continue;
+      head0.append(h("th", { colspan: String(columns.reduce((n, c) => n + c.values.length, 0)), scope: "colgroup", class: "uc-matrix-scope", dataset: { scope } }, icon(scope === "constellations" ? "hub" : "groups"), scope === "constellations" ? "World · constellations" : "Personas"));
+    }
   }
-  table.append(h("thead", null, head1, head2));
+  const dimRow = grouped ? head1 : head0;
+  const valueRow = grouped ? head2 : head1;
+  for (const column of matrix.columns) {
+    dimRow.append(h("th", { colspan: String(column.values.length), scope: "colgroup", class: "uc-matrix-dim" }, column.label));
+    for (const value of column.values) valueRow.append(h("th", { scope: "col", class: value.gap ? "is-gap" : "", title: value.gap ? `${value.label}: not covered` : value.label }, value.label, value.gap ? h("span", { class: "uc-gap-tag" }, "gap") : null));
+  }
+  table.append(h("thead", null, head0, ...(grouped ? [head1, head2] : [head1])));
   const body = h("tbody");
   for (const row of matrix.rows) {
     const selected = row.kind === "base" ? !variantId : variantId === row.id;
@@ -341,7 +380,7 @@ function coveragePanel(ctx, matrix) {
     "section",
     { class: "uc-coverage", "aria-label": "Coverage" },
     h("h2", { class: "uc-h2" }, "Coverage"),
-    h("p", { class: "uc-muted uc-coverage-intro" }, "Rows are the base flow and each variant, columns the trait values of your persona pool."),
+    h("p", { class: "uc-muted uc-coverage-intro" }, grouped ? "Rows are the base flow and each variant. Columns are the trait values of the world (constellations) and of the persona pool." : "Rows are the base flow and each variant, columns the trait values of your persona pool."),
     matrix.columns.length === 0 ? h("p", { class: "uc-muted" }, "No persona traits to cover yet.") : h("div", { class: "uc-matrix-wrap" }, table),
     h("p", { class: "uc-legend-line" }, dot(""), " The flow handles this value: for Base from the traits of its personas, for a variant the values named in its when. any: no condition on that dimension (a persona or variant without it). A column that neither Base nor any variant covers is a gap, the same rule as suggest_use_case_variants."),
     matrix.gaps > 0

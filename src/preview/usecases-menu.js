@@ -15,7 +15,7 @@ export function closeMenu() {
  *   anchor: HTMLElement,
  *   label: string,
  *   title?: string,
- *   items: { value: string, label: string, count?: number, checked?: boolean, leading?: Node | null, command?: boolean, icon?: string, disabled?: boolean }[], // `command`: a plain menuitem (an action, not a choice) with an optional `icon`; `disabled` keeps it in the menu as aria-disabled, skipped by the arrows
+ *   items: { value: string, label: string, count?: number, checked?: boolean, leading?: Node | null, trailing?: Node | null, command?: boolean, icon?: string, disabled?: boolean }[], // `command`: a plain menuitem (an action, not a choice) with an optional `icon`; `disabled` keeps it in the menu as aria-disabled, skipped by the arrows
  *   onPick: (value: string) => void,
  *   clearLabel?: string,
  *   onClear?: () => void,
@@ -24,6 +24,7 @@ export function closeMenu() {
  *   limit?: number, // how many items to draw at once (the rest follow the filter text)
  *   align?: "end", // opens with its right edge under the anchor (kept inside the dialog / window) instead of its left edge
  *   width?: number, // px; with `align` also the minimum width
+ *   note?: string, // a hint under the items
  *   allowCustom?: boolean, // the typed text can be picked as a value of its own (a list the facets could not hold completely)
  * }} spec
  */
@@ -58,6 +59,7 @@ export function openMenu(spec) {
           { type: "button", class: "chrome-menu-item uc-menu-item", role: "menuitemradio", "aria-checked": item.checked ? "true" : "false", dataset: { value: item.value }, onClick: () => pick(item.value) },
           item.leading ?? h("span", { class: "icon chrome-menu-check", "aria-hidden": "true" }, item.checked ? "check" : ""),
           h("span", { class: "uc-menu-label" }, item.label),
+          item.trailing ?? null,
           item.count !== undefined ? h("span", { class: "chrome-menu-hint" }, Number(item.count).toLocaleString("en-US")) : null,
         ),
       );
@@ -139,6 +141,7 @@ export function openMenu(spec) {
     menu.append(input);
   }
   menu.append(list);
+  if (spec.note) menu.append(h("p", { class: "chrome-menu-label uc-menu-note", role: "presentation" }, spec.note));
   if (spec.onClear) {
     menu.append(h("div", { class: "chrome-menu-divider", role: "separator" }), h("button", { type: "button", class: "chrome-menu-item uc-menu-item", role: "menuitem", onClick: () => { close(); spec.onClear(); } }, spec.clearLabel ?? "Clear"));
   }

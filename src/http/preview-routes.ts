@@ -123,6 +123,17 @@ export async function handlePreviewRoutes(req: IncomingMessage, res: ServerRespo
     return true;
   }
 
+  if (url.pathname === "/api/world") {
+    // The world pool as stored (entities, relationship types, constellations): the preview's World tab and the constellation filter read it here, because no tool lists it. Read-only and not a tool; a project without world.json gets empty lists and nothing is created.
+    try {
+      sendJson(res, 200, await store.readWorld());
+    } catch (err) {
+      if (err instanceof InvalidFileError) sendJson(res, 422, { code: "invalid_state", message: err.message });
+      else throw err;
+    }
+    return true;
+  }
+
   if (url.pathname === "/api/flows") {
     const records = await readAllFlows(store);
     sendJson(res, 200, { flows: records.map(toPublicFlowRecord) });

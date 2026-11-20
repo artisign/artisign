@@ -22,12 +22,12 @@ afterEach(() => vi.unstubAllGlobals());
 describe("usecases-api", () => {
   it("exports exactly the fixed wrappers, and callTool stays private", () => {
     expect(Object.keys(api).sort()).toEqual(
-      ["deleteDataObject", "deleteDimension", "deletePersona", "deleteUseCase", "fetchUseCaseSource", "generatePersonas", "getUseCase", "listUseCases", "setUseCases", "suggestUseCaseVariants"].sort(),
+      ["deleteConstellation", "deleteDataObject", "deleteDimension", "deleteMainEntity", "deletePersona", "deleteRelationshipType", "deleteUseCase", "fetchUseCaseSource", "fetchWorldSource", "generatePersonas", "getUseCase", "listUseCases", "setUseCases", "suggestUseCaseVariants"].sort(),
     );
     expect(api.callTool).toBeUndefined();
   });
 
-  it("sends only the six tool names, with the four delete kinds", async () => {
+  it("sends only the six tool names, with the seven delete kinds", async () => {
     const sent = stubFetch();
     await api.listUseCases("/p", { limit: 1 });
     await api.getUseCase("/p", "a");
@@ -38,6 +38,9 @@ describe("usecases-api", () => {
     await api.deleteDimension("/p", "x");
     await api.deleteDataObject("/p", "x");
     await api.deleteUseCase("/p", "x");
+    await api.deleteMainEntity("/p", "x");
+    await api.deleteConstellation("/p", "x");
+    await api.deleteRelationshipType("/p", "x");
     const tools = sent.map((s) => /\/api\/tools\/([a-z_]+)\?project=/.exec(s.url)?.[1]);
     expect([...new Set(tools)].sort()).toEqual(["delete_entity", "generate_personas", "get_use_case", "list_use_cases", "set_use_cases", "suggest_use_case_variants"]);
     expect(sent.every((s) => s.method === "POST" && s.url.includes("project=%2Fp"))).toBe(true);
@@ -46,6 +49,9 @@ describe("usecases-api", () => {
       { kind: "dimension", name: "x" },
       { kind: "data_object", name: "x" },
       { kind: "use_case", name: "x" },
+      { kind: "entity", name: "x" },
+      { kind: "constellation", name: "x" },
+      { kind: "relationship_type", name: "x" },
     ]);
   });
 
@@ -54,6 +60,16 @@ describe("usecases-api", () => {
     await api.fetchUseCaseSource("/p", "a b");
     expect(sent[0].url).toBe("/api/use-case?id=a%20b&project=%2Fp");
     expect(sent[0].method).toBe("GET");
+  });
+
+  it("reads the world pool from its own internal route and tolerates a missing list", async () => {
+    const sent = stubFetch();
+    const res = await api.fetchWorldSource("/p");
+    expect(sent[0].url).toBe("/api/world?project=%2Fp");
+    expect(sent[0].method).toBe("GET");
+    expect(res).toEqual({ ok: true, world: { entities: [], relationship_types: [], constellations: [] } });
+    vi.stubGlobal("fetch", async () => ({ ok: false, status: 422, statusText: "x", json: async () => ({ code: "invalid_state", message: "bad file" }) }));
+    expect(await api.fetchWorldSource("/p")).toEqual({ ok: false, status: 422, code: "invalid_state", message: "bad file" });
   });
 
   it("no other use-case source module names /api/tools/ (tests and fixtures excluded)", () => {

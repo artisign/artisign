@@ -28,29 +28,29 @@ describe("detail view", () => {
   it("shows the text of an object trigger, never [object Object]", () => {
     const bundle = withTrigger(baseBundle, { text: "The insurer raises the premium", actor: "dana", via: "partner API" });
     const root = render({ bundle, base: bundle });
-    expect($$(".uc-story-cell p")[0].textContent).toBe("The insurer raises the premium");
+    expect($$(".uc-trigger-text")[0].textContent).toBe("The insurer raises the premium");
     expect(root.textContent).not.toContain("[object Object]");
   });
 
   it("still shows a string trigger, and a dash without one", () => {
     render();
-    expect($$(".uc-story-cell p")[0].textContent).toBe("Step has no target");
+    expect($$(".uc-trigger-text")[0].textContent).toBe("Step has no target");
     const { trigger, ...rest } = baseBundle.use_case;
     expect(trigger).toBeDefined();
     const bare = { ...baseBundle, use_case: rest };
     render({ bundle: bare, base: bare });
-    expect($$(".uc-story-cell p")[0].textContent).toBe("—");
+    expect($$(".uc-trigger-text")[0].textContent).toBe("—");
   });
 
   it("the changed badge compares what the trigger says, not its shape", () => {
     const base = withTrigger(baseBundle, { text: "Step has no target" });
     const same = withTrigger(variantBundle, { text: "Step has no target" });
     render({ bundle: same, base, source: { ...rawUseCase, variants: [{ ...rawUseCase.variants[0], trigger: "Step has no target" }] }, variantId: "agent" });
-    expect($$(".uc-story-cell")[0].textContent).not.toContain("Changed");
+    expect($$(".uc-trigger")[0].textContent).not.toContain("Changed");
 
     const other = withTrigger(variantBundle, { text: "Agent starts", actor: "dex" });
     render({ bundle: other, base, source: { ...rawUseCase, variants: [{ ...rawUseCase.variants[0], trigger: { text: "Agent starts", actor: "dex" } }] }, variantId: "agent" });
-    expect($$(".uc-story-cell")[0].textContent).toContain("Changed");
+    expect($$(".uc-trigger")[0].textContent).toContain("Changed");
   });
 });
 
@@ -102,11 +102,16 @@ describe("variant trigger override", () => {
     expect(out.trigger).toEqual(trigger);
   });
 
-  it("edits the text only, keeping actor and via, and still rejects an empty override", () => {
+  it("edits the text only, keeping actor and via; clearing the text keeps the structure (N5), a text-only override stays an error", () => {
     const draft = variantDraft(stored);
     draft.overrides.trigger = "  The insurer writes ";
     expect(build(draft).out.trigger).toEqual({ ...trigger, text: "The insurer writes" });
     draft.overrides.trigger = " ";
+    // The override still says who acts and how: the empty text is not an empty override.
+    expect(build(draft).errors).toEqual([]);
+    expect(build(draft).out.trigger).toEqual({ ...trigger, text: "" });
+    // Switching to the text form is the explicit way to drop the structure; then an empty text is an empty override.
+    draft.triggerShape.kind = "text";
     expect(build(draft).errors).toEqual(['Variant "T": the trigger override is empty.']);
   });
 

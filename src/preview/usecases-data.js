@@ -34,15 +34,6 @@ export function triggerKey(trigger) {
   return JSON.stringify([t.text ?? "", t.actor ?? null, t.via ?? null, t.at ?? null, t.state ?? null]);
 }
 
-/**
- * The trigger to store after the text was edited. A stored structured trigger keeps actor / via / state / at and only its
- * text changes (never overwritten by a string); an untouched trigger is written back exactly as stored.
- */
-export function triggerWithText(stored, text, original) {
-  if (stored !== null && typeof stored === "object") return text === original ? stored : { ...stored, text };
-  return text;
-}
-
 /** Lowercase kebab-case id from free text ("Map a Step!" -> "map-a-step"); "" when nothing usable is left. */
 export function slugify(text) {
   return String(text ?? "")
@@ -114,13 +105,14 @@ export function indexById(list) {
 
 // --- List queries -----------------------------------------------------------------------------------------------
 
-export const EMPTY_FILTERS = Object.freeze({ query: "", persona: "", status: "", tag: "", screen: "", hasVariants: false });
+export const EMPTY_FILTERS = Object.freeze({ query: "", persona: "", constellation: "", status: "", tag: "", screen: "", hasVariants: false });
 
 /** The list_use_cases input for a filter state: only what is set, so an untouched list sends nothing but paging. */
 export function buildQuery(filters, extra = {}) {
   const input = {};
   if (filters.query?.trim()) input.query = filters.query.trim();
   if (filters.persona) input.persona = filters.persona;
+  if (filters.constellation) input.constellation = filters.constellation;
   if (filters.status) input.status = filters.status;
   if (filters.tag) input.tag = filters.tag;
   if (filters.screen) input.screen = filters.screen;
@@ -533,13 +525,24 @@ function stepWas(base, step) {
  * Number of differences a variant carries, for the chip meta ("4 changes"): its step ops, replaced inputs / outputs and each
  * actor swap that changes at least one inherited base step (spec §4: an entry whose key equals its value, or whose key no base
  * step has, changes nothing). A step the variant removes or replaces is taken as written, so a swap only counts for base steps
- * the ops leave alone. `baseSteps` are the base case's steps; without them no swap can be counted.
+ * the ops leave alone. `baseSteps` are the base case's steps; without them no swap can be counted. `baseCase` (its `constellations`) lets a
+ * variant's own constellation list count against the base.
  */
-export function variantChangeCount(variant, baseSteps = []) {
+export function variantChangeCount(variant, baseSteps = [], baseCase = {}) {
   const rewritten = new Set((variant?.steps ?? []).filter((op) => op.op === "remove" || op.op === "replace").map((op) => op.step_id));
   const surviving = baseSteps.filter((step) => !rewritten.has(step.id));
   const swaps = Object.entries(variant?.actors ?? {}).filter(([from, to]) => from !== to && surviving.some((step) => step.actor === from)).length;
-  return (variant?.steps?.length ?? 0) + (variant?.outputs ? 1 : 0) + (variant?.inputs ? 1 : 0) + swaps;
+  // ADR-011: a variant's own trigger, each starting-state entry (an unset one too) and each constellation it adds or drops count as one difference.
+  const world = (variant?.trigger !== undefined ? 1 : 0) + (variant?.state?.length ?? 0) + constellationDiffCount(variant?.constellations, baseCase.constellations);
+  return (variant?.steps?.length ?? 0) + (variant?.outputs ? 1 : 0) + (variant?.inputs ? 1 : 0) + swaps + world;
+}
+
+/** Constellations a variant's own list adds to or drops from the base list; nothing when the variant keeps the base list. */
+function constellationDiffCount(variantList, baseList) {
+  if (!Array.isArray(variantList)) return 0;
+  const base = new Set(baseList ?? []);
+  const own = new Set(variantList);
+  return variantList.filter((id) => !base.has(id)).length + [...base].filter((id) => !own.has(id)).length;
 }
 
 /** A `when` condition as readable entries: [{ dimension, label, values: [{ id, label }] }]. */
@@ -566,22 +569,25 @@ export function matchingPersonas(when, personas) {
 /**
  * The coverage matrix: rows = Base and each variant, columns = the values of each dimension the persona pool uses.
  * Base row: a mark for every value held by the base use case's personas, "any" for a dimension where a base persona has no trait
- * (or there is no base persona). Variant row: a mark for each value its `when` names, "any" for every dimension its `when` does not
+ * (or there is no base persona). Dimensions of scope `constellations` are columns of a second group (`scope` on the column) and are
+ * judged on the traits of the base case's constellations instead (`baseConstellations`; `usedValues`: dimension id -> value ids the
+ * constellation pool uses), only for a case that lists some. Variant row: a mark for each value its `when` names, "any" for every dimension its `when` does not
  * constrain. A column neither Base nor any variant covers is a gap. `uncovered` (the coverage of `suggest_use_case_variants`:
  * [{ dimension, uncovered: [valueId] }]) decides the gaps when given, so the UI and the tool agree; without it the same rule is
  * computed here (a base "any" covers every value, a variant only the values it names).
  */
-export function coverageMatrix({ dimensions, pool, basePersonas, variants, uncovered }) {
+export function coverageMatrix({ dimensions, pool, basePersonas, variants, uncovered, baseConstellations = null, usedValues = null }) {
   const tool = uncovered ? new Map(uncovered.map((c) => [c.dimension, new Set(c.uncovered)])) : null;
-  const columns = [];
+  const worldColumns = [];
+  const personaColumns = [];
   const rows = [{ id: "base", title: "Base", kind: "base", dims: {} }, ...variants.map((v) => ({ id: v.id, title: v.title ?? v.id, kind: "variant", dims: {} }))];
   let gaps = 0;
-  for (const dimension of dimensions) {
-    const used = new Set(pool.flatMap((persona) => (persona.traits?.[dimension.id] ? [persona.traits[dimension.id]] : [])));
+  /** One dimension's column group and the marks of every row; `holders` are the base case's personas or constellations, `used` the values the pool uses. */
+  const addDimension = (dimension, holders, used, columns, scope) => {
     const values = dimension.values.filter((value) => used.has(value.id));
-    if (values.length === 0) continue;
-    const baseAny = basePersonas.length === 0 || basePersonas.some((persona) => !persona.traits?.[dimension.id]);
-    const baseValues = new Set(basePersonas.flatMap((persona) => (persona.traits?.[dimension.id] ? [persona.traits[dimension.id]] : [])));
+    if (values.length === 0) return;
+    const baseAny = holders.length === 0 || holders.some((holder) => !holder.traits?.[dimension.id]);
+    const baseValues = new Set(holders.flatMap((holder) => (holder.traits?.[dimension.id] ? [holder.traits[dimension.id]] : [])));
     rows[0].dims[dimension.id] = baseAny ? { any: true } : { marks: new Set(baseValues) };
     variants.forEach((variant, i) => {
       const named = variant.when?.[dimension.id];
@@ -593,9 +599,21 @@ export function coverageMatrix({ dimensions, pool, basePersonas, variants, uncov
       if (gap) gaps++;
       return { value: value.id, label: value.label, gap };
     });
-    columns.push({ dimension: dimension.id, label: dimension.label, values: cols });
+    columns.push({ dimension: dimension.id, label: dimension.label, scope, values: cols });
+  };
+  // A dimension only matches what it describes (ADR-011): persona dimensions the personas, constellation dimensions the constellations —
+  // and those only for a case that lists constellations.
+  for (const dimension of dimensions) {
+    if ((dimension.scope ?? "personas") === "constellations") {
+      if (baseConstellations === null || baseConstellations.length === 0) continue;
+      const used = usedValues?.get(dimension.id) ?? new Set(baseConstellations.flatMap((c) => (c.traits?.[dimension.id] ? [c.traits[dimension.id]] : [])));
+      addDimension(dimension, baseConstellations, used, worldColumns, "constellations");
+    } else {
+      const used = new Set(pool.flatMap((persona) => (persona.traits?.[dimension.id] ? [persona.traits[dimension.id]] : [])));
+      addDimension(dimension, basePersonas, used, personaColumns, "personas");
+    }
   }
-  return { columns, rows, gaps };
+  return { columns: [...worldColumns, ...personaColumns], rows, gaps };
 }
 
 // --- Persona pool -------------------------------------------------------------------------------------------------

@@ -28,7 +28,8 @@ describe("base flow", () => {
     expect($(".uc-breadcrumb").textContent).toContain("mapping");
     expect($(".uc-status").dataset.status).toBe("ready");
     expect($$(".uc-person-name").map((n) => n.textContent)).toEqual(["Dana"]);
-    expect($$(".uc-story-cell p").map((p) => p.textContent)).toEqual(["Step has no target", "Map it", "Mapped"]);
+    expect($(".uc-trigger-text").textContent).toBe("Step has no target");
+    expect($$(".uc-story-cell p").map((p) => p.textContent)).toEqual(["Map it", "Mapped"]);
     expect($$(".uc-step-no").map((n) => n.textContent)).toEqual(["Step 1 · Dana", "Step 2 · Dana", "Step 3 · System"]);
     expect($(".uc-h2-meta").textContent).toContain("3 steps");
   });

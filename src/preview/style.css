@@ -9773,3 +9773,487 @@ button.uc-target:hover {
 .uc-world-guide-note {
   margin: var(--space-2xl) 0 0;
 }
+
+/* CHR-1154 — the world editors: dialog context, condition and state rows, the trigger editor, constellation chips, the branch list
+   and the branch dialog, the world pool's entry points, and the entity / relationship type / constellation dialogs. */
+.uc-dialog-context {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
+}
+
+.uc-form-note {
+  margin: 0;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.uc-foot-note {
+  align-self: center;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.uc-link-row {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.uc-link-row:hover {
+  text-decoration: underline;
+}
+
+.uc-link-row:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.uc-cst-name .uc-link-row {
+  font-size: inherit;
+}
+
+/* Condition rows (a state trigger, a branch's `when`) and starting-state rows */
+.uc-cond-rows,
+.uc-state-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.uc-cond-row,
+.uc-state-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.uc-cond-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.3fr) minmax(0, 0.9fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.uc-state-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1.2fr) auto auto;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.uc-state-rows:not(.is-variant) .uc-state-fields {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1.2fr) auto;
+}
+
+.uc-state-rows:not(.is-variant) .uc-state-note {
+  display: none;
+}
+
+.uc-state-row[data-kind] {
+  padding-left: var(--space-md);
+  border-left: 3px solid transparent;
+}
+
+.uc-state-row[data-kind="changed"] {
+  border-left-color: var(--chrome-warning);
+}
+
+.uc-state-row[data-kind="added"] {
+  border-left-color: var(--chrome-ok);
+}
+
+.uc-state-row[data-kind="unset"] {
+  border-left: 3px dashed var(--chrome-danger);
+}
+
+.uc-state-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 80px;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.uc-state-new {
+  color: var(--chrome-ok);
+}
+
+.uc-unset {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: var(--size-control);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-sm);
+  border: 1px dashed color-mix(in srgb, var(--chrome-danger) 45%, transparent);
+  color: var(--chrome-danger);
+  font-size: var(--ui-xs);
+}
+
+.uc-cond-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.uc-op-legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-sidebar);
+}
+
+.uc-op-legend-title {
+  margin: 0;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.uc-op-legend-list {
+  display: grid;
+  grid-template-columns: repeat(4, auto auto);
+  gap: var(--space-xs) var(--space-lg);
+  margin: 0;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
+}
+
+.uc-op-legend-list dt {
+  margin: 0;
+}
+
+.uc-op-legend-list dd {
+  margin: 0;
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+/* The trigger editor */
+.uc-trigger-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.uc-trigger-edit > legend {
+  padding: 0;
+  margin-bottom: var(--space-sm);
+}
+
+.uc-trig-mode {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.uc-trig-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.uc-trig-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 0.8fr);
+  gap: var(--space-xl);
+}
+
+.uc-trig-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--chrome-border);
+}
+
+.uc-trig-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+/* Constellations a case or a variant holds in */
+.uc-cst-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.uc-cst-chip.is-unknown {
+  border: 1px dashed var(--chrome-warning);
+  background: var(--chrome-warning-subtle);
+  color: var(--chrome-warning);
+}
+
+.uc-cst-warns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/* Branches: the list in the case dialog and the branch dialog */
+.uc-branch-list,
+.uc-branch-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.uc-branch-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--chrome-border-strong);
+}
+
+.uc-branch-row .uc-field-warn {
+  grid-column: 1 / -1;
+}
+
+.uc-branch-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.uc-branch-row-title {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uc-branch-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--chrome-border);
+}
+
+.uc-branch-step .uc-step-edit-top {
+  grid-template-columns: 20px 48px 130px minmax(0, 1fr) auto;
+}
+
+.uc-branch-step .uc-target-edit {
+  padding-left: 68px;
+}
+
+.uc-step-id-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding-left: 68px;
+}
+
+.uc-step-id-row[hidden] {
+  display: none;
+}
+
+.uc-step-id-row .chrome-field {
+  max-width: 200px;
+}
+
+.uc-end-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.uc-end-group > legend {
+  padding: 0;
+  margin-bottom: var(--space-md);
+}
+
+.uc-end-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.uc-op-branch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding-left: 28px;
+}
+
+.uc-op-branch-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ui-sm);
+}
+
+.uc-step-op[data-op$="_branch"] {
+  border-left: 3px solid var(--chrome-warning);
+}
+
+.uc-step-op[data-op="add_branch"] {
+  border-left-color: var(--chrome-ok);
+}
+
+.uc-step-op[data-op="remove_branch"] {
+  border-left: 3px dashed var(--chrome-danger);
+}
+
+.uc-when-scope {
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+/* Entity, relationship type and constellation dialogs */
+.uc-kind-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-md);
+}
+
+.uc-kind-preview {
+  display: inline-flex;
+  align-items: center;
+  height: var(--size-control);
+  color: var(--chrome-text-tertiary);
+}
+
+.uc-entity-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-xl);
+  align-items: end;
+}
+
+.uc-entity-avatar-btn {
+  margin-bottom: 2px;
+}
+
+.uc-reads {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-field);
+}
+
+.uc-reads-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin: 0;
+}
+
+.uc-reads-type {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.uc-reads-type .icon {
+  font-size: var(--size-icon-sm);
+}
+
+.uc-share-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xl);
+}
+
+.uc-cst-trait-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md) var(--space-xl);
+}
+
+.uc-rel-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* From and Relationship share one width; To is the widest, so a long participant name is never cut (design review R3). */
+.uc-rel-head,
+.uc-rel-fields {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(130px, 1fr) minmax(210px, 1.5fr) minmax(110px, 1fr) 28px;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.uc-rel-head {
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.uc-rel-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.uc-rel-members {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--chrome-border);
+}
+
+.uc-participant.is-unknown .uc-mono {
+  color: var(--chrome-warning);
+}
+
+.uc-world-steps .uc-guide-actions {
+  margin-top: var(--space-md);
+}
+
+.uc-entity-usage {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.uc-entity-usage .icon {
+  font-size: var(--size-icon-sm);
+}
+
+.uc-persona-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}

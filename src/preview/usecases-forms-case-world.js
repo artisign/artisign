@@ -30,7 +30,7 @@ const TRIGGER_HINTS = {
  */
 export function createTriggerEditor({ read, write, shape, pool, actorOptions, path, label, markDirty, refresh, empty = null }) {
   const box = h("fieldset", { class: "uc-trigger-edit" });
-  const body = h("div", { class: "uc-trigger-body" });
+  const body = h("div", { class: "uc-trig-body" });
   const hintEl = h("span", { class: "uc-form-note" });
   const mode = segmented({ label: `${label} form`, name: nextId("uc-trigger-kind"), value: shape.kind, options: [{ value: "text", label: "Text" }, { value: "action", label: "Action" }, { value: "state", label: "State or time" }], onChange: (value) => { shape.kind = value; markDirty(); draw(); } });
   const errorHint = (suffix) => h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `${path}.${suffix}` } });
@@ -55,7 +55,7 @@ export function createTriggerEditor({ read, write, shape, pool, actorOptions, pa
     const built = buildConditions(ready, { path: "x", label: "x", errors, fieldErrors: [] });
     const at = shape.at.trim();
     const chips = [...built.flatMap((c, i) => [i > 0 ? h("span", { class: "uc-cond-and" }, "and") : null, conditionChip(c)]), at !== "" && isIsoAt(at) ? timeChip(at) : null];
-    fill(target, h("span", { class: "uc-label-hint" }, "Trigger line in the detail"), h("div", { class: "uc-trigger-line" }, read().trim() !== "" ? h("span", { class: "uc-trigger-text" }, read().trim()) : null, ...chips));
+    fill(target, h("span", { class: "uc-label-hint" }, "Trigger line in the detail"), h("div", { class: "uc-trig-line" }, read().trim() !== "" ? h("span", { class: "uc-trigger-text" }, read().trim()) : null, ...chips));
   }
 
   function draw() {
@@ -70,14 +70,14 @@ export function createTriggerEditor({ read, write, shape, pool, actorOptions, pa
       actor.dataset.path = `${path}.actor`;
       fill(
         body,
-        h("div", { class: "uc-trigger-action" }, field("Actor", actor), field("What happens", textControl(textInput({ value: read(), placeholder: "sends the renewal notice", ariaLabel: `${label} what happens`, onInput: (value) => { write(value); markDirty(); } }))), field("Via", via, { hint: "optional" })),
+        h("div", { class: "uc-trig-action" }, field("Actor", actor), field("What happens", textControl(textInput({ value: read(), placeholder: "sends the renewal notice", ariaLabel: `${label} what happens`, onInput: (value) => { write(value); markDirty(); } }))), field("Via", via, { hint: "optional" })),
         viaHint,
         h("p", { class: "uc-warn-text uc-field-warn", hidden: true, dataset: { path: `${path}.actor` } }),
         h("p", { class: "uc-form-note" }, "Via names the channel and needs an actor. Personas only: an entity cannot act."),
       );
     } else {
       const atHint = errorHint("at");
-      const preview = h("div", { class: "uc-trigger-preview" });
+      const preview = h("div", { class: "uc-trig-preview" });
       const at = bound(textInput({ value: shape.at, mono: true, placeholder: "2027-01-01", ariaLabel: `${label} at`, onInput: (value) => { shape.at = value; markDirty(); drawPreview(preview); } }), "at", atHint);
       conditions = conditionRows({ rows: shape.conditions, pool, path: `${path}.state`, label: "Condition", markDirty: () => { markDirty(); drawPreview(preview); }, refresh });
       fill(
@@ -94,7 +94,7 @@ export function createTriggerEditor({ read, write, shape, pool, actorOptions, pa
     refresh();
   }
 
-  box.append(h("legend", { class: "uc-form-h" }, label), h("div", { class: "uc-trigger-mode" }, mode, hintEl), body);
+  box.append(h("legend", { class: "uc-form-h" }, label), h("div", { class: "uc-trig-mode" }, mode, hintEl), body);
   draw();
   return { el: box, redraw: draw, atError: AT_ERROR };
 }
@@ -141,8 +141,9 @@ export function ensureStepIds(draft) {
 
 /** One line under a branch row: where it forks, how many conditions and steps, where it goes on. */
 export function branchMeta(branch, mains) {
-  const at = branch.from === "" ? "before the first step" : `after step ${mains.findIndex((s) => s.id === branch.from) + 1}`;
-  const end = branch.ends ? "ends the case" : `continues at step ${mains.findIndex((s) => s.id === branch.rejoin) + 1}`;
+  const place = (id) => (mains.some((s) => s.id === id) ? `step ${mains.findIndex((s) => s.id === id) + 1}` : `${id} (not a main-flow step)`);
+  const at = branch.from === "" ? "before the first step" : `after ${place(branch.from)}`;
+  const end = branch.ends ? "ends the case" : `continues at ${place(branch.rejoin)}`;
   return `${at} · ${plural(branch.when.length, "condition")} · ${plural(branch.steps.length, "step")} · ${end}`;
 }
 
@@ -195,7 +196,7 @@ export function createBranchList(env) {
     draw();
   }
 
-  function draw() {
+  function draw(silent = false) {
     const tags = labels();
     const steps = mains();
     fill(
@@ -204,7 +205,7 @@ export function createBranchList(env) {
         h(
           "div",
           { class: "uc-branch-row", role: "group", "aria-label": `Branch ${tags[i]}`, dataset: { branch: branch.id } },
-          h("span", { class: "uc-frame-no", dataset: { kind: "branch" } }, tags[i]),
+          h("span", { class: "uc-frame-no is-branch" }, tags[i]),
           h("div", { class: "uc-branch-row-text" }, h("span", { class: "uc-branch-row-title" }, branch.title || branch.id), h("span", { class: "uc-form-note" }, branchMeta(branch, steps))),
           h("button", { type: "button", class: "chrome-btn chrome-btn--compact", "aria-label": `Edit branch ${tags[i]}`, onClick: () => edit(branch) }, "Edit"),
           removeButton(`Remove branch ${tags[i]}`, () => { draft.branches.splice(draft.branches.indexOf(branch), 1); env.markDirty(); draw(); }),
@@ -214,7 +215,7 @@ export function createBranchList(env) {
       draft.branches.length === 0 ? h("p", { class: "uc-muted" }, "No branches. A branch is an alternative or exception path that forks from a step.") : null,
       h("button", { type: "button", class: "uc-link-btn", onClick: add }, icon("add"), "Add branch"),
     );
-    env.refresh();
+    if (!silent) env.refresh();
   }
   return { el: box, redraw: draw };
 }

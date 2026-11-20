@@ -144,7 +144,7 @@ export async function openBranchDialog(options) {
       rowEl = h(
         "div",
         { class: "uc-branch-step", dataset: { index: String(index) } },
-        h("div", { class: "uc-step-edit-top" }, reorder.handle(() => rowEl), h("span", { class: "uc-frame-no", dataset: { kind: "branch" } }, branchStepNumber(tag, index + 1)), selectInput({ options: options.actorOptions(step.actor), value: step.actor || "system", ariaLabel: `Step ${index + 1} actor`, onChange: (value) => { step.actor = value; touch(); } }), actionInput, h("span", { class: "uc-step-edit-tools" }, reorder.moreButton(() => rowEl), removeButton(`Remove step ${index + 1}`, () => { draft.steps.splice(at(), 1); touch(); drawSteps(); }))),
+        h("div", { class: "uc-step-edit-top" }, reorder.handle(() => rowEl), h("span", { class: "uc-frame-no is-branch" }, branchStepNumber(tag, index + 1)), selectInput({ options: options.actorOptions(step.actor), value: step.actor || "system", ariaLabel: `Step ${index + 1} actor`, onChange: (value) => { step.actor = value; touch(); } }), actionInput, h("span", { class: "uc-step-edit-tools" }, reorder.moreButton(() => rowEl), removeButton(`Remove step ${index + 1}`, () => { draft.steps.splice(at(), 1); touch(); drawSteps(); }))),
         actionHint,
         idRow,
         targetRow,
@@ -200,7 +200,8 @@ export async function openBranchDialog(options) {
     // Untouched rows report nothing until left (untilTouched), but Apply stays blocked meanwhile.
     applyButton.disabled = count > 0;
     applyButton.title = count > 0 ? lastBuild.errors[0] : "";
-    dialog.setMessage(count > 0 ? `${count} ${count === 1 ? "error" : "errors"}. ${lastBuild.errors[0]}` : "", "error");
+    // A branch nobody typed into yet says nothing in the footer (Apply is disabled and says why in its title); an edited one names its errors.
+    dialog.setMessage(count > 0 && (dialog.isDirty() || !isNew) ? `${count} ${count === 1 ? "error" : "errors"}. ${lastBuild.errors[0]}` : "", "error");
   }
   function apply() {
     refresh();

@@ -1,6 +1,7 @@
 // Use Cases tab — the preview's calls to the daemon. Every use-case tool call goes through one of the fixed wrappers
 // below; `callTool` is private, so no caller can name a tool or a delete kind (ADR-010). The one extra read,
-// GET /api/use-case (`fetchUseCaseSource`), is an internal route, not a tool: it returns the stored case for the edit form.
+// GET /api/use-case (`fetchUseCaseSource`) and GET /api/world (`fetchWorldSource`), are internal routes, not tools: the stored case
+// for the edit form, and the stored world pool (entities, relationship types, constellations) for the World tab and the filter.
 // Every call names its project (see api.js fetchScreens).
 
 /** @typedef {{ ok: true, data: Record<string, any> } | { ok: false, status: number, code?: string, message: string }} ToolResult */
@@ -61,4 +62,21 @@ export async function fetchUseCaseSource(project, id) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return { ok: false, status: res.status, code: body.code, message: body.message ?? res.statusText };
   return { ok: true, useCase: body.use_case };
+}
+
+/**
+ * The world pool as stored: entities, relationship types and constellations (GET /api/world, an internal route, not a tool).
+ * A project without world.json answers empty lists.
+ * @returns {Promise<{ ok: true, world: { entities: any[], relationship_types: any[], constellations: any[] } } | { ok: false, status: number, code?: string, message: string }>}
+ */
+export async function fetchWorldSource(project) {
+  let res;
+  try {
+    res = await fetch(`/api/world?project=${encodeURIComponent(project)}`);
+  } catch (error) {
+    return { ok: false, status: 0, message: error instanceof Error ? error.message : String(error) };
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, status: res.status, code: body.code, message: body.message ?? res.statusText };
+  return { ok: true, world: { entities: body.entities ?? [], relationship_types: body.relationship_types ?? [], constellations: body.constellations ?? [] } };
 }

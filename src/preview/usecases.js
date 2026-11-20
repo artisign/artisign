@@ -39,11 +39,15 @@ import {
   actorName,
 } from "./usecases-data.js";
 import { avatar, statusDot } from "./usecases-parts.js";
+import { actorKind } from "./usecases-world-parts.js";
+import { renderWorldNav, renderWorldPage } from "./usecases-world-pool.js";
+import { flowSequence } from "./usecases-world-data.js";
 import { avatarOf } from "./usecases-data.js";
 
 const SECTIONS = [
   { id: "cases", label: "Use cases" },
   { id: "personas", label: "Personas" },
+  { id: "world", label: "World" },
   { id: "objects", label: "Data objects" },
 ];
 const RELOAD_DEBOUNCE_MS = 120;
@@ -76,9 +80,12 @@ export function createUseCasesView(options) {
   let personaListLimit = LIST_PAGE;
   let selectedPersona = null;
   let selectedObject = null;
+  let selectedWorldPart = "entities";
   let coverageOpen = false;
   let selectedStep = null; // the mapping view's focused step: survives a reload while the step still exists
   let shownInvalid = ""; // key of the set of unreadable files the toast last reported
+  let pendingWorldError = ""; // a world-read error held back while a confirmation was visible
+  let shownWorldError = ""; // the world-read error the toast last said, so a reload does not repeat it
   let writeToast = false; // the visible toast is a write's confirmation
   let pendingInvalid = null; // an invalid-files report held back while a confirmation was visible
 
@@ -93,6 +100,7 @@ export function createUseCasesView(options) {
   const casesPanelEl = h("div", { class: "uc-side-panel", dataset: { section: "cases" } });
   const personasPanelEl = h("div", { class: "uc-side-panel", dataset: { section: "personas" }, hidden: true });
   const objectsPanelEl = h("div", { class: "uc-side-panel", dataset: { section: "objects" }, hidden: true });
+  const worldPanelEl = h("div", { class: "uc-side-panel uc-world-nav", dataset: { section: "world" }, hidden: true });
   const personaSearch = h("input", { type: "search", class: "chrome-field uc-search-input", placeholder: "Search personas, goals, traits…", "aria-label": "Search personas", autocomplete: "off" });
   const personaSummary = h("div", { class: "uc-result" });
   const personaListEl = h("div", { class: "uc-plist" });
@@ -101,7 +109,7 @@ export function createUseCasesView(options) {
   const objectSummary = h("div", { class: "uc-result" });
   const objectListEl = h("div", { class: "uc-plist" });
   objectsPanelEl.append(h("div", { class: "uc-search" }, icon("search"), objectSearch), objectSummary, objectListEl);
-  const side = h("aside", { class: "uc-side" }, subnav, casesPanelEl, personasPanelEl, objectsPanelEl);
+  const side = h("aside", { class: "uc-side" }, subnav, casesPanelEl, personasPanelEl, worldPanelEl, objectsPanelEl);
   const toast = h("div", { class: "uc-toast", role: "status", hidden: true });
   const content = h("div", { class: "uc-content" });
   const main = h("main", { class: "uc-main" }, toast, content);
@@ -173,18 +181,24 @@ export function createUseCasesView(options) {
   // --- Pool ------------------------------------------------------------------------------------------------------
 
   function emptyPool() {
-    return { personas: [], dimensions: [], objects: [], personasById: new Map(), dimensionsById: new Map(), objectsById: new Map(), counts: null, usage: Object.assign(new Map(), { complete: false }), loaded: false };
+    // `world`: the stored world pool (GET /api/world); `constellations`: id -> name for the filter menu.
+    return { worldError: "", world: { entities: [], relationship_types: [], constellations: [] }, constellations: new Map(), personas: [], dimensions: [], objects: [], personasById: new Map(), dimensionsById: new Map(), objectsById: new Map(), counts: null, usage: Object.assign(new Map(), { complete: false }), loaded: false };
   }
 
   async function loadPool() {
     const forProject = project;
-    const res = await api.listUseCases(forProject, { limit: 1, include: ["personas", "dimensions", "data_objects"] });
+    const [res, worldRes] = await Promise.all([api.listUseCases(forProject, { limit: 1, include: ["personas", "dimensions", "data_objects"] }), api.fetchWorldSource(forProject)]);
     if (forProject !== project) return;
     if (!res.ok) {
       showToast(errorMessage(res), []);
       return;
     }
     const data = res.data;
+    // The world pool has its own read; a failed one never blocks the rest, and is said where the world shows (the World tab, the filter menu, a toast).
+    pool.world = worldRes.ok ? worldRes.world : { entities: [], relationship_types: [], constellations: [] };
+    pool.worldError = worldRes.ok ? "" : errorMessage(worldRes);
+    reportWorldError(pool.worldError);
+    pool.constellations = new Map(pool.world.constellations.map((c) => [c.id, c.name]));
     pool.personas = data.personas ?? [];
     pool.dimensions = data.dimensions ?? [];
     pool.objects = data.data_objects ?? [];
@@ -212,7 +226,7 @@ export function createUseCasesView(options) {
 
   function renderList() {
     const rows = listRows();
-    const labels = { persona: filters.persona ? actorName(filters.persona, pool.personasById) : "" };
+    const labels = { persona: filters.persona ? actorName(filters.persona, pool.personasById) : "", constellation: filters.constellation ? (pool.constellations.get(filters.constellation) ?? filters.constellation) : "" };
     const empty = isEmptyProject();
     const emptyText = `${plural(0, "use case")} · ${plural(pool.counts?.personas ?? 0, "persona")}`;
     listPanel.update({ filters, sort, total: list.total, counts: list.counts, rows, selectedId: detail?.id ?? null, activeKey: list.activeKey, labels, loading: list.loading, error: list.error, empty, emptyText });
@@ -247,6 +261,24 @@ export function createUseCasesView(options) {
       writeToast = false;
       if (pendingInvalid) showInvalid(pendingInvalid);
     }
+    // A held-back world error comes after the invalid-files report: once no toast is showing any more.
+    if (toast.hidden && pendingWorldError) reportWorldError(pendingWorldError);
+  }
+
+  /** The world-read error toast: said once per message, and held back while a write's confirmation is visible. */
+  function reportWorldError(message) {
+    if (message === "" || message === shownWorldError) {
+      pendingWorldError = "";
+      if (message === "") shownWorldError = "";
+      return;
+    }
+    if (writeToast && !toast.hidden) {
+      pendingWorldError = message;
+      return;
+    }
+    shownWorldError = message;
+    pendingWorldError = "";
+    showToast(`The world could not be read: ${message}`, []);
   }
 
   async function loadList() {
@@ -482,6 +514,29 @@ export function createUseCasesView(options) {
         clearLabel: "Clear screen filter",
       });
     }
+    if (kind === "constellation") {
+      const known = new Map(pool.constellations);
+      if (filters.constellation && !known.has(filters.constellation)) known.set(filters.constellation, filters.constellation);
+      const clear = () => {
+        filters = { ...filters, constellation: "" };
+        loadList();
+      };
+      return openMenu({
+        anchor,
+        label: "Constellation",
+        title: "Constellation · from the world pool",
+        items: [...known].map(([value, label]) => ({ value, label, checked: filters.constellation === value })),
+        filterable: true,
+        emptyText: pool.worldError ? `The world could not be read: ${pool.worldError}` : "No constellations in the world yet.",
+        note: "Matches the case and its variants. No counts: a case can hold in several worlds.",
+        onPick: (value) => {
+          filters = { ...filters, constellation: value };
+          loadList();
+        },
+        onClear: filters.constellation ? clear : undefined,
+        clearLabel: "Clear constellation filter",
+      });
+    }
     // Counts inside the current filters, except this one: with it applied the facet would show only the picked value.
     let facets = list.facets ?? {};
     if (filters[kind]) {
@@ -494,7 +549,7 @@ export function createUseCasesView(options) {
     // The facets stop at 50 values. Every persona is known client-side, so that menu lists them all; for tags the menu's text
     // field offers what was typed as the filter value (the server matches tags case-insensitively).
     if (kind === "persona" && truncated) entries = pool.personas.map((p) => [p.id, counts[p.id]]);
-    const items = entries.map(([value, count]) => ({ value, label: kind === "status" ? STATUS_LABELS[value] : kind === "persona" ? actorName(value, pool.personasById) : value, count, checked: filters[kind] === value, leading: kind === "persona" ? avatar(avatarOf(value, pool.personasById), "sm") : kind === "status" ? statusDot(value) : null }));
+    const items = entries.map(([value, count]) => ({ value, label: kind === "status" ? STATUS_LABELS[value] : kind === "persona" ? actorName(value, pool.personasById) : value, count, checked: filters[kind] === value, leading: kind === "persona" ? avatar(avatarOf(value, pool.personasById), "sm") : kind === "status" ? statusDot(value) : null, trailing: kind === "persona" ? actorKind(pool.personasById.get(value)?.kind) : null }));
     openMenu({
       anchor,
       label: kind[0].toUpperCase() + kind.slice(1),
@@ -561,7 +616,7 @@ export function createUseCasesView(options) {
     const { id, variantId } = detail;
     const hadMapping = mode === "mapping";
     await openCase(id, variantId, { keepMode: true });
-    if (hadMapping && detail?.view) showMapping(detail.view.use_case.steps?.some((s) => s.id === selectedStep) ? selectedStep : null);
+    if (hadMapping && detail?.view) showMapping(flowSequence(detail.view.use_case.steps ?? [], detail.view.use_case.branches ?? []).some((item) => item.step.id === selectedStep) ? selectedStep : null);
   }
 
   function showMapping(stepId) {
@@ -584,6 +639,7 @@ export function createUseCasesView(options) {
       handlers: {
         onVariant: (variantId) => openCase(detail.id, variantId),
         onEdit: () => editUseCase(detail.id),
+        onOpenWorld: () => setSection("world"),
         onMap: (stepId) => showMapping(stepId),
         onCopyId: () => copy(detail.id),
         onCopy: (text) => copy(text),
@@ -614,11 +670,14 @@ export function createUseCasesView(options) {
     casesPanelEl.hidden = section !== "cases";
     personasPanelEl.hidden = section !== "personas";
     objectsPanelEl.hidden = section !== "objects";
+    worldPanelEl.hidden = section !== "world";
+    addButton.hidden = section === "world"; // the world is edited in its own dialogs (not part of the read views)
     addButton.setAttribute("aria-label", section === "cases" ? "New use case" : section === "personas" ? "New persona" : "New data object");
     addButton.title = addButton.getAttribute("aria-label");
     if (mode === "mapping" && detail?.view) return; // the mapping view owns the content
     if (section === "personas") return renderPersonas();
     if (section === "objects") return renderObjects();
+    if (section === "world") return renderWorld();
     if (isEmptyProject()) return renderGuide();
     if (!detail) {
       content.replaceChildren(h("div", { class: "uc-placeholder" }, list.loading ? "Loading…" : pool.counts?.use_cases === 0 ? h("div", null, h("p", null, "No use cases yet."), h("button", { type: "button", class: "chrome-btn", onClick: () => newUseCase() }, icon("add"), "New use case")) : "Select a use case."));
@@ -664,8 +723,14 @@ export function createUseCasesView(options) {
     if (section === "objects" && mode !== "mapping") renderObjectPage(content, { pool, query: objectQuery, selectedId: selectedObject, handlers });
   }
 
+  function renderWorld() {
+    renderWorldNav(worldPanelEl, { world: pool.world, selected: selectedWorldPart, onSelect: (part) => { selectedWorldPart = part; renderWorld(); document.getElementById(`uc-world-${part}`)?.scrollIntoView?.({ block: "start" }); } });
+    if (section === "world" && mode !== "mapping") renderWorldPage(content, { world: pool.world, pool, selected: selectedWorldPart, error: pool.worldError });
+  }
+
   function renderPools() {
     renderPoolPanel();
+    if (section === "world") return renderWorld();
     if (section === "personas") renderPersonas();
     else if (section === "objects") renderObjects();
     else renderAll();

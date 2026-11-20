@@ -22,7 +22,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("usecases-api", () => {
   it("exports exactly the fixed wrappers, and callTool stays private", () => {
     expect(Object.keys(api).sort()).toEqual(
-      ["deleteDataObject", "deleteDimension", "deletePersona", "deleteUseCase", "fetchUseCaseSource", "generatePersonas", "getUseCase", "listUseCases", "setUseCases", "suggestUseCaseVariants"].sort(),
+      ["deleteDataObject", "deleteDimension", "deletePersona", "deleteUseCase", "fetchUseCaseSource", "fetchWorldSource", "generatePersonas", "getUseCase", "listUseCases", "setUseCases", "suggestUseCaseVariants"].sort(),
     );
     expect(api.callTool).toBeUndefined();
   });
@@ -54,6 +54,16 @@ describe("usecases-api", () => {
     await api.fetchUseCaseSource("/p", "a b");
     expect(sent[0].url).toBe("/api/use-case?id=a%20b&project=%2Fp");
     expect(sent[0].method).toBe("GET");
+  });
+
+  it("reads the world pool from its own internal route and tolerates a missing list", async () => {
+    const sent = stubFetch();
+    const res = await api.fetchWorldSource("/p");
+    expect(sent[0].url).toBe("/api/world?project=%2Fp");
+    expect(sent[0].method).toBe("GET");
+    expect(res).toEqual({ ok: true, world: { entities: [], relationship_types: [], constellations: [] } });
+    vi.stubGlobal("fetch", async () => ({ ok: false, status: 422, statusText: "x", json: async () => ({ code: "invalid_state", message: "bad file" }) }));
+    expect(await api.fetchWorldSource("/p")).toEqual({ ok: false, status: 422, code: "invalid_state", message: "bad file" });
   });
 
   it("no other use-case source module names /api/tools/ (tests and fixtures excluded)", () => {

@@ -9,6 +9,8 @@ import { avatar, targetChip, filterChip } from "./usecases-parts.js";
 import { createFittingIframe } from "./iframe-fit.js";
 import { updateInspectOverlay } from "./inspector.js";
 import { avatarOf, actorName, mappingFor, stepScope, changedKeys, formatValue, plural } from "./usecases-data.js";
+import { flowSequence, lanesAtStep, numberBranches } from "./usecases-world-data.js";
+import { branchLabel } from "./usecases-world-parts.js";
 
 const FRAME_WIDTH = 240;
 const WIDE_FRAME_WIDTH = 420;
@@ -44,21 +46,27 @@ export function dataChangeLine(step, objectsById) {
     .join(" · ");
 }
 
-/** The distinct screens of a flow in order of first use, each with the steps (number, mapping) that point at it. */
-export function framesOf(steps, bundle) {
+/**
+ * The distinct screens of a flow in order of first use, each with the steps (number, mapping) that point at it. Numbers are 1, 2, …
+ * for main steps and `2A.1` (fork step, letter, position) for branch steps; a branch before the first step leads (A.1).
+ */
+export function framesOf(steps, bundle, branches = []) {
   const frames = new Map();
-  steps.forEach((step, index) => {
-    if (!step.target) return;
+  for (const { step, number, branch } of flowSequence(steps, branches)) {
+    if (!step.target) continue;
     const found = mappingFor(bundle, step.id);
     let frame = frames.get(step.target.screen);
     if (!frame) {
       frame = { screen: step.target.screen, exists: found?.screen.exists !== false, steps: [] };
       frames.set(step.target.screen, frame);
     }
-    frame.steps.push({ step, number: index + 1, mapping: found?.mapping ?? null, scope: stepScope(step, found?.mapping) });
-  });
+    frame.steps.push({ step, number, branch: Boolean(branch), mapping: found?.mapping ?? null, scope: stepScope(step, found?.mapping) });
+  }
   return [...frames.values()];
 }
+
+/** `uc-frame-no`: the step number as a pill; a branch step's number is dashed. */
+const frameNo = (number, branch) => h("span", { class: branch ? "uc-frame-no is-branch" : "uc-frame-no" }, String(number));
 
 /**
  * @param {{
@@ -87,7 +95,7 @@ export function createMappingView({ root, fetchRender, handlers }) {
 
   function buildFrame(frame, ctx) {
     const { project } = ctx;
-    const labelNumbers = frame.steps.map((s) => h("span", { class: "uc-frame-no" }, String(s.number)));
+    const labelNumbers = frame.steps.map((s) => frameNo(s.number, s.branch));
     // The scope is said in words on the frame itself, not only in the step list: Element / Screen, plus Stale / Unstable.
     const kinds = [];
     if (frame.steps.some((s) => s.scope === "element")) kinds.push(["element", "Element"]);
@@ -189,25 +197,27 @@ export function createMappingView({ root, fetchRender, handlers }) {
     const myToken = token;
     const { bundle, variantId, variants, pool, project } = ctx;
     const useCase = bundle.use_case;
-    steps = useCase.steps ?? [];
-    const frames = framesOf(steps, bundle);
+    const mainSteps = useCase.steps ?? [];
+    const branches = useCase.branches ?? [];
+    const sequence = flowSequence(mainSteps, branches);
+    steps = sequence.map((item) => item.step);
+    const frames = framesOf(mainSteps, bundle, branches);
     const variantLabel = variantId ? (variants.find((v) => v.id === variantId)?.title ?? variantId) : "Base";
     frameEls = new Map();
     stepEls = new Map();
 
-    const flowList = h("ol", { class: "uc-map-steps" });
-    steps.forEach((step, index) => {
+    const stepItem = ({ step, number, branch }) => {
       const found = mappingFor(bundle, step.id);
       const scope = stepScope(step, found?.mapping);
       const dataLine = dataChangeLine(step, pool.objectsById);
       const row = h(
         "li",
-        { class: "uc-map-step", dataset: { step: step.id, scope } },
+        { class: "uc-map-step", dataset: { step: step.id, scope, branch: branch ? branch.branch.id : "" } },
         h(
           "button",
-          { type: "button", class: "uc-map-step-btn", onClick: () => { select(step.id); handlers.onStep(step.id); } },
+          { type: "button", class: "uc-map-step-btn", "aria-label": `Step ${number}: ${step.action}`, onClick: () => { select(step.id); handlers.onStep(step.id); } },
           avatar(avatarOf(step.actor, pool.personasById), "sm", actorName(step.actor, pool.personasById)),
-          h("span", { class: "uc-map-step-text" }, h("span", { class: "uc-map-step-action" }, `${index + 1} · ${step.action}`), step.target ? targetChip(scope, step.target.screen, step.target.node) : h("span", { class: "uc-muted" }, "Not mapped")),
+          h("span", { class: "uc-map-step-text" }, h("span", { class: "uc-map-step-action" }, frameNo(number, Boolean(branch)), step.action), step.target ? targetChip(scope, step.target.screen, step.target.node) : h("span", { class: "uc-muted" }, "Not mapped")),
         ),
         dataLine ? h("p", { class: "uc-map-data" }, dataLine) : null,
         scope === "stale"
@@ -222,7 +232,26 @@ export function createMappingView({ root, fetchRender, handlers }) {
             : null,
       );
       stepEls.set(step.id, row);
-      flowList.append(row);
+      return row;
+    };
+
+    // Main steps in a list; each branch is a dashed block right under its fork step (a branch before the first step leads the list).
+    const flowList = h("ol", { class: "uc-map-steps" });
+    const branchBlock = (entry) => {
+      const end = entry.branch.rejoin === undefined ? "ends the case" : `continues at ${mainSteps.findIndex((s) => s.id === entry.branch.rejoin) + 1 || entry.branch.rejoin}`;
+      return h(
+        "li",
+        { class: "uc-map-branch", dataset: { branch: entry.branch.id } },
+        h("div", { class: "uc-map-branch-head" }, icon("call_split"), branchLabel(entry)),
+        h("ol", { class: "uc-map-steps" }, sequence.filter((item) => item.branch?.branch.id === entry.branch.id).map(stepItem)),
+        h("p", { class: "uc-map-branch-end" }, end),
+      );
+    };
+    const numbered = numberBranches(useCase);
+    flowList.append(...lanesAtStep(numbered, null).map(branchBlock));
+    sequence.filter((item) => !item.branch).forEach((item) => {
+      flowList.append(stepItem(item));
+      flowList.append(...lanesAtStep(numbered, item.step.id).map(branchBlock));
     });
 
     const canvas = h("div", { class: "uc-map-canvas", tabindex: "0", "aria-label": "Mapped screens in flow order" });
@@ -233,7 +262,7 @@ export function createMappingView({ root, fetchRender, handlers }) {
       frameEls.set(frame.screen, built.parts);
       track.append(built.wrap);
     });
-    canvas.append(frames.length === 0 ? h("div", { class: "uc-map-none" }, h("p", null, "No step of this use case is mapped to a screen yet."), h("button", { type: "button", class: "chrome-btn", onClick: () => handlers.onPickTarget(steps[0]?.id ?? "") }, "Edit steps")) : track);
+    canvas.append(frames.length === 0 ? h("div", { class: "uc-map-none" }, h("p", null, "No step of this use case is mapped to a screen yet."), h("button", { type: "button", class: "chrome-btn", onClick: () => handlers.onPickTarget(mainSteps[0]?.id ?? "") }, "Edit steps")) : track);
 
     fill(
       root,
@@ -247,11 +276,13 @@ export function createMappingView({ root, fetchRender, handlers }) {
           h("strong", { class: "uc-map-title" }, useCase.title),
           variants.length > 0 ? filterChip({ label: variantLabel, onClick: (e) => handlers.onVariantMenu(e.currentTarget) }) : null,
           h("span", { class: "uc-map-spacer" }),
+          branches.length > 0 ? h("span", { class: "uc-legend-item" }, frameNo(2, false), "Main step") : null,
+          branches.length > 0 ? h("span", { class: "uc-legend-item" }, frameNo("2A.1", true), "Branch step: fork, letter, position") : null,
           h("span", { class: "uc-legend-item" }, h("span", { class: "uc-swatch", dataset: { kind: "element" } }), "Element"),
           h("span", { class: "uc-legend-item" }, h("span", { class: "uc-swatch", dataset: { kind: "screen" } }), "Whole screen"),
           h("span", { class: "uc-legend-item" }, h("span", { class: "uc-swatch", dataset: { kind: "stale" } }), "Stale"),
         ),
-        h("div", { class: "uc-map-body" }, h("aside", { class: "uc-map-flow" }, h("h2", { class: "uc-map-flow-head" }, "Flow", h("span", { class: "uc-h2-meta" }, `${plural(steps.length, "step")} · click a step to focus its screen`)), flowList), canvas),
+        h("div", { class: "uc-map-body" }, h("aside", { class: "uc-map-flow" }, h("h2", { class: "uc-map-flow-head" }, "Flow", h("span", { class: "uc-h2-meta" }, `${plural(mainSteps.length, "step")}${branches.length > 0 ? ` · ${plural(branches.length, "branch", "branches")}` : ""} · click a step to focus its screen`)), flowList), canvas),
       ),
     );
     select(ctx.stepId ?? null, { scroll: Boolean(ctx.stepId) });

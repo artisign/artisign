@@ -3,7 +3,7 @@
 // flattenFlat). Group counts come from the facets, rows from paged queries — the panel never holds thousands of nodes.
 
 import { h, icon } from "./usecases-dom.js";
-import { filterChip } from "./usecases-parts.js";
+import { filterChip, countPill } from "./usecases-parts.js";
 import { statusDot } from "./usecases-parts.js";
 import { rowTops, visibleWindow, treeKeyNav, ROW_HEIGHT, SORTS, STATUS_LABELS, formatCount, plural, hasActiveFilters } from "./usecases-data.js";
 
@@ -120,10 +120,15 @@ export function createListPanel(el, handlers) {
     if (row.kind === "case") {
       const u = row.u;
       const selected = model.selectedId === u.id;
+      // A case a constellation filter matched only through one of its variants says so instead of counting it as its own.
+      const viaVariant = Boolean(model.filters.constellation) && !(u.constellations ?? []).includes(model.filters.constellation);
       const meta = [
         statusDot(u.status),
         h("span", null, STATUS_LABELS[u.status] ?? u.status),
+        u.branches ? countPill("call_split", u.branches, "branches", "branch") : null,
+        u.constellations?.length ? countPill("hub", u.constellations.length, "constellations", "constellation") : null,
         ...(u.variants ? [h("span", { "aria-hidden": "true" }, "·"), h("span", null, plural(u.variants, "variant"))] : []),
+        ...(viaVariant ? [h("span", { class: "uc-list-via" }, "matched by a variant")] : []),
       ];
       return h(
         "div",
@@ -159,6 +164,7 @@ export function createListPanel(el, handlers) {
     result.hidden = Boolean(model.empty);
     filters.replaceChildren(
       filterChip({ label: label("Persona", model.labels.persona), active: Boolean(f.persona), onClick: (e) => handlers.onFilterMenu("persona", e.currentTarget), onClear: () => handlers.onClearFilter("persona") }),
+      filterChip({ label: label("Constellation", model.labels.constellation), active: Boolean(f.constellation), onClick: (e) => handlers.onFilterMenu("constellation", e.currentTarget), onClear: () => handlers.onClearFilter("constellation") }),
       filterChip({ label: label("Status", f.status && (STATUS_LABELS[f.status] ?? f.status)), active: Boolean(f.status), onClick: (e) => handlers.onFilterMenu("status", e.currentTarget), onClear: () => handlers.onClearFilter("status") }),
       filterChip({ label: label("Tag", f.tag), active: Boolean(f.tag), onClick: (e) => handlers.onFilterMenu("tag", e.currentTarget), onClear: () => handlers.onClearFilter("tag") }),
       filterChip({ label: label("Screen", f.screen), active: Boolean(f.screen), onClick: (e) => handlers.onFilterMenu("screen", e.currentTarget), onClear: () => handlers.onClearFilter("screen") }),

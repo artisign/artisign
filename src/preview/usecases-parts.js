@@ -24,9 +24,10 @@ const DIFF = {
   added: { icon: "add", label: "Added" },
   removed: { icon: "remove", label: "Removed" },
   base: { icon: "check", label: "From base" },
+  emptied: { icon: "block", label: "Emptied" },
 };
 
-/** `uc-diff-badge`: changed / added / removed / base. */
+/** `uc-diff-badge`: changed / added / removed / base / emptied (a branch a variant left without steps). */
 export function diffBadge(kind) {
   const spec = DIFF[kind] ?? DIFF.changed;
   return h("span", { class: "uc-diff", dataset: { kind } }, icon(spec.icon), spec.label);
@@ -66,6 +67,11 @@ export function dataCard(kind, objectName, example, highlight) {
         : lines.map((line) => h("div", { class: line.changed ? "uc-data-line is-changed" : "uc-data-line" }, `${line.key}: ${line.text}`)),
     ),
   );
+}
+
+/** A count pill of a list row (`uc-list-row counts`): the icon is decoration, the word is read out ("3 branches"). */
+export function countPill(iconName, count, many, one) {
+  return h("span", { class: "uc-count-pill" }, icon(iconName), String(count), h("span", { class: "mcp-visually-hidden" }, ` ${count === 1 ? one : many}`));
 }
 
 /** `uc-variant-chip` (default / selected / add). */

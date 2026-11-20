@@ -11,6 +11,7 @@ let calls;
 let invalid; // extra fields of the list answer (warnings, invalid_file_count)
 let bundle; // what get_use_case answers
 let failGroup;
+let worldFail; // GET /api/world answers 422
 let holdLists; // a promise the list_use_cases answers wait for, or null
 let source;
 let poolObjects; // the data objects the fake daemon holds
@@ -45,6 +46,7 @@ function stubDaemon() {
       const summary = { id: "map-step", title: rawUseCase.title, group: "alpha", status: "ready", steps: 3 };
       return json({ total: 1, use_cases: body.group || body.limit !== 1 ? [summary] : [], counts: { use_cases: 1, personas: personas.length, dimensions: dimensions.length, data_objects: objects.length }, facets: { status: {}, group: { alpha: 1 }, tag: {}, persona: {} }, personas, dimensions, data_objects: poolObjects, ...invalid });
     }
+    if (path === "/api/world" && worldFail) return { ok: false, status: 422, json: async () => ({ code: "invalid_state", message: "world.json is not valid" }) };
     if (path === "/api/tools/get_use_case") return json(bundle);
     if (path === "/api/tools/suggest_use_case_variants") return json({ suggestions: [] });
     if (path === "/api/use-case") return json({ use_case: source });
@@ -72,6 +74,7 @@ const selectedStep = () => $(".uc-map-step.is-selected")?.dataset.step ?? null;
 
 beforeEach(() => {
   invalid = {};
+  worldFail = false;
   bundle = baseBundle;
   failGroup = false;
   holdLists = null;
@@ -142,6 +145,37 @@ describe("the invalid-files toast", () => {
     expect(toast()).toBe("Some use case files could not be loaded.");
   });
 
+  it("a world that cannot be read never replaces a save confirmation either, and shows once that is gone", async () => {
+    bundle = staleBundle();
+    const view = await openView();
+    await toMapping();
+    leaveUnmapped();
+    await flush();
+    worldFail = true;
+    view.onChange();
+    await settle();
+    expect(toast()).toBe("Step left unmapped.");
+    $(".uc-toast button").click();
+    expect(toast()).toBe("The world could not be read: world.json is not valid");
+  });
+
+  it("a held-back world error comes after the invalid-files report", async () => {
+    bundle = staleBundle();
+    const view = await openView();
+    await toMapping();
+    leaveUnmapped();
+    await flush();
+    invalid = { warnings, invalid_file_count: 1 };
+    worldFail = true;
+    view.onChange();
+    await settle();
+    expect(toast()).toBe("Step left unmapped.");
+    $(".uc-toast button").click();
+    expect(toast()).toBe("Some use case files could not be loaded.");
+    $(".uc-toast button").click();
+    expect(toast()).toBe("The world could not be read: world.json is not valid");
+  });
+
   it("a confirmation that hides by itself releases the held-back report too", async () => {
     bundle = staleBundle();
     const view = await openView();
@@ -171,6 +205,22 @@ describe("the selected mapping step", () => {
     view.onChange();
     await settle();
     expect($(".uc-mapping")).not.toBeNull();
+    expect(selectedStep()).toBeNull();
+  });
+
+  it("a focused branch step survives a reload too, and falls back when its branch is gone", async () => {
+    const branch = { id: "late", title: "Late", from: "tap", when: [{ subject: "system", property: "x", value: 1 }], steps: [{ id: "late-1", actor: "system", action: "Says it is late", target: { screen: "picker" } }] };
+    bundle = { ...baseBundle, use_case: { ...baseBundle.use_case, branches: [branch] } };
+    const view = await openView();
+    await toMapping();
+    $(".uc-map-step[data-step='late-1'] .uc-map-step-btn").click();
+    expect(selectedStep()).toBe("late-1");
+    view.onChange();
+    await settle();
+    expect(selectedStep()).toBe("late-1");
+    bundle = baseBundle;
+    view.onChange();
+    await settle();
     expect(selectedStep()).toBeNull();
   });
 });

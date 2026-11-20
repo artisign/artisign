@@ -1,6 +1,7 @@
 // Use Cases tab — the small forms: persona, dimension, data object, and "Generate from dimensions" (dry-run preview, then
 // create). All write through set_use_cases / generate_personas / delete_entity, the same tools the MCP server offers;
-// reference problems come back as warnings and never block. Payload builders are exported for the tests.
+// a save's reference problems come back as warnings; a delete of an entry that is still referenced is refused until the human chooses
+// "Delete anyway". Payload builders are exported for the tests.
 
 import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
@@ -9,6 +10,7 @@ import { KIND_ICONS } from "./usecases-world-data.js";
 import { AVATAR_COLORS, AVATAR_EMOJIS, FIELD_TYPES, slugify, uniqueId, isValidId, initials, formatExampleValue, parseExampleValue, plural, formatCount } from "./usecases-data.js";
 
 const REMOVE_NOTE = "Nothing is repaired: use cases that still name it keep a warning.";
+const REFUSE_NOTE = "If something still refers to it, the delete is refused and you can review what first.";
 
 // --- Pure payload builders --------------------------------------------------------------------------------------------
 
@@ -121,13 +123,13 @@ export function confirmDeleteInline(dialog, { name, remove, done, used = "" }) {
     dialog.close(done(response));
   };
   const offerForce = (message) => {
-    dialog.setMessage(`${refusalText(message)} ${REMOVE_NOTE}`, "warning");
+    dialog.setMessage(`${refusalText(message)} Delete anyway leaves these references broken. ${REMOVE_NOTE}`, "warning");
     dialog.showActions([
       { label: "Keep it", autofocus: true, onClick: () => dialog.restoreActions() },
       { label: "Delete anyway", id: "delete-anyway", danger: true, onClick: () => finish(true) },
     ]);
   };
-  dialog.setMessage(`Delete ${name}? ${used ? `${used} ` : ""}${REMOVE_NOTE}`, "warning");
+  dialog.setMessage(`Delete ${name}? ${used ? `${used} ` : ""}${REFUSE_NOTE} ${REMOVE_NOTE}`, "warning");
   dialog.showActions([
     { label: "Keep it", autofocus: true, onClick: () => dialog.restoreActions() },
     { label: `Delete ${name}`, danger: true, onClick: () => finish(false) },

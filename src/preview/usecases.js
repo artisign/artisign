@@ -857,10 +857,11 @@ export function createUseCasesView(options) {
     if (autoHideMs > 0) showToast.timer = setTimeout(hideToast, autoHideMs);
   }
 
-  /** Response of a write: warnings are shown, never blocking. */
+  /** Response of a write: warnings are shown. A save is never blocked by them; a delete's warnings list what it left dangling (it went through after a refusal or none). */
   function reportWrite(data, label) {
     const warnings = data.warnings ?? [];
-    if (warnings.length > 0) showToast(`${label} ${warningSummary(warnings, data.warning_count)}`, warnings, 0, data.warning_count ?? warnings.length);
+    const deleted = /deleted\.$/.test(label);
+    if (warnings.length > 0) showToast(`${label} ${warningSummary(warnings, data.warning_count, { deleted })}`, warnings, 0, data.warning_count ?? warnings.length);
     else showToast(label, [], 1800);
     writeToast = true;
   }

@@ -7,7 +7,7 @@ import { h, icon } from "./usecases-dom.js";
 import { openMenu } from "./usecases-menu.js";
 import { avatar, statusBadge, diffBadge, targetChip, variantChip, traitChip } from "./usecases-parts.js";
 import { actorKind, mappingNote, stepDataBlock, warnLine } from "./usecases-world-parts.js";
-import { orphansOf, conditionOrphan, orphanSummary, actorMissing } from "./usecases-orphans.js";
+import { orphansOf, conditionOrphan, orphanSummary, actorMissing, hiddenNote } from "./usecases-orphans.js";
 import { KIND_ICONS, warningsByTarget, numberBranches, scopeOf, matchingConstellations, whenScopeText, triggerChanged, stateRows } from "./usecases-world-data.js";
 import { triggerRow, worldSection, worldDiffSection, stateSection, branchesDiffSection, lanesAt, stepBranchNotes } from "./usecases-world-view.js";
 import {
@@ -60,6 +60,8 @@ export function renderDetail(root, ctx) {
   const seen = new Set();
   const caseWarnings = [...(base.warnings ?? []), ...(bundle.warnings ?? [])].filter((x) => !seen.has(`${x.kind}|${x.target}|${x.message}`) && seen.add(`${x.kind}|${x.target}|${x.message}`));
   ctx.orphans = orphansOf(caseWarnings, baseCase.id, [...new Set([...(baseCase.constellations ?? []), ...(useCase.constellations ?? []), ...(source?.variants ?? []).flatMap((v) => v.constellations ?? [])])]);
+  // get_use_case caps its warning list (warning_count is the true total): an orphan past the cap is unseen, so the card cannot confirm full coverage.
+  ctx.orphans.incomplete = [base, bundle].some((b) => (b.warning_count ?? 0) > (b.warnings?.length ?? 0));
 
   const main = h("div", { class: "uc-detail-main" });
   main.append(header(ctx, useCase, w));
@@ -150,7 +152,7 @@ function orphanChip(ctx, variantId, entry, value) {
   chip.classList.add("is-orphan");
   chip.dataset.orphan = orphan;
   chip.title = orphan === "dimension" ? "This dimension no longer exists" : "This value no longer exists";
-  chip.append(icon("warning"));
+  chip.append(icon("warning"), hiddenNote(orphan === "dimension" ? "this dimension no longer exists" : "this value no longer exists"));
   return chip;
 }
 
@@ -201,7 +203,7 @@ function people(ctx, useCase) {
     { class: "uc-people" },
     ids.map((id) => {
       const persona = pool.personasById.get(id);
-      const orphan = !persona || Boolean(ctx.orphans?.personas.has(id));
+      const orphan = Boolean(ctx.orphans?.personas.has(id));
       const sub = persona ? [KIND_ICONS[persona.kind]?.label, persona.role, traitSummary(persona, pool.dimensionsById)].filter(Boolean).join(" · ") : "Unknown persona";
       return h(
         "div",
@@ -404,10 +406,11 @@ function coveragePanel(ctx, matrix) {
     h("p", { class: "uc-legend-line" }, dot(""), " The flow handles this value: for Base from the traits of its personas, for a variant the values named in its when. any: no condition on that dimension (a persona or variant without it). A column that neither Base nor any variant covers is a gap, the same rule as suggest_use_case_variants."),
     matrix.gaps > 0
       ? h("div", { class: "uc-gap-box" }, h("p", null, `${plural(matrix.gaps, "gap")}: ${matrix.columns.map((c) => ({ label: c.label, open: c.values.filter((v) => v.gap).map((v) => v.label) })).filter((c) => c.open.length > 0).map((c) => `${c.label} (${c.open.join(", ")})`).join("; ")}. Ask your agent to draft variants for them:`), h("div", { class: "uc-prompt" }, h("code", null, prompt), h("button", { type: "button", class: "chrome-icon-btn chrome-icon-btn--sm", "aria-label": "Copy prompt", onClick: () => handlers.onCopy(prompt) }, icon("content_copy"))))
-      : ctx.orphans.count > 0
+      : ctx.orphans.count > 0 || ctx.orphans.incomplete
         ? null
         : h("p", { class: "uc-muted" }, "Every trait value the persona pool uses is covered."),
     ctx.orphans.count > 0 ? orphanBox(ctx, useCaseId) : null,
+    ctx.orphans.incomplete ? h("p", { class: "uc-muted", dataset: { orphans: "incomplete" } }, "The warning list of this case is incomplete (the tool caps it), so full coverage cannot be confirmed. Ask your agent to check it with get_use_case.") : null,
   );
 }
 

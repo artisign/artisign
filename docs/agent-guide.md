@@ -684,8 +684,12 @@ nothing is referenced, naming up to 5 files; repair them, or pass `force: true`.
 `force` the response adds one `invalid_file` warning per unreadable case file (target
 `use_case:<id>`, at most 10) and `invalid_file_count` with the total when there are more:
 the referrer list may be incomplete. `relationship_type` never fails closed, its scan reads
-no case file. A pool file with one invalid entry is `invalid_state` for every kind, before
-any scan.
+no case file. `delete_entity` reads the pools strictly: a pool file with one invalid entry is
+`invalid_state`, before any scan, for the files the kind reads. Per kind: `use_case` reads no
+pool file; `persona` and `dimension` read `personas.json` and `world.json`; `data_object`
+reads `data-objects.json` and `world.json`; `entity` reads `world.json` and `personas.json`;
+`constellation` and `relationship_type` read `world.json`. The case files are read for every
+kind but `relationship_type` and `use_case` (see the fail-closed rule above).
 
 Like design
 files, `usecases/` changes only through these tools. The one exception: a file

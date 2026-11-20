@@ -35,7 +35,7 @@ describe("orphan markers", () => {
     const broken = constellations.map((c) => (c.id === "single-parent" ? { ...c, relationships: [{ from: "maria", type: "mentors", to: "leo" }] } : c));
     const warnings = [{ kind: "unknown_relationship_type", target: "constellation:single-parent", message: 'relationship "maria mentors leo" names undeclared type "mentors"' }];
     render(withWarnings(worldBundle, warnings, { constellations: broken }));
-    expect($('.uc-cst[data-constellation="single-parent"] [data-orphan="relationship_type"]').textContent).toBe("mentors");
+    expect($('.uc-cst[data-constellation="single-parent"] [data-orphan="relationship_type"]').textContent).toContain("mentors");
     expect($('.uc-cst[data-constellation="two-parents"] [data-orphan="relationship_type"]')).toBeNull();
   });
 
@@ -95,4 +95,62 @@ describe("the coverage card counts the new kinds", () => {
     expect([...o.dataObjects]).toEqual(["book"]);
     expect(orphanSummary(o)).toContain("ghost");
   });
+});
+
+describe("review round (code-review of PR #200)", () => {
+  it("an existing entity used as an actor (in no constellation, no state subject) gets no marker", () => {
+    // `ghost-entity` exists in the world pool but is not in the bundle's entities, and no unknown_persona warning names it.
+    const steps = baseCase.steps.map((s) => (s.id === "open" ? { ...s, actor: "ghost-entity" } : s));
+    const trigger = { ...baseCase.trigger, actor: "ghost-entity" };
+    const warnings = [{ kind: "entity_as_actor", target: "use_case:review-premium/open", message: '"ghost-entity" is an entity; only a persona or "system" can act' }];
+    render(withWarnings(worldBundle, warnings, { use_case: { ...baseCase, steps, trigger } }));
+    expect($('[data-orphan="actor"]')).toBeNull();
+  });
+
+  it("a capped warning list (warning_count above what was listed) never claims full coverage", () => {
+    const filler = Array.from({ length: 50 }, (_, i) => ({ kind: "invalid_example_value", target: `use_case:review-premium/s${i}`, message: `value ${i}` }));
+    const capped = { ...worldBundle, warnings: filler, warning_count: 61 }; // an unknown_dimension past index 50 is not in the list
+    const root = render(capped);
+    const panel = $(".uc-coverage", root);
+    expect(panel.textContent).not.toContain("Every trait value the persona pool uses is covered");
+    expect($('[data-orphans="incomplete"]', panel).textContent).toContain("incomplete");
+  });
+
+  it("a complete list without orphans still reports full coverage", () => {
+    const root = render({ ...worldBundle, warnings: [] });
+    expect($(".uc-coverage", root).textContent).toContain("Every trait value the persona pool uses is covered");
+    expect($('[data-orphans="incomplete"]')).toBeNull();
+  });
+
+  it("a trait of a constellation that names a deleted dimension is a constellation orphan, named in the summary", () => {
+    const o = orphansOf(
+      [
+        { kind: "unknown_dimension", target: "constellation:single-parent", message: 'trait "household" is not a defined dimension' },
+        { kind: "unknown_trait_value", target: "constellation:single-parent", message: '"blended" is not a value of dimension "household"' },
+      ],
+      "review-premium",
+      ["single-parent"],
+    );
+    expect(o.conditions).toEqual([]);
+    expect(o.constellationTraits).toEqual([
+      { constellation: "single-parent", dimension: "household" },
+      { constellation: "single-parent", dimension: "household", value: "blended" },
+    ]);
+    expect(orphanSummary(o)).toContain("single-parent: household");
+    expect(orphanSummary(o)).not.toContain("base:");
+  });
+
+  it("orphan chips and relation ends carry text for assistive technology, not only a title", () => {
+    const broken = constellations.map((c) => (c.id === "single-parent" ? { ...c, relationships: [{ from: "maria", type: "mentors", to: "ghost" }] } : c));
+    const warnings = [
+      { kind: "unknown_participant", target: "constellation:single-parent", message: '"ghost" in relationship "maria mentors ghost" is neither a persona nor an entity' },
+      { kind: "unknown_relationship_type", target: "constellation:single-parent", message: 'relationship "maria mentors ghost" names undeclared type "mentors"' },
+    ];
+    render(withWarnings(worldBundle, warnings, { constellations: broken }));
+    const card = $('.uc-cst[data-constellation="single-parent"]');
+    expect($('.uc-relation-end[data-orphan="participant"] .uc-visually-hidden', card).textContent).toContain("neither a persona nor an entity");
+    expect($('[data-orphan="relationship_type"] .uc-visually-hidden', card).textContent).toContain("not declared");
+    expect($('.uc-participant[data-orphan="participant"] .uc-visually-hidden', card).textContent).toContain("neither a persona nor an entity");
+  });
+
 });

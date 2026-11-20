@@ -213,6 +213,7 @@ describe("orphans (CHR-1125): what the case names but the pools lack", () => {
     const chip = $(".uc-applies .uc-trait.is-orphan");
     expect(chip.dataset.orphan).toBe("dimension");
     expect(chip.title).toBe("This dimension no longer exists");
+    expect($(".uc-visually-hidden", chip).textContent).toContain("no longer exists");
     expect($(".uc-applies").textContent).toContain("a condition names a dimension that no longer exists");
   });
 

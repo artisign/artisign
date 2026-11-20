@@ -2,6 +2,8 @@
 // (delete_entity with force, a warn-only write, a hand edit). The source is the warnings get_use_case already returns
 // (unknown_persona, unknown_dimension, unknown_trait_value, unknown_constellation); there is no new warning kind.
 
+import { h } from "./usecases-dom.js";
+
 const ORPHAN_KINDS = new Set([
   "unknown_persona",
   "unknown_dimension",
@@ -23,6 +25,7 @@ export function orphansOf(warnings, useCaseId, constellationIds = []) {
   const out = {
     personas: new Set(),
     conditions: [],
+    constellationTraits: [],
     constellations: new Set(),
     participants: new Set(),
     relationshipTypes: new Set(),
@@ -50,10 +53,23 @@ export function orphansOf(warnings, useCaseId, constellationIds = []) {
     else if (w.kind === "unknown_constellation" && quoted[0]) out.constellations.add(quoted[0]);
     else if (w.kind === "unknown_dimension") {
       const dimension = quoted.at(-1);
-      if (dimension) out.conditions.push({ variant, dimension });
-    } else if (w.kind === "unknown_trait_value" && quoted.length >= 2)
-      out.conditions.push({ variant, dimension: quoted[1], value: quoted[0] });
-    else continue;
+      if (!dimension) continue;
+      // A trait of a constellation (not a variant condition) is named by its constellation.
+      if (target.startsWith("constellation:"))
+        out.constellationTraits.push({
+          constellation: target.slice("constellation:".length),
+          dimension,
+        });
+      else out.conditions.push({ variant, dimension });
+    } else if (w.kind === "unknown_trait_value" && quoted.length >= 2) {
+      if (target.startsWith("constellation:"))
+        out.constellationTraits.push({
+          constellation: target.slice("constellation:".length),
+          dimension: quoted[1],
+          value: quoted[0],
+        });
+      else out.conditions.push({ variant, dimension: quoted[1], value: quoted[0] });
+    } else continue;
     out.count++;
   }
   return out;
@@ -92,6 +108,18 @@ export function orphanSummary(orphans) {
     parts.push(
       `${orphans.constellations.size === 1 ? "1 constellation is" : `${orphans.constellations.size} constellations are`} missing from the world (${[...orphans.constellations].join(", ")})`,
     );
+  if (orphans.constellationTraits.length > 0) {
+    const named = [
+      ...new Set(
+        orphans.constellationTraits.map(
+          (c) => `${c.constellation}: ${c.dimension}${c.value ? ` = ${c.value}` : ""}`,
+        ),
+      ),
+    ];
+    parts.push(
+      `${orphans.constellationTraits.length === 1 ? "1 constellation trait names" : `${orphans.constellationTraits.length} constellation traits name`} a dimension or value that no longer exists (${named.join("; ")})`,
+    );
+  }
   const list = (set) => [...set].join(", ");
   if (orphans.participants.size > 0)
     parts.push(
@@ -110,8 +138,11 @@ export function orphanSummary(orphans) {
 
 /** A step or trigger actor the pools no longer have (an entity there is `entity_as_actor`, a different warning). */
 export function actorMissing(ctx, id) {
-  if (id === undefined || id === "system") return false;
-  if (ctx.orphans?.personas.has(id)) return true;
-  if (ctx.pool.personasById.has(id)) return false;
-  return !(ctx.bundle.entities ?? []).concat(ctx.base?.entities ?? []).some((e) => e.id === id);
+  // Only what an unknown_persona warning names: the bundle's entities are just the members and subjects, so "not in the bundle" does not mean "not in the world".
+  return id !== undefined && id !== "system" && Boolean(ctx.orphans?.personas.has(id));
+}
+
+/** Text for assistive technology only; a `title` alone is not announced. */
+export function hiddenNote(text) {
+  return h("span", { class: "uc-visually-hidden" }, ` (${text})`);
 }

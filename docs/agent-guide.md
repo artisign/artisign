@@ -652,6 +652,47 @@ Workflow, in this order:
    "data_objects"]` adds the pools). A summary also carries `branches` (count)
    and `constellations`.
 
+**Key reference.** Every accepted key per entity — before `|` required, after
+`|` optional; anything else is `validation_failed` (strict). Nested shapes are
+named `parent.key`; `[]` is a list item. `traits` is `{dimension: value}`;
+`avatar` is `{emoji, color}`.
+
+```shapes
+dimension: id label values | description scope
+dimension.values[]: id label |
+persona: id name | kind role description avatar traits goals generated
+avatar: | emoji color
+entity: id name | type description avatar traits object
+relationship_type: id label | inverse_label description same_traits field
+relationship_type.field: object name |
+constellation: id name relationships | description traits generated
+constellation.relationships[]: from type to | note
+data_object: id name | description fields
+data_object.fields[]: name type | description values ref example
+use_case: id title inputs outputs | group tags status personas constellations trigger goal outcome state steps branches variants
+trigger (object form): text | actor via state at
+state[] (use case): subject property value |
+condition (trigger state, branch when): subject property value | op
+input: object example | source
+output: object example | target
+step: id actor action | target data note via
+step.target: screen | node
+step.data[]: object | before after
+branch: id title when steps | from rejoin outcome
+variant: id title when | description personas constellations state actors trigger goal outcome inputs outputs steps
+variant.state[]: subject property | value unset
+step_op replace: op step_id step |
+step_op insert_after: op step_id step |
+step_op remove: op step_id |
+step_op append: op step | branch
+step_op add_branch: op branch |
+step_op replace_branch: op branch_id branch |
+step_op remove_branch: op branch_id |
+```
+
+(`unset: true` replaces `value` in a
+variant state entry. `inputs`/`outputs` need at least one entry; a case's `status` defaults to `draft`.)
+
 Writing: `set_use_cases` takes `{dimensions?, personas?, entities?,
 relationship_types?, constellations?, data_objects?, use_cases?}`, each a list of entities with an `id` (lowercase kebab-case,
 chosen by you, stable — a use case id is its filename). It upserts by id; an

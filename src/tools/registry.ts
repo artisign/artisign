@@ -176,7 +176,7 @@ export const TOOLS: ToolDefinition[] = [
 
   tool(
     "list_use_cases",
-    "Use cases, filtered, sorted, paged (group is a path prefix, query is text; constellation, entity: world filters). Returns summaries, total and, on the first page, facet counts; include adds the pools. Empty without a usecases/ folder.",
+    "Use case specs, filtered, sorted, paged (group is a path prefix, query is text; constellation, entity: world filters). Returns summaries, total and, on the first page, facet counts; include adds the pools. Empty without a usecases/ folder.",
     {
       group: z.string().optional(),
       persona: z.string().optional(),
@@ -197,7 +197,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "get_use_case",
-    "One-call bundle to implement a use case: it, its personas, dimensions, data objects and mapped screens with nodes (scope element|screen, stale when gone), plus warnings. variant resolves that variant (steps marked change changed|added, removed_steps); without it the base case plus its variants.",
+    "One-call bundle to implement a use case spec: it, its personas, dimensions, data objects and mapped screens with nodes (scope element|screen, stale when gone), plus warnings. variant resolves that variant (steps marked change changed|added, removed_steps); without it the base case plus its variants.",
     { id: z.string(), variant: z.string().optional() },
     (store, input) => getUseCase(store, input as never),
   ),
@@ -279,7 +279,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "set_use_cases",
-    "Bulk upsert by id of dimensions, personas, entities, relationship_types, constellations, data_objects, use_cases (shapes: get_guide). An existing entity merges at top level: given keys replace (arrays whole), null removes a key. Validated before anything is written; unknown references only warn.",
+    "Bulk upsert by id of dimensions, personas, entities, relationship_types, constellations, data_objects, use_cases (the use case specs; shapes: get_guide). An existing entity merges at top level: given keys replace (arrays whole), null removes a key. Validated before anything is written; unknown references only warn.",
     {
       dimensions: z.array(z.record(z.string(), z.unknown())).optional(),
       personas: z.array(z.record(z.string(), z.unknown())).optional(),
@@ -305,7 +305,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "suggest_use_case_variants",
-    "Trait values of the persona pool (and, for a case with constellations, the constellation pool) that neither the use case's personas or constellations nor its variants' when cover yet, with variant skeletons to complete and write back via set_use_cases (variants replaced whole).",
+    "Trait values of the persona pool (and, for a case with constellations, the constellation pool) that neither the use case spec's personas or constellations nor its variants' when cover yet, with variant skeletons to complete and write back via set_use_cases (variants replaced whole).",
     { id: z.string(), limit: z.number().int().positive().optional() },
     (store, input) => suggestVariants(store, input as never),
   ),

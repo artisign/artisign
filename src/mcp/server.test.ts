@@ -286,9 +286,10 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   // 24,886 to 24,938 (+52).
   // CHR-1125: delete_entity gains the force input; the description is reworded
   // and shorter (499 to 475 chars): 24,938 to 24,941 (+3).
+  // CHR-1129: "use case spec" in four descriptions: 24,941 to 24,976 (+35).
   // The pin is exact (CHR-1143): any change, up or down, shows here.
-  it("pins the measured tools/list size as information, not a limit (24,941 chars, ~6,235 tokens)", () => {
-    expect(JSON.stringify(tools).length).toBe(24_941);
+  it("pins the measured tools/list size as information, not a limit (24,976 chars, ~6,244 tokens)", () => {
+    expect(JSON.stringify(tools).length).toBe(24_976);
   });
 
   it("keeps every advertised tool entry within 2,000 chars", () => {

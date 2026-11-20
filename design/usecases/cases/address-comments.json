@@ -3,13 +3,27 @@
   "title": "Address open comments and resolve them",
   "group": "review",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "design-agent-dex"
   ],
-  "trigger": "A design session starts and the project has open comments.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "A design session starts and the project has open comments.",
+    "state": [
+      {
+        "subject": "project-shop",
+        "property": "open_comment_count",
+        "op": "gt",
+        "value": 0
+      }
+    ]
+  },
   "goal": "Every open comment is answered and the screen fixed.",
   "outcome": "Comments are resolved with a reply naming the change.",
   "inputs": [
@@ -36,12 +50,14 @@
     {
       "id": "list",
       "actor": "design-agent-dex",
-      "action": "Lists open comments"
+      "action": "Lists open comments",
+      "via": "MCP"
     },
     {
       "id": "fix",
       "actor": "design-agent-dex",
-      "action": "Fixes the node with patch_html and checks the screenshot"
+      "action": "Fixes the node with patch_html and checks the screenshot",
+      "via": "MCP"
     },
     {
       "id": "reply",
@@ -57,7 +73,8 @@
             "status": "resolved"
           }
         }
-      ]
+      ],
+      "via": "MCP"
     },
     {
       "id": "see",

@@ -3,13 +3,21 @@
   "title": "Define dimensions and personas",
   "group": "use-cases",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "product-owner-pablo"
   ],
-  "trigger": "Pablo starts writing specs for a product.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Pablo starts writing specs for a product.",
+    "actor": "product-owner-pablo",
+    "via": "browser preview"
+  },
   "goal": "A persona pool that covers how users differ.",
   "outcome": "Dimensions with values and personas with traits; generated personas fill the gaps.",
   "inputs": [

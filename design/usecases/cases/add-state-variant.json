@@ -3,13 +3,21 @@
   "title": "Add a state, overlay or step variant of a screen",
   "group": "variants",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "design-agent-dex"
   ],
-  "trigger": "A screen needs its empty, error or dialog state.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana asks for a screen's empty, error or dialog state.",
+    "actor": "designer-dana",
+    "via": "ticket"
+  },
   "goal": "The state lives next to its parent in the sidebar tree.",
   "outcome": "A variant screen with variant_of and variant_kind, nested under its parent.",
   "inputs": [
@@ -36,12 +44,14 @@
     {
       "id": "write",
       "actor": "design-agent-dex",
-      "action": "Writes the variant screen with stable structural ids"
+      "action": "Writes the variant screen with stable structural ids",
+      "via": "MCP"
     },
     {
       "id": "meta",
       "actor": "design-agent-dex",
-      "action": "Sets variant_of and variant_kind with set_meta"
+      "action": "Sets variant_of and variant_kind with set_meta",
+      "via": "MCP"
     },
     {
       "id": "tree",

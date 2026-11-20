@@ -3,13 +3,21 @@
   "title": "Find one use case among thousands",
   "group": "use-cases",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "product-owner-pablo"
   ],
-  "trigger": "Pablo needs the spec of one flow in a large project.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Pablo needs the spec of one flow in a large project.",
+    "actor": "product-owner-pablo",
+    "via": "browser preview"
+  },
   "goal": "Open the right case in seconds.",
   "outcome": "The list is narrowed by search, filters and groups.",
   "inputs": [
@@ -61,13 +69,22 @@
     {
       "id": "agent",
       "title": "Agent browses through MCP",
+      "description": "A coding agent filters through list_use_cases instead of the list view.",
       "when": {
         "actor-type": [
           "agent"
         ]
       },
-      "actors": {
-        "product-owner-pablo": "coding-agent-coda"
+      "personas": [
+        "coding-agent-coda"
+      ],
+      "constellations": [
+        "coding-agent-ready-project"
+      ],
+      "trigger": {
+        "text": "Coda needs the spec of one flow in a large project.",
+        "actor": "coding-agent-coda",
+        "via": "ticket"
       },
       "steps": [
         {
@@ -76,7 +93,8 @@
           "step": {
             "id": "list",
             "actor": "coding-agent-coda",
-            "action": "Calls list_use_cases with group, persona or query"
+            "action": "Calls list_use_cases with group, persona or query",
+            "via": "MCP"
           }
         },
         {
@@ -89,7 +107,8 @@
           "step": {
             "id": "get",
             "actor": "coding-agent-coda",
-            "action": "Calls get_use_case"
+            "action": "Calls get_use_case",
+            "via": "MCP"
           }
         }
       ]

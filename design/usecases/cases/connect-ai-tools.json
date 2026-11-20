@@ -3,15 +3,30 @@
   "title": "Connect AI tools to Artisign",
   "group": "setup",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "solo-founder-sol"
   ],
-  "trigger": "Sol has installed artisign and starts it for the first time; no AI tool is connected yet.",
+  "constellations": [
+    "solo-founder-empty-project"
+  ],
+  "trigger": {
+    "text": "Sol has installed artisign and starts it for the first time; no AI tool is connected yet.",
+    "actor": "solo-founder-sol",
+    "via": "browser preview"
+  },
   "goal": "Every AI tool Sol uses can call the Artisign MCP tools.",
   "outcome": "Each selected client has one pinned MCP entry and shows as connected in the MCP setup dialog.",
+  "state": [
+    {
+      "subject": "ai-tool-sol",
+      "property": "connected",
+      "value": false
+    }
+  ],
   "inputs": [
     {
       "object": "mcp-client",
@@ -74,6 +89,54 @@
       "target": {
         "screen": "shell-mcp-setup-dialog-skill"
       }
+    }
+  ],
+  "branches": [
+    {
+      "id": "skill-already-installed",
+      "title": "Skill already installed everywhere",
+      "from": "write-entries",
+      "when": [
+        {
+          "subject": "ai-tool-sol",
+          "property": "skill_installed",
+          "value": true
+        }
+      ],
+      "steps": [
+        {
+          "id": "skill-all-installed",
+          "actor": "system",
+          "action": "Shows the skill as installed for every connected tool",
+          "target": {
+            "screen": "shell-mcp-setup-dialog-skill-all-installed"
+          }
+        }
+      ],
+      "outcome": "The tools are connected; there is no skill left to install."
+    },
+    {
+      "id": "skill-status-unavailable",
+      "title": "Skill status cannot be read",
+      "from": "write-entries",
+      "when": [
+        {
+          "subject": "system",
+          "property": "skill_status",
+          "value": "unavailable"
+        }
+      ],
+      "steps": [
+        {
+          "id": "skill-unavailable",
+          "actor": "system",
+          "action": "Says the skill status could not be read and offers a retry",
+          "target": {
+            "screen": "shell-mcp-setup-dialog-skill-status-unavailable"
+          }
+        }
+      ],
+      "rejoin": "install-skill"
     }
   ]
 }

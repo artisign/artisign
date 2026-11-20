@@ -3,13 +3,21 @@
   "title": "Build tokens and components before screens",
   "group": "design",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "design-agent-dex"
   ],
-  "trigger": "A new direction starts and the project has no design system.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana starts a new direction; it has no design system yet.",
+    "actor": "designer-dana",
+    "via": "ticket"
+  },
   "goal": "Screens can be composed of refs only.",
   "outcome": "Tokens and base components exist with usage notes and show in the Design System view.",
   "inputs": [
@@ -40,17 +48,20 @@
     {
       "id": "set-tokens",
       "actor": "design-agent-dex",
-      "action": "Sets color, spacing, radius and type tokens with set_tokens"
+      "action": "Sets color, spacing, radius and type tokens with set_tokens",
+      "via": "MCP"
     },
     {
       "id": "write-components",
       "actor": "design-agent-dex",
-      "action": "Writes base components with variants via write_html kind component"
+      "action": "Writes base components with variants via write_html kind component",
+      "via": "MCP"
     },
     {
       "id": "usage",
       "actor": "design-agent-dex",
-      "action": "Adds usage metadata to each component with set_meta"
+      "action": "Adds usage metadata to each component with set_meta",
+      "via": "MCP"
     },
     {
       "id": "review",

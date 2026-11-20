@@ -3,15 +3,30 @@
   "title": "Follow the agent while it works",
   "group": "follow",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "designer-dana"
   ],
-  "trigger": "The agent starts a task and Dana wants to watch.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana hands the agent a task and wants to watch it work.",
+    "actor": "designer-dana",
+    "via": "AI tool chat"
+  },
   "goal": "The preview shows whatever the agent touches.",
   "outcome": "Each tool call navigates and highlights the nodes; Dana's own navigation pauses following.",
+  "state": [
+    {
+      "subject": "system",
+      "property": "follow",
+      "value": false
+    }
+  ],
   "inputs": [
     {
       "object": "settings",
@@ -73,6 +88,54 @@
       "target": {
         "screen": "follow-active-feed"
       }
+    }
+  ],
+  "branches": [
+    {
+      "id": "feed-empty",
+      "title": "Agent has not called a tool yet",
+      "from": "turn-on",
+      "when": [
+        {
+          "subject": "system",
+          "property": "activity_feed_length",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "show-empty-feed",
+          "actor": "system",
+          "action": "Shows the empty activity feed until the first tool call",
+          "target": {
+            "screen": "follow-feed-empty"
+          }
+        }
+      ],
+      "rejoin": "highlight"
+    },
+    {
+      "id": "mockup-touched",
+      "title": "Agent writes a mockup",
+      "from": "highlight",
+      "when": [
+        {
+          "subject": "system",
+          "property": "touched_kind",
+          "value": "mockup"
+        }
+      ],
+      "steps": [
+        {
+          "id": "mockup-cue",
+          "actor": "system",
+          "action": "Shows a cue that the agent is working on a mockup",
+          "target": {
+            "screen": "follow-mockup-cue"
+          }
+        }
+      ],
+      "rejoin": "pause"
     }
   ]
 }

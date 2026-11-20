@@ -3,13 +3,21 @@
   "title": "Add a variant for an uncovered persona group",
   "group": "use-cases",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "product-owner-pablo"
   ],
-  "trigger": "A use case does not cover some trait values of the persona pool.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "A use case does not cover some trait values of the persona pool.",
+    "actor": "product-owner-pablo",
+    "via": "browser preview"
+  },
   "goal": "Every persona group has a matching flow.",
   "outcome": "A variant with when, overrides and step ops.",
   "inputs": [

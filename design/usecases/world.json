@@ -1,0 +1,191 @@
+{
+  "entities": [
+    {
+      "id": "project-coffee-finder",
+      "name": "coffee-finder",
+      "type": "Design project",
+      "description": "Sol's new, empty design project for a coffee finder app.",
+      "avatar": {
+        "emoji": "☕"
+      },
+      "traits": {
+        "project-size": "small"
+      },
+      "object": "project"
+    },
+    {
+      "id": "project-shop",
+      "name": "shop",
+      "type": "Design project",
+      "description": "A large shop product with hundreds of screens and thousands of use cases.",
+      "avatar": {
+        "emoji": "🛍️"
+      },
+      "traits": {
+        "project-size": "large"
+      },
+      "object": "project"
+    },
+    {
+      "id": "project-website",
+      "name": "website",
+      "type": "Design project",
+      "description": "The marketing website of the shop, a small second project.",
+      "avatar": {
+        "emoji": "🌐"
+      },
+      "traits": {
+        "project-size": "small"
+      },
+      "object": "project"
+    },
+    {
+      "id": "ai-tool-sol",
+      "name": "Sol's AI coding tool",
+      "type": "Connected AI tool",
+      "description": "The AI tool Sol works in; the design agent runs inside it and reaches Artisign through its MCP client entry.",
+      "avatar": {
+        "emoji": "🧰"
+      },
+      "traits": {},
+      "object": "mcp-client"
+    }
+  ],
+  "relationship_types": [
+    {
+      "id": "owns",
+      "label": "owns",
+      "inverse_label": "is owned by"
+    },
+    {
+      "id": "designs",
+      "label": "designs",
+      "inverse_label": "is designed by"
+    },
+    {
+      "id": "reviews",
+      "label": "reviews",
+      "inverse_label": "is reviewed by"
+    },
+    {
+      "id": "implements",
+      "label": "implements",
+      "inverse_label": "is implemented by"
+    },
+    {
+      "id": "uses",
+      "label": "uses",
+      "inverse_label": "is used by"
+    },
+    {
+      "id": "runs-in",
+      "label": "runs in",
+      "inverse_label": "runs"
+    },
+    {
+      "id": "installs-from",
+      "label": "installs Artisign from",
+      "inverse_label": "serves Artisign to"
+    }
+  ],
+  "constellations": [
+    {
+      "id": "solo-founder-empty-project",
+      "name": "Solo founder with an empty project",
+      "description": "Sol works alone: one new project, one AI tool with the design agent inside, Artisign installed from npm.",
+      "traits": {
+        "project-size": "small"
+      },
+      "relationships": [
+        {
+          "from": "solo-founder-sol",
+          "type": "owns",
+          "to": "project-coffee-finder"
+        },
+        {
+          "from": "solo-founder-sol",
+          "type": "uses",
+          "to": "ai-tool-sol"
+        },
+        {
+          "from": "design-agent-dex",
+          "type": "runs-in",
+          "to": "ai-tool-sol"
+        },
+        {
+          "from": "design-agent-dex",
+          "type": "designs",
+          "to": "project-coffee-finder"
+        },
+        {
+          "from": "ai-tool-sol",
+          "type": "installs-from",
+          "to": "npm-registry"
+        }
+      ]
+    },
+    {
+      "id": "design-team-large-project",
+      "name": "Designer, product owner and design agent on a large project",
+      "description": "Dana steers and reviews, Pablo owns the specs, Dex writes the design of a large project.",
+      "traits": {
+        "project-size": "large"
+      },
+      "relationships": [
+        {
+          "from": "product-owner-pablo",
+          "type": "owns",
+          "to": "project-shop"
+        },
+        {
+          "from": "design-agent-dex",
+          "type": "designs",
+          "to": "project-shop"
+        },
+        {
+          "from": "designer-dana",
+          "type": "reviews",
+          "to": "project-shop"
+        }
+      ]
+    },
+    {
+      "id": "designer-two-projects",
+      "name": "Designer on two projects",
+      "description": "Dana reviews the large shop and its small website in two browser tabs.",
+      "traits": {},
+      "relationships": [
+        {
+          "from": "designer-dana",
+          "type": "reviews",
+          "to": "project-shop"
+        },
+        {
+          "from": "designer-dana",
+          "type": "reviews",
+          "to": "project-website"
+        }
+      ]
+    },
+    {
+      "id": "coding-agent-ready-project",
+      "name": "Coding agent reading a ready project",
+      "description": "Coda implements the shop from its finished design and use cases; Pablo owns the specs.",
+      "traits": {
+        "project-size": "large"
+      },
+      "relationships": [
+        {
+          "from": "product-owner-pablo",
+          "type": "owns",
+          "to": "project-shop"
+        },
+        {
+          "from": "coding-agent-coda",
+          "type": "implements",
+          "to": "project-shop"
+        }
+      ]
+    }
+  ]
+}

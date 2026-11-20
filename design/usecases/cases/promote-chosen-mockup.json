@@ -3,14 +3,22 @@
   "title": "Promote the chosen mockup into a screen",
   "group": "mockups",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "designer-dana",
     "design-agent-dex"
   ],
-  "trigger": "Dana picked one option.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana picked one option.",
+    "actor": "designer-dana",
+    "via": "AI tool chat"
+  },
   "goal": "The chosen option becomes a real screen bound to the design system.",
   "outcome": "A screen exists; the mockup stays as history until it is deleted.",
   "inputs": [
@@ -46,17 +54,20 @@
     {
       "id": "promote",
       "actor": "design-agent-dex",
-      "action": "Calls promote_mockup into a screen"
+      "action": "Calls promote_mockup into a screen",
+      "via": "MCP"
     },
     {
       "id": "bind",
       "actor": "design-agent-dex",
-      "action": "Replaces inline values with refs"
+      "action": "Replaces inline values with refs",
+      "via": "MCP"
     },
     {
       "id": "cleanup",
       "actor": "design-agent-dex",
-      "action": "Deletes the mockup with delete_entity when no longer needed"
+      "action": "Deletes the mockup with delete_entity when no longer needed",
+      "via": "MCP"
     }
   ]
 }

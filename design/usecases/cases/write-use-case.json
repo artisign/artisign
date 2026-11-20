@@ -3,13 +3,21 @@
   "title": "Write a use case in the preview",
   "group": "use-cases",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "product-owner-pablo"
   ],
-  "trigger": "Pablo wants to specify a new flow.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Pablo wants to specify a new flow.",
+    "actor": "product-owner-pablo",
+    "via": "browser preview"
+  },
   "goal": "A use case with trigger, goal, outcome, inputs, outputs and steps.",
   "outcome": "The case is saved under usecases/cases and listed.",
   "inputs": [
@@ -70,23 +78,24 @@
     {
       "id": "agent",
       "title": "Agent writes the case through MCP",
+      "description": "The agent writes the whole case in one set_use_cases call; there is no dialog.",
       "when": {
         "actor-type": [
           "agent"
         ]
       },
-      "actors": {
-        "product-owner-pablo": "design-agent-dex"
+      "personas": [
+        "design-agent-dex"
+      ],
+      "trigger": {
+        "text": "Pablo asks the agent to turn existing screens into use cases.",
+        "actor": "product-owner-pablo",
+        "via": "AI tool chat"
       },
-      "trigger": "The user asks the agent to turn existing screens into use cases.",
       "steps": [
         {
           "op": "remove",
           "step_id": "new"
-        },
-        {
-          "op": "remove",
-          "step_id": "reorder"
         },
         {
           "op": "replace",
@@ -94,8 +103,13 @@
           "step": {
             "id": "write",
             "actor": "design-agent-dex",
-            "action": "Calls set_use_cases with the full case"
+            "action": "Calls set_use_cases with the full case",
+            "via": "MCP"
           }
+        },
+        {
+          "op": "remove",
+          "step_id": "reorder"
         }
       ]
     }

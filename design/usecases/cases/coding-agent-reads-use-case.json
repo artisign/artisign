@@ -3,13 +3,21 @@
   "title": "Coding agent reads a use case with everything attached",
   "group": "handoff",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "coding-agent-coda"
   ],
-  "trigger": "Coda picks up a ticket that names a use case.",
+  "constellations": [
+    "coding-agent-ready-project"
+  ],
+  "trigger": {
+    "text": "Coda picks up a ticket that names a use case.",
+    "actor": "coding-agent-coda",
+    "via": "ticket"
+  },
   "goal": "Implement the flow without guessing.",
   "outcome": "One call returned the case, its personas, data objects and mapped screens.",
   "inputs": [
@@ -34,12 +42,14 @@
     {
       "id": "read",
       "actor": "coding-agent-coda",
-      "action": "Calls get_use_case with the id"
+      "action": "Calls get_use_case with the id",
+      "via": "MCP"
     },
     {
       "id": "variant",
       "actor": "coding-agent-coda",
-      "action": "Reads a variant resolved with variant id"
+      "action": "Reads a variant resolved with variant id",
+      "via": "MCP"
     },
     {
       "id": "check",

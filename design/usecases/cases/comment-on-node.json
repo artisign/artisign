@@ -3,13 +3,21 @@
   "title": "Comment on a node in the preview",
   "group": "review",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "designer-dana"
   ],
-  "trigger": "Dana sees something wrong on a screen.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana sees something wrong on a screen.",
+    "actor": "designer-dana",
+    "via": "browser preview"
+  },
   "goal": "The note is anchored to the exact element for the agent.",
   "outcome": "An open comment on the node, listed in the Comments panel.",
   "inputs": [

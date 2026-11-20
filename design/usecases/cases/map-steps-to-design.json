@@ -3,13 +3,21 @@
   "title": "Map use-case steps onto screens and elements",
   "group": "use-cases",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "design-agent-dex"
   ],
-  "trigger": "A use case has steps without targets.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Pablo asks for the steps of a use case to be mapped onto the design.",
+    "actor": "product-owner-pablo",
+    "via": "ticket"
+  },
   "goal": "Each step points at the screen or element it happens on.",
   "outcome": "The mapping view shows every step on its screen; nothing is stale.",
   "inputs": [
@@ -34,12 +42,14 @@
     {
       "id": "ids",
       "actor": "design-agent-dex",
-      "action": "Gives the target nodes authored ids"
+      "action": "Gives the target nodes authored ids",
+      "via": "MCP"
     },
     {
       "id": "map",
       "actor": "design-agent-dex",
-      "action": "Sets step.target with set_use_cases"
+      "action": "Sets step.target with set_use_cases",
+      "via": "MCP"
     },
     {
       "id": "view",
@@ -48,6 +58,32 @@
       "target": {
         "screen": "usecases-mapping"
       }
+    }
+  ],
+  "branches": [
+    {
+      "id": "case-with-branches",
+      "title": "The case has branches",
+      "from": "map",
+      "when": [
+        {
+          "subject": "system",
+          "property": "mapped_case_branch_count",
+          "op": "gt",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "view-branches",
+          "actor": "product-owner-pablo",
+          "action": "Checks the mapping view with branch steps in their own lane",
+          "target": {
+            "screen": "usecases-mapping-branches"
+          }
+        }
+      ],
+      "outcome": "Main-flow and branch steps both point at their screens."
     }
   ]
 }

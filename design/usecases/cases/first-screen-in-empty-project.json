@@ -3,16 +3,41 @@
   "title": "Design the first screen of an empty project",
   "group": "setup",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "solo-founder-sol",
     "design-agent-dex"
   ],
-  "trigger": "A project is open but has no screens.",
+  "constellations": [
+    "solo-founder-empty-project"
+  ],
+  "trigger": {
+    "text": "A project is open but has no screens.",
+    "state": [
+      {
+        "subject": "project-coffee-finder",
+        "property": "screen_count",
+        "value": 0
+      }
+    ]
+  },
   "goal": "The project has a first screen built on tokens and components.",
   "outcome": "The first screen replaces the how-to-start guide on the canvas.",
+  "state": [
+    {
+      "subject": "project-coffee-finder",
+      "property": "open",
+      "value": true
+    },
+    {
+      "subject": "project-coffee-finder",
+      "property": "token_count",
+      "value": 0
+    }
+  ],
   "inputs": [
     {
       "object": "project",
@@ -48,17 +73,20 @@
     {
       "id": "prompt",
       "actor": "solo-founder-sol",
-      "action": "Pastes the prompt into the AI tool"
+      "action": "Pastes the prompt into the AI tool",
+      "via": "AI tool chat"
     },
     {
       "id": "tokens",
       "actor": "design-agent-dex",
-      "action": "Defines tokens and base components first"
+      "action": "Defines tokens and base components first",
+      "via": "MCP"
     },
     {
       "id": "write",
       "actor": "design-agent-dex",
-      "action": "Writes the screen from refs and checks it with a screenshot"
+      "action": "Writes the screen from refs and checks it with a screenshot",
+      "via": "MCP"
     },
     {
       "id": "shown",

@@ -3,13 +3,21 @@
   "title": "Compare variants against the main screen",
   "group": "variants",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "designer-dana"
   ],
-  "trigger": "Dana wants to check what a variant changes.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana wants to check what a variant changes.",
+    "actor": "designer-dana",
+    "via": "browser preview"
+  },
   "goal": "See differences between the main screen and up to three variants.",
   "outcome": "Columns with a diff overlay of added, changed and removed nodes.",
   "inputs": [

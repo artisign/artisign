@@ -3,13 +3,21 @@
   "title": "Present a ticket's screens on the Board",
   "group": "board",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "design-agent-dex"
   ],
-  "trigger": "The agent finished the screens of a ticket and wants Dana to review them.",
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "The agent finished the screens of a ticket and wants Dana to review them.",
+    "actor": "design-agent-dex",
+    "via": "MCP"
+  },
   "goal": "Dana's open browser shows exactly the ticket's screens.",
   "outcome": "The Board is filtered to the ticket tag with the key screens pinned.",
   "inputs": [
@@ -50,7 +58,8 @@
             "filter": "chr-123"
           }
         }
-      ]
+      ],
+      "via": "MCP"
     },
     {
       "id": "switch",
@@ -67,6 +76,31 @@
       "target": {
         "screen": "board-view-clusters-expanded"
       }
+    }
+  ],
+  "branches": [
+    {
+      "id": "no-tagged-screens",
+      "title": "No screen carries the ticket tag",
+      "from": "set-state",
+      "when": [
+        {
+          "subject": "system",
+          "property": "screens_matching_filter",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "board-empty",
+          "actor": "system",
+          "action": "Shows the empty Board for the filter",
+          "target": {
+            "screen": "board-view-empty"
+          }
+        }
+      ],
+      "outcome": "Dex tags the screens and presents again."
     }
   ]
 }

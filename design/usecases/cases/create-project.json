@@ -3,15 +3,30 @@
   "title": "Create a new design project",
   "group": "setup",
   "tags": [
-    "chr-1120"
+    "chr-1120",
+    "chr-1160"
   ],
   "status": "ready",
   "personas": [
     "solo-founder-sol"
   ],
-  "trigger": "No project is open and Sol wants to start designing.",
+  "constellations": [
+    "solo-founder-empty-project"
+  ],
+  "trigger": {
+    "text": "No project is open and Sol wants to start designing.",
+    "actor": "solo-founder-sol",
+    "via": "browser preview"
+  },
   "goal": "A new, empty Artisign project exists in a folder of Sol's choice.",
   "outcome": "The project is open in the tab and shows how to start.",
+  "state": [
+    {
+      "subject": "system",
+      "property": "open_project_count",
+      "value": 0
+    }
+  ],
   "inputs": [
     {
       "object": "project",
@@ -88,34 +103,82 @@
       ]
     }
   ],
-  "variants": [
+  "branches": [
     {
       "id": "folder-exists",
       "title": "Folder name already taken",
-      "when": {
-        "experience": [
-          "first-run",
-          "regular"
-        ]
-      },
+      "from": "new-folder",
+      "when": [
+        {
+          "subject": "system",
+          "property": "new_folder_exists",
+          "value": true
+        }
+      ],
       "steps": [
         {
-          "op": "replace",
-          "step_id": "folder-created",
-          "step": {
-            "id": "folder-exists",
-            "actor": "system",
-            "action": "Refuses the name and says the folder exists",
-            "target": {
-              "screen": "init-project-dialog-new-folder-exists"
-            }
+          "id": "name-taken",
+          "actor": "system",
+          "action": "Refuses the name and says the folder exists",
+          "target": {
+            "screen": "init-project-dialog-new-folder-exists"
           }
         }
-      ]
+      ],
+      "rejoin": "new-folder"
     },
+    {
+      "id": "folder-name-invalid",
+      "title": "Folder name not allowed",
+      "from": "new-folder",
+      "when": [
+        {
+          "subject": "system",
+          "property": "new_folder_name_valid",
+          "value": false
+        }
+      ],
+      "steps": [
+        {
+          "id": "name-invalid",
+          "actor": "system",
+          "action": "Marks the name as invalid and keeps the dialog open",
+          "target": {
+            "screen": "init-project-dialog-new-folder-invalid"
+          }
+        }
+      ],
+      "rejoin": "new-folder"
+    },
+    {
+      "id": "no-write-permission",
+      "title": "Parent folder not writable",
+      "from": "new-folder",
+      "when": [
+        {
+          "subject": "system",
+          "property": "parent_folder_writable",
+          "value": false
+        }
+      ],
+      "steps": [
+        {
+          "id": "permission-denied",
+          "actor": "system",
+          "action": "Says the folder cannot be created here",
+          "target": {
+            "screen": "init-project-dialog-new-folder-permission"
+          }
+        }
+      ],
+      "rejoin": "browse-folder"
+    }
+  ],
+  "variants": [
     {
       "id": "agent",
       "title": "Agent creates the project through MCP",
+      "description": "An agent has no dialog: it asks for the folder and calls init_project.",
       "when": {
         "actor-type": [
           "agent"
@@ -124,11 +187,37 @@
       "personas": [
         "design-agent-dex"
       ],
-      "trigger": "The user asks the AI tool to create an Artisign project.",
+      "state": [
+        {
+          "subject": "system",
+          "property": "open_project_count",
+          "unset": true
+        }
+      ],
+      "trigger": {
+        "text": "Sol asks the AI tool to create an Artisign project.",
+        "actor": "solo-founder-sol",
+        "via": "AI tool chat"
+      },
+      "inputs": [
+        {
+          "object": "project",
+          "source": "init_project call with the folder the user named",
+          "example": {
+            "root": "/Users/sol/coffee-finder/design"
+          }
+        }
+      ],
       "steps": [
         {
-          "op": "remove",
-          "step_id": "start-create"
+          "op": "replace",
+          "step_id": "start-create",
+          "step": {
+            "id": "ask-folder",
+            "actor": "design-agent-dex",
+            "action": "Asks the user where the project should live, then calls init_project",
+            "via": "MCP"
+          }
         },
         {
           "op": "remove",
@@ -139,13 +228,20 @@
           "step_id": "new-folder"
         },
         {
-          "op": "replace",
-          "step_id": "folder-created",
-          "step": {
-            "id": "ask-folder",
-            "actor": "design-agent-dex",
-            "action": "Asks the user where the project should live, then calls init_project"
-          }
+          "op": "remove",
+          "step_id": "folder-created"
+        },
+        {
+          "op": "remove_branch",
+          "branch_id": "folder-exists"
+        },
+        {
+          "op": "remove_branch",
+          "branch_id": "folder-name-invalid"
+        },
+        {
+          "op": "remove_branch",
+          "branch_id": "no-write-permission"
         }
       ]
     }

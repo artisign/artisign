@@ -274,6 +274,8 @@ describe("data cards", () => {
     ]);
     expect(invalidExampleValues(object, { status: "active", title: null, due: "2026-12-01", tags: [], owner: "m-1" })).toEqual([]);
     expect(invalidExampleValues(undefined, { a: 1 })).toEqual([]);
+    expect(invalidExampleValues(object, { status: "x".repeat(50) })).toEqual([`"${"x".repeat(29)}… is not a value of enum loan.status (active, returned)`]);
+    expect(invalidExampleValues({ id: "loan", fields: [{ name: "status", type: "enum", values: [] }] }, { status: "a" })).toEqual(['"a" is not a value of enum loan.status (it declares no values)']);
   });
 
   it("marks output keys that differ from the same object's input", () => {

@@ -48,7 +48,11 @@ export function validateDataObject(object: DataObject, pools: ValidationPools): 
 export function exampleValueProblem(objectId: string, field: DataField, value: unknown): string | undefined {
   if (fitsField(field, value)) return undefined;
   const path = `${objectId}.${field.name}`;
-  if (field.type === "enum" && field.values !== undefined) return `${JSON.stringify(value)} is not a value of enum ${path} (${field.values.join(", ")})`;
+  if (field.type === "enum" && field.values !== undefined) {
+    const quoted = JSON.stringify(value);
+    const shown = quoted.length > 30 ? `${quoted.slice(0, 30)}…` : quoted;
+    return `${shown} is not a value of enum ${path} ${field.values.length > 0 ? `(${field.values.join(", ")})` : "(it declares no values)"}`;
+  }
   const got = Array.isArray(value) ? "list" : typeof value;
   switch (field.type) {
     case "date":

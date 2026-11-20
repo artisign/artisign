@@ -76,6 +76,14 @@ describe("invalid_example_value", () => {
     ]);
   });
 
+  it("truncates a long enum value and words an enum with no values", async () => {
+    const long = "x".repeat(50);
+    const w = await invalid(useCase({ outputs: [{ object: "loan", example: { status: long } }] }));
+    expect(w.map((x) => x.message)).toEqual([`"${"x".repeat(29)}… is not a value of enum loan.status (active, returned)`]);
+    const empty = buildPools([], [], [{ id: "loan", name: "Loan", fields: [{ name: "status", type: "enum", values: [] }] }], world, true);
+    expect((await invalid(useCase({ outputs: [{ object: "loan", example: { status: "a" } }] }), empty)).map((x) => x.message)).toEqual(['"a" is not a value of enum loan.status (it declares no values)']);
+  });
+
   it("rejects a non-string for an enum without declared values", async () => {
     const w = await invalid(useCase({ outputs: [{ object: "loan", example: { kind: 3 } }] }));
     expect(w.map((x) => x.message)).toEqual(["loan.kind: expected an enum value (string), got number"]);

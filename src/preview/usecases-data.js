@@ -478,7 +478,11 @@ export function invalidExampleValues(dataObject, example) {
     const path = `${dataObject.id}.${field.name}`;
     const got = Array.isArray(value) ? "list" : typeof value;
     const quoted = typeof value === "string" ? JSON.stringify(value) : got;
-    if (field.type === "enum" && field.values !== undefined) messages.push(`${JSON.stringify(value)} is not a value of enum ${path} (${field.values.join(", ")})`);
+    if (field.type === "enum" && field.values !== undefined) {
+      const text = JSON.stringify(value);
+      const shown = text.length > 30 ? `${text.slice(0, 30)}…` : text;
+      messages.push(`${shown} is not a value of enum ${path} ${field.values.length > 0 ? `(${field.values.join(", ")})` : "(it declares no values)"}`);
+    }
     else if (field.type === "date") messages.push(`${path}: expected a date (YYYY-MM-DD), got ${quoted}`);
     else if (field.type === "datetime") messages.push(`${path}: expected a datetime (e.g. 2026-12-01T09:30:00Z), got ${quoted}`);
     else if (field.type === "enum") messages.push(`${path}: expected an enum value (string), got ${got}`);

@@ -560,7 +560,9 @@ Workflow, in this order:
      `example` is an object with at least one key; `{}` is refused.
      A key the data object does not declare is `unknown_data_field`; a value
      that does not fit its field's type or enum `values` (`null` always fits;
-     a `ref` is checked as an id string only) is `invalid_example_value`.
+     a `ref` is checked as an id string only; a `date` must be a real calendar
+     date `YYYY-MM-DD`, a `datetime` ISO 8601 with `T`, e.g.
+     `2026-12-01T09:30:00Z`) is `invalid_example_value`.
      Both are warnings. Step `data` `before`/`after` are checked the same way.
    - **`steps`** — the flow: `{id, actor, action, target?, data?, via?}`.
      `actor` is a persona id or `"system"`; `via` names the interface an

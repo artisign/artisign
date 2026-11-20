@@ -406,8 +406,8 @@ a **branch**. The loan limit is a state any member can meet, so it is a branch
 without `from` (it forks before the first step) with the condition
 `member-ana.open-loans` at least 5 (`gte`), and no fixed starting value that
 contradicts it. The system explains the limit, then the case ends with that
-outcome (or `rejoin` continues the main flow at a later step). A branch that
-forks after a main-flow step (`from`) does not nest; a deeper alternative is a
+outcome (or `rejoin` continues the main flow at a later step). Branches do not
+nest: `from` and `rejoin` name main-flow steps, and a deeper alternative is a
 second branch with a narrower condition.
 
 **Which mechanism for which difference?**

@@ -14,6 +14,7 @@ let failGroup;
 let worldFail; // GET /api/world answers 422
 let holdLists; // a promise the list_use_cases answers wait for, or null
 let source;
+let alphaCount; // how many cases the fake daemon holds in group alpha
 let poolObjects; // the data objects the fake daemon holds
 
 const flush = async () => {
@@ -43,8 +44,8 @@ function stubDaemon() {
     if (path === "/api/tools/list_use_cases") {
       if (holdLists) await holdLists;
       if (body.group && failGroup) return { ok: false, status: 500, json: async () => ({ code: "io_error", message: "disk on fire" }) };
-      const summary = { id: "map-step", title: rawUseCase.title, group: "alpha", status: "ready", steps: 3 };
-      return json({ total: 1, use_cases: body.group || body.limit !== 1 ? [summary] : [], counts: { use_cases: 1, personas: personas.length, dimensions: dimensions.length, data_objects: objects.length }, facets: { status: {}, group: { alpha: 1 }, tag: {}, persona: {} }, personas, dimensions, data_objects: poolObjects, ...invalid });
+      const all = Array.from({ length: alphaCount }, (_, i) => ({ id: i === 0 ? "map-step" : `map-step-${i}`, title: rawUseCase.title, group: "alpha", status: "ready", steps: 3 }));
+      return json({ total: alphaCount, use_cases: body.group || body.limit !== 1 ? all.slice(0, body.limit ?? all.length) : [], counts: { use_cases: 1, personas: personas.length, dimensions: dimensions.length, data_objects: objects.length }, facets: { status: {}, group: { alpha: alphaCount }, tag: {}, persona: {} }, personas, dimensions, data_objects: poolObjects, ...invalid });
     }
     if (path === "/api/world" && worldFail) return { ok: false, status: 422, json: async () => ({ code: "invalid_state", message: "world.json is not valid" }) };
     if (path === "/api/tools/get_use_case") return json(bundle);
@@ -74,6 +75,7 @@ const selectedStep = () => $(".uc-map-step.is-selected")?.dataset.step ?? null;
 
 beforeEach(() => {
   invalid = {};
+  alphaCount = 1;
   worldFail = false;
   bundle = baseBundle;
   failGroup = false;
@@ -290,5 +292,33 @@ describe("deleting a use case", () => {
     view.onChange();
     await settle();
     expect(count("get_use_case")).toBe(1); // the landing auto-select only: no second load of the same detail
+  });
+});
+
+describe("a reload keeps a group's rows without a single-row pager", () => {
+  const moreLabels = () => $$(".uc-more-row").map((r) => r.textContent.trim());
+  const rowsShown = () => $$(".uc-list-row").length;
+
+  it("5 shown, a 6th arrives: all 6 show and there is no single-row pager", async () => {
+    alphaCount = 5;
+    const view = await openView();
+    expect(rowsShown()).toBe(5);
+    expect(moreLabels()).toEqual([]);
+    alphaCount = 6;
+    view.onChange();
+    await settle();
+    expect(rowsShown()).toBe(6);
+    expect(moreLabels()).toEqual([]);
+  });
+
+  it("5 shown, 7 total after the reload: 5 rows and the pager says 2", async () => {
+    alphaCount = 5;
+    const view = await openView();
+    expect(rowsShown()).toBe(5);
+    alphaCount = 7;
+    view.onChange();
+    await settle();
+    expect(rowsShown()).toBe(5);
+    expect(moreLabels()).toEqual(["Show 2 more"]);
   });
 });

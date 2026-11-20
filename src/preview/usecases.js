@@ -432,7 +432,7 @@ export function createUseCasesView(options) {
       list.groupState.set(path, { rows: [], cursor: undefined, loading: false });
       return;
     }
-    const want = Math.min(node.direct, Math.max(pageSize(node.direct, GROUP_FIRST_PAGE), count));
+    const want = Math.min(node.direct, pageSize(node.direct, Math.max(GROUP_FIRST_PAGE, count)));
     list.groupState.set(path, { rows: list.groupState.get(path)?.rows ?? [], cursor: undefined, loading: true });
     renderList();
     const result = await pageRows({ ...buildQuery(filters), group: path, sort: "group" }, want, undefined, (u) => u.group === path);
@@ -445,7 +445,7 @@ export function createUseCasesView(options) {
 
   async function reloadUngrouped(count, req) {
     const offset = list.total - list.ungrouped.count;
-    const want = Math.min(list.ungrouped.count, Math.max(pageSize(list.ungrouped.count, GROUP_FIRST_PAGE), count));
+    const want = Math.min(list.ungrouped.count, pageSize(list.ungrouped.count, Math.max(GROUP_FIRST_PAGE, count)));
     list.ungrouped.loading = true;
     renderList();
     const result = await pageRows({ ...buildQuery(filters), sort: "group" }, want, String(offset), () => true);

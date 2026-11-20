@@ -139,6 +139,16 @@ describe("live warnings", () => {
     expect(text).toContain("step.0.node: not-there is not an element of editor.");
   });
 
+  it("flags example values that do not fit the field, next to the key warnings", () => {
+    const draft = draftFromSource(rawUseCase);
+    draft.outputs[0].example = "status: lost, owner: 5";
+    const warnings = draftWarnings({ draft, pool, screens, nodes: { editor: ["btn-map"] } }).filter((w) => w.path === "output.0");
+    expect(warnings.map((w) => w.message)).toEqual([
+      '"lost" is not a value of enum mapping.status (draft, ready).',
+      "mapping.owner: expected a ref (id string), got number.",
+    ]);
+  });
+
   it("is quiet for a clean draft", () => {
     const draft = draftFromSource(rawUseCase);
     draft.steps[2].screen = "picker";

@@ -48,6 +48,8 @@ export type WarningKind =
   | "unknown_persona"
   | "unknown_data_object"
   | "unknown_data_field"
+  // An example value (input/output example, step data before/after) that does not fit its data-object field's type or enum values.
+  | "invalid_example_value"
   | "unknown_dimension"
   | "unknown_trait_value"
   | "variant_step_missing"

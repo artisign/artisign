@@ -558,6 +558,10 @@ Workflow, in this order:
      `{object, example}` (`source` on an input, `target` on an output): what
      the case consumes and produces, with concrete example values. An
      `example` is an object with at least one key; `{}` is refused.
+     A key the data object does not declare is `unknown_data_field`; a value
+     that does not fit its field's type or enum `values` (`null` always fits;
+     a `ref` is checked as an id string only) is `invalid_example_value`.
+     Both are warnings. Step `data` `before`/`after` are checked the same way.
    - **`steps`** — the flow: `{id, actor, action, target?, data?, via?}`.
      `actor` is a persona id or `"system"`; `via` names the interface an
      outside actor uses. `data` lists the state change of a step: `{object,

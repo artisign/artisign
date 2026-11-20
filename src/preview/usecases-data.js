@@ -436,6 +436,58 @@ export function undeclaredExampleKeys(dataObject, example) {
   return Object.keys(example ?? {}).filter((key) => !declared.has(key));
 }
 
+function isCalendarDate(text) {
+  const [year, month, day] = text.split("-").map(Number);
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return probe.getUTCFullYear() === year && probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day;
+}
+
+/** Whether `value` fits the field's type and enum values; null fits anything (nothing there yet). Mirrors the server's check (src/usecases/world.ts). */
+function fitsField(field, value) {
+  if (value === null) return true;
+  switch (field.type) {
+    case "string":
+    case "ref":
+      return typeof value === "string";
+    case "number":
+      return typeof value === "number";
+    case "boolean":
+      return typeof value === "boolean";
+    case "date":
+      return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && isCalendarDate(value);
+    case "datetime":
+      return typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value)) && isCalendarDate(value.slice(0, 10));
+    case "enum":
+      return typeof value === "string" && (field.values === undefined || field.values.includes(value));
+    case "list":
+      return Array.isArray(value);
+    case "object":
+      return typeof value === "object" && !Array.isArray(value);
+    default:
+      return true;
+  }
+}
+
+/** Example values that do not fit their declared field (a warning, never an error), worded like the server's `invalid_example_value`. */
+export function invalidExampleValues(dataObject, example) {
+  if (!dataObject) return [];
+  const messages = [];
+  for (const [key, value] of Object.entries(example ?? {})) {
+    const field = dataObject.fields.find((f) => f.name === key);
+    if (!field || fitsField(field, value)) continue;
+    const path = `${dataObject.id}.${field.name}`;
+    const got = Array.isArray(value) ? "list" : typeof value;
+    const quoted = typeof value === "string" ? JSON.stringify(value) : got;
+    if (field.type === "enum" && field.values !== undefined) messages.push(`${JSON.stringify(value)} is not a value of enum ${path} (${field.values.join(", ")})`);
+    else if (field.type === "date") messages.push(`${path}: expected a date (YYYY-MM-DD), got ${quoted}`);
+    else if (field.type === "datetime") messages.push(`${path}: expected a datetime (e.g. 2026-12-01T09:30:00Z), got ${quoted}`);
+    else if (field.type === "enum") messages.push(`${path}: expected an enum value (string), got ${got}`);
+    else if (field.type === "ref") messages.push(`${path}: expected a ref (id string), got ${got}`);
+    else messages.push(`${path}: expected ${field.type}, got ${got}`);
+  }
+  return messages;
+}
+
 /**
  * "Leave unmapped" for one step of the view shown: drops its target in the place the step lives. With a variant selected that is the
  * variant's op that produces the effective step (the last op carrying the step id: an append followed by a replace of the same step

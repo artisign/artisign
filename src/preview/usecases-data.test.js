@@ -23,6 +23,7 @@ import {
   formatExample,
   parseExample,
   undeclaredExampleKeys,
+  invalidExampleValues,
   stepScope,
   mappingFor,
   buildFlowRows,
@@ -251,6 +252,28 @@ describe("data cards", () => {
     ]);
     expect(undeclaredExampleKeys(object, { status: 1, color: 2 })).toEqual(["color"]);
     expect(undeclaredExampleKeys(undefined, { a: 1 })).toEqual([]);
+  });
+
+  it("lists example values that do not fit their field, worded like the server", () => {
+    const object = {
+      id: "loan",
+      fields: [
+        { name: "status", type: "enum", values: ["active", "returned"] },
+        { name: "title", type: "string" },
+        { name: "due", type: "date" },
+        { name: "tags", type: "list" },
+        { name: "owner", type: "ref", ref: "member" },
+      ],
+    };
+    expect(invalidExampleValues(object, { status: "lost", title: 5, due: "2026-02-31", tags: "x", owner: 3, extra: 1 })).toEqual([
+      '"lost" is not a value of enum loan.status (active, returned)',
+      "loan.title: expected string, got number",
+      'loan.due: expected a date (YYYY-MM-DD), got "2026-02-31"',
+      "loan.tags: expected list, got string",
+      "loan.owner: expected a ref (id string), got number",
+    ]);
+    expect(invalidExampleValues(object, { status: "active", title: null, due: "2026-12-01", tags: [], owner: "m-1" })).toEqual([]);
+    expect(invalidExampleValues(undefined, { a: 1 })).toEqual([]);
   });
 
   it("marks output keys that differ from the same object's input", () => {

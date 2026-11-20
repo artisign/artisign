@@ -79,7 +79,7 @@ function isCalendarDate(value: string): boolean {
 }
 
 /** Whether `value` fits the field's type (and `enum` values). `null` fits anything: nothing there yet. Dates are checked by shape, not evaluated. */
-function fitsField(field: DataField, value: unknown): boolean {
+export function fitsField(field: DataField, value: unknown): boolean {
   if (value === null) return true;
   switch (field.type) {
     case "string":

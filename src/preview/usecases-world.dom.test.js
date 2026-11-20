@@ -84,6 +84,9 @@ describe("world cards", () => {
     renderDetail(document.body.firstChild, { bundle: worldBundle, base: worldBundle, source: baseCase, variantId: null, pool: makeWorldPool(), coverageOpen: false, handlers: { ...handlers, onOpenWorld } });
     $$(".uc-h2-action").find((b) => b.textContent === "Open in World").click();
     expect(onOpenWorld).toHaveBeenCalledTimes(1);
+    // a sibling of the heading in its row, not part of the heading's name
+    expect($("#uc-world-h").textContent).not.toContain("Open in World");
+    expect($(".uc-h2-action").parentElement).toBe($("#uc-world-h").parentElement);
   });
 
   it("a case without constellations has no World section", () => {

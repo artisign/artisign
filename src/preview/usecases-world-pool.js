@@ -61,8 +61,12 @@ export function renderWorldPage(root, { world, pool, selected, error = "" }) {
         { class: "uc-guide" },
         h("h1", { class: "uc-guide-title" }, "Describe the world your use cases start in"),
         h("p", { class: "uc-guide-lede" }, "The world is optional. Add it when a case depends on what exists before its first step: a child on the policy, who is whose parent, which household the case plays in. Use cases keep working without it."),
-        h("ol", { class: "uc-world-steps" }, h("li", null, "Add the things that are not actors, such as a child or a policy."), h("li", null, "Name how participants relate to each other."), h("li", null, "Group personas and entities into constellations, by hand or from dimensions that describe constellations.")),
-        h("p", { class: "uc-muted" }, "Ask your agent to create them with set_use_cases."),
+        h(
+          "ol",
+          { class: "uc-guide-steps" },
+          ["Add the things that are not actors, such as a child or a policy.", "Name how participants relate to each other.", "Group personas and entities into constellations, by hand or from dimensions that describe constellations."].map((line, i) => h("li", null, h("span", { class: "uc-guide-num" }, String(i + 1)), h("div", null, h("p", null, line)))),
+        ),
+        h("p", { class: "uc-guide-lede uc-world-guide-note" }, "Ask your agent to create them with set_use_cases."),
       ),
     );
     return;

@@ -125,7 +125,7 @@ export function worldSection(ctx, w) {
   return h(
     "section",
     { class: "uc-section", "aria-labelledby": "uc-world-h" },
-    h("div", { class: "uc-h2-row" }, h("h2", { class: "uc-h2", id: "uc-world-h" }, "World", h("span", { class: "uc-h2-meta" }, `${plural(ids.length, "constellation")} · the case holds ${ids.length === 1 ? "in it" : "in any of them"}`), ctx.handlers.onOpenWorld ? h("button", { type: "button", class: "chrome-btn chrome-btn--ghost chrome-btn--compact uc-h2-action", onClick: ctx.handlers.onOpenWorld }, "Open in World") : null)),
+    h("div", { class: "uc-h2-row" }, h("h2", { class: "uc-h2", id: "uc-world-h" }, "World", h("span", { class: "uc-h2-meta" }, `${plural(ids.length, "constellation")} · the case holds ${ids.length === 1 ? "in it" : "in any of them"}`)), ctx.handlers.onOpenWorld ? h("button", { type: "button", class: "chrome-btn chrome-btn--ghost chrome-btn--compact uc-h2-action", onClick: ctx.handlers.onOpenWorld }, "Open in World") : null),
     h("div", { class: "uc-cst-grid" }, ids.map((id) => (byId.has(id) ? constellationCard(ctx, byId.get(id), w) : unknownConstellationCard(id)))),
   );
 }

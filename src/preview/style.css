@@ -9717,15 +9717,6 @@ button.uc-target:hover {
   margin-left: var(--space-sm);
 }
 
-.uc-world-steps {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  margin: var(--space-xl) 0;
-  padding-left: var(--space-3xl);
-  font-size: var(--ui-base);
-}
-
 /* Type size of the world views: the design's screen text is 13px (--ui-base); branch and diff content must not fall back to the browser default */
 .uc-world-page,
 .uc-cst,
@@ -9762,4 +9753,13 @@ button.uc-target:hover {
 
 .uc-lane-card.is-compact > .uc-branch-end {
   margin-left: 0;
+}
+
+/* The empty-world guide: every line at the token size */
+.uc-guide {
+  font-size: var(--ui-base);
+}
+
+.uc-world-guide-note {
+  margin: var(--space-2xl) 0 0;
 }

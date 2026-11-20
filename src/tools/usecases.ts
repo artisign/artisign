@@ -392,7 +392,7 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
     });
   }
 
-  // Skipped pool entries come first, so the cap of the list never drops them.
+  // The case's own warnings come first; the skipped pool entries are appended after the world checks below.
   const warnings = markSkipped(await validateUseCase(useCase, pools, lookup), issues);
   warnings.push(...ambiguousIds(bundlePersonas, world.entities));
   // The world the bundle shows is checked on read too: a member's change after the constellation was written shows up here.

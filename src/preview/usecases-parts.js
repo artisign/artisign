@@ -75,8 +75,8 @@ export function countPill(iconName, count, many, one) {
 }
 
 /** `uc-variant-chip` (default / selected / add). */
-export function variantChip({ label, meta, selected = false, add = false, onClick, title }) {
-  if (add) return h("button", { type: "button", class: "uc-variant-chip", dataset: { kind: "add" }, onClick, title }, icon("add"), label);
+export function variantChip({ label, meta, selected = false, add = false, onClick, title, paused = false }) {
+  if (add) return h("button", { type: "button", class: "uc-variant-chip", dataset: { kind: "add" }, "aria-disabled": paused ? "true" : null, onClick, title }, icon("add"), label);
   return h("button", { type: "button", class: "uc-variant-chip", "aria-pressed": selected ? "true" : "false", onClick, title }, h("span", null, label), meta ? h("span", { class: "uc-variant-meta" }, meta) : null);
 }
 

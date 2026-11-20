@@ -12,15 +12,18 @@ const SHOWN = 5;
 /** Fills `el` with the full-panel state for an unreadable file. `onRetry` re-reads everything. */
 export function renderLoadProblem(el, { message, onRetry }) {
   const { file, detail } = describeLoadProblem(message);
+  // role="alert" announces when it is inserted: the panel is rebuilt only when what it says changes, not on every render of the tab.
+  const key = JSON.stringify([file, detail]);
+  if (el.firstElementChild?.dataset.problemKey === key) return;
   el.replaceChildren(
     h(
       "div",
-      { class: "uc-problem", role: "alert" },
+      { class: "uc-problem", role: "alert", dataset: { problemKey: key } },
       icon("warning", "uc-problem-icon"),
       h("h2", { class: "uc-problem-title" }, file ? "A use case file could not be read" : "Use cases could not be loaded"),
       file ? h("p", { class: "uc-problem-file" }, h("code", null, file)) : null,
       h("p", { class: "uc-problem-detail" }, detail),
-      h("p", { class: "uc-muted" }, file ? "Nothing is lost. Open the file in a text editor and fix it or remove it, or ask your AI agent to, then press Retry." : "Press Retry. If it keeps failing, look at the terminal where artisign runs."),
+      h("p", { class: "uc-problem-hint" }, file ? "Open the file in a text editor and fix it (or restore it from git), or ask your agent to, then press Retry." : "Press Retry. If it keeps failing, look at the terminal where artisign runs."),
       h("button", { type: "button", class: "chrome-btn", dataset: { action: "retry" }, onClick: onRetry }, icon("refresh"), "Retry"),
     ),
   );
@@ -45,9 +48,20 @@ export function renderEntryNotice(el, { warnings, total = warnings.length, onRet
       { class: "uc-toast-body" },
       h("strong", null, `${plural(total, "entry", "entries")} in ${where} could not be loaded and ${total === 1 ? "is" : "are"} left out.`),
       h("ul", null, warnings.slice(0, SHOWN).map((w) => h("li", null, w.message ?? String(w)))),
-      total > SHOWN ? h("p", { class: "uc-muted" }, `… and ${total - SHOWN} more`) : null,
-      h("p", { class: "uc-muted" }, "Everything else still works. Fix or remove the entries in the file (or ask your AI agent to), then press Retry. Saving changes is paused until then."),
+      total > SHOWN ? h("p", { class: "uc-problem-hint" }, `… and ${total - SHOWN} more`) : null,
+      h("p", { class: "uc-problem-hint" }, "Everything else still works. Fix the entries in the file (or restore it from git), or ask your agent to, then press Retry. Saving changes is paused until then."),
     ),
     h("button", { type: "button", class: "uc-link-btn", dataset: { action: "retry" }, onClick: onRetry }, icon("refresh"), "Retry"),
   );
+}
+
+/**
+ * Why saving is paused, or "" when it is not: a write starts from a strict read of every pool file, so it is refused while a file cannot be read
+ * or has skipped entries. The controls that would open an editor say so (aria-disabled + title) instead of failing on save.
+ */
+export function savingPausedReason({ problem, warnings }) {
+  if (!problem && warnings.length === 0) return "";
+  const files = problem ? [describeLoadProblem(problem).file] : warnings.map((w) => /usecases\/[\w./-]+\.json/.exec(w.message ?? "")?.[0]);
+  const named = [...new Set(files.filter(Boolean))];
+  return `Saving is paused until ${named.length > 0 ? named.join(" and ") : "the use case files"} ${named.length > 1 ? "are" : "is"} fixed.`;
 }

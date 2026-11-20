@@ -42,7 +42,7 @@ import {
 } from "./usecases-data.js";
 import { avatar, statusDot } from "./usecases-parts.js";
 import { actorKind } from "./usecases-world-parts.js";
-import { renderLoadProblem, renderEntryNotice } from "./usecases-problem.js";
+import { renderLoadProblem, renderEntryNotice, savingPausedReason } from "./usecases-problem.js";
 import { renderWorldNav, renderWorldPage } from "./usecases-world-pool.js";
 import { flowSequence } from "./usecases-world-data.js";
 import { avatarOf } from "./usecases-data.js";
@@ -226,6 +226,7 @@ export function createUseCasesView(options) {
 
   const poolView = () => pool;
   const loadProblem = () => poolProblem || listProblem;
+  const pausedReason = () => savingPausedReason({ problem: loadProblem(), warnings: [...listEntryWarnings, ...worldEntryWarnings] });
 
   /** What a person has to look at: the whole-file problem as the tab's content, skipped entries as a notice above it (the toast keeps unreadable case files). */
   function renderProblems() {
@@ -675,6 +676,7 @@ export function createUseCasesView(options) {
       variantId: detail.variantId,
       pool,
       coverageOpen,
+      paused: pausedReason(),
       handlers: {
         onVariant: (variantId) => openCase(detail.id, variantId),
         onEdit: () => editUseCase(detail.id),
@@ -712,8 +714,10 @@ export function createUseCasesView(options) {
     worldPanelEl.hidden = section !== "world";
     addButton.hidden = section === "world"; // the world is edited in its own dialogs (not part of the read views)
     addButton.setAttribute("aria-label", section === "cases" ? "New use case" : section === "personas" ? "New persona" : "New data object");
-    addButton.title = addButton.getAttribute("aria-label");
-    addButton.disabled = Boolean(loadProblem()); // a dialog would open on empty pools and its save would be refused
+    // Paused, not disabled: the button stays focusable and says why (a dialog would open on incomplete pools and its save would be refused).
+    const paused = pausedReason();
+    addButton.setAttribute("aria-disabled", paused ? "true" : "false");
+    addButton.title = paused || addButton.getAttribute("aria-label");
     renderProblems();
     if (mode === "mapping" && detail?.view) return; // the mapping view owns the content
     if (loadProblem() && section !== "world") {
@@ -736,11 +740,13 @@ export function createUseCasesView(options) {
 
   /** A sidebar whose pool could not be read says so instead of listing nothing (or the last good read). */
   function renderPoolProblem(summaryEl, listEl, what) {
-    summaryEl.textContent = "";
+    summaryEl.hidden = true; // no empty band with a divider above the message
     listEl.replaceChildren(h("p", { class: "uc-list-status" }, `${what} could not be loaded.`));
   }
 
   function renderPoolPanel() {
+    personaSummary.hidden = false;
+    objectSummary.hidden = false;
     personaSummary.textContent = `${plural(pool.personas.length, "persona")} · ${plural(pool.dimensions.length, "dimension")}`;
     objectSummary.textContent = plural(pool.objects.length, "data object");
   }
@@ -877,6 +883,7 @@ export function createUseCasesView(options) {
   }
 
   async function newUseCase() {
+    if (pausedReason()) return;
     if (!pool.loaded) await loadPool();
     const saved = await openUseCaseDialog(useCaseDialogOptions({ mode: "new", source: null }));
     if (!saved) return;
@@ -886,6 +893,7 @@ export function createUseCasesView(options) {
   }
 
   async function editUseCase(id, focus = {}) {
+    if (pausedReason()) return;
     // Always from the file as it is now: an edit sends whole arrays (shallow merge), so a stale copy would overwrite an agent's change.
     const res = await api.fetchUseCaseSource(project, id);
     if (!res.ok) return showToast(res.message, []);
@@ -990,6 +998,7 @@ export function createUseCasesView(options) {
   }
 
   function addForSection() {
+    if (pausedReason()) return;
     if (section === "cases") newUseCase();
     else if (section === "personas") editPersona(null);
     else editObject(null);

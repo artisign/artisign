@@ -363,7 +363,8 @@ describe("with use cases", () => {
     await new Promise((r) => setTimeout(r, 300));
     await flush();
     expect($(".uc-plist").textContent).toBe("Personas could not be loaded.");
-    expect($("#uc-add").disabled).toBe(true);
+    expect($("#uc-add").getAttribute("aria-disabled")).toBe("true");
+    expect($("#uc-add").title).toBe("Saving is paused until usecases/personas.json is fixed.");
     $$(".uc-subtab")[3].click();
     await flush();
     expect($$(".uc-plist")[1].textContent).toBe("Data objects could not be loaded.");
@@ -374,7 +375,7 @@ describe("with use cases", () => {
     $$(".uc-subtab")[0].click();
     $(".uc-problem [data-action=retry]").click();
     await flush();
-    expect($("#uc-add").disabled).toBe(false);
+    expect($("#uc-add").getAttribute("aria-disabled")).toBe("false");
   });
 
   it("the notice counts from invalid_pool_entry_count and keeps the case-file toast", async () => {
@@ -388,6 +389,47 @@ describe("with use cases", () => {
     expect($(".uc-notice").textContent).toContain("and 7 more");
     expect($(".uc-toast:not(.uc-notice)").hidden).toBe(false);
     expect($(".uc-toast:not(.uc-notice)").textContent).toContain("broken.json");
+  });
+
+  it("while entries are skipped, + / Edit / + Variant say saving is paused (focusable, not disabled) and open nothing; the copy says \"agent\"", async () => {
+    store.invalid = { warnings: [{ kind: "invalid_file", target: "persona:x", message: "usecases/personas.json personas[0] (x) is not loaded: name: Invalid input" }] };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    const reason = "Saving is paused until usecases/personas.json is fixed.";
+    const add = $("#uc-add");
+    expect(add.getAttribute("aria-disabled")).toBe("true");
+    expect(add.disabled).toBe(false);
+    expect(add.title).toBe(reason);
+    const edit = $$(".uc-actions .chrome-btn").find((b) => b.textContent.includes("Edit"));
+    expect(edit.getAttribute("aria-disabled")).toBe("true");
+    expect(edit.title).toBe(reason);
+    expect($(".uc-variant-chip[data-kind=add]").getAttribute("aria-disabled")).toBe("true");
+    calls.length = 0;
+    add.click();
+    edit.click();
+    $(".uc-variant-chip[data-kind=add]").click();
+    await flush();
+    expect(calls.some((c) => c.path === "/api/use-case")).toBe(false);
+    expect($(".uc-dialog")).toBeNull();
+    expect($(".uc-notice").textContent).toContain("ask your agent");
+    expect($(".uc-notice").textContent).not.toContain("AI agent");
+  });
+
+  it("the problem panel is not rebuilt (and so not announced again) while it says the same", async () => {
+    store.failInclude = true;
+    await import("./app.js");
+    await flush();
+    await openTab();
+    const first = $(".uc-problem");
+    expect(first.textContent).toContain("fix it (or restore it from git), or ask your agent to");
+    expect(first.textContent).not.toContain("Nothing is lost");
+    $$(".uc-subtab")[0].click();
+    $$(".uc-subtab")[1].click();
+    $$(".uc-subtab")[0].click();
+    await flush();
+    expect($(".uc-problem")).toBe(first);
+    expect($(".uc-side-panel[data-section=personas] .uc-result").hidden).toBe(true);
   });
 
   it("a world with skipped entries is named in the same notice", async () => {

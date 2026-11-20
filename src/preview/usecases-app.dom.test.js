@@ -450,6 +450,26 @@ describe("with use cases", () => {
       await checkPaused([".uc-persona-open", ".uc-dim-name", ".uc-h2-action", ".uc-persona-new", ".uc-page-head .uc-actions .chrome-btn--primary"]);
     });
 
+    it("a world.json that cannot be read pauses saving too, on every page", async () => {
+      store.worldFail = true;
+      await import("./app.js");
+      await flush();
+      await openTab();
+      const worldReason = "Saving is paused until usecases/world.json is fixed.";
+      expect($("#uc-add").getAttribute("aria-disabled")).toBe("true");
+      expect($("#uc-add").title).toBe(worldReason);
+      const edit = $$(".uc-actions .chrome-btn").find((b) => b.textContent.includes("Edit"));
+      expect(edit.getAttribute("aria-disabled")).toBe("true");
+      $$(".uc-subtab").find((b) => b.dataset.section === "personas").click();
+      await flush();
+      const persona = $(".uc-content .uc-persona-new");
+      expect(persona.getAttribute("aria-disabled")).toBe("true");
+      expect(persona.title).toBe(worldReason);
+      persona.click();
+      await flush();
+      expect($(".uc-dialog")).toBeNull();
+    });
+
     it("Data objects: New data object and the object pencil", async () => {
       await visit("objects");
       await checkPaused([".uc-io-pencil", ".uc-page-head .uc-actions button"]);

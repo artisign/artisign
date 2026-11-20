@@ -113,6 +113,20 @@ describe("use-case pool files — invalid entries on the read path", () => {
     expect(unknown.filter((w) => w.message.startsWith('persona "ana-staff" does not exist')).some((w) => w.message.includes("is invalid and not loaded"))).toBe(false);
   });
 
+  it("marks the world messages about an undeclared relationship type too", async () => {
+    await setUseCases(fx.store, {
+      entities: [{ id: "branch", name: "Branch" }],
+      relationship_types: [{ id: "owns", label: "owns" }],
+      constellations: [{ id: "fam", name: "Fam", relationships: [{ from: "member-ana", type: "owns", to: "branch" }] }],
+      use_cases: [{ ...BORROW, id: "with-world", constellations: ["fam"] }],
+    });
+    await writeFile(file("world.json"), JSON.stringify({ entities: [{ id: "branch", name: "Branch" }], relationship_types: [{ id: "owns" }, { id: "own", label: "own" }], constellations: [{ id: "fam", name: "Fam", relationships: [{ from: "member-ana", type: "owns", to: "branch" }] }] }));
+    const bundle = (await getUseCase(fx.store, { id: "with-world" })) as GetRes;
+    const undeclared = bundle.warnings.find((w) => w.kind === "unknown_relationship_type");
+    expect(undeclared?.message).toContain('names undeclared type "owns"');
+    expect(undeclared?.message).toContain("its entry in usecases/world.json is invalid and not loaded");
+  });
+
   it("says a skipped entry is unreadable where a case refers to it", async () => {
     await poolJson({ dimensions: DIMENSIONS, personas: [{ id: "member-ana" }] });
     const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as GetRes;

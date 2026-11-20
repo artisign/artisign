@@ -212,6 +212,9 @@ const UNKNOWN_REFERENCES: { pattern: RegExp; lists: PoolEntryIssue["list"][] }[]
   { pattern: /^constellation "([^"]+)" does not exist$/, lists: ["constellations"] },
   { pattern: /^"([^"]+)" in relationship ".*" is neither a persona nor an entity$/, lists: ["personas", "entities"] },
   { pattern: /^state subject "([^"]+)" is neither a persona, an entity nor "system"$/, lists: ["personas", "entities"] },
+  { pattern: /^relationship ".*" names undeclared type "([^"]+)"$/, lists: ["relationship_types"] },
+  { pattern: /^entity ".*" is an instance of unknown data object "([^"]+)"$/, lists: ["objects"] },
+  { pattern: /^field of relationship type ".*" names unknown data object "([^"]+)"$/, lists: ["objects"] },
   { pattern: /^trait "([^"]+)" is not a defined dimension$/, lists: ["dimensions"] },
   { pattern: /^"when" names unknown dimension "([^"]+)"$/, lists: ["dimensions"] },
   { pattern: /^same_traits names "([^"]+)", which is not a defined dimension$/, lists: ["dimensions"] },
@@ -409,14 +412,14 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   }
 
   // The case's own warnings come first; the skipped pool entries are appended after the world checks below.
-  const warnings = markSkipped(await validateUseCase(useCase, pools, lookup), issues);
+  let warnings = await validateUseCase(useCase, pools, lookup);
   warnings.push(...ambiguousIds(bundlePersonas, world.entities));
   // The world the bundle shows is checked on read too: a member's change after the constellation was written shows up here.
   for (const entity of bundleEntities) warnings.push(...validateEntity(entity, pools));
   for (const type of bundleRelationshipTypes) warnings.push(...validateRelationshipType(type, pools));
   for (const constellation of bundleConstellations) warnings.push(...validateConstellation(constellation, pools));
   // The case's own warnings first, the skipped pool entries after them: the cap of 50 never displaces what is wrong with the case (warning_count stays the true total).
-  warnings.push(...poolEntryWarnings(issues));
+  warnings = [...markSkipped(warnings, issues), ...poolEntryWarnings(issues)];
   const response: Record<string, unknown> = {
     use_case: effective,
     ...(variant ? { variant: { id: variant.id, title: variant.title, ...(variant.description !== undefined ? { description: variant.description } : {}), when: variant.when } } : {}),

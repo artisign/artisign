@@ -236,7 +236,7 @@ export function createUseCasesView(options) {
       el.title = reason;
     }
   }
-  const pausedReason = () => savingPausedReason({ problem: loadProblem(), warnings: [...listEntryWarnings, ...worldEntryWarnings] });
+  const pausedReason = () => savingPausedReason({ problems: [loadProblem(), pool.worldError], warnings: [...listEntryWarnings, ...worldEntryWarnings] });
 
   /** What a person has to look at: the whole-file problem as the tab's content, skipped entries as a notice above it (the toast keeps unreadable case files). */
   function renderProblems() {

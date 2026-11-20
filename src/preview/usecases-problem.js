@@ -59,9 +59,10 @@ export function renderEntryNotice(el, { warnings, total = warnings.length, onRet
  * Why saving is paused, or "" when it is not: a write starts from a strict read of every pool file, so it is refused while a file cannot be read
  * or has skipped entries. The controls that would open an editor say so (aria-disabled + title) instead of failing on save.
  */
-export function savingPausedReason({ problem, warnings }) {
-  if (!problem && warnings.length === 0) return "";
-  const files = problem ? [describeLoadProblem(problem).file] : warnings.map((w) => /usecases\/[\w./-]+\.json/.exec(w.message ?? "")?.[0]);
+export function savingPausedReason({ problems, warnings }) {
+  const failed = problems.filter(Boolean);
+  if (failed.length === 0 && warnings.length === 0) return "";
+  const files = [...failed.map((message) => describeLoadProblem(message).file), ...warnings.map((w) => /usecases\/[\w./-]+\.json/.exec(w.message ?? "")?.[0])];
   const named = [...new Set(files.filter(Boolean))];
   return `Saving is paused until ${named.length > 0 ? named.join(" and ") : "the use case files"} ${named.length > 1 ? "are" : "is"} fixed.`;
 }

@@ -1,0 +1,108 @@
+{
+  "id": "filter-by-constellation",
+  "title": "Filter the use case list by constellation",
+  "group": "use-cases/world",
+  "tags": [
+    "chr-1161"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo"
+  ],
+  "constellations": [
+    "product-owner-world-modelled-project"
+  ],
+  "trigger": {
+    "text": "Pablo changes a constellation and needs every case that plays in it.",
+    "actor": "product-owner-pablo",
+    "via": "browser preview"
+  },
+  "goal": "See every case that lists a constellation, directly or through a variant.",
+  "outcome": "The list shows only the matching cases with their count.",
+  "inputs": [
+    {
+      "object": "constellation",
+      "source": "usecases/world.json",
+      "example": {
+        "id": "single-parent-household"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "use-case",
+      "target": "Filtered list",
+      "example": {
+        "id": "renew-policy",
+        "constellations": [
+          "two-parent-household",
+          "single-parent-household"
+        ]
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open-filter",
+      "actor": "product-owner-pablo",
+      "action": "Opens the Constellation filter",
+      "target": {
+        "screen": "usecases-list-world",
+        "node": "f-constellation"
+      }
+    },
+    {
+      "id": "pick-constellation",
+      "actor": "product-owner-pablo",
+      "action": "Picks one constellation",
+      "target": {
+        "screen": "usecases-list-world",
+        "node": "cm-single"
+      }
+    },
+    {
+      "id": "narrow-list",
+      "actor": "system",
+      "action": "Narrows the list to cases that list it, in the base or a variant, and counts them",
+      "target": {
+        "screen": "usecases-list-world",
+        "node": "uc-count"
+      }
+    },
+    {
+      "id": "open-match",
+      "actor": "product-owner-pablo",
+      "action": "Opens a match; kind icons on the persona chips show who acts",
+      "target": {
+        "screen": "usecases-list-world",
+        "node": "d-people"
+      }
+    }
+  ],
+  "branches": [
+    {
+      "id": "no-match",
+      "title": "No case plays in the constellation",
+      "from": "pick-constellation",
+      "when": [
+        {
+          "subject": "system",
+          "property": "matching_case_count",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "clear-filter",
+          "actor": "product-owner-pablo",
+          "action": "Sees an empty list and clears the filter",
+          "target": {
+            "screen": "usecases-list-world",
+            "node": "cm-clear"
+          }
+        }
+      ],
+      "outcome": "The full list is back; the constellation is used by no case."
+    }
+  ]
+}

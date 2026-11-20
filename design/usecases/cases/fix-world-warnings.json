@@ -1,0 +1,216 @@
+{
+  "id": "fix-world-warnings",
+  "title": "Find and fix world warnings",
+  "group": "use-cases/world",
+  "tags": [
+    "chr-1161"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo"
+  ],
+  "constellations": [
+    "product-owner-world-modelled-project"
+  ],
+  "trigger": {
+    "text": "After a change to a case or the pool, world warnings appear.",
+    "state": [
+      {
+        "subject": "system",
+        "property": "world_warning_count",
+        "op": "gt",
+        "value": 0
+      }
+    ]
+  },
+  "goal": "No case and no pool entry carries a world warning.",
+  "outcome": "The World card, the Starting state table and the World sidebar show no amber entry.",
+  "inputs": [
+    {
+      "object": "world-warning",
+      "source": "Case detail",
+      "example": {
+        "kind": "unknown_constellation",
+        "target": "use_case:renew-policy/constellation:blended-household"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "use-case",
+      "target": "usecases/cases/",
+      "example": {
+        "id": "renew-policy",
+        "constellations": [
+          "two-parent-household",
+          "single-parent-household"
+        ]
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open-case",
+      "actor": "product-owner-pablo",
+      "action": "Opens the case; each world warning sits at its target, such as an unknown constellation on the World card",
+      "target": {
+        "screen": "usecases-detail-world",
+        "node": "cst-unknown-w"
+      }
+    },
+    {
+      "id": "fix-in-editor",
+      "actor": "product-owner-pablo",
+      "action": "Removes the unknown constellation from the case in the editor, or creates it in World",
+      "target": {
+        "screen": "usecases-edit-dialog-world"
+      }
+    },
+    {
+      "id": "recheck",
+      "actor": "system",
+      "action": "Checks the case again on save and drops the fixed warning",
+      "target": {
+        "screen": "usecases-detail-world"
+      }
+    }
+  ],
+  "branches": [
+    {
+      "id": "pool-warning",
+      "title": "The warning sits on a pool entry",
+      "when": [
+        {
+          "subject": "system",
+          "property": "pool_warning_count",
+          "op": "gt",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "see-pool-count",
+          "actor": "product-owner-pablo",
+          "action": "Sees the warning count next to Constellations in the World sidebar",
+          "target": {
+            "screen": "usecases-world",
+            "node": "toc-cst"
+          }
+        },
+        {
+          "id": "fix-in-pool",
+          "actor": "product-owner-pablo",
+          "action": "Fixes the pool entry the warning sits on, such as a relationship whose two ends are the same participant",
+          "target": {
+            "screen": "usecases-world",
+            "node": "c-couple-w"
+          }
+        }
+      ],
+      "outcome": "The pool entry carries no warning; the sidebar count is gone."
+    },
+    {
+      "id": "unknown-state-subject",
+      "title": "A starting-state subject is not in the world",
+      "from": "open-case",
+      "when": [
+        {
+          "subject": "system",
+          "property": "warning_kind",
+          "value": "unknown_participant"
+        },
+        {
+          "subject": "system",
+          "property": "warning_target_segment",
+          "value": "state"
+        }
+      ],
+      "steps": [
+        {
+          "id": "follow-add-to-world",
+          "actor": "product-owner-pablo",
+          "action": "Follows Add it to the world from the state row",
+          "target": {
+            "screen": "usecases-detail-world",
+            "node": "st-r6-hint"
+          }
+        },
+        {
+          "id": "create-entity",
+          "actor": "product-owner-pablo",
+          "action": "Creates the missing entity",
+          "target": {
+            "screen": "usecases-entity-dialog"
+          }
+        }
+      ],
+      "rejoin": "recheck"
+    }
+  ],
+  "variants": [
+    {
+      "id": "agent-fixes-warnings",
+      "title": "Design agent fixes the warnings through MCP",
+      "description": "An agent reads the warnings from the tool responses and fixes them with set_use_cases; it sees no list, detail or World view.",
+      "when": {
+        "actor-type": [
+          "agent"
+        ]
+      },
+      "personas": [
+        "design-agent-dex"
+      ],
+      "outcome": "list_use_cases and get_use_case return no world warning for the case, and set_use_cases none for the pool entries it wrote.",
+      "inputs": [
+        {
+          "object": "world-warning",
+          "source": "get_use_case / list_use_cases response",
+          "example": {
+            "kind": "unknown_constellation",
+            "target": "use_case:renew-policy/constellation:blended-household"
+          }
+        }
+      ],
+      "steps": [
+        {
+          "op": "replace",
+          "step_id": "open-case",
+          "step": {
+            "id": "list-warnings",
+            "actor": "design-agent-dex",
+            "action": "Reads the warnings of the case with get_use_case; each names its kind and target",
+            "via": "MCP"
+          }
+        },
+        {
+          "op": "replace",
+          "step_id": "fix-in-editor",
+          "step": {
+            "id": "fix-with-tool",
+            "actor": "design-agent-dex",
+            "action": "Fixes the case or the pool entry the target names with set_use_cases",
+            "via": "MCP"
+          }
+        },
+        {
+          "op": "replace",
+          "step_id": "recheck",
+          "step": {
+            "id": "read-response",
+            "actor": "design-agent-dex",
+            "action": "Reads the response and calls get_use_case again until no warning is left",
+            "via": "MCP"
+          }
+        },
+        {
+          "op": "remove_branch",
+          "branch_id": "pool-warning"
+        },
+        {
+          "op": "remove_branch",
+          "branch_id": "unknown-state-subject"
+        }
+      ]
+    }
+  ]
+}

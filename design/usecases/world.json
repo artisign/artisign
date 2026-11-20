@@ -49,6 +49,19 @@
       },
       "traits": {},
       "object": "mcp-client"
+    },
+    {
+      "id": "project-home-insurance",
+      "name": "home-insurance",
+      "type": "Design project",
+      "description": "A home insurance product (renewals, claims, co-insured family members) whose use cases model households as a world.",
+      "avatar": {
+        "emoji": "🏠"
+      },
+      "traits": {
+        "project-size": "large"
+      },
+      "object": "project"
     }
   ],
   "relationship_types": [
@@ -184,6 +197,31 @@
           "from": "coding-agent-coda",
           "type": "implements",
           "to": "project-shop"
+        }
+      ]
+    },
+    {
+      "id": "product-owner-world-modelled-project",
+      "name": "Product owner, design agent and coding agent on a world-modelled product",
+      "description": "Pablo owns the specs of the home-insurance product and models its world, Dex designs it, Coda implements it from the cases.",
+      "traits": {
+        "project-size": "large"
+      },
+      "relationships": [
+        {
+          "from": "product-owner-pablo",
+          "type": "owns",
+          "to": "project-home-insurance"
+        },
+        {
+          "from": "design-agent-dex",
+          "type": "designs",
+          "to": "project-home-insurance"
+        },
+        {
+          "from": "coding-agent-coda",
+          "type": "implements",
+          "to": "project-home-insurance"
         }
       ]
     }

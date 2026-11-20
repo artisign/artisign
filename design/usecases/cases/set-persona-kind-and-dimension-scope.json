@@ -1,0 +1,121 @@
+{
+  "id": "set-persona-kind-and-dimension-scope",
+  "title": "Set a persona's kind and a dimension's scope",
+  "group": "use-cases/world",
+  "tags": [
+    "chr-1161"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo"
+  ],
+  "constellations": [
+    "product-owner-world-modelled-project"
+  ],
+  "trigger": {
+    "text": "Pablo adds the insurer of the renewal flow as an outside actor and finds that the existing household dimension describes worlds, not people.",
+    "actor": "product-owner-pablo",
+    "via": "browser preview"
+  },
+  "goal": "Every outside actor is a persona with the right kind, and every dimension says whether it describes personas or constellations.",
+  "outcome": "The insurer is a persona of kind organization; the household dimension is offered only where constellations are edited.",
+  "inputs": [
+    {
+      "object": "persona",
+      "source": "Product knowledge",
+      "example": {
+        "id": "insurer-north",
+        "kind": "organization"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "dimension",
+      "target": "usecases/dimensions.json",
+      "example": {
+        "id": "household-type",
+        "scope": "constellations"
+      }
+    },
+    {
+      "object": "persona",
+      "target": "usecases/personas.json",
+      "example": {
+        "id": "insurer-north",
+        "kind": "organization"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open-persona",
+      "actor": "product-owner-pablo",
+      "action": "Opens the persona of an outside actor",
+      "target": {
+        "screen": "usecases-edit-dialog-persona"
+      }
+    },
+    {
+      "id": "set-kind",
+      "actor": "product-owner-pablo",
+      "action": "Sets Kind to human, agent, service or organization",
+      "target": {
+        "screen": "usecases-edit-dialog-persona",
+        "node": "pd-f-kind"
+      }
+    },
+    {
+      "id": "open-dimension",
+      "actor": "product-owner-pablo",
+      "action": "Opens a dimension",
+      "target": {
+        "screen": "usecases-dimension-dialog"
+      }
+    },
+    {
+      "id": "set-scope",
+      "actor": "product-owner-pablo",
+      "action": "Sets Describes to Constellations",
+      "target": {
+        "screen": "usecases-dimension-dialog",
+        "node": "dd-f-scope"
+      }
+    },
+    {
+      "id": "offer-by-scope",
+      "actor": "system",
+      "action": "Offers the dimension only where constellations are edited, such as Generate constellations",
+      "target": {
+        "screen": "usecases-generate-dialog-constellations",
+        "node": "gd-f-dims"
+      }
+    }
+  ],
+  "branches": [
+    {
+      "id": "stored-trait-other-scope",
+      "title": "Personas still carry a trait of the changed dimension",
+      "from": "set-scope",
+      "when": [
+        {
+          "subject": "system",
+          "property": "stored_trait_other_scope_count",
+          "op": "gt",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "label-other-scope",
+          "actor": "system",
+          "action": "Keeps the stored persona traits and labels them with the dimension's scope",
+          "target": {
+            "screen": "usecases-edit-dialog-persona"
+          }
+        }
+      ],
+      "rejoin": "offer-by-scope"
+    }
+  ]
+}

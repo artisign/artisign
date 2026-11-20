@@ -402,7 +402,7 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "delete_entity",
-    "Delete a screen, component, pattern or mockup (variant: one mockup variant, mockup only). A screen takes its flow edges and meta with it; comments stay. Referenced components are refused (references listed), as are screens with variant screens unless cascade: true (screen only) deletes the subtree. Use-case kinds persona, dimension, entity, relationship_type, constellation, data_object, use_case delete by id and warn about dangling references.",
+    "Delete a screen, component, pattern or mockup (variant: one mockup variant, mockup only). A screen takes its flow edges and meta with it; comments stay. Referenced components are refused (references listed), as are screens with variant screens unless cascade: true (screen only) deletes the subtree. Use-case kinds persona, dimension, entity, relationship_type, constellation, data_object, use_case delete by id and warn about dangling references. Screens also warn mapping_stale for use-case steps.",
     { kind: z.enum(["screen", "component", "pattern", "mockup", "persona", "data_object", "use_case", "dimension", "entity", "constellation", "relationship_type"]), name: z.string(), variant: z.string().optional(), cascade: z.boolean().optional() },
     // ctx threaded through the way init_project's is — deleteEntity uses
     // ctx.viewState.pruneScreen(name) to drop a deleted screen from the

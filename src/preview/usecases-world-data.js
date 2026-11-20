@@ -330,7 +330,7 @@ export function triggerBaseParts(baseTrigger, trigger) {
       ["", t.text || undefined],
       ["actor", t.actor],
       ["via", t.via],
-      ["when", (t.state ?? []).length > 0 ? t.state.map((c) => conditionParts(c).key).join(", ") : undefined],
+      ["when", (t.state ?? []).length > 0 ? t.state.map((c) => { const part = conditionParts(c); return `${part.key} ${part.symbol} ${part.value}`; }).join(", ") : undefined],
       ["from", t.at],
     ];
   };

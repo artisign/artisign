@@ -162,6 +162,14 @@ describe("variant differences", () => {
     expect(kinds(undefined, undefined)).toEqual([["", "no trigger", "same"]]);
   });
 
+  it("a condition that only changes its operator or value is a changed `when` part, not the same", () => {
+    const when = (op, value) => ({ text: "Premium", state: [{ subject: "policy", property: "premium", op, value }] });
+    const kind = (a, b) => triggerBaseParts(a, b).find((p) => p.label === "when").kind;
+    expect(kind(when("gt", 100), when("gt", 200))).toBe("changed");
+    expect(kind(when("gt", 100), when("gte", 100))).toBe("changed");
+    expect(kind(when("gt", 100), when("gt", 100))).toBe("same");
+  });
+
   it("applies-when: the scope of the dimensions and the constellations that match", () => {
     const byId = new Map(dimensions.map((d) => [d.id, d]));
     expect(whenScopeText({ household: ["single-parent"] }, byId)).toBe("a world trait");

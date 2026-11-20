@@ -161,6 +161,16 @@
         "design-agent-dex"
       ],
       "outcome": "list_use_cases and get_use_case return no world warning for the case, and set_use_cases none for the pool entries it wrote.",
+      "inputs": [
+        {
+          "object": "world-warning",
+          "source": "get_use_case / list_use_cases response",
+          "example": {
+            "kind": "unknown_constellation",
+            "target": "use_case:renew-policy/constellation:blended-household"
+          }
+        }
+      ],
       "steps": [
         {
           "op": "replace",

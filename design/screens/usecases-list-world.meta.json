@@ -1,0 +1,8 @@
+{
+  "notes": "List with the **Constellation** filter open (CHR-1146; `list_use_cases {constellation}`). The filter row gains a Constellation chip after Persona. Its menu lists the constellations of the world pool (name only, checkmark = active, single choice like Persona) — **no counts**: a case can hold in several worlds, so the spec defines no facet for it. Hint: \"Matches the case and its variants.\" Clear at the bottom. Active chip: \"Constellation: <name>\" (ellipsized).\n\n**Row counts** (summary keys `branches`, `constellations`) come from `uc-list-row` variants `counts` / `counts-selected` / `constellations-only`: after the status, a pill with `call_split` + branch count and a pill with `hub` + constellation count. Icons are `aria-hidden`, the words (\"branches\", \"constellations\") are visually hidden text, so the row reads \"3 branches, 3 constellations\". A pill at 0 is omitted (pick the variant). A case matched only through a variant says \"matched by a variant\".\n\n**Persona chips** in the detail carry `uc-actor-kind` after the name (Human, Agent, Service, Organization); no kind → no icon. The Persona filter menu lists the same icon after each name.\n\nFlows: selected row → `usecases-detail-world`; World tab → `usecases-world`.",
+  "tags": [
+    "chr-1146"
+  ],
+  "variant_of": "usecases-list",
+  "variant_kind": "overlay"
+}

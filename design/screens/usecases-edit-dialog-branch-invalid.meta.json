@@ -1,0 +1,10 @@
+{
+  "notes": "**Branch editor, invalid** (CHR-1146; hard save rules of decision `chr1103`). Opened from a variant's Branch changes row in **replace_branch** mode (`usecases-edit-dialog-variant-world`), drawn over `usecases-detail-world-variant`.\n\n- **ID read-only in replace_branch:** the id is no field but a dashed, locked value (`aria-readonly`), hint \"A replaced branch keeps its id.\" Add branch (base or variant) keeps the editable ID field.\n- **Branch without a condition (error):** the When fieldset gets `aria-invalid` + `aria-describedby` to \"Add at least one condition. A branch without one cannot be saved.\" (danger, error icon). Same pattern for **no step**: \"Add at least one step. A branch without one cannot be saved.\" under the Steps legend.\n- **Step id collision (error):** step ids share one namespace with the main flow and all branches. A step's id stays hidden (derived from the action) until it collides; then an id field (`chrome-field mono-error`, `aria-invalid`, `aria-describedby`) appears in the row with \"accept is already step 3 of the main flow. Give this step another id.\" The row gets a danger left edge. Against another branch: \"… is already step 2B.1 of branch 2B. …\"\n- **Via** (`step.via`, optional) is a field at the end of the target line of every step row; placeholder \"Via\", filled values read \"via app\".\n- **Footer:** count plus the first error (\"2 errors. Branch 2A needs a condition.\", `role=\"status\"`); Apply branch is disabled (`aria-disabled`, same text as `title`). Errors block Apply; warnings never do.\n\nFlows: back / Cancel → `usecases-edit-dialog-variant-world`; close → `usecases-detail-world-variant`.",
+  "tags": [
+    "chr-1146",
+    "dialog",
+    "error-state"
+  ],
+  "variant_of": "usecases-edit-dialog-branch",
+  "variant_kind": "state"
+}

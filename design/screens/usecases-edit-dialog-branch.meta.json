@@ -1,0 +1,9 @@
+{
+  "notes": "Branch editor (CHR-1146; branch `{id, title, from?, when[], steps[], rejoin?, outcome?}`). Opens from a branch row's Edit in the use case editor and replaces it in place (back arrow returns, nothing is saved until the use case is saved). 760px.\n\nFields: Title (autofocus), ID (mono, unique among branches; `duplicate_branch_id` is refused on write; **read-only** when the editor is opened for a variant's replace_branch). **Forks** (native select: \"Before the first step\" + every main-flow step \"After step N · action\") — the letter follows the fork (2A, 2B, …; A, B, … before the first step). **When** — condition rows like the trigger's (Subject, Property, Operator words, Value), all must hold; value parse rule as in `usecases-edit-dialog-trigger-state`. **Steps** — the step row of the use case editor (drag handle, actor, action, target Screen/Element/None, **Via** at the end of the target line, optional) with a `uc-frame-no branch` number instead of the plain number; step ids share one namespace with the main flow. **After the last step** — radio group: Continue at (native select of main-flow steps → `rejoin`) or End the case (optional outcome field, enabled only when chosen). A `from`/`rejoin` that is no longer a main-flow step shows `branch_from_missing` / `branch_rejoin_missing` under its select.\n\nErrors (no condition, no step, step id collision, `in` without a list) block Apply: `usecases-edit-dialog-branch-invalid`.\n\nFooter: Remove branch (danger text), Cancel, primary **Apply branch** (applies to the editor; the use case's Save writes). Flows: back / Cancel / Apply → `usecases-edit-dialog-world`.",
+  "tags": [
+    "chr-1146",
+    "dialog"
+  ],
+  "variant_of": "usecases-edit-dialog-world",
+  "variant_kind": "overlay"
+}

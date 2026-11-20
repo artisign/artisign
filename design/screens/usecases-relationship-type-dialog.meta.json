@@ -1,0 +1,9 @@
+{
+  "notes": "New / edit relationship type (CHR-1146; `{id, label, inverse_label?, description?, same_traits?, field?{object, name}}`), saved via `set_use_cases` (`relationship_types`). 580px over `usecases-world`.\n\nFields: Label (autofocus, reads left to right: \"is parent of\"), **Inverse label · optional, never derived** (`inverse_label`; empty stays empty, Artisign never infers an inverse, §3.5), ID (mono). A live \"Reads as\" preview with `uc-relation-row`s (sample participants from the pool). Description. **Both ends share** (`same_traits`): one native checkbox per dimension; hint \"A constellation warns when the two ends have different values for a shared dimension\" (`trait_conflict`). **Data field** (optional): two native selects, object then field; disabled with \"No data object\" while no data model exists.\n\nFooter: **Delete** (danger text; asks before it deletes, `delete_entity` kind `relationship_type`, warns about constellations that still use it), usage count (\"Used in 2 constellations\"), Cancel, primary **Save relationship type**. Flows → `usecases-world`.",
+  "tags": [
+    "chr-1146",
+    "dialog"
+  ],
+  "variant_of": "usecases-world",
+  "variant_kind": "overlay"
+}

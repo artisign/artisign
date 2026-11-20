@@ -1,0 +1,9 @@
+{
+  "notes": "New / edit constellation (CHR-1146; `{id, name, description?, traits?, relationships[{from, type, to, note?}], generated?}`), saved via `set_use_cases` (`constellations`). 820px over `usecases-world`; also opened from a World card in `usecases-detail-world`.\n\nFields: Name, ID (mono), Description; **Traits**: one native select per dimension with scope Constellations (4-column grid). A stored trait whose dimension is persona-scoped (or unknown) still shows, as its own select labelled \"<Dimension> · personas\", so saving never drops it (sample: Channel = Letter). **Relationships**: a fieldset of rows, each `role=\"group\"` with an accessible name (\"Relationship 3\"), three native selects From / Relationship / To (participants = personas + entities; types from the pool), a **Note** field (`note`, optional; placeholder \"Note\") and a remove button. A row with a warning gets `uc-select warning` on the offending select and the message under the row, linked by `aria-describedby`. Warnings on rows: `unknown_participant`, `unknown_relationship_type`, `self_relationship`, `duplicate_relationship`; `trait_conflict` names both ends. \"Add relationship\" appends a row and focuses its From select.\n\n**Members** (read-only): derived from the relationship ends — personas with colour avatars, entities as squares, an unknown id in amber mono. An entity with no relationship gives `entity_unrelated`.\n\nFooter: **Delete** (danger text; asks first, `delete_entity` kind `constellation`, warns about use cases that still name it), usage (\"Used by 3 use cases\"), warning count (amber, `role=\"status\"`), Cancel, primary **Save constellation**. Warnings never block. Flows → `usecases-world`.",
+  "tags": [
+    "chr-1146",
+    "dialog"
+  ],
+  "variant_of": "usecases-world",
+  "variant_kind": "overlay"
+}

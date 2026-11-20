@@ -26,7 +26,7 @@ discipline in copying values.
    a name from that list, or an absolute path. If two projects share a name,
    pass the root. To start a new project, ask the user where it should live
    before `init_project` — it returns `project`, the name to use in later calls.
-1. `get_project` (default `summary` view) — screens, counts, design-system pointer.
+1. `get_project` (default `summary` view) — screens, counts (plus `use_case_count` once the project has use cases), design-system pointer.
 2. `get_design_system` at `view: "tree"` — know every token, component, and
    pattern **before** designing anything. You cannot reuse what you have not
    read. Reach for `full` only once you're about to edit a definition's

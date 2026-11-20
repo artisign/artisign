@@ -509,6 +509,17 @@ function upsert<T extends { id: string }>(current: T[], changes: Parsed<T>[]): T
 
 const WRITE_BATCH = 32;
 
+/** Singular and plural commit-message labels per write kind. */
+const KIND_LABELS = {
+  dimensions: ["dimension", "dimensions"],
+  personas: ["persona", "personas"],
+  entities: ["entity", "entities"],
+  relationship_types: ["relationship type", "relationship types"],
+  constellations: ["constellation", "constellations"],
+  data_objects: ["data object", "data objects"],
+  use_cases: ["use case", "use cases"],
+} as const;
+
 /**
  * The stored versions of the cases a call names, read in batches like the writes. A missing case is a create.
  * An invalid stored case is never overwritten: every one the call names is collected and reported together as
@@ -632,7 +643,7 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
       created: created.length,
       updated: updated.length,
     };
-    summary.push(`${changes.length} ${kind}`);
+    summary.push(`${changes.length} ${changes.length === 1 ? KIND_LABELS[kind][0] : KIND_LABELS[kind][1]}`);
   }
   const commitResult = await commitUseCaseWrite(store, ctx, "set_use_cases", summary.join(", "), files);
   return { ...counts, ...commitFields(commitResult), ...reportWarnings(warnings) };

@@ -296,7 +296,7 @@ describe("world.json in preview commits (ctx.source: human)", () => {
     await writeFile(join(dir, "stray.txt"), "left over");
     const res = await setUseCases(store, WORLD, human);
     expect(res.commit).toMatch(/^[0-9a-f]{40}$/);
-    expect(await git("log", "-1", "--format=%s")).toBe("set_use_cases (preview): 2 entities, 3 relationship_types, 1 constellations");
+    expect(await git("log", "-1", "--format=%s")).toBe("set_use_cases (preview): 2 entities, 3 relationship types, 1 constellation");
     expect(await lastFiles()).toEqual(["usecases/world.json"]);
     expect(await dirty()).toEqual(["stray.txt"]);
   });

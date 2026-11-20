@@ -5401,18 +5401,24 @@ body:has(#settings-menu:not([hidden])) #update-notice {
   flex: none;
   display: flex;
   align-items: stretch;
-  gap: 2px;
+  gap: 0;
   height: var(--size-bar-main);
-  padding: 0 var(--space-md);
+  padding: 0 var(--space-sm);
   border-bottom: 1px solid var(--chrome-border);
 }
 
+/* The "+" is never squeezed or pushed out: the four tabs plus it have to fit the 296px sidebar, so the tabs give way (tight padding, then clipping) before the button does. */
 .uc-subnav .chrome-icon-btn {
   align-self: center;
+  flex: none;
 }
 
 .uc-subtab {
-  padding: 0 var(--space-sm);
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0 var(--space-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: var(--ui-sm);
   white-space: nowrap;
 }
@@ -6665,6 +6671,11 @@ button.uc-target:hover {
   border-top: 1px solid var(--chrome-border);
   vertical-align: top;
   overflow-wrap: anywhere;
+}
+
+/* Field and Type names stay whole words; only the Example column (the last one) may break anywhere and takes the width that is left. */
+.uc-table td:not(:last-child) {
+  overflow-wrap: normal;
 }
 
 .uc-table .uc-mono {

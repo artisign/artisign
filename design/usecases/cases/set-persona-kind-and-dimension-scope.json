@@ -13,7 +13,7 @@
     "product-owner-world-modelled-project"
   ],
   "trigger": {
-    "text": "An insurer starts the renewal flow, and households differ in a way no persona trait describes.",
+    "text": "Pablo adds the insurer of the renewal flow as an outside actor and finds that the existing household dimension describes worlds, not people.",
     "actor": "product-owner-pablo",
     "via": "browser preview"
   },

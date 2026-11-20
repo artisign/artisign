@@ -529,8 +529,11 @@
         },
         {
           "name": "field",
-          "type": "string",
-          "example": "insured-person.parent"
+          "type": "object",
+          "example": {
+            "object": "insured-person",
+            "name": "parent"
+          }
         }
       ]
     },
@@ -580,7 +583,7 @@
       "description": "A non-blocking check result on a case, a variant or a pool entry, shown at its target.",
       "fields": [
         {
-          "name": "code",
+          "name": "kind",
           "type": "enum",
           "values": [
             "unknown_participant",
@@ -604,7 +607,7 @@
         {
           "name": "target",
           "type": "string",
-          "example": "renew-policy/constellation:blended-household"
+          "example": "use_case:renew-policy/constellation:blended-household"
         },
         {
           "name": "message",

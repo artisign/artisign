@@ -13,7 +13,7 @@
     "product-owner-world-modelled-project"
   ],
   "trigger": {
-    "text": "Pablo adds a constellation-scoped dimension and wants one world for each of its values.",
+    "text": "Pablo wants a constellation for every value combination of the constellation-scoped dimensions, for example after adding one.",
     "actor": "product-owner-pablo",
     "via": "browser preview"
   },
@@ -121,7 +121,7 @@
   "branches": [
     {
       "id": "all-covered",
-      "title": "Every combination already has a constellation",
+      "title": "Every combination already has a constellation, as on a second run",
       "from": "preview-skeletons",
       "when": [
         {

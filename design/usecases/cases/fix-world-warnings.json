@@ -13,7 +13,7 @@
     "product-owner-world-modelled-project"
   ],
   "trigger": {
-    "text": "After a change to the pool, cases carry world warnings.",
+    "text": "After a change to a case or the pool, world warnings appear.",
     "state": [
       {
         "subject": "system",
@@ -24,41 +24,35 @@
     ]
   },
   "goal": "No case and no pool entry carries a world warning.",
-  "outcome": "The warning count pills are gone from the list; the World tab shows no amber entry.",
+  "outcome": "The World card, the Starting state table and the World sidebar show no amber entry.",
   "inputs": [
     {
       "object": "world-warning",
-      "source": "list_use_cases / get_use_case",
+      "source": "Case detail",
       "example": {
-        "code": "unknown_constellation",
-        "target": "renew-policy/constellation:blended-household"
+        "kind": "unknown_constellation",
+        "target": "use_case:renew-policy/constellation:blended-household"
       }
     }
   ],
   "outputs": [
     {
-      "object": "constellation",
-      "target": "usecases/world.json",
+      "object": "use-case",
+      "target": "usecases/cases/",
       "example": {
-        "id": "blended-household",
-        "name": "Blended household"
+        "id": "renew-policy",
+        "constellations": [
+          "two-parent-household",
+          "single-parent-household"
+        ]
       }
     }
   ],
   "steps": [
     {
-      "id": "spot-count",
-      "actor": "product-owner-pablo",
-      "action": "Spots the warning count pill on a case row",
-      "target": {
-        "screen": "usecases-list-world",
-        "node": "row-premium"
-      }
-    },
-    {
       "id": "open-case",
       "actor": "product-owner-pablo",
-      "action": "Opens the case; each warning sits at its target",
+      "action": "Opens the case; each world warning sits at its target, such as an unknown constellation on the World card",
       "target": {
         "screen": "usecases-detail-world",
         "node": "cst-unknown-w"
@@ -67,7 +61,7 @@
     {
       "id": "fix-in-editor",
       "actor": "product-owner-pablo",
-      "action": "Fixes a case-level warning in the case editor, such as an actor outside the constellations",
+      "action": "Removes the unknown constellation from the case in the editor, or creates it in World",
       "target": {
         "screen": "usecases-edit-dialog-world"
       }
@@ -85,26 +79,35 @@
     {
       "id": "pool-warning",
       "title": "The warning sits on a pool entry",
-      "from": "open-case",
       "when": [
         {
           "subject": "system",
-          "property": "warning_target_kind",
-          "value": "pool"
+          "property": "pool_warning_count",
+          "op": "gt",
+          "value": 0
         }
       ],
       "steps": [
         {
+          "id": "see-pool-count",
+          "actor": "product-owner-pablo",
+          "action": "Sees the warning count next to Constellations in the World sidebar",
+          "target": {
+            "screen": "usecases-world",
+            "node": "toc-cst"
+          }
+        },
+        {
           "id": "fix-in-pool",
           "actor": "product-owner-pablo",
-          "action": "Opens the pool entry in World and fixes it there, such as a relationship whose two ends are the same participant",
+          "action": "Fixes the pool entry the warning sits on, such as a relationship whose two ends are the same participant",
           "target": {
             "screen": "usecases-world",
             "node": "c-couple-w"
           }
         }
       ],
-      "rejoin": "recheck"
+      "outcome": "The pool entry carries no warning; the sidebar count is gone."
     },
     {
       "id": "unknown-state-subject",
@@ -113,8 +116,13 @@
       "when": [
         {
           "subject": "system",
-          "property": "warning_code",
+          "property": "warning_kind",
           "value": "unknown_participant"
+        },
+        {
+          "subject": "system",
+          "property": "warning_target_segment",
+          "value": "state"
         }
       ],
       "steps": [
@@ -143,7 +151,7 @@
     {
       "id": "agent-fixes-warnings",
       "title": "Design agent fixes the warnings through MCP",
-      "description": "An agent reads the warnings from the tool responses and fixes them with set_use_cases; it sees no list or detail view.",
+      "description": "An agent reads the warnings from the tool responses and fixes them with set_use_cases; it sees no list, detail or World view.",
       "when": {
         "actor-type": [
           "agent"
@@ -152,20 +160,17 @@
       "personas": [
         "design-agent-dex"
       ],
+      "outcome": "list_use_cases and get_use_case return no world warning for the case, and set_use_cases none for the pool entries it wrote.",
       "steps": [
         {
           "op": "replace",
-          "step_id": "spot-count",
+          "step_id": "open-case",
           "step": {
             "id": "list-warnings",
             "actor": "design-agent-dex",
-            "action": "Reads the warnings of the cases with list_use_cases and get_use_case",
+            "action": "Reads the warnings of the case with get_use_case; each names its kind and target",
             "via": "MCP"
           }
-        },
-        {
-          "op": "remove",
-          "step_id": "open-case"
         },
         {
           "op": "replace",
@@ -173,7 +178,7 @@
           "step": {
             "id": "fix-with-tool",
             "actor": "design-agent-dex",
-            "action": "Fixes the case or the pool entry the message names with set_use_cases",
+            "action": "Fixes the case or the pool entry the target names with set_use_cases",
             "via": "MCP"
           }
         },

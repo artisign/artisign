@@ -13,7 +13,7 @@
     "product-owner-world-modelled-project"
   ],
   "trigger": {
-    "text": "Pablo turns a prose trigger into who starts the case, through which interface, and in which world.",
+    "text": "Pablo turns a prose trigger into a structured one and places the case in its world.",
     "actor": "product-owner-pablo",
     "via": "browser preview"
   },

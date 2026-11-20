@@ -75,17 +75,17 @@
       }
     },
     {
-      "id": "add-conditions",
+      "id": "add-branch-steps",
       "actor": "product-owner-pablo",
-      "action": "Adds conditions of subject, property, operator and value",
+      "action": "Adds the branch steps; their ids share one namespace with the main flow",
       "target": {
         "screen": "usecases-edit-dialog-branch"
       }
     },
     {
-      "id": "add-branch-steps",
+      "id": "add-conditions",
       "actor": "product-owner-pablo",
-      "action": "Adds the branch steps; their ids share one namespace with the main flow",
+      "action": "Adds conditions of subject, property, operator and value",
       "target": {
         "screen": "usecases-edit-dialog-branch"
       }
@@ -117,32 +117,37 @@
   "branches": [
     {
       "id": "branch-without-condition",
-      "title": "The branch has no condition",
+      "title": "Pablo saves before adding a condition",
       "from": "add-branch-steps",
       "when": [
         {
           "subject": "system",
           "property": "branch_condition_count",
           "value": 0
+        },
+        {
+          "subject": "system",
+          "property": "save_requested",
+          "value": true
         }
       ],
       "steps": [
         {
           "id": "block-no-condition",
           "actor": "system",
-          "action": "Blocks Save, counts the errors in the footer and marks the empty conditions",
+          "action": "Blocks Save and counts the errors in the footer",
           "target": {
             "screen": "usecases-edit-dialog-branch-invalid",
-            "node": "bw-err"
+            "node": "bd-msg"
           }
         },
         {
           "id": "fix-condition",
           "actor": "product-owner-pablo",
-          "action": "Adds at least one condition",
+          "action": "Adds at least one condition where the field hint asks for it",
           "target": {
             "screen": "usecases-edit-dialog-branch-invalid",
-            "node": "bd-msg"
+            "node": "bw-err"
           }
         }
       ],
@@ -179,7 +184,7 @@
           }
         }
       ],
-      "rejoin": "save-branch"
+      "rejoin": "add-conditions"
     }
   ]
 }

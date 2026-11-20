@@ -18,7 +18,7 @@
     "via": "browser preview"
   },
   "goal": "A variant states its own constellations, trigger, starting state and branches as differences from the base case.",
-  "outcome": "The variant detail shows the diff: changed, added, removed, unset and emptied, next to the inherited rows.",
+  "outcome": "The variant detail shows the diff: changed, added, removed, unset and, for a branch left without steps, emptied, next to the inherited rows.",
   "inputs": [
     {
       "object": "use-case",
@@ -103,6 +103,15 @@
       }
     },
     {
+      "id": "remove-branch-step",
+      "actor": "product-owner-pablo",
+      "action": "Removes a step of an inherited branch with a Remove step change",
+      "target": {
+        "screen": "usecases-edit-dialog-variant-world",
+        "node": "bo-4"
+      }
+    },
+    {
       "id": "see-variant-diff",
       "actor": "system",
       "action": "Shows the resolved variant as a diff of constellations, trigger, state and branches",
@@ -114,12 +123,12 @@
   "branches": [
     {
       "id": "branch-emptied",
-      "title": "The variant leaves a branch without steps",
-      "from": "replace-branch",
+      "title": "The removed step was the branch's last one",
+      "from": "remove-branch-step",
       "when": [
         {
           "subject": "system",
-          "property": "variant_branch_step_count",
+          "property": "inherited_branch_steps_left",
           "value": 0
         }
       ],
@@ -127,13 +136,32 @@
         {
           "id": "warn-branch-empty",
           "actor": "system",
-          "action": "Marks the branch Emptied and warns branch_empty at its lane",
+          "action": "Warns under the change that the branch has no steps left",
           "target": {
-            "screen": "usecases-detail-world-variant"
+            "screen": "usecases-edit-dialog-variant-world",
+            "node": "bo-4-w"
+          }
+        },
+        {
+          "id": "see-branch-emptied",
+          "actor": "system",
+          "action": "Marks the branch Emptied in the variant detail and warns branch_empty at its lane",
+          "target": {
+            "screen": "usecases-detail-world-variant",
+            "node": "br-b"
+          }
+        },
+        {
+          "id": "remove-or-keep",
+          "actor": "product-owner-pablo",
+          "action": "Adds a Remove branch change for it too, or deletes the Remove step change to keep the step",
+          "target": {
+            "screen": "usecases-edit-dialog-variant-world",
+            "node": "fs-branches"
           }
         }
       ],
-      "rejoin": "replace-branch"
+      "rejoin": "see-variant-diff"
     }
   ]
 }

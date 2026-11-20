@@ -1,10 +1,10 @@
 import type { Warning } from "../tools/types.js";
-import { SYSTEM_ACTOR, normalizeTrigger, type DataObject, type Dimension, type Persona, type UseCase, type UseCaseStep, type World } from "./schema.js";
+import { SYSTEM_ACTOR, normalizeTrigger, type DataField, type DataObject, type Dimension, type Persona, type UseCase, type UseCaseStep, type World } from "./schema.js";
 import { isGeneratedId } from "../model/node-id.js";
 import { actorMapPersonas, stepsOfOp } from "./query.js";
 import { resolveUseCase, type EffectiveUseCase } from "./resolve.js";
 import type { ScreenLookup } from "./screens.js";
-import { caseWorldWarnings, participantKind, traitWarnings } from "./world.js";
+import { caseWorldWarnings, fitsField, participantKind, traitWarnings } from "./world.js";
 
 /** The pools a use case is checked against. Built once per call, shared by every entity checked in it. */
 export type ValidationPools = {
@@ -42,6 +42,30 @@ export function validateDataObject(object: DataObject, pools: ValidationPools): 
     }
   }
   return warnings;
+}
+
+/** What is wrong with `value` for `field`, or undefined when it fits. Never evaluated further: a `ref` is checked as an id string only (the pools hold no instances). */
+export function exampleValueProblem(objectId: string, field: DataField, value: unknown): string | undefined {
+  if (fitsField(field, value)) return undefined;
+  const path = `${objectId}.${field.name}`;
+  if (field.type === "enum" && field.values !== undefined) {
+    const quoted = JSON.stringify(value);
+    const shown = quoted.length > 30 ? `${quoted.slice(0, 30)}…` : quoted;
+    return `${shown} is not a value of enum ${path} ${field.values.length > 0 ? `(${field.values.join(", ")})` : "(it declares no values)"}`;
+  }
+  const got = Array.isArray(value) ? "list" : typeof value;
+  switch (field.type) {
+    case "date":
+      return `${path}: expected a date (YYYY-MM-DD), got ${typeof value === "string" ? JSON.stringify(value) : got}`;
+    case "datetime":
+      return `${path}: expected a datetime (e.g. 2026-12-01T09:30:00Z), got ${typeof value === "string" ? JSON.stringify(value) : got}`;
+    case "enum":
+      return `${path}: expected an enum value (string), got ${got}`;
+    case "ref":
+      return `${path}: expected a ref (id string), got ${got}`;
+    default:
+      return `${path}: expected ${field.type}, got ${got}`;
+  }
 }
 
 /** Branch problems of an effective case: a `from` / `rejoin` that is not a main-flow step, a branch a variant left without steps. */
@@ -86,9 +110,15 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
       warn({ kind: "unknown_data_object", target, message: `data object "${objectId}" does not exist` });
       return;
     }
-    const declared = new Set(object.fields.map((f) => f.name));
-    for (const key of Object.keys(example ?? {})) {
-      if (!declared.has(key)) warn({ kind: "unknown_data_field", target, message: `"${key}" is not a field of data object "${objectId}"` });
+    const fields = new Map(object.fields.map((f) => [f.name, f]));
+    for (const [key, value] of Object.entries(example ?? {})) {
+      const field = fields.get(key);
+      if (!field) {
+        warn({ kind: "unknown_data_field", target, message: `"${key}" is not a field of data object "${objectId}"` });
+        continue;
+      }
+      const problem = exampleValueProblem(objectId, field, value);
+      if (problem !== undefined) warn({ kind: "invalid_example_value", target, message: problem });
     }
   };
   const checkIo = (list: { object: string; example: Record<string, unknown> }[], target: string): void => {

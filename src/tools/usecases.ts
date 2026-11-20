@@ -393,7 +393,7 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   }
 
   // Skipped pool entries come first, so the cap of the list never drops them.
-  const warnings = [...poolEntryWarnings(issues), ...markSkipped(await validateUseCase(useCase, pools, lookup), issues)];
+  const warnings = markSkipped(await validateUseCase(useCase, pools, lookup), issues);
   warnings.push(...ambiguousIds(bundlePersonas, world.entities));
   // The world the bundle shows is checked on read too: a member's change after the constellation was written shows up here.
   for (const entity of bundleEntities) warnings.push(...validateEntity(entity, pools));
@@ -417,6 +417,10 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
     screens: [...screens.values()],
     ...reportWarnings(warnings),
   };
+  // Skipped pool entries are capped on their own (10, real total beside them) so they never push the case's own warnings out of the 50.
+  const skipped = poolEntryWarnings(issues);
+  if (skipped.length > 0) response.warnings = [...skipped.slice(0, 10), ...(response.warnings as Warning[])];
+  if (skipped.length > 10) response.pool_invalid_count = skipped.length;
   return response;
 }
 

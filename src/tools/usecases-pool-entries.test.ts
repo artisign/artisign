@@ -142,4 +142,51 @@ describe("use-case pool files — invalid entries on the read path", () => {
     await poolJson({ dimensions: DIMENSIONS, personas: PERSONAS });
     await expect(setUseCases(fx.store, { personas: [{ id: "ok", name: "Ok" }] })).resolves.toMatchObject({ personas: { created: 1 } });
   });
+
+  it("get_use_case caps skipped pool entries on their own, so the case's warnings survive", async () => {
+    await poolJson({ dimensions: DIMENSIONS, personas: Array.from({ length: 60 }, (_, i) => ({ id: `p-${i}` })) });
+    const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as GetRes & { pool_invalid_count?: number };
+    expect(bundle.warnings.filter((w) => w.kind === "invalid_file")).toHaveLength(10);
+    expect(bundle.pool_invalid_count).toBe(60);
+    expect(bundle.warnings.some((w) => w.kind === "unknown_persona")).toBe(true);
+  });
+
+  it("suggest_use_case_variants caps and counts its warnings like the other tools", async () => {
+    await poolJson({ dimensions: DIMENSIONS, personas: Array.from({ length: 55 }, (_, i) => ({ id: `p-${i}` })) });
+    const res = (await suggestVariants(fx.store, { id: "borrow-book" })) as { warnings?: Warning[]; warning_count?: number };
+    expect(res.warnings).toHaveLength(50);
+    expect(res.warning_count).toBe(55);
+  });
+
+  // The strict read (what writes start from) and the lenient read (what reads use) must call the same entries invalid, or a rule added to one path would let a write drop data or a read hide it.
+  describe("strict and lenient reads agree", () => {
+    const entity = { id: "branch", name: "Branch" };
+    const type = { id: "borrows", label: "borrows" };
+    const constellation = { id: "c", name: "C", relationships: [{ from: "a", type: "borrows", to: "b" }] };
+    const object = { id: "loan", name: "Loan", fields: [{ name: "status", type: "enum", values: ["a"] }] };
+    const cases: [string, string, string, unknown[]][] = [
+      ["personas.json", "personas", "persona", [{ id: "ok", name: "Ok" }, { id: "x" }, { id: "BAD", name: "x" }, { id: "system", name: "x" }, { id: "a", name: "A", kind: "alien" }, { id: "a", name: "A", extra: 1 }, { id: "a", name: "A", traits: { k: 1 } }, "text", null, []]],
+      ["personas.json", "dimensions", "dimension", [DIMENSIONS[0], { id: "d", label: "D", values: [] }, { id: "d", label: "D", values: [{ id: "v", label: "V" }, { id: "v", label: "W" }] }, { id: "d", label: "D", values: [{ id: "v", label: "V" }], scope: "nope" }]],
+      ["world.json", "entities", "entity", [entity, { id: "e" }, { id: "system", name: "S" }, { ...entity, traits: { k: 1 } }]],
+      ["world.json", "relationship_types", "relationship_type", [type, { id: "t" }, { ...type, field: { object: "o" } }]],
+      ["world.json", "constellations", "constellation", [constellation, { id: "c", name: "C" }, { ...constellation, relationships: [{ from: "a" }] }]],
+      ["data-objects.json", "objects", "data object", [object, { id: "o" }, { ...object, fields: [{ name: "", type: "string" }] }, { ...object, fields: [{ name: "f", type: "nope" }] }]],
+    ];
+    const read = {
+      "personas.json": [() => fx.store.readPersonaPool(), () => fx.store.readPersonaPoolLenient().then((r) => r.invalid)],
+      "world.json": [() => fx.store.readWorld(), () => fx.store.readWorldLenient().then((r) => r.invalid)],
+      "data-objects.json": [() => fx.store.readDataObjects(), () => fx.store.readDataObjectsLenient().then((r) => r.invalid)],
+    } as const;
+
+    it.each(cases)("%s %s: every fixture, alone and twice", async (name, list, _label, fixtures) => {
+      const [strict, lenient] = read[name as keyof typeof read];
+      const batches = [...fixtures.map((f) => [f]), ...fixtures.map((f) => [f, f])];
+      for (const entries of batches) {
+        await writeFile(file(name), JSON.stringify({ [list]: entries }));
+        const strictInvalid = await strict().then(() => false, () => true);
+        const lenientInvalid = ((await lenient()) as unknown[]).length > 0;
+        expect(lenientInvalid, `${list}: ${JSON.stringify(entries)}`).toBe(strictInvalid);
+      }
+    });
+  });
 });

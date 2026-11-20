@@ -1,8 +1,9 @@
 {
-  "notes": "Data objects, sub-view \"Data objects\" of the Use Cases tab (new in CHR-1062; the experiment drawing lacked it, the build has it). Full length 1440×1380.\n\n**Left panel:** search (\"Search data objects…\"), \"7 data objects\", one row per object: `data_object` icon, name, field count right-aligned. `+` (`btn-add-object`) = new data object → `usecases-object-dialog` (create mode).\n\n**Main (56px side padding):** header \"Data objects\" + one-sentence explanation (\"Reusable shapes of the data your use cases read and write. Inputs, outputs and before/after cards refer to them by id.\") and the primary **New data object** (`btn-new-object` → `usecases-object-dialog`, create mode). Two-column grid of cards (`align-items: start`): name + id (mono), edit pencil (`oc-*-edit`, `chrome-icon-btn sm` → `usecases-object-dialog`, edit mode with Delete), description, then a Field · Type · Example table (mono; a `ref` field shows \"ref → <object>\", an `enum` its values in the dialog).\n\nSample objects are Artisign's own model: Persona, Dimension, Data object, Use case, Step, Variant, Mapping.",
+  "notes": "Data objects, sub-view \"Data objects\" of the Use Cases tab (new in CHR-1062; the experiment drawing lacked it, the build has it). Full length 1440×1380.\n\n**Left panel:** search (\"Search data objects…\"), \"7 data objects\", one row per object: `data_object` icon, name, field count right-aligned. `+` (`btn-add-object`) = new data object → `usecases-object-dialog` (create mode).\n\n**Main (56px side padding):** header \"Data objects\" + one-sentence explanation (\"Reusable shapes of the data your use cases read and write. Inputs, outputs and before/after cards refer to them by id.\") and the primary **New data object** (`btn-new-object` → `usecases-object-dialog`, create mode). Two-column grid of cards (`align-items: start`): name + id (mono), edit pencil (`oc-*-edit`, `chrome-icon-btn sm` → `usecases-object-dialog`, edit mode with Delete), description, then a Field · Type · Example table (mono; a `ref` field shows \"ref → <object>\", an `enum` its values in the dialog).\n\nSample objects are artisign's own model: Persona, Dimension, Data object, Use case, Step, Variant, Mapping.",
   "tags": [
     "chr-1062",
-    "chr-1104"
+    "chr-1104",
+    "chr-1074"
   ],
   "variant_of": "usecases-list",
   "variant_kind": "state"

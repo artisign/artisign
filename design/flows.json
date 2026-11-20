@@ -822,30 +822,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "usecases-mapping.map-back",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-mapping.ms4-remap",
-    "event": "tap",
-    "to": "usecases-edit-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-mapping.fr-detail",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "usecases-mapping.fr-dialog",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
     "from": "usecases-personas.sub-cases",
     "event": "tap",
     "to": "usecases-list",
@@ -1689,6 +1665,30 @@
     "from": "usecases-edit-dialog-world.dlg-save",
     "event": "tap",
     "to": "usecases-detail-world",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.map-back",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.ms4-remap",
+    "event": "tap",
+    "to": "usecases-edit-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.fr-detail",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "usecases-mapping.fr-dialog",
+    "event": "tap",
+    "to": "app-shell",
     "to_kind": "screen"
   }
 ]

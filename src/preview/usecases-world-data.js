@@ -319,17 +319,30 @@ export function whenScopeText(when, dimensionsById) {
 }
 
 /**
- * What the base trigger said that the variant's does not, as `[label, value]` pairs (`["via", "webhook"]`): only the parts that
- * differ, so the card can strike just those. A trigger the variant drops altogether gives every part the base had.
+ * The base trigger set against the variant's, part by part (text, actor, via, state, at), as `{ label, value, kind }`: the base's own
+ * parts first - `same` (kept), `changed` (the variant says something else) or `removed` (the variant says nothing) - then the parts only
+ * the variant has as `added`. A trigger without any part gives one `same` part "no trigger".
  */
 export function triggerBaseParts(baseTrigger, trigger) {
-  const base = triggerObject(baseTrigger);
-  const now = triggerObject(trigger);
-  const parts = [];
-  if ((base.text ?? "") !== (now.text ?? "") && base.text) parts.push(["", base.text]);
-  if (base.actor !== undefined && base.actor !== now.actor) parts.push(["actor", base.actor]);
-  if (base.via !== undefined && base.via !== now.via) parts.push(["via", base.via]);
-  if ((base.state ?? []).length > 0 && JSON.stringify(base.state) !== JSON.stringify(now.state ?? [])) parts.push(["when", base.state.map((c) => conditionParts(c).key).join(", ")]);
-  if (base.at !== undefined && base.at !== now.at) parts.push(["from", base.at]);
-  return parts;
+  const partsOf = (value) => {
+    const t = triggerObject(value);
+    return [
+      ["", t.text || undefined],
+      ["actor", t.actor],
+      ["via", t.via],
+      ["when", (t.state ?? []).length > 0 ? t.state.map((c) => conditionParts(c).key).join(", ") : undefined],
+      ["from", t.at],
+    ];
+  };
+  const now = new Map(partsOf(trigger));
+  const base = partsOf(baseTrigger);
+  const out = [];
+  for (const [label, value] of base) {
+    if (value === undefined) continue;
+    const next = now.get(label);
+    out.push({ label, value, kind: next === value ? "same" : next === undefined ? "removed" : "changed" });
+  }
+  const had = new Set(base.filter(([, value]) => value !== undefined).map(([label]) => label));
+  for (const [label, value] of partsOf(trigger)) if (value !== undefined && !had.has(label)) out.push({ label, value, kind: "added" });
+  return out.length > 0 ? out : [{ label: "", value: "no trigger", kind: "same" }];
 }

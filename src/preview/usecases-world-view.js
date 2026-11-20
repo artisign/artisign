@@ -85,11 +85,23 @@ export function triggerRow(ctx, { trigger, baseTrigger, changed, w }) {
   );
 }
 
-/** "Base: via ~~webhook~~": only the parts the variant's trigger changed are struck. */
+/**
+ * "Base: via ~~webhook~~": the base trigger, with only the parts the variant changed or dropped struck and the parts it kept plain; a
+ * part only the variant has follows with an Added badge.
+ */
 function baseTriggerLine(ctx, baseTrigger, trigger) {
   const parts = triggerBaseParts(baseTrigger, trigger);
-  const shown = parts.length > 0 ? parts : [["", "no trigger"]];
-  return h("p", { class: "uc-step-was" }, "Base: ", shown.flatMap(([label, value], i) => [i > 0 ? " · " : null, label ? `${label} ` : null, h("s", null, label === "actor" ? participant(value, ctx).name : value)]));
+  const shown = (part) => (part.label === "actor" ? participant(part.value, ctx).name : part.value);
+  // With something changed or dropped only that is shown (the kept parts are on the card above); when the variant only adds, the base shows whole.
+  const baseParts = parts.filter((p) => p.kind !== "added");
+  const kept = baseParts.some((p) => p.kind !== "same") ? baseParts.filter((p) => p.kind !== "same") : baseParts;
+  const added = parts.filter((p) => p.kind === "added");
+  return h(
+    "p",
+    { class: "uc-step-was" },
+    kept.length > 0 ? ["Base: ", kept.flatMap((p, i) => [i > 0 ? " · " : null, p.label ? `${p.label} ` : null, p.kind === "same" ? shown(p) : h("s", null, shown(p))])] : null,
+    added.map((p, i) => [kept.length > 0 || i > 0 ? " " : null, diffBadge("added"), ` ${p.label ? `${p.label} ` : ""}${shown(p)}`]),
+  );
 }
 
 // --- World -----------------------------------------------------------------------------------------------------
@@ -266,8 +278,17 @@ function whenLine(branch, w, was) {
 }
 
 /** A compact step row of a variant's branch card: number, actor, action (no target chip, no avatar). */
-function compactStep(ctx, entry, step, position) {
-  return h("li", { class: "uc-lane-compact", dataset: { step: step.id, change: step.change ?? "" } }, h("span", { class: "uc-lane-compact-no" }, branchStepNumber(entry.label, position)), h("span", { class: "uc-lane-compact-actor" }, participant(step.actor, ctx).name), h("span", null, step.action));
+function compactStep(ctx, entry, step, position, w) {
+  const found = mappingFor(ctx.bundle, step.id);
+  const stepWarnings = (w.step.get(step.id) ?? []).filter((x) => !x.kind.startsWith("mapping_"));
+  return h(
+    "li",
+    { class: "uc-lane-compact", dataset: { step: step.id, change: step.change ?? "" } },
+    h("div", { class: "uc-lane-compact-row" }, h("span", { class: "uc-lane-compact-no" }, branchStepNumber(entry.label, position)), h("span", { class: "uc-lane-compact-actor" }, participant(step.actor, ctx).name), h("span", null, step.action)),
+    // the step's own warnings and its mapping note stay under it, as in a full lane
+    mappingNote(step, found?.mapping, found?.screen),
+    stepWarnings.map((x) => warnLine(x.message)),
+  );
 }
 
 /** The "removes the only step" message of an emptied branch, in the number of steps the base branch had. */
@@ -296,7 +317,7 @@ export function branchLane(ctx, entry, w, { change = null, base = null, compact 
     ? [h("p", { class: "uc-warn" }, icon("warning"), emptiedText(entry, (baseBranch?.steps ?? []).length))]
     : [
         whenLine(branch, w, was),
-        h("ol", { class: compact ? "uc-lane-steps is-compact" : "uc-lane-steps" }, (branch.steps ?? []).map((step, i) => (compact ? compactStep(ctx, entry, step, i + 1) : laneStep(ctx, entry, step, i + 1, w)))),
+        h("ol", { class: compact ? "uc-lane-steps is-compact" : "uc-lane-steps" }, (branch.steps ?? []).map((step, i) => (compact ? compactStep(ctx, entry, step, i + 1, w) : laneStep(ctx, entry, step, i + 1, w)))),
         dropped.map((s) => h("p", { class: "uc-step-was" }, "Base: ", h("s", null, `${participant(s.actor, ctx).name} ${s.action}`.trim()))),
         showEnd ? branchEndChip(end.kind, end.text) : null,
       ];

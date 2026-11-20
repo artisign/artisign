@@ -220,6 +220,30 @@ describe("variant view", () => {
     expect($(".uc-lane-card[data-branch=rise]").dataset.change).toBe("emptied");
   });
 
+  it("a variant that only adds to the trigger shows the base whole, nothing struck, and the addition with an Added badge", () => {
+    const base = { ...worldBundle, use_case: { ...baseCase, trigger: { text: "sends the renewal notice" } } };
+    renderVariant({ base, bundle: { ...worldVariantBundle, use_case: { ...worldVariantBundle.use_case, trigger: { text: "sends the renewal notice", via: "letter" } } } });
+    const line = $(".uc-trigger .uc-step-was");
+    expect(line.querySelector("s")).toBeNull();
+    expect(text(line)).toContain("Base: sends the renewal notice");
+    expect(text(line)).toContain("Added via letter");
+    expect($(".uc-diff[data-kind=added]", line)).not.toBeNull();
+    expect(text(line)).not.toContain("no trigger");
+  });
+
+  it("a variant trigger that drops what the base said strikes it", () => {
+    renderVariant({ bundle: { ...worldVariantBundle, use_case: { ...worldVariantBundle.use_case, trigger: { text: "" } } } });
+    expect($(".uc-trigger .uc-step-was s")).not.toBeNull();
+  });
+
+  it("a branch step's own warnings and its mapping note stay under its compact row", () => {
+    const bundle = { ...worldVariantBundle, warnings: [...worldVariantBundle.warnings, { kind: "entity_as_actor", target: "use_case:review-premium#single/cosign", message: "jon is an entity" }], screens: [{ screen: "options", exists: false, mappings: [{ step: "cosign", scope: "screen", stale: true, branch: "rise" }] }] };
+    renderVariant({ bundle });
+    const row = $(".uc-lane-compact[data-step=cosign]");
+    expect(text(row)).toContain("jon is an entity");
+    expect(text(row)).toContain("no longer exists");
+  });
+
   it("the Base chip counts the branches; a variant's branch cards list compact steps; the variant table draws names only", () => {
     renderVariant();
     expect(text($(".uc-variant-chip[aria-pressed=false] .uc-variant-meta"))).toBe("3 steps · 3 branches");

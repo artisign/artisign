@@ -159,6 +159,23 @@ describe("the invalid-files toast", () => {
     expect(toast()).toBe("The world could not be read: world.json is not valid");
   });
 
+  it("a held-back world error comes after the invalid-files report", async () => {
+    bundle = staleBundle();
+    const view = await openView();
+    await toMapping();
+    leaveUnmapped();
+    await flush();
+    invalid = { warnings, invalid_file_count: 1 };
+    worldFail = true;
+    view.onChange();
+    await settle();
+    expect(toast()).toBe("Step left unmapped.");
+    $(".uc-toast button").click();
+    expect(toast()).toBe("Some use case files could not be loaded.");
+    $(".uc-toast button").click();
+    expect(toast()).toBe("The world could not be read: world.json is not valid");
+  });
+
   it("a confirmation that hides by itself releases the held-back report too", async () => {
     bundle = staleBundle();
     const view = await openView();

@@ -151,9 +151,15 @@ describe("variant differences", () => {
 
   it("the base trigger line strikes only the parts the variant changed", () => {
     const base = { text: "Sends the notice", actor: "insurer", via: "webhook" };
-    expect(triggerBaseParts(base, { text: "Sends the notice", actor: "insurer", via: "letter" })).toEqual([["via", "webhook"]]);
-    expect(triggerBaseParts(base, { text: "Sends it", actor: "jon" })).toEqual([["", "Sends the notice"], ["actor", "insurer"], ["via", "webhook"]]);
-    expect(triggerBaseParts("Plain", "Plain")).toEqual([]);
+    const kinds = (a, b) => triggerBaseParts(a, b).map((p) => [p.label, p.value, p.kind]);
+    expect(kinds(base, { text: "Sends the notice", actor: "insurer", via: "letter" })).toEqual([["", "Sends the notice", "same"], ["actor", "insurer", "same"], ["via", "webhook", "changed"]]);
+    expect(kinds(base, { text: "Sends it", actor: "jon" })).toEqual([["", "Sends the notice", "changed"], ["actor", "insurer", "changed"], ["via", "webhook", "removed"]]);
+    // only added: the base is whole and nothing of it is struck
+    expect(kinds({ text: "Plain" }, { text: "Plain", via: "app" })).toEqual([["", "Plain", "same"], ["via", "app", "added"]]);
+    expect(kinds("Plain", { text: "Plain", actor: "jon" })).toEqual([["", "Plain", "same"], ["actor", "jon", "added"]]);
+    // dropped altogether, and none at all
+    expect(kinds(base, undefined).map((p) => p[2])).toEqual(["removed", "removed", "removed"]);
+    expect(kinds(undefined, undefined)).toEqual([["", "no trigger", "same"]]);
   });
 
   it("applies-when: the scope of the dimensions and the constellations that match", () => {

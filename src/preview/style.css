@@ -9739,9 +9739,19 @@ button.uc-target:hover {
 
 .uc-lane-compact {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: var(--ui-base);
+}
+
+.uc-lane-compact-row {
+  display: flex;
   align-items: baseline;
   gap: var(--space-md);
-  font-size: var(--ui-base);
+}
+
+.uc-lane-compact > .uc-warn {
+  padding-left: 40px;
 }
 
 .uc-lane-compact-no,

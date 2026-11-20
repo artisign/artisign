@@ -260,8 +260,9 @@ export function createUseCasesView(options) {
     if (writeToast) {
       writeToast = false;
       if (pendingInvalid) showInvalid(pendingInvalid);
-      else if (pendingWorldError) reportWorldError(pendingWorldError);
     }
+    // A held-back world error comes after the invalid-files report: once no toast is showing any more.
+    if (toast.hidden && pendingWorldError) reportWorldError(pendingWorldError);
   }
 
   /** The world-read error toast: said once per message, and held back while a write's confirmation is visible. */

@@ -96,17 +96,18 @@ export async function openEntityDialog(options) {
       field("Data object", objectSelect, { hint: "optional, refines the entity once a data model exists" }),
     ),
   );
-  const note = infoNote("");
   const saveButton = footer(dialog, {
     saveLabel: mode === "new" ? "Create entity" : "Save entity",
     onSave: save,
     deleteLabel: "Delete",
-    note: mode === "edit" ? note : undefined,
     onDelete: mode === "edit" ? async () => confirmDeleteInline(dialog, { name: source.name, used: await (options.usage?.(source.id) ?? ""), remove: () => options.remove(source.id), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
   });
   if (mode === "edit") {
+    // Where the entity is used, under its fields: a member of constellations, a subject in use cases.
     const members = pool.world?.constellations?.filter((c) => draftMembers(c.relationships).includes(source.id)).length ?? 0;
-    options.usage?.(source.id).then((text) => (note.textContent = `${members > 0 ? `A member of ${plural(members, "constellation")}` : "In no constellation"}${text ? ` · ${text.replace(/\.$/, "").toLowerCase()}` : ""}`));
+    const note = h("p", { class: "uc-form-note uc-entity-usage" }, icon("hub"), `${members > 0 ? `A member of ${plural(members, "constellation")}` : "In no constellation"}`);
+    dialog.body.querySelector(".uc-form").append(note);
+    options.usage?.(source.id).then((text) => text && note.append(` · ${text.replace(/\.$/, "").toLowerCase()}`));
   }
   drawAvatar();
   const closed = dialog.open();
@@ -144,7 +145,8 @@ export async function openRelationshipTypeDialog(options) {
   // "Reads as": the label read left to right, with two participants of the pool as the example.
   const reads = h("div", { class: "uc-reads", role: "group", "aria-label": "Reads as" });
   const sample = () => {
-    const names = [...pool.personas.map((p) => p.name), ...entitiesOf(pool).map((e) => e.name)];
+    // A persona and an entity of the pool read best ("Maria is parent of Leo"); fewer of either falls back to what there is.
+    const names = [pool.personas[0]?.name, entitiesOf(pool)[0]?.name, pool.personas[1]?.name].filter(Boolean);
     return [names[0] ?? "A", names[1] ?? "B"];
   };
   const readLine = (from, text, to) => h("p", { class: "uc-reads-line" }, h("strong", null, from), h("span", { class: "uc-reads-type" }, h("span", { "aria-hidden": "true" }, "—"), text, icon("arrow_forward")), h("strong", null, to));

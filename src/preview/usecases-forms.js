@@ -240,10 +240,12 @@ export async function openUseCaseDialog(options) {
   };
 
   let variantEditor = null;
-  // The variant editor reads the base (its "From base" values, the step lists), so a base edit tells it to re-read.
+  let branchList = null;
+  // The variant editor reads the base (its "From base" values, the step lists) and the branch list reads the steps it forks from, so a base edit tells them to re-read.
   const markDirty = () => {
     touch();
     variantEditor?.syncBase();
+    branchList?.redraw(true);
   };
   const touch = () => {
     dialog.setDirty(true);
@@ -340,6 +342,7 @@ export async function openUseCaseDialog(options) {
     // The variant editor lists the base steps (its step selects, "From base" values): it follows every move, with one warning pass in all.
     quiet = true;
     variantEditor?.syncBase();
+    branchList?.redraw(true);
     quiet = false;
     refreshWarnings();
   };
@@ -436,7 +439,7 @@ export async function openUseCaseDialog(options) {
   const triggerEditor = createTriggerEditor({ read: () => draft.trigger, write: (value) => { draft.trigger = value; }, shape: draft.triggerShape, pool: options.pool, actorOptions, path: "trigger", label: "Trigger", markDirty, refresh: refreshAfterDraw });
   const constellations = constellationChips({ list: draft.constellations, pool: options.pool, path: "constellation", markDirty });
   const stateEditor = stateRows({ rows: draft.state, pool: options.pool, path: "state", label: "State row", markDirty, refresh: refreshAfterDraw });
-  const branchList = createBranchList({ draft, pool: options.pool, screens: options.screens, actorOptions, ensureNodes, markDirty, refresh: refreshAfterDraw });
+  branchList = createBranchList({ draft, pool: options.pool, screens: options.screens, actorOptions, ensureNodes, markDirty, refresh: refreshAfterDraw });
   branchList.redraw();
 
   // --- Variants (usecases-variant-edit.js) -----------------------------------------------------------------------

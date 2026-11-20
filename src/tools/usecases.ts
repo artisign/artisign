@@ -58,6 +58,7 @@ import {
   type UseCaseFilter,
   type ValidationPools,
 } from "../usecases/index.js";
+import { mappingRemovedWarnings } from "../usecases/mapping-removed.js";
 import { isGeneratedId } from "../model/node-id.js";
 import type { CommitResult } from "../store/index.js";
 import { ToolError, commitFields, type ToolHandlerContext, type Warning } from "./types.js";
@@ -613,6 +614,7 @@ async function setUseCasesInner(store: Store, input: SetUseCasesInput, ctx: Tool
   }
   const lookup = new ScreenLookup(store);
   for (const useCase of useCases) warnings.push(...(await validateUseCase(useCase.value, pools, lookup)));
+  for (const useCase of useCases) warnings.push(...mappingRemovedWarnings(existingCases.get(useCase.id), useCase.value));
 
   const files: string[] = [];
   if (dimensions.length > 0 || personas.length > 0) {

@@ -56,6 +56,7 @@ export type WarningKind =
   | "mapping_stale"
   // An element mapping onto a generated node id (n<counter>): a position, not an identity — it can silently point at another element after a rewrite.
   | "mapping_unstable"
+  | "mapping_removed"
   | "duplicate_step_id"
   | "duplicate_branch_id"
   | "branch_empty"

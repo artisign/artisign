@@ -34,6 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   takes three more kinds (`entity`, `constellation`, `relationship_type`), seven use-case kinds in all. World
   problems are warnings and never block a write; states and conditions are stored and shown, never evaluated.
   The Use Cases tab has read views and editors for the world.
+- **Use cases:** `set_use_cases` warns `mapping_removed` (never blocking) when a rewritten step, base flow or branch, drops
+  the `target` it had, or when a variant `replace` op's `step` has no `target` while the base step it replaces had one.
 
 ### Improvements
 

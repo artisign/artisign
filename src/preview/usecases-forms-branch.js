@@ -61,6 +61,7 @@ export async function openBranchDialog(options) {
   titleInput.dataset.hint = titleHint.id;
   const idLocked = mode === "replace" || !isNew;
   const idInput = textInput({ value: draft.id, mono: true, readonly: idLocked, placeholder: "from the title", onInput: (value) => { draft.id = value; touch(); } });
+  if (idLocked) idInput.classList.add("uc-locked");
   idInput.dataset.errorPath = "branch.id";
   const idHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: "branch.id" } });
   idInput.dataset.hint = idHint.id;
@@ -233,10 +234,7 @@ export async function openBranchDialog(options) {
     h(
       "div",
       { class: "uc-form uc-branch-form" },
-      h("div", { class: "uc-form-row" }, field("Title", titleInput), field("ID", idInput, { hint: idLocked ? undefined : "from the title" })),
-      titleHint,
-      idHint,
-      mode === "replace" ? h("p", { class: "uc-hint" }, icon("lock"), "A replaced branch keeps its id.") : null,
+      h("div", { class: "uc-form-row" }, h("div", { class: "uc-id-col" }, field("Title", titleInput), titleHint), h("div", { class: "uc-id-col" }, field("ID", idInput, { hint: idLocked ? undefined : "from the title" }), idHint, mode === "replace" ? h("p", { class: "uc-form-note uc-lock-note" }, icon("lock"), "A replaced branch keeps its id.") : null)),
       field("Forks", forkSelect),
       h("p", { class: "uc-form-note" }, 'Or "Before the first step": another starting state. The letter follows the fork: 2A, 2B, … and A, B, … before the first step.'),
       h("div", { class: "uc-field" }, h("span", { class: "uc-label" }, "When", h("span", { class: "uc-label-hint" }, " · all conditions hold")), whenHint, when.el),

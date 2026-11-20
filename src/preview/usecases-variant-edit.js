@@ -747,7 +747,7 @@ export function createVariantEditor(env) {
       if (spec.key === "trigger") {
         // The variant replaces the trigger whole: overriding one part writes the complete trigger object (the base copied in, then edited).
         const emptyHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `variant.${index}.override.trigger` } });
-        const editor = createTriggerEditor({ read: () => variant.overrides.trigger, write: (value) => { variant.overrides.trigger = value; }, shape: variant.triggerShape, pool: env.pool, actorOptions: env.actorOptions, path: `variant.${index}.trigger`, label: `Variant ${n} trigger`, markDirty, refresh: env.refresh, empty: { path: `variant.${index}.override.trigger`, hint: emptyHint } });
+        const editor = createTriggerEditor({ read: () => variant.overrides.trigger, write: (value) => { variant.overrides.trigger = value; }, shape: variant.triggerShape, pool: env.pool, actorOptions: env.actorOptions, path: `variant.${index}.trigger`, label: `Variant ${n} trigger`, base: () => ({ text: draft.trigger, shape: draft.triggerShape }), markDirty, refresh: env.refresh, empty: { path: `variant.${index}.override.trigger`, hint: emptyHint } });
         return h("div", { class: "uc-override-edit" }, editor.el, emptyHint);
       }
       if (spec.key === "constellations") return constellationChips({ list: variant.overrides.constellations, pool: env.pool, path: `variant.${index}.constellation`, markDirty, label: `variant ${n}` }).el;

@@ -7732,7 +7732,8 @@ button.uc-target:hover {
 
 /* Dialogs (native <dialog>) */
 .uc-dialog {
-  width: min(520px, calc(100vw - 32px));
+  width: min(580px, calc(100vw - 32px));
+  overflow: hidden; /* the body scrolls, never the dialog: nothing positioned inside may overflow it */
   max-height: calc(100vh - 64px);
   padding: 0;
   border: none;
@@ -7779,6 +7780,7 @@ button.uc-target:hover {
 }
 
 .uc-dialog-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -7805,6 +7807,20 @@ button.uc-target:hover {
   color: var(--chrome-warning);
 }
 
+.uc-foot-msg[data-tone="warning"]:not(:empty) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.uc-foot-msg[data-tone="warning"]:not(:empty)::before {
+  content: "warning";
+  content: "warning" / "";
+  font-family: "Material Symbols Rounded";
+  font-size: var(--size-icon-sm);
+  line-height: 1;
+}
+
 .uc-foot-msg[data-tone="error"] {
   display: flex;
   align-items: center;
@@ -7823,6 +7839,34 @@ button.uc-target:hover {
 .uc-foot-actions {
   display: flex;
   gap: var(--space-md);
+}
+
+/* Delete (and the "used by" note) sit at the left of the footer, the message in the middle, Cancel and Save at the right. */
+.uc-dialog-foot .uc-foot-actions {
+  display: contents;
+}
+
+.uc-dialog-foot .uc-foot-msg {
+  order: 2;
+}
+
+.uc-dialog-foot .uc-foot-actions > * {
+  order: 3;
+}
+
+.uc-dialog-foot .uc-foot-actions > .uc-btn-start {
+  order: 0;
+  margin-right: 0;
+}
+
+.uc-dialog-foot .uc-foot-actions > .uc-foot-note {
+  order: 1;
+}
+
+.uc-locked {
+  border-style: dashed;
+  background: transparent;
+  color: var(--chrome-text-secondary);
 }
 
 .uc-btn-danger {
@@ -8212,6 +8256,7 @@ button.uc-target:hover {
 }
 
 .uc-field-error,
+.uc-dialog .uc-field-warn,
 .uc-variants-edit .uc-field-warn {
   display: flex;
   align-items: center;
@@ -8225,6 +8270,7 @@ button.uc-target:hover {
 }
 
 .uc-field-error::before,
+.uc-dialog .uc-field-warn::before,
 .uc-variants-edit .uc-field-warn::before {
   content: "error";
   content: "error" / "";
@@ -8233,11 +8279,13 @@ button.uc-target:hover {
   line-height: 1;
 }
 
+.uc-dialog .uc-field-warn::before,
 .uc-variants-edit .uc-field-warn::before {
   content: "warning";
   content: "warning" / "";
 }
 
+.uc-dialog .uc-field-warn[hidden],
 .uc-variants-edit .uc-field-warn[hidden] {
   display: none;
 }
@@ -10253,4 +10301,21 @@ button.uc-target:hover {
   flex-direction: column;
   gap: var(--space-lg);
   min-width: 0;
+}
+
+.uc-id-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.uc-lock-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.uc-lock-note .icon {
+  font-size: var(--size-icon-xs);
 }

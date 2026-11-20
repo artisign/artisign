@@ -377,6 +377,17 @@ describe("the variant: overrides, state merge and branch changes", () => {
     expect(payload.variants[0].trigger).toEqual({ text: "sends the renewal notice", actor: "insurer", via: "letter" });
   });
 
+  it("the override names what it changes and strikes the changed part of the base, like the read view", async () => {
+    await open();
+    const legend = () => $(".uc-trigger-edit > legend", rowOf("trigger")).textContent;
+    expect(legend()).toBe("Via, overridden"); // the stored override changes the via only
+    expect($(".uc-trig-base", rowOf("trigger")).textContent).toBe("Base: sends the renewal notice · actor insurer · via webhook");
+    expect($$(".uc-trig-base s", rowOf("trigger")).map((s) => s.textContent)).toEqual(["via webhook"]);
+    type($("input[aria-label='Variant 1 trigger via']", rowOf("trigger")), "webhook");
+    expect(legend()).toBe("Trigger, overridden");
+    expect($$(".uc-trig-base s", rowOf("trigger"))).toHaveLength(0);
+  });
+
   it("an empty text-only trigger override is an error; a structured one with its text cleared keeps the structure", async () => {
     await open();
     $("button[aria-label='Use base trigger']", rowOf("trigger")).click();
@@ -488,7 +499,7 @@ describe("the variant: overrides, state merge and branch changes", () => {
     expect($("h1", top()).textContent).toBe("Replace branch 2A");
     expect($("input.uc-mono", top()).readOnly).toBe(true);
     expect($("input.uc-mono", top()).value).toBe("rise");
-    expect($(".uc-hint", top()).textContent).toContain("A replaced branch keeps its id.");
+    expect($(".uc-lock-note", top()).textContent).toContain("A replaced branch keeps its id.");
     type($("input[autofocus]", top()), "Premium rises by more than 10 %");
     footButton("Apply branch").click();
     await flush();

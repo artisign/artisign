@@ -10,7 +10,7 @@ import { conditionRows } from "./usecases-forms-rows.js";
 import { conditionChip, timeChip } from "./usecases-world-parts.js";
 import { openBranchDialog } from "./usecases-forms-branch.js";
 import { blankBranch, buildConditions, isIsoAt, AT_ERROR } from "./usecases-world-edit.js";
-import { numberBranches } from "./usecases-world-data.js";
+import { numberBranches, triggerBaseParts } from "./usecases-world-data.js";
 import { baseModel, placesIn } from "./usecases-variant-edit.js";
 import { slugify, uniqueId, plural } from "./usecases-data.js";
 
@@ -28,8 +28,33 @@ const TRIGGER_HINTS = {
  * (see buildTrigger).
  * @param {{ read: () => string, write: (text: string) => void, shape: Record<string, any>, pool: () => any, actorOptions: (current: string) => { value: string, label: string }[], path: string, label: string, markDirty: () => void, refresh: () => void }} spec
  */
-export function createTriggerEditor({ read, write, shape, pool, actorOptions, path, label, markDirty, refresh, empty = null }) {
+const PART_NAMES = { "": "Text", actor: "Actor", via: "Via", when: "When", from: "From" };
+
+/** The trigger object a text and a shape stand for (only for showing; the save goes through buildTrigger). */
+function shapeObject(text, shape) {
+  const ready = shape.conditions.filter((c) => c.subject !== "" && c.property.trim() !== "");
+  if (shape.kind === "action" && shape.actor !== "") return { text, actor: shape.actor, ...(shape.via.trim() !== "" ? { via: shape.via.trim() } : {}) };
+  if (shape.kind === "state") return { text, ...(ready.length > 0 ? { state: ready.map((c) => ({ subject: c.subject, property: c.property, op: c.op, value: c.value })) } : {}), ...(shape.at.trim() !== "" ? { at: shape.at.trim() } : {}) };
+  return { text };
+}
+
+export function createTriggerEditor({ read, write, shape, pool, actorOptions, path, label, markDirty: reportDirty, refresh, empty = null, base = null }) {
+  const markDirty = () => {
+    reportDirty();
+    paintBase();
+  };
   const box = h("fieldset", { class: "uc-trigger-edit" });
+  const legend = h("legend", { class: "uc-form-h" }, label);
+  const baseLine = h("p", { class: "uc-form-note uc-trig-base" });
+  /** A variant's override: the legend names what it changes ("Via, overridden") and the base line strikes the changed parts ("Base: via ~~webhook~~"). */
+  const paintBase = () => {
+    if (!base) return;
+    const was = base();
+    const parts = triggerBaseParts(shapeObject(was.text, was.shape), shapeObject(read(), shape));
+    const changed = parts.filter((p) => p.kind !== "same");
+    legend.textContent = changed.length > 0 ? `${changed.map((p) => PART_NAMES[p.label] ?? p.label).join(", ")}, overridden` : "Trigger, overridden";
+    fill(baseLine, "Base: ", ...parts.flatMap((p, i) => [i > 0 ? " · " : null, p.kind === "same" || p.kind === "added" ? `${p.label ? `${p.label} ` : ""}${p.value}` : h("s", null, `${p.label ? `${p.label} ` : ""}${p.value}`)]));
+  };
   const body = h("div", { class: "uc-trig-body" });
   const hintEl = h("span", { class: "uc-form-note" });
   const mode = segmented({ label: `${label} form`, name: nextId("uc-trigger-kind"), value: shape.kind, options: [{ value: "text", label: "Text" }, { value: "action", label: "Action" }, { value: "state", label: "State or time" }], onChange: (value) => { shape.kind = value; markDirty(); draw(); } });
@@ -94,7 +119,8 @@ export function createTriggerEditor({ read, write, shape, pool, actorOptions, pa
     refresh();
   }
 
-  box.append(h("legend", { class: "uc-form-h" }, label), h("div", { class: "uc-trig-mode" }, mode, hintEl), body);
+  paintBase();
+  box.append(legend, ...(base ? [baseLine] : []), h("div", { class: "uc-trig-mode" }, mode, hintEl), body);
   draw();
   return { el: box, redraw: draw, atError: AT_ERROR };
 }

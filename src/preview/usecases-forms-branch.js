@@ -127,6 +127,7 @@ export async function openBranchDialog(options) {
       const nodeList = h("datalist", { id: nodeListId });
       const fillNodes = (screen) => options.ensureNodes(screen)?.then((list) => nodeList.replaceChildren(...(list ?? []).slice(0, 400).map((n) => h("option", { value: n }, n))));
       const actionHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `branch.step.${index}.action` } });
+      const nodeHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `branch.step.${index}.node` } });
       const idHintEl = h("p", { class: "uc-field-error uc-step-id-hint", id: nextId("uc-err"), hidden: true, dataset: { path: `branch.step.${index}.id` } });
       const actionInput = textInput({ value: step.action, placeholder: "What happens", ariaLabel: `Step ${index + 1} action`, onInput: (value) => { step.action = value; touch(); } });
       actionInput.dataset.errorPath = `branch.step.${index}.action`;
@@ -137,14 +138,17 @@ export async function openBranchDialog(options) {
       const idRow = h("div", { class: "uc-step-id-row", hidden: !step.showId }, stepIdInput, idHintEl);
       const screenInput = textInput({ value: step.screen, list: screenListId, placeholder: "screen", mono: true, ariaLabel: `Step ${index + 1} screen`, onInput: (value) => { step.screen = value; touch(); if (options.screens().includes(value.trim())) fillNodes(value.trim()); } });
       const nodeInput = textInput({ value: step.node, list: nodeListId, placeholder: "element id", mono: true, ariaLabel: `Step ${index + 1} element`, onInput: (value) => { step.node = value; touch(); } });
+      nodeInput.dataset.errorPath = `branch.step.${index}.node`;
+      nodeInput.dataset.hint = nodeHint.id;
       const viaInput = textInput({ value: step.via, placeholder: "Via", ariaLabel: `Step ${index + 1} via`, onInput: (value) => { step.via = value; touch(); } });
       const targetRow = h("div", { class: "uc-target-edit" });
       const drawTarget = () => {
         fill(
           targetRow,
-          segmented({ label: `Step ${at() + 1} target`, name: nextId("uc-kind"), value: step.kind, options: [{ value: "screen", label: "Screen" }, { value: "element", label: "Element" }, { value: "none", label: "None" }], onChange: (value) => { step.kind = value; touch(); drawTarget(); } }),
+          segmented({ label: `Step ${at() + 1} target`, name: nextId("uc-kind"), value: step.kind, options: [{ value: "screen", label: "Screen" }, { value: "element", label: "Element" }, { value: "none", label: "None" }], onChange: (value) => { step.kind = value; drawTarget(); touch(); } }),
           step.kind !== "none" ? screenInput : null,
           step.kind === "element" ? nodeInput : null,
+          step.kind === "element" ? nodeHint : null,
           step.kind !== "none" ? h("datalist", { id: screenListId }, options.screens().map((s) => h("option", { value: s }))) : null,
           step.kind === "element" ? nodeList : null,
           viaInput,

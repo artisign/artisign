@@ -136,7 +136,12 @@ export function parseIo(list, sideKey, label, errors) {
 }
 
 /** One step as a payload object (a base step or the step of a change); `label` prefixes problems with its data changes. */
-export function buildStepObject(step, id, label, errors) {
+export function buildStepObject(step, id, label, errors, at = null) {
+  // An element target needs its element id: without one the step would be saved as a plain screen mapping, silently.
+  if (step.kind === "element" && step.screen.trim() !== "" && step.node.trim() === "") {
+    errors.push(`${label}: Element id required.`);
+    at?.fieldErrors.push({ path: at.path, message: "Element id required" });
+  }
   const out = { ...step.extra, id, actor: step.actor || "system", action: written(step.action, step.origAction) };
   if (step.kind !== "none" && step.screen.trim() !== "") out.target = { screen: step.screen.trim(), ...(step.kind === "element" && step.node.trim() !== "" ? { node: step.node.trim() } : {}) };
   const data = step.data
@@ -418,7 +423,7 @@ export function buildVariant(variant, index, { baseSteps, baseBranches = [], use
       errors.push(`${where}: ${message}`);
       fieldErrors.push({ path: `${path}.id`, message });
     }
-    const built = buildStepObject(step, id, where, errors);
+    const built = buildStepObject(step, id, where, errors, { path: `${path}.node`, fieldErrors });
     applyOp(model, op, built);
     ops.push(op.op === "append" ? { ...op.extra, op: "append", step: built, ...((op.branchId ?? "") !== "" ? { branch: op.branchId } : {}) } : { ...op.extra, op: op.op, step_id: op.stepId, step: built });
   });
@@ -581,12 +586,16 @@ export function createVariantEditor(env) {
     actionInput.dataset.hint = actionHint.id;
     const screenInput = textInput({ value: step.screen, list: screenListId, placeholder: "screen", mono: true, ariaLabel: `${label()} screen`, onInput: (value) => { step.screen = value; markDirty(); if (env.screens().includes(value.trim())) fillNodes(value.trim()); } });
     const nodeInput = textInput({ value: step.node, list: nodeListId, placeholder: "element id", mono: true, ariaLabel: `${label()} element`, onInput: (value) => { step.node = value; markDirty(); } });
+    const nodeHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `${path}.node` } });
+    nodeInput.dataset.errorPath = `${path}.node`;
+    nodeInput.dataset.hint = nodeHint.id;
     const targetRow = h("div", { class: "uc-target-edit" });
     const drawTarget = () => {
       fill(targetRow,
-        segmented({ label: `${label()} target`, name: nextId("uc-kind"), value: step.kind, options: [{ value: "screen", label: "Screen" }, { value: "element", label: "Element" }, { value: "none", label: "None" }], onChange: (value) => { step.kind = value; markDirty(); drawTarget(); } }),
+        segmented({ label: `${label()} target`, name: nextId("uc-kind"), value: step.kind, options: [{ value: "screen", label: "Screen" }, { value: "element", label: "Element" }, { value: "none", label: "None" }], onChange: (value) => { step.kind = value; drawTarget(); markDirty(); } }),
         step.kind !== "none" ? screenInput : null,
         step.kind === "element" ? nodeInput : null,
+        step.kind === "element" ? nodeHint : null,
         step.kind !== "none" ? h("datalist", { id: screenListId }, env.screens().map((s) => h("option", { value: s }))) : null,
         step.kind === "element" ? nodeList : null,
       );

@@ -7146,7 +7146,24 @@ button.uc-target:hover {
   min-width: 0;
   overflow: auto;
   padding: var(--space-3xl);
+  /* Room after the last card, so the end of the track reads as an end; the scrollbar stays visible (an overlay scrollbar hides until the pointer moves, and a card cut by the edge looked cut off). */
+  padding-inline-end: calc(var(--space-3xl) * 3);
   background: var(--chrome-canvas);
+}
+
+.uc-map-canvas::-webkit-scrollbar {
+  height: 12px;
+  width: 12px;
+}
+
+.uc-map-canvas::-webkit-scrollbar-track {
+  background: var(--chrome-border);
+}
+
+.uc-map-canvas::-webkit-scrollbar-thumb {
+  border: 2px solid var(--chrome-border);
+  border-radius: 6px;
+  background: var(--chrome-text-tertiary);
 }
 
 .uc-map-track {

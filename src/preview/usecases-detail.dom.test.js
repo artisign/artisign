@@ -34,6 +34,11 @@ describe("base flow", () => {
     expect($(".uc-h2-meta").textContent).toContain("3 steps");
   });
 
+  it("the flow header names the screens that do not exist", () => {
+    render();
+    expect($(".uc-h2-meta").textContent).toContain("(1 missing)");
+  });
+
   it("derives the scope badge per step: Element, Screen, Stale", () => {
     render();
     const chips = $$(".uc-target");
@@ -42,7 +47,7 @@ describe("base flow", () => {
     expect(chips[0].textContent).toContain("btn-map");
     expect(chips[1].textContent).toContain("Screen");
     expect(chips[2].textContent).toContain("Stale");
-    expect($(".uc-warn").textContent).toContain("Screen gone-screen no longer exists. Pick a new target.");
+    expect($(".uc-warn").textContent).toContain(`Screen "gone-screen" not found.`);
   });
 
   it("opens the mapping view for a step from its chip and for all steps from 'Show on screens'", () => {

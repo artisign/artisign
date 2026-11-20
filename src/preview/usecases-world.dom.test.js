@@ -241,7 +241,7 @@ describe("variant view", () => {
     renderVariant({ bundle });
     const row = $(".uc-lane-compact[data-step=cosign]");
     expect(text(row)).toContain("jon is an entity");
-    expect(text(row)).toContain("no longer exists");
+    expect(text(row)).toContain("not found");
   });
 
   it("the Base chip counts the branches; a variant's branch cards list compact steps; the variant table draws names only", () => {

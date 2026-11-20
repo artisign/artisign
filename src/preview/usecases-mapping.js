@@ -5,7 +5,7 @@
 // are marked. Clicking a step focuses its frame, clicking a frame opens the screen.
 
 import { h, icon, fill } from "./usecases-dom.js";
-import { avatar, targetChip, filterChip } from "./usecases-parts.js";
+import { avatar, targetChip, filterChip, missingScreenText, missingElementText } from "./usecases-parts.js";
 import { createFittingIframe } from "./iframe-fit.js";
 import { updateInspectOverlay } from "./inspector.js";
 import { avatarOf, actorName, mappingFor, stepScope, changedKeys, formatValue, plural } from "./usecases-data.js";
@@ -112,7 +112,7 @@ export function createMappingView({ root, fetchRender, handlers }) {
     if (!frame.exists) {
       box.style.width = `${FRAME_WIDTH}px`;
       box.style.height = `${Math.round(FRAME_WIDTH * 1.6)}px`;
-      box.append(h("div", { class: "uc-frame-missing" }, icon("link_off"), h("strong", null, "Screen not found"), h("p", null, `${plural(frame.steps.length, "step")} point${frame.steps.length === 1 ? "s" : ""} at a screen that no longer exists in this project.`)));
+      box.append(h("div", { class: "uc-frame-missing" }, icon("link_off"), h("strong", null, "Screen not found"), h("p", null, `${plural(frame.steps.length, "step")} point${frame.steps.length === 1 ? "s" : ""} at a screen that is not in this project.`)));
       return { wrap, parts }; // a frame for a missing screen is not a button: nothing to open
     }
     wrap.addEventListener("click", () => handlers.onOpenScreen(frame.screen, frame.steps.find((s) => s.step.id === selected)?.step.target?.node ?? frame.steps.find((s) => s.step.target?.node)?.step.target.node ?? null));
@@ -224,7 +224,7 @@ export function createMappingView({ root, fetchRender, handlers }) {
           ? h(
               "div",
               { class: "uc-map-stale" },
-              h("p", null, icon("warning"), found?.screen.exists === false ? `The screen ${step.target.screen} was removed or renamed. Artisign never rewrites mappings on its own.` : `The element ${step.target.node} is gone from ${step.target.screen}. Artisign never rewrites mappings on its own.`),
+              h("p", null, icon("warning"), found?.screen.exists === false ? `${missingScreenText(step.target.screen)} Mappings are never rewritten automatically.` : `${missingElementText(step.target.node, step.target.screen)} Mappings are never rewritten automatically.`),
               h("div", { class: "uc-map-stale-actions" }, h("button", { type: "button", class: "chrome-btn chrome-btn--compact", onClick: () => handlers.onPickTarget(step.id) }, "Pick new target"), h("button", { type: "button", class: "chrome-btn chrome-btn--ghost chrome-btn--compact", onClick: () => handlers.onUnmap(step.id) }, "Leave unmapped")),
             )
           : found?.mapping?.unstable

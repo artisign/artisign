@@ -2,7 +2,21 @@
 // variant / filter chip, segmented control). One builder per component so every view draws them identically.
 
 import { h, icon } from "./usecases-dom.js";
-import { STATUS_LABELS, exampleLines, safeColor } from "./usecases-data.js";
+import { STATUS_LABELS, exampleLines, safeColor, describeLoadProblem } from "./usecases-data.js";
+
+/** One wording for a mapping target that is not there (it may have been deleted, renamed or never existed). */
+export function missingScreenText(screen) {
+  return `Screen "${screen}" not found.`;
+}
+export function missingElementText(node, screen) {
+  return `Element "${node}" not found on screen "${screen}".`;
+}
+
+/** A failed save, written for the person at the dialog: the agent remedy of the tool message ("repair … by hand", "the one case where usecases/ may be edited directly") is left out. */
+export function saveErrorText(message) {
+  const { file, detail } = describeLoadProblem(message);
+  return file ? `${detail} (${file})` : detail;
+}
 
 /** `uc-avatar`: the emoji (or initials) on the persona's own colour — persona data, set as `--avatar-color`, not a token. */
 export function avatar(av, size = "md", title = "") {

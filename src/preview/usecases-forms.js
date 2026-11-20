@@ -6,7 +6,7 @@
 
 import { h, icon, fill } from "./usecases-dom.js";
 import { createDialog, field, textInput, textArea, selectInput, removeButton, nextId } from "./usecases-dialog.js";
-import { segmented, avatar } from "./usecases-parts.js";
+import { segmented, avatar, missingScreenText, missingElementText, saveErrorText } from "./usecases-parts.js";
 import { openMenu } from "./usecases-menu.js";
 import { createVariantEditor, emptyStep, touchScope, variantDraft, ioDraft, stepDraft, parseIo, buildStepObject, buildVariant, variantStepIds, allBranchStepIds, variantWarnings, showFieldErrors, baseModel, placesIn } from "./usecases-variant-edit.js";
 import { createTriggerEditor, constellationChips, createBranchList } from "./usecases-forms-case-world.js";
@@ -55,12 +55,18 @@ export function draftFromSource(source) {
   };
 }
 
+/** The case personas plus every actor that is a pool persona, deduplicated in order (the system and unknown actors are not personas). */
+function withActors(personas, actors, personaIds) {
+  if (!personaIds) return personas;
+  return [...new Set([...personas, ...actors.filter((actor) => actor && actor !== "system" && personaIds.has(actor))])];
+}
+
 /**
  * The set_use_cases entity for a draft. `source` is the stored case when editing: cleared optional fields become null (the tool's
  * "remove this key"), `variants`, `state`, `constellations` and `branches` are only sent when they changed. `nameOf` names a participant
- * for the messages. Returns { errors } when the draft cannot be sent at all.
+ * for the messages. `personaIds` (the pool's persona ids): a step or trigger actor that is one of them joins the case personas. Returns { errors } when the draft cannot be sent at all.
  */
-export function buildPayload({ id, draft, source, nameOf = (participant) => participant }) {
+export function buildPayload({ id, draft, source, nameOf = (participant) => participant, personaIds = null }) {
   const errors = [];
   if (draft.title.trim() === "") errors.push("A title is required.");
   if (!isValidId(id)) errors.push("The id must be lowercase kebab-case (a-z, 0-9, -).");
@@ -79,7 +85,7 @@ export function buildPayload({ id, draft, source, nameOf = (participant) => part
       errors.push(`Step ${index + 1} needs an action.`);
       fieldErrors.push({ path: `step.${index}.action`, message: "The step needs an action.", untilTouched: true });
     }
-    return buildStepObject(step, stepId, `Step ${index + 1}`, errors);
+    return buildStepObject(step, stepId, `Step ${index + 1}`, errors, { path: `step.${index}.node`, fieldErrors });
   });
 
   const trigger = buildTrigger({ text: draft.trigger, origText: triggerText(source?.trigger), shape: draft.triggerShape, orig: source?.trigger }, { path: "trigger", label: "Trigger", errors, fieldErrors });
@@ -122,7 +128,7 @@ export function buildPayload({ id, draft, source, nameOf = (participant) => part
     id,
     title: draft.title.trim(),
     status: draft.status,
-    personas: draft.personas,
+    personas: withActors(draft.personas, [...steps.map((s) => s.actor), ...(draft.triggerShape.kind === "action" ? [draft.triggerShape.actor] : [])], personaIds),
     inputs,
     outputs,
     steps,
@@ -166,8 +172,8 @@ export function draftWarnings({ draft, pool, screens, nodes }) {
   draft.steps.forEach((step, i) => {
     if (step.actor !== "system" && step.actor !== "" && !pool.personasById.has(step.actor)) warnings.push({ path: `step.${i}.actor`, message: `Persona ${step.actor} does not exist.` });
     if (step.kind !== "none" && step.screen.trim() !== "") {
-      if (!screenSet.has(step.screen.trim())) warnings.push({ path: `step.${i}.screen`, message: "This screen no longer exists. Pick another one." });
-      else if (step.kind === "element" && step.node.trim() !== "" && nodes[step.screen.trim()] && !nodes[step.screen.trim()].includes(step.node.trim())) warnings.push({ path: `step.${i}.node`, message: `${step.node.trim()} is not an element of ${step.screen.trim()}.` });
+      if (!screenSet.has(step.screen.trim())) warnings.push({ path: `step.${i}.screen`, message: missingScreenText(step.screen.trim()) });
+      else if (step.kind === "element" && step.node.trim() !== "" && nodes[step.screen.trim()] && !nodes[step.screen.trim()].includes(step.node.trim())) warnings.push({ path: `step.${i}.node`, message: missingElementText(step.node.trim(), step.screen.trim()) });
     }
     step.data.forEach((d, j) => {
       check(`step.${i}.data.${j}.before`, d.object, d.before);
@@ -261,13 +267,13 @@ export async function openUseCaseDialog(options) {
   };
 
   // --- Basics -------------------------------------------------------------------------------------------------
-  const titleInput = textInput({ value: draft.title, autofocus: true, placeholder: "Map a step to a screen element", onInput: (value) => { draft.title = value; if (!idTouched) { id = uniqueId(slugify(value), options.takenIds()); idInput.value = id; } markDirty(); } });
+  const titleInput = textInput({ value: draft.title, autofocus: true, placeholder: "Borrow a book", onInput: (value) => { draft.title = value; if (!idTouched) { id = uniqueId(slugify(value), options.takenIds()); idInput.value = id; } markDirty(); } });
   const groupListId = nextId("uc-groups");
-  const groupInput = textInput({ value: draft.group, list: groupListId, placeholder: "mapping/elements", onInput: (value) => { draft.group = value; markDirty(); } });
+  const groupInput = textInput({ value: draft.group, list: groupListId, placeholder: "lending/loans", onInput: (value) => { draft.group = value; markDirty(); } });
   const groupList = h("datalist", { id: groupListId }, options.groups().map((g) => h("option", { value: g })));
   const idInput = textInput({ value: id, mono: true, readonly: mode === "edit", placeholder: "derived from the title", onInput: (value) => { id = value; idTouched = true; markDirty(); } });
   const statusControl = segmented({ label: "Status", name: "status", value: draft.status, options: STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] })), onChange: (value) => { draft.status = value; markDirty(); } });
-  const tagsInput = textInput({ value: draft.tags, placeholder: "mapping, design", onInput: (value) => { draft.tags = value; markDirty(); } });
+  const tagsInput = textInput({ value: draft.tags, placeholder: "lending, member", onInput: (value) => { draft.tags = value; markDirty(); } });
 
   // --- Personas -----------------------------------------------------------------------------------------------
   const personaRow = h("div", { class: "uc-chip-row" });
@@ -307,7 +313,7 @@ export async function openUseCaseDialog(options) {
           { class: "uc-io-row" },
           h("span", { class: "uc-io-kind" }, kind === "inputs" ? "In" : "Out"),
           selectInput({ options: objectOptions(), value: row.object, ariaLabel: "Data object", onChange: (value) => { row.object = value; markDirty(); } }),
-          textInput({ value: row.side, placeholder: "Use case editor", ariaLabel: sideLabel, onInput: (value) => { row.side = value; markDirty(); } }),
+          textInput({ value: row.side, placeholder: "Catalog", ariaLabel: sideLabel, onInput: (value) => { row.side = value; markDirty(); } }),
           exampleInput,
           removeButton(`Remove ${kind === "inputs" ? "input" : "output"} ${index + 1}`, () => { draft[kind].splice(index, 1); markDirty(); drawIo(); }),
           warn,
@@ -375,14 +381,18 @@ export async function openUseCaseDialog(options) {
       const screenInput = textInput({ value: step.screen, list: screenListId, placeholder: "screen", mono: true, ariaLabel: `Step ${at() + 1} screen`, onInput: (value) => { step.screen = value; markDirty(); if (options.screens().includes(value.trim())) fillNodes(value.trim()); } });
       const nodeInput = textInput({ value: step.node, list: nodeListId, placeholder: "element id", mono: true, ariaLabel: `Step ${at() + 1} element`, onInput: (value) => { step.node = value; markDirty(); } });
       const viaInput = textInput({ value: step.via ?? "", placeholder: "Via", ariaLabel: `Step ${at() + 1} via`, onInput: (value) => { step.via = value; markDirty(); } });
+      const nodeHint = h("p", { class: "uc-field-error", id: nextId("uc-err"), hidden: true, dataset: { path: `step.${at()}.node` } });
       screenInput.dataset.path = `step.${at()}.screen`;
       nodeInput.dataset.path = `step.${at()}.node`;
+      nodeInput.dataset.errorPath = `step.${at()}.node`;
+      nodeInput.dataset.hint = nodeHint.id;
       const targetRow = h("div", { class: "uc-target-edit" });
       const drawTarget = () => {
         fill(targetRow,
-          segmented({ label: `Step ${at() + 1} target`, name: `kind-${at()}`, value: step.kind, options: [{ value: "screen", label: "Screen" }, { value: "element", label: "Element" }, { value: "none", label: "None" }], onChange: (value) => { step.kind = value; markDirty(); drawTarget(); } }),
+          segmented({ label: `Step ${at() + 1} target`, name: `kind-${at()}`, value: step.kind, options: [{ value: "screen", label: "Screen" }, { value: "element", label: "Element" }, { value: "none", label: "None" }], onChange: (value) => { step.kind = value; drawTarget(); markDirty(); } }),
           step.kind !== "none" ? screenInput : null,
           step.kind === "element" ? nodeInput : null,
+          step.kind === "element" ? nodeHint : null,
           step.kind !== "none" ? h("datalist", { id: screenListId }, options.screens().map((s) => h("option", { value: s }))) : null,
           step.kind === "element" ? nodeList : null,
           viaInput,
@@ -491,7 +501,7 @@ export async function openUseCaseDialog(options) {
         return;
       }
     }
-    const built = buildPayload({ id: finalId, draft, source, nameOf });
+    const built = buildPayload({ id: finalId, draft, source, nameOf, personaIds: new Set(options.pool().personasById.keys()) });
     if (built.errors) {
       saving = false;
       saveButton.disabled = false;
@@ -501,7 +511,7 @@ export async function openUseCaseDialog(options) {
     saving = false;
     if (!response.ok) {
       saveButton.disabled = false;
-      dialog.setMessage(response.message, "error");
+      dialog.setMessage(saveErrorText(response.message), "error");
       return;
     }
     result = { id: finalId, data: response.data };

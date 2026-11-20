@@ -3,7 +3,7 @@
 
 import { hiddenNote } from "./usecases-orphans.js";
 import { h, icon } from "./usecases-dom.js";
-import { avatar, dataCard } from "./usecases-parts.js";
+import { avatar, dataCard, missingScreenText, missingElementText } from "./usecases-parts.js";
 import { changedKeys } from "./usecases-data.js";
 import { KIND_ICONS, conditionParts } from "./usecases-world-data.js";
 
@@ -80,7 +80,7 @@ export function warnLine(text, id = null) {
 export function mappingNote(step, mapping, screenEntry) {
   if (!step.target || !mapping) return null;
   if (mapping.stale) {
-    const text = screenEntry && screenEntry.exists === false ? `Screen ${step.target.screen} no longer exists. Pick a new target.` : `Element ${step.target.node} no longer exists on ${step.target.screen}. Pick a new target.`;
+    const text = screenEntry && screenEntry.exists === false ? missingScreenText(step.target.screen) : missingElementText(step.target.node, step.target.screen);
     return h("p", { class: "uc-warn" }, icon("warning"), text);
   }
   if (mapping.unstable) return h("p", { class: "uc-warn" }, icon("warning"), `${step.target.node} is a generated id: it can point at another element after a rewrite. Give the node an authored id.`);

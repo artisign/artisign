@@ -131,7 +131,7 @@ describe("mapping view", () => {
     missing.click();
     expect(handlers.onOpenScreen).not.toHaveBeenCalled(); // a missing screen is not clickable
     const stale = $(".uc-map-step[data-scope=stale]");
-    expect(stale.querySelector(".uc-map-stale").textContent).toContain("never rewrites mappings");
+    expect(stale.querySelector(".uc-map-stale").textContent).toContain("Mappings are never rewritten automatically.");
     const [pick, leave] = $$(".uc-map-stale-actions button", stale);
     pick.click();
     expect(handlers.onPickTarget).toHaveBeenCalledWith("notify");

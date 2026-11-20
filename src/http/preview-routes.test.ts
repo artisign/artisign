@@ -128,6 +128,31 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
     });
   });
 
+  describe("GET /api/world", () => {
+    it("returns the stored world, and empty lists without world.json (nothing is created)", async () => {
+      const empty = await getJson("/api/world");
+      expect(empty).toEqual({ status: 200, json: { entities: [], relationship_types: [], constellations: [] } });
+      await expect(stat(join(dir, "usecases"))).rejects.toMatchObject({ code: "ENOENT" });
+      const world = {
+        entities: [{ id: "leo", name: "Leo", traits: {} }],
+        relationship_types: [{ id: "holds", label: "holds" }],
+        constellations: [{ id: "c1", name: "One", traits: {}, relationships: [{ from: "leo", type: "holds", to: "leo" }] }],
+      };
+      await store.writeWorld(world as never);
+      const stored = await getJson("/api/world");
+      expect(stored.status).toBe(200);
+      expect(stored.json).toEqual(await store.readWorld());
+    });
+
+    it("answers 422 invalid_state for a file that no longer validates", async () => {
+      await mkdir(join(dir, "usecases"), { recursive: true });
+      await writeFile(join(dir, "usecases", "world.json"), "{ not json");
+      const bad = await getJson("/api/world");
+      expect(bad.status).toBe(422);
+      expect(bad.json.code).toBe("invalid_state");
+    });
+  });
+
   describe("GET /api/compare", () => {
     beforeEach(async () => {
       await store.writeScreen("dash", `<main id="page"><h1 id="greeting">Hi</h1><ul id="card-list"><li id="card-1">A</li></ul></main>`);

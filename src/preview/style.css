@@ -9632,3 +9632,96 @@ button.uc-target:hover {
 .uc-legend-item .uc-frame-no {
   margin-right: var(--space-xs);
 }
+
+/* World pool (read view): the three parts in the side panel, tables and cards in the page */
+.uc-world-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+}
+
+.uc-world-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--space-md) var(--space-lg);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.uc-world-nav-item:hover {
+  background: var(--chrome-hover);
+}
+
+.uc-world-nav-item.is-selected {
+  background: var(--chrome-active);
+}
+
+.uc-world-nav-item:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+}
+
+.uc-world-nav-name {
+  font-size: var(--ui-base);
+  font-weight: 500;
+}
+
+.uc-world-nav-hint {
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.uc-world-nav-note {
+  margin: var(--space-lg) var(--space-lg) 0;
+  font-size: var(--ui-2xs);
+  line-height: 1.5;
+  color: var(--chrome-text-tertiary);
+}
+
+.uc-world-page {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-2xl) var(--space-2xl) 48px;
+}
+
+.uc-world-table .uc-state th:first-child {
+  width: auto;
+}
+
+.uc-world-table .uc-state td,
+.uc-world-table .uc-state tbody th {
+  vertical-align: middle;
+}
+
+.uc-world-card-sub {
+  margin: 0;
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--ui-xs);
+}
+
+.uc-cst.is-generated {
+  border-style: dashed;
+}
+
+.uc-world-generated {
+  margin-left: var(--space-sm);
+}
+
+.uc-world-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin: var(--space-xl) 0;
+  padding-left: var(--space-3xl);
+  font-size: var(--ui-base);
+}

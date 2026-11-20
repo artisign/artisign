@@ -62,3 +62,20 @@ export async function fetchUseCaseSource(project, id) {
   if (!res.ok) return { ok: false, status: res.status, code: body.code, message: body.message ?? res.statusText };
   return { ok: true, useCase: body.use_case };
 }
+
+/**
+ * The world pool as stored: entities, relationship types and constellations (GET /api/world, an internal route, not a tool).
+ * A project without world.json answers empty lists.
+ * @returns {Promise<{ ok: true, world: { entities: any[], relationship_types: any[], constellations: any[] } } | { ok: false, status: number, code?: string, message: string }>}
+ */
+export async function fetchWorldSource(project) {
+  let res;
+  try {
+    res = await fetch(`/api/world?project=${encodeURIComponent(project)}`);
+  } catch (error) {
+    return { ok: false, status: 0, message: error instanceof Error ? error.message : String(error) };
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, status: res.status, code: body.code, message: body.message ?? res.statusText };
+  return { ok: true, world: { entities: body.entities ?? [], relationship_types: body.relationship_types ?? [], constellations: body.constellations ?? [] } };
+}

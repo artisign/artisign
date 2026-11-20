@@ -40,11 +40,13 @@ import {
 } from "./usecases-data.js";
 import { avatar, statusDot } from "./usecases-parts.js";
 import { actorKind } from "./usecases-world-parts.js";
+import { renderWorldNav, renderWorldPage } from "./usecases-world-pool.js";
 import { avatarOf } from "./usecases-data.js";
 
 const SECTIONS = [
   { id: "cases", label: "Use cases" },
   { id: "personas", label: "Personas" },
+  { id: "world", label: "World" },
   { id: "objects", label: "Data objects" },
 ];
 const RELOAD_DEBOUNCE_MS = 120;
@@ -77,6 +79,7 @@ export function createUseCasesView(options) {
   let personaListLimit = LIST_PAGE;
   let selectedPersona = null;
   let selectedObject = null;
+  let selectedWorldPart = "entities";
   let coverageOpen = false;
   let selectedStep = null; // the mapping view's focused step: survives a reload while the step still exists
   let shownInvalid = ""; // key of the set of unreadable files the toast last reported
@@ -94,6 +97,7 @@ export function createUseCasesView(options) {
   const casesPanelEl = h("div", { class: "uc-side-panel", dataset: { section: "cases" } });
   const personasPanelEl = h("div", { class: "uc-side-panel", dataset: { section: "personas" }, hidden: true });
   const objectsPanelEl = h("div", { class: "uc-side-panel", dataset: { section: "objects" }, hidden: true });
+  const worldPanelEl = h("div", { class: "uc-side-panel uc-world-nav", dataset: { section: "world" }, hidden: true });
   const personaSearch = h("input", { type: "search", class: "chrome-field uc-search-input", placeholder: "Search personas, goals, traits…", "aria-label": "Search personas", autocomplete: "off" });
   const personaSummary = h("div", { class: "uc-result" });
   const personaListEl = h("div", { class: "uc-plist" });
@@ -102,7 +106,7 @@ export function createUseCasesView(options) {
   const objectSummary = h("div", { class: "uc-result" });
   const objectListEl = h("div", { class: "uc-plist" });
   objectsPanelEl.append(h("div", { class: "uc-search" }, icon("search"), objectSearch), objectSummary, objectListEl);
-  const side = h("aside", { class: "uc-side" }, subnav, casesPanelEl, personasPanelEl, objectsPanelEl);
+  const side = h("aside", { class: "uc-side" }, subnav, casesPanelEl, personasPanelEl, worldPanelEl, objectsPanelEl);
   const toast = h("div", { class: "uc-toast", role: "status", hidden: true });
   const content = h("div", { class: "uc-content" });
   const main = h("main", { class: "uc-main" }, toast, content);
@@ -174,19 +178,22 @@ export function createUseCasesView(options) {
   // --- Pool ------------------------------------------------------------------------------------------------------
 
   function emptyPool() {
-    // `constellations`: id -> name of every constellation seen so far (the bundles opened). There is no read of the whole world pool yet.
-    return { constellations: new Map(), personas: [], dimensions: [], objects: [], personasById: new Map(), dimensionsById: new Map(), objectsById: new Map(), counts: null, usage: Object.assign(new Map(), { complete: false }), loaded: false };
+    // `world`: the stored world pool (GET /api/world); `constellations`: id -> name for the filter menu.
+    return { world: { entities: [], relationship_types: [], constellations: [] }, constellations: new Map(), personas: [], dimensions: [], objects: [], personasById: new Map(), dimensionsById: new Map(), objectsById: new Map(), counts: null, usage: Object.assign(new Map(), { complete: false }), loaded: false };
   }
 
   async function loadPool() {
     const forProject = project;
-    const res = await api.listUseCases(forProject, { limit: 1, include: ["personas", "dimensions", "data_objects"] });
+    const [res, worldRes] = await Promise.all([api.listUseCases(forProject, { limit: 1, include: ["personas", "dimensions", "data_objects"] }), api.fetchWorldSource(forProject)]);
     if (forProject !== project) return;
     if (!res.ok) {
       showToast(errorMessage(res), []);
       return;
     }
     const data = res.data;
+    // The world pool has its own read; a failed one leaves the pool empty and never blocks the rest.
+    pool.world = worldRes.ok ? worldRes.world : { entities: [], relationship_types: [], constellations: [] };
+    pool.constellations = new Map(pool.world.constellations.map((c) => [c.id, c.name]));
     pool.personas = data.personas ?? [];
     pool.dimensions = data.dimensions ?? [];
     pool.objects = data.data_objects ?? [];
@@ -485,9 +492,7 @@ export function createUseCasesView(options) {
       });
     }
     if (kind === "constellation") {
-      // The world pool is not listed by the tool: the menu offers the constellations seen in opened cases and in the loaded rows, and what is typed.
       const known = new Map(pool.constellations);
-      for (const u of loadedSummaries()) for (const id of u.constellations ?? []) if (!known.has(id)) known.set(id, id);
       if (filters.constellation && !known.has(filters.constellation)) known.set(filters.constellation, filters.constellation);
       const clear = () => {
         filters = { ...filters, constellation: "" };
@@ -499,8 +504,7 @@ export function createUseCasesView(options) {
         title: "Constellation · from the world pool",
         items: [...known].map(([value, label]) => ({ value, label, checked: filters.constellation === value })),
         filterable: true,
-        allowCustom: true,
-        emptyText: "No constellations yet.",
+        emptyText: "No constellations in the world yet.",
         note: "Matches the case and its variants. No counts: a case can hold in several worlds.",
         onPick: (value) => {
           filters = { ...filters, constellation: value };
@@ -543,11 +547,6 @@ export function createUseCasesView(options) {
     });
   }
 
-  /** Every summary the list holds right now (grouped rows, ungrouped rows or the flat page). */
-  function loadedSummaries() {
-    return [...[...list.groupState.values()].flatMap((state) => state.rows), ...list.ungrouped.rows, ...list.flat.items];
-  }
-
   function openSortMenu(anchor) {
     openMenu({
       anchor,
@@ -579,7 +578,6 @@ export function createUseCasesView(options) {
     } else {
       detail = { id, variantId, loading: false, error: "", view: view.data, base: base?.ok ? base.data : view.data, source: source.ok ? source.useCase : null, suggest: suggest.ok ? suggest.data : null };
     }
-    for (const c of [...(base?.ok ? (base.data.constellations ?? []) : []), ...(view.ok ? (view.data.constellations ?? []) : [])]) pool.constellations.set(c.id, c.name);
     // Reveal it in the list: its group path opens (the tree loads groups lazily).
     if (list.mode === "tree" && detail.view) {
       const open = groupAncestors(detail.view.use_case.group).filter((p) => list.tree?.byPath.has(p) && !list.expanded.has(p));
@@ -648,11 +646,14 @@ export function createUseCasesView(options) {
     casesPanelEl.hidden = section !== "cases";
     personasPanelEl.hidden = section !== "personas";
     objectsPanelEl.hidden = section !== "objects";
+    worldPanelEl.hidden = section !== "world";
+    addButton.hidden = section === "world"; // the world is edited in its own dialogs (not part of the read views)
     addButton.setAttribute("aria-label", section === "cases" ? "New use case" : section === "personas" ? "New persona" : "New data object");
     addButton.title = addButton.getAttribute("aria-label");
     if (mode === "mapping" && detail?.view) return; // the mapping view owns the content
     if (section === "personas") return renderPersonas();
     if (section === "objects") return renderObjects();
+    if (section === "world") return renderWorld();
     if (isEmptyProject()) return renderGuide();
     if (!detail) {
       content.replaceChildren(h("div", { class: "uc-placeholder" }, list.loading ? "Loading…" : pool.counts?.use_cases === 0 ? h("div", null, h("p", null, "No use cases yet."), h("button", { type: "button", class: "chrome-btn", onClick: () => newUseCase() }, icon("add"), "New use case")) : "Select a use case."));
@@ -698,8 +699,14 @@ export function createUseCasesView(options) {
     if (section === "objects" && mode !== "mapping") renderObjectPage(content, { pool, query: objectQuery, selectedId: selectedObject, handlers });
   }
 
+  function renderWorld() {
+    renderWorldNav(worldPanelEl, { world: pool.world, selected: selectedWorldPart, onSelect: (part) => { selectedWorldPart = part; renderWorld(); document.getElementById(`uc-world-${part}`)?.scrollIntoView?.({ block: "start" }); } });
+    if (section === "world" && mode !== "mapping") renderWorldPage(content, { world: pool.world, pool, selected: selectedWorldPart });
+  }
+
   function renderPools() {
     renderPoolPanel();
+    if (section === "world") return renderWorld();
     if (section === "personas") renderPersonas();
     else if (section === "objects") renderObjects();
     else renderAll();

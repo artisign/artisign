@@ -90,6 +90,7 @@ function stubDaemon() {
       return json(found ? { ...baseBundle, use_case: { ...baseBundle.use_case, id: found.id, title: found.title, group: found.group } } : baseBundle);
     }
     if (path === "/api/use-case") return json({ use_case: rawUseCase });
+    if (path === "/api/world") return json(store?.world ?? { entities: [], relationship_types: [], constellations: [] });
     return json({});
   });
 }
@@ -505,6 +506,56 @@ describe("review fixes", () => {
       .click();
     await flush();
     expect($$(".uc-menu .uc-menu-label").map((l) => l.textContent)).toEqual(["Dana", "Dex", "Medium project"]);
+  });
+});
+
+describe("world pool", () => {
+  const world = {
+    entities: [{ id: "leo", name: "Leo", type: "Child", avatar: { emoji: "🧒" }, traits: {} }],
+    relationship_types: [{ id: "parent-of", label: "is parent of", inverse_label: "is child of" }],
+    constellations: [{ id: "single-parent", name: "Single parent, one child", traits: {}, relationships: [{ from: "dana", type: "parent-of", to: "leo" }] }, { id: "couple", name: "Couple without children", traits: {}, relationships: [] }],
+  };
+  beforeEach(() => {
+    store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements")], world };
+  });
+
+  it("the Constellation filter menu lists the names from the pool and sends the id as the filter", async () => {
+    await import("./app.js");
+    await flush();
+    await openTab();
+    expect(calls.some((c) => c.path === "/api/world" && c.method === "GET")).toBe(true);
+    $$(".uc-filter-chip-main").find((b) => b.textContent.startsWith("Constellation")).click();
+    await flush();
+    expect($$(".uc-menu .uc-menu-label").map((l) => l.textContent)).toEqual(["Single parent, one child", "Couple without children"]);
+    $$(".uc-menu .uc-menu-item").find((b) => b.textContent.includes("Couple")).click();
+    await flush();
+    expect(calls.filter((c) => c.tool === "list_use_cases").at(-1).body.constellation).toBe("couple");
+    expect($$(".uc-filter-chip").some((c) => c.textContent.includes("Constellation: Couple without children"))).toBe(true);
+  });
+
+  it("the World tab reads the pool: counts in the side panel, three sections, no editors", async () => {
+    await import("./app.js");
+    await flush();
+    await openTab();
+    $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
+    await flush();
+    expect($$(".uc-world-nav-item .uc-world-nav-hint").map((n) => n.textContent)).toEqual(["1 · things with identity", "1 · how participants relate", "2 · starting worlds"]);
+    expect($$(".uc-world-page .uc-h2").map((h) => h.firstChild.textContent)).toEqual(["Entities", "Relationship types", "Constellations"]);
+    expect($(".uc-world-page tr[data-id=leo]").textContent).toContain("Child");
+    expect($$(".uc-cst").map((c) => c.querySelector(".uc-cst-name").textContent)).toEqual(["Single parent, one child", "Couple without children"]);
+    expect($("#uc-add").hidden).toBe(true);
+    expect($$("#usecases-view .uc-world-page button")).toHaveLength(0);
+  });
+
+  it("an empty world shows the guide instead of tables", async () => {
+    store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements")] };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
+    await flush();
+    expect($(".uc-guide-title").textContent).toBe("Describe the world your use cases start in");
+    expect($(".uc-world-page")).toBeNull();
   });
 });
 

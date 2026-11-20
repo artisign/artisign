@@ -717,7 +717,8 @@ constellations (`outside_constellation`, once per participant — actor or state
 condition subject — per case and per variant), conflicting
 traits (`trait_conflict`), an entity in no constellation (`entity_unrelated`),
 a branch `from` / `rejoin` that is no main-flow step (`branch_from_missing`,
-`branch_rejoin_missing`). Data-object references are checked only when
+`branch_rejoin_missing`), a step rewritten without the `target` it had, or a variant `replace` op whose
+step lacks the base step's `target` (`mapping_removed`, `set_use_cases` only — resend the `target` to keep the mapping). Data-object references are checked only when
 `data-objects.json` exists (an empty file counts). `get_use_case` also checks
 the world objects of its bundle; `set_use_cases` re-checks the constellations
 whose members or relationship types the call touches.

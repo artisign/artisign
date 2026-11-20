@@ -380,6 +380,56 @@ describe("use case tools", () => {
       expect((res.warnings as Warning[]).filter((w) => w.kind === "mapping_stale").map((w) => w.target)).toEqual(["use_case:borrow-book/a"]);
     });
 
+    describe("mapping_removed", () => {
+      const removed = (res: Record<string, unknown>): Warning[] => (res.warnings as Warning[]).filter((w) => w.kind === "mapping_removed");
+      const branchCase = (steps: unknown[], extra: Record<string, unknown> = {}): Record<string, unknown> =>
+        borrowCase({
+          steps: [
+            { id: "tap-book", actor: "member-ana", action: "Taps the book", target: { screen: "shelf", node: "book-14" } },
+            { id: "pick", actor: "member-ana", action: "Picks a copy", target: { screen: "sheet" } },
+          ],
+          branches: [{ id: "none-left", title: "None left", from: "pick", when: [{ subject: "loan", property: "status", value: "on-loan" }], steps }],
+          ...extra,
+        });
+
+      it("warns when a stored step is rewritten without its target, and still writes", async () => {
+        await seed();
+        const res = await setUseCases(fx.store, {
+          use_cases: [borrowCase({ steps: [{ id: "tap-book", actor: "member-ana", action: "Taps the book now" }, { id: "pick", actor: "member-ana", action: "Picks", target: { screen: "sheet" } }] })],
+        });
+        expect(removed(res)).toEqual([{ kind: "mapping_removed", target: "use_case:borrow-book/tap-book", message: 'step "tap-book" lost its target (was screen "shelf", node "book-14")' }]);
+        expect((await fx.store.readUseCase("borrow-book")).steps[0]!.target).toBeUndefined();
+      });
+
+      it("does not warn for a different target, a step that had none, a removed step or a new case", async () => {
+        await seed();
+        const res = await setUseCases(fx.store, {
+          use_cases: [borrowCase({ steps: [{ id: "tap-book", actor: "member-ana", action: "x", target: { screen: "sheet" } }, { id: "done", actor: "system", action: "no target before" }] })],
+        });
+        expect(removed(res)).toEqual([]);
+        const fresh = await setUseCases(fx.store, { use_cases: [borrowCase({ id: "other-case", steps: [{ id: "a", actor: "system", action: "x" }] })] });
+        expect(removed(fresh)).toEqual([]);
+      });
+
+      it("covers a step inside a branch", async () => {
+        await seed();
+        await setUseCases(fx.store, { use_cases: [branchCase([{ id: "retry", actor: "member-ana", action: "Retries", target: { screen: "sheet" } }])] });
+        const res = await setUseCases(fx.store, { use_cases: [branchCase([{ id: "retry", actor: "member-ana", action: "Retries again" }])] });
+        expect(removed(res).map((w) => [w.target, w.message])).toEqual([["use_case:borrow-book/retry", 'step "retry" lost its target (was screen "sheet")']]);
+      });
+
+      it("warns for a variant replace op without target when the base step had one", async () => {
+        await seed();
+        const variant = (step: Record<string, unknown>) => ({ id: "staff", title: "Staff", when: { membership: ["staff"] }, steps: [{ op: "replace", step_id: "pick", step }] });
+        const res = await setUseCases(fx.store, { use_cases: [borrowCase({ variants: [variant({ id: "pick", actor: "staff-lee", action: "Picks" })] })] });
+        expect(removed(res).map((w) => w.target)).toEqual(["use_case:borrow-book#staff/pick"]);
+        const kept = await setUseCases(fx.store, { use_cases: [borrowCase({ variants: [variant({ id: "pick", actor: "staff-lee", action: "Picks", target: { screen: "sheet" } })] })] });
+        expect(removed(kept)).toEqual([]);
+        const noBase = await setUseCases(fx.store, { use_cases: [borrowCase({ variants: [{ id: "staff", title: "Staff", when: { membership: ["staff"] }, steps: [{ op: "replace", step_id: "done", step: { id: "done", actor: "system", action: "x" } }] }] })] });
+        expect(removed(noBase)).toEqual([]);
+      });
+    });
+
     it("caps and de-duplicates a flood of warnings but reports the count", async () => {
       const cases = Array.from({ length: 80 }, (_, i) => borrowCase({ id: `case-${i}`, personas: [`ghost-${i}`] }));
       const res = await setUseCases(fx.store, { use_cases: cases });

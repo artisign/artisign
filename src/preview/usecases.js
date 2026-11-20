@@ -249,7 +249,7 @@ export function createUseCasesView(options) {
     const empty = isEmptyProject();
     const emptyText = `${plural(0, "use case")} · ${plural(pool.counts?.personas ?? 0, "persona")}`;
     // The reason is said once, in the tab's content; the list only says that there is none.
-    listPanel.update({ filters, sort, total: list.total, counts: list.counts, rows, selectedId: detail?.id ?? null, activeKey: list.activeKey, labels, loading: list.loading, error: list.error ? "Use cases could not be loaded." : "", empty, emptyText });
+    listPanel.update({ filters, sort, total: list.total, counts: list.counts, rows, selectedId: detail?.id ?? null, activeKey: list.activeKey, labels, loading: list.loading, error: list.error ? "Use cases could not be loaded." : "", empty: empty || Boolean(list.error), emptyText });
   }
 
   /** The invalid-files toast shows when the set of unreadable files changes — not on every list load — and never replaces a write's confirmation. */
@@ -318,6 +318,11 @@ export function createUseCasesView(options) {
     if (!first.ok) {
       list.error = listProblem;
       listEntryWarnings = [];
+      // Nothing of an earlier read stays on show next to the problem.
+      list.total = 0;
+      list.mode = "flat";
+      list.tree = null;
+      list.flat = { items: [], cursor: null, loading: false, error: "" };
       renderList();
       renderAll();
       return;

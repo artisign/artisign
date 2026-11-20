@@ -314,6 +314,8 @@ describe("with use cases", () => {
     expect($(".uc-content").textContent).not.toContain("by hand");
     expect($(".uc-content").textContent).not.toContain("Select a use case.");
     expect($(".uc-list-status").textContent).toBe("Use cases could not be loaded.");
+    expect($(".uc-result").hidden).toBe(true); // no "0 use cases"
+    expect($$(".uc-list-row")).toHaveLength(0);
     // A failure without a file (daemon unreachable) says so in plain words.
     store.failAll = "disk on fire";
     $(".uc-problem [data-action=retry]").click();

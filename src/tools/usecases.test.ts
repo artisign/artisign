@@ -358,6 +358,20 @@ describe("use case tools", () => {
       expect(await fx.store.listUseCaseIds()).toEqual(["borrow-book"]); // written regardless
     });
 
+    it("warns, never blocks, about an example value that does not fit its field", async () => {
+      const res = await setUseCases(fx.store, {
+        dimensions: DIMENSIONS,
+        personas: PERSONAS,
+        data_objects: DATA_OBJECTS,
+        use_cases: [borrowCase({ outputs: [{ object: "loan", example: { status: "lost", member: 5 } }] })],
+      });
+      expect((res.warnings as Warning[]).filter((w) => w.kind === "invalid_example_value").map((w) => w.message)).toEqual([
+        '"lost" is not a value of enum loan.status (available, on-loan)',
+        "loan.member: expected a ref (id string), got number",
+      ]);
+      expect(await fx.store.listUseCaseIds()).toEqual(["borrow-book"]);
+    });
+
     it("flags a mapping to a missing screen or node as mapping_stale on write", async () => {
       await seed();
       const res = await setUseCases(fx.store, {

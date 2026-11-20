@@ -52,7 +52,7 @@ describe("mapping_stale at write time (CHR-1123)", () => {
     const res = await writeHtml(fx.store, { screen: "catalog", mode: "replace", html_aug: catalogHtml("btn-loan") });
     const warnings = stale(res);
     expect(warnings.map((w) => w.target).sort()).toEqual(["use_case:borrow-book#staff/override", "use_case:borrow-book/borrow", "use_case:borrow-book/deny"]);
-    expect(warnings.find((w) => w.target === "use_case:borrow-book/deny")!.message).toBe('node "btn-borrow" does not exist on screen "catalog" (branch "denied")');
+    expect(warnings.find((w) => w.target === "use_case:borrow-book/deny")!.message).toBe('node "btn-borrow" does not exist on screen "catalog"');
     // Same semantics as the read: get_use_case agrees.
     const read = (await getUseCase(fx.store, { id: "borrow-book" })) as { warnings: Warning[] };
     expect(read.warnings.filter((w) => w.kind === "mapping_stale")).toHaveLength(3);
@@ -79,6 +79,27 @@ describe("mapping_stale at write time (CHR-1123)", () => {
     await writeHtml(fx.store, { screen: "catalog", mode: "replace", html_aug: catalogHtml("btn-loan") });
     const again = await writeHtml(fx.store, { screen: "catalog", mode: "replace", html_aug: catalogHtml("btn-other") });
     expect(stale(again)).toEqual([]);
+  });
+
+  it("a step already stale (node missing) is not reported again when its screen is deleted", async () => {
+    await seed();
+    await writeHtml(fx.store, { screen: "catalog", mode: "replace", html_aug: catalogHtml("btn-loan") });
+    const res = await deleteEntity(fx.store, { kind: "screen", name: "catalog" });
+    expect(stale(res)).toEqual([]);
+  });
+
+  it("fails open: a readUseCases error neither blocks nor fails write_html, patch_html or delete_entity", async () => {
+    await seed();
+    fx.store.readUseCases = async () => {
+      throw Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
+    };
+    const written = await writeHtml(fx.store, { screen: "catalog", mode: "replace", html_aug: catalogHtml("btn-loan") });
+    expect(stale(written)).toEqual([]);
+    const patched = await patchHtml(fx.store, { target: { kind: "node", node: "catalog.btn-loan" }, operation: "delete" });
+    expect(stale(patched)).toEqual([]);
+    const deleted = await deleteEntity(fx.store, { kind: "screen", name: "loan-confirm" });
+    expect(stale(deleted)).toEqual([]);
+    expect(await fx.store.listScreens()).not.toContain("loan-confirm");
   });
 
   it("delete_entity screen warns next to dangling_flow, for the screen and for a node on it", async () => {

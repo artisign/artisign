@@ -560,6 +560,12 @@ Workflow, in this order:
      `{object, example}` (`source` on an input, `target` on an output): what
      the case consumes and produces, with concrete example values. An
      `example` is an object with at least one key; `{}` is refused.
+     A key the data object does not declare is `unknown_data_field`; a value
+     that does not fit its field's type or enum `values` (`null` always fits;
+     a `ref` is checked as an id string only; a `date` must be a real calendar
+     date `YYYY-MM-DD`, a `datetime` ISO 8601 with `T`, e.g.
+     `2026-12-01T09:30:00Z`) is `invalid_example_value`.
+     Both are warnings. Step `data` `before`/`after` are checked the same way.
    - **`steps`** — the flow: `{id, actor, action, target?, data?, via?}`.
      `actor` is a persona id or `"system"`; `via` names the interface an
      outside actor uses. `data` lists the state change of a step: `{object,
@@ -621,8 +627,7 @@ Workflow, in this order:
    the response of the write that broke it: `delete_entity` (screen),
    `write_html` (replace) and `patch_html` (delete, replace) add one
    `mapping_stale` warning per step the write left pointing at nothing (target
-   `use_case:<id>[#<variant>]/<step>`, a branch step names its branch in the
-   message), at most 20 per response with `mapping_stale_omitted_count` for the
+   `use_case:<id>[#<variant>]/<step>`, the same message as on read), at most 20 per response with `mapping_stale_omitted_count` for the
    rest. Mappings that were already stale before the write are not repeated.
    Projects without use cases get no extra field.
    An element inside a component instance's slot fill is mapped by its authored

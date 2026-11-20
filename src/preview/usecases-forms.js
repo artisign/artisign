@@ -22,6 +22,7 @@ import {
   isValidId,
   parseExample,
   undeclaredExampleKeys,
+  invalidExampleValues,
   avatarOf,
   actorName,
   warningSummary,
@@ -145,7 +146,7 @@ export function buildPayload({ id, draft, source, nameOf = (participant) => part
 }
 
 /**
- * Reference problems of a draft (warnings, never blocking): an example key the data object does not declare, an unknown persona
+ * Reference problems of a draft (warnings, never blocking): an example key the data object does not declare or a value that does not fit its field, an unknown persona
  * or actor, a target screen / element that does not exist. `nodes` maps a screen to its node ids once loaded.
  */
 export function draftWarnings({ draft, pool, screens, nodes }) {
@@ -157,6 +158,7 @@ export function draftWarnings({ draft, pool, screens, nodes }) {
     const object = pool.objectsById.get(objectId);
     if (!object) return warnings.push({ path: where, message: `Data object ${objectId} does not exist.` });
     for (const key of undeclaredExampleKeys(object, parsed.value)) warnings.push({ path: where, message: `${key} is not a field of ${object.name}.` });
+    for (const message of invalidExampleValues(object, parsed.value)) warnings.push({ path: where, message: `${message}.` });
   };
   draft.inputs.forEach((row, i) => check(`input.${i}`, row.object, row.example));
   draft.outputs.forEach((row, i) => check(`output.${i}`, row.object, row.example));

@@ -443,7 +443,9 @@ size and example names; nothing changes). Delete the variants first, or pass
 `delete_entity {kind: "screen", name, cascade: true}` to remove the whole
 subtree at every depth in one commit: `deleted_screens` lists them, their
 outgoing flows are dropped, and a `dangling_flow` warning appears for each
-flow from a screen outside the subtree into it. `cascade` is screen-only.
+flow from a screen outside the subtree into it, and a `mapping_stale` warning
+for each use-case step mapped to a deleted screen or to a node on it (see Use
+cases). `cascade` is screen-only.
 
 ### Backdrop (`data-backdrop`)
 
@@ -615,7 +617,14 @@ Workflow, in this order:
    position, not an identity, and after the screen is rewritten it can silently
    point at another element (`mapping_unstable` warns). Mappings are never
    rewritten for you, so a mapping to a regenerated screen or a removed node is
-   reported as `mapping_stale` on read.
+   reported as `mapping_stale` on read — and, when use cases map the screen, in
+   the response of the write that broke it: `delete_entity` (screen),
+   `write_html` (replace) and `patch_html` (delete, replace) add one
+   `mapping_stale` warning per step the write left pointing at nothing (target
+   `use_case:<id>[#<variant>]/<step>`, a branch step names its branch in the
+   message), at most 20 per response with `mapping_stale_omitted_count` for the
+   rest. Mappings that were already stale before the write are not repeated.
+   Projects without use cases get no extra field.
    An element inside a component instance's slot fill is mapped by its authored
    id, like any other node; a fill without an authored id, or an element of a
    backdrop layer, cannot be mapped. Branch steps map like main-flow steps.

@@ -5,3 +5,4 @@ export * from "./generate.js";
 export * from "./query.js";
 export { ScreenLookup, type MappedNode } from "./screens.js";
 export * from "./world.js";
+export { guardMappings, MAPPING_STALE_CAP, type MappingGuard } from "./stale.js";

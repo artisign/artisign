@@ -44,6 +44,18 @@ export function validateDataObject(object: DataObject, pools: ValidationPools): 
   return warnings;
 }
 
+/** The `mapping_stale` check of one step: its target screen or node does not exist. Shared by `get_use_case` / `set_use_cases` and the write-time check (`stale.ts`). */
+export async function mappingStaleWarning(step: UseCaseStep, target: string, screens: ScreenLookup): Promise<Warning | undefined> {
+  if (!step.target) return undefined;
+  if (!(await screens.hasScreen(step.target.screen))) {
+    return { kind: "mapping_stale", target, message: `screen "${step.target.screen}" does not exist` };
+  }
+  if (step.target.node !== undefined && !(await screens.node(step.target.screen, step.target.node))) {
+    return { kind: "mapping_stale", target, message: `node "${step.target.node}" does not exist on screen "${step.target.screen}"` };
+  }
+  return undefined;
+}
+
 /** Branch problems of an effective case: a `from` / `rejoin` that is not a main-flow step, a branch a variant left without steps. */
 function branchWarnings(effective: EffectiveUseCase, target: string): Warning[] {
   const warnings: Warning[] = [];
@@ -109,12 +121,9 @@ export async function validateUseCase(useCase: UseCase, pools: ValidationPools, 
         suggestion: `give the element an authored id on screen "${step.target.screen}" first (id attribute in write_html or patch_html replace), then map the step to it`,
       });
     }
-    if (screens && step.target) {
-      if (!(await screens.hasScreen(step.target.screen))) {
-        warn({ kind: "mapping_stale", target, message: `screen "${step.target.screen}" does not exist` });
-      } else if (step.target.node !== undefined && !(await screens.node(step.target.screen, step.target.node))) {
-        warn({ kind: "mapping_stale", target, message: `node "${step.target.node}" does not exist on screen "${step.target.screen}"` });
-      }
+    if (screens) {
+      const stale = await mappingStaleWarning(step, target, screens);
+      if (stale) warn(stale);
     }
   };
 

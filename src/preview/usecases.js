@@ -226,6 +226,16 @@ export function createUseCasesView(options) {
 
   const poolView = () => pool;
   const loadProblem = () => poolProblem || listProblem;
+  /** Marks every control of a pool page that opens an editor or a generator while saving is paused: focusable, with the reason as its title; the handlers refuse the click too. */
+  function markPaused(root) {
+    const reason = pausedReason();
+    if (!reason) return;
+    for (const el of root.querySelectorAll(".uc-persona-open, .uc-dim-name, .uc-h2-action, .uc-persona-new, .uc-io-pencil, .uc-page-head .uc-actions button, .uc-world-page .uc-h2-row button, .uc-world-page .uc-link-row, .uc-world-page .uc-guide-actions button")) {
+      if (el.disabled) continue;
+      el.setAttribute("aria-disabled", "true");
+      el.title = reason;
+    }
+  }
   const pausedReason = () => savingPausedReason({ problem: loadProblem(), warnings: [...listEntryWarnings, ...worldEntryWarnings] });
 
   /** What a person has to look at: the whole-file problem as the tab's content, skipped entries as a notice above it (the toast keeps unreadable case files). */
@@ -755,7 +765,10 @@ export function createUseCasesView(options) {
     if (loadProblem()) return renderPoolProblem(personaSummary, personaListEl, "Personas");
     renderPoolPanel();
     renderPersonaList(personaListEl, { pool, query: poolQuery, selectedId: selectedPersona, limit: personaListLimit, handlers: { onSelect: (id) => { selectedPersona = id; scrollToPersona(id); renderPersonas(); }, onMore: () => { personaListLimit += LIST_PAGE * 2; renderPersonas(); } } });
-    if (section === "personas" && mode !== "mapping" && !loadProblem()) renderPersonaPage(content, { pool, query: poolQuery, selectedId: selectedPersona, limit: personaLimit, usage: pool.usage, handlers: personaHandlers });
+    if (section === "personas" && mode !== "mapping" && !loadProblem()) {
+      renderPersonaPage(content, { pool, query: poolQuery, selectedId: selectedPersona, limit: personaLimit, usage: pool.usage, handlers: personaHandlers });
+      markPaused(content);
+    }
   }
 
   function scrollToPersona(id) {
@@ -780,12 +793,18 @@ export function createUseCasesView(options) {
     renderPoolPanel();
     const handlers = { onSelect: (id) => { selectedObject = id; renderObjects(); }, onNew: () => editObject(null), onEdit: (id) => editObject(id) };
     renderObjectList(objectListEl, { pool, query: objectQuery, selectedId: selectedObject, handlers });
-    if (section === "objects" && mode !== "mapping" && !loadProblem()) renderObjectPage(content, { pool, query: objectQuery, selectedId: selectedObject, handlers });
+    if (section === "objects" && mode !== "mapping" && !loadProblem()) {
+      renderObjectPage(content, { pool, query: objectQuery, selectedId: selectedObject, handlers });
+      markPaused(content);
+    }
   }
 
   function renderWorld() {
     renderWorldNav(worldPanelEl, { world: pool.world, selected: selectedWorldPart, onSelect: (part) => { selectedWorldPart = part; renderWorld(); document.getElementById(`uc-world-${part}`)?.scrollIntoView?.({ block: "start" }); } });
-    if (section === "world" && mode !== "mapping") renderWorldPage(content, { world: pool.world, pool, selected: selectedWorldPart, error: pool.worldError, handlers: worldHandlers });
+    if (section === "world" && mode !== "mapping") {
+      renderWorldPage(content, { world: pool.world, pool, selected: selectedWorldPart, error: pool.worldError, handlers: worldHandlers });
+      markPaused(content);
+    }
   }
 
   const worldHandlers = {
@@ -937,6 +956,7 @@ export function createUseCasesView(options) {
   }
 
   async function editPersona(id) {
+    if (pausedReason()) return;
     let source = id ? pool.personasById.get(id) : null;
     if (id && !source) return;
     const saved = await openPersonaDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("persona"), save: (payload) => api.setUseCases(project, { personas: [payload] }), remove: (pid) => api.deletePersona(project, pid) });
@@ -947,6 +967,7 @@ export function createUseCasesView(options) {
   }
 
   async function editDimension(id) {
+    if (pausedReason()) return;
     const source = id ? pool.dimensionsById.get(id) : null;
     const saved = await openDimensionDialog({ mode: id ? "edit" : "new", source, takenIds: takenIds("dimension"), save: (payload) => api.setUseCases(project, { dimensions: [payload] }), remove: (did) => api.deleteDimension(project, did) });
     if (!saved) return;
@@ -954,6 +975,7 @@ export function createUseCasesView(options) {
   }
 
   async function editObject(id) {
+    if (pausedReason()) return;
     const source = id ? pool.objectsById.get(id) : null;
     const saved = await openObjectDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("object"), save: (payload) => api.setUseCases(project, { data_objects: [payload] }), remove: (oid) => api.deleteDataObject(project, oid) });
     if (!saved) return;
@@ -962,6 +984,7 @@ export function createUseCasesView(options) {
   }
 
   async function generate(target = "personas") {
+    if (pausedReason()) return;
     const saved = await openGenerateDialog({ pool: poolView, target, generate: (input) => api.generatePersonas(project, input) });
     if (!saved) return;
     reportWrite(saved.data, `${plural(saved.created, saved.target === "constellations" ? "constellation" : "persona")} generated.`);
@@ -974,6 +997,7 @@ export function createUseCasesView(options) {
   };
 
   async function editEntity(id) {
+    if (pausedReason()) return;
     const source = id ? pool.world.entities.find((e) => e.id === id) : null;
     if (id && !source) return;
     const saved = await openEntityDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("entity"), save: (payload) => api.setUseCases(project, { entities: [payload] }), remove: (eid) => api.deleteMainEntity(project, eid), usage: usageOf((eid) => ({ entity: eid })) });
@@ -982,6 +1006,7 @@ export function createUseCasesView(options) {
   }
 
   async function editRelationshipType(id) {
+    if (pausedReason()) return;
     const source = id ? pool.world.relationship_types.find((t) => t.id === id) : null;
     if (id && !source) return;
     const saved = await openRelationshipTypeDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("relationship_type"), save: (payload) => api.setUseCases(project, { relationship_types: [payload] }), remove: (tid) => api.deleteRelationshipType(project, tid) });
@@ -990,6 +1015,7 @@ export function createUseCasesView(options) {
   }
 
   async function editConstellation(id) {
+    if (pausedReason()) return;
     const source = id ? pool.world.constellations.find((c) => c.id === id) : null;
     if (id && !source) return;
     const saved = await openConstellationDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("constellation"), save: (payload) => api.setUseCases(project, { constellations: [payload] }), remove: (cid) => api.deleteConstellation(project, cid), usage: usageOf((cid) => ({ constellation: cid })) });

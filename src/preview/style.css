@@ -5961,9 +5961,10 @@ body:has(#settings-menu:not([hidden])) #update-notice {
 }
 
 .uc-plist > .uc-list-status {
-  margin: 0 calc(var(--space-md) * -1); /* the sidebar's own padding would indent it past the Use cases message */
+  margin: calc(var(--space-md) * -1) calc(var(--space-md) * -1) 0; /* the sidebar's own padding would indent it past the Use cases message */
 }
 
+.uc-content [aria-disabled="true"],
 #uc-add[aria-disabled="true"],
 .uc-actions .chrome-btn[aria-disabled="true"],
 .uc-variant-chip[aria-disabled="true"] {

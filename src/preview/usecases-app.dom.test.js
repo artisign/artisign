@@ -416,6 +416,51 @@ describe("with use cases", () => {
     expect($(".uc-notice").textContent).not.toContain("AI agent");
   });
 
+  describe("pool pages while entries are skipped", () => {
+    const reason = "Saving is paused until usecases/personas.json is fixed.";
+    const entry = { kind: "invalid_file", target: "persona:x", message: "usecases/personas.json personas[0] (x) is not loaded: name: Invalid input" };
+    const visit = async (section) => {
+      store.invalid = { warnings: [entry] };
+      store.world = { entities: [{ id: "leo", name: "Leo", traits: {} }], relationship_types: [{ id: "parent-of", label: "parent of" }], constellations: [{ id: "fam", name: "Family", traits: {}, relationships: [] }] };
+      await import("./app.js");
+      await flush();
+      await openTab();
+      $$(".uc-subtab").find((b) => b.dataset.section === section).click();
+      await flush();
+    };
+    const checkPaused = async (selectors) => {
+      calls.length = 0;
+      for (const selector of selectors) {
+        const controls = $$(`.uc-content ${selector}`);
+        expect(controls.length, selector).toBeGreaterThan(0);
+        for (const control of controls) {
+          expect(control.getAttribute("aria-disabled"), selector).toBe("true");
+          expect(control.disabled).toBeFalsy();
+          expect(control.title, selector).toBe(reason);
+          control.click();
+        }
+      }
+      await flush();
+      expect($(".uc-dialog")).toBeNull();
+      expect(calls.some((c) => c.tool === "generate_personas" || c.tool === "set_use_cases")).toBe(false);
+    };
+
+    it("Personas: New persona, Generate, + Dimension, persona and dimension edit", async () => {
+      await visit("personas");
+      await checkPaused([".uc-persona-open", ".uc-dim-name", ".uc-h2-action", ".uc-persona-new", ".uc-page-head .uc-actions .chrome-btn--primary"]);
+    });
+
+    it("Data objects: New data object and the object pencil", async () => {
+      await visit("objects");
+      await checkPaused([".uc-io-pencil", ".uc-page-head .uc-actions button"]);
+    });
+
+    it("World: the New … buttons, Generate and the edit links", async () => {
+      await visit("world");
+      await checkPaused([".uc-h2-row button", ".uc-link-row"]);
+    });
+  });
+
   it("the problem panel is not rebuilt (and so not announced again) while it says the same", async () => {
     store.failInclude = true;
     await import("./app.js");

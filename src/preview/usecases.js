@@ -39,6 +39,7 @@ import {
   actorName,
 } from "./usecases-data.js";
 import { avatar, statusDot } from "./usecases-parts.js";
+import { actorKind } from "./usecases-world-parts.js";
 import { avatarOf } from "./usecases-data.js";
 
 const SECTIONS = [
@@ -173,7 +174,8 @@ export function createUseCasesView(options) {
   // --- Pool ------------------------------------------------------------------------------------------------------
 
   function emptyPool() {
-    return { personas: [], dimensions: [], objects: [], personasById: new Map(), dimensionsById: new Map(), objectsById: new Map(), counts: null, usage: Object.assign(new Map(), { complete: false }), loaded: false };
+    // `constellations`: id -> name of every constellation seen so far (the bundles opened). There is no read of the whole world pool yet.
+    return { constellations: new Map(), personas: [], dimensions: [], objects: [], personasById: new Map(), dimensionsById: new Map(), objectsById: new Map(), counts: null, usage: Object.assign(new Map(), { complete: false }), loaded: false };
   }
 
   async function loadPool() {
@@ -212,7 +214,7 @@ export function createUseCasesView(options) {
 
   function renderList() {
     const rows = listRows();
-    const labels = { persona: filters.persona ? actorName(filters.persona, pool.personasById) : "" };
+    const labels = { persona: filters.persona ? actorName(filters.persona, pool.personasById) : "", constellation: filters.constellation ? (pool.constellations.get(filters.constellation) ?? filters.constellation) : "" };
     const empty = isEmptyProject();
     const emptyText = `${plural(0, "use case")} · ${plural(pool.counts?.personas ?? 0, "persona")}`;
     listPanel.update({ filters, sort, total: list.total, counts: list.counts, rows, selectedId: detail?.id ?? null, activeKey: list.activeKey, labels, loading: list.loading, error: list.error, empty, emptyText });
@@ -482,6 +484,32 @@ export function createUseCasesView(options) {
         clearLabel: "Clear screen filter",
       });
     }
+    if (kind === "constellation") {
+      // The world pool is not listed by the tool: the menu offers the constellations seen in opened cases and in the loaded rows, and what is typed.
+      const known = new Map(pool.constellations);
+      for (const u of loadedSummaries()) for (const id of u.constellations ?? []) if (!known.has(id)) known.set(id, id);
+      if (filters.constellation && !known.has(filters.constellation)) known.set(filters.constellation, filters.constellation);
+      const clear = () => {
+        filters = { ...filters, constellation: "" };
+        loadList();
+      };
+      return openMenu({
+        anchor,
+        label: "Constellation",
+        title: "Constellation · from the world pool",
+        items: [...known].map(([value, label]) => ({ value, label, checked: filters.constellation === value })),
+        filterable: true,
+        allowCustom: true,
+        emptyText: "No constellations yet.",
+        note: "Matches the case and its variants. No counts: a case can hold in several worlds.",
+        onPick: (value) => {
+          filters = { ...filters, constellation: value };
+          loadList();
+        },
+        onClear: filters.constellation ? clear : undefined,
+        clearLabel: "Clear constellation filter",
+      });
+    }
     // Counts inside the current filters, except this one: with it applied the facet would show only the picked value.
     let facets = list.facets ?? {};
     if (filters[kind]) {
@@ -494,7 +522,7 @@ export function createUseCasesView(options) {
     // The facets stop at 50 values. Every persona is known client-side, so that menu lists them all; for tags the menu's text
     // field offers what was typed as the filter value (the server matches tags case-insensitively).
     if (kind === "persona" && truncated) entries = pool.personas.map((p) => [p.id, counts[p.id]]);
-    const items = entries.map(([value, count]) => ({ value, label: kind === "status" ? STATUS_LABELS[value] : kind === "persona" ? actorName(value, pool.personasById) : value, count, checked: filters[kind] === value, leading: kind === "persona" ? avatar(avatarOf(value, pool.personasById), "sm") : kind === "status" ? statusDot(value) : null }));
+    const items = entries.map(([value, count]) => ({ value, label: kind === "status" ? STATUS_LABELS[value] : kind === "persona" ? actorName(value, pool.personasById) : value, count, checked: filters[kind] === value, leading: kind === "persona" ? avatar(avatarOf(value, pool.personasById), "sm") : kind === "status" ? statusDot(value) : null, trailing: kind === "persona" ? actorKind(pool.personasById.get(value)?.kind) : null }));
     openMenu({
       anchor,
       label: kind[0].toUpperCase() + kind.slice(1),
@@ -513,6 +541,11 @@ export function createUseCasesView(options) {
       } : undefined,
       clearLabel: `Clear ${kind} filter`,
     });
+  }
+
+  /** Every summary the list holds right now (grouped rows, ungrouped rows or the flat page). */
+  function loadedSummaries() {
+    return [...[...list.groupState.values()].flatMap((state) => state.rows), ...list.ungrouped.rows, ...list.flat.items];
   }
 
   function openSortMenu(anchor) {
@@ -546,6 +579,7 @@ export function createUseCasesView(options) {
     } else {
       detail = { id, variantId, loading: false, error: "", view: view.data, base: base?.ok ? base.data : view.data, source: source.ok ? source.useCase : null, suggest: suggest.ok ? suggest.data : null };
     }
+    for (const c of [...(base?.ok ? (base.data.constellations ?? []) : []), ...(view.ok ? (view.data.constellations ?? []) : [])]) pool.constellations.set(c.id, c.name);
     // Reveal it in the list: its group path opens (the tree loads groups lazily).
     if (list.mode === "tree" && detail.view) {
       const open = groupAncestors(detail.view.use_case.group).filter((p) => list.tree?.byPath.has(p) && !list.expanded.has(p));

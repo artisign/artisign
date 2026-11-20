@@ -103,6 +103,14 @@ describe("preview HTTP routes (/api/screens, /api/render/*, /api/design-system)"
       expect(json).toEqual({ use_case: useCase });
     });
 
+    it("returns a trigger in the form it is stored in: an object stays an object, a string stays a string", async () => {
+      const structured = { text: "The insurer sends the notice", actor: "insurer", via: "webhook" };
+      await store.writeUseCase({ ...useCase, trigger: structured });
+      expect(((await getJson("/api/use-case?id=assign")).json.use_case as { trigger: unknown }).trigger).toEqual(structured);
+      await store.writeUseCase({ ...useCase, trigger: "Plain text" });
+      expect(((await getJson("/api/use-case?id=assign")).json.use_case as { trigger: unknown }).trigger).toBe("Plain text");
+    });
+
     it("answers 404 for an unknown id, 400 for a malformed one, 422 for a file that no longer validates", async () => {
       expect((await getJson("/api/use-case?id=missing")).status).toBe(404);
       expect((await getJson("/api/use-case?id=Not_Valid")).status).toBe(400);

@@ -608,4 +608,36 @@ describe("menu with typed values", () => {
     custom.click();
     expect(onPick).toHaveBeenCalledWith("rare-tag");
   });
+
+  it("a refused delete lists the references and offers Delete anyway, which is the only call with force", async () => {
+    const refusal = { ok: false, status: 409, code: "conflict", message: 'persona "gen-medium" is still referenced by 1 use case(s): borrow-book — remove these references first (set_use_cases), or pass force: true to delete anyway' };
+    const remove = vi.fn(async (_id, force) => (force ? { ok: true, data: { warnings: [] } } : refusal));
+    const closed = openPersonaDialog({ mode: "edit", source: makePool().personas[2], pool: () => makePool(), takenIds: () => new Set(), save: vi.fn(), remove });
+    await flush();
+    button("Delete").click();
+    button("Delete Medium project").click();
+    await flush();
+    expect(remove.mock.calls).toEqual([["gen-medium"]]); // the first call never sends force
+    expect($(".uc-foot-msg").textContent).toContain('persona "gen-medium" is still referenced by 1 use case(s): borrow-book');
+    expect($(".uc-foot-msg").textContent).not.toContain("force: true");
+    expect($("dialog")).not.toBeNull(); // still open, nothing deleted
+    button("Delete anyway").click();
+    await flush();
+    expect(remove.mock.calls).toEqual([["gen-medium"], ["gen-medium", true]]);
+    expect(await closed).toMatchObject({ id: "gen-medium", deleted: true });
+  });
+
+  it("Keep it after a refusal deletes nothing and never sends force", async () => {
+    const remove = vi.fn(async () => ({ ok: false, status: 409, code: "conflict", message: 'cannot safely delete persona "x" — reference check is incomplete because the following case file(s) failed to load: usecases/cases/a.json — repair them, or pass force: true to delete anyway' }));
+    openPersonaDialog({ mode: "edit", source: makePool().personas[2], pool: () => makePool(), takenIds: () => new Set(), save: vi.fn(), remove });
+    await flush();
+    button("Delete").click();
+    button("Delete Medium project").click();
+    await flush();
+    expect($(".uc-foot-msg").textContent).toContain("usecases/cases/a.json could not be read");
+    button("Keep it").click();
+    expect(button("Delete anyway")).toBeUndefined();
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith("gen-medium");
+  });
 });

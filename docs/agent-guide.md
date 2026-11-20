@@ -662,8 +662,32 @@ dimensions, example fields or screens only come back as warnings. The
 response gives `created` and `updated` counts per kind, not the ids. Delete with
 `delete_entity` kinds `persona`, `dimension`, `data_object`, `use_case`,
 `entity`, `constellation`, `relationship_type` (always the whole entity; `variant` is rejected for them, it only
-applies to `mockup`) — it
-warns about references left dangling and does not repair them. Like design
+applies to `mockup`).
+
+A referenced pool entry is refused. For `persona`, `dimension`, `data_object`, `entity`,
+`constellation` and `relationship_type`, `delete_entity` finds the references with the same
+scan that used to only warn (`dangling_reference`); if there is at least one, it answers
+`conflict`, lists the referrers (at most 5 ids per group, then `+N more`) and writes
+nothing. Pass `force: true` to delete anyway: the entry goes, the response carries the
+`dangling_reference` warnings, and nothing is repaired — the referrers stay and every read
+warns about them from then on (`unknown_persona`, `unknown_dimension`, and so on). A
+`use_case` is referenced by nothing and is never refused. `force` on any other kind
+(`screen`, `component`, `pattern`, `mockup`, `use_case`) is `validation_failed`;
+`force: false` is accepted everywhere. A referenced component stays refused without any
+override. Guard order: `variant`, then `cascade`, then `force`, then the lookup
+(`not_found`), then the reference scan.
+
+If a case file under `usecases/cases/` fails to load, the scan cannot rule out a referrer.
+For `persona`, `dimension`, `data_object`, `constellation` and `entity` (an entity only
+while no persona has the same id) the delete is then refused with `conflict` even when
+nothing is referenced, naming up to 5 files; repair them, or pass `force: true`. With
+`force` the response adds one `invalid_file` warning per unreadable case file (target
+`use_case:<id>`, at most 10) and `invalid_file_count` with the total when there are more:
+the referrer list may be incomplete. `relationship_type` never fails closed, its scan reads
+no case file. A pool file with one invalid entry is `invalid_state` for every kind, before
+any scan.
+
+Like design
 files, `usecases/` changes only through these tools. The one exception: a file
 under `usecases/` that no longer validates (hand edit, merge conflict, a newer
 version's key) makes the tools fail with `invalid_state` naming it; then you may

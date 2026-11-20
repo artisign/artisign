@@ -141,7 +141,7 @@ describe("use case tools", () => {
       await setUseCases(fx.store, { dimensions: DIMENSIONS, personas: PERSONAS, data_objects: DATA_OBJECTS, use_cases: [borrowCase()] });
       await new Promise((resolve) => setTimeout(resolve, 40));
       await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", title: "Changed" }] });
-      await deleteEntity(fx.store, { kind: "persona", name: "staff-lee" });
+      await deleteEntity(fx.store, { kind: "persona", name: "staff-lee", force: true });
 
       expect(await existing()).toBe(before);
       expect(((await getProject(fx.store, {})) as { last_write_at: string }).last_write_at).toBe(stamp);
@@ -549,7 +549,7 @@ describe("use case tools", () => {
           ],
         });
         for (const [name, expected] of [["member-ana", "only-in-map"], ["staff-lee", "only-in-map"]] as const) {
-          const res = await deleteEntity(fx.store, { kind: "persona", name });
+          const res = await deleteEntity(fx.store, { kind: "persona", name, force: true });
           expect(res.warnings).toEqual([expect.objectContaining({ kind: "dangling_reference", target: `persona:${name}`, message: expect.stringContaining(expected) })]);
         }
         expect(await fx.store.listUseCaseIds()).toContain("only-in-map");
@@ -874,8 +874,8 @@ describe("use case tools", () => {
 
       it("target constellations without any constellation-scoped dimension is validation_failed", async () => {
         await setUseCases(fx.store, { dimensions: [{ id: "role", label: "Role", values: [{ id: "a", label: "A" }] }] });
-        await deleteEntity(fx.store, { kind: "dimension", name: "household" });
-        await deleteEntity(fx.store, { kind: "dimension", name: "branch" });
+        await deleteEntity(fx.store, { kind: "dimension", name: "household", force: true });
+        await deleteEntity(fx.store, { kind: "dimension", name: "branch", force: true });
         await expect(generatePersonas(fx.store, { target: "constellations", dry_run: true })).rejects.toMatchObject({
           code: "validation_failed",
           message: expect.stringContaining("constellations-scoped"),
@@ -976,23 +976,23 @@ describe("use case tools", () => {
     });
 
     it("deletes a persona and warns about the use cases still naming it", async () => {
-      const res = await deleteEntity(fx.store, { kind: "persona", name: "member-ana" });
+      const res = await deleteEntity(fx.store, { kind: "persona", name: "member-ana", force: true });
       expect(res.warnings).toEqual([expect.objectContaining({ kind: "dangling_reference", target: "persona:member-ana", message: expect.stringContaining("borrow-book") })]);
       expect((await fx.store.readPersonaPool()).personas.map((p) => p.id)).toEqual(["staff-lee"]);
       expect(await fx.store.listUseCaseIds()).toEqual(["borrow-book"]); // the reference is reported, not repaired
     });
 
     it("deletes a data object and warns about use cases and other objects pointing at it", async () => {
-      const res = await deleteEntity(fx.store, { kind: "data_object", name: "member" });
+      const res = await deleteEntity(fx.store, { kind: "data_object", name: "member", force: true });
       expect(res.warnings as Warning[]).toHaveLength(1);
       expect((res.warnings as Warning[])[0]!.message).toContain("loan");
-      const second = await deleteEntity(fx.store, { kind: "data_object", name: "loan" });
+      const second = await deleteEntity(fx.store, { kind: "data_object", name: "loan", force: true });
       expect((second.warnings as Warning[])[0]!.message).toContain("borrow-book");
       expect(await fx.store.readDataObjects()).toEqual([]);
     });
 
     it("deletes a dimension and warns about personas and variant conditions using it", async () => {
-      const res = await deleteEntity(fx.store, { kind: "dimension", name: "branch-access" });
+      const res = await deleteEntity(fx.store, { kind: "dimension", name: "branch-access", force: true });
       expect((res.warnings as Warning[]).map((w) => w.message)).toEqual([expect.stringContaining("member-ana, staff-lee"), expect.stringContaining("borrow-book")]);
       expect((await fx.store.readPersonaPool()).dimensions.map((d) => d.id)).toEqual(["membership"]);
     });
@@ -1010,7 +1010,7 @@ describe("use case tools", () => {
       const res = (await listUseCases(fx.store, {})) as ListRes;
       expect(res.total).toBe(1);
       expect(res.warnings).toEqual([expect.objectContaining({ kind: "invalid_file", target: "use_case:Bad Name", message: expect.stringContaining("not a valid use case id") })]);
-      await expect(deleteEntity(fx.store, { kind: "persona", name: "staff-lee" })).resolves.toMatchObject({ kind: "persona" });
+      await expect(deleteEntity(fx.store, { kind: "persona", name: "staff-lee", force: true })).resolves.toMatchObject({ kind: "persona" });
     });
 
     it("warns mapping_unstable for an element mapping onto a generated node id, in set_use_cases and get_use_case", async () => {
@@ -1071,7 +1071,7 @@ describe("use case tools", () => {
       expect(kinds(res.warnings)).toEqual(expect.arrayContaining(["mapping_stale", "unknown_dimension"]));
       await expect(getUseCase(fx.store, { id: "borrow-book" })).resolves.toMatchObject({ screens: [{ mappings: [{ stale: true }] }] });
       expect(((await suggestVariants(fx.store, { id: "borrow-book" })) as SuggestRes).suggestions.map((x) => x.id)).toEqual(["constructor-y"]);
-      await expect(deleteEntity(fx.store, { kind: "dimension", name: "constructor" })).resolves.toMatchObject({ warnings: expect.any(Array) });
+      await expect(deleteEntity(fx.store, { kind: "dimension", name: "constructor", force: true })).resolves.toMatchObject({ warnings: expect.any(Array) });
     });
 
     it("reports an invalid case or pool file as invalid_state naming the file, with the way out", async () => {

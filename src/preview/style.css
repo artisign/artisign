@@ -6234,6 +6234,33 @@ body:has(#settings-menu:not([hidden])) #update-notice {
   font-weight: 500;
 }
 
+.uc-person.is-orphan .uc-person-name {
+  color: var(--chrome-warning);
+}
+
+.uc-orphan-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--ui-xs);
+  color: var(--chrome-warning);
+}
+
+.uc-orphan-note .icon,
+.uc-trait.is-orphan .icon {
+  font-size: var(--size-icon-sm);
+}
+
+.uc-trait.is-orphan {
+  align-items: center;
+  border: 1px dashed var(--chrome-warning);
+  color: var(--chrome-warning);
+}
+
+.uc-orphan-box {
+  border-color: var(--chrome-warning);
+}
+
 .uc-person-sub {
   font-size: var(--ui-xs);
   color: var(--chrome-text-tertiary);

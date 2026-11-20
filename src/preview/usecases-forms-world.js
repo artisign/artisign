@@ -100,7 +100,7 @@ export async function openEntityDialog(options) {
     saveLabel: mode === "new" ? "Create entity" : "Save entity",
     onSave: save,
     deleteLabel: "Delete",
-    onDelete: mode === "edit" ? async () => confirmDeleteInline(dialog, { name: source.name, used: await (options.usage?.(source.id) ?? ""), remove: () => options.remove(source.id), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
+    onDelete: mode === "edit" ? async () => confirmDeleteInline(dialog, { name: source.name, used: await (options.usage?.(source.id) ?? ""), remove: (force) => (force ? options.remove(source.id, true) : options.remove(source.id)), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
   });
   if (mode === "edit") {
     // Where the entity is used, under its fields: a member of constellations, a subject in use cases.
@@ -209,7 +209,7 @@ export async function openRelationshipTypeDialog(options) {
     onSave: save,
     deleteLabel: "Delete",
     note: mode === "edit" ? infoNote(usedIn > 0 ? `Used in ${plural(usedIn, "constellation")}` : "Used in no constellation") : undefined,
-    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.label, used: usedIn > 0 ? `Used in ${plural(usedIn, "constellation")}.` : "", remove: () => options.remove(source.id), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
+    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.label, used: usedIn > 0 ? `Used in ${plural(usedIn, "constellation")}.` : "", remove: (force) => (force ? options.remove(source.id, true) : options.remove(source.id)), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
   });
   drawReads();
   drawField();
@@ -373,7 +373,7 @@ export async function openConstellationDialog(options) {
     onSave: save,
     deleteLabel: "Delete",
     note: mode === "edit" ? usage : undefined,
-    onDelete: mode === "edit" ? async () => confirmDeleteInline(dialog, { name: source.name, used: await (options.usage?.(source.id) ?? ""), remove: () => options.remove(source.id), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
+    onDelete: mode === "edit" ? async () => confirmDeleteInline(dialog, { name: source.name, used: await (options.usage?.(source.id) ?? ""), remove: (force) => (force ? options.remove(source.id, true) : options.remove(source.id)), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
   });
   if (mode === "edit") options.usage?.(source.id).then((text) => (usage.textContent = text.replace(/\.$/, "")));
   drawRelationships();

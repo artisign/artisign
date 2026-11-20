@@ -198,14 +198,14 @@ describe("branches inside a use case (ADR-011)", () => {
           loanCase({ id: "variant-branch", title: "V", branches: undefined, variants: [{ id: "v", title: "V", when: { membership: ["staff"] }, steps: [{ op: "add_branch", branch: { id: "vb", title: "VB", when: [{ subject: "copy-42", property: "status", value: "lost" }], steps: [{ id: "vb1", actor: "system", action: "x" }] } }] }] }),
         ],
       });
-      const res = await deleteEntity(fx.store, { kind: "entity", name: "copy-42" });
+      const res = await deleteEntity(fx.store, { kind: "entity", name: "copy-42", force: true });
       expect(warningsOf(res)).toEqual([expect.objectContaining({ kind: "dangling_reference", message: expect.stringContaining("2 use case(s) as a state, condition or trigger subject") })]);
-      expect(warningsOf(await deleteEntity(fx.store, { kind: "entity", name: "shelf" }))).toEqual([]);
+      expect(warningsOf(await deleteEntity(fx.store, { kind: "entity", name: "shelf", force: true }))).toEqual([]);
     });
 
     it("a persona named only by a branch condition lists the case (the persona set already holds branch actors)", async () => {
       await setUseCases(fx.store, { use_cases: [loanCase({ personas: [], steps: [], branches: [{ id: "b", title: "B", when: when("lee"), steps: [{ id: "b1", actor: "system", action: "x" }] }] })] });
-      const res = await deleteEntity(fx.store, { kind: "persona", name: "lee" });
+      const res = await deleteEntity(fx.store, { kind: "persona", name: "lee", force: true });
       expect(warningsOf(res).map((w) => w.message).join(" ")).toContain("borrow-a-book");
     });
   });

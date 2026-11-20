@@ -163,15 +163,15 @@ describe("use-case state, structured trigger and constellations (ADR-011)", () =
           loanCase({ id: "renew", title: "Renew" }),
         ],
       });
-      const res = await deleteEntity(fx.store, { kind: "constellation", name: "ana-and-copy" });
+      const res = await deleteEntity(fx.store, { kind: "constellation", name: "ana-and-copy", force: true });
       expect(warningsOf(res)).toEqual([expect.objectContaining({ kind: "dangling_reference", message: expect.stringContaining("borrow-a-book, borrow-a-book#staff, return-a-book#late") })]);
       expect(warningsOf(res)[0]!.message).toContain("3 use case(s) or variant(s)");
-      expect(warningsOf(await deleteEntity(fx.store, { kind: "constellation", name: "unused" }))[0]!.message).toContain("borrow-a-book#other");
+      expect(warningsOf(await deleteEntity(fx.store, { kind: "constellation", name: "unused", force: true }))[0]!.message).toContain("borrow-a-book#other");
     });
 
     it("a constellation nobody names deletes without a warning", async () => {
       await setUseCases(fx.store, { constellations: [{ id: "lonely", name: "Lonely", relationships: [] }], use_cases: [loanCase()] });
-      expect(warningsOf(await deleteEntity(fx.store, { kind: "constellation", name: "lonely" }))).toEqual([]);
+      expect(warningsOf(await deleteEntity(fx.store, { kind: "constellation", name: "lonely", force: true }))).toEqual([]);
     });
 
     it("an entity lists the use cases naming it as a state, condition or trigger subject", async () => {
@@ -185,10 +185,10 @@ describe("use-case state, structured trigger and constellations (ADR-011)", () =
           loanCase({ id: "other-subject", title: "O", state: [{ subject: "shelf", property: "full", value: true }] }),
         ],
       });
-      const res = await deleteEntity(fx.store, { kind: "entity", name: "copy-42" });
+      const res = await deleteEntity(fx.store, { kind: "entity", name: "copy-42", force: true });
       expect(warningsOf(res)).toEqual([expect.objectContaining({ kind: "dangling_reference", message: expect.stringContaining("4 use case(s) as a state, condition or trigger subject") })]);
       expect(warningsOf(res)[0]!.message).toContain("borrow-a-book, trigger-case, variant-case, variant-trigger");
-      expect(warningsOf(await deleteEntity(fx.store, { kind: "entity", name: "idle" }))).toEqual([]);
+      expect(warningsOf(await deleteEntity(fx.store, { kind: "entity", name: "idle", force: true }))).toEqual([]);
     });
 
     it("a persona lists the use cases naming it as a state, condition or trigger subject, unless an entity with that id still resolves it", async () => {
@@ -198,12 +198,12 @@ describe("use-case state, structured trigger and constellations (ADR-011)", () =
           loanCase({ id: "trigger-case", title: "T", trigger: { text: "t", state: [{ subject: "lee", property: "open-loans", op: "gt", value: 3 }] } }),
         ],
       });
-      const res = await deleteEntity(fx.store, { kind: "persona", name: "lee" });
+      const res = await deleteEntity(fx.store, { kind: "persona", name: "lee", force: true });
       const messages = warningsOf(res).map((w) => w.message).join("\n");
       expect(messages).toContain("2 use case(s) as a state, condition or trigger subject: subject-case, trigger-case");
 
       await setUseCases(fx.store, { personas: [{ id: "lee", name: "Lee" }], entities: [{ id: "lee", name: "Lee entity" }] });
-      expect(warningsOf(await deleteEntity(fx.store, { kind: "persona", name: "lee" })).map((w) => w.message).join("\n")).not.toContain("subject");
+      expect(warningsOf(await deleteEntity(fx.store, { kind: "persona", name: "lee", force: true })).map((w) => w.message).join("\n")).not.toContain("subject");
     });
 
     it("N1: with a persona and an entity sharing an id, deleting one does not warn for what still resolves to the other", async () => {
@@ -217,10 +217,10 @@ describe("use-case state, structured trigger and constellations (ADR-011)", () =
       };
       await sharing();
       // The persona goes: the entity still resolves the constellation ref and the state subject.
-      const persona = await deleteEntity(fx.store, { kind: "persona", name: "leo" });
+      const persona = await deleteEntity(fx.store, { kind: "persona", name: "leo", force: true });
       expect(warningsOf(persona).filter((w) => w.message.includes("constellation"))).toEqual([]);
       // Entity "leo" is now alone: deleting it dangles again.
-      const entity = await deleteEntity(fx.store, { kind: "entity", name: "leo" });
+      const entity = await deleteEntity(fx.store, { kind: "entity", name: "leo", force: true });
       expect(warningsOf(entity).map((w) => w.message).join("\n")).toContain("constellation(s): family");
       expect(warningsOf(entity).map((w) => w.message).join("\n")).toContain("leo-case");
     });
@@ -233,7 +233,7 @@ describe("use-case state, structured trigger and constellations (ADR-011)", () =
         constellations: [{ id: "family", name: "Family", relationships: [{ from: "policy", type: "covers", to: "leo" }] }],
         use_cases: [loanCase({ id: "leo-case", title: "L", state: [{ subject: "leo", property: "age", value: 7 }] })],
       });
-      expect(warningsOf(await deleteEntity(fx.store, { kind: "entity", name: "leo" }))).toEqual([]);
+      expect(warningsOf(await deleteEntity(fx.store, { kind: "entity", name: "leo", force: true }))).toEqual([]);
     });
   });
 });

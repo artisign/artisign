@@ -98,21 +98,39 @@ export function footer(dialog, { saveLabel, onSave, onDelete, deleteLabel, note 
   return save;
 }
 
-/** Delete with an inline confirm line in the footer; the entity's referrers come back as warnings, nothing blocks. */
+/** The references (or unreadable files) out of a `conflict` refusal of delete_entity, without the agent-facing way out. */
+export function refusalText(message) {
+  const files = /failed to load: (.*?) — repair/.exec(message);
+  if (message.startsWith("cannot safely delete") && files) return `The reference check is incomplete: ${files[1]} could not be read.`;
+  return `${message.split(" — ")[0]}.`;
+}
+
+/**
+ * Delete with an inline confirm line in the footer. A referenced entry is refused by the server (`conflict`): the dialog then
+ * lists what refers to it and offers "Delete anyway", which repeats the delete with force; without that second choice
+ * `remove` is never called with force.
+ */
 export function confirmDeleteInline(dialog, { name, remove, done, used = "" }) {
+  const finish = async (force) => {
+    const response = await remove(force);
+    if (!response.ok) {
+      if (!force && response.code === "conflict") return offerForce(response.message);
+      return dialog.setMessage(response.message, "error");
+    }
+    dialog.setDirty(false);
+    dialog.close(done(response));
+  };
+  const offerForce = (message) => {
+    dialog.setMessage(`${refusalText(message)} ${REMOVE_NOTE}`, "warning");
+    dialog.showActions([
+      { label: "Keep it", autofocus: true, onClick: () => dialog.restoreActions() },
+      { label: "Delete anyway", id: "delete-anyway", danger: true, onClick: () => finish(true) },
+    ]);
+  };
   dialog.setMessage(`Delete ${name}? ${used ? `${used} ` : ""}${REMOVE_NOTE}`, "warning");
   dialog.showActions([
     { label: "Keep it", autofocus: true, onClick: () => dialog.restoreActions() },
-    {
-      label: `Delete ${name}`,
-      danger: true,
-      onClick: async () => {
-        const response = await remove();
-        if (!response.ok) return dialog.setMessage(response.message, "error");
-        dialog.setDirty(false);
-        dialog.close(done(response));
-      },
-    },
+    { label: `Delete ${name}`, danger: true, onClick: () => finish(false) },
   ]);
 }
 
@@ -225,7 +243,7 @@ export async function openPersonaDialog(options) {
     saveLabel: mode === "new" ? "Create persona" : "Save persona",
     onSave: save,
     deleteLabel: "Delete",
-    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.name, remove: () => options.remove(source.id), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
+    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.name, remove: (force) => (force ? options.remove(source.id, true) : options.remove(source.id)), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
   });
   drawAvatar();
   drawSwatches();
@@ -295,7 +313,7 @@ export async function openDimensionDialog(options) {
     saveLabel: mode === "new" ? "Create dimension" : "Save dimension",
     onSave: save,
     deleteLabel: "Delete",
-    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.label, remove: () => options.remove(source.id), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
+    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.label, remove: (force) => (force ? options.remove(source.id, true) : options.remove(source.id)), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
   });
   drawValues();
   const closed = dialog.open();
@@ -376,7 +394,7 @@ export async function openObjectDialog(options) {
     saveLabel: mode === "new" ? "Create data object" : "Save data object",
     onSave: save,
     deleteLabel: "Delete",
-    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.name, remove: () => options.remove(source.id), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
+    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.name, remove: (force) => (force ? options.remove(source.id, true) : options.remove(source.id)), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
   });
   drawFields();
   const closed = dialog.open();

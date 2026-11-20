@@ -878,7 +878,7 @@ export function createUseCasesView(options) {
   async function editPersona(id) {
     let source = id ? pool.personasById.get(id) : null;
     if (id && !source) return;
-    const saved = await openPersonaDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("persona"), save: (payload) => api.setUseCases(project, { personas: [payload] }), remove: (pid) => api.deletePersona(project, pid) });
+    const saved = await openPersonaDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("persona"), save: (payload) => api.setUseCases(project, { personas: [payload] }), remove: (pid, force) => api.deletePersona(project, pid, force) });
     if (!saved) return;
     reportWrite(saved.data, saved.deleted ? "Persona deleted." : "Persona saved.");
     if (saved.deleted) selectedPersona = null;
@@ -887,14 +887,14 @@ export function createUseCasesView(options) {
 
   async function editDimension(id) {
     const source = id ? pool.dimensionsById.get(id) : null;
-    const saved = await openDimensionDialog({ mode: id ? "edit" : "new", source, takenIds: takenIds("dimension"), save: (payload) => api.setUseCases(project, { dimensions: [payload] }), remove: (did) => api.deleteDimension(project, did) });
+    const saved = await openDimensionDialog({ mode: id ? "edit" : "new", source, takenIds: takenIds("dimension"), save: (payload) => api.setUseCases(project, { dimensions: [payload] }), remove: (did, force) => api.deleteDimension(project, did, force) });
     if (!saved) return;
     reportWrite(saved.data, saved.deleted ? "Dimension deleted." : "Dimension saved.");
   }
 
   async function editObject(id) {
     const source = id ? pool.objectsById.get(id) : null;
-    const saved = await openObjectDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("object"), save: (payload) => api.setUseCases(project, { data_objects: [payload] }), remove: (oid) => api.deleteDataObject(project, oid) });
+    const saved = await openObjectDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("object"), save: (payload) => api.setUseCases(project, { data_objects: [payload] }), remove: (oid, force) => api.deleteDataObject(project, oid, force) });
     if (!saved) return;
     reportWrite(saved.data, saved.deleted ? "Data object deleted." : "Data object saved.");
     if (!saved.deleted) selectedObject = saved.id;
@@ -915,7 +915,7 @@ export function createUseCasesView(options) {
   async function editEntity(id) {
     const source = id ? pool.world.entities.find((e) => e.id === id) : null;
     if (id && !source) return;
-    const saved = await openEntityDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("entity"), save: (payload) => api.setUseCases(project, { entities: [payload] }), remove: (eid) => api.deleteMainEntity(project, eid), usage: usageOf((eid) => ({ entity: eid })) });
+    const saved = await openEntityDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("entity"), save: (payload) => api.setUseCases(project, { entities: [payload] }), remove: (eid, force) => api.deleteMainEntity(project, eid, force), usage: usageOf((eid) => ({ entity: eid })) });
     if (!saved) return;
     reportWrite(saved.data, saved.deleted ? "Entity deleted." : "Entity saved.");
   }
@@ -923,7 +923,7 @@ export function createUseCasesView(options) {
   async function editRelationshipType(id) {
     const source = id ? pool.world.relationship_types.find((t) => t.id === id) : null;
     if (id && !source) return;
-    const saved = await openRelationshipTypeDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("relationship_type"), save: (payload) => api.setUseCases(project, { relationship_types: [payload] }), remove: (tid) => api.deleteRelationshipType(project, tid) });
+    const saved = await openRelationshipTypeDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("relationship_type"), save: (payload) => api.setUseCases(project, { relationship_types: [payload] }), remove: (tid, force) => api.deleteRelationshipType(project, tid, force) });
     if (!saved) return;
     reportWrite(saved.data, saved.deleted ? "Relationship type deleted." : "Relationship type saved.");
   }
@@ -931,7 +931,7 @@ export function createUseCasesView(options) {
   async function editConstellation(id) {
     const source = id ? pool.world.constellations.find((c) => c.id === id) : null;
     if (id && !source) return;
-    const saved = await openConstellationDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("constellation"), save: (payload) => api.setUseCases(project, { constellations: [payload] }), remove: (cid) => api.deleteConstellation(project, cid), usage: usageOf((cid) => ({ constellation: cid })) });
+    const saved = await openConstellationDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("constellation"), save: (payload) => api.setUseCases(project, { constellations: [payload] }), remove: (cid, force) => api.deleteConstellation(project, cid, force), usage: usageOf((cid) => ({ constellation: cid })) });
     if (!saved) return;
     reportWrite(saved.data, saved.deleted ? "Constellation deleted." : "Constellation saved.");
   }

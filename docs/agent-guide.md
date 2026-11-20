@@ -664,7 +664,11 @@ tools say so depends on the file. An invalid case file, and an invalid entry in
 `personas.json`, `world.json` or `data-objects.json`, is skipped on reads and
 reported as an `invalid_file` warning (`target` `<kind>:<id>`, `<kind>:#<index>`
 for an entry without an id; `use_case:<id>` for a case file) naming the file
-and the problem; everything else still loads. Writes that start from such a pool
+and the problem; everything else still loads. `list_use_cases` lists at most 10 of each
+kind; `invalid_file_count` is the real number of unreadable case files and
+`pool_invalid_count` the real number of skipped pool entries (each present only
+above 10). `get_use_case` words a reference to a skipped id as unreadable, not
+missing. Writes that start from such a pool
 (`set_use_cases`, `generate_personas`, `delete_entity`) fail with `invalid_state`
 until the entry is repaired, so nothing is dropped silently. A file that is not
 JSON or has the wrong top level fails every read of it with `invalid_state`.

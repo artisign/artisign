@@ -94,6 +94,7 @@ export function createUseCasesView(options) {
   let poolProblem = ""; // the pool read failed outright (a file that is not JSON, the wrong shape): the tab says so instead of showing empty lists
   let listProblem = ""; // the same for the list read
   let listEntryWarnings = []; // skipped entries of personas.json / data-objects.json, from the list read
+  let entryTotal = 0; // the real number of skipped entries in the list read (the list carries at most 10)
   let worldEntryWarnings = []; // skipped entries of world.json, from GET /api/world
 
   const pool = emptyPool();
@@ -198,14 +199,20 @@ export function createUseCasesView(options) {
     const [res, worldRes] = await Promise.all([api.listUseCases(forProject, { limit: 1, include: ["personas", "dimensions", "data_objects"] }), api.fetchWorldSource(forProject)]);
     if (forProject !== project) return;
     poolProblem = res.ok ? "" : errorMessage(res);
-    if (!res.ok) return; // the tab's content says so (renderAll), with Retry
-    const data = res.data;
-    // The world pool has its own read; a failed one never blocks the rest, and is said where the world shows (the World tab, the filter menu, a toast).
-    pool.world = worldRes.ok ? worldRes.world : { entities: [], relationship_types: [], constellations: [] };
+    // The world pool has its own read, applied whatever the other one says; a failed one is said where the world shows (the World tab, the filter menu, a toast).
+    const world = worldRes.ok ? worldRes.world : { entities: [], relationship_types: [], constellations: [] };
+    const worldError = worldRes.ok ? "" : errorMessage(worldRes);
     worldEntryWarnings = worldRes.ok ? worldRes.warnings : [];
-    pool.worldError = worldRes.ok ? "" : errorMessage(worldRes);
-    reportWorldError(pool.worldError);
-    pool.constellations = new Map(pool.world.constellations.map((c) => [c.id, c.name]));
+    reportWorldError(worldError);
+    if (!res.ok) {
+      // The tab's content says so (renderAll), with Retry; nothing of the last good read stays on show.
+      Object.assign(pool, emptyPool(), { world, worldError, constellations: new Map(world.constellations.map((c) => [c.id, c.name])) });
+      return;
+    }
+    const data = res.data;
+    pool.world = world;
+    pool.worldError = worldError;
+    pool.constellations = new Map(world.constellations.map((c) => [c.id, c.name]));
     pool.personas = data.personas ?? [];
     pool.dimensions = data.dimensions ?? [];
     pool.objects = data.data_objects ?? [];
@@ -222,7 +229,7 @@ export function createUseCasesView(options) {
 
   /** What a person has to look at: the whole-file problem as the tab's content, skipped entries as a notice above it (the toast keeps unreadable case files). */
   function renderProblems() {
-    renderEntryNotice(notice, { warnings: [...listEntryWarnings, ...worldEntryWarnings], onRetry: retry });
+    renderEntryNotice(notice, { warnings: [...listEntryWarnings, ...worldEntryWarnings], total: entryTotal + worldEntryWarnings.length, onRetry: retry });
   }
 
   async function retry() {
@@ -256,7 +263,8 @@ export function createUseCasesView(options) {
   function reportInvalidFiles(data) {
     const { entries, files: warnings } = splitInvalidWarnings(data.warnings);
     listEntryWarnings = entries;
-    const total = data.invalid_file_count === undefined ? undefined : Math.max(warnings.length, data.invalid_file_count - entries.length);
+    entryTotal = data.pool_invalid_count ?? entries.length;
+    const total = data.invalid_file_count; // case files only; pool entries have pool_invalid_count
     const key = warnings.length ? JSON.stringify([total ?? warnings.length, warnings.map((w) => w.message ?? String(w))]) : "";
     if (key === shownInvalid || key === "") {
       pendingInvalid = null;
@@ -318,6 +326,7 @@ export function createUseCasesView(options) {
     if (!first.ok) {
       list.error = listProblem;
       listEntryWarnings = [];
+      entryTotal = 0;
       // Nothing of an earlier read stays on show next to the problem.
       list.total = 0;
       list.mode = "flat";
@@ -704,9 +713,14 @@ export function createUseCasesView(options) {
     addButton.hidden = section === "world"; // the world is edited in its own dialogs (not part of the read views)
     addButton.setAttribute("aria-label", section === "cases" ? "New use case" : section === "personas" ? "New persona" : "New data object");
     addButton.title = addButton.getAttribute("aria-label");
+    addButton.disabled = Boolean(loadProblem()); // a dialog would open on empty pools and its save would be refused
     renderProblems();
     if (mode === "mapping" && detail?.view) return; // the mapping view owns the content
-    if (loadProblem() && section !== "world") return renderLoadProblem(content, { message: loadProblem(), onRetry: retry }); // not an empty list: the data is there, it cannot be read
+    if (loadProblem() && section !== "world") {
+      renderPersonas(); // while there is a problem these only say so in their sidebars
+      renderObjects();
+      return renderLoadProblem(content, { message: loadProblem(), onRetry: retry });
+    } // not an empty list: the data is there, it cannot be read
     if (section === "personas") return renderPersonas();
     if (section === "objects") return renderObjects();
     if (section === "world") return renderWorld();
@@ -720,12 +734,19 @@ export function createUseCasesView(options) {
     renderDetail(content, detailCtx());
   }
 
+  /** A sidebar whose pool could not be read says so instead of listing nothing (or the last good read). */
+  function renderPoolProblem(summaryEl, listEl, what) {
+    summaryEl.textContent = "";
+    listEl.replaceChildren(h("p", { class: "uc-list-status" }, `${what} could not be loaded.`));
+  }
+
   function renderPoolPanel() {
     personaSummary.textContent = `${plural(pool.personas.length, "persona")} · ${plural(pool.dimensions.length, "dimension")}`;
     objectSummary.textContent = plural(pool.objects.length, "data object");
   }
 
   function renderPersonas() {
+    if (loadProblem()) return renderPoolProblem(personaSummary, personaListEl, "Personas");
     renderPoolPanel();
     renderPersonaList(personaListEl, { pool, query: poolQuery, selectedId: selectedPersona, limit: personaListLimit, handlers: { onSelect: (id) => { selectedPersona = id; scrollToPersona(id); renderPersonas(); }, onMore: () => { personaListLimit += LIST_PAGE * 2; renderPersonas(); } } });
     if (section === "personas" && mode !== "mapping" && !loadProblem()) renderPersonaPage(content, { pool, query: poolQuery, selectedId: selectedPersona, limit: personaLimit, usage: pool.usage, handlers: personaHandlers });
@@ -749,6 +770,7 @@ export function createUseCasesView(options) {
   };
 
   function renderObjects() {
+    if (loadProblem()) return renderPoolProblem(objectSummary, objectListEl, "Data objects");
     renderPoolPanel();
     const handlers = { onSelect: (id) => { selectedObject = id; renderObjects(); }, onNew: () => editObject(null), onEdit: (id) => editObject(id) };
     renderObjectList(objectListEl, { pool, query: objectQuery, selectedId: selectedObject, handlers });
@@ -1031,6 +1053,7 @@ export function createUseCasesView(options) {
       poolProblem = "";
       listProblem = "";
       listEntryWarnings = [];
+      entryTotal = 0;
       worldEntryWarnings = [];
       list.req++;
       mapping.hide();

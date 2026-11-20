@@ -205,6 +205,17 @@ function invalidCaseWarnings(invalid: UseCaseFileIssue[]): Warning[] {
   return invalid.map((file): Warning => ({ kind: "invalid_file", target: `use_case:${file.id}`, message: `usecases/cases/${file.id}.json is not loaded: ${file.error}` }));
 }
 
+/** A reference to an id whose entry was skipped is not "missing": say the entry is unreadable, so nobody re-creates it blindly. */
+function markSkipped(warnings: Warning[], issues: PoolEntryIssue[]): Warning[] {
+  const skipped = issues.filter((issue) => issue.id !== undefined);
+  if (skipped.length === 0) return warnings;
+  return warnings.map((warning) => {
+    if (!/^unknown_/.test(warning.kind)) return warning;
+    const hit = skipped.find((issue) => warning.message.includes(`"${issue.id}"`));
+    return hit ? { ...warning, message: `${warning.message} (its entry in ${hit.file} is invalid and not loaded)` } : warning;
+  });
+}
+
 /** A pool read twice in one call (the entity filter and the pools) reports each entry once. */
 function uniqueIssues(issues: PoolEntryIssue[]): PoolEntryIssue[] {
   const seen = new Set<string>();
@@ -258,12 +269,12 @@ async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promis
     if (input.include?.includes("dimensions")) response.dimensions = dimensions;
     if (input.include?.includes("data_objects")) response.data_objects = objects;
   }
-  // Skipped pool entries first: they affect every case, and the cap must not drop them behind a long list of case files.
-  const unreadable = [...poolEntryWarnings(uniqueIssues(poolIssues)), ...invalidCaseWarnings(invalid)];
-  if (unreadable.length > 0) {
-    response.warnings = unreadable.slice(0, 10);
-    if (unreadable.length > 10) response.invalid_file_count = unreadable.length;
-  }
+  // Capped and counted per kind, so skipped pool entries never hide an unreadable case file (and the reverse): 10 of each, the real totals beside them.
+  const entries = poolEntryWarnings(uniqueIssues(poolIssues));
+  const files = invalidCaseWarnings(invalid);
+  if (entries.length + files.length > 0) response.warnings = [...entries.slice(0, 10), ...files.slice(0, 10)];
+  if (files.length > 10) response.invalid_file_count = files.length;
+  if (entries.length > 10) response.pool_invalid_count = entries.length;
   return response;
 }
 
@@ -382,7 +393,7 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   }
 
   // Skipped pool entries come first, so the cap of the list never drops them.
-  const warnings = [...poolEntryWarnings(issues), ...(await validateUseCase(useCase, pools, lookup))];
+  const warnings = [...poolEntryWarnings(issues), ...markSkipped(await validateUseCase(useCase, pools, lookup), issues)];
   warnings.push(...ambiguousIds(bundlePersonas, world.entities));
   // The world the bundle shows is checked on read too: a member's change after the constellation was written shows up here.
   for (const entity of bundleEntities) warnings.push(...validateEntity(entity, pools));

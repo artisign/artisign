@@ -349,6 +349,47 @@ describe("with use cases", () => {
     expect($(".uc-notice").hidden).toBe(true);
   });
 
+  it("a pool that breaks while the tab is open leaves no old rows in the sidebars, the add button is off, and the world read still applies", async () => {
+    store.world = { entities: [], relationship_types: [], constellations: [] };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    $$(".uc-subtab")[1].click();
+    await flush();
+    expect($(".uc-plist").textContent).not.toBe("");
+    store.failInclude = true;
+    store.world = { entities: [{ id: "leo", name: "Leo", traits: {} }], relationship_types: [], constellations: [] };
+    emit({ type: "change", kind: "usecases", name: "personas" });
+    await new Promise((r) => setTimeout(r, 300));
+    await flush();
+    expect($(".uc-plist").textContent).toBe("Personas could not be loaded.");
+    expect($("#uc-add").disabled).toBe(true);
+    $$(".uc-subtab")[3].click();
+    await flush();
+    expect($$(".uc-plist")[1].textContent).toBe("Data objects could not be loaded.");
+    $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
+    await flush();
+    expect($(".uc-world-page tr[data-id=leo]")).not.toBeNull(); // the world read applies although the pool read failed
+    store.failInclude = false;
+    $$(".uc-subtab")[0].click();
+    $(".uc-problem [data-action=retry]").click();
+    await flush();
+    expect($("#uc-add").disabled).toBe(false);
+  });
+
+  it("the notice counts from pool_invalid_count and keeps the case-file toast", async () => {
+    const entries = Array.from({ length: 10 }, (_, i) => ({ kind: "invalid_file", target: `persona:p-${i}`, message: `usecases/personas.json personas[${i}] (p-${i}) is not loaded: x` }));
+    const caseFile = { kind: "invalid_file", target: "use_case:broken", message: "usecases/cases/broken.json is not loaded: x" };
+    store.invalid = { warnings: [...entries, caseFile], pool_invalid_count: 12 };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    expect($(".uc-notice").textContent).toContain("12 entries in usecases/personas.json could not be loaded");
+    expect($(".uc-notice").textContent).toContain("and 7 more");
+    expect($(".uc-toast:not(.uc-notice)").hidden).toBe(false);
+    expect($(".uc-toast:not(.uc-notice)").textContent).toContain("broken.json");
+  });
+
   it("a world with skipped entries is named in the same notice", async () => {
     store.world = { entities: [], relationship_types: [], constellations: [], warnings: [{ kind: "invalid_file", target: "entity:oops", message: "usecases/world.json entities[1] (oops) is not loaded: name: Invalid input" }] };
     await import("./app.js");

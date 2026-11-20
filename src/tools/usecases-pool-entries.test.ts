@@ -23,7 +23,7 @@ const BORROW = {
   steps: [{ id: "tap", actor: "member-ana", action: "Taps the book" }],
 };
 
-type ListRes = { total: number; use_cases: { id: string }[]; counts: Record<string, number>; personas?: { id: string }[]; dimensions?: { id: string }[]; data_objects?: { id: string }[]; warnings?: Warning[]; invalid_file_count?: number };
+type ListRes = { total: number; use_cases: { id: string }[]; counts: Record<string, number>; personas?: { id: string }[]; dimensions?: { id: string }[]; data_objects?: { id: string }[]; warnings?: Warning[]; invalid_file_count?: number; pool_invalid_count?: number };
 type GetRes = { personas: { id: string }[]; warnings: Warning[] };
 
 describe("use-case pool files — invalid entries on the read path", () => {
@@ -85,16 +85,27 @@ describe("use-case pool files — invalid entries on the read path", () => {
     expect(((await listUseCases(fx.store, {})) as ListRes).warnings).toBeUndefined();
   });
 
-  it("puts pool entries and case files in one list, pool entries first, capped at 10 with the real count", async () => {
+  it("caps and counts pool entries and case files separately: neither hides the other", async () => {
     await mkdir(file("cases"), { recursive: true });
     await writeFile(file("cases/broken.json"), "{ nope");
-    await poolJson({ dimensions: [], personas: Array.from({ length: 11 }, (_, i) => ({ id: `p-${i}` })) });
+    await poolJson({ dimensions: [], personas: Array.from({ length: 12 }, (_, i) => ({ id: `p-${i}` })) });
     const list = (await listUseCases(fx.store, {})) as ListRes;
-    expect(list.warnings).toHaveLength(10);
-    expect(list.warnings?.map((w) => w.target)).toEqual(Array.from({ length: 10 }, (_, i) => `persona:p-${i}`));
-    expect(list.invalid_file_count).toBe(12);
-    await poolJson({ dimensions: [], personas: [{ id: "p-0" }] });
-    expect(((await listUseCases(fx.store, {})) as ListRes).warnings?.map((w) => w.target)).toEqual(["persona:p-0", "use_case:broken"]);
+    expect(list.warnings).toHaveLength(11);
+    expect(list.warnings?.map((w) => w.target)).toEqual([...Array.from({ length: 10 }, (_, i) => `persona:p-${i}`), "use_case:broken"]);
+    expect(list.pool_invalid_count).toBe(12);
+    expect(list.invalid_file_count).toBeUndefined(); // counts case files only, as before
+    for (let i = 0; i < 11; i++) await writeFile(file(`cases/broken-${String(i).padStart(2, "0")}.json`), "{ nope");
+    const more = (await listUseCases(fx.store, {})) as ListRes;
+    expect(more.warnings?.filter((w) => w.target?.startsWith("use_case:"))).toHaveLength(10);
+    expect(more.invalid_file_count).toBe(12);
+    expect(more.pool_invalid_count).toBe(12);
+  });
+
+  it("says a skipped entry is unreadable where a case refers to it", async () => {
+    await poolJson({ dimensions: DIMENSIONS, personas: [{ id: "member-ana" }] });
+    const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as GetRes;
+    const unknown = bundle.warnings.find((w) => w.kind === "unknown_persona");
+    expect(unknown?.message).toContain("its entry in usecases/personas.json is invalid and not loaded");
   });
 
   it("suggest_use_case_variants reports skipped entries too", async () => {

@@ -220,3 +220,16 @@ describe("saved empty values stay as stored (PR #191, N1)", () => {
     expect(buildPayload({ id: stored.id, draft: draftFromSource(stored), source: stored }).payload).not.toHaveProperty("branches");
   });
 });
+
+describe("generated ids inside one variant (PR #191, N4)", () => {
+  it("a step a later change generates does not repeat the id add_branch generated for the same action", () => {
+    const v = variant([
+      { op: "add_branch", branch: { id: "failure", title: "Failure", when: [{ subject: "a", property: "p", value: 1 }], steps: [{ id: "", actor: "system", action: "Retry" }] } },
+      { op: "append", step: { id: "", actor: "system", action: "Retry" } },
+    ]);
+    const { out, errors } = build(v);
+    expect(errors).toEqual([]);
+    const ids = [out.steps[0].branch.steps[0].id, out.steps[1].step.id];
+    expect(ids).toEqual(["retry", "retry-2"]);
+  });
+});

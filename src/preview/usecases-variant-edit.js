@@ -379,7 +379,8 @@ export function buildVariant(variant, index, { baseSteps, baseBranches = [], use
       }
       const replaced = op.op === "replace_branch" ? model.branches.find((b) => b.id === op.branchId) : undefined;
       const problems = [];
-      const built = buildBranch(op.branch ?? blankBranch(), { taken: placesIn(model, replaced?.id), ids: new Set(model.branches.filter((b) => b !== replaced).map((b) => b.id)), errors: problems, fieldErrors: [], label: "The branch", lockId: op.op === "replace_branch" });
+      const built = buildBranch(op.branch ?? blankBranch(), { taken: placesIn(model, replaced?.id), ids: new Set(model.branches.filter((b) => b !== replaced).map((b) => b.id)), errors: problems, fieldErrors: [], label: "The branch", lockId: op.op === "replace_branch", avoid: usedStepIds });
+      for (const step of built.steps) usedStepIds.add(step.id); // a step generated later never repeats these ids
       if (op.op === "add_branch" && model.branches.some((b) => b.id === built.id)) problems.push(`${built.id} is already a branch of this case. Give the new branch another id.`);
       if (problems.length > 0) {
         errors.push(`${where}: ${problems[0]}`);

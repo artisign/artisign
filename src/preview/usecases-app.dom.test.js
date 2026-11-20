@@ -139,7 +139,7 @@ describe("optionality", () => {
     await openTab();
     expect($("#usecases-view").hidden).toBe(false);
     expect($(".uc-guide-title").textContent).toBe("Describe what people do with your screens");
-    expect($(".uc-guide-lede").textContent).toContain("optional");
+    expect($(".uc-guide-lede").textContent).toContain("Use case specs are optional");
     expect($(".uc-guide").textContent).toContain("Write use cases for the screens in demo");
     expect($(".uc-list-status").textContent).toBe("0 use cases · 0 personas");
     const tools = useCaseCalls().map((c) => c.tool ?? c.path);

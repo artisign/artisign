@@ -845,7 +845,7 @@ export function createUseCasesView(options) {
         "div",
         { class: "uc-guide" },
         h("h1", { class: "uc-guide-title" }, "Describe what people do with your screens"),
-        h("p", { class: "uc-guide-lede" }, "Use cases are optional. Without them this project works exactly as before. Add them when coding agents should build against concrete flows: who acts, which screen or element each step touches, and example data before and after."),
+        h("p", { class: "uc-guide-lede" }, "Use case specs are optional. Without them this project works exactly as before. Add them when coding agents should build against concrete flows: who acts, which screen or element each step touches, and example data before and after."),
         h(
           "ol",
           { class: "uc-guide-steps" },

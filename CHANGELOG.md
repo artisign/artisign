@@ -39,6 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Improvements
 
+- **"Use case spec":** the README, the descriptions of `list_use_cases`, `get_use_case`, `set_use_cases` and `suggest_use_case_variants`, and the empty state of the Use Cases tab now introduce the term "use case spec", so "use case" is not read as "purpose". Names, tools and routes are unchanged.
 - **`delete_entity` refuses a referenced use-case pool entry unless `force: true`:** a `persona`, `dimension`,
   `data_object`, `entity`, `constellation` or `relationship_type` that a use case or another pool entry still names
   is refused with `conflict` and the references listed (at most 5 ids per group); nothing is written. `force: true`

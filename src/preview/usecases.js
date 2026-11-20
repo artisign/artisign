@@ -38,9 +38,11 @@ import {
   plural,
   errorMessage,
   actorName,
+  splitInvalidWarnings,
 } from "./usecases-data.js";
 import { avatar, statusDot } from "./usecases-parts.js";
 import { actorKind } from "./usecases-world-parts.js";
+import { renderLoadProblem, renderEntryNotice, savingPausedReason } from "./usecases-problem.js";
 import { renderWorldNav, renderWorldPage } from "./usecases-world-pool.js";
 import { flowSequence } from "./usecases-world-data.js";
 import { avatarOf } from "./usecases-data.js";
@@ -89,6 +91,11 @@ export function createUseCasesView(options) {
   let shownWorldError = ""; // the world-read error the toast last said, so a reload does not repeat it
   let writeToast = false; // the visible toast is a write's confirmation
   let pendingInvalid = null; // an invalid-files report held back while a confirmation was visible
+  let poolProblem = ""; // the pool read failed outright (a file that is not JSON, the wrong shape): the tab says so instead of showing empty lists
+  let listProblem = ""; // the same for the list read
+  let listEntryWarnings = []; // skipped entries of personas.json / data-objects.json, from the list read
+  let entryTotal = 0; // the real number of skipped entries in the list read (the list carries at most 10)
+  let worldEntryWarnings = []; // skipped entries of world.json, from GET /api/world
 
   const pool = emptyPool();
   const list = { req: 0, loading: false, error: "", total: 0, counts: null, facets: null, facetsTruncated: [], mode: "tree", tree: null, expanded: new Set(), groupState: new Map(), groupErrors: new Map(), ungrouped: { count: 0, rows: [], loading: false }, flat: { items: [], cursor: null, loading: false, error: "" }, activeKey: null };
@@ -112,8 +119,9 @@ export function createUseCasesView(options) {
   objectsPanelEl.append(h("div", { class: "uc-search" }, icon("search"), objectSearch), objectSummary, objectListEl);
   const side = h("aside", { class: "uc-side" }, subnav, casesPanelEl, personasPanelEl, worldPanelEl, objectsPanelEl);
   const toast = h("div", { class: "uc-toast", role: "status", hidden: true });
+  const notice = h("div", { class: "uc-toast uc-notice", role: "status", hidden: true });
   const content = h("div", { class: "uc-content" });
-  const main = h("main", { class: "uc-main" }, toast, content);
+  const main = h("main", { class: "uc-main" }, toast, notice, content);
   const root = h("div", { class: "uc-root", dataset: { mode: "detail" } }, side, main);
   rootEl.append(root);
 
@@ -190,16 +198,21 @@ export function createUseCasesView(options) {
     const forProject = project;
     const [res, worldRes] = await Promise.all([api.listUseCases(forProject, { limit: 1, include: ["personas", "dimensions", "data_objects"] }), api.fetchWorldSource(forProject)]);
     if (forProject !== project) return;
+    poolProblem = res.ok ? "" : errorMessage(res);
+    // The world pool has its own read, applied whatever the other one says; a failed one is said where the world shows (the World tab, the filter menu, a toast).
+    const world = worldRes.ok ? worldRes.world : { entities: [], relationship_types: [], constellations: [] };
+    const worldError = worldRes.ok ? "" : errorMessage(worldRes);
+    worldEntryWarnings = worldRes.ok ? worldRes.warnings : [];
+    reportWorldError(worldError);
     if (!res.ok) {
-      showToast(errorMessage(res), []);
+      // The tab's content says so (renderAll), with Retry; nothing of the last good read stays on show.
+      Object.assign(pool, emptyPool(), { world, worldError, constellations: new Map(world.constellations.map((c) => [c.id, c.name])) });
       return;
     }
     const data = res.data;
-    // The world pool has its own read; a failed one never blocks the rest, and is said where the world shows (the World tab, the filter menu, a toast).
-    pool.world = worldRes.ok ? worldRes.world : { entities: [], relationship_types: [], constellations: [] };
-    pool.worldError = worldRes.ok ? "" : errorMessage(worldRes);
-    reportWorldError(pool.worldError);
-    pool.constellations = new Map(pool.world.constellations.map((c) => [c.id, c.name]));
+    pool.world = world;
+    pool.worldError = worldError;
+    pool.constellations = new Map(world.constellations.map((c) => [c.id, c.name]));
     pool.personas = data.personas ?? [];
     pool.dimensions = data.dimensions ?? [];
     pool.objects = data.data_objects ?? [];
@@ -212,6 +225,29 @@ export function createUseCasesView(options) {
   }
 
   const poolView = () => pool;
+  const loadProblem = () => poolProblem || listProblem;
+  /** Marks every control of a pool page that opens an editor or a generator while saving is paused: focusable, with the reason as its title; the handlers refuse the click too. */
+  function markPaused(root) {
+    const reason = pausedReason();
+    if (!reason) return;
+    for (const el of root.querySelectorAll(".uc-persona-open, .uc-dim-name, .uc-h2-action, .uc-persona-new, .uc-io-pencil, .uc-page-head .uc-actions button, .uc-world-page .uc-h2-row button, .uc-world-page .uc-link-row, .uc-world-page .uc-guide-actions button")) {
+      if (el.disabled) continue;
+      el.setAttribute("aria-disabled", "true");
+      el.title = reason;
+    }
+  }
+  const pausedReason = () => savingPausedReason({ problems: [loadProblem(), pool.worldError], warnings: [...listEntryWarnings, ...worldEntryWarnings] });
+
+  /** What a person has to look at: the whole-file problem as the tab's content, skipped entries as a notice above it (the toast keeps unreadable case files). */
+  function renderProblems() {
+    renderEntryNotice(notice, { warnings: [...listEntryWarnings, ...worldEntryWarnings], total: entryTotal + worldEntryWarnings.length, onRetry: retry });
+  }
+
+  async function retry() {
+    await Promise.all([loadPool(), loadList()]);
+    renderPools();
+    renderAll();
+  }
   const isEmptyProject = () => pool.loaded && pool.counts && pool.counts.use_cases === 0 && pool.counts.personas === 0 && pool.counts.dimensions === 0 && pool.counts.data_objects === 0;
 
   // --- List ------------------------------------------------------------------------------------------------------
@@ -230,19 +266,23 @@ export function createUseCasesView(options) {
     const labels = { persona: filters.persona ? actorName(filters.persona, pool.personasById) : "", constellation: filters.constellation ? (pool.constellations.get(filters.constellation) ?? filters.constellation) : "" };
     const empty = isEmptyProject();
     const emptyText = `${plural(0, "use case")} · ${plural(pool.counts?.personas ?? 0, "persona")}`;
-    listPanel.update({ filters, sort, total: list.total, counts: list.counts, rows, selectedId: detail?.id ?? null, activeKey: list.activeKey, labels, loading: list.loading, error: list.error, empty, emptyText });
+    // The reason is said once, in the tab's content; the list only says that there is none.
+    listPanel.update({ filters, sort, total: list.total, counts: list.counts, rows, selectedId: detail?.id ?? null, activeKey: list.activeKey, labels, loading: list.loading, error: list.error ? "Use cases could not be loaded." : "", empty: empty || Boolean(list.error), emptyText });
   }
 
   /** The invalid-files toast shows when the set of unreadable files changes — not on every list load — and never replaces a write's confirmation. */
   function reportInvalidFiles(data) {
-    const warnings = data.warnings ?? [];
-    const key = warnings.length ? JSON.stringify([data.invalid_file_count ?? warnings.length, warnings.map((w) => w.message ?? String(w))]) : "";
+    const { entries, files: warnings } = splitInvalidWarnings(data.warnings);
+    listEntryWarnings = entries;
+    entryTotal = data.invalid_pool_entry_count ?? entries.length;
+    const total = data.invalid_file_count; // case files only; pool entries have invalid_pool_entry_count
+    const key = warnings.length ? JSON.stringify([total ?? warnings.length, warnings.map((w) => w.message ?? String(w))]) : "";
     if (key === shownInvalid || key === "") {
       pendingInvalid = null;
       shownInvalid = key === "" ? "" : shownInvalid;
       return;
     }
-    const report = { key, warnings, total: data.invalid_file_count };
+    const report = { key, warnings, total };
     if (writeToast && !toast.hidden) {
       pendingInvalid = report; // shown when the confirmation goes away
       return;
@@ -293,9 +333,18 @@ export function createUseCasesView(options) {
     const first = await api.listUseCases(forProject, { ...query, sort, limit: sort === "group" ? 1 : FLAT_PAGE });
     if (stale()) return;
     list.loading = false;
+    listProblem = first.ok ? "" : errorMessage(first);
     if (!first.ok) {
-      list.error = errorMessage(first);
+      list.error = listProblem;
+      listEntryWarnings = [];
+      entryTotal = 0;
+      // Nothing of an earlier read stays on show next to the problem.
+      list.total = 0;
+      list.mode = "flat";
+      list.tree = null;
+      list.flat = { items: [], cursor: null, loading: false, error: "" };
       renderList();
+      renderAll();
       return;
     }
     const data = first.data;
@@ -637,6 +686,7 @@ export function createUseCasesView(options) {
       variantId: detail.variantId,
       pool,
       coverageOpen,
+      paused: pausedReason(),
       handlers: {
         onVariant: (variantId) => openCase(detail.id, variantId),
         onEdit: () => editUseCase(detail.id),
@@ -674,8 +724,17 @@ export function createUseCasesView(options) {
     worldPanelEl.hidden = section !== "world";
     addButton.hidden = section === "world"; // the world is edited in its own dialogs (not part of the read views)
     addButton.setAttribute("aria-label", section === "cases" ? "New use case" : section === "personas" ? "New persona" : "New data object");
-    addButton.title = addButton.getAttribute("aria-label");
+    // Paused, not disabled: the button stays focusable and says why (a dialog would open on incomplete pools and its save would be refused).
+    const paused = pausedReason();
+    addButton.setAttribute("aria-disabled", paused ? "true" : "false");
+    addButton.title = paused || addButton.getAttribute("aria-label");
+    renderProblems();
     if (mode === "mapping" && detail?.view) return; // the mapping view owns the content
+    if (loadProblem() && section !== "world") {
+      renderPersonas(); // while there is a problem these only say so in their sidebars
+      renderObjects();
+      return renderLoadProblem(content, { message: loadProblem(), onRetry: retry });
+    } // not an empty list: the data is there, it cannot be read
     if (section === "personas") return renderPersonas();
     if (section === "objects") return renderObjects();
     if (section === "world") return renderWorld();
@@ -689,15 +748,27 @@ export function createUseCasesView(options) {
     renderDetail(content, detailCtx());
   }
 
+  /** A sidebar whose pool could not be read says so instead of listing nothing (or the last good read). */
+  function renderPoolProblem(summaryEl, listEl, what) {
+    summaryEl.hidden = true; // no empty band with a divider above the message
+    listEl.replaceChildren(h("p", { class: "uc-list-status" }, `${what} could not be loaded.`));
+  }
+
   function renderPoolPanel() {
+    personaSummary.hidden = false;
+    objectSummary.hidden = false;
     personaSummary.textContent = `${plural(pool.personas.length, "persona")} · ${plural(pool.dimensions.length, "dimension")}`;
     objectSummary.textContent = plural(pool.objects.length, "data object");
   }
 
   function renderPersonas() {
+    if (loadProblem()) return renderPoolProblem(personaSummary, personaListEl, "Personas");
     renderPoolPanel();
     renderPersonaList(personaListEl, { pool, query: poolQuery, selectedId: selectedPersona, limit: personaListLimit, handlers: { onSelect: (id) => { selectedPersona = id; scrollToPersona(id); renderPersonas(); }, onMore: () => { personaListLimit += LIST_PAGE * 2; renderPersonas(); } } });
-    if (section === "personas" && mode !== "mapping") renderPersonaPage(content, { pool, query: poolQuery, selectedId: selectedPersona, limit: personaLimit, usage: pool.usage, handlers: personaHandlers });
+    if (section === "personas" && mode !== "mapping" && !loadProblem()) {
+      renderPersonaPage(content, { pool, query: poolQuery, selectedId: selectedPersona, limit: personaLimit, usage: pool.usage, handlers: personaHandlers });
+      markPaused(content);
+    }
   }
 
   function scrollToPersona(id) {
@@ -718,15 +789,22 @@ export function createUseCasesView(options) {
   };
 
   function renderObjects() {
+    if (loadProblem()) return renderPoolProblem(objectSummary, objectListEl, "Data objects");
     renderPoolPanel();
     const handlers = { onSelect: (id) => { selectedObject = id; renderObjects(); }, onNew: () => editObject(null), onEdit: (id) => editObject(id) };
     renderObjectList(objectListEl, { pool, query: objectQuery, selectedId: selectedObject, handlers });
-    if (section === "objects" && mode !== "mapping") renderObjectPage(content, { pool, query: objectQuery, selectedId: selectedObject, handlers });
+    if (section === "objects" && mode !== "mapping" && !loadProblem()) {
+      renderObjectPage(content, { pool, query: objectQuery, selectedId: selectedObject, handlers });
+      markPaused(content);
+    }
   }
 
   function renderWorld() {
     renderWorldNav(worldPanelEl, { world: pool.world, selected: selectedWorldPart, onSelect: (part) => { selectedWorldPart = part; renderWorld(); document.getElementById(`uc-world-${part}`)?.scrollIntoView?.({ block: "start" }); } });
-    if (section === "world" && mode !== "mapping") renderWorldPage(content, { world: pool.world, pool, selected: selectedWorldPart, error: pool.worldError, handlers: worldHandlers });
+    if (section === "world" && mode !== "mapping") {
+      renderWorldPage(content, { world: pool.world, pool, selected: selectedWorldPart, error: pool.worldError, handlers: worldHandlers });
+      markPaused(content);
+    }
   }
 
   const worldHandlers = {
@@ -824,6 +902,7 @@ export function createUseCasesView(options) {
   }
 
   async function newUseCase() {
+    if (pausedReason()) return;
     if (!pool.loaded) await loadPool();
     const saved = await openUseCaseDialog(useCaseDialogOptions({ mode: "new", source: null }));
     if (!saved) return;
@@ -833,6 +912,7 @@ export function createUseCasesView(options) {
   }
 
   async function editUseCase(id, focus = {}) {
+    if (pausedReason()) return;
     // Always from the file as it is now: an edit sends whole arrays (shallow merge), so a stale copy would overwrite an agent's change.
     const res = await api.fetchUseCaseSource(project, id);
     if (!res.ok) return showToast(res.message, []);
@@ -876,6 +956,7 @@ export function createUseCasesView(options) {
   }
 
   async function editPersona(id) {
+    if (pausedReason()) return;
     let source = id ? pool.personasById.get(id) : null;
     if (id && !source) return;
     const saved = await openPersonaDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("persona"), save: (payload) => api.setUseCases(project, { personas: [payload] }), remove: (pid) => api.deletePersona(project, pid) });
@@ -886,6 +967,7 @@ export function createUseCasesView(options) {
   }
 
   async function editDimension(id) {
+    if (pausedReason()) return;
     const source = id ? pool.dimensionsById.get(id) : null;
     const saved = await openDimensionDialog({ mode: id ? "edit" : "new", source, takenIds: takenIds("dimension"), save: (payload) => api.setUseCases(project, { dimensions: [payload] }), remove: (did) => api.deleteDimension(project, did) });
     if (!saved) return;
@@ -893,6 +975,7 @@ export function createUseCasesView(options) {
   }
 
   async function editObject(id) {
+    if (pausedReason()) return;
     const source = id ? pool.objectsById.get(id) : null;
     const saved = await openObjectDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("object"), save: (payload) => api.setUseCases(project, { data_objects: [payload] }), remove: (oid) => api.deleteDataObject(project, oid) });
     if (!saved) return;
@@ -901,6 +984,7 @@ export function createUseCasesView(options) {
   }
 
   async function generate(target = "personas") {
+    if (pausedReason()) return;
     const saved = await openGenerateDialog({ pool: poolView, target, generate: (input) => api.generatePersonas(project, input) });
     if (!saved) return;
     reportWrite(saved.data, `${plural(saved.created, saved.target === "constellations" ? "constellation" : "persona")} generated.`);
@@ -913,6 +997,7 @@ export function createUseCasesView(options) {
   };
 
   async function editEntity(id) {
+    if (pausedReason()) return;
     const source = id ? pool.world.entities.find((e) => e.id === id) : null;
     if (id && !source) return;
     const saved = await openEntityDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("entity"), save: (payload) => api.setUseCases(project, { entities: [payload] }), remove: (eid) => api.deleteMainEntity(project, eid), usage: usageOf((eid) => ({ entity: eid })) });
@@ -921,6 +1006,7 @@ export function createUseCasesView(options) {
   }
 
   async function editRelationshipType(id) {
+    if (pausedReason()) return;
     const source = id ? pool.world.relationship_types.find((t) => t.id === id) : null;
     if (id && !source) return;
     const saved = await openRelationshipTypeDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("relationship_type"), save: (payload) => api.setUseCases(project, { relationship_types: [payload] }), remove: (tid) => api.deleteRelationshipType(project, tid) });
@@ -929,6 +1015,7 @@ export function createUseCasesView(options) {
   }
 
   async function editConstellation(id) {
+    if (pausedReason()) return;
     const source = id ? pool.world.constellations.find((c) => c.id === id) : null;
     if (id && !source) return;
     const saved = await openConstellationDialog({ mode: id ? "edit" : "new", source, pool: poolView, takenIds: takenIds("constellation"), save: (payload) => api.setUseCases(project, { constellations: [payload] }), remove: (cid) => api.deleteConstellation(project, cid), usage: usageOf((cid) => ({ constellation: cid })) });
@@ -937,6 +1024,7 @@ export function createUseCasesView(options) {
   }
 
   function addForSection() {
+    if (pausedReason()) return;
     if (section === "cases") newUseCase();
     else if (section === "personas") editPersona(null);
     else editObject(null);
@@ -997,6 +1085,11 @@ export function createUseCasesView(options) {
       selectedStep = null;
       filters = { ...EMPTY_FILTERS };
       Object.assign(pool, emptyPool());
+      poolProblem = "";
+      listProblem = "";
+      listEntryWarnings = [];
+      entryTotal = 0;
+      worldEntryWarnings = [];
       list.req++;
       mapping.hide();
       if (visible) start();

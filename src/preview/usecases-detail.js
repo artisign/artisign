@@ -97,7 +97,7 @@ function header(ctx, useCase, w) {
         "div",
         { class: "uc-actions" },
         h("button", { type: "button", class: "chrome-btn", onClick: () => handlers.onMap(null), disabled: !(useCase.steps ?? []).some((s) => s.target) }, icon("view_carousel"), "Show on screens"),
-        h("button", { type: "button", class: "chrome-btn", onClick: handlers.onEdit }, icon("edit"), "Edit"),
+        h("button", { type: "button", class: "chrome-btn", onClick: handlers.onEdit, "aria-disabled": ctx.paused ? "true" : null, title: ctx.paused || null }, icon("edit"), "Edit"),
         h("button", { type: "button", class: "chrome-icon-btn", "aria-label": "More actions", title: "More actions", "aria-haspopup": "menu", "aria-expanded": "false", onClick: (e) => openMenu({ anchor: e.currentTarget, label: "More actions", items: [{ value: "delete", label: "Delete use case", leading: icon("delete", "chrome-menu-icon") }], onPick: () => handlers.onDelete() }) }, icon("more_horiz")),
       ),
     ),
@@ -123,7 +123,7 @@ function variantBar(ctx, variants, source, matrix) {
     const changes = raw ? variantChangeCount(raw, baseCase.steps, baseCase) : 0;
     chips.push(variantChip({ label: variant.title, meta: raw ? plural(changes, "change") : "", selected: variantId === variant.id, title: variant.description, onClick: () => handlers.onVariant(variant.id) }));
   }
-  chips.push(variantChip({ label: "Variant", add: true, onClick: handlers.onAddVariant, title: "Add a variant" }));
+  chips.push(variantChip({ label: "Variant", add: true, onClick: handlers.onAddVariant, title: ctx.paused || "Add a variant", paused: Boolean(ctx.paused) }));
   return h(
     "div",
     { class: "uc-variant-bar" },

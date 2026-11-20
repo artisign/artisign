@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -123,13 +123,19 @@ describe("use case tools", () => {
   });
 
   describe("existing tools do not see use cases", () => {
-    it("keeps get_project, get_screen, get_design_system, find_nodes and last_write_at identical once usecases/ exists", async () => {
+    it("keeps get_project, get_screen, get_design_system and find_nodes identical once usecases/ exists, bar use_case_count and last_write_at", async () => {
       await writeHtml(fx.store, { screen: "home", mode: "create", title: "Home", html_aug: `<div id="n1">Hi</div>` });
+      const strip = (project: Record<string, unknown>): Record<string, unknown> => {
+        const rest = { ...project };
+        delete rest.use_case_count;
+        delete rest.last_write_at;
+        return rest;
+      };
       const existing = async (): Promise<string> =>
         JSON.stringify([
-          await getProject(fx.store, {}),
-          await getProject(fx.store, { view: "tree" }),
-          await getProject(fx.store, { view: "full" }),
+          strip(await getProject(fx.store, {})),
+          strip(await getProject(fx.store, { view: "tree" })),
+          strip(await getProject(fx.store, { view: "full" })),
           await getScreen(fx.store, { screen: "home" }),
           await getDesignSystem(fx.store, {}),
           await findNodes(fx.store, { where: [{ kind: "has_flow" }] }),
@@ -144,7 +150,25 @@ describe("use case tools", () => {
       await deleteEntity(fx.store, { kind: "persona", name: "staff-lee", force: true });
 
       expect(await existing()).toBe(before);
-      expect(((await getProject(fx.store, {})) as { last_write_at: string }).last_write_at).toBe(stamp);
+      const after = (await getProject(fx.store, {})) as { last_write_at: string; use_case_count?: number };
+      expect(after.use_case_count).toBe(1);
+      expect(after.last_write_at > stamp).toBe(true);
+    });
+
+    it("moves last_write_at when set_use_cases writes", async () => {
+      await writeHtml(fx.store, { screen: "home", mode: "create", title: "Home", html_aug: `<div id="n1">Hi</div>` });
+      await utimes(join(fx.dir, "screens", "home.html"), new Date("2020-01-01"), new Date("2020-01-01"));
+      const stamp = ((await getProject(fx.store, {})) as { last_write_at: string }).last_write_at;
+      await setUseCases(fx.store, { dimensions: DIMENSIONS, personas: PERSONAS, data_objects: DATA_OBJECTS, use_cases: [borrowCase()] });
+      expect(((await getProject(fx.store, {})) as { last_write_at: string }).last_write_at > stamp).toBe(true);
+    });
+
+    it("get_project carries use_case_count only when the project has a use case", async () => {
+      expect(await getProject(fx.store, {})).not.toHaveProperty("use_case_count");
+      await setUseCases(fx.store, { dimensions: DIMENSIONS, personas: PERSONAS });
+      expect(await getProject(fx.store, {})).not.toHaveProperty("use_case_count");
+      await setUseCases(fx.store, { data_objects: DATA_OBJECTS, use_cases: [borrowCase()] });
+      expect(await getProject(fx.store, {})).toMatchObject({ use_case_count: 1 });
     });
   });
 
@@ -1207,7 +1231,7 @@ describe("use cases in the store", () => {
     expect(first.commit).toMatch(/^[0-9a-f]{40}$/);
     await deleteEntity(store, { kind: "use_case", name: "borrow-book" });
     const { stdout } = await execFileAsync("git", ["log", "--format=%s"], { cwd: dir });
-    expect(stdout.trim().split("\n").slice(0, 2)).toEqual(["delete_entity: use_case:borrow-book", "set_use_cases: 2 personas, 1 use_cases"]);
+    expect(stdout.trim().split("\n").slice(0, 2)).toEqual(["delete_entity: use_case:borrow-book", "set_use_cases: 2 personas, 1 use case"]);
   });
 
   it("refuses a pool file it cannot trust instead of coercing it away", async () => {
@@ -1249,7 +1273,7 @@ describe("preview commits (ctx.source: human)", () => {
     await writeFile(join(dir, "stray.txt"), "left over");
     const res = await setUseCases(store, { use_cases: [borrowCase({ id: "renew-loan", title: "Renew a loan" })] }, human);
     expect(res.commit).toMatch(/^[0-9a-f]{40}$/);
-    expect(await lastSubject()).toBe("set_use_cases (preview): 1 use_cases");
+    expect(await lastSubject()).toBe("set_use_cases (preview): 1 use case");
     expect(await lastFiles()).toEqual(["usecases/cases/renew-loan.json"]);
     expect(await dirty()).toEqual(["stray.txt"]);
   });
@@ -1259,13 +1283,22 @@ describe("preview commits (ctx.source: human)", () => {
     await writeHtmlAndLeave();
     const res = await setUseCases(store, { personas: [{ id: "member-ana", name: "Anna" }] }, human);
     expect(res.commit).toMatch(/^[0-9a-f]{40}$/);
-    expect(await lastSubject()).toBe("set_use_cases (preview): 1 personas");
+    expect(await lastSubject()).toBe("set_use_cases (preview): 1 persona");
     expect(await lastFiles()).toEqual(["usecases/personas.json"]);
     expect(await dirty()).toEqual(["screens/leftover.html", "usecases/cases/borrow-book.json"]);
     // The next agent commit picks the leftovers up, unmarked.
     await setUseCases(store, { personas: [{ id: "staff-lee", name: "Leigh" }] });
-    expect(await lastSubject()).toBe("set_use_cases: 1 personas");
+    expect(await lastSubject()).toBe("set_use_cases: 1 persona");
     expect(await dirty()).toEqual([]);
+  });
+
+  it("labels the commit summary with singular and plural names", async () => {
+    await setUseCases(store, {
+      entities: [{ id: "shelf", name: "Shelf", type: "Furniture" }, { id: "desk", name: "Desk", type: "Furniture" }],
+      relationship_types: [{ id: "stands-on", label: "stands on" }],
+      data_objects: [{ id: "fine", name: "Fine", fields: [{ name: "amount", type: "string" }] }],
+    });
+    expect(await lastSubject()).toBe("set_use_cases: 2 entities, 1 relationship type, 1 data object");
   });
 
   async function writeHtmlAndLeave(): Promise<void> {
@@ -1373,7 +1406,7 @@ describe("preview commits (ctx.source: human)", () => {
       const res = await setUseCases(new FsStore(fresh), { use_cases: [borrowCase()] }, human);
       expect(res.commit).toMatch(/^[0-9a-f]{40}$/);
       const { stdout } = await execFileAsync("git", ["show", "--name-only", "--format=%s", "HEAD"], { cwd: fresh });
-      expect(stdout.trim().split("\n")).toEqual(["set_use_cases (preview): 1 use_cases", "", "usecases/cases/borrow-book.json"]);
+      expect(stdout.trim().split("\n")).toEqual(["set_use_cases (preview): 1 use case", "", "usecases/cases/borrow-book.json"]);
     } finally {
       await rm(fresh, { recursive: true, force: true });
     }

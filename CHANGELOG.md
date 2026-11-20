@@ -52,6 +52,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `delete_entity` with `variant` on any kind other than `mockup` now fails with `validation_failed` and deletes
   nothing; before, the parameter was ignored for the use-case kinds and the whole entity was deleted.
 
+### Fixed
+
+- **Use cases (tool contract change):** `get_project` carries `use_case_count` once a project has at least one use case
+  (absent otherwise, so projects without `usecases/` answer unchanged). `last_write_at` now also moves on use-case
+  writes.
+- **Use cases (tool contract change):** the commit message of `set_use_cases` uses singular and plural labels
+  ("1 use case", "2 entities", "1 relationship type") instead of the raw keys.
+
 ## [2.2.1] - 2026-11-14
 
 An agent skill on how to design with artisign, mockup variants in `patch_html` and `inspect_node`,

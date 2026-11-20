@@ -127,6 +127,7 @@ const PROJECT_ALWAYS = [
   "mockup_count",
   "flow_count",
   "open_comment_count",
+  "use_case_count",
   "head",
   "head_reason",
   "last_write_at",
@@ -155,6 +156,9 @@ export async function getProject(store: Store, input: GetProjectInput): Promise<
     openCommentCountByScreen.set(thread.root.screen, (openCommentCountByScreen.get(thread.root.screen) ?? 0) + 1);
   }
 
+  // Only a project that has use cases carries the count, so one without a usecases/ folder answers byte-identically.
+  const useCaseCount = (await store.listUseCaseIds()).length;
+
   const summary: Record<string, unknown> = {
     name: config.name,
     root: store.projectDir,
@@ -164,6 +168,7 @@ export async function getProject(store: Store, input: GetProjectInput): Promise<
     mockup_count: mockupNames.length,
     flow_count: flowRecords.length,
     open_comment_count: openCommentCount,
+    ...(useCaseCount > 0 ? { use_case_count: useCaseCount } : {}),
     head: head.sha,
     ...(head.head_reason !== undefined ? { head_reason: head.head_reason } : {}),
     ...(lastWriteAt !== undefined ? { last_write_at: lastWriteAt } : {}),

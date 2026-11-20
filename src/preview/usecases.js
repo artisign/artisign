@@ -263,8 +263,8 @@ export function createUseCasesView(options) {
   function reportInvalidFiles(data) {
     const { entries, files: warnings } = splitInvalidWarnings(data.warnings);
     listEntryWarnings = entries;
-    entryTotal = data.pool_invalid_count ?? entries.length;
-    const total = data.invalid_file_count; // case files only; pool entries have pool_invalid_count
+    entryTotal = data.invalid_pool_entry_count ?? entries.length;
+    const total = data.invalid_file_count; // case files only; pool entries have invalid_pool_entry_count
     const key = warnings.length ? JSON.stringify([total ?? warnings.length, warnings.map((w) => w.message ?? String(w))]) : "";
     if (key === shownInvalid || key === "") {
       pendingInvalid = null;

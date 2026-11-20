@@ -377,10 +377,10 @@ describe("with use cases", () => {
     expect($("#uc-add").disabled).toBe(false);
   });
 
-  it("the notice counts from pool_invalid_count and keeps the case-file toast", async () => {
+  it("the notice counts from invalid_pool_entry_count and keeps the case-file toast", async () => {
     const entries = Array.from({ length: 10 }, (_, i) => ({ kind: "invalid_file", target: `persona:p-${i}`, message: `usecases/personas.json personas[${i}] (p-${i}) is not loaded: x` }));
     const caseFile = { kind: "invalid_file", target: "use_case:broken", message: "usecases/cases/broken.json is not loaded: x" };
-    store.invalid = { warnings: [...entries, caseFile], pool_invalid_count: 12 };
+    store.invalid = { warnings: [...entries, caseFile], invalid_pool_entry_count: 12 };
     await import("./app.js");
     await flush();
     await openTab();

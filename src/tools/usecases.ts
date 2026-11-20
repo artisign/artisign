@@ -274,7 +274,7 @@ async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promis
   const files = invalidCaseWarnings(invalid);
   if (entries.length + files.length > 0) response.warnings = [...entries.slice(0, 10), ...files.slice(0, 10)];
   if (files.length > 10) response.invalid_file_count = files.length;
-  if (entries.length > 10) response.pool_invalid_count = entries.length;
+  if (entries.length > 10) response.invalid_pool_entry_count = entries.length;
   return response;
 }
 
@@ -399,6 +399,8 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
   for (const entity of bundleEntities) warnings.push(...validateEntity(entity, pools));
   for (const type of bundleRelationshipTypes) warnings.push(...validateRelationshipType(type, pools));
   for (const constellation of bundleConstellations) warnings.push(...validateConstellation(constellation, pools));
+  // The case's own warnings first, the skipped pool entries after them: the cap of 50 never displaces what is wrong with the case (warning_count stays the true total).
+  warnings.push(...poolEntryWarnings(issues));
   const response: Record<string, unknown> = {
     use_case: effective,
     ...(variant ? { variant: { id: variant.id, title: variant.title, ...(variant.description !== undefined ? { description: variant.description } : {}), when: variant.when } } : {}),
@@ -417,10 +419,6 @@ async function getUseCaseInner(store: Store, input: GetUseCaseInput): Promise<Re
     screens: [...screens.values()],
     ...reportWarnings(warnings),
   };
-  // Skipped pool entries are capped on their own (10, real total beside them) so they never push the case's own warnings out of the 50.
-  const skipped = poolEntryWarnings(issues);
-  if (skipped.length > 0) response.warnings = [...skipped.slice(0, 10), ...(response.warnings as Warning[])];
-  if (skipped.length > 10) response.pool_invalid_count = skipped.length;
   return response;
 }
 

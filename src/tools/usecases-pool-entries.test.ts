@@ -23,7 +23,7 @@ const BORROW = {
   steps: [{ id: "tap", actor: "member-ana", action: "Taps the book" }],
 };
 
-type ListRes = { total: number; use_cases: { id: string }[]; counts: Record<string, number>; personas?: { id: string }[]; dimensions?: { id: string }[]; data_objects?: { id: string }[]; warnings?: Warning[]; invalid_file_count?: number; pool_invalid_count?: number };
+type ListRes = { total: number; use_cases: { id: string }[]; counts: Record<string, number>; personas?: { id: string }[]; dimensions?: { id: string }[]; data_objects?: { id: string }[]; warnings?: Warning[]; invalid_file_count?: number; invalid_pool_entry_count?: number };
 type GetRes = { personas: { id: string }[]; warnings: Warning[] };
 
 describe("use-case pool files — invalid entries on the read path", () => {
@@ -47,7 +47,7 @@ describe("use-case pool files — invalid entries on the read path", () => {
       { kind: "invalid_file", target: "persona:x", message: expect.stringMatching(/^usecases\/personas\.json personas\[0\] \(x\) is not loaded: name: /) },
     ]);
     const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as GetRes;
-    expect(bundle.warnings[0]).toMatchObject({ kind: "invalid_file", target: "persona:x" });
+    expect(bundle.warnings.find((w) => w.kind === "invalid_file")).toMatchObject({ target: "persona:x" });
   });
 
   it("keeps the valid entries, names entries without an id by position and skips a repeated id", async () => {
@@ -92,13 +92,13 @@ describe("use-case pool files — invalid entries on the read path", () => {
     const list = (await listUseCases(fx.store, {})) as ListRes;
     expect(list.warnings).toHaveLength(11);
     expect(list.warnings?.map((w) => w.target)).toEqual([...Array.from({ length: 10 }, (_, i) => `persona:p-${i}`), "use_case:broken"]);
-    expect(list.pool_invalid_count).toBe(12);
+    expect(list.invalid_pool_entry_count).toBe(12);
     expect(list.invalid_file_count).toBeUndefined(); // counts case files only, as before
     for (let i = 0; i < 11; i++) await writeFile(file(`cases/broken-${String(i).padStart(2, "0")}.json`), "{ nope");
     const more = (await listUseCases(fx.store, {})) as ListRes;
     expect(more.warnings?.filter((w) => w.target?.startsWith("use_case:"))).toHaveLength(10);
     expect(more.invalid_file_count).toBe(12);
-    expect(more.pool_invalid_count).toBe(12);
+    expect(more.invalid_pool_entry_count).toBe(12);
   });
 
   it("says a skipped entry is unreadable where a case refers to it", async () => {
@@ -143,12 +143,13 @@ describe("use-case pool files — invalid entries on the read path", () => {
     await expect(setUseCases(fx.store, { personas: [{ id: "ok", name: "Ok" }] })).resolves.toMatchObject({ personas: { created: 1 } });
   });
 
-  it("get_use_case caps skipped pool entries on their own, so the case's warnings survive", async () => {
+  it("get_use_case puts the case's own warnings first, so skipped pool entries never displace them", async () => {
     await poolJson({ dimensions: DIMENSIONS, personas: Array.from({ length: 60 }, (_, i) => ({ id: `p-${i}` })) });
-    const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as GetRes & { pool_invalid_count?: number };
-    expect(bundle.warnings.filter((w) => w.kind === "invalid_file")).toHaveLength(10);
-    expect(bundle.pool_invalid_count).toBe(60);
+    const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as GetRes & { warning_count?: number };
+    expect(bundle.warnings).toHaveLength(50);
+    expect(bundle.warnings[0]?.kind).not.toBe("invalid_file");
     expect(bundle.warnings.some((w) => w.kind === "unknown_persona")).toBe(true);
+    expect(bundle.warning_count).toBeGreaterThanOrEqual(61);
   });
 
   it("suggest_use_case_variants caps and counts its warnings like the other tools", async () => {

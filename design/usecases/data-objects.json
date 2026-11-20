@@ -304,7 +304,7 @@
     {
       "id": "use-case",
       "name": "Use case",
-      "description": "A spec: trigger, goal, outcome, inputs, outputs, steps mapped to the design, and variants.",
+      "description": "A spec: trigger, goal, outcome, inputs, outputs, steps mapped to the design, branches, the world it plays in, and variants.",
       "fields": [
         {
           "name": "id",
@@ -338,18 +338,81 @@
               "id": "open-dialog"
             }
           ]
+        },
+        {
+          "name": "trigger",
+          "type": "object",
+          "example": {
+            "text": "The insurer sends the renewal notice.",
+            "actor": "insurer-north",
+            "via": "letter"
+          }
+        },
+        {
+          "name": "constellations",
+          "type": "list",
+          "example": [
+            "two-parent-household"
+          ]
+        },
+        {
+          "name": "state",
+          "type": "list",
+          "example": [
+            {
+              "subject": "leo",
+              "property": "age",
+              "value": 17
+            }
+          ]
+        },
+        {
+          "name": "branches",
+          "type": "list",
+          "example": [
+            {
+              "id": "premium-rises-a-lot",
+              "from": "notify",
+              "rejoin": "accept"
+            }
+          ]
+        },
+        {
+          "name": "variants",
+          "type": "list",
+          "example": [
+            {
+              "id": "single-parent",
+              "when": {
+                "household-type": [
+                  "single-parent"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
     {
       "id": "persona",
       "name": "Persona",
-      "description": "One member of the user pool, described by trait values of the dimensions.",
+      "description": "One outside actor of the user pool (a person, an agent, a service or an organization), described by trait values of the persona-scoped dimensions.",
       "fields": [
         {
           "name": "id",
           "type": "string",
           "example": "designer-dana"
+        },
+        {
+          "name": "kind",
+          "type": "enum",
+          "values": [
+            "human",
+            "agent",
+            "service",
+            "organization"
+          ],
+          "example": "human"
         },
         {
           "name": "traits",
@@ -362,6 +425,191 @@
           "name": "generated",
           "type": "boolean",
           "example": false
+        }
+      ]
+    },
+    {
+      "id": "dimension",
+      "name": "Dimension",
+      "description": "An axis along which personas or worlds differ, with its values and the scope it describes.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "example": "household-type"
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "example": "Household type"
+        },
+        {
+          "name": "scope",
+          "type": "enum",
+          "values": [
+            "personas",
+            "constellations"
+          ],
+          "example": "constellations"
+        },
+        {
+          "name": "values",
+          "type": "list",
+          "example": [
+            {
+              "id": "two-parents"
+            },
+            {
+              "id": "single-parent"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "main-entity",
+      "name": "Main entity",
+      "description": "A thing with identity in the world of a use case (a policy, a co-insured child, a book copy). It never acts.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "example": "leo"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "example": "Leo"
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "example": "Child"
+        },
+        {
+          "name": "traits",
+          "type": "object",
+          "example": {
+            "household-type": "two-parents"
+          }
+        },
+        {
+          "name": "object",
+          "type": "string",
+          "example": "insured-person"
+        }
+      ]
+    },
+    {
+      "id": "relationship-type",
+      "name": "Relationship type",
+      "description": "How two participants of a constellation relate. The inverse label is optional and never derived.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "example": "parent-of"
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "example": "parent of"
+        },
+        {
+          "name": "inverse_label",
+          "type": "string",
+          "example": "child of"
+        },
+        {
+          "name": "same_traits",
+          "type": "list",
+          "example": [
+            "household-type"
+          ]
+        },
+        {
+          "name": "field",
+          "type": "string",
+          "example": "insured-person.parent"
+        }
+      ]
+    },
+    {
+      "id": "constellation",
+      "name": "Constellation",
+      "description": "One fixed starting world: personas and entities and the relationships between them.",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string",
+          "example": "two-parent-household"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "example": "Two parents, one child"
+        },
+        {
+          "name": "traits",
+          "type": "object",
+          "example": {
+            "household-type": "two-parents"
+          }
+        },
+        {
+          "name": "relationships",
+          "type": "list",
+          "example": [
+            {
+              "from": "maria",
+              "type": "parent-of",
+              "to": "leo"
+            }
+          ]
+        },
+        {
+          "name": "generated",
+          "type": "boolean",
+          "example": false
+        }
+      ]
+    },
+    {
+      "id": "world-warning",
+      "name": "World warning",
+      "description": "A non-blocking check result on a case, a variant or a pool entry, shown at its target.",
+      "fields": [
+        {
+          "name": "code",
+          "type": "enum",
+          "values": [
+            "unknown_participant",
+            "unknown_relationship_type",
+            "unknown_constellation",
+            "ambiguous_id",
+            "self_relationship",
+            "duplicate_relationship",
+            "trait_conflict",
+            "entity_unrelated",
+            "entity_as_actor",
+            "outside_constellation",
+            "branch_from_missing",
+            "branch_rejoin_missing",
+            "branch_empty",
+            "variant_actor_invalid",
+            "state_value_mismatch"
+          ],
+          "example": "unknown_constellation"
+        },
+        {
+          "name": "target",
+          "type": "string",
+          "example": "renew-policy/constellation:blended-household"
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "example": "Constellation blended-household does not exist. Create it in World."
         }
       ]
     }

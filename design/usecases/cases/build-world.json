@@ -1,0 +1,256 @@
+{
+  "id": "build-world",
+  "title": "Build the world: entities, relationship types and a constellation",
+  "group": "use-cases/world",
+  "tags": [
+    "chr-1161"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo"
+  ],
+  "constellations": [
+    "product-owner-world-modelled-project"
+  ],
+  "trigger": {
+    "text": "Pablo starts specifying cases whose flow depends on who is related to what, such as a policy and a co-insured child.",
+    "actor": "product-owner-pablo",
+    "via": "browser preview"
+  },
+  "goal": "The product's world exists once in the pool, so cases name a constellation instead of describing their setting in prose.",
+  "outcome": "The World tab holds the entities, the relationship types and at least one constellation, with no pool warning.",
+  "inputs": [
+    {
+      "object": "main-entity",
+      "source": "Product knowledge",
+      "example": {
+        "id": "leo",
+        "name": "Leo",
+        "type": "Child"
+      }
+    },
+    {
+      "object": "relationship-type",
+      "source": "Product knowledge",
+      "example": {
+        "id": "parent-of",
+        "label": "parent of"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "constellation",
+      "target": "usecases/world.json",
+      "example": {
+        "id": "two-parent-household",
+        "name": "Two parents, one child",
+        "relationships": [
+          {
+            "from": "maria",
+            "type": "parent-of",
+            "to": "leo"
+          }
+        ]
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open-world",
+      "actor": "product-owner-pablo",
+      "action": "Opens the World sub-tab of Use Cases",
+      "target": {
+        "screen": "usecases-world",
+        "node": "sub-world"
+      }
+    },
+    {
+      "id": "add-entity",
+      "actor": "product-owner-pablo",
+      "action": "Adds an entity with id, name, type, traits and an optional data object",
+      "target": {
+        "screen": "usecases-entity-dialog"
+      },
+      "data": [
+        {
+          "object": "main-entity",
+          "before": {
+            "id": "leo"
+          },
+          "after": {
+            "id": "leo",
+            "name": "Leo",
+            "type": "Child"
+          }
+        }
+      ]
+    },
+    {
+      "id": "add-relationship-type",
+      "actor": "product-owner-pablo",
+      "action": "Adds a relationship type; the inverse label stays optional and is never derived",
+      "target": {
+        "screen": "usecases-relationship-type-dialog"
+      }
+    },
+    {
+      "id": "add-constellation",
+      "actor": "product-owner-pablo",
+      "action": "Adds a constellation and its relationships between personas and entities, with an optional note per relationship",
+      "target": {
+        "screen": "usecases-constellation-dialog"
+      }
+    },
+    {
+      "id": "see-pool",
+      "actor": "system",
+      "action": "Lists the new constellation with its traits and member count in the pool",
+      "target": {
+        "screen": "usecases-world",
+        "node": "cst-grid"
+      }
+    }
+  ],
+  "branches": [
+    {
+      "id": "world-empty",
+      "title": "The world is still empty",
+      "when": [
+        {
+          "subject": "system",
+          "property": "world_entity_count",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "see-empty-world",
+          "actor": "system",
+          "action": "Shows the empty World tab with one first action per section",
+          "target": {
+            "screen": "usecases-world-empty"
+          }
+        },
+        {
+          "id": "start-first-entity",
+          "actor": "product-owner-pablo",
+          "action": "Starts with the first entity from the empty state",
+          "target": {
+            "screen": "usecases-world-empty"
+          }
+        }
+      ],
+      "rejoin": "add-entity"
+    },
+    {
+      "id": "entity-unrelated",
+      "title": "An entity is in no constellation",
+      "from": "see-pool",
+      "when": [
+        {
+          "subject": "system",
+          "property": "unrelated_entity_count",
+          "op": "gt",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "see-unrelated",
+          "actor": "system",
+          "action": "Shows the entity_unrelated warning on the entity's pool row",
+          "target": {
+            "screen": "usecases-world",
+            "node": "ent-table"
+          }
+        }
+      ],
+      "rejoin": "add-constellation"
+    }
+  ],
+  "variants": [
+    {
+      "id": "agent-models-world",
+      "title": "Design agent models the world through MCP",
+      "description": "An agent has no World tab: it writes the pool in one set_use_cases call and reads the warnings in the response.",
+      "when": {
+        "actor-type": [
+          "agent"
+        ]
+      },
+      "personas": [
+        "design-agent-dex"
+      ],
+      "trigger": {
+        "text": "Pablo asks Dex in a ticket to model the world of the product.",
+        "actor": "product-owner-pablo",
+        "via": "ticket"
+      },
+      "steps": [
+        {
+          "op": "remove",
+          "step_id": "open-world"
+        },
+        {
+          "op": "replace",
+          "step_id": "add-entity",
+          "step": {
+            "id": "write-world",
+            "actor": "design-agent-dex",
+            "action": "Writes entities, relationship types and constellations in one set_use_cases call",
+            "via": "MCP"
+          }
+        },
+        {
+          "op": "remove",
+          "step_id": "add-relationship-type"
+        },
+        {
+          "op": "remove",
+          "step_id": "add-constellation"
+        },
+        {
+          "op": "replace",
+          "step_id": "see-pool",
+          "step": {
+            "id": "read-world-warnings",
+            "actor": "design-agent-dex",
+            "action": "Reads the world warnings in the set_use_cases response",
+            "via": "MCP"
+          }
+        },
+        {
+          "op": "remove_branch",
+          "branch_id": "world-empty"
+        },
+        {
+          "op": "replace_branch",
+          "branch_id": "entity-unrelated",
+          "branch": {
+            "id": "entity-unrelated",
+            "title": "An entity is in no constellation",
+            "from": "read-world-warnings",
+            "when": [
+              {
+                "subject": "system",
+                "property": "unrelated_entity_count",
+                "op": "gt",
+                "value": 0
+              }
+            ],
+            "steps": [
+              {
+                "id": "relate-entity",
+                "actor": "design-agent-dex",
+                "action": "Adds the entity to a constellation in a second set_use_cases call",
+                "via": "MCP"
+              }
+            ],
+            "rejoin": "read-world-warnings"
+          }
+        }
+      ]
+    }
+  ]
+}

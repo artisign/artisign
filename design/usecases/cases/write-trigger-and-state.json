@@ -1,0 +1,162 @@
+{
+  "id": "write-trigger-and-state",
+  "title": "Write a structured trigger and a starting state",
+  "group": "use-cases/world",
+  "tags": [
+    "chr-1161"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo"
+  ],
+  "constellations": [
+    "product-owner-world-modelled-project"
+  ],
+  "trigger": {
+    "text": "Pablo turns a prose trigger into who starts the case, through which interface, and in which world.",
+    "actor": "product-owner-pablo",
+    "via": "browser preview"
+  },
+  "goal": "A case says who or what starts it, the constellations it holds for and the state the world starts in.",
+  "outcome": "The detail shows the trigger line, the World card and the Starting state table.",
+  "inputs": [
+    {
+      "object": "use-case",
+      "source": "usecases/cases/",
+      "example": {
+        "id": "renew-policy",
+        "trigger": {
+          "text": "The insurer sends the renewal notice."
+        }
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "use-case",
+      "target": "usecases/cases/",
+      "example": {
+        "id": "renew-policy",
+        "trigger": {
+          "text": "The insurer sends the renewal notice.",
+          "actor": "insurer-north",
+          "via": "letter"
+        },
+        "constellations": [
+          "two-parent-household"
+        ],
+        "state": [
+          {
+            "subject": "leo",
+            "property": "age",
+            "value": 17
+          }
+        ]
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open-editor",
+      "actor": "product-owner-pablo",
+      "action": "Opens the case editor",
+      "target": {
+        "screen": "usecases-edit-dialog-world"
+      }
+    },
+    {
+      "id": "set-trigger",
+      "actor": "product-owner-pablo",
+      "action": "Chooses Action and picks an actor and a via for the trigger",
+      "target": {
+        "screen": "usecases-edit-dialog-world",
+        "node": "fs-trigger"
+      }
+    },
+    {
+      "id": "pick-constellations",
+      "actor": "product-owner-pablo",
+      "action": "Picks the constellations the case holds for",
+      "target": {
+        "screen": "usecases-edit-dialog-world"
+      }
+    },
+    {
+      "id": "add-state",
+      "actor": "product-owner-pablo",
+      "action": "Adds starting-state rows of subject, property and value",
+      "target": {
+        "screen": "usecases-edit-dialog-world",
+        "node": "fs-state"
+      }
+    },
+    {
+      "id": "set-step-via",
+      "actor": "product-owner-pablo",
+      "action": "Sets Via on a step an outside actor performs",
+      "target": {
+        "screen": "usecases-edit-dialog",
+        "node": "st1-via"
+      }
+    },
+    {
+      "id": "see-detail",
+      "actor": "system",
+      "action": "Saves and shows the trigger line with actor, kind and via",
+      "target": {
+        "screen": "usecases-detail-world",
+        "node": "story-trigger"
+      }
+    }
+  ],
+  "branches": [
+    {
+      "id": "state-or-time-trigger",
+      "title": "The case starts on a state or a date",
+      "from": "open-editor",
+      "when": [
+        {
+          "subject": "system",
+          "property": "trigger_kind",
+          "value": "state_or_time"
+        }
+      ],
+      "steps": [
+        {
+          "id": "set-state-trigger",
+          "actor": "product-owner-pablo",
+          "action": "Switches the trigger to State or time and enters conditions or a date; there is no Actor field",
+          "target": {
+            "screen": "usecases-edit-dialog-trigger-state"
+          }
+        }
+      ],
+      "rejoin": "pick-constellations"
+    },
+    {
+      "id": "duplicate-state-row",
+      "title": "A subject and property are set twice",
+      "from": "add-state",
+      "when": [
+        {
+          "subject": "system",
+          "property": "duplicate_state_pair_count",
+          "op": "gt",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "block-duplicate",
+          "actor": "system",
+          "action": "Marks the second row, says the pair is already set above and disables Save",
+          "target": {
+            "screen": "usecases-edit-dialog-world",
+            "node": "fs-state"
+          }
+        }
+      ],
+      "rejoin": "add-state"
+    }
+  ]
+}

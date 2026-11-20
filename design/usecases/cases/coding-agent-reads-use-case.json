@@ -4,7 +4,8 @@
   "group": "handoff",
   "tags": [
     "chr-1120",
-    "chr-1160"
+    "chr-1160",
+    "chr-1161"
   ],
   "status": "ready",
   "personas": [
@@ -19,7 +20,7 @@
     "via": "ticket"
   },
   "goal": "Implement the flow without guessing.",
-  "outcome": "One call returned the case, its personas, data objects and mapped screens.",
+  "outcome": "One call returned the case, its personas, data objects and mapped screens, and for a case with a world also its entities, constellations, relationship types, starting state and every branch.",
   "inputs": [
     {
       "object": "use-case",
@@ -59,6 +60,45 @@
         "screen": "usecases-detail",
         "node": "btn-mapping"
       }
+    }
+  ],
+  "branches": [
+    {
+      "id": "case-with-world",
+      "title": "The case plays in a world",
+      "from": "read",
+      "when": [
+        {
+          "subject": "system",
+          "property": "case_constellation_count",
+          "op": "gt",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "read-world",
+          "actor": "coding-agent-coda",
+          "action": "Reads the entities, constellations and relationship types in the bundle, with the structured trigger and the starting state",
+          "via": "MCP"
+        },
+        {
+          "id": "implement-branches",
+          "actor": "coding-agent-coda",
+          "action": "Implements every branch lane; the bundle carries them all and never says which one applies",
+          "via": "MCP"
+        },
+        {
+          "id": "check-world",
+          "actor": "product-owner-pablo",
+          "action": "Sees the same world in the detail view",
+          "target": {
+            "screen": "usecases-detail-world",
+            "node": "d-world"
+          }
+        }
+      ],
+      "rejoin": "variant"
     }
   ]
 }

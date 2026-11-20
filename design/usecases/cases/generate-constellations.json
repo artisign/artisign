@@ -1,0 +1,146 @@
+{
+  "id": "generate-constellations",
+  "title": "Generate constellations and check their coverage",
+  "group": "use-cases/world",
+  "tags": [
+    "chr-1161"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo"
+  ],
+  "constellations": [
+    "product-owner-world-modelled-project"
+  ],
+  "trigger": {
+    "text": "Pablo adds a constellation-scoped dimension and wants one world for each of its values.",
+    "actor": "product-owner-pablo",
+    "via": "browser preview"
+  },
+  "goal": "Every value combination of the constellation-scoped dimensions has a constellation, and each case shows which worlds it covers.",
+  "outcome": "Generated skeletons sit in the pool with their relationships filled in; the coverage of a case lists the uncovered constellation values.",
+  "inputs": [
+    {
+      "object": "dimension",
+      "source": "usecases/dimensions.json",
+      "example": {
+        "id": "household-type",
+        "scope": "constellations",
+        "values": [
+          {
+            "id": "two-parents"
+          },
+          {
+            "id": "single-parent"
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "constellation",
+      "target": "usecases/world.json",
+      "example": {
+        "id": "gen-single-parent",
+        "traits": {
+          "household-type": "single-parent"
+        },
+        "relationships": [],
+        "generated": true
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open-generate",
+      "actor": "product-owner-pablo",
+      "action": "Chooses Generate in the Constellations section of the World tab",
+      "target": {
+        "screen": "usecases-world",
+        "node": "cst-gen"
+      }
+    },
+    {
+      "id": "switch-target",
+      "actor": "product-owner-pablo",
+      "action": "Switches the target from Personas to Constellations",
+      "target": {
+        "screen": "usecases-generate-dialog",
+        "node": "gd-target"
+      }
+    },
+    {
+      "id": "preview-skeletons",
+      "actor": "product-owner-pablo",
+      "action": "Picks constellation-scoped dimensions and previews the skeletons pairwise",
+      "target": {
+        "screen": "usecases-generate-dialog-constellations"
+      }
+    },
+    {
+      "id": "write-skeletons",
+      "actor": "system",
+      "action": "Writes the skeletons with no relationships and marks them generated",
+      "target": {
+        "screen": "usecases-world",
+        "node": "cst-grid"
+      },
+      "data": [
+        {
+          "object": "constellation",
+          "before": {
+            "id": "gen-single-parent"
+          },
+          "after": {
+            "id": "gen-single-parent",
+            "relationships": [],
+            "generated": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "fill-relationships",
+      "actor": "product-owner-pablo",
+      "action": "Fills in the relationships of each skeleton",
+      "target": {
+        "screen": "usecases-constellation-dialog"
+      }
+    },
+    {
+      "id": "check-coverage",
+      "actor": "product-owner-pablo",
+      "action": "Reads a case's coverage, with World and Personas column groups",
+      "target": {
+        "screen": "usecases-detail-world-variant",
+        "node": "coverage"
+      }
+    }
+  ],
+  "branches": [
+    {
+      "id": "all-covered",
+      "title": "Every combination already has a constellation",
+      "from": "preview-skeletons",
+      "when": [
+        {
+          "subject": "system",
+          "property": "uncovered_constellation_combination_count",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "nothing-to-generate",
+          "actor": "system",
+          "action": "Says every combination is covered and writes nothing",
+          "target": {
+            "screen": "usecases-generate-dialog-constellations"
+          }
+        }
+      ],
+      "rejoin": "check-coverage"
+    }
+  ]
+}

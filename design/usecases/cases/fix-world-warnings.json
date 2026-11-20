@@ -1,0 +1,201 @@
+{
+  "id": "fix-world-warnings",
+  "title": "Find and fix world warnings",
+  "group": "use-cases/world",
+  "tags": [
+    "chr-1161"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo"
+  ],
+  "constellations": [
+    "product-owner-world-modelled-project"
+  ],
+  "trigger": {
+    "text": "After a change to the pool, cases carry world warnings.",
+    "state": [
+      {
+        "subject": "system",
+        "property": "world_warning_count",
+        "op": "gt",
+        "value": 0
+      }
+    ]
+  },
+  "goal": "No case and no pool entry carries a world warning.",
+  "outcome": "The warning count pills are gone from the list; the World tab shows no amber entry.",
+  "inputs": [
+    {
+      "object": "world-warning",
+      "source": "list_use_cases / get_use_case",
+      "example": {
+        "code": "unknown_constellation",
+        "target": "renew-policy/constellation:blended-household"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "constellation",
+      "target": "usecases/world.json",
+      "example": {
+        "id": "blended-household",
+        "name": "Blended household"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "spot-count",
+      "actor": "product-owner-pablo",
+      "action": "Spots the warning count pill on a case row",
+      "target": {
+        "screen": "usecases-list-world",
+        "node": "row-premium"
+      }
+    },
+    {
+      "id": "open-case",
+      "actor": "product-owner-pablo",
+      "action": "Opens the case; each warning sits at its target",
+      "target": {
+        "screen": "usecases-detail-world",
+        "node": "cst-unknown-w"
+      }
+    },
+    {
+      "id": "fix-in-editor",
+      "actor": "product-owner-pablo",
+      "action": "Fixes a case-level warning in the case editor, such as an actor outside the constellations",
+      "target": {
+        "screen": "usecases-edit-dialog-world"
+      }
+    },
+    {
+      "id": "recheck",
+      "actor": "system",
+      "action": "Checks the case again on save and drops the fixed warning",
+      "target": {
+        "screen": "usecases-detail-world"
+      }
+    }
+  ],
+  "branches": [
+    {
+      "id": "pool-warning",
+      "title": "The warning sits on a pool entry",
+      "from": "open-case",
+      "when": [
+        {
+          "subject": "system",
+          "property": "warning_target_kind",
+          "value": "pool"
+        }
+      ],
+      "steps": [
+        {
+          "id": "fix-in-pool",
+          "actor": "product-owner-pablo",
+          "action": "Opens the pool entry in World and fixes it there, such as a relationship whose two ends are the same participant",
+          "target": {
+            "screen": "usecases-world",
+            "node": "c-couple-w"
+          }
+        }
+      ],
+      "rejoin": "recheck"
+    },
+    {
+      "id": "unknown-state-subject",
+      "title": "A starting-state subject is not in the world",
+      "from": "open-case",
+      "when": [
+        {
+          "subject": "system",
+          "property": "warning_code",
+          "value": "unknown_participant"
+        }
+      ],
+      "steps": [
+        {
+          "id": "follow-add-to-world",
+          "actor": "product-owner-pablo",
+          "action": "Follows Add it to the world from the state row",
+          "target": {
+            "screen": "usecases-detail-world",
+            "node": "st-r6-hint"
+          }
+        },
+        {
+          "id": "create-entity",
+          "actor": "product-owner-pablo",
+          "action": "Creates the missing entity",
+          "target": {
+            "screen": "usecases-entity-dialog"
+          }
+        }
+      ],
+      "rejoin": "recheck"
+    }
+  ],
+  "variants": [
+    {
+      "id": "agent-fixes-warnings",
+      "title": "Design agent fixes the warnings through MCP",
+      "description": "An agent reads the warnings from the tool responses and fixes them with set_use_cases; it sees no list or detail view.",
+      "when": {
+        "actor-type": [
+          "agent"
+        ]
+      },
+      "personas": [
+        "design-agent-dex"
+      ],
+      "steps": [
+        {
+          "op": "replace",
+          "step_id": "spot-count",
+          "step": {
+            "id": "list-warnings",
+            "actor": "design-agent-dex",
+            "action": "Reads the warnings of the cases with list_use_cases and get_use_case",
+            "via": "MCP"
+          }
+        },
+        {
+          "op": "remove",
+          "step_id": "open-case"
+        },
+        {
+          "op": "replace",
+          "step_id": "fix-in-editor",
+          "step": {
+            "id": "fix-with-tool",
+            "actor": "design-agent-dex",
+            "action": "Fixes the case or the pool entry the message names with set_use_cases",
+            "via": "MCP"
+          }
+        },
+        {
+          "op": "replace",
+          "step_id": "recheck",
+          "step": {
+            "id": "read-response",
+            "actor": "design-agent-dex",
+            "action": "Reads the response and calls get_use_case again until no warning is left",
+            "via": "MCP"
+          }
+        },
+        {
+          "op": "remove_branch",
+          "branch_id": "pool-warning"
+        },
+        {
+          "op": "remove_branch",
+          "branch_id": "unknown-state-subject"
+        }
+      ]
+    }
+  ]
+}

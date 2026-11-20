@@ -1,0 +1,185 @@
+{
+  "id": "add-branch",
+  "title": "Add a branch with conditions and a rejoin",
+  "group": "use-cases/world",
+  "tags": [
+    "chr-1161"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo",
+    "design-agent-dex"
+  ],
+  "constellations": [
+    "product-owner-world-modelled-project"
+  ],
+  "trigger": {
+    "text": "Pablo finds that for some starting states the renewal takes another path.",
+    "actor": "product-owner-pablo",
+    "via": "browser preview"
+  },
+  "goal": "The alternative path sits in the case as a branch with its own conditions, instead of as a second case.",
+  "outcome": "The detail shows the branch as its own lane under its fork, and the mapping view shows its steps on their screens.",
+  "inputs": [
+    {
+      "object": "use-case",
+      "source": "usecases/cases/",
+      "example": {
+        "id": "renew-policy",
+        "steps": [
+          {
+            "id": "notify"
+          },
+          {
+            "id": "review"
+          },
+          {
+            "id": "accept"
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "use-case",
+      "target": "usecases/cases/",
+      "example": {
+        "id": "renew-policy",
+        "branches": [
+          {
+            "id": "premium-rises-a-lot",
+            "from": "notify",
+            "rejoin": "accept"
+          }
+        ]
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "start-branch",
+      "actor": "product-owner-pablo",
+      "action": "Adds a branch in the Branches section of the case editor",
+      "target": {
+        "screen": "usecases-edit-dialog-world",
+        "node": "fs-branches"
+      }
+    },
+    {
+      "id": "set-fork-and-rejoin",
+      "actor": "product-owner-pablo",
+      "action": "Picks the main-flow step it forks after and the step it rejoins, or no rejoin with an outcome",
+      "target": {
+        "screen": "usecases-edit-dialog-branch"
+      }
+    },
+    {
+      "id": "add-conditions",
+      "actor": "product-owner-pablo",
+      "action": "Adds conditions of subject, property, operator and value",
+      "target": {
+        "screen": "usecases-edit-dialog-branch"
+      }
+    },
+    {
+      "id": "add-branch-steps",
+      "actor": "product-owner-pablo",
+      "action": "Adds the branch steps; their ids share one namespace with the main flow",
+      "target": {
+        "screen": "usecases-edit-dialog-branch"
+      }
+    },
+    {
+      "id": "save-branch",
+      "actor": "system",
+      "action": "Saves and shows the branch lane with its conditions and rejoin",
+      "target": {
+        "screen": "usecases-detail-world",
+        "node": "lane-a"
+      }
+    },
+    {
+      "id": "map-branch-steps",
+      "actor": "design-agent-dex",
+      "action": "Maps the branch steps onto screens with set_use_cases",
+      "via": "MCP"
+    },
+    {
+      "id": "check-mapping",
+      "actor": "product-owner-pablo",
+      "action": "Checks the branch steps under their fork in the mapping view",
+      "target": {
+        "screen": "usecases-mapping-branches"
+      }
+    }
+  ],
+  "branches": [
+    {
+      "id": "branch-without-condition",
+      "title": "The branch has no condition",
+      "from": "add-branch-steps",
+      "when": [
+        {
+          "subject": "system",
+          "property": "branch_condition_count",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "block-no-condition",
+          "actor": "system",
+          "action": "Blocks Save, counts the errors in the footer and marks the empty conditions",
+          "target": {
+            "screen": "usecases-edit-dialog-branch-invalid",
+            "node": "bw-err"
+          }
+        },
+        {
+          "id": "fix-condition",
+          "actor": "product-owner-pablo",
+          "action": "Adds at least one condition",
+          "target": {
+            "screen": "usecases-edit-dialog-branch-invalid",
+            "node": "bd-msg"
+          }
+        }
+      ],
+      "rejoin": "save-branch"
+    },
+    {
+      "id": "step-id-collision",
+      "title": "A branch step id is already taken",
+      "from": "add-branch-steps",
+      "when": [
+        {
+          "subject": "system",
+          "property": "branch_step_id_taken",
+          "value": true
+        }
+      ],
+      "steps": [
+        {
+          "id": "block-id-collision",
+          "actor": "system",
+          "action": "Says which step already has the id and blocks Save",
+          "target": {
+            "screen": "usecases-edit-dialog-branch-invalid",
+            "node": "bs3-err"
+          }
+        },
+        {
+          "id": "rename-step",
+          "actor": "product-owner-pablo",
+          "action": "Gives the branch step another id",
+          "target": {
+            "screen": "usecases-edit-dialog-branch-invalid",
+            "node": "bs-3"
+          }
+        }
+      ],
+      "rejoin": "save-branch"
+    }
+  ]
+}

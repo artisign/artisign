@@ -1,0 +1,139 @@
+{
+  "id": "give-variant-own-world",
+  "title": "Give a variant its own world",
+  "group": "use-cases/world",
+  "tags": [
+    "chr-1161"
+  ],
+  "status": "ready",
+  "personas": [
+    "product-owner-pablo"
+  ],
+  "constellations": [
+    "product-owner-world-modelled-project"
+  ],
+  "trigger": {
+    "text": "Pablo sees that a household type plays the renewal in another world: one parent, no co-insured partner.",
+    "actor": "product-owner-pablo",
+    "via": "browser preview"
+  },
+  "goal": "A variant states its own constellations, trigger, starting state and branches as differences from the base case.",
+  "outcome": "The variant detail shows the diff: changed, added, removed, unset and emptied, next to the inherited rows.",
+  "inputs": [
+    {
+      "object": "use-case",
+      "source": "usecases/cases/",
+      "example": {
+        "id": "renew-policy",
+        "variants": [
+          {
+            "id": "single-parent",
+            "when": {
+              "household-type": [
+                "single-parent"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "use-case",
+      "target": "usecases/cases/",
+      "example": {
+        "id": "renew-policy",
+        "variants": [
+          {
+            "id": "single-parent",
+            "when": {
+              "household-type": [
+                "single-parent"
+              ]
+            },
+            "constellations": [
+              "single-parent-household"
+            ],
+            "state": [
+              {
+                "subject": "maria",
+                "property": "co_insured_partner",
+                "unset": true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open-variant",
+      "actor": "product-owner-pablo",
+      "action": "Opens the variant section of the case editor",
+      "target": {
+        "screen": "usecases-edit-dialog-variant-world"
+      }
+    },
+    {
+      "id": "set-when",
+      "actor": "product-owner-pablo",
+      "action": "Selects the dimension value the variant holds for in When",
+      "target": {
+        "screen": "usecases-edit-dialog-variant-world"
+      }
+    },
+    {
+      "id": "override-world",
+      "actor": "product-owner-pablo",
+      "action": "Overrides the constellations and merges the starting state: a row replaces, adds or unsets",
+      "target": {
+        "screen": "usecases-edit-dialog-variant-world",
+        "node": "fs-state"
+      }
+    },
+    {
+      "id": "replace-branch",
+      "actor": "product-owner-pablo",
+      "action": "Replaces a base branch; the replaced branch keeps its id",
+      "target": {
+        "screen": "usecases-edit-dialog-branch-invalid",
+        "node": "bd-f-id"
+      }
+    },
+    {
+      "id": "see-variant-diff",
+      "actor": "system",
+      "action": "Shows the resolved variant as a diff of constellations, trigger, state and branches",
+      "target": {
+        "screen": "usecases-detail-world-variant"
+      }
+    }
+  ],
+  "branches": [
+    {
+      "id": "branch-emptied",
+      "title": "The variant leaves a branch without steps",
+      "from": "replace-branch",
+      "when": [
+        {
+          "subject": "system",
+          "property": "variant_branch_step_count",
+          "value": 0
+        }
+      ],
+      "steps": [
+        {
+          "id": "warn-branch-empty",
+          "actor": "system",
+          "action": "Marks the branch Emptied and warns branch_empty at its lane",
+          "target": {
+            "screen": "usecases-detail-world-variant"
+          }
+        }
+      ],
+      "rejoin": "replace-branch"
+    }
+  ]
+}

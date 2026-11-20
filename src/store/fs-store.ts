@@ -7,8 +7,10 @@ import { CONFIG_FILENAME, CACHE_DIR } from "../init/artisign-config.js";
 import { atomicWrite, ensureCacheGitignore } from "./atomic-write.js";
 import { autoCommit, autoCommitPaths, getHeadCommit } from "./git.js";
 import { watchProject } from "./watcher.js";
-import { InvalidFileError, dataObjectsDocSchema, describeIssues, isValidId, personaPoolSchema, useCaseSchema, worldSchema, type DataObject, type PersonaPool, type UseCase, type World } from "../usecases/schema.js";
-import type { Store, UseCaseFileIssue, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, VariantKind, TagMeta, DesignSystemMeta, DesignDecision, CommitResult, HeadCommitResult, MockupMeta, MockupVariantMeta } from "./types.js";
+import { InvalidFileError, constellationSchema, dataObjectSchema, dataObjectsDocSchema, describeIssues, dimensionSchema, entitySchema, isValidId, personaPoolSchema, personaSchema, relationshipTypeSchema, useCaseSchema, worldSchema, type DataObject, type PersonaPool, type UseCase, type World } from "../usecases/schema.js";
+import type { Store, UseCaseFileIssue, PoolEntryIssue, PoolList, TokensDocument, FlowRecord, ProjectChangeEvent, ScreenMeta, VariantKind, TagMeta, DesignSystemMeta, DesignDecision, CommitResult, HeadCommitResult, MockupMeta, MockupVariantMeta } from "./types.js";
+
+type PoolListSpec = { key: PoolList; schema: { safeParse: (value: unknown) => { success: true; data: { id: string } } | { success: false; error: ZodError } } };
 
 function emptyScreenMeta(): ScreenMeta {
   return { notes: "", tags: [] };
@@ -432,6 +434,74 @@ export class FsStore implements Store {
     const result = parse(json);
     if (!result.success) throw new InvalidFileError(`usecases/${file}`, describeIssues(result.error));
     return result.data;
+  }
+
+  /**
+   * The read path of a pool file: each entry is validated on its own, valid ones are kept (the first of two with one id), every other one is reported.
+   * Only a file there is nothing to salvage from — not JSON, not an object, an unknown top-level key, a list that is not an array — throws like the strict read.
+   */
+  private async readPoolEntries(file: string, lists: readonly PoolListSpec[]): Promise<{ kept: Record<string, unknown[]>; invalid: PoolEntryIssue[] }> {
+    const rel = `usecases/${file}`;
+    const kept: Record<string, unknown[]> = Object.fromEntries(lists.map((l) => [l.key, []]));
+    let raw: string;
+    try {
+      raw = await readFile(this.path("usecases", file), "utf-8");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return { kept, invalid: [] };
+      throw err;
+    }
+    let json: unknown;
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      throw new InvalidFileError(rel, "not valid JSON");
+    }
+    if (typeof json !== "object" || json === null || Array.isArray(json)) throw new InvalidFileError(rel, "(root): expected an object");
+    const document = json as Record<string, unknown>;
+    const unknown = Object.keys(document).find((key) => !lists.some((l) => l.key === key));
+    if (unknown !== undefined) throw new InvalidFileError(rel, `(root): unrecognized key "${unknown}"`);
+
+    const invalid: PoolEntryIssue[] = [];
+    for (const { key, schema } of lists) {
+      const items = document[key];
+      if (items === undefined) continue;
+      if (!Array.isArray(items)) throw new InvalidFileError(rel, `${key}: expected an array`);
+      const seen = new Set<string>();
+      items.forEach((item: unknown, index) => {
+        const rawId = typeof item === "object" && item !== null && typeof (item as { id?: unknown }).id === "string" ? (item as { id: string }).id : undefined;
+        const issue = (error: string): PoolEntryIssue => ({ file: rel, list: key, index, ...(rawId !== undefined ? { id: rawId } : {}), error });
+        const result = schema.safeParse(item);
+        if (!result.success) invalid.push(issue(describeIssues(result.error)));
+        else if (seen.has(result.data.id)) invalid.push(issue(`duplicate id "${result.data.id}" — the first entry with this id is kept`));
+        else {
+          seen.add(result.data.id);
+          kept[key]!.push(result.data);
+        }
+      });
+    }
+    return { kept, invalid };
+  }
+
+  async readPersonaPoolLenient(): Promise<{ pool: PersonaPool; invalid: PoolEntryIssue[] }> {
+    const { kept, invalid } = await this.readPoolEntries("personas.json", [
+      { key: "dimensions", schema: dimensionSchema },
+      { key: "personas", schema: personaSchema },
+    ]);
+    return { pool: { dimensions: kept.dimensions as PersonaPool["dimensions"], personas: kept.personas as PersonaPool["personas"] }, invalid };
+  }
+
+  async readWorldLenient(): Promise<{ world: World; invalid: PoolEntryIssue[] }> {
+    const { kept, invalid } = await this.readPoolEntries("world.json", [
+      { key: "entities", schema: entitySchema },
+      { key: "relationship_types", schema: relationshipTypeSchema },
+      { key: "constellations", schema: constellationSchema },
+    ]);
+    return { world: { entities: kept.entities as World["entities"], relationship_types: kept.relationship_types as World["relationship_types"], constellations: kept.constellations as World["constellations"] }, invalid };
+  }
+
+  async readDataObjectsLenient(): Promise<{ objects: DataObject[]; invalid: PoolEntryIssue[] }> {
+    const { kept, invalid } = await this.readPoolEntries("data-objects.json", [{ key: "objects", schema: dataObjectSchema }]);
+    return { objects: kept.objects as DataObject[], invalid };
   }
 
   async readPersonaPool(): Promise<PersonaPool> {

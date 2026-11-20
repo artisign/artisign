@@ -84,6 +84,10 @@ export type HeadCommitResult = {
 /** A case file that failed to parse or validate — reported, never thrown, so one bad file cannot hide the rest. */
 export type UseCaseFileIssue = { id: string; error: string };
 
+/** One entry of a pool file (`personas.json`, `world.json`, `data-objects.json`) that failed to validate. `list` is the array it sits in, `index` its position there; `id` is absent when the entry has none. */
+export type PoolEntryIssue = { file: string; list: PoolList; index: number; id?: string; error: string };
+export type PoolList = "dimensions" | "personas" | "entities" | "relationship_types" | "constellations" | "objects";
+
 /**
  * The single boundary for all filesystem access. Every part of the codebase
  * that needs to read or write project state goes through this interface —
@@ -187,11 +191,16 @@ export interface Store {
    * file that no longer validates throws (naming the file) rather than being
    * coerced — a hand edit must not be silently dropped by the next write.
    */
+  /** Strict: throws `InvalidFileError` when any entry is invalid. What a write starts from, so a bad entry is never dropped by the next write. */
   readPersonaPool(): Promise<PersonaPool>;
+  /** Read path: valid entries are kept, each invalid one is listed in `invalid`. A file that is not JSON or has the wrong top-level shape still throws `InvalidFileError`. */
+  readPersonaPoolLenient(): Promise<{ pool: PersonaPool; invalid: PoolEntryIssue[] }>;
   writePersonaPool(pool: PersonaPool): Promise<void>;
   readWorld(): Promise<World>;
+  readWorldLenient(): Promise<{ world: World; invalid: PoolEntryIssue[] }>;
   writeWorld(world: World): Promise<void>;
   readDataObjects(): Promise<DataObject[]>;
+  readDataObjectsLenient(): Promise<{ objects: DataObject[]; invalid: PoolEntryIssue[] }>;
   /** Whether `usecases/data-objects.json` exists: data-model checks (`unknown_data_object`, `state_value_mismatch`, …) apply only then, even if it lists no object. */
   dataModelExists(): Promise<boolean>;
   writeDataObjects(objects: DataObject[]): Promise<void>;

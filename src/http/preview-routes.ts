@@ -10,6 +10,7 @@ import { variantLinks, variantFields } from "../tools/variants.js";
 import { readAllFlows, toPublicFlowRecord } from "../tools/flows.js";
 import { compareScreens } from "../tools/compare.js";
 import { ToolError } from "../tools/types.js";
+import { poolEntryWarnings } from "../tools/usecases.js";
 import { InvalidFileError, isValidId } from "../usecases/index.js";
 import {
   parseScreen,
@@ -126,7 +127,9 @@ export async function handlePreviewRoutes(req: IncomingMessage, res: ServerRespo
   if (url.pathname === "/api/world") {
     // The world pool as stored (entities, relationship types, constellations): the preview's World tab and the constellation filter read it here, because no tool lists it. Read-only and not a tool; a project without world.json gets empty lists and nothing is created.
     try {
-      sendJson(res, 200, await store.readWorld());
+      // Invalid entries are skipped and named in `warnings` (the same invalid_file shape as the tools); the rest loads.
+      const { world, invalid } = await store.readWorldLenient();
+      sendJson(res, 200, invalid.length > 0 ? { ...world, warnings: poolEntryWarnings(invalid) } : world);
     } catch (err) {
       if (err instanceof InvalidFileError) sendJson(res, 422, { code: "invalid_state", message: err.message });
       else throw err;

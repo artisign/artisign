@@ -5911,6 +5911,72 @@ body:has(#settings-menu:not([hidden])) #update-notice {
   flex: 1;
 }
 
+.uc-notice {
+  position: static;
+}
+
+.uc-notice .uc-link-btn {
+  flex: none;
+}
+
+.uc-problem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  max-width: 520px;
+  margin: 0 auto;
+  padding: var(--space-3xl) var(--space-2xl);
+  text-align: center;
+  font-size: var(--ui-sm);
+}
+
+.uc-problem-icon {
+  font-size: var(--size-icon);
+  color: var(--chrome-warning);
+}
+
+.uc-problem-title {
+  margin: 0;
+  font-size: var(--ui-title);
+  font-weight: 600;
+  color: var(--chrome-text);
+}
+
+.uc-problem p {
+  margin: 0;
+}
+
+.uc-problem-file code {
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--chrome-text);
+}
+
+.uc-problem-hint {
+  color: var(--chrome-text-secondary);
+}
+
+.uc-notice .uc-problem-hint {
+  margin: var(--space-xs) 0 0;
+}
+
+.uc-plist > .uc-list-status {
+  margin: calc(var(--space-md) * -1) calc(var(--space-md) * -1) 0; /* the sidebar's own padding would indent it past the Use cases message */
+}
+
+.uc-content [aria-disabled="true"],
+#uc-add[aria-disabled="true"],
+.uc-actions .chrome-btn[aria-disabled="true"],
+.uc-variant-chip[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.uc-problem-detail {
+  color: var(--chrome-warning);
+  overflow-wrap: anywhere;
+}
+
 .uc-toast ul {
   margin: var(--space-xs) 0 0;
   padding-left: var(--space-xl);

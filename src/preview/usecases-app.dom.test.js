@@ -35,6 +35,7 @@ function summarize(u) {
 function listUseCases(input) {
   if (store?.failCursor && input.cursor !== undefined) return { __fail: true };
   if (store?.failFlatFirst && input.sort === "group" && input.limit === 100 && input.cursor === undefined) return { __fail: true };
+  if (store?.failAll) return { __fail: true, status: 422, code: "invalid_state", message: store.failAll };
   if (store?.failInclude && input.include) return { __fail: true, status: 422, code: "invalid_state", message: "invalid usecases/personas.json: not valid JSON" };
   const all = store?.cases ?? [];
   let list = all.filter((u) => (!input.screen || u.steps.some((s) => s.target?.screen === input.screen)) && (!input.group || u.group === input.group || u.group?.startsWith(`${input.group}/`)) && (!input.status || u.status === input.status) && (!input.query || u.title.toLowerCase().includes(input.query.toLowerCase())));
@@ -278,12 +279,231 @@ describe("with use cases", () => {
     expect($(".uc-result-text").textContent).toBe("3 use cases");
   });
 
-  it("an invalid pool file (invalid_state) is reported with the server message", async () => {
+  it("a pool file that cannot be read shows a state for people with the file, what to do and Retry, not an empty tab", async () => {
     store.failInclude = true;
     await import("./app.js");
     await flush();
     await openTab();
-    expect($(".uc-toast").textContent).toContain("invalid usecases/personas.json");
+    const problem = $(".uc-problem");
+    expect(problem).not.toBeNull();
+    expect(problem.textContent).toContain("A use case file could not be read");
+    expect(problem.querySelector("code").textContent).toBe("usecases/personas.json");
+    expect(problem.textContent).toContain("not valid JSON");
+    expect(problem.textContent).toContain("press Retry");
+    expect(problem.textContent).not.toContain("invalid usecases/");
+    expect($(".uc-content").textContent).not.toContain("Select a use case.");
+    expect($(".uc-toast").hidden).toBe(true);
+    // The pool sections do not look empty either.
+    $$(".uc-subtab")[1].click();
+    await flush();
+    expect($(".uc-problem")).not.toBeNull();
+    expect($(".uc-content").textContent).not.toContain("No personas yet.");
+    // Repaired: Retry reads again and the problem gives way to the tab.
+    store.failInclude = false;
+    $(".uc-problem [data-action=retry]").click();
+    await flush();
+    expect($(".uc-problem")).toBeNull();
+  });
+
+  it("a list read that fails with an agent-oriented message is translated: no remedy text, the sidebar only says it could not load", async () => {
+    store.failAll = "invalid usecases/personas.json: personas.0.name: Invalid input: expected string, received undefined — repair or remove the file by hand (the one case where usecases/ may be edited directly)";
+    await import("./app.js");
+    await flush();
+    await openTab();
+    expect($(".uc-problem-detail").textContent).toBe("personas.0.name: Invalid input: expected string, received undefined");
+    expect($(".uc-content").textContent).not.toContain("by hand");
+    expect($(".uc-content").textContent).not.toContain("Select a use case.");
+    expect($(".uc-list-status").textContent).toBe("Use cases could not be loaded.");
+    expect($(".uc-result").hidden).toBe(true); // no "0 use cases"
+    expect($$(".uc-list-row")).toHaveLength(0);
+    // A failure without a file (daemon unreachable) says so in plain words.
+    store.failAll = "disk on fire";
+    $(".uc-problem [data-action=retry]").click();
+    await flush();
+    expect($(".uc-problem-title").textContent).toBe("Use cases could not be loaded");
+    expect($(".uc-problem code")).toBeNull();
+    store.failAll = undefined;
+    $(".uc-problem [data-action=retry]").click();
+    await flush();
+    expect($(".uc-problem")).toBeNull();
+    expect($(".uc-result-text").textContent).toBe("3 use cases");
+  });
+
+  it("skipped pool entries show a notice with Retry above the content while the rest of the tab keeps working", async () => {
+    const entry = { kind: "invalid_file", target: "persona:x", message: "usecases/personas.json personas[0] (x) is not loaded: name: Invalid input" };
+    store.invalid = { warnings: [entry], invalid_file_count: 1 };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    const notice = $(".uc-notice");
+    expect(notice.hidden).toBe(false);
+    expect(notice.textContent).toContain("1 entry in usecases/personas.json could not be loaded and is left out.");
+    expect(notice.textContent).toContain("personas[0] (x)");
+    expect(notice.textContent).toContain("press Retry");
+    expect($(".uc-toast:not(.uc-notice)").hidden).toBe(true); // an entry is not an unreadable case file
+    expect($(".uc-problem")).toBeNull();
+    expect($(".uc-result-text").textContent).toBe("3 use cases");
+    store.invalid = undefined;
+    notice.querySelector("[data-action=retry]").click();
+    await flush();
+    expect($(".uc-notice").hidden).toBe(true);
+  });
+
+  it("a pool that breaks while the tab is open leaves no old rows in the sidebars, the add button is off, and the world read still applies", async () => {
+    store.world = { entities: [], relationship_types: [], constellations: [] };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    $$(".uc-subtab")[1].click();
+    await flush();
+    expect($(".uc-plist").textContent).not.toBe("");
+    store.failInclude = true;
+    store.world = { entities: [{ id: "leo", name: "Leo", traits: {} }], relationship_types: [], constellations: [] };
+    emit({ type: "change", kind: "usecases", name: "personas" });
+    await new Promise((r) => setTimeout(r, 300));
+    await flush();
+    expect($(".uc-plist").textContent).toBe("Personas could not be loaded.");
+    expect($("#uc-add").getAttribute("aria-disabled")).toBe("true");
+    expect($("#uc-add").title).toBe("Saving is paused until usecases/personas.json is fixed.");
+    $$(".uc-subtab")[3].click();
+    await flush();
+    expect($$(".uc-plist")[1].textContent).toBe("Data objects could not be loaded.");
+    $$(".uc-subtab").find((b) => b.dataset.section === "world").click();
+    await flush();
+    expect($(".uc-world-page tr[data-id=leo]")).not.toBeNull(); // the world read applies although the pool read failed
+    store.failInclude = false;
+    $$(".uc-subtab")[0].click();
+    $(".uc-problem [data-action=retry]").click();
+    await flush();
+    expect($("#uc-add").getAttribute("aria-disabled")).toBe("false");
+  });
+
+  it("the notice counts from invalid_pool_entry_count and keeps the case-file toast", async () => {
+    const entries = Array.from({ length: 10 }, (_, i) => ({ kind: "invalid_file", target: `persona:p-${i}`, message: `usecases/personas.json personas[${i}] (p-${i}) is not loaded: x` }));
+    const caseFile = { kind: "invalid_file", target: "use_case:broken", message: "usecases/cases/broken.json is not loaded: x" };
+    store.invalid = { warnings: [...entries, caseFile], invalid_pool_entry_count: 12 };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    expect($(".uc-notice").textContent).toContain("12 entries in usecases/personas.json could not be loaded");
+    expect($(".uc-notice").textContent).toContain("and 7 more");
+    expect($(".uc-toast:not(.uc-notice)").hidden).toBe(false);
+    expect($(".uc-toast:not(.uc-notice)").textContent).toContain("broken.json");
+  });
+
+  it("while entries are skipped, + / Edit / + Variant say saving is paused (focusable, not disabled) and open nothing; the copy says \"agent\"", async () => {
+    store.invalid = { warnings: [{ kind: "invalid_file", target: "persona:x", message: "usecases/personas.json personas[0] (x) is not loaded: name: Invalid input" }] };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    const reason = "Saving is paused until usecases/personas.json is fixed.";
+    const add = $("#uc-add");
+    expect(add.getAttribute("aria-disabled")).toBe("true");
+    expect(add.disabled).toBe(false);
+    expect(add.title).toBe(reason);
+    const edit = $$(".uc-actions .chrome-btn").find((b) => b.textContent.includes("Edit"));
+    expect(edit.getAttribute("aria-disabled")).toBe("true");
+    expect(edit.title).toBe(reason);
+    expect($(".uc-variant-chip[data-kind=add]").getAttribute("aria-disabled")).toBe("true");
+    calls.length = 0;
+    add.click();
+    edit.click();
+    $(".uc-variant-chip[data-kind=add]").click();
+    await flush();
+    expect(calls.some((c) => c.path === "/api/use-case")).toBe(false);
+    expect($(".uc-dialog")).toBeNull();
+    expect($(".uc-notice").textContent).toContain("ask your agent");
+    expect($(".uc-notice").textContent).not.toContain("AI agent");
+  });
+
+  describe("pool pages while entries are skipped", () => {
+    const reason = "Saving is paused until usecases/personas.json is fixed.";
+    const entry = { kind: "invalid_file", target: "persona:x", message: "usecases/personas.json personas[0] (x) is not loaded: name: Invalid input" };
+    const visit = async (section) => {
+      store.invalid = { warnings: [entry] };
+      store.world = { entities: [{ id: "leo", name: "Leo", traits: {} }], relationship_types: [{ id: "parent-of", label: "parent of" }], constellations: [{ id: "fam", name: "Family", traits: {}, relationships: [] }] };
+      await import("./app.js");
+      await flush();
+      await openTab();
+      $$(".uc-subtab").find((b) => b.dataset.section === section).click();
+      await flush();
+    };
+    const checkPaused = async (selectors) => {
+      calls.length = 0;
+      for (const selector of selectors) {
+        const controls = $$(`.uc-content ${selector}`);
+        expect(controls.length, selector).toBeGreaterThan(0);
+        for (const control of controls) {
+          expect(control.getAttribute("aria-disabled"), selector).toBe("true");
+          expect(control.disabled).toBeFalsy();
+          expect(control.title, selector).toBe(reason);
+          control.click();
+        }
+      }
+      await flush();
+      expect($(".uc-dialog")).toBeNull();
+      expect(calls.some((c) => c.tool === "generate_personas" || c.tool === "set_use_cases")).toBe(false);
+    };
+
+    it("Personas: New persona, Generate, + Dimension, persona and dimension edit", async () => {
+      await visit("personas");
+      await checkPaused([".uc-persona-open", ".uc-dim-name", ".uc-h2-action", ".uc-persona-new", ".uc-page-head .uc-actions .chrome-btn--primary"]);
+    });
+
+    it("a world.json that cannot be read pauses saving too, on every page", async () => {
+      store.worldFail = true;
+      await import("./app.js");
+      await flush();
+      await openTab();
+      const worldReason = "Saving is paused until usecases/world.json is fixed.";
+      expect($("#uc-add").getAttribute("aria-disabled")).toBe("true");
+      expect($("#uc-add").title).toBe(worldReason);
+      const edit = $$(".uc-actions .chrome-btn").find((b) => b.textContent.includes("Edit"));
+      expect(edit.getAttribute("aria-disabled")).toBe("true");
+      $$(".uc-subtab").find((b) => b.dataset.section === "personas").click();
+      await flush();
+      const persona = $(".uc-content .uc-persona-new");
+      expect(persona.getAttribute("aria-disabled")).toBe("true");
+      expect(persona.title).toBe(worldReason);
+      persona.click();
+      await flush();
+      expect($(".uc-dialog")).toBeNull();
+    });
+
+    it("Data objects: New data object and the object pencil", async () => {
+      await visit("objects");
+      await checkPaused([".uc-io-pencil", ".uc-page-head .uc-actions button"]);
+    });
+
+    it("World: the New … buttons, Generate and the edit links", async () => {
+      await visit("world");
+      await checkPaused([".uc-h2-row button", ".uc-link-row"]);
+    });
+  });
+
+  it("the problem panel is not rebuilt (and so not announced again) while it says the same", async () => {
+    store.failInclude = true;
+    await import("./app.js");
+    await flush();
+    await openTab();
+    const first = $(".uc-problem");
+    expect(first.textContent).toContain("fix it (or restore it from git), or ask your agent to");
+    expect(first.textContent).not.toContain("Nothing is lost");
+    $$(".uc-subtab")[0].click();
+    $$(".uc-subtab")[1].click();
+    $$(".uc-subtab")[0].click();
+    await flush();
+    expect($(".uc-problem")).toBe(first);
+    expect($(".uc-side-panel[data-section=personas] .uc-result").hidden).toBe(true);
+  });
+
+  it("a world with skipped entries is named in the same notice", async () => {
+    store.world = { entities: [], relationship_types: [], constellations: [], warnings: [{ kind: "invalid_file", target: "entity:oops", message: "usecases/world.json entities[1] (oops) is not loaded: name: Invalid input" }] };
+    await import("./app.js");
+    await flush();
+    await openTab();
+    expect($(".uc-notice").hidden).toBe(false);
+    expect($(".uc-notice").textContent).toContain("usecases/world.json");
   });
 
   it("the folder-level events of usecases/ and usecases/cases reload too (a case written with its new folder has no file event)", async () => {

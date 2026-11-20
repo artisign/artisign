@@ -7,7 +7,7 @@ import { h, icon } from "./usecases-dom.js";
 import { openMenu } from "./usecases-menu.js";
 import { avatar, statusBadge, diffBadge, targetChip, variantChip, traitChip } from "./usecases-parts.js";
 import { actorKind, mappingNote, stepDataBlock, warnLine } from "./usecases-world-parts.js";
-import { orphansOf, conditionOrphan, orphanSummary } from "./usecases-orphans.js";
+import { orphansOf, conditionOrphan, orphanSummary, actorMissing } from "./usecases-orphans.js";
 import { KIND_ICONS, warningsByTarget, numberBranches, scopeOf, matchingConstellations, whenScopeText, triggerChanged, stateRows } from "./usecases-world-data.js";
 import { triggerRow, worldSection, worldDiffSection, stateSection, branchesDiffSection, lanesAt, stepBranchNotes } from "./usecases-world-view.js";
 import {
@@ -59,7 +59,7 @@ export function renderDetail(root, ctx) {
   // The base bundle carries the warnings of every variant, a variant bundle its own: together they are what the case names but the pools lack.
   const seen = new Set();
   const caseWarnings = [...(base.warnings ?? []), ...(bundle.warnings ?? [])].filter((x) => !seen.has(`${x.kind}|${x.target}|${x.message}`) && seen.add(`${x.kind}|${x.target}|${x.message}`));
-  ctx.orphans = orphansOf(caseWarnings, baseCase.id);
+  ctx.orphans = orphansOf(caseWarnings, baseCase.id, [...new Set([...(baseCase.constellations ?? []), ...(useCase.constellations ?? []), ...(source?.variants ?? []).flatMap((v) => v.constellations ?? [])])]);
 
   const main = h("div", { class: "uc-detail-main" });
   main.append(header(ctx, useCase, w));
@@ -292,6 +292,7 @@ function stepRow(ctx, row, numbered, w) {
     { class: "uc-step-card", dataset: { change: row.change ?? "" } },
     h("div", { class: "uc-step-head" }, h("span", { class: "uc-step-no" }, `Step ${row.number} · ${actorName(step.actor, pool.personasById)}${step.via ? ` · via ${step.via}` : ""}`), row.change === "changed" ? diffBadge("changed") : row.change === "added" ? diffBadge("added") : row.change === "base" ? diffBadge("base") : null),
     h("p", { class: "uc-step-action" }, step.action),
+    actorMissing(ctx, step.actor) ? h("p", { class: "uc-orphan-note", dataset: { orphan: "actor" } }, icon("warning"), `${step.actor} is missing from the persona pool`) : null,
     was?.actor ? h("p", { class: "uc-step-was" }, "Actor was ", h("s", null, actorName(was.actor, pool.personasById))) : null,
     was?.action ? h("p", { class: "uc-step-was" }, "Base: ", h("s", null, was.action)) : null,
     was?.target ? h("p", { class: "uc-step-was" }, "Target was ", h("s", null, was.target)) : null,
@@ -300,7 +301,7 @@ function stepRow(ctx, row, numbered, w) {
     stepWarnings.map((x) => warnLine(x.message)),
     stepBranchNotes(numbered, step.id),
   );
-  return h("li", { class: "uc-step", dataset: { change: row.change ?? "", step: step.id } }, h("span", { class: "uc-step-rail" }, avatar(avatarOf(step.actor, pool.personasById), "lg", actorName(step.actor, pool.personasById))), card, stepDataBlock(step, pool.objectsById));
+  return h("li", { class: "uc-step", dataset: { change: row.change ?? "", step: step.id } }, h("span", { class: "uc-step-rail" }, avatar(avatarOf(step.actor, pool.personasById), "lg", actorName(step.actor, pool.personasById))), card, stepDataBlock(step, pool.objectsById, ctx.orphans?.dataObjects));
 }
 
 function ioCard(ctx, item, kind, compareTo) {
@@ -313,7 +314,7 @@ function ioCard(ctx, item, kind, compareTo) {
   return h(
     "div",
     { class: "uc-io-card" },
-    h("div", { class: "uc-io-head" }, h("span", { class: "uc-io-name" }, object?.name ?? item.object), h("span", { class: "uc-io-id" }, item.object), h("span", { class: "uc-io-side" }, sideLabel)),
+    h("div", { class: "uc-io-head" }, h("span", { class: "uc-io-name" }, object?.name ?? item.object), ctx.orphans?.dataObjects.has(item.object) ? h("span", { class: "uc-orphan-note", dataset: { orphan: "data_object" } }, icon("warning"), "Missing from the pool") : null, h("span", { class: "uc-io-id" }, item.object), h("span", { class: "uc-io-side" }, sideLabel)),
     h(
       "table",
       { class: "uc-table" },

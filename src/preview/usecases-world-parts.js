@@ -22,7 +22,7 @@ export function entityAvatar(av, size = "md", title = "") {
 export function participantChip(p, { size = "sm", withTail = true } = {}) {
   const art = p.kind === "entity" ? entityAvatar(p.avatar, size, p.name) : p.kind === "unknown" ? h("span", { class: "uc-avatar", dataset: { size, kind: "unknown" }, title: p.id }, p.avatar.text) : avatar(p.avatar, size, p.name);
   const tail = !withTail ? null : p.kind === "persona" ? actorKind(p.persona?.kind) : p.kind === "entity" && p.type ? h("span", { class: "uc-participant-type" }, p.type) : null;
-  return h("span", { class: "uc-participant", dataset: { kind: p.kind } }, art, h("span", { class: "uc-participant-name" }, p.name), tail);
+  return h("span", { class: p.kind === "unknown" ? "uc-participant is-orphan" : "uc-participant", dataset: p.kind === "unknown" ? { kind: p.kind, orphan: "participant" } : { kind: p.kind }, title: p.kind === "unknown" ? "Neither a persona nor an entity" : null }, art, h("span", { class: "uc-participant-name" }, p.name), tail);
 }
 
 /** `uc-condition-chip`: subject.property, the operator symbol (its word is the accessible name), the value. `warning` underlines the key. */
@@ -60,11 +60,12 @@ export function branchEndChip(kind, text) {
 }
 
 /** `uc-relation-row`: from — type → to, and the relationship's note when it has one. */
-export function relationRow({ from, label, to, note, warning = "" }) {
+export function relationRow({ from, label, to, note, warning = "", fromOrphan = false, toOrphan = false, typeOrphan = false }) {
+  const end = (text, orphan) => h("span", { class: orphan ? "uc-relation-end is-orphan" : "uc-relation-end", dataset: orphan ? { orphan: "participant" } : {}, title: orphan ? "Neither a persona nor an entity" : null }, text, orphan ? icon("warning") : null);
   return h(
     "li",
-    { class: `uc-relation${warning ? " is-warning" : ""}` },
-    h("span", { class: "uc-relation-line" }, h("span", { class: "uc-relation-end" }, from), h("span", { class: "uc-relation-type" }, h("span", { "aria-hidden": "true" }, "—"), h("span", null, label), icon("arrow_forward")), h("span", { class: "uc-relation-end" }, to)),
+    { class: `uc-relation${warning || fromOrphan || toOrphan || typeOrphan ? " is-warning" : ""}` },
+    h("span", { class: "uc-relation-line" }, end(from, fromOrphan), h("span", { class: "uc-relation-type" }, h("span", { "aria-hidden": "true" }, "—"), h("span", typeOrphan ? { class: "is-orphan", dataset: { orphan: "relationship_type" }, title: "This relationship type is not declared" } : null, label), typeOrphan ? icon("warning") : icon("arrow_forward")), end(to, toOrphan)),
     note ? h("span", { class: "uc-relation-note" }, note) : null,
   );
 }
@@ -86,10 +87,11 @@ export function mappingNote(step, mapping, screenEntry) {
 }
 
 /** The before / after data cards of a step, `null` without data. */
-export function stepDataBlock(step, objectsById) {
+export function stepDataBlock(step, objectsById, missingObjects = new Set()) {
   const data = (step.data ?? []).map((entry) => {
     const name = objectsById.get(entry.object)?.name ?? entry.object;
-    return h("div", { class: "uc-step-data" }, dataCard("before", name, entry.before ?? {}, new Set()), icon("arrow_forward", "uc-data-arrow"), dataCard("after", name, entry.after ?? {}, changedKeys(entry.before, entry.after)));
+    const missing = missingObjects.has(entry.object);
+    return h("div", { class: missing ? "uc-step-data is-orphan" : "uc-step-data", dataset: missing ? { orphan: "data_object" } : {} }, missing ? h("p", { class: "uc-orphan-note" }, icon("warning"), `Data object "${entry.object}" is missing from the pool`) : null, dataCard("before", name, entry.before ?? {}, new Set()), icon("arrow_forward", "uc-data-arrow"), dataCard("after", name, entry.after ?? {}, changedKeys(entry.before, entry.after)));
   });
   return data.length > 0 ? h("div", { class: "uc-step-datas" }, data) : null;
 }

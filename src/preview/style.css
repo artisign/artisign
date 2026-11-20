@@ -6323,6 +6323,28 @@ body:has(#settings-menu:not([hidden])) #update-notice {
   color: var(--chrome-warning);
 }
 
+.uc-relation-end.is-orphan,
+.uc-relation-type .is-orphan,
+.uc-participant.is-orphan,
+.uc-trigger-actor.is-orphan,
+.uc-step-data.is-orphan,
+.uc-io-head .uc-orphan-note {
+  color: var(--chrome-warning);
+}
+
+.uc-relation-end.is-orphan,
+.uc-relation-type .is-orphan {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}
+
+.uc-relation-end.is-orphan .icon {
+  font-size: var(--size-icon-sm);
+}
+
 .uc-orphan-box {
   border-color: var(--chrome-warning);
 }

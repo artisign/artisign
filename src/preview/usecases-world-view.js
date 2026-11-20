@@ -3,6 +3,7 @@
 // Built from get_use_case bundles; warnings sit at their targets, never block, and Artisign never picks a branch.
 
 import { h, icon } from "./usecases-dom.js";
+import { actorMissing } from "./usecases-orphans.js";
 import { avatar, diffBadge, targetChip, traitChip } from "./usecases-parts.js";
 import { triggerText, mappingFor, stepScope, plural } from "./usecases-data.js";
 import { actorKind, branchEndChip, conditionChip, conditionList, entityAvatar, mappingNote, participantChip, relationRow, stepDataBlock, timeChip, warnLine } from "./usecases-world-parts.js";
@@ -56,7 +57,8 @@ function triggerBody(ctx, trigger, w) {
   const kids = [];
   if (t.actor !== undefined) {
     const p = participant(t.actor, ctx);
-    kids.push(h("span", { class: "uc-trigger-actor" }, participantAvatar(p), h("span", { class: "uc-trigger-name" }, p.name), p.kind === "persona" ? actorKind(p.persona?.kind) : null));
+    const missing = actorMissing(ctx, t.actor);
+    kids.push(h("span", { class: missing ? "uc-trigger-actor is-orphan" : "uc-trigger-actor", dataset: missing ? { orphan: "actor" } : {} }, participantAvatar(p), h("span", { class: "uc-trigger-name" }, p.name), p.kind === "persona" ? actorKind(p.persona?.kind) : null, missing ? h("span", { class: "uc-orphan-note" }, icon("warning"), "Missing from the persona pool") : null));
   } else if ((t.state ?? []).length > 0 || t.at !== undefined) {
     kids.push(h("span", { class: "uc-trigger-conds" }, h("span", { class: "uc-muted" }, "When"), conditionList(t.state ?? [], { warnings: (c) => w.triggerState.get(`${c.subject}.${c.property}`) }), t.at !== undefined ? timeChip(t.at) : null));
   }
@@ -111,7 +113,15 @@ function constellationCard(ctx, constellation, w) {
   const rels = (constellation.relationships ?? []).map((r) => {
     const from = participant(r.from, ctx);
     const to = participant(r.to, ctx);
-    return relationRow({ from: from.name, label: relationLabel(r.type, ctx.bundle), to: to.name, note: r.note });
+    return relationRow({
+      from: from.name,
+      label: relationLabel(r.type, ctx.bundle),
+      to: to.name,
+      note: r.note,
+      fromOrphan: from.kind === "unknown" || Boolean(ctx.orphans?.participants.has(r.from)),
+      toOrphan: to.kind === "unknown" || Boolean(ctx.orphans?.participants.has(r.to)),
+      typeOrphan: Boolean(ctx.orphans?.relationshipTypes.has(r.type)),
+    });
   });
   return h(
     "article",
@@ -126,7 +136,7 @@ function constellationCard(ctx, constellation, w) {
 const traitsOf = (c) => Object.keys(c.traits ?? {});
 
 function unknownConstellationCard(id) {
-  return h("article", { class: "uc-cst is-unknown", dataset: { constellation: id } }, h("span", { class: "uc-mono" }, id), warnLine("Not in the world pool. Create the constellation in World or remove it from this case."));
+  return h("article", { class: "uc-cst is-unknown", dataset: { constellation: id, orphan: "constellation" } }, h("span", { class: "uc-mono" }, id), warnLine("Not in the world pool. Create the constellation in World or remove it from this case."));
 }
 
 /** The World section of the base view: one card per constellation of the case, an unknown one as a dashed amber card. */

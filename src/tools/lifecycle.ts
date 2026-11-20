@@ -696,6 +696,9 @@ async function deleteScreenEntity(store: Store, name: string, cascade: boolean, 
 }
 
 export async function deleteEntity(store: Store, input: DeleteEntityInput, ctx?: ToolHandlerContext): Promise<Record<string, unknown>> {
+  if (input.variant !== undefined && input.kind !== "mockup") {
+    throw new ToolError("validation_failed", "variant only applies to kind \"mockup\"");
+  }
   if (input.cascade === true && input.kind !== "screen") {
     throw new ToolError("validation_failed", "cascade only applies to kind \"screen\"");
   }

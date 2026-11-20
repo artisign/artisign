@@ -78,8 +78,8 @@ function isCalendarDate(value: string): boolean {
   return probe.getUTCFullYear() === year && probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day;
 }
 
-/** Whether `value` fits the field's type (and `enum` values). `null` fits anything: nothing there yet. Dates are checked by shape, not evaluated. */
-function fitsField(field: DataField, value: unknown): boolean {
+/** Whether `value` fits the field's type (and `enum` values). `null` fits anything: nothing there yet. Dates are checked for shape plus calendar validity. */
+export function fitsField(field: DataField, value: unknown): boolean {
   if (value === null) return true;
   switch (field.type) {
     case "string":

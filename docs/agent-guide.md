@@ -558,6 +558,12 @@ Workflow, in this order:
      `{object, example}` (`source` on an input, `target` on an output): what
      the case consumes and produces, with concrete example values. An
      `example` is an object with at least one key; `{}` is refused.
+     A key the data object does not declare is `unknown_data_field`; a value
+     that does not fit its field's type or enum `values` (`null` always fits;
+     a `ref` is checked as an id string only; a `date` must be a real calendar
+     date `YYYY-MM-DD`, a `datetime` ISO 8601 with `T`, e.g.
+     `2026-12-01T09:30:00Z`) is `invalid_example_value`.
+     Both are warnings. Step `data` `before`/`after` are checked the same way.
    - **`steps`** — the flow: `{id, actor, action, target?, data?, via?}`.
      `actor` is a persona id or `"system"`; `via` names the interface an
      outside actor uses. `data` lists the state change of a step: `{object,
@@ -647,7 +653,8 @@ call is validated before anything is written; unknown personas, data objects,
 dimensions, example fields or screens only come back as warnings. The
 response gives `created` and `updated` counts per kind, not the ids. Delete with
 `delete_entity` kinds `persona`, `dimension`, `data_object`, `use_case`,
-`entity`, `constellation`, `relationship_type` — it
+`entity`, `constellation`, `relationship_type` (always the whole entity; `variant` is rejected for them, it only
+applies to `mockup`) — it
 warns about references left dangling and does not repair them. Like design
 files, `usecases/` changes only through these tools. The one exception: a file
 under `usecases/` that no longer validates (hand edit, merge conflict, a newer

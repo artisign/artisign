@@ -369,7 +369,66 @@ reliably produces vague metadata, because the reasoning is gone.
 
 ---
 
-## 8. Anti-patterns, and why each one bites
+## 8. Use cases and the world they play in (optional)
+
+Screens say what the product looks like. Use cases say what it must do, for
+whom, with which data. They are optional: a project without a `usecases/`
+folder is unaffected, and nothing is created until the first `set_use_cases`.
+The normative rules are in the Agent Guide (section "Use cases"); this section
+shows the idea with a small library app, *Shelf*.
+
+**Start with who.** Define a dimension (`membership`: `student`, `staff`), then
+personas with traits (`member-ana`, a student; `staff-lee`). A missing trait
+means "any value".
+
+**Add the world only when the situation matters.** Say a loan depends on a
+member's household, the copy and the branch library. Then:
+
+- a *main entity* is a thing with identity that relates to a persona or another
+  entity: the book copy `copy-0042`. A value without identity (the number of
+  open loans) is a *property state*, not an entity;
+- a *relationship type* names how two participants relate (`borrows`,
+  `held-by`);
+- a *constellation* is one fixed starting world: Ana, the copy and the branch,
+  joined by `member-ana borrows copy-0042` and `copy-0042 held-by north-branch`.
+  Relationships exist only inside a constellation.
+
+**Write the case.** "Borrow a book" has a `trigger` (Ana scans the copy at the
+kiosk: an action of a persona with `via: "kiosk"`; or a state, such as a due
+date, never both), a starting `state` (`member-ana.open-loans = 4`) and the
+main flow. Where the flow forks, add a **branch**: when `member-ana.open-loans`
+is at least 5, the system explains the loan limit, then the case ends with that
+outcome (or `rejoin` continues the main flow at a later step). A branch forks
+after a main-flow step and does not nest; a deeper alternative is a second
+branch with a narrower condition.
+
+**Which mechanism for which difference?**
+
+| The difference is ... | Write it as |
+|---|---|
+| a different goal | a separate use case |
+| a different actor or world (persona or constellation traits) | a variant |
+| a different path given a state (data, a result, time, connectivity) | a branch |
+| a starting state that a dimension value causes (staff have more loan slots) | a variant `state` under that `when` |
+| a starting state any persona of the case can meet (the catalogue is empty) | a branch without `from` |
+| an outside reason to start | the `trigger` |
+
+If you can name the dimension value that causes a starting state, it is a
+variant; if any persona of the case can meet it, it is a branch.
+
+**Map and hand off.** Map steps to screens and elements with `step.target`
+(give the node an authored id first), then a coding agent reads one call,
+`get_use_case`, and gets the case, its personas and data, the mapped screens
+and, for a case with a world, its entities, constellations and relationship
+types. artisign stores and shows states and conditions; it never evaluates
+them. Problems in the world (an unknown participant, an entity used as an
+actor, a participant outside the case's constellations) are warnings and never
+block a write. In the preview, the **Use Cases** tab has read views for the
+world and editors for it.
+
+---
+
+## 9. Anti-patterns, and why each one bites
 
 | Anti-pattern | Why it hurts |
 |---|---|
@@ -385,7 +444,7 @@ reliably produces vague metadata, because the reasoning is gone.
 
 ---
 
-## 9. Building skills from this workflow
+## 10. Building skills from this workflow
 
 If you run your own agents against artisign, the recommended split:
 
@@ -407,7 +466,7 @@ If you run your own agents against artisign, the recommended split:
 
 ---
 
-## 10. The short version
+## 11. The short version
 
 1. Read the system before designing (`get_project`, `get_design_system`,
    `list_comments`).

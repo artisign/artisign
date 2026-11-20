@@ -139,16 +139,18 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 
 ### Unreleased — on `main`, not part of 2.2.1
 
-Specs that coding agents write and read: an optional `usecases/` folder with personas, data objects and use cases whose steps map onto screens and elements. A project without it behaves exactly as before. These five tools and four extra `delete_entity` kinds are merged but not yet in a release, so the tool count above is unchanged until one ships. The preview shows them in a fourth tab, **Use Cases**, where people can also create, edit and delete the same data.
+Specs that coding agents write and read: an optional `usecases/` folder with personas, data objects and use cases whose steps map onto screens and elements. A project without it behaves exactly as before. These five tools and seven extra `delete_entity` kinds are merged but not yet in a release, so the tool count above is unchanged until one ships. The preview shows them in a fourth tab, **Use Cases**, where people can also create, edit and delete the same data.
+
+Optionally a use case plays in a **world model**, so the spec says who and what is there and what the case starts from, not only what the screen does. A library example: a *main entity* is a thing with identity that relates to a persona or another entity (a book copy on loan to a member); a *constellation* is one fixed starting world (a member, a branch library and a copy, joined by `borrows` and `held-by` relationships); a *property state* is a value at the start of a case (`member-ana.open-loans = 4`). A use case adds a `trigger` (an action of a persona, with `via` for the interface, or a state or point in time), a starting `state`, and **branches**: alternative paths that fork after a main-flow step when conditions hold (a loan limit is reached) and either rejoin the flow or end the case. Variants can change the constellations, the state and the branches too. Artisign stores, resolves, validates and shows states and conditions; it never evaluates them. World problems (an unknown participant, an entity acting as a persona, a participant outside the case's constellations, conflicting traits) come back as warnings and never block a write. Nothing new is needed in the tool list: `set_use_cases` takes `entities`, `relationship_types` and `constellations`, `get_use_case` returns the world of one case, and `list_use_cases` filters by `constellation` and `entity`. The Use Cases tab has read views and editors for it.
 
 | Bucket | Tool | Does |
 |---|---|---|
-| Reads | `list_use_cases` | Use cases filtered by group prefix, persona, screen, node, tag, status, text or variants; sorted, paged, with facet counts. `include` adds the personas, dimensions and data objects. |
-| Reads | `get_use_case` | One-call bundle for a coding agent: the (variant-resolved) use case, its personas, data objects and the mapped screens with their nodes. |
-| Reads | `suggest_use_case_variants` | For one use case, the persona-pool trait values no variant covers yet, with variant skeletons to fill in. |
-| Writes | `set_use_cases` | Bulk upsert of dimensions, personas, data objects and use cases; one commit per call, reference problems are warnings. |
-| Writes | `generate_personas` | Deterministic generic personas from the dimensions (`pairwise` or `all`), skipping combinations already covered; `dry_run` previews. |
-| Lifecycle | `delete_entity` | Also takes the kinds `persona`, `dimension`, `data_object` and `use_case`, warning about dangling references. |
+| Reads | `list_use_cases` | Use cases filtered by group prefix, persona, screen, node, tag, status, text, variants, constellation or entity; sorted, paged, with facet counts. `include` adds the personas, dimensions and data objects. |
+| Reads | `get_use_case` | One-call bundle for a coding agent: the (variant-resolved) use case, its personas, data objects and the mapped screens with their nodes, plus its world (entities, constellations, relationship types) when it has one. |
+| Reads | `suggest_use_case_variants` | For one use case, the persona-pool trait values (and, for a case with constellations, the constellation-scoped values) no variant covers yet, with variant skeletons to fill in. |
+| Writes | `set_use_cases` | Bulk upsert of dimensions, personas, entities, relationship types, constellations, data objects and use cases; one commit per call, reference problems are warnings. |
+| Writes | `generate_personas` | Deterministic generic personas from the dimensions (`pairwise` or `all`), skipping combinations already covered; `target: "constellations"` writes constellation skeletons instead; `dry_run` previews. |
+| Lifecycle | `delete_entity` | Also takes the seven use-case kinds `persona`, `dimension`, `data_object`, `use_case`, `entity`, `constellation` and `relationship_type`, warning about dangling references. |
 
 ### The write → screenshot → adjust loop
 

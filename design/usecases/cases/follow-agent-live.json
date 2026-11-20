@@ -16,7 +16,7 @@
   "trigger": {
     "text": "Dana hands the agent a task and wants to watch it work.",
     "actor": "designer-dana",
-    "via": "browser preview"
+    "via": "AI tool chat"
   },
   "goal": "The preview shows whatever the agent touches.",
   "outcome": "Each tool call navigates and highlights the nodes; Dana's own navigation pauses following.",

@@ -7,7 +7,8 @@ import { h, icon } from "./usecases-dom.js";
 import { openMenu } from "./usecases-menu.js";
 import { avatar, statusBadge, diffBadge, targetChip, variantChip, traitChip } from "./usecases-parts.js";
 import { actorKind, mappingNote, stepDataBlock, warnLine } from "./usecases-world-parts.js";
-import { orphansOf, conditionOrphan, orphanSummary, actorMissing, hiddenNote } from "./usecases-orphans.js";
+import { orphansOf, conditionOrphan, orphanParts, actorMissing, hiddenNote } from "./usecases-orphans.js";
+import { constellationMembers } from "./usecases-world-data.js";
 import { KIND_ICONS, warningsByTarget, numberBranches, scopeOf, matchingConstellations, whenScopeText, triggerChanged, stateRows } from "./usecases-world-data.js";
 import { triggerRow, worldSection, worldDiffSection, stateSection, branchesDiffSection, lanesAt, stepBranchNotes } from "./usecases-world-view.js";
 import {
@@ -59,7 +60,7 @@ export function renderDetail(root, ctx) {
   // The base bundle carries the warnings of every variant, a variant bundle its own: together they are what the case names but the pools lack.
   const seen = new Set();
   const caseWarnings = [...(base.warnings ?? []), ...(bundle.warnings ?? [])].filter((x) => !seen.has(`${x.kind}|${x.target}|${x.message}`) && seen.add(`${x.kind}|${x.target}|${x.message}`));
-  ctx.orphans = orphansOf(caseWarnings, baseCase.id, [...new Set([...(baseCase.constellations ?? []), ...(useCase.constellations ?? []), ...(source?.variants ?? []).flatMap((v) => v.constellations ?? [])])]);
+  ctx.orphans = orphansOf(caseWarnings, baseCase.id, [...new Set([...(baseCase.constellations ?? []), ...(useCase.constellations ?? []), ...(source?.variants ?? []).flatMap((v) => v.constellations ?? [])])], [...new Set([...(bundle.constellations ?? []), ...(base.constellations ?? [])].flatMap(constellationMembers))]);
   // get_use_case caps its warning list (warning_count is the true total): an orphan past the cap is unseen, so the card cannot confirm full coverage.
   ctx.orphans.incomplete = [base, bundle].some((b) => (b.warning_count ?? 0) > (b.warnings?.length ?? 0));
 
@@ -147,7 +148,8 @@ function variantBar(ctx, variants, source, matrix) {
 /** A condition chip; one on a deleted dimension or value is marked as orphaned, not just shown with its raw id. */
 function orphanChip(ctx, variantId, entry, value) {
   const orphan = conditionOrphan(ctx.orphans, variantId, entry.dimension, value.id);
-  const chip = traitChip(entry.label, value.label);
+  // A deleted dimension or value shows its id, the one text that is left; the marker comes on top.
+  const chip = orphan ? traitChip(entry.dimension, value.id) : traitChip(entry.label, value.label);
   if (!orphan) return chip;
   chip.classList.add("is-orphan");
   chip.dataset.orphan = orphan;
@@ -175,7 +177,7 @@ function variantPanel(ctx, variant, raw) {
       { class: "uc-applies" },
       h("span", { class: "uc-muted" }, "Applies when"),
       conditions.map((entry) => entry.values.map((v) => orphanChip(ctx, variant.id, entry, v))),
-      h("span", { class: "uc-muted" }, `${whenScopeText(variant.when, pool.dimensionsById)} · matches ${matchText}${conditions.some((entry) => conditionOrphan(ctx.orphans, variant.id, entry.dimension)) ? " (a condition names a dimension that no longer exists)" : ""}`),
+      h("span", { class: "uc-muted" }, `${whenScopeText(variant.when, pool.dimensionsById)} · matches ${matchText}${conditions.some((entry) => conditionOrphan(ctx.orphans, variant.id, entry.dimension)) ? " (a condition names a dimension that no longer exists)" : conditions.some((entry) => entry.values.some((v) => conditionOrphan(ctx.orphans, variant.id, entry.dimension, v.id) === "value")) ? " (a condition names a value that no longer exists)" : ""}`),
       matches.length > 0 ? h("span", { class: "uc-avatar-stack" }, matches.slice(0, 5).map((p) => avatar(avatarOf(p.id, pool.personasById), "sm", p.name))) : null,
     ),
     variant.description ? h("p", { class: "uc-variant-desc" }, variant.description) : null,
@@ -424,10 +426,13 @@ function coveragePanel(ctx, matrix) {
 /** The coverage card never claims full coverage while the case names what the pools lack: it says what, with the copy-prompt pattern of the gap box. */
 function orphanBox(ctx, useCaseId) {
   const prompt = `Repair the missing references in ${useCaseId}`;
+  const { coverage, repair } = orphanParts(ctx.orphans);
   return h(
     "div",
     { class: "uc-gap-box uc-orphan-box", dataset: { orphans: String(ctx.orphans.count) } },
-    h("p", null, `Coverage is incomplete: ${orphanSummary(ctx.orphans)}. These are not counted. Ask your agent to repair them:`),
+    coverage.length > 0 ? h("p", null, `Coverage is incomplete: ${coverage.join("; ")}. These are not counted.`) : null,
+    repair.length > 0 ? h("p", null, `References to repair: ${repair.join("; ")}.`) : null,
+    h("p", null, "Ask your agent to repair them:"),
     h("div", { class: "uc-prompt" }, h("code", null, prompt), h("button", { type: "button", class: "chrome-icon-btn chrome-icon-btn--sm", "aria-label": "Copy prompt", onClick: () => ctx.handlers.onCopy(prompt) }, icon("content_copy"))),
   );
 }

@@ -128,7 +128,7 @@ function constellationCard(ctx, constellation, w) {
     { class: "uc-cst", dataset: { constellation: constellation.id } },
     h("header", { class: "uc-cst-head" }, h("h3", { class: "uc-cst-name" }, constellation.name), (traitsOf(constellation)).length > 0 ? h("span", { class: "uc-cst-traits" }, traitChips(ctx, constellation.traits)) : null),
     rels.length > 0 ? h("ul", { class: "uc-cst-rels", "aria-label": `Relationships in ${constellation.name}` }, rels) : h("p", { class: "uc-muted uc-cst-empty" }, "No relationships yet."),
-    h("div", { class: "uc-cst-members" }, h("span", { class: "uc-muted" }, "Members"), members.map((id) => participantChip(participant(id, ctx)))),
+    h("div", { class: "uc-cst-members" }, h("span", { class: "uc-muted" }, "Members"), members.map((id) => participantChip(participant(id, ctx), { missingObject: ctx.orphans?.entityObjects.get(id) ?? null }))),
     w.constellation.get(constellation.id)?.length ? h("div", { class: "uc-cst-warn" }, w.constellation.get(constellation.id).map((x) => warnLine(x.message))) : null,
   );
 }

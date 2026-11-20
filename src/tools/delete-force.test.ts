@@ -125,6 +125,12 @@ describe("delete_entity refuses a referenced pool entry unless force (CHR-1125)"
     },
   );
 
+  it("uses the same words for kinds with an underscore in the refusal and in the fail-closed message", async () => {
+    await expect(deleteEntity(fx.store, { kind: "data_object", name: "book" })).rejects.toMatchObject({ message: expect.stringContaining('data object "book" is still referenced') });
+    await writeFile(join(fx.dir, "usecases", "cases", "broken.json"), "{ not json");
+    await expect(deleteEntity(fx.store, { kind: "data_object", name: "unused" })).rejects.toMatchObject({ message: expect.stringContaining('cannot safely delete data object "unused"') });
+  });
+
   it("deletes with force: true and returns the dangling_reference warnings", async () => {
     const res = await deleteEntity(fx.store, { kind: "persona", name: "staff-lee", force: true });
     expect(res.warnings).toEqual([
@@ -215,6 +221,57 @@ describe("delete_entity refuses a referenced pool entry unless force (CHR-1125)"
         });
         expect((err as Error).message, kind).toContain("reference check is incomplete");
       }
+    });
+
+    it("fails closed for a dimension too (a dimension nobody uses still needs the case files to rule that out)", async () => {
+      await setUseCases(fx.store, {
+        dimensions: [
+          { id: "language", label: "Language", values: [{ id: "en", label: "English" }] },
+        ],
+      });
+      const err = await deleteEntity(fx.store, { kind: "dimension", name: "language" }).catch(
+        (e: unknown) => e as Error & { code: string },
+      );
+      expect(err).toMatchObject({
+        code: "conflict",
+        message: expect.stringContaining("usecases/cases/broken.json"),
+      });
+      const forced = await deleteEntity(fx.store, {
+        kind: "dimension",
+        name: "language",
+        force: true,
+      });
+      expect(forced.warnings as Warning[]).toEqual([
+        expect.objectContaining({ kind: "invalid_file", target: "use_case:broken" }),
+      ]);
+    });
+
+    describe("when a persona and an entity share an id", () => {
+      beforeEach(async () => {
+        await setUseCases(fx.store, {
+          entities: [{ id: "visitor", name: "Visitor entity", type: "Guest" }],
+        });
+      });
+
+      it("deleting the entity does not fail closed: the persona still resolves the id, so no case file is scanned", async () => {
+        const res = await deleteEntity(fx.store, { kind: "entity", name: "visitor" });
+        expect(res).toMatchObject({ kind: "entity", warnings: [] });
+      });
+
+      it("deleting the entity with force adds no invalid_file warning and no invalid_file_count", async () => {
+        const res = await deleteEntity(fx.store, { kind: "entity", name: "visitor", force: true });
+        expect(res.warnings).toEqual([]);
+        expect(res).not.toHaveProperty("invalid_file_count");
+      });
+
+      it("deleting the persona still scans the case files, so it fails closed", async () => {
+        await expect(
+          deleteEntity(fx.store, { kind: "persona", name: "visitor" }),
+        ).rejects.toMatchObject({
+          code: "conflict",
+          message: expect.stringContaining("reference check is incomplete"),
+        });
+      });
     });
 
     it("does not fail closed for relationship_type, whose scan reads no case file", async () => {

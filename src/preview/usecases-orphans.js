@@ -19,9 +19,12 @@ const ORPHAN_KINDS = new Set([
  * `constellationIds`: the constellations the case and its variants list; the warnings sitting on them (`constellation:<id>`: a relationship end or type that no longer exists) count too.
  * @returns {{ personas: Set<string>, conditions: { variant: string, dimension: string, value?: string }[], constellations: Set<string>, participants: Set<string>, relationshipTypes: Set<string>, dataObjects: Set<string>, count: number }}
  */
-export function orphansOf(warnings, useCaseId, constellationIds = []) {
+export function orphansOf(warnings, useCaseId, constellationIds = [], entityIds = []) {
   const base = `use_case:${useCaseId}`;
-  const inWorld = new Set(constellationIds.map((id) => `constellation:${id}`));
+  const inWorld = new Set([
+    ...constellationIds.map((id) => `constellation:${id}`),
+    ...entityIds.map((id) => `entity:${id}`),
+  ]);
   const out = {
     personas: new Set(),
     conditions: [],
@@ -30,6 +33,7 @@ export function orphansOf(warnings, useCaseId, constellationIds = []) {
     participants: new Set(),
     relationshipTypes: new Set(),
     dataObjects: new Set(),
+    entityObjects: new Map(),
     count: 0,
   };
   for (const w of warnings ?? []) {
@@ -48,6 +52,8 @@ export function orphansOf(warnings, useCaseId, constellationIds = []) {
     else if (w.kind === "unknown_participant" && quoted[0]) out.participants.add(quoted[0]);
     else if (w.kind === "unknown_relationship_type" && quoted.length > 0)
       out.relationshipTypes.add(quoted.at(-1));
+    else if (w.kind === "unknown_data_object" && target.startsWith("entity:") && quoted.length > 0)
+      out.entityObjects.set(target.slice("entity:".length), quoted.at(-1));
     else if (w.kind === "unknown_data_object" && quoted.length > 0)
       out.dataObjects.add(quoted.at(-1));
     else if (w.kind === "unknown_constellation" && quoted[0]) out.constellations.add(quoted[0]);
@@ -85,9 +91,10 @@ export function conditionOrphan(orphans, variant, dimension, value) {
   return null;
 }
 
-/** One sentence for the coverage card naming the orphans, or "" when there are none. */
-export function orphanSummary(orphans) {
-  const parts = [];
+/** What the case names but the pools lack, in two lists: what changes the coverage counts (persona, dimension, trait value, constellation) and what is only a reference to repair. */
+export function orphanParts(orphans) {
+  const coverage = [];
+  const repair = [];
   if (orphans.conditions.length > 0) {
     const named = [
       ...new Set(
@@ -96,16 +103,16 @@ export function orphanSummary(orphans) {
         ),
       ),
     ];
-    parts.push(
+    coverage.push(
       `${orphans.conditions.length === 1 ? "1 condition names" : `${orphans.conditions.length} conditions name`} a dimension or value that no longer exists (${named.join("; ")})`,
     );
   }
   if (orphans.personas.size > 0)
-    parts.push(
+    coverage.push(
       `${orphans.personas.size === 1 ? "1 persona is" : `${orphans.personas.size} personas are`} missing from the pool (${[...orphans.personas].join(", ")})`,
     );
   if (orphans.constellations.size > 0)
-    parts.push(
+    coverage.push(
       `${orphans.constellations.size === 1 ? "1 constellation is" : `${orphans.constellations.size} constellations are`} missing from the world (${[...orphans.constellations].join(", ")})`,
     );
   if (orphans.constellationTraits.length > 0) {
@@ -116,24 +123,36 @@ export function orphanSummary(orphans) {
         ),
       ),
     ];
-    parts.push(
+    coverage.push(
       `${orphans.constellationTraits.length === 1 ? "1 constellation trait names" : `${orphans.constellationTraits.length} constellation traits name`} a dimension or value that no longer exists (${named.join("; ")})`,
     );
   }
   const list = (set) => [...set].join(", ");
   if (orphans.participants.size > 0)
-    parts.push(
+    repair.push(
       `${orphans.participants.size === 1 ? "1 participant is" : `${orphans.participants.size} participants are`} neither a persona nor an entity (${list(orphans.participants)})`,
     );
   if (orphans.relationshipTypes.size > 0)
-    parts.push(
+    repair.push(
       `${orphans.relationshipTypes.size === 1 ? "1 relationship type is" : `${orphans.relationshipTypes.size} relationship types are`} undeclared (${list(orphans.relationshipTypes)})`,
     );
   if (orphans.dataObjects.size > 0)
-    parts.push(
+    repair.push(
       `${orphans.dataObjects.size === 1 ? "1 data object is" : `${orphans.dataObjects.size} data objects are`} missing (${list(orphans.dataObjects)})`,
     );
-  return parts.join("; ");
+  if (orphans.entityObjects.size > 0) {
+    const named = [...orphans.entityObjects].map(([entity, object]) => `${entity}: ${object}`);
+    repair.push(
+      `${orphans.entityObjects.size === 1 ? "1 entity is an instance" : `${orphans.entityObjects.size} entities are instances`} of a data object that is missing (${named.join("; ")})`,
+    );
+  }
+  return { coverage, repair };
+}
+
+/** Both lists as one string (for tests and plain text). */
+export function orphanSummary(orphans) {
+  const { coverage, repair } = orphanParts(orphans);
+  return [...coverage, ...repair].join("; ");
 }
 
 /** A step or trigger actor the pools no longer have (an entity there is `entity_as_actor`, a different warning). */

@@ -759,7 +759,7 @@ function dangling(kind: string, name: string, referrers: string[], by: string): 
   if (referrers.length === 0) return [];
   const shown = referrers.slice(0, EXAMPLE_IDS).join(", ");
   const more = referrers.length > EXAMPLE_IDS ? `, +${referrers.length - EXAMPLE_IDS} more` : "";
-  return [{ kind: "dangling_reference", target: `${kind}:${name}`, message: `${kind} "${name}" is still referenced by ${referrers.length} ${by}: ${shown}${more}` }];
+  return [{ kind: "dangling_reference", target: `${kind}:${name}`, message: `${kind.replace("_", " ")} "${name}" is still referenced by ${referrers.length} ${by}: ${shown}${more}` }];
 }
 
 /** A constellation names a participant when it is an end of one of its relationships. */

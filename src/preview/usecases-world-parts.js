@@ -20,10 +20,10 @@ export function entityAvatar(av, size = "md", title = "") {
 }
 
 /** A participant as a small inline unit: avatar, name, then the kind icon (personas) or the type (entities). */
-export function participantChip(p, { size = "sm", withTail = true } = {}) {
+export function participantChip(p, { size = "sm", withTail = true, missingObject = null } = {}) {
   const art = p.kind === "entity" ? entityAvatar(p.avatar, size, p.name) : p.kind === "unknown" ? h("span", { class: "uc-avatar", dataset: { size, kind: "unknown" }, title: p.id }, p.avatar.text) : avatar(p.avatar, size, p.name);
   const tail = !withTail ? null : p.kind === "persona" ? actorKind(p.persona?.kind) : p.kind === "entity" && p.type ? h("span", { class: "uc-participant-type" }, p.type) : null;
-  return h("span", { class: p.kind === "unknown" ? "uc-participant is-orphan" : "uc-participant", dataset: p.kind === "unknown" ? { kind: p.kind, orphan: "participant" } : { kind: p.kind }, title: p.kind === "unknown" ? "Neither a persona nor an entity" : null }, art, h("span", { class: "uc-participant-name" }, p.name), p.kind === "unknown" ? hiddenNote("neither a persona nor an entity") : null, tail);
+  return h("span", { class: p.kind === "unknown" || missingObject ? "uc-participant is-orphan" : "uc-participant", dataset: p.kind === "unknown" ? { kind: p.kind, orphan: "participant" } : missingObject ? { kind: p.kind, orphan: "entity_object" } : { kind: p.kind }, title: p.kind === "unknown" ? "Neither a persona nor an entity" : missingObject ? `Its data object ${missingObject} no longer exists` : null }, art, h("span", { class: "uc-participant-name" }, p.name), p.kind === "unknown" ? hiddenNote("neither a persona nor an entity") : null, tail, missingObject ? [icon("warning"), hiddenNote(`its data object ${missingObject} no longer exists`)] : null);
 }
 
 /** `uc-condition-chip`: subject.property, the operator symbol (its word is the accessible name), the value. `warning` underlines the key. */

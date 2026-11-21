@@ -69,6 +69,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Bugfixes
 
+- **Use cases:** when the daemon is gone (`artisign stop`), every view of the tab now says "artisign is not running. Start it with `artisign start`, then press Retry." instead of "Failed to fetch" and a hint to look at a terminal. HTTP error messages are unchanged.
 - **Tool contracts:** `get_screenshot` accepts a full `node` ref on its own (`<screen>.<id>`, `mockup:<name>#<variant>.<id>`, `component:`/`pattern:`); the screen or mockup is derived from it, and a contradicting `screen`, `mockup` or `variant` fails with `validation_failed`. `get_screen` no longer advertises `output_format: "jsx"`, and its `fields` accepts every key the response can carry (including `tags`), checked by a test against the schema enum.
 - **Flows:** `write_html`, `patch_html` and `set_flow` return an `unknown_flow_target` warning for a flow whose target screen or `<screen>.<node>` does not exist, naming the node and the target; the write still succeeds, and the warning stops once the target exists. `import_html` returns the same `repeated_pattern` warnings as `write_html`.
 - **Use cases (tool contract change for the omitted counts):** a persona's summary no longer repeats its role, a single remaining list row loads instead of "Show 1 more", an empty string shows as `""` in data changes, and `list_use_cases` / `delete_entity` (with `force`) report `invalid_file_omitted_count` (and `invalid_pool_entry_omitted_count`) beside the invalid counts.

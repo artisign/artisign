@@ -94,6 +94,16 @@ describe("usecases-api", () => {
     expect(await api.fetchWorldSource("/p")).toEqual({ ok: false, status: 422, code: "invalid_state", message: "bad file" });
   });
 
+  it("answers the same not-running message for every call when the daemon cannot be reached (CHR-1179)", async () => {
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    const expected = { ok: false, status: 0, message: "artisign is not running. Start it with `artisign start`, then press Retry." };
+    expect(await api.listUseCases("/p", {})).toEqual(expected);
+    expect(await api.fetchUseCaseSource("/p", "a")).toEqual(expected);
+    expect(await api.fetchWorldSource("/p")).toEqual(expected);
+  });
+
   it("no other use-case source module names /api/tools/ (tests and fixtures excluded)", () => {
     const sources = readdirSync(dir).filter((f) => /^usecases.*\.js$/.test(f) && !/\.test(-helper)?\.js$/.test(f) && f !== "usecases-api.js");
     expect(sources.length).toBeGreaterThan(5);

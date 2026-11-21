@@ -6,6 +6,7 @@ import { initProject } from "../init/init-project.js";
 import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
 import { startDaemon, type DaemonHandle } from "../daemon/start.js";
 import { FsStore } from "../store/index.js";
+import { TEST_TIMEOUT_MS } from "../../vitest.timeouts.js";
 
 async function waitForSseEvent(response: Response, predicate: (evt: Record<string, unknown>) => boolean, timeoutMs: number): Promise<Record<string, unknown>> {
   const reader = response.body!.getReader();
@@ -249,5 +250,5 @@ describe("GET /events (SSE)", () => {
     expect(result).not.toBe(timedOut);
 
     await stopped; // afterEach also calls daemon.stop(); it's idempotent, so this just confirms it already settled.
-  }, 5000);
+  }, TEST_TIMEOUT_MS);
 });

@@ -274,9 +274,13 @@ someone has to maintain.
 
 - **Second occurrence rule:** the moment a value or element pattern appears a
   second time, promote it. Do not wait for a third.
-- `kind: "token"` rewrites every other structurally identical occurrence
-  project-wide to a ref — screens, components, and patterns alike — so you
-  get consistency retroactively. `kind: "component"` rewrites every
+- `kind: "token"` takes the value of one inline CSS property (`property`,
+  e.g. `height`; optional only when the node has exactly one inline property —
+  with several it fails with `validation_failed` and lists them, an unknown one
+  fails with `not_found`) and rewrites every identical value of **that same
+  property** project-wide to a ref — screens, components, and patterns alike —
+  so you get consistency retroactively. An equal value on another property
+  (`#fff` as `color` when you promoted `background`) is never touched. `kind: "component"` rewrites every
   structurally identical occurrence across screens, but never inside another
   component or pattern definition — a call targeting one screen node must not
   have the side effect of rewriting curated design-system source files.

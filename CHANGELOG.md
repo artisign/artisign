@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`promote_to_system` (token):** takes a `property` input naming the inline CSS property that becomes the token. Without it a node with several inline properties fails with `validation_failed` (candidates listed), an unknown property fails with `not_found`, and the project-wide rewrite now only replaces equal values of that same property. Before, the first property alphabetically was promoted and every equal value of any property was rewritten.
+
 ### Features
 
 - **Use cases:** `suggest_use_case_variants` lists dimension values that no persona (or constellation) carries under a separate `unpooled` key, per dimension, with a hint to `generate_personas`; they are no longer silently missing from the response.

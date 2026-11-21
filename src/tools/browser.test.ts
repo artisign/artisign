@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
+import { chmod, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   getBrowser,
@@ -13,6 +14,7 @@ import {
   fromRemoteValue,
   BROWSER_ENV,
   NO_BROWSER_MESSAGE,
+  noBrowserMessage,
 } from "./browser.js";
 
 const has =
@@ -53,6 +55,62 @@ describe("discoverBrowsers", () => {
 
   it("finds nothing without a PATH on Linux", () => {
     expect(discoverBrowsers({ platform: "linux", env: {}, exists: () => true })).toEqual([]);
+  });
+});
+
+describe("Windows discovery", () => {
+  const env = {
+    ProgramFiles: "C:\\Program Files",
+    "ProgramFiles(x86)": "C:\\Program Files (x86)",
+    LOCALAPPDATA: "C:\\Users\\me\\AppData\\Local",
+  };
+  const win = { platform: "win32" as const, env };
+
+  it("finds browsers under Program Files, Program Files (x86) and LocalAppData, in ADR-007 order", () => {
+    const edge = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
+    const chrome = "C:\\Users\\me\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe";
+    const brave = "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe";
+    const firefox = "C:\\Program Files\\Mozilla Firefox\\firefox.exe";
+    expect(discoverBrowsers({ ...win, exists: has(firefox, brave, edge, chrome) })).toEqual([
+      { kind: "chrome", executable: chrome },
+      { kind: "edge", executable: edge },
+      { kind: "brave", executable: brave },
+      { kind: "firefox", executable: firefox },
+    ]);
+  });
+
+  it("finds nothing when no standard location has a browser", () => {
+    expect(discoverBrowsers({ ...win, exists: () => false })).toEqual([]);
+  });
+
+  it("honours ARTISIGN_BROWSER with spaces and backslashes, and infers the kind from it", () => {
+    const path = "D:\\My Tools\\Mozilla Firefox\\firefox.exe";
+    expect(
+      selectBrowser(undefined, { ...win, env: { ...env, [BROWSER_ENV]: path }, exists: has(path) }),
+    ).toEqual({ kind: "firefox", executable: path });
+    expect(
+      selectBrowser(undefined, {
+        ...win,
+        env: { ...env, [BROWSER_ENV]: `"${path}"` },
+        exists: has(path),
+      }),
+    ).toEqual({ kind: "firefox", executable: path });
+    expect(kindFromExecutable("C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe")).toBe(
+      "edge",
+    );
+  });
+
+  it("names the checked Windows locations and the override when nothing is installed", () => {
+    expect(() => selectBrowser(undefined, { ...win, exists: () => false })).toThrowError(
+      expect.objectContaining({
+        code: "io_error",
+        message: expect.stringContaining("C:\\Program Files (x86)"),
+      }),
+    );
+    const message = noBrowserMessage({ ...win, exists: () => false });
+    expect(message).toContain(BROWSER_ENV);
+    expect(message).toContain("C:\\Users\\me\\AppData\\Local");
+    expect(noBrowserMessage({ platform: "win32", env: {} })).toContain("%ProgramFiles%");
   });
 });
 
@@ -217,30 +275,78 @@ describe("getBrowser — cached browser lifecycle", () => {
     expect(launches).toBe(2);
   });
 
-  it("kills a browser whose launch fails after it was spawned", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "artisign-fake-browser-"));
+  // The fake browser is a shebang script, which Windows cannot execute.
+  it.skipIf(process.platform === "win32")(
+    "kills a browser whose launch fails after it was spawned",
+    async () => {
+      const dir = await mkdtemp(join(tmpdir(), "artisign-fake-browser-"));
+      try {
+        // Prints a DevTools endpoint nobody listens on, then stays alive — the
+        // connect step fails after the spawn succeeded.
+        const fake = join(dir, "chrome");
+        const pidFile = join(dir, "pid");
+        await writeFile(
+          fake,
+          `#!${process.execPath}\nrequire("node:fs").writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n` +
+            `process.stderr.write("DevTools listening on ws://127.0.0.1:9/devtools/browser/x\\n");\nsetInterval(() => {}, 1000);\n`,
+        );
+        await chmod(fake, 0o755);
+        __setBrowserForTests({ select: () => ({ kind: "chrome", executable: fake }) });
+
+        await expect(getBrowser()).rejects.toMatchObject({
+          code: "io_error",
+          message: expect.stringContaining("Could not start Chrome"),
+        });
+
+        const pid = Number(await readFile(pidFile, "utf8"));
+        expect(() => process.kill(pid, 0)).toThrow();
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
+  );
+});
+
+function browserInstalled(): boolean {
+  try {
+    selectBrowser(undefined);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+describe.skipIf(!browserInstalled())("owner killed (installed browser)", () => {
+  it("the watchdog removes the temp profile after the owning process is killed", async () => {
+    const root = join(homedir(), "artisign-browser-profiles");
+    const script = `import { getBrowser } from ${JSON.stringify(new URL("./browser.ts", import.meta.url).href)};
+      await getBrowser(); console.log("READY"); setInterval(() => {}, 1000);`;
+    const owner = spawn(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "-e", script],
+      {
+        stdio: ["ignore", "pipe", "inherit"],
+      },
+    );
     try {
-      // Prints a DevTools endpoint nobody listens on, then stays alive — the
-      // connect step fails after the spawn succeeded.
-      const fake = join(dir, "chrome");
-      const pidFile = join(dir, "pid");
-      await writeFile(
-        fake,
-        `#!${process.execPath}\nrequire("node:fs").writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n` +
-          `process.stderr.write("DevTools listening on ws://127.0.0.1:9/devtools/browser/x\\n");\nsetInterval(() => {}, 1000);\n`,
-      );
-      await chmod(fake, 0o755);
-      __setBrowserForTests({ select: () => ({ kind: "chrome", executable: fake }) });
-
-      await expect(getBrowser()).rejects.toMatchObject({
-        code: "io_error",
-        message: expect.stringContaining("Could not start Chrome"),
+      await new Promise<void>((resolve, reject) => {
+        owner.stdout!.on("data", (d: Buffer) => d.toString().includes("READY") && resolve());
+        owner.on("exit", () => reject(new Error("owner exited before launching a browser")));
       });
+      const mine = async (): Promise<string[]> =>
+        (await readdir(root).catch(() => [] as string[])).filter((e) =>
+          e.startsWith(`${owner.pid}-`),
+        );
+      expect(await mine()).toHaveLength(1);
 
-      const pid = Number(await readFile(pidFile, "utf8"));
-      expect(() => process.kill(pid, 0)).toThrow();
+      owner.removeAllListeners("exit");
+      owner.kill("SIGKILL"); // no exit handler runs — only the watchdog can clean up
+      const deadline = Date.now() + 20_000;
+      while ((await mine()).length > 0 && Date.now() < deadline)
+        await new Promise((r) => setTimeout(r, 250));
+      expect(await mine()).toEqual([]);
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      owner.kill("SIGKILL");
     }
-  });
+  }, 60_000);
 });

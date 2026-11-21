@@ -10,7 +10,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, delimiter, join } from "node:path";
+import { basename, join, posix, win32 } from "node:path";
 import { randomUUID } from "node:crypto";
 import { ToolError } from "./types.js";
 
@@ -57,7 +57,8 @@ const LABELS: Record<BrowserKind, string> = {
  * Where each browser lives, in discovery order: Chromium-family first (closest
  * to what most people review the preview in), Firefox last — on many Linux
  * desktops the only browser there is. macOS: app bundles in /Applications or
- * ~/Applications. Linux: executables on PATH.
+ * ~/Applications. Linux: executables on PATH. Windows: the standard install
+ * directories under %ProgramFiles%, %ProgramFiles(x86)% and %LOCALAPPDATA%.
  */
 const MAC_APPS: Record<BrowserKind, string> = {
   chrome: "Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -74,6 +75,20 @@ const LINUX_BINARIES: Record<BrowserKind, string[]> = {
   firefox: ["firefox", "firefox-esr"],
 };
 
+/** Install locations relative to a Windows root, per browser. Roots are tried in WINDOWS_ROOT_VARS order. */
+const WINDOWS_EXECUTABLES: Record<BrowserKind, string[]> = {
+  chrome: ["Google\\Chrome\\Application\\chrome.exe"],
+  edge: ["Microsoft\\Edge\\Application\\msedge.exe"],
+  brave: ["BraveSoftware\\Brave-Browser\\Application\\brave.exe"],
+  chromium: ["Chromium\\Application\\chrome.exe"],
+  firefox: ["Mozilla Firefox\\firefox.exe"],
+};
+const WINDOWS_ROOT_VARS = ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"] as const;
+
+function windowsRoots(env: NodeJS.ProcessEnv): string[] {
+  return WINDOWS_ROOT_VARS.map((name) => env[name]?.trim()).filter((v): v is string => !!v);
+}
+
 export type InstalledBrowser = { kind: BrowserKind; executable: string };
 
 export type DiscoveryOptions = {
@@ -85,7 +100,10 @@ export type DiscoveryOptions = {
 
 /** The kind an arbitrary executable path most likely is — decides CDP vs. BiDi for `ARTISIGN_BROWSER`. */
 export function kindFromExecutable(executable: string): BrowserKind {
-  const name = basename(executable).toLowerCase();
+  // win32.basename splits on both separators, so a Windows path is read correctly on any OS.
+  const name = (
+    /^[a-z]:|\\/i.test(executable) ? win32.basename(executable) : basename(executable)
+  ).toLowerCase();
   if (name.includes("firefox")) return "firefox";
   if (name.includes("edge")) return "edge";
   if (name.includes("brave")) return "brave";
@@ -103,12 +121,19 @@ export function discoverBrowsers(options: DiscoveryOptions = {}): InstalledBrows
   const found: InstalledBrowser[] = [];
   for (const kind of BROWSER_KINDS) {
     const candidates =
-      platform === "darwin"
-        ? [join("/Applications", MAC_APPS[kind]), join(home, "Applications", MAC_APPS[kind])]
-        : (env.PATH ?? "")
-            .split(delimiter)
-            .filter(Boolean)
-            .flatMap((dir) => LINUX_BINARIES[kind].map((bin) => join(dir, bin)));
+      platform === "win32"
+        ? windowsRoots(env).flatMap((root) =>
+            WINDOWS_EXECUTABLES[kind].map((rel) => win32.join(root, rel)),
+          )
+        : platform === "darwin"
+          ? [
+              posix.join("/Applications", MAC_APPS[kind]),
+              posix.join(home, "Applications", MAC_APPS[kind]),
+            ]
+          : (env.PATH ?? "")
+              .split(posix.delimiter)
+              .filter(Boolean)
+              .flatMap((dir) => LINUX_BINARIES[kind].map((bin) => posix.join(dir, bin)));
     const executable = candidates.find(exists);
     if (executable) found.push({ kind, executable });
   }
@@ -118,6 +143,15 @@ export function discoverBrowsers(options: DiscoveryOptions = {}): InstalledBrows
 export const NO_BROWSER_MESSAGE =
   "No supported browser found. Screenshots use a browser that is already installed on this machine — install " +
   `Chrome, Edge, Brave, Chromium or Firefox, or set ${BROWSER_ENV}=<path to a browser executable>.`;
+
+/** The no-browser error; on Windows it also names the locations that were checked. */
+export function noBrowserMessage(options: DiscoveryOptions = {}): string {
+  const platform = options.platform ?? process.platform;
+  if (platform !== "win32") return NO_BROWSER_MESSAGE;
+  const roots = windowsRoots(options.env ?? process.env);
+  const checked = (roots.length > 0 ? roots : WINDOWS_ROOT_VARS.map((v) => `%${v}%`)).join(", ");
+  return `${NO_BROWSER_MESSAGE} Checked the standard install locations under: ${checked}.`;
+}
 
 /**
  * Picks the browser for one call: the requested `kind`, else the
@@ -130,7 +164,7 @@ export function selectBrowser(
 ): InstalledBrowser {
   const env = options.env ?? process.env;
   const exists = options.exists ?? existsSync;
-  const override = env[BROWSER_ENV]?.trim();
+  const override = env[BROWSER_ENV]?.trim().replace(/^"(.*)"$/, "$1");
   if (override) {
     if (!exists(override)) {
       throw new ToolError(
@@ -144,7 +178,7 @@ export function selectBrowser(
   }
   const installed = discoverBrowsers(options);
   if (kind === undefined) {
-    if (installed.length === 0) throw new ToolError("io_error", NO_BROWSER_MESSAGE);
+    if (installed.length === 0) throw new ToolError("io_error", noBrowserMessage(options));
     return installed[0]!;
   }
   const match = installed.find((b) => b.kind === kind);
@@ -160,6 +194,9 @@ export function selectBrowser(
 
 // ---------------------------------------------------------------------------
 // Process launch
+
+/** On Windows a profile stays locked briefly after the browser exits (EBUSY); rm retries. */
+const RM_OPTIONS = { recursive: true, force: true, maxRetries: 10, retryDelay: 200 };
 
 /** Every browser process and temp profile still alive — killed/removed synchronously on process exit. */
 const liveChildren = new Set<ChildProcess>();
@@ -237,8 +274,10 @@ const timer = setInterval(() => {
     return;
   }
   clearInterval(timer);
+  // Windows: end the whole process tree; the profile may stay locked for a moment, so removal retries (EBUSY).
+  if (process.platform === "win32") { try { require("node:child_process").execFileSync("taskkill", ["/PID", browser, "/T", "/F"], { stdio: "ignore", windowsHide: true }); } catch {} }
   try { process.kill(Number(browser)); } catch {}
-  setTimeout(() => require("node:fs").rmSync(profile, { recursive: true, force: true }), 2000);
+  setTimeout(() => require("node:fs").rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }), 2000);
 }, 1000);`;
 
 function startWatchdog(browserPid: number, profile: string): void {
@@ -248,6 +287,7 @@ function startWatchdog(browserPid: number, profile: string): void {
     {
       detached: true,
       stdio: "ignore",
+      windowsHide: true,
     },
   );
   watchdog.on("error", () => {}); // best effort — the exit handler and the stale-profile sweep still apply
@@ -361,7 +401,7 @@ async function sweepStaleProfiles(root: string): Promise<void> {
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "ESRCH") continue;
     }
-    await rm(join(root, entry), { recursive: true, force: true }).catch(() => {});
+    await rm(join(root, entry), RM_OPTIONS).catch(() => {});
   }
 }
 
@@ -711,7 +751,7 @@ async function launch(installed: InstalledBrowser): Promise<Browser> {
   liveProfiles.add(profile);
   const removeProfile = async (): Promise<void> => {
     liveProfiles.delete(profile);
-    await rm(profile, { recursive: true, force: true }).catch(() => {});
+    await rm(profile, RM_OPTIONS).catch(() => {});
   };
   let browser: Browser;
   try {

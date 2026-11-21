@@ -43,6 +43,7 @@ function spawnDaemon(cliEntry: string, args: string[]): void {
   const child = spawn(process.execPath, [cliEntry, ...args], {
     detached: true,
     stdio: "ignore",
+    windowsHide: true,
   });
   child.unref();
 }

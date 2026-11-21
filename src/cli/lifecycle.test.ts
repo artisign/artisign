@@ -4,6 +4,7 @@ import type { ChildProcess, ExecFileException } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { npmPlan } from "./update.js";
 import { readLock } from "../daemon/lock.js";
 import { SHUTDOWN_PATH, SHUTDOWN_TOKEN_HEADER } from "../daemon/shutdown.js";
 import {
@@ -61,7 +62,9 @@ describe("CLI lifecycle", () => {
 
   beforeAll(async () => {
     await new Promise<void>((resolve, reject) => {
-      execFile("npm", ["run", "build"], { cwd: repoRoot }, (err) => (err ? reject(err) : resolve()));
+      // `npm.cmd` needs a shell on Windows (Node >= 20 refuses to spawn it directly).
+      const plan = npmPlan(["run", "build"]);
+      execFile(plan.command, plan.args, { cwd: repoRoot, shell: plan.shell }, (err) => (err ? reject(err) : resolve()));
     });
   }, 60_000);
 

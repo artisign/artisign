@@ -3,13 +3,16 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { chmod, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { defaultClientEnv } from "../setup/clients.js";
 import { handleAboutApi } from "./about-routes.js";
 import { handleSetupApi } from "./setup-routes.js";
 import { STARTED_VERSION } from "./server.js";
 import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
 import { startDaemon, type DaemonHandle } from "../daemon/start.js";
+
+/** `~/a/b` as the route shows it: the host's separator, like the paths themselves. */
+const tilde = (path: string): string => path.replaceAll("/", sep);
 
 describe("handleSetupApi / handleAboutApi (injected env)", () => {
   let root: string;
@@ -47,10 +50,10 @@ describe("handleSetupApi / handleAboutApi (injected env)", () => {
       skill: { command: string; content: string; clients: { name: string; status: string; path?: string }[] };
     };
     expect(body.skill.command).toBe("artisign setup --skill");
-    expect(body.skill.content).toMatch(/^---\nname: artisign\n/);
+    expect(body.skill.content).toMatch(/^---\r?\nname: artisign\r?\n/);
     const byName = Object.fromEntries(body.skill.clients.map((c) => [c.name, c]));
     expect(byName["Claude Desktop"]).toEqual({ name: "Claude Desktop", status: "unsupported" });
-    expect(byName.Cursor).toEqual({ name: "Cursor", status: "missing", path: "~/.cursor/skills/artisign/SKILL.md" });
+    expect(byName.Cursor).toEqual({ name: "Cursor", status: "missing", path: tilde("~/.cursor/skills/artisign/SKILL.md") });
     expect(await readdir(join(root, "home", ".cursor"))).toEqual(before);
   });
 
@@ -78,7 +81,7 @@ describe("handleSetupApi / handleAboutApi (injected env)", () => {
       const body = (await (await fetch(`${base}/api/setup`)).json()) as { skill: { clients: { name: string; status: string; error?: string }[] } };
       const cursor = body.skill.clients.find((c) => c.name === "Cursor");
       if (cursor?.status !== "unreadable") return; // running as root: the file is readable anyway
-      expect(cursor.error).toContain("~/.cursor/skills/artisign/SKILL.md");
+      expect(cursor.error).toContain(tilde("~/.cursor/skills/artisign/SKILL.md"));
       expect(cursor.error).not.toContain(join(root, "home"));
     } finally {
       await chmod(file, 0o644);
@@ -102,10 +105,10 @@ describe("handleSetupApi / handleAboutApi (injected env)", () => {
     expect(body.command).toBe("artisign setup");
     expect(body.clients.map((c) => c.name)).toEqual(["Claude Code", "Claude Desktop", "Cursor", "Codex CLI", "VS Code", "opencode"]);
     const cursor = body.clients.find((c) => c.name === "Cursor");
-    expect(cursor).toMatchObject({ found: true, connected: true, manual: { kind: "config", path: "~/.cursor/mcp.json" } });
+    expect(cursor).toMatchObject({ found: true, connected: true, manual: { kind: "config", path: tilde("~/.cursor/mcp.json") } });
     expect(cursor?.manual.text).toContain("artisign@7.1.0");
     expect(body.clients.find((c) => c.name === "Claude Desktop")).toMatchObject({ found: false, connected: false });
-    expect(body.clients.find((c) => c.name === "Codex CLI")?.manual.path).toBe("~/.codex/config.toml");
+    expect(body.clients.find((c) => c.name === "Codex CLI")?.manual.path).toBe(tilde("~/.codex/config.toml"));
   });
 
   it("does not write any client config", async () => {

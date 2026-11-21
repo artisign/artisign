@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { runUpdate, runRepin, type UpdateDeps } from "./update.js";
+import { join } from "node:path";
+import { runUpdate, runRepin, npmPlan, type UpdateDeps } from "./update.js";
 
 function setup(
   over: Partial<UpdateDeps> & {
@@ -50,9 +51,7 @@ describe("update", () => {
     expect(await runUpdate(deps)).toBe(0);
     expect(npmCalls).toEqual(["view artisign version", "install -g artisign@latest", "root -g"]);
     expect(deps.npm).toHaveBeenCalledWith(["install", "-g", "artisign@latest"], true);
-    expect(deps.repin).toHaveBeenCalledWith(
-      "/usr/local/lib/node_modules/artisign/dist/cli/index.js",
-    );
+    expect(deps.repin).toHaveBeenCalledWith(join("/usr/local/lib/node_modules", "artisign", "dist", "cli", "index.js"));
   });
 
   it("an npm failure other than permissions prints no prefix advice", async () => {
@@ -65,9 +64,7 @@ describe("update", () => {
   it("falls back to the running binary's entry when npm's global root does not hold the new version", async () => {
     const { deps } = setup({ exists: () => false });
     expect(await runUpdate(deps)).toBe(0);
-    expect(deps.repin).toHaveBeenCalledWith(
-      "/usr/local/lib/node_modules/artisign/dist/cli/index.js",
-    );
+    expect(deps.repin).toHaveBeenCalledWith("/usr/local/lib/node_modules/artisign/dist/cli/index.js");
   });
 
   it("an npm failure (EACCES) gives one message with the fix, exit 1, and re-pins nothing", async () => {
@@ -172,5 +169,22 @@ describe("repin", () => {
 
   it("returns non-zero when the old daemon would not stop", async () => {
     expect(await runRepin("e", make([], "failed"))).toBe(1);
+  });
+});
+
+describe("npmPlan", () => {
+  it("spawns npm directly on macOS and Linux", () => {
+    expect(npmPlan(["install", "-g", "artisign@latest"], "linux")).toEqual({ command: "npm", args: ["install", "-g", "artisign@latest"], shell: false });
+  });
+  it("runs npm.cmd through a shell on Windows", () => {
+    expect(npmPlan(["view", "artisign", "version"], "win32")).toEqual({ command: "npm.cmd view artisign version", args: [], shell: true });
+  });
+});
+
+describe("runUpdate installer detection", () => {
+  it("recognises a pnpm install under a Windows path", async () => {
+    const { deps, out } = setup({ entryPath: "C:\\Users\\x\\AppData\\Local\\pnpm\\global\\5\\node_modules\\artisign\\dist\\cli\\index.js" });
+    expect(await runUpdate(deps)).toBe(0);
+    expect(out.join("\n")).toContain("pnpm add -g artisign@latest");
   });
 });

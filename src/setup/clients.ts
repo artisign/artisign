@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process";
 import { access, constants, readFile, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import { delimiter, dirname, join, sep } from "node:path";
 import { atomicWrite } from "../store/atomic-write.js";
+import { spawnPlan } from "./shell.js";
 
 /** Everything a client definition touches outside itself, so tests can run against a fake HOME and a fake `claude`. */
 export type ClientEnv = {
@@ -25,7 +26,10 @@ export function defaultClientEnv(): ClientEnv {
     pathEnv: process.env.PATH ?? "",
     vars: process.env,
     execPath: process.execPath,
-    run: (command, args) => new Promise((resolve) => execFile(command, args, { timeout: 30_000 }, (err) => resolve(err === null))),
+    run: (command, args) => {
+      const plan = spawnPlan(command, args);
+      return new Promise((resolve) => execFile(plan.command, plan.args, { timeout: 30_000, shell: plan.shell }, (err) => resolve(err === null)));
+    },
   };
 }
 
@@ -63,13 +67,38 @@ async function exists(path: string, mode = constants.F_OK): Promise<boolean> {
   }
 }
 
-async function findOnPath(program: string, pathEnv: string): Promise<string | undefined> {
-  for (const dir of pathEnv.split(delimiter)) {
+const isWindows = (env: ClientEnv): boolean => env.platform === "win32";
+
+/** The file names `program` can have on disk: on Windows the `PATHEXT` extensions (`claude.cmd`, `npx.cmd`), elsewhere itself. */
+function programNames(env: ClientEnv, program: string): string[] {
+  if (!isWindows(env)) return [program];
+  const exts = (env.vars.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter((e) => e !== "");
+  if (exts.some((e) => program.toLowerCase().endsWith(e.toLowerCase()))) return [program];
+  return exts.flatMap((e) => (e === e.toLowerCase() ? [program + e] : [program + e, program + e.toLowerCase()]));
+}
+
+/** First match on PATH. Windows has no execute bit, so it only asks that the file exists. */
+async function findOnPath(env: ClientEnv, program: string): Promise<string | undefined> {
+  const mode = isWindows(env) ? constants.F_OK : constants.X_OK;
+  for (const dir of env.pathEnv.split(isWindows(env) ? ";" : delimiter)) {
     if (dir === "") continue;
-    const candidate = join(dir, program);
-    if (await exists(candidate, constants.X_OK)) return candidate;
+    for (const name of programNames(env, program)) {
+      const candidate = join(dir, name);
+      if (await exists(candidate, mode)) return candidate;
+    }
   }
   return undefined;
+}
+
+/** `%APPDATA%`, where Claude Desktop and VS Code keep their user data on Windows. */
+const appData = (env: ClientEnv): string => env.vars.APPDATA ?? join(env.home, "AppData", "Roaming");
+
+/**
+ * What starts the server. Windows clients cannot launch the `npx.cmd` shim directly, so it goes through `cmd /c` — the form
+ * Claude Code and Codex document for native Windows and one every other client accepts; elsewhere plain `npx`.
+ */
+function npxLauncher(env: ClientEnv, version: string): { command: string; args: string[] } {
+  return isWindows(env) ? { command: "cmd", args: ["/c", "npx", ...npxArgs(version)] } : { command: "npx", args: npxArgs(version) };
 }
 
 type JsonObject = Record<string, unknown>;
@@ -151,8 +180,11 @@ const npxArgs = (version: string): string[] => ["-y", `${NAME}@${version}`, "mcp
 
 const jsonSnippet = (key: ServersKey, entry: JsonObject): string => JSON.stringify({ [key]: { [NAME]: entry } }, null, 2);
 
-const claudeCodeFileEntry = (version: string): JsonObject => ({ type: "stdio", command: "npx", args: npxArgs(version), env: {} });
-const claudeAddArgs = (version: string): string[] => ["mcp", "add", "--scope", "user", "--transport", "stdio", NAME, "--", "npx", ...npxArgs(version)];
+const claudeCodeFileEntry = (env: ClientEnv, version: string): JsonObject => ({ type: "stdio", ...npxLauncher(env, version), env: {} });
+const claudeAddArgs = (env: ClientEnv, version: string): string[] => {
+  const { command, args } = npxLauncher(env, version);
+  return ["mcp", "add", "--scope", "user", "--transport", "stdio", NAME, "--", command, ...args];
+};
 
 /**
  * Claude Code, user scope (`~/.claude.json`, top-level `mcpServers`). The `claude` CLI owns that file and its locking, so
@@ -162,26 +194,26 @@ export const claudeCode: Client = {
   name: "Claude Code",
   async detect(env) {
     const file = join(env.home, ".claude.json");
-    const found = (await findOnPath("claude", env.pathEnv)) !== undefined || (await exists(file));
+    const found = (await findOnPath(env, "claude")) !== undefined || (await exists(file));
     return { found, hasEntry: found && (await hasServerEntry(file)) };
   },
   async write(env, version) {
-    const claude = await findOnPath("claude", env.pathEnv);
+    const claude = await findOnPath(env, "claude");
     if (claude === undefined) {
-      await editServers(join(env.home, ".claude.json"), claudeCodeFileEntry(version));
+      await editServers(join(env.home, ".claude.json"), claudeCodeFileEntry(env, version));
       return;
     }
     // `add` refuses an existing name; replacing means remove first (its failure just means there was nothing to remove).
     await env.run(claude, ["mcp", "remove", NAME, "--scope", "user"]);
-    const added = await env.run(claude, claudeAddArgs(version));
+    const added = await env.run(claude, claudeAddArgs(env, version));
     if (!added) throw new Error("`claude mcp add` failed");
   },
   async manual(env, version) {
-    if ((await findOnPath("claude", env.pathEnv)) !== undefined) return { kind: "command", text: `claude ${claudeAddArgs(version).join(" ")}` };
-    return { kind: "config", path: join(env.home, ".claude.json"), text: jsonSnippet("mcpServers", claudeCodeFileEntry(version)) };
+    if ((await findOnPath(env, "claude")) !== undefined) return { kind: "command", text: `claude ${claudeAddArgs(env, version).join(" ")}` };
+    return { kind: "config", path: join(env.home, ".claude.json"), text: jsonSnippet("mcpServers", claudeCodeFileEntry(env, version)) };
   },
   async remove(env) {
-    const claude = await findOnPath("claude", env.pathEnv);
+    const claude = await findOnPath(env, "claude");
     if (claude === undefined) await editServers(join(env.home, ".claude.json"), undefined);
     else if (!(await env.run(claude, ["mcp", "remove", NAME, "--scope", "user"]))) throw new Error("`claude mcp remove` failed");
   },
@@ -193,6 +225,7 @@ export const claudeCode: Client = {
 function desktopDirs(env: ClientEnv): string[] {
   if (env.platform === "darwin") return [join(env.home, "Library", "Application Support", "Claude")];
   if (env.platform === "linux") return [join(env.home, ".config", "Claude"), join(env.home, ".config", "claude")];
+  if (isWindows(env)) return [join(appData(env), "Claude")];
   return [];
 }
 
@@ -200,7 +233,7 @@ async function desktopConfigPath(env: ClientEnv): Promise<string | undefined> {
   for (const dir of desktopDirs(env)) {
     const file = join(dir, "claude_desktop_config.json");
     // The lowercase Linux directory is also a common XDG name for other things: only a config file in it says "Desktop".
-    const isLowercase = dir.endsWith("/claude");
+    const isLowercase = dir.endsWith(`${sep}claude`);
     if (isLowercase ? await exists(file) : await exists(dir)) return file;
   }
   return undefined;
@@ -215,11 +248,13 @@ async function desktopConfigPath(env: ClientEnv): Promise<string | undefined> {
 async function absoluteNpxEntry(
   env: ClientEnv,
   version: string,
-): Promise<{ command: string; args: string[]; env: { PATH: string } }> {
-  const npx = (await findOnPath("npx", env.pathEnv)) ?? join(dirname(env.execPath), "npx");
-  if (!(await exists(npx, constants.X_OK))) {
+): Promise<{ command: string; args: string[]; env: { PATH?: string } }> {
+  const npx = (await findOnPath(env, "npx")) ?? join(dirname(env.execPath), isWindows(env) ? "npx.cmd" : "npx");
+  if (!(await exists(npx, isWindows(env) ? constants.F_OK : constants.X_OK))) {
     throw new Error("npx was not found on PATH or next to node; install npm and run setup again (nothing was changed)");
   }
+  // Windows GUI apps inherit the system PATH, and `cmd /c npx` finds the shim there: nothing to pin.
+  if (isWindows(env)) return { ...npxLauncher(env, version), env: {} };
   const bin = dirname(npx);
   return {
     command: npx,
@@ -229,11 +264,11 @@ async function absoluteNpxEntry(
 }
 
 /** `absoluteNpxEntry`, or plain `npx` for the copy-only snippet when there is no npx to point at. */
-async function absoluteOrPlainNpxEntry(env: ClientEnv, version: string): Promise<{ command: string; args: string[]; env?: { PATH: string } }> {
+async function absoluteOrPlainNpxEntry(env: ClientEnv, version: string): Promise<{ command: string; args: string[]; env?: { PATH?: string } }> {
   try {
     return await absoluteNpxEntry(env, version);
   } catch {
-    return { command: "npx", args: npxArgs(version) };
+    return npxLauncher(env, version);
   }
 }
 
@@ -332,8 +367,10 @@ function hasUnmatchedCodexEntry(toml: string): boolean {
 const codexHome = (env: ClientEnv): string => env.vars.CODEX_HOME ?? join(env.home, ".codex");
 const codexConfig = (env: ClientEnv): string => join(codexHome(env), "config.toml");
 
-const codexEntry = (version: string): string =>
-  `[mcp_servers.artisign]\ncommand = "npx"\nargs = ${JSON.stringify(npxArgs(version))}\n${STARTUP_TIMEOUT}\n`;
+const codexEntry = (env: ClientEnv, version: string): string => {
+  const { command, args } = npxLauncher(env, version);
+  return `[mcp_servers.artisign]\ncommand = ${JSON.stringify(command)}\nargs = ${JSON.stringify(args)}\n${STARTUP_TIMEOUT}\n`;
+};
 
 async function readCodexConfig(path: string): Promise<{ text: string; mode?: number }> {
   try {
@@ -345,17 +382,17 @@ async function readCodexConfig(path: string): Promise<{ text: string; mode?: num
   }
 }
 
-async function editCodexConfig(configPath: string, version: string | undefined): Promise<void> {
+async function editCodexConfig(env: ClientEnv, configPath: string, version: string | undefined): Promise<void> {
   const path = await realpath(configPath).catch(() => configPath);
   const { text, mode } = await readCodexConfig(path);
   const rest = withoutCodexEntry(text);
   if (hasUnmatchedCodexEntry(rest)) {
     throw new Error(
       `${path} declares mcp_servers.artisign in a form setup does not edit (an inline table or dotted keys). Nothing was changed. ` +
-        (version === undefined ? "Remove that entry by hand." : `Replace it by hand with:\n${codexEntry(version)}`),
+        (version === undefined ? "Remove that entry by hand." : `Replace it by hand with:\n${codexEntry(env, version)}`),
     );
   }
-  const entry = version === undefined ? "" : codexEntry(version);
+  const entry = version === undefined ? "" : codexEntry(env, version);
   const out = [rest, entry].filter((part) => part !== "").join("\n\n");
   await atomicWrite(path, out === "" ? "" : `${out.replace(/\n*$/, "")}\n`, mode);
 }
@@ -378,7 +415,7 @@ async function addCodexStartupTimeout(configPath: string): Promise<void> {
 export const codex: Client = {
   name: "Codex CLI",
   async detect(env) {
-    const found = (await exists(codexHome(env))) || (await findOnPath("codex", env.pathEnv)) !== undefined;
+    const found = (await exists(codexHome(env))) || (await findOnPath(env, "codex")) !== undefined;
     let hasEntry = false;
     try {
       const text = await readFile(codexConfig(env), "utf8");
@@ -389,26 +426,27 @@ export const codex: Client = {
     return { found, hasEntry };
   },
   async write(env, version) {
-    const bin = await findOnPath("codex", env.pathEnv);
+    const bin = await findOnPath(env, "codex");
     if (bin === undefined) {
-      await editCodexConfig(codexConfig(env), version);
+      await editCodexConfig(env, codexConfig(env), version);
       return;
     }
     // `add` refuses an existing name; its failure to remove just means there was nothing to remove.
     await env.run(bin, ["mcp", "remove", NAME]);
-    if (!(await env.run(bin, ["mcp", "add", NAME, "--", "npx", ...npxArgs(version)]))) throw new Error("`codex mcp add` failed");
+    const launcher = npxLauncher(env, version);
+    if (!(await env.run(bin, ["mcp", "add", NAME, "--", launcher.command, ...launcher.args]))) throw new Error("`codex mcp add` failed");
     await addCodexStartupTimeout(codexConfig(env));
   },
   // Always the config entry, even with the `codex` CLI: `codex mcp add` has no timeout option, so only the table carries it.
   async manual(env, version) {
-    return { kind: "config", path: codexConfig(env), text: codexEntry(version) };
+    return { kind: "config", path: codexConfig(env), text: codexEntry(env, version) };
   },
   async remove(env) {
-    const bin = await findOnPath("codex", env.pathEnv);
+    const bin = await findOnPath(env, "codex");
     if (bin !== undefined) {
       if (!(await env.run(bin, ["mcp", "remove", NAME]))) throw new Error("`codex mcp remove` failed");
     } else if (await exists(codexConfig(env))) {
-      await editCodexConfig(codexConfig(env), undefined);
+      await editCodexConfig(env, codexConfig(env), undefined);
     }
   },
   // https://developers.openai.com/codex/skills — the documented user location is `$HOME/.agents/skills`, not `$CODEX_HOME`.
@@ -419,6 +457,7 @@ export const codex: Client = {
 function vscodeUserDir(env: ClientEnv): string | undefined {
   if (env.platform === "darwin") return join(env.home, "Library", "Application Support", "Code", "User");
   if (env.platform === "linux") return join(env.home, ".config", "Code", "User");
+  if (isWindows(env)) return join(appData(env), "Code", "User");
   return undefined;
 }
 
@@ -455,20 +494,20 @@ async function opencodeConfigPath(env: ClientEnv): Promise<string> {
   return !(await exists(join(dir, "opencode.json"))) && (await exists(jsonc)) ? jsonc : join(dir, "opencode.json");
 }
 
-const opencodeEntry = (version: string): JsonObject => ({ type: "local", command: ["npx", ...npxArgs(version)], enabled: true, timeout: 60_000 });
+const opencodeEntry = (env: ClientEnv, version: string): JsonObject => ({ type: "local", command: [npxLauncher(env, version).command, ...npxLauncher(env, version).args], enabled: true, timeout: 60_000 });
 
 /** opencode: `~/.config/opencode/opencode.json`, key `mcp`, `{type: "local", command: [...], enabled}`; a terminal tool, so plain `npx`. */
 export const opencode: Client = {
   name: "opencode",
   async detect(env) {
-    const found = (await exists(join(env.home, ".config", "opencode"))) || (await findOnPath("opencode", env.pathEnv)) !== undefined;
+    const found = (await exists(join(env.home, ".config", "opencode"))) || (await findOnPath(env, "opencode")) !== undefined;
     return { found, hasEntry: found && (await hasServerEntry(await opencodeConfigPath(env), "mcp")) };
   },
   async write(env, version) {
-    await editServers(await opencodeConfigPath(env), opencodeEntry(version), "mcp");
+    await editServers(await opencodeConfigPath(env), opencodeEntry(env, version), "mcp");
   },
   async manual(env, version) {
-    return { kind: "config", path: await opencodeConfigPath(env), text: jsonSnippet("mcp", opencodeEntry(version)) };
+    return { kind: "config", path: await opencodeConfigPath(env), text: jsonSnippet("mcp", opencodeEntry(env, version)) };
   },
   async remove(env) {
     const path = await opencodeConfigPath(env);

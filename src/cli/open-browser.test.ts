@@ -8,6 +8,13 @@ describe("openerCommand", () => {
   it("uses xdg-open on Linux", () => expect(openerCommand(URL_, "linux")).toEqual({ command: "xdg-open", args: [URL_] }));
 });
 
+describe("openerCommand on Windows", () => {
+  it("uses cmd /c start with an empty window title", () =>
+    expect(openerCommand(URL_, "win32")).toEqual({ command: "cmd", args: ["/c", "start", '""', URL_] }));
+  it("escapes & so the URL is not cut off", () =>
+    expect(openerCommand("http://127.0.0.1:1/?a=1&b=2", "win32").args[3]).toBe("http://127.0.0.1:1/?a=1^&b=2"));
+});
+
 describe("openBrowser", () => {
   it("spawns the opener detached with stdio ignored and lets go of it", () => {
     const child = { on: vi.fn(), unref: vi.fn() };

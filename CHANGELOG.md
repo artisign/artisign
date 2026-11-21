@@ -21,7 +21,7 @@ Use cases, a new way to describe what your app does before and while you design 
 
 - `get_screenshot` accepts just a node ref, and `get_screen` no longer lists the `jsx` output option that never worked.
 - Writes warn when a flow points at a screen or node that does not exist, and `import_html` warns about repeated patterns like `write_html` does.
-- The git auto-commit now waits while a merge, rebase or similar operation is unfinished, instead of getting in its way.
+- The git auto-commit is skipped, and says so, while a merge, rebase or similar operation is unfinished; your writes still succeed.
 
 ### Bugfixes
 

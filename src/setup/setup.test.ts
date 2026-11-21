@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { chmod, lstat, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { defaultClientEnv, CLIENTS, claudeDesktop, type ClientEnv } from "./clients.js";
 import { connectClients } from "./connect.js";
 import { runSetup, restartStaleDaemon, restartDaemon, type SetupDeps } from "../cli/setup.js";
@@ -75,7 +75,7 @@ const claudeCalls = async (): Promise<string[]> =>
   (await readFile(claudeLog, "utf8").catch(() => "")).split("\n").filter(Boolean);
 
 describe("setup: fresh install", () => {
-  it("asks per client, drives the claude CLI at user scope and writes the Desktop entry with absolute paths", async () => {
+  it.skipIf(process.platform === "win32")("asks per client, drives the claude CLI at user scope and writes the Desktop entry with absolute paths", async () => {
     await installFakeClaude();
     await installDesktop({ globalShortcut: "Cmd+L", mcpServers: { other: { command: "x" } } });
     const { d, out } = deps();
@@ -125,7 +125,7 @@ describe("setup: first-run offer (yes + askSkill)", () => {
     return { d, out };
   };
 
-  it("connects without asking, then installs the skill only on a yes", async () => {
+  it.skipIf(process.platform === "win32")("connects without asking, then installs the skill only on a yes", async () => {
     const { d } = await run(["y"]);
     expect(d.ask).toHaveBeenCalledTimes(1);
     expect((await claudeCalls()).length).toBe(2);
@@ -139,7 +139,7 @@ describe("setup: first-run offer (yes + askSkill)", () => {
     expect((await stat(skillPath())).isFile()).toBe(true);
   });
 
-  it("n installs no skill but still connects", async () => {
+  it.skipIf(process.platform === "win32")("n installs no skill but still connects", async () => {
     await run(["n"]);
     expect(await stat(skillPath()).catch(() => null)).toBeNull();
     expect((await claudeCalls()).length).toBe(2);
@@ -167,7 +167,7 @@ describe("setup: the npx Claude Desktop runs", () => {
     await runSetup({ cliEntry: "e", yes: true }, d);
     const entry = await entryOf();
     expect(entry.command).toBe(join(bin, "npx"));
-    expect(entry.env.PATH.startsWith(`${bin}:`)).toBe(true);
+    expect(entry.env.PATH.startsWith(`${bin}${delimiter}`)).toBe(true);
   });
 
   it("falls back to the directory of the running node when npx is not on PATH", async () => {
@@ -241,7 +241,7 @@ describe("setup: restarting a stale daemon", () => {
 });
 
 describe("setup: config files that must not be clobbered", () => {
-  it("an unreadable ~/.claude.json is not replaced by a fresh one", async () => {
+  it.skipIf(process.platform === "win32")("an unreadable ~/.claude.json is not replaced by a fresh one", async () => {
     const file = join(home, ".claude.json");
     await writeFile(file, JSON.stringify({ precious: true }));
     await chmod(file, 0o000);
@@ -299,7 +299,7 @@ describe("setup: config files that must not be clobbered", () => {
 });
 
 describe("setup: Claude Code without the CLI", () => {
-  it("edits ~/.claude.json atomically, keeping every other key and the file mode", async () => {
+  it.skipIf(process.platform === "win32")("edits ~/.claude.json atomically, keeping every other key and the file mode", async () => {
     const file = join(home, ".claude.json");
     await writeFile(
       file,
@@ -352,7 +352,7 @@ describe("setup: upgrade and remove", () => {
     expect(await claudeCalls()).toEqual([]);
   });
 
-  it("--remove removes exactly the artisign entries", async () => {
+  it.skipIf(process.platform === "win32")("--remove removes exactly the artisign entries", async () => {
     await installFakeClaude();
     await installDesktop({
       theme: "dark",

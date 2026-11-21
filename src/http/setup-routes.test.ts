@@ -50,7 +50,7 @@ describe("handleSetupApi / handleAboutApi (injected env)", () => {
       skill: { command: string; content: string; clients: { name: string; status: string; path?: string }[] };
     };
     expect(body.skill.command).toBe("artisign setup --skill");
-    expect(body.skill.content).toMatch(/^---\nname: artisign\n/);
+    expect(body.skill.content).toMatch(/^---\r?\nname: artisign\r?\n/);
     const byName = Object.fromEntries(body.skill.clients.map((c) => [c.name, c]));
     expect(byName["Claude Desktop"]).toEqual({ name: "Claude Desktop", status: "unsupported" });
     expect(byName.Cursor).toEqual({ name: "Cursor", status: "missing", path: tilde("~/.cursor/skills/artisign/SKILL.md") });

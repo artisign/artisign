@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { chmod, lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { defaultClientEnv, cursor, codex, vscode, opencode, claudeCode, claudeDesktop, type Client, type ClientEnv } from "./clients.js";
 import { connectClients, disconnectClients } from "./connect.js";
 
@@ -70,7 +70,7 @@ describe("Cursor", () => {
     expect(entry?.command).toBe(join(bin, "npx"));
     expect((entry as unknown as { type: string }).type).toBe("stdio");
     expect(entry?.args).toEqual(["-y", "artisign@5.0.0", "mcp"]);
-    expect(entry?.env.PATH.startsWith(`${bin}:`)).toBe(true);
+    expect(entry?.env.PATH.startsWith(`${bin}${delimiter}`)).toBe(true);
   });
 });
 
@@ -216,7 +216,7 @@ describe("Codex CLI: shapes the text edit must not duplicate", () => {
     expect(await readFile(join(custom, "config.toml"), "utf8")).toContain("artisign@5.0.0");
   });
 
-  it("drives the codex CLI when it is on PATH, then adds the startup timeout", async () => {
+  it.skipIf(process.platform === "win32")("drives the codex CLI when it is on PATH, then adds the startup timeout", async () => {
     const log = join(root, "codex.log");
     await writeFile(
       join(bin, "codex"),

@@ -25,7 +25,7 @@ const skillMd = (client: typeof cursor): string => skillFile(client, env()) as s
 
 describe("the shipped skill", () => {
   it("is the artisign skill with its frontmatter", () => {
-    expect(skill).toMatch(/^---\nname: artisign\n/);
+    expect(skill).toMatch(/^---\r?\nname: artisign\r?\n/);
   });
 });
 

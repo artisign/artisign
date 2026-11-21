@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { join } from "node:path";
 import { runUpdate, runRepin, npmPlan, type UpdateDeps } from "./update.js";
 
 function setup(
@@ -50,9 +51,7 @@ describe("update", () => {
     expect(await runUpdate(deps)).toBe(0);
     expect(npmCalls).toEqual(["view artisign version", "install -g artisign@latest", "root -g"]);
     expect(deps.npm).toHaveBeenCalledWith(["install", "-g", "artisign@latest"], true);
-    expect(deps.repin).toHaveBeenCalledWith(
-      "/usr/local/lib/node_modules/artisign/dist/cli/index.js",
-    );
+    expect(deps.repin).toHaveBeenCalledWith(join("/usr/local/lib/node_modules", "artisign", "dist", "cli", "index.js"));
   });
 
   it("an npm failure other than permissions prints no prefix advice", async () => {
@@ -65,9 +64,7 @@ describe("update", () => {
   it("falls back to the running binary's entry when npm's global root does not hold the new version", async () => {
     const { deps } = setup({ exists: () => false });
     expect(await runUpdate(deps)).toBe(0);
-    expect(deps.repin).toHaveBeenCalledWith(
-      "/usr/local/lib/node_modules/artisign/dist/cli/index.js",
-    );
+    expect(deps.repin).toHaveBeenCalledWith(join("/usr/local/lib/node_modules", "artisign", "dist", "cli", "index.js"));
   });
 
   it("an npm failure (EACCES) gives one message with the fix, exit 1, and re-pins nothing", async () => {

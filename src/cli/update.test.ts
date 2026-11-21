@@ -177,7 +177,7 @@ describe("npmPlan", () => {
     expect(npmPlan(["install", "-g", "artisign@latest"], "linux")).toEqual({ command: "npm", args: ["install", "-g", "artisign@latest"], shell: false });
   });
   it("runs npm.cmd through a shell on Windows", () => {
-    expect(npmPlan(["view", "artisign", "version"], "win32")).toEqual({ command: "npm.cmd", args: ["view", "artisign", "version"], shell: true });
+    expect(npmPlan(["view", "artisign", "version"], "win32")).toEqual({ command: "npm.cmd view artisign version", args: [], shell: true });
   });
 });
 

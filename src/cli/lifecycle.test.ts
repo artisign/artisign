@@ -5,6 +5,8 @@ import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { npmPlan } from "./update.js";
+import { readLock } from "../daemon/lock.js";
+import { SHUTDOWN_PATH, SHUTDOWN_TOKEN_HEADER } from "../daemon/shutdown.js";
 import {
   setupArtisignHome,
   setupProject,
@@ -42,6 +44,17 @@ function firstStdoutLine(child: ChildProcess): Promise<string> {
     child.on("error", reject);
     child.on("exit", () => reject(new Error(`serve exited before printing: ${buffer}`)));
   });
+}
+
+/** What `artisign stop` does on Windows, spelled out so the foreground-serve test exercises the graceful path there. */
+async function requestShutdown(port: number | undefined): Promise<void> {
+  const lock = await readLock();
+  if (!lock?.shutdownToken || lock.port !== port) throw new Error("serve wrote no shutdown token to daemon.lock");
+  const res = await fetch(`http://127.0.0.1:${lock.port}${SHUTDOWN_PATH}`, {
+    method: "POST",
+    headers: { [SHUTDOWN_TOKEN_HEADER]: lock.shutdownToken },
+  });
+  expect(res.status).toBe(202);
 }
 
 describe("CLI lifecycle", () => {
@@ -97,6 +110,7 @@ describe("CLI lifecycle", () => {
   it("serve honours --port instead of taking it for a project directory", async () => {
     const project = await setupProject();
     const child = spawn(process.execPath, [cliEntry, "serve", "--port", "0", project.dir]);
+    let servePort: number | undefined;
 
     try {
       const line = await firstStdoutLine(child);
@@ -104,13 +118,18 @@ describe("CLI lifecycle", () => {
       expect(Number.isInteger(port)).toBe(true);
       expect(port).not.toBe(4711);
 
+      servePort = port;
       const health = await fetch(`http://127.0.0.1:${port}/health`);
       expect(health.ok).toBe(true);
     } finally {
       // Wait for the daemon to actually exit before removing the project
       // directory — it still holds chokidar watchers and the global lock.
-      child.kill("SIGTERM");
-      await once(child, "exit");
+      // SIGTERM is a hard kill on Windows: go through the same endpoint `artisign stop` uses there.
+      if (process.platform === "win32") await requestShutdown(servePort);
+      else child.kill("SIGTERM");
+      const [code] = (await once(child, "exit")) as [number | null];
+      expect(code).toBe(0);
+      expect(await readLock()).toBeUndefined();
       await project.cleanup();
     }
   }, 20_000);

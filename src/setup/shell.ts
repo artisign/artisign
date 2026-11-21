@@ -22,8 +22,12 @@ export function quoteCmdArg(arg: string): string {
 export const isWindowsBatch = (command: string, platform: NodeJS.Platform): boolean =>
   platform === "win32" && /\.(cmd|bat)$/i.test(command);
 
-/** How to start `command`: unchanged everywhere except for a `.cmd`/`.bat` on Windows, which runs through a shell. */
+/**
+ * How to start `command`: unchanged everywhere except for a `.cmd`/`.bat` on Windows, which runs through a shell as one
+ * already-quoted command line with no args array — Node joins args with `shell: true` unescaped anyway and, since Node 24,
+ * warns about it (DEP0190) on every call.
+ */
 export function spawnPlan(command: string, args: string[], platform: NodeJS.Platform = process.platform): SpawnPlan {
   if (!isWindowsBatch(command, platform)) return { command, args, shell: false };
-  return { command: quoteCmdArg(command), args: args.map(quoteCmdArg), shell: true };
+  return { command: [command, ...args].map(quoteCmdArg).join(" "), args: [], shell: true };
 }

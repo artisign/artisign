@@ -10,7 +10,7 @@ async function ensureDaemon(cliEntry: string): Promise<{ port: number }> {
   const running = await findRunningDaemon();
   if (running) return { port: running.port };
   // stdio "ignore": the daemon's console output must never reach the bridge's stdout, which carries MCP only.
-  spawn(process.execPath, [cliEntry, "__daemon"], { detached: true, stdio: "ignore" }).unref();
+  spawn(process.execPath, [cliEntry, "__daemon"], { detached: true, stdio: "ignore", windowsHide: true }).unref();
   const lock = await pollForHealthyDaemon(10_000);
   if (!lock) throw new Error("timed out waiting for the daemon to start");
   return { port: lock.port };

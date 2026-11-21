@@ -419,12 +419,13 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "promote_to_system",
-    "Lift a node's inline value or a repeated element into a design-system token, component or pattern. token rewrites every matching inline value project-wide, definitions included; component rewrites identical occurrences across screens only, never inside definitions; pattern only creates the file and leaves the source markup.",
+    "Lift a node's inline value or a repeated element into a design-system token, component or pattern. token takes the value of one inline CSS property (`property`, required when the node has several) and rewrites every identical value of that same property project-wide, definitions included; component rewrites identical occurrences across screens only, never inside definitions; pattern only creates the file and leaves the source markup.",
     {
       node: z.string(),
       kind: z.enum(["token", "component", "pattern"]),
       name: z.string(),
       variants: z.array(z.string()).optional(),
+      property: z.string().optional(),
     },
     (store, input) => promoteToSystem(store, input as never),
   ),

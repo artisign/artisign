@@ -1,6 +1,7 @@
 import { readFile, readdir, appendFile, rm, stat, lstat } from "node:fs/promises";
 import type { Dirent } from "node:fs";
-import { resolve, basename, extname, sep } from "node:path";
+import { resolve, basename, extname } from "node:path";
+import { isWithin } from "./paths.js";
 import type { ZodError } from "zod";
 import type { ArtisignConfig } from "../init/artisign-config.js";
 import { CONFIG_FILENAME, CACHE_DIR } from "../init/artisign-config.js";
@@ -190,7 +191,7 @@ export class FsStore implements Store {
    */
   private path(...segments: string[]): string {
     const full = resolve(this.projectDir, ...segments);
-    if (full !== this.projectDir && !full.startsWith(this.projectDir + sep)) {
+    if (!isWithin(this.projectDir, full)) {
       throw new Error(`refusing to access path outside the project directory: ${segments.join("/")}`);
     }
     return full;
@@ -400,7 +401,7 @@ export class FsStore implements Store {
   private assetPath(relPath: string): string {
     const assetsRoot = resolve(this.projectDir, "assets");
     const full = resolve(assetsRoot, relPath);
-    if (full !== assetsRoot && !full.startsWith(assetsRoot + sep)) {
+    if (!isWithin(assetsRoot, full)) {
       throw new Error(`refusing to access path outside assets/: ${relPath}`);
     }
     return full;

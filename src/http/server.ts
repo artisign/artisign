@@ -2,7 +2,8 @@ import { createServer as createHttpServer, type Server, type ServerResponse, typ
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { dirname, extname, isAbsolute, resolve, sep } from "node:path";
+import { dirname, extname, isAbsolute, resolve } from "node:path";
+import { isWithin } from "../store/paths.js";
 import { createMcpHttpHandler, type ProjectResolver } from "../mcp/index.js";
 import { handleToolsApi } from "./tools-api.js";
 import { handlePreviewRoutes } from "./preview-routes.js";
@@ -80,7 +81,7 @@ function servePreviewFile(pathname: string, res: ServerResponse): void {
   const ext = extname(relative);
   const contentType = STATIC_CONTENT_TYPES[ext];
   const filePath = resolve(PREVIEW_DIR, relative);
-  if (!contentType || (filePath !== PREVIEW_DIR && !filePath.startsWith(PREVIEW_DIR + sep))) {
+  if (!contentType || !isWithin(PREVIEW_DIR, filePath)) {
     res.writeHead(404, { "content-type": "text/plain" });
     res.end("Not found");
     return;

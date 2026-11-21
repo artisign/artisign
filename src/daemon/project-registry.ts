@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { realpathSync } from "node:fs";
+import { pathIdentity } from "../store/paths.js";
 import { FsStore } from "../store/index.js";
 import { watchAndReindex, type WatchAndReindexHandle } from "../model/index.js";
 import { clearFontMemo } from "../model/fonts.js";
@@ -223,7 +224,7 @@ export class ProjectRegistry {
 
     const resolved = resolve(root);
     for (const [k, entry] of this.projects) {
-      if (entry.handle.root === resolved) return { key: k, entry };
+      if (pathIdentity(entry.handle.root) === pathIdentity(resolved)) return { key: k, entry };
     }
     return undefined;
   }
@@ -411,9 +412,9 @@ export class ProjectRegistry {
 function projectKey(dir: string): string {
   const root = resolve(dir);
   try {
-    return realpathSync(root);
+    return pathIdentity(realpathSync(root));
   } catch {
-    return root;
+    return pathIdentity(root);
   }
 }
 

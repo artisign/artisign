@@ -61,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Bugfixes
 
+- **Tool contracts:** `get_screenshot` accepts a full `node` ref on its own (`<screen>.<id>`, `mockup:<name>#<variant>.<id>`, `component:`/`pattern:`); the screen or mockup is derived from it, and a contradicting `screen`, `mockup` or `variant` fails with `validation_failed`. `get_screen` no longer advertises `output_format: "jsx"`, and its `fields` accepts every key the response can carry (including `tags`), checked by a test against the schema enum.
 - **Use cases (tool contract change for the omitted counts):** a persona's summary no longer repeats its role, a single remaining list row loads instead of "Show 1 more", an empty string shows as `""` in data changes, and `list_use_cases` / `delete_entity` (with `force`) report `invalid_file_omitted_count` (and `invalid_pool_entry_omitted_count`) beside the invalid counts.
 - `delete_entity` with `variant` on any kind other than `mockup` now fails with `validation_failed` and deletes
   nothing; before, the parameter was ignored for the use-case kinds and the whole entity was deleted.

@@ -291,7 +291,7 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   // derived from the strict schemas: 24,976 to 41,778 (+16,802 chars, ~+4,200 tokens; set_use_cases entry 18,164 chars).
   // The pin is exact (CHR-1143): any change, up or down, shows here.
   it("pins the measured tools/list size as information, not a limit (41,778 chars, ~10,445 tokens)", () => {
-    expect(JSON.stringify(tools).length).toBe(41_778);
+    expect(JSON.stringify(tools).length).toBe(41_952);
   });
 
   // CHR-1168: set_use_cases carries every entity shape on purpose, so it has an exact size pin of its own

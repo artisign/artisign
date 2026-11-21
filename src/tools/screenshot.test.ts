@@ -168,6 +168,29 @@ describe("getScreenshot — node/screen validation (no browser needed)", () => {
     });
   });
 
+  it("derives the screen from a node ref given alone (no exactly-one error)", async () => {
+    // Missing screen -> not_found proves the screen was derived from the ref and looked up.
+    await expect(getScreenshot(fx.store, { node: "nope.n1" })).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("derives mockup and variant from a mockup node ref given alone", async () => {
+    await expect(getScreenshot(fx.store, { node: "mockup:nope#a.n1" })).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("rejects a mockup node ref contradicting screen, mockup or variant", async () => {
+    for (const extra of [{ screen: "home" }, { mockup: "other" }, { variant: "b" }]) {
+      await expect(getScreenshot(fx.store, { node: "mockup:m#a.n1", ...extra })).rejects.toMatchObject({
+        code: "validation_failed",
+      });
+    }
+  });
+
+  it("accepts a mockup node ref that agrees with mockup and variant", async () => {
+    await expect(getScreenshot(fx.store, { node: "mockup:nope#a.n1", mockup: "nope", variant: "a" })).rejects.toMatchObject({
+      code: "not_found",
+    });
+  });
+
   it("mockup not_found before the browser is touched", async () => {
     await expect(getScreenshot(fx.store, { mockup: "nope", variant: "a" })).rejects.toMatchObject({ code: "not_found" });
   });

@@ -306,7 +306,7 @@ a response carries at most 8, with the rest counted in
 `repeated_pattern_omitted_count`. It names the occurrence count and up to
 three other screens, plus a `suggestion` — `$<component>` when one matches,
 `promote_to_system` otherwise. Advisory only, like `drift` — it never blocks
-the write. A purely layout-styled wrapper (positioning, spacing, sizing —
+the write. `import_html` returns the same `repeated_pattern` warnings. A purely layout-styled wrapper (positioning, spacing, sizing —
 nothing visual) never triggers it; treat it as the tool catching what the
 rule above already asks you to do yourself.
 
@@ -357,6 +357,12 @@ Click routes are data, not annotations. Wire navigation with
 `data-flow-target` (plus `data-flow-trigger` when not `tap`) as you design, or
 edit edges later with `set_flow`. A screen nobody can reach, or a CTA that goes
 nowhere, is an unfinished design.
+
+A flow whose target screen, or `<screen>.<node>`, does not exist returns an
+`unknown_flow_target` warning (`write_html`, `patch_html` for the nodes it
+touched, `set_flow`), naming the node and the target. The edge is still
+written, so build screens in any order: the warning disappears on the next
+write once the target exists.
 
 `data-flow-target` also works on content you pass into a component's slot
 (a back button filled into `$nav-bar`): the edge is keyed by that element's

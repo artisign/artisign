@@ -42,6 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Improvements
 
+- **Use cases:** `set_use_cases` advertises a typed input schema in `tools/list` for all seven pools (keys, required keys and nested shapes), derived from the strict schemas; the write is still validated by the tool itself (`validation_failed` with path and rule).
 - **Use cases: a dimension is named by `name`, not `label`:** like personas, entities, constellations and data objects.
   `dimension: { id, name, description?, scope?, values: [{ id, label }] }`; `values[].label` and a relationship type's
   `label` stay. There is no alias: a dimension written with `label` is `validation_failed`, and a stored dimension

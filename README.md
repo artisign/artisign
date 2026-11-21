@@ -152,7 +152,7 @@ Optionally a use case plays in a **world model**, so the spec says who and what 
 | Reads | `suggest_use_case_variants` | For one use case, the persona-pool trait values (and, for a case with constellations, the constellation-scoped values) no variant covers yet, with variant skeletons to fill in. |
 | Writes | `set_use_cases` | Bulk upsert of dimensions, personas, entities, relationship types, constellations, data objects and use cases; one commit per call, reference problems are warnings. |
 | Writes | `generate_personas` | Deterministic generic personas from the dimensions (`pairwise` or `all`), skipping combinations already covered; `target: "constellations"` writes constellation skeletons instead; `dry_run` previews. |
-| Lifecycle | `delete_entity` | Also takes the seven use-case kinds `persona`, `dimension`, `data_object`, `use_case`, `entity`, `constellation` and `relationship_type`, warning about dangling references. |
+| Lifecycle | `delete_entity` | Also takes the seven use-case kinds `persona`, `dimension`, `data_object`, `use_case`, `entity`, `constellation` and `relationship_type`. A still-referenced `persona`, `dimension`, `data_object`, `entity`, `constellation` or `relationship_type` is refused with `conflict` listing the referrers; it is deleted only with `force: true`, which then warns `dangling_reference`. A `use_case` is referenced by nothing and is never refused. |
 
 ### The write → screenshot → adjust loop
 

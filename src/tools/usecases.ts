@@ -758,13 +758,14 @@ export type SuggestVariantsInput = { id: string; limit?: number };
 async function suggestVariantsInner(store: Store, input: SuggestVariantsInput): Promise<Record<string, unknown>> {
   const useCase = await loadUseCase(store, input.id);
   const [{ pool, invalid: personaIssues }, { world, invalid: worldIssues }] = await Promise.all([store.readPersonaPoolLenient(), store.readWorldLenient()]);
-  const { coverage, suggestions } = suggestVariantGaps(useCase, pool.dimensions, pool.personas, world.constellations);
+  const { coverage, suggestions, unpooled } = suggestVariantGaps(useCase, pool.dimensions, pool.personas, world.constellations);
   const skipped = poolEntryWarnings([...personaIssues, ...worldIssues]);
   const limit = input.limit ?? 20;
   return {
     coverage,
     suggestions: suggestions.slice(0, limit),
     ...(suggestions.length > limit ? { suggestion_count: suggestions.length } : {}),
+    ...(unpooled.length > 0 ? { unpooled } : {}),
     ...(coverage.length === 0 && (pool.dimensions.length === 0 || pool.personas.length === 0) ? { hint: "define dimensions and personas first (set_use_cases), traits drive the suggestions" } : {}),
     ...(skipped.length > 0 ? reportWarnings(skipped) : {}),
   };

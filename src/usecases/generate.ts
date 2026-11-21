@@ -318,6 +318,9 @@ export function buildGeneratedConstellation(combination: Combination, dimensions
 
 export type DimensionCoverage = { dimension: string; covered: string[]; uncovered: string[] };
 
+/** Dimension values that no entry of the matching pool carries as a trait: reported, but neither covered nor uncovered and without a skeleton. */
+export type UnpooledValues = { dimension: string; values: string[]; hint: string };
+
 export type VariantSuggestion = {
   id: string;
   title: string;
@@ -351,13 +354,14 @@ export function suggestVariantGaps(
   dimensions: Dimension[],
   personas: Persona[],
   constellations: Constellation[] = [],
-): { coverage: DimensionCoverage[]; suggestions: VariantSuggestion[] } {
+): { coverage: DimensionCoverage[]; suggestions: VariantSuggestion[]; unpooled: UnpooledValues[] } {
   const byId = new Map(personas.map((p) => [p.id, p]));
   const ownPersonas = useCase.personas.map((id) => byId.get(id)).filter((p): p is Persona => p !== undefined);
   const constellationById = new Map(constellations.map((c) => [c.id, c]));
   const ownConstellations = (useCase.constellations ?? []).map((id) => constellationById.get(id)).filter((c): c is Constellation => c !== undefined);
   const coverage: DimensionCoverage[] = [];
   const suggestions: VariantSuggestion[] = [];
+  const unpooled: UnpooledValues[] = [];
   const taken = new Set((useCase.variants ?? []).map((v) => v.id));
 
   for (const dimension of dimensions) {
@@ -367,6 +371,15 @@ export function suggestVariantGaps(
     const pool: Covering[] = forConstellations ? constellations : personas;
     const own: Covering[] = forConstellations ? ownConstellations : ownPersonas;
     const used = dimension.values.filter((v) => pool.some((p) => ownValue(p.traits, dimension.id) === v.id));
+    const carried = new Set(used.map((v) => v.id));
+    const missing = dimension.values.filter((v) => !carried.has(v.id)).map((v) => v.id);
+    if (missing.length > 0) {
+      unpooled.push({
+        dimension: dimension.id,
+        values: missing,
+        hint: forConstellations ? 'generate_personas with target: "constellations" creates constellations for these values' : "generate_personas creates personas for these values",
+      });
+    }
     if (used.length === 0) continue;
     const covered = new Set<string>();
     for (const persona of own) {
@@ -391,5 +404,5 @@ export function suggestVariantGaps(
       });
     }
   }
-  return { coverage, suggestions };
+  return { coverage, suggestions, unpooled };
 }

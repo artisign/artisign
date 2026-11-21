@@ -590,7 +590,11 @@ Workflow, in this order:
    follow unless the variant sets its own, a value `"system"` drops the persona, and steps
    written by an op are not touched. `suggest_use_case_variants {id}` names the trait values of the persona pool
    that neither the case's personas nor an existing variant cover, with
-   skeletons to fill in. Write variants back with `set_use_cases` — `variants`
+   skeletons to fill in. Values that no pool entry carries as a trait are
+   listed apart under `unpooled` (`[{dimension, values, hint}]`, per dimension
+   in declared order, absent when none, not cut by `limit`): they are neither
+   covered nor uncovered and get no skeleton, the `hint` names the
+   `generate_personas` call that creates them. Write variants back with `set_use_cases` — `variants`
    is replaced as a whole, so read the existing ones first. `when` names at
    least one dimension, of either scope. A variant may also override
    `constellations`, merge `state` by key (an entry replaces or adds;

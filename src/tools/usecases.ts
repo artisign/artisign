@@ -68,11 +68,16 @@ const ERROR_LIMIT = 10;
 /** Most personas a generate_personas dry run lists; would_create keeps the full count. */
 const DRY_RUN_PERSONA_CAP = 50;
 
-/** De-duplicated and capped: a bulk write over thousands of cases must not answer with thousands of lines. */
+/**
+ * De-duplicated and capped: a bulk write over thousands of cases must not answer with thousands of lines.
+ * The same warning is one of the same kind, target and message. An "unknown_*" warning names the missing id in its
+ * message and reads the same wherever it is used, so it counts once per message (the first location is kept);
+ * the other kinds describe a place and keep one line per target.
+ */
 function reportWarnings(warnings: Warning[]): { warnings: Warning[]; warning_count?: number } {
   const seen = new Set<string>();
   const unique = warnings.filter((w) => {
-    const key = `${w.kind}|${w.target ?? ""}|${w.message}`;
+    const key = w.kind.startsWith("unknown_") ? `${w.kind}|${w.message}` : `${w.kind}|${w.target ?? ""}|${w.message}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -281,7 +286,7 @@ async function listUseCasesInner(store: Store, input: ListUseCasesInput): Promis
     poolIssues.push(...issues);
     if (input.cursor === undefined) {
       response.counts = { use_cases: useCases.length, personas: personas.length, dimensions: dimensions.length, data_objects: objects.length };
-      const { facets, truncated } = facetCounts(matches);
+      const { facets, truncated } = facetCounts(matches, new Set(personas.map((p) => p.id)));
       response.facets = facets;
       if (truncated.length > 0) response.facets_truncated = truncated;
     }
@@ -919,7 +924,7 @@ async function deleteUseCaseEntityInner(store: Store, kind: UseCaseEntityKind, n
   }
   const invalidOmitted = invalidCount !== undefined ? invalidCount - 10 : undefined;
   const commitResult = await commitUseCaseWrite(store, ctx, "delete_entity", `${kind}:${name}`, [path]);
-  return { kind, name, path, ...commitFields(commitResult), warnings, ...(invalidCount !== undefined ? { invalid_file_count: invalidCount, invalid_file_omitted_count: invalidOmitted } : {}) };
+  return { kind, name, path, ...commitFields(commitResult), ...reportWarnings(warnings), ...(invalidCount !== undefined ? { invalid_file_count: invalidCount, invalid_file_omitted_count: invalidOmitted } : {}) };
 }
 
 // Public entry points: invalid files become invalid_state; every writer runs one at a time per store.

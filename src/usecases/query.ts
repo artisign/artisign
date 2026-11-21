@@ -217,8 +217,8 @@ export const FACET_LIMIT = 50;
 
 export type Facets = Record<"status" | "group" | "tag" | "persona", Record<string, number>>;
 
-/** Counts over `useCases` per facet, biggest first, each capped at FACET_LIMIT; `truncated` names the capped ones. */
-export function facetCounts(useCases: UseCase[]): { facets: Facets; truncated: string[] } {
+/** Counts over `useCases` per facet, biggest first (the persona facet counts only ids in `personaIds`: entities and unknown actors show up as warnings, not here), each capped at FACET_LIMIT; `truncated` names the capped ones. */
+export function facetCounts(useCases: UseCase[], personaIds?: ReadonlySet<string>): { facets: Facets; truncated: string[] } {
   const raw: Record<keyof Facets, Map<string, number>> = {
     status: new Map(),
     group: new Map(),
@@ -232,7 +232,7 @@ export function facetCounts(useCases: UseCase[]): { facets: Facets; truncated: s
     bump("status", useCase.status);
     bump("group", useCase.group);
     for (const tag of new Set(useCase.tags ?? [])) bump("tag", tag);
-    for (const persona of personasOf(useCase)) bump("persona", persona);
+    for (const persona of personasOf(useCase)) if (personaIds === undefined || personaIds.has(persona)) bump("persona", persona);
   }
   const facets = {} as Facets;
   const truncated: string[] = [];

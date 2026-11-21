@@ -21,6 +21,15 @@ import { writeMockup, getMockup, promoteMockup } from "./mockups.js";
 import { setBoardState } from "./board-state.js";
 import { listUseCases, getUseCase, setUseCases, generatePersonas, suggestVariants } from "./usecases.js";
 import { SORT_KEYS, USE_CASE_STATUSES } from "../usecases/index.js";
+import {
+  constellationSchema,
+  dataObjectSchema,
+  dimensionSchema,
+  entitySchema,
+  personaSchema,
+  relationshipTypeSchema,
+  useCaseSchema,
+} from "../usecases/schema.js";
 
 // Repeated on every node-ref input; INSTRUCTIONS (NODE REFS) has the full rule, but some clients drop instructions.
 const NODE_REF = "<screen>.<node-id>, or component:<name>#<variant>.<node-id> / pattern:<name>.<node-id>";
@@ -69,6 +78,18 @@ const predicateSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("text_match"), pattern: z.string() }),
   z.object({ kind: z.literal("has_flow") }),
 ]);
+
+/**
+ * One pool of `set_use_cases`: the *advertised* item schema is derived from the strict entity schema (one source), while the
+ * *runtime* parse stays the permissive list of open records. The handler's own validation therefore remains the only
+ * authority and a wrong write fails as the tool's `validation_failed` (path + rule), never as a client-side schema error of
+ * another shape. `.meta({ items })` replaces only the `items` of the generated JSON schema; the zod parse is untouched.
+ */
+function advertisedPool(entity: z.ZodType) {
+  const items: Record<string, unknown> = z.toJSONSchema(entity, { io: "input", unrepresentable: "any", target: "draft-7" });
+  delete items.$schema;
+  return z.array(z.record(z.string(), z.unknown())).meta({ items }).optional();
+}
 
 export type ToolDefinition = {
   name: string;
@@ -281,13 +302,13 @@ export const TOOLS: ToolDefinition[] = [
     "set_use_cases",
     "Bulk upsert by id of dimensions, personas, entities, relationship_types, constellations, data_objects, use_cases (the use case specs; shapes: get_guide). An existing entity merges at top level: given keys replace (arrays whole), null removes a key. Validated before anything is written; unknown references only warn.",
     {
-      dimensions: z.array(z.record(z.string(), z.unknown())).optional(),
-      personas: z.array(z.record(z.string(), z.unknown())).optional(),
-      entities: z.array(z.record(z.string(), z.unknown())).optional(),
-      relationship_types: z.array(z.record(z.string(), z.unknown())).optional(),
-      constellations: z.array(z.record(z.string(), z.unknown())).optional(),
-      data_objects: z.array(z.record(z.string(), z.unknown())).optional(),
-      use_cases: z.array(z.record(z.string(), z.unknown())).optional(),
+      dimensions: advertisedPool(dimensionSchema),
+      personas: advertisedPool(personaSchema),
+      entities: advertisedPool(entitySchema),
+      relationship_types: advertisedPool(relationshipTypeSchema),
+      constellations: advertisedPool(constellationSchema),
+      data_objects: advertisedPool(dataObjectSchema),
+      use_cases: advertisedPool(useCaseSchema),
     },
     (store, input, ctx) => setUseCases(store, input as never, ctx),
   ),

@@ -6,84 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Fixed
+## [2.3.0] - 2026-11-21
 
-- **`promote_to_system` (token):** takes a `property` input naming the inline CSS property that becomes the token. Without it a node with several inline properties fails with `validation_failed` (candidates listed), an unknown property fails with `not_found`, and the project-wide rewrite now only replaces equal values of that same property. Before, the first property alphabetically was promoted and every equal value of any property was rewritten.
+Use cases, a new way to describe what your app does before and while you design it, plus Windows support.
 
 ### Features
 
-- **Use cases:** a variant's `actors` map now also reaches the `when` subject of inherited branch conditions, the subjects of an inherited state trigger and of the inherited starting state (entity ids, `system` and anything the variant wrote itself stay as they are). The preview shows the same result.
-
-- **Slot fills:** `update_refs` takes a slot-fill element addressed as `<screen>.<id>` (authored id): change its `style` through `token_refs` or its `variant` in one call, without replacing the element; refs are validated as on any node and the id, flows and comments stay. `component_ref` only rebinds a fill that already is a component instance. The `patch_html` `set_attr` refusal of `style`/`class` on a fill names `update_refs`.
-- **Windows support:** `package.json` allows installs on `win32`. Project paths, atomic writes, browser discovery and cleanup, the daemon stop, `artisign setup`/`update`, opening the preview and the git auto-commit work with Windows paths and `.cmd` shims, and CI runs the full suite on `windows-latest` (Node 24, Edge and Firefox). Not part of a release yet.
-
-- **Use cases:** `suggest_use_case_variants` lists dimension values that no persona (or constellation) carries under a separate `unpooled` key, per dimension, with a hint to `generate_personas`; they are no longer silently missing from the response.
-
-- **Use cases:** specs that coding agents write and read. An optional `usecases/` folder holds personas, reusable
-  data objects and one file per use case; a use case has inputs and outputs with example values, a flow of steps
-  that can be mapped to screens and elements, and variants stored as differences. Five new tools
-  (`list_use_cases`, `get_use_case`, `set_use_cases`, `generate_personas`, `suggest_use_case_variants`) and four new
-  `delete_entity` kinds (`persona`, `dimension`, `data_object`, `use_case`) read and write them. A stale or
-  unstable step mapping is reported, never rewritten. A project without `usecases/` behaves exactly as before.
-  `list_use_cases` pages at most 100 per call, a `generate_personas` dry run lists at most 50 personas (`would_create` is
-  the full count, `personas_truncated` marks the cut), `set_use_cases` returns counts instead of id lists, and an
-  input or output `example` must hold at least one key. A variant's optional `actors` map swaps the persona of the
-  inherited steps (and of the base `personas`) without rewriting each step as an op.
-- **Use Cases tab in the preview:** a fourth tab with a grouped, searchable and filterable list (tested with 2,400 use cases),
-  the detail with personas, flow and before/after data, variants shown as a difference with a coverage matrix, a mapping view that
-  places each step on the live screen, the persona, dimension and data-object pools, and dialogs to create, edit and delete them. The Screens
-  tab lists the use cases that map onto the open screen. A project without `usecases/` shows an empty guide and nothing is written.
-- **World model for use cases:** a use case can say who and what is there and what it starts from. Pool entries
-  `entities` (things with identity that relate to a persona or another entity), `relationship_types` and
-  `constellations` (one fixed starting world each) are written with `set_use_cases`; a persona takes a `kind`
-  (`human`, `agent`, `service`, `organization`) and a dimension a `scope` (`personas` or `constellations`). A use
-  case gains `constellations`, a `trigger` (an action of a persona, or a state or point in time), a starting
-  `state` and `branches` (alternative paths that fork after a main-flow step and rejoin or end the case);
-  variants can override constellations, merge state and add, replace or remove branches. `get_use_case` returns
-  the world of the case, `list_use_cases` filters by `constellation` and `entity`, `generate_personas` takes
-  `target: "constellations"` and `suggest_use_case_variants` covers constellation-scoped dimensions. `delete_entity`
-  takes three more kinds (`entity`, `constellation`, `relationship_type`), seven use-case kinds in all. World
-  problems are warnings and never block a write; states and conditions are stored and shown, never evaluated.
-  The Use Cases tab has read views and editors for the world.
-- **Use cases:** `set_use_cases` warns `mapping_removed` (never blocking) when a rewritten step, base flow or branch, drops
-  the `target` it had, or when a variant `replace` op's `step` has no `target` while the base step it replaces had one.
-- **Use cases:** `set_use_cases` warns `items_removed` (never blocking, one per case and list) naming the ids a replaced `steps`, `branches` or `variants` list dropped.
+- **Use cases:** define the world your app operates in, then design and build against it. Use cases are the base for screen design, and coding agents read the same spec to build the app and to write its tests. Personas, entities and starting states describe the world, data objects define the data with example values, steps map onto screens and elements, and variants cover the cases that differ. A project without use cases behaves exactly as before.
+- **Use Cases tab (beta):** browse, search and edit use cases in the preview, see each step on the live screen, and manage personas, entities and data objects with dialogs.
+- **Windows support:** artisign installs and runs on Windows, including setup, update, screenshots and the git auto-commit. CI now runs the full suite on Windows.
+- **Slot fills:** `update_refs` can change the style or variant of an element inside a component slot, without replacing it.
 
 ### Improvements
 
-- **Use cases:** `set_use_cases` advertises a typed input schema in `tools/list` for all seven pools (keys, required keys and nested shapes), derived from the strict schemas; the write is still validated by the tool itself (`validation_failed` with path and rule).
-- **Use cases: a dimension is named by `name`, not `label`:** like personas, entities, constellations and data objects.
-  `dimension: { id, name, description?, scope?, values: [{ id, label }] }`; `values[].label` and a relationship type's
-  `label` stay. There is no alias: a dimension written with `label` is `validation_failed`, and a stored dimension
-  with `label` is skipped on reads as `invalid_file` and makes writes to `personas.json` fail with `invalid_state`.
-  The pool view, the dimension dialog, `generate_personas` and `suggest_use_case_variants` follow.
-- **"Use case spec":** the README, the descriptions of `list_use_cases`, `get_use_case`, `set_use_cases` and `suggest_use_case_variants`, and the empty state of the Use Cases tab now introduce the term "use case spec", so "use case" is not read as "purpose". Names, tools and routes are unchanged.
-- **`delete_entity` refuses a referenced use-case pool entry unless `force: true`:** a `persona`, `dimension`,
-  `data_object`, `entity`, `constellation` or `relationship_type` that a use case or another pool entry still names
-  is refused with `conflict` and the references listed (at most 5 ids per group); nothing is written. `force: true`
-  deletes as before, with the `dangling_reference` warnings. When a case file cannot be read, the reference check is
-  incomplete: the delete is refused without `force` (not for `relationship_type`), and with `force` the response adds
-  `invalid_file` warnings and `invalid_file_count`. `force` on any other kind is `validation_failed`. A referenced
-  component stays refused without an override. In the preview, a refused delete lists the references and offers
-  "Delete anyway"; the detail view marks personas and conditions the pools no longer have, and the coverage card no
-  longer reports full coverage while they exist. The `delete_entity` description is reworded to stay within 500 characters.
+- `get_screenshot` accepts just a node ref, and `get_screen` no longer lists the `jsx` output option that never worked.
+- Writes warn when a flow points at a screen or node that does not exist, and `import_html` warns about repeated patterns like `write_html` does.
+- The git auto-commit is skipped, and says so, while a merge, rebase or similar operation is unfinished; your writes still succeed.
 
 ### Bugfixes
 
-- **Use cases:** when the daemon is gone (`artisign stop`), every view of the tab now says "artisign is not running. Start it with `artisign start`, then press Retry." instead of "Failed to fetch" and a hint to look at a terminal. HTTP error messages are unchanged.
-- **Tool contracts:** `get_screenshot` accepts a full `node` ref on its own (`<screen>.<id>`, `mockup:<name>#<variant>.<id>`, `component:`/`pattern:`); the screen or mockup is derived from it, and a contradicting `screen`, `mockup` or `variant` fails with `validation_failed`. `get_screen` no longer advertises `output_format: "jsx"`, and its `fields` accepts every key the response can carry (including `tags`), checked by a test against the schema enum.
-- **Flows:** `write_html`, `patch_html` and `set_flow` return an `unknown_flow_target` warning for a flow whose target screen or `<screen>.<node>` does not exist, naming the node and the target; the write still succeeds, and the warning stops once the target exists. `import_html` returns the same `repeated_pattern` warnings as `write_html`.
-- **Use cases (tool contract change for the omitted counts):** a persona's summary no longer repeats its role, a single remaining list row loads instead of "Show 1 more", an empty string shows as `""` in data changes, and `list_use_cases` / `delete_entity` (with `force`) report `invalid_file_omitted_count` (and `invalid_pool_entry_omitted_count`) beside the invalid counts.
-- `delete_entity` with `variant` on any kind other than `mockup` now fails with `validation_failed` and deletes
-  nothing; before, the parameter was ignored for the use-case kinds and the whole entity was deleted.
-
-### Fixed
-
-- **Use cases (tool contract change):** `get_project` carries `use_case_count` once a project has at least one use case
-  (absent otherwise, so projects without `usecases/` answer unchanged). `last_write_at` now also moves on use-case
-  writes.
-- **Use cases (tool contract change):** the commit message of `set_use_cases` uses singular and plural labels
-  ("1 use case", "2 entities", "1 relationship type") instead of the raw keys.
+- `promote_to_system` asks which property to promote (`property`) when a node has several, instead of silently taking the first one, and rewrites only that property.
+- `delete_entity` refuses `variant` on a screen, component or pattern instead of ignoring it and deleting the whole entity.
+- The live preview no longer misses a file written into a folder at the moment it is created.
 
 ## [2.2.1] - 2026-11-14
 

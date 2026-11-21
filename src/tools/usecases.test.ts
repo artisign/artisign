@@ -462,6 +462,51 @@ describe("use case tools", () => {
     });
   });
 
+  describe("items_removed", () => {
+    const itemsRemoved = (res: Record<string, unknown>): Warning[] => (res.warnings as Warning[]).filter((w) => w.kind === "items_removed");
+    const v = (id: string): Record<string, unknown> => ({ id, title: id, when: { membership: ["staff"] }, steps: [] });
+    const br = (id: string): Record<string, unknown> => ({ id, title: id, from: "pick", when: [{ subject: "loan", property: "status", value: "on-loan" }], steps: [{ id: `${id}-s`, actor: "member-ana", action: "x" }] });
+
+    it("names the steps a shorter list dropped, after mapping_removed, and still writes", async () => {
+      await seed();
+      const res = await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", steps: [{ id: "tap-book", actor: "member-ana", action: "Taps" }] }] });
+      expect(itemsRemoved(res)).toEqual([{ kind: "items_removed", target: "use_case:borrow-book", message: 'removed from steps: "pick", "done"' }]);
+      const kinds = (res.warnings as Warning[]).map((w) => w.kind);
+      expect(kinds.indexOf("mapping_removed")).toBeLessThan(kinds.indexOf("items_removed"));
+      expect((await fx.store.readUseCase("borrow-book")).steps).toHaveLength(1);
+    });
+
+    it("names the variant a replaced variants list dropped", async () => {
+      await seed();
+      await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", variants: [v("regular-customer"), v("staff-extended")] }] });
+      const res = await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", variants: [v("staff-extended")] }] });
+      expect(itemsRemoved(res)).toEqual([{ kind: "items_removed", target: "use_case:borrow-book", message: 'removed from variants: "regular-customer"' }]);
+    });
+
+    it("covers branches, null, and orders steps, branches, variants", async () => {
+      await seed();
+      await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", branches: [br("a"), br("b")], variants: [v("x")] }] });
+      const res = await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", steps: [{ id: "tap-book", actor: "member-ana", action: "Taps" }], branches: [br("b")], variants: null }] });
+      expect(itemsRemoved(res).map((w) => w.message)).toEqual(['removed from steps: "pick", "done"', 'removed from branches: "a"', 'removed from variants: "x"']);
+    });
+
+    it("keeps one warning per case when two cases drop the same ids", async () => {
+      await seed();
+      await setUseCases(fx.store, { use_cases: [borrowCase({ id: "second-case" })] });
+      const only = [{ id: "tap-book", actor: "member-ana", action: "Taps" }];
+      const res = await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", steps: only }, { id: "second-case", steps: only }] });
+      expect(itemsRemoved(res).map((w) => w.target)).toEqual(["use_case:borrow-book", "use_case:second-case"]);
+    });
+
+    it("is silent for a new case, an omitted key, and a list that grows or is reordered", async () => {
+      await seed();
+      expect(itemsRemoved(await setUseCases(fx.store, { use_cases: [borrowCase({ id: "fresh-case" })] }))).toEqual([]);
+      expect(itemsRemoved(await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", status: "ready" }] }))).toEqual([]);
+      const steps = (borrowCase().steps as Record<string, unknown>[]).slice().reverse().concat([{ id: "extra", actor: "system", action: "More" }]);
+      expect(itemsRemoved(await setUseCases(fx.store, { use_cases: [{ id: "borrow-book", steps }] }))).toEqual([]);
+    });
+  });
+
   describe("get_use_case", () => {
     it("bundles the use case with personas, dimensions, data objects (incl. refs) and mapped screens", async () => {
       await seed();

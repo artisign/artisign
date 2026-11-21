@@ -113,6 +113,62 @@ describe("autoCommit", () => {
     expect(second.skipped_reason).toBe("nothing_to_commit");
   });
 
+  it("commits a project in a directory with spaces and non-ASCII characters", async () => {
+    const projectDir = join(dir, "café naïve résumé");
+    await mkdir(join(projectDir, "screens"), { recursive: true });
+    await writeFile(join(projectDir, "screens", "crème brûlée.html"), "<div id=\"n1\"></div>");
+    const result = await autoCommit(projectDir, "write_html: crème brûlée");
+    expect(result.sha).toMatch(/^[0-9a-f]{40}$/);
+    const paths = await autoCommitPaths(projectDir, "write_html: crème brûlée", ["screens/crème brûlée.html"]);
+    expect(paths.skipped_reason).toBe("nothing_to_commit");
+  });
+
+  it("returns sha null with a git_error reason when git is not on PATH", async () => {
+    await writeFile(join(dir, "screens.html"), "<div id=\"n1\"></div>");
+    const emptyBin = await mkdtemp(join(tmpdir(), "artisign-nogit-"));
+    const savedPath = process.env.PATH;
+    const pathKey = Object.keys(process.env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+    process.env[pathKey] = emptyBin;
+    try {
+      const result = await autoCommit(dir, "write_html: screens");
+      expect(result.sha).toBeNull();
+      expect(result.skipped_reason).toMatch(/^git_error: /);
+    } finally {
+      process.env[pathKey] = savedPath;
+      await rm(emptyBin, { recursive: true, force: true });
+    }
+  });
+
+  describe("with core.autocrlf=true in the repo", () => {
+    it("commits LF files unchanged and shows only the changed line in the next commit", async () => {
+      await git(dir, ["init"]);
+      await git(dir, ["config", "core.autocrlf", "true"]);
+      const file = join(dir, "screen.html");
+      await writeFile(file, "<div>\n<p>a</p>\n<p>b</p>\n</div>\n");
+      const first = await autoCommit(dir, "write_html: screen");
+      expect(first.sha).toMatch(/^[0-9a-f]{40}$/);
+
+      await writeFile(file, "<div>\n<p>a</p>\n<p>c</p>\n</div>\n");
+      const second = await autoCommit(dir, "patch_html: screen");
+      expect(second.sha).toMatch(/^[0-9a-f]{40}$/);
+
+      expect(await readFile(file, "utf8")).toBe("<div>\n<p>a</p>\n<p>c</p>\n</div>\n");
+      const blob = await git(dir, ["show", "HEAD:screen.html"]);
+      expect(blob).not.toContain("\r");
+      const stat = await git(dir, ["show", "--numstat", "--format=", "HEAD"]);
+      expect(stat).toBe("1\t1\tscreen.html");
+    });
+
+    it("stores the bytes artisign wrote, without converting line endings", async () => {
+      await git(dir, ["init"]);
+      await git(dir, ["config", "core.autocrlf", "true"]);
+      await writeFile(join(dir, "crlf.txt"), "one\r\ntwo\r\n");
+      expect((await autoCommit(dir, "write_html: crlf")).sha).toMatch(/^[0-9a-f]{40}$/);
+      const blob = await execFileAsync("git", ["cat-file", "blob", "HEAD:crlf.txt"], { cwd: dir, encoding: "buffer" });
+      expect(blob.stdout.toString("utf8")).toBe("one\r\ntwo\r\n");
+    });
+  });
+
   describe("identity", () => {
     let gitConfig: GitConfigFixture | undefined;
 

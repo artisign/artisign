@@ -8,12 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Features
 
-<<<<<<< HEAD
 - **Use cases:** a variant's `actors` map now also reaches the `when` subject of inherited branch conditions, the subjects of an inherited state trigger and of the inherited starting state (entity ids, `system` and anything the variant wrote itself stay as they are). The preview shows the same result.
-=======
 - **Windows support:** `package.json` allows installs on `win32`. Project paths, atomic writes, browser discovery and cleanup, the daemon stop, `artisign setup`/`update`, opening the preview and the git auto-commit work with Windows paths and `.cmd` shims, and CI runs the full suite on `windows-latest` (Node 24, Edge and Firefox). Not part of a release yet.
 
->>>>>>> origin/main
 - **Use cases:** `suggest_use_case_variants` lists dimension values that no persona (or constellation) carries under a separate `unpooled` key, per dimension, with a hint to `generate_personas`; they are no longer silently missing from the response.
 
 - **Use cases:** specs that coding agents write and read. An optional `usecases/` folder holds personas, reusable

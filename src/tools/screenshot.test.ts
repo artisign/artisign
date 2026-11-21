@@ -168,6 +168,29 @@ describe("getScreenshot — node/screen validation (no browser needed)", () => {
     });
   });
 
+  it("derives the screen from a node ref given alone (no exactly-one error)", async () => {
+    // Missing screen -> not_found proves the screen was derived from the ref and looked up.
+    await expect(getScreenshot(fx.store, { node: "nope.n1" })).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("derives mockup and variant from a mockup node ref given alone", async () => {
+    await expect(getScreenshot(fx.store, { node: "mockup:nope#a.n1" })).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("rejects a mockup node ref contradicting screen, mockup or variant", async () => {
+    for (const extra of [{ screen: "home" }, { mockup: "other" }, { variant: "b" }]) {
+      await expect(getScreenshot(fx.store, { node: "mockup:m#a.n1", ...extra })).rejects.toMatchObject({
+        code: "validation_failed",
+      });
+    }
+  });
+
+  it("accepts a mockup node ref that agrees with mockup and variant", async () => {
+    await expect(getScreenshot(fx.store, { node: "mockup:nope#a.n1", mockup: "nope", variant: "a" })).rejects.toMatchObject({
+      code: "not_found",
+    });
+  });
+
   it("mockup not_found before the browser is touched", async () => {
     await expect(getScreenshot(fx.store, { mockup: "nope", variant: "a" })).rejects.toMatchObject({ code: "not_found" });
   });
@@ -416,6 +439,38 @@ describe.skipIf(!isBrowserAvailable())("getScreenshot — e2e (installed browser
       expect(buffer.subarray(0, 8)).toEqual(PNG_MAGIC);
       expect(result.width).toBeLessThan(390);
       expect(result.height).toBeLessThan(844);
+    },
+    30_000,
+  );
+
+  it(
+    "derives the screen from a node ref alone and clips to the node, not the full page",
+    async () => {
+      const clipped = await getScreenshot(store, { node: "welcome.n4" });
+      const withScreen = await getScreenshot(store, { screen: "welcome", node: "welcome.n4" });
+      expect({ width: clipped.width, height: clipped.height }).toEqual({ width: withScreen.width, height: withScreen.height });
+      expect(clipped.width).toBeLessThan(390);
+      expect(clipped.height).toBeLessThan(844);
+    },
+    30_000,
+  );
+
+  it(
+    "derives mockup and variant from a mockup node ref alone and clips to the node, not the full page",
+    async () => {
+      await store.writeMockupVariant(
+        "welcome-hero",
+        "bold",
+        `<section style="padding: 40px"><button id="cta" style="width: 120px; height: 40px; padding: 0; border: none">Go</button></section>`,
+      );
+      const full = await getScreenshot(store, { mockup: "welcome-hero", variant: "bold" });
+      const clipped = await getScreenshot(store, { node: "mockup:welcome-hero#bold.cta" });
+      // The node's box plus NODE_SCREENSHOT_PADDING_PX on each side.
+      expect({ width: clipped.width, height: clipped.height }).toEqual({
+        width: 120 + 2 * NODE_SCREENSHOT_PADDING_PX,
+        height: 40 + 2 * NODE_SCREENSHOT_PADDING_PX,
+      });
+      expect(clipped.height).toBeLessThan(full.height);
     },
     30_000,
   );

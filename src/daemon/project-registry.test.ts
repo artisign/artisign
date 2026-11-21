@@ -9,6 +9,7 @@ import { ProjectRegistry } from "./project-registry.js";
 import { readGlobalConfig, writeGlobalConfig } from "./global-config.js";
 import { FsStore } from "../store/index.js";
 import { ensureFontsCached, isMaterialSymbolsAvailable, __setFetchForTests, __resetFontMemoForTests } from "../model/fonts.js";
+import { LONG_TEST_TIMEOUT_MS } from "../../vitest.timeouts.js";
 
 async function readIndex(root: string): Promise<{ screens: Record<string, { nodeCount: number }> }> {
   const raw = await readFile(join(root, ".artisign", "index.json"), "utf-8");
@@ -197,7 +198,7 @@ describe("ProjectRegistry", () => {
     });
 
     expect((await readIndex(dirB)).screens.home?.nodeCount).toBe(1);
-  }, 10000);
+  }, LONG_TEST_TIMEOUT_MS);
 
   it("close() stops the index watcher — a later external edit is no longer picked up", async () => {
     const dir = await makeProject(`<div id="n1"></div>`);
@@ -452,7 +453,7 @@ describe("ProjectRegistry", () => {
         }
       }, 20);
     });
-  }, 10000);
+  }, LONG_TEST_TIMEOUT_MS);
 
   it("an invalid artisign.json after open keeps the old name and does not throw", async () => {
     const dir = await makeProject();
@@ -518,7 +519,7 @@ describe("ProjectRegistry", () => {
 
     // A later close() on the already-evicted root is a no-op, not a crash.
     await expect(registry.close(dirA)).resolves.toBeUndefined();
-  }, 10000);
+  }, LONG_TEST_TIMEOUT_MS);
 
   it("activeProject already names the surviving project at the moment project-closed is broadcast, and no separate project-switched follows", async () => {
     const dirA = await makeProject();
@@ -562,7 +563,7 @@ describe("ProjectRegistry", () => {
     // "project-switched" for the same eviction would make every connected
     // client double its project-switch handling (see review finding 2).
     expect(events.some((e) => e.type === "project-switched")).toBe(false);
-  }, 10000);
+  }, LONG_TEST_TIMEOUT_MS);
 
   it("evicts when only artisign.json is deleted, root directory still present", async () => {
     const dir = await makeProject();
@@ -573,7 +574,7 @@ describe("ProjectRegistry", () => {
 
     await waitUntilUnlisted(dir);
     expect(registry.activeProject).toBeUndefined();
-  }, 10000);
+  }, LONG_TEST_TIMEOUT_MS);
 
   it("settled() waits until an evicted project has stopped writing its index", async () => {
     const dir = await makeProject(`<div id="n1"></div>`);
@@ -592,7 +593,7 @@ describe("ProjectRegistry", () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     await expect(stat(join(dir, ".artisign", "index.json"))).rejects.toThrow();
-  }, 10000);
+  }, LONG_TEST_TIMEOUT_MS);
 
   it("does not evict when artisign.json is merely broken (hand-edited, not deleted)", async () => {
     const dir = await makeProject();

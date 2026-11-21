@@ -19,7 +19,7 @@ import { loadAllDocuments } from "./definitions.js";
 import { buildStyleOccurrenceIndex } from "./style-index.js";
 import { parseNodeRef, formatNodeRef, requireScreenNodeRef } from "./node-ref.js";
 import { assertValidBackdrop, backdropCandidateWarning, backdropHint } from "./backdrop.js";
-import { syncScreenFlows, fillFlowWarnings } from "./flows.js";
+import { syncScreenFlows, fillFlowWarnings, unknownFlowTargetWarnings } from "./flows.js";
 import { diffScreenDocuments } from "./diff.js";
 import { findBySelector, findFillById, findFillsBySelector, patchFill, spliceFragment, removeNode } from "./patch.js";
 import { convertToComponentInstance, revertComponentInstanceToElement } from "./node-convert.js";
@@ -71,6 +71,26 @@ function mapRepeatedPatternWarnings(
     message: w.message,
     suggestion: w.suggestion,
   }));
+}
+
+/**
+ * The `repeated_pattern` warnings of a whole-screen write (write_html,
+ * import_html), capped at REPEATED_PATTERN_CAP. A cheap pre-check first, before
+ * paying for buildStyleOccurrenceIndex's project-wide loadAllDocuments scan
+ * (CHR-635): most writes touch no visually-styled ad-hoc node at all (a
+ * component instance, a pure layout wrapper, plain text) and pay nothing.
+ */
+export async function repeatedPatternWarningsForWrite(
+  store: Store,
+  registry: Awaited<ReturnType<typeof loadRegistry>>,
+  doc: ScreenDocument,
+  screen: string,
+): Promise<{ warnings: Warning[]; omittedCount: number }> {
+  if (!Object.values(doc.nodes).some((n) => isRepeatedPatternCandidate(n))) return { warnings: [], omittedCount: 0 };
+  const styleIndex = await buildStyleOccurrenceIndex(store, registry);
+  const all = mapRepeatedPatternWarnings(computeRepeatedPatternWarnings(doc, screen, styleIndex), screen, doc.rootNodeId);
+  const warnings = all.slice(0, REPEATED_PATTERN_CAP);
+  return { warnings, omittedCount: all.length - warnings.length };
 }
 
 // ---------------------------------------------------------------------------
@@ -248,27 +268,18 @@ export async function writeHtml(store: Store, input: WriteHtmlInput): Promise<Re
     suggestion: w.suggestion,
   }));
 
-  // Cheap pre-check before paying for buildStyleOccurrenceIndex's
-  // project-wide loadAllDocuments scan (CHR-635): most writes touch no
-  // visually-styled ad-hoc node at all (a component instance, a pure
-  // layout wrapper, plain text) and pay nothing for repeated_pattern.
-  let repeatedPatternWarnings: Warning[] = [];
-  let repeatedPatternOmittedCount = 0;
-  if (Object.values(doc.nodes).some((n) => isRepeatedPatternCandidate(n))) {
-    const styleIndex = await buildStyleOccurrenceIndex(store, registry);
-    const allRepeatedPatternWarnings = mapRepeatedPatternWarnings(
-      computeRepeatedPatternWarnings(doc, input.screen, styleIndex),
-      input.screen,
-      doc.rootNodeId,
-    );
-    repeatedPatternWarnings = allRepeatedPatternWarnings.slice(0, REPEATED_PATTERN_CAP);
-    repeatedPatternOmittedCount = allRepeatedPatternWarnings.length - repeatedPatternWarnings.length;
-  }
+  const { warnings: repeatedPatternWarnings, omittedCount: repeatedPatternOmittedCount } = await repeatedPatternWarningsForWrite(
+    store,
+    registry,
+    doc,
+    input.screen,
+  );
 
   const backdropWarning = await backdropCandidateWarning(store, registry, input.screen, doc);
   const warnings = [
     ...refWarnings,
     ...fillFlowWarnings(doc),
+    ...(await unknownFlowTargetWarnings(store, doc)),
     ...driftWarnings,
     ...repeatedPatternWarnings,
     ...(backdropWarning ? [backdropWarning] : []),
@@ -460,6 +471,7 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
     warnings: [
       ...refWarnings,
       ...fillFlowWarnings(doc, new Set(affectedNodeIds)),
+      ...(await unknownFlowTargetWarnings(store, doc, new Set(affectedNodeIds))),
       ...scopedDriftWarnings,
       ...scopedRepeatedPatternWarnings,
       ...(backdropWarning ? [backdropWarning] : []),
@@ -497,8 +509,18 @@ export async function updateRefs(store: Store, input: UpdateRefsInput): Promise<
 
   const { screen, nodeId } = parsedRef;
   const { doc } = await loadScreen(store, screen);
-  const node = doc.nodes[nodeId];
-  if (!node) throw new ToolError("not_found", `node "${input.node}" was not found`);
+  const liveNode = doc.nodes[nodeId];
+  // A slot-fill element addressed by its authored id (CHR-1141): same ref, style and variant handling as a live node.
+  const fillLoc = liveNode ? undefined : findFillById(doc, nodeId);
+  const fill = fillLoc?.sub;
+  if (!liveNode && !fill) throw new ToolError("not_found", `node "${input.node}" was not found`);
+  const node = (liveNode ?? fill)!;
+  if (fill && input.refs.component_ref !== undefined && (input.refs.component_ref === null || fill.kind !== "component_instance")) {
+    throw new ToolError(
+      "validation_failed",
+      `"${input.node}" is slot-fill content — component_ref can only rebind a fill that already is a component instance; replace the fill (patch_html replace) to change what it is`,
+    );
+  }
 
   const registry = await loadRegistry(store);
   const warnings: Warning[] = [];
@@ -506,7 +528,7 @@ export async function updateRefs(store: Store, input: UpdateRefsInput): Promise<
 
   if (input.refs.component_ref !== undefined) {
     if (input.refs.component_ref === null) {
-      if (node.kind === "component_instance") revertComponentInstanceToElement(doc, node);
+      if (node.kind === "component_instance") revertComponentInstanceToElement(doc, liveNode!);
       else delete node.refs.component;
     } else {
       if (!registry.componentNames.has(input.refs.component_ref)) {
@@ -516,7 +538,7 @@ export async function updateRefs(store: Store, input: UpdateRefsInput): Promise<
         // Already an instance — just rebind which component it's an instance of.
         node.refs.component = input.refs.component_ref;
       } else {
-        convertToComponentInstance(doc, node, input.refs.component_ref);
+        convertToComponentInstance(doc, liveNode!, input.refs.component_ref);
       }
     }
     applied.component_ref = input.refs.component_ref;
@@ -562,7 +584,7 @@ export async function updateRefs(store: Store, input: UpdateRefsInput): Promise<
   await syncScreenFlows(store, doc);
   const commitResult = await store.commit(`update_refs: ${input.node}`);
 
-  warnings.push(...fillFlowWarnings(doc, new Set([nodeId])));
+  warnings.push(...fillFlowWarnings(doc, new Set([fillLoc ? fillLoc.owner.id : nodeId])));
   return { node: input.node, ...commitFields(commitResult), applied_refs: applied, warnings };
 }
 
@@ -767,5 +789,11 @@ export async function setFlow(store: Store, input: SetFlowInput): Promise<Record
   await syncScreenFlows(store, doc);
   const commitResult = await store.commit(`set_flow: ${input.node}`);
 
-  return { node: input.node, ...commitFields(commitResult), path: "flows.json", applied_flow: input.flow, warnings: [] };
+  return {
+    node: input.node,
+    ...commitFields(commitResult),
+    path: "flows.json",
+    applied_flow: input.flow,
+    warnings: input.flow ? await unknownFlowTargetWarnings(store, doc, new Set([nodeId])) : [],
+  };
 }

@@ -8,6 +8,7 @@ import {
   getDesignSystem,
   findNodes,
   listComments,
+  SCREEN_FIELDS,
 } from "./reads.js";
 import { writeHtml, patchHtml, updateRefs, setTokens, setFlow } from "./writes.js";
 import { initProjectTool, listProjects, importHtml, promoteToSystem, deleteEntity } from "./lifecycle.js";
@@ -145,8 +146,7 @@ export const TOOLS: ToolDefinition[] = [
     {
       screen: z.string(),
       view: viewSchema.optional(),
-      fields: z.array(z.string()).optional(),
-      output_format: z.enum(["html", "jsx"]).optional(),
+      fields: z.array(z.enum(SCREEN_FIELDS)).optional(),
     },
     (store, input) => getScreen(store, input as never),
   ),
@@ -371,7 +371,7 @@ export const TOOLS: ToolDefinition[] = [
   // Visual review -----------------------------------------------------------
   tool(
     "get_screenshot",
-    "PNG of a screen, one mockup variant (mockup + variant) or, on its own, a definition node ref — exactly one target. node clips a screen to one element (+8px): far fewer vision tokens. For a mockup, width sets the viewport (default 390) and the capture is full-page; a screen renders at its root's declared size. scale 1-3 (default 1) multiplies vision cost. browser re-renders in another installed engine; the result names the one used.",
+    "PNG of a screen, a mockup variant (mockup + variant) or a node. node takes a full ref alone (<screen>.<id>, mockup:<name>#<variant>.<id>, component:/pattern: ref): the screen or mockup is derived, a contradicting screen/mockup/variant fails validation_failed, and the capture clips to that element (+8px). Mockup: width sets the viewport (default 390), full-page. scale 1-3 (default 1). browser re-renders in another installed engine.",
     {
       screen: z.string().optional(),
       node: z.string().describe(NODE_REF).optional(),
@@ -419,12 +419,13 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "promote_to_system",
-    "Lift a node's inline value or a repeated element into a design-system token, component or pattern. token rewrites every matching inline value project-wide, definitions included; component rewrites identical occurrences across screens only, never inside definitions; pattern only creates the file and leaves the source markup.",
+    "Lift a node's inline value or a repeated element into a design-system token, component or pattern. token takes the value of one inline CSS property (`property`, required when the node has several) and rewrites every identical value of that same property project-wide, definitions included; component rewrites identical occurrences across screens only, never inside definitions; pattern only creates the file and leaves the source markup.",
     {
       node: z.string(),
       kind: z.enum(["token", "component", "pattern"]),
       name: z.string(),
       variants: z.array(z.string()).optional(),
+      property: z.string().optional(),
     },
     (store, input) => promoteToSystem(store, input as never),
   ),

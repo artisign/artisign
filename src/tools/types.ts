@@ -11,6 +11,8 @@ export type WarningKind =
   | "lock_contention"
   | "suspicious_attr"
   | "dangling_flow"
+  // A flow written by write_html / patch_html / set_flow names a screen or node that does not exist (yet). Advisory: the edge is kept.
+  | "unknown_flow_target"
   | "load_failed"
   // A definition write touched a node with no explicit `id` in source
   // (ADR-004 §3). Deliberately its own kind, not folded into
@@ -210,7 +212,7 @@ export function reservedSetAttrMessage(name: string, onFill = false): string {
   if (name === "id" || name === "data-node-id") {
     return `"${name}" is a stable node id — it cannot be changed`;
   }
-  return `"${name}" is ref-bearing — use update_refs instead`;
+  return `"${name}" is ref-bearing — use update_refs instead${onFill ? " (it takes a fill element with an authored id as <screen>.<id>)" : ""}`;
 }
 
 /** Every write response spreads this — `commit_skipped_reason` is present only when `sha` is `null`. */

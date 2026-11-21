@@ -117,10 +117,15 @@ On a fresh project the order is: **tokens → base components → screens.**
   fill the slots, including with other component instances. Slot-fill content
   is readable — `get_node` (view `full`) lists it under `slots`, one entry per
   fill in document order with its slot name; `find_nodes` matches inside it
-  too. It never appears in `children`, and `get_node`/`update_refs` do not
-  take a ref into it. `patch_html` and `inspect_node` do: give the fill
+  too. It never appears in `children`, and `get_node` does not take a ref into
+  it. `update_refs`, `patch_html` and `inspect_node` do: give the fill
   element an explicit `id` and address it as `<screen>.<id>` (`patch_html`
-  also reaches fills by `css_selector`). The authored fill markup in the
+  also reaches fills by `css_selector`). Change a fill element's `style` or
+  token refs with `update_refs` — `token_refs` and `variant` work as on any
+  screen node, refs are validated the same way, and the element keeps its id,
+  flows and comments; `set_attr` still refuses `style`/`class`, and its error
+  names `update_refs`. `component_ref` only rebinds a fill that already is a
+  component instance (anything else: replace the fill). The authored fill markup in the
   screen file is what gets edited. A slot's top-level fill can be replaced by
   a single element or deleted, but has no siblings to insert next to; inside
   it, every operation works. A fill with no `id` has no ref — give it one.
@@ -230,8 +235,11 @@ When a design system already exists:
 
 After **every** `write_html` / `patch_html`:
 
-1. `get_screenshot` for the screen (or clipped to the changed `node` — much
-   cheaper) and look at the image.
+1. `get_screenshot` for the screen (or `get_screenshot {node}` clipped to the
+   changed node — much cheaper; a full ref such as `home.btn-login` or
+   `mockup:<name>#<variant>.<id>` is enough, the screen or mockup is derived
+   from it and a contradicting `screen`/`mockup`/`variant` fails with
+   `validation_failed`) and look at the image.
 2. Red outlines mark unresolved token/component/variant refs. Fix before the
    next edit.
 3. For geometry and computed-value questions ("is this 44px tall?", "what color
@@ -274,9 +282,13 @@ someone has to maintain.
 
 - **Second occurrence rule:** the moment a value or element pattern appears a
   second time, promote it. Do not wait for a third.
-- `kind: "token"` rewrites every other structurally identical occurrence
-  project-wide to a ref — screens, components, and patterns alike — so you
-  get consistency retroactively. `kind: "component"` rewrites every
+- `kind: "token"` takes the value of one inline CSS property (`property`,
+  e.g. `height`; optional only when the node has exactly one inline property —
+  with several it fails with `validation_failed` and lists them, an unknown one
+  fails with `not_found`) and rewrites every identical value of **that same
+  property** project-wide to a ref — screens, components, and patterns alike —
+  so you get consistency retroactively. An equal value on another property
+  (`#fff` as `color` when you promoted `background`) is never touched. `kind: "component"` rewrites every
   structurally identical occurrence across screens, but never inside another
   component or pattern definition — a call targeting one screen node must not
   have the side effect of rewriting curated design-system source files.
@@ -306,7 +318,7 @@ a response carries at most 8, with the rest counted in
 `repeated_pattern_omitted_count`. It names the occurrence count and up to
 three other screens, plus a `suggestion` — `$<component>` when one matches,
 `promote_to_system` otherwise. Advisory only, like `drift` — it never blocks
-the write. A purely layout-styled wrapper (positioning, spacing, sizing —
+the write. `import_html` returns the same `repeated_pattern` warnings. A purely layout-styled wrapper (positioning, spacing, sizing —
 nothing visual) never triggers it; treat it as the tool catching what the
 rule above already asks you to do yourself.
 
@@ -357,6 +369,12 @@ Click routes are data, not annotations. Wire navigation with
 `data-flow-target` (plus `data-flow-trigger` when not `tap`) as you design, or
 edit edges later with `set_flow`. A screen nobody can reach, or a CTA that goes
 nowhere, is an unfinished design.
+
+A flow whose target screen, or `<screen>.<node>`, does not exist returns an
+`unknown_flow_target` warning (`write_html`, `patch_html` for the nodes it
+touched, `set_flow`), naming the node and the target. The edge is still
+written, so build screens in any order: the warning disappears on the next
+write once the target exists.
 
 `data-flow-target` also works on content you pass into a component's slot
 (a back button filled into `$nav-bar`): the edge is keyed by that element's

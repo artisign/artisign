@@ -145,6 +145,51 @@ describe("promote_to_system", () => {
     expect(await fx.store.readScreen("home")).not.toContain("#3366ff");
   });
 
+  describe("kind=token property", () => {
+    it("promotes the chosen property and leaves an equal value of another property alone", async () => {
+      await fx.store.writeScreen("home", `<div id="card" style="height: 140px; background: #fff"></div>`);
+      await fx.store.writeScreen("other", `<div id="root"><p id="t" style="color: #fff; height: 140px"></p><p id="u" style="height: 90px"></p></div>`);
+      const res = await promoteToSystem(fx.store, { node: "home.card", kind: "token", name: "size.card_h", property: "height" });
+
+      expect((await fx.store.readTokens()).size).toEqual({ card_h: "140px" });
+      expect(res.rewritten_nodes).toEqual(expect.arrayContaining(["home.card", "other.t"]));
+      expect(await fx.store.readScreen("home")).toContain("height: $size.card_h");
+      expect(await fx.store.readScreen("home")).toContain("#fff");
+      const other = await fx.store.readScreen("other");
+      expect(other).toContain("height: $size.card_h");
+      expect(other).toMatch(/color: #fff/);
+      expect(other).not.toContain("color: $size.card_h");
+    });
+
+    it("does not rewrite an equal value of a different property, definitions included", async () => {
+      await fx.store.writeScreen("home", `<div id="root"><div id="n1" style="width: 10px"></div><div id="n2" style="height: 10px"></div></div>`);
+      await fx.store.writeComponent("box", `<div id="b" style="width: 10px; height: 10px"></div>`);
+      await promoteToSystem(fx.store, { node: "home.n1", kind: "token", name: "size.w", property: "width" });
+      const screen = await fx.store.readScreen("home");
+      expect(screen).toContain("height: 10px");
+      const comp = await fx.store.readComponent("box");
+      expect(comp).toContain("width: $size.w");
+      expect(comp).toContain("height: 10px");
+    });
+
+    it("fails with validation_failed listing candidates when the node has several properties and none is chosen", async () => {
+      await fx.store.writeScreen("home", `<div id="n1" style="height: 140px; color: #fff"></div>`);
+      await expect(
+        promoteToSystem(fx.store, { node: "home.n1", kind: "token", name: "size.card_h" }),
+      ).rejects.toMatchObject({ code: "validation_failed", message: expect.stringContaining("color, height") });
+      expect((await fx.store.readTokens()).size).toBeUndefined();
+      expect(await fx.store.readScreen("home")).toContain("140px");
+    });
+
+    it("fails with not_found for a property the node does not have and changes nothing", async () => {
+      await fx.store.writeScreen("home", `<div id="n1" style="height: 140px"></div>`);
+      await expect(
+        promoteToSystem(fx.store, { node: "home.n1", kind: "token", name: "size.card_h", property: "width" }),
+      ).rejects.toMatchObject({ code: "not_found" });
+      expect((await fx.store.readTokens()).size).toBeUndefined();
+    });
+  });
+
   // promote writes the definition file through store.writeComponent
   // directly, bypassing writeDefinition — so it could silently produce
   // exactly the definition write_html warns about via the slot-styling check.

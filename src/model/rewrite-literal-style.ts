@@ -22,7 +22,7 @@ function isTemplate(node: P5Element): node is P5Template {
  * attribute values directly, so there's no entity-decoding to do here).
  * Returns `null` when nothing matched.
  */
-function replaceDeclarationValue(decodedStyle: string, value: string, path: string): string | null {
+function replaceDeclarationValue(decodedStyle: string, value: string, path: string, property?: string): string | null {
   let changed = false;
   const rewritten = decodedStyle
     .split(";")
@@ -31,6 +31,7 @@ function replaceDeclarationValue(decodedStyle: string, value: string, path: stri
       if (sep === -1) return decl;
       const prop = decl.slice(0, sep);
       const rawValue = decl.slice(sep + 1);
+      if (property !== undefined && prop.trim().toLowerCase() !== property.toLowerCase()) return decl;
       if (rawValue.trim() !== value) return decl;
       const leadingWs = rawValue.match(/^\s*/)![0];
       const trailingWs = rawValue.match(/\s*$/)![0];
@@ -43,14 +44,14 @@ function replaceDeclarationValue(decodedStyle: string, value: string, path: stri
 
 type Replacement = { start: number; end: number; text: string };
 
-function collectReplacements(nodes: P5ChildNode[], value: string, path: string, out: Replacement[]): void {
+function collectReplacements(nodes: P5ChildNode[], value: string, path: string, out: Replacement[], property?: string): void {
   for (const node of nodes) {
     if (!isElementLike(node)) continue;
 
     const styleAttr = node.attrs.find((a) => a.name === "style");
     const styleLoc = node.sourceCodeLocation?.attrs?.style;
     if (styleAttr && styleLoc) {
-      const rewritten = replaceDeclarationValue(styleAttr.value, value, path);
+      const rewritten = replaceDeclarationValue(styleAttr.value, value, path, property);
       if (rewritten !== null) {
         out.push({ start: styleLoc.startOffset, end: styleLoc.endOffset, text: `style="${escapeAttr(rewritten)}"` });
       }
@@ -58,8 +59,8 @@ function collectReplacements(nodes: P5ChildNode[], value: string, path: string, 
 
     // A <template>'s children live in `.content`, not `.childNodes` — parse5
     // models it after the real HTMLTemplateElement content-document model.
-    if (isTemplate(node)) collectReplacements(node.content.childNodes, value, path, out);
-    else collectReplacements(node.childNodes, value, path, out);
+    if (isTemplate(node)) collectReplacements(node.content.childNodes, value, path, out, property);
+    else collectReplacements(node.childNodes, value, path, out, property);
   }
 }
 
@@ -73,15 +74,17 @@ function collectReplacements(nodes: P5ChildNode[], value: string, path: string, 
  * comment or escaped example text, and cannot compare against an
  * HTML-escaped literal without re-implementing an HTML tokenizer).
  *
+ * With `property`, only declarations of that CSS property are rewritten.
+ *
  * Only the exact byte range of each matching style attribute is replaced —
  * `escapeAttr` is the same escaping `serializeScreen` uses — everything
  * else in `html`, including comments, text content, and untouched
  * attributes/ids, stays byte-for-byte identical.
  */
-export function rewriteLiteralStyleValueInDefinition(html: string, value: string, path: string): { html: string; changed: boolean } {
+export function rewriteLiteralStyleValueInDefinition(html: string, value: string, path: string, property?: string): { html: string; changed: boolean } {
   const fragment = parseFragment(html, { sourceCodeLocationInfo: true });
   const replacements: Replacement[] = [];
-  collectReplacements(fragment.childNodes, value, path, replacements);
+  collectReplacements(fragment.childNodes, value, path, replacements, property);
   if (replacements.length === 0) return { html, changed: false };
 
   // Applied back-to-front so an earlier (smaller-offset) replacement's

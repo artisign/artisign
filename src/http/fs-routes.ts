@@ -123,8 +123,9 @@ async function createDir(req: IncomingMessage, res: ServerResponse): Promise<boo
       sendJson(res, 409, { code: "already_exists", message: `a folder named "${folderName}" already exists here` });
     } else if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
       sendJson(res, 403, { code: "permission_denied", message: `permission denied: ${resolve(parent)}` });
-    } else if (code === "ENAMETOOLONG") {
-      sendJson(res, 400, { code: "validation_failed", message: "folder name is too long" });
+    } else if (code === "ENAMETOOLONG" || code === "EINVAL") {
+      // Windows reports an over-long name as EINVAL, not ENAMETOOLONG.
+      sendJson(res, 400, { code: "validation_failed", message: "folder name is too long or not valid on this filesystem" });
     } else if (code === "ENOENT" || code === "ENOTDIR" || code === "ELOOP") {
       sendJson(res, 404, { code: "not_found", message: `directory not found: ${resolve(parent)}` });
     } else {

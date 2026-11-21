@@ -47,6 +47,10 @@ artisign
 - **Each launch uses a fresh, throwaway profile** in `~/artisign-browser-profiles/`, removed when the browser closes. It lives under your home directory, not `/tmp`, because a Snap- or Flatpak-packaged Firefox cannot see `/tmp`.
 - **No browser installed** (a bare server or container): both tools fail with the fix in the error message; every other tool works without one. Installing `chromium` or `firefox-esr` from the distribution's packages is enough.
 
+### Unreleased — on `main`, not part of 2.2.1
+
+**Windows support.** `package.json` on `main` lists `win32` in `os`; the published `latest` still refuses to install on Windows until the next release. What is tested: CI runs the four quality gates on a `windows-latest` runner (Windows Server, Node 24) and the screenshot and inspect-node tests with Edge and with Firefox on that runner. Windows 11 smoke test: TBD after smoke test. Git for Windows is optional: it is only needed for the automatic commit of each write; without it artisign skips the commit and everything else works. No setup client is verified on Windows yet.
+
 **Privacy.** artisign collects nothing — no telemetry, no account, no server beyond the local one it runs. These requests reach the network, none of them about you, and that is the complete list: the update check (at most once a day) asks `registry.npmjs.org` for the latest version and sends nothing else; `artisign update` runs `npm`, and the `npx` in your AI tool's entry fetches the pinned version from npm, both talking to the npm registry; and the first render of a project in each artisign run (and again when its typography tokens change) fetches the font families named in your tokens — plus the Material Symbols Rounded icon font, always (a copy shipped with the package is the fallback when that fails) — from Google Fonts, then caches them locally (see [Fonts & icons](#fonts--icons)). A remote `https://` URL that a screen's own HTML references (an image, a stylesheet) is loaded by the browser that renders it, like any web page. Everything else stays on `127.0.0.1`.
 
 ## Quickstart

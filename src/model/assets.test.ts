@@ -146,7 +146,7 @@ describe("resolveAssetRefs", () => {
   });
 
   it("a project dir with a space, an apostrophe and parentheses survives inside src=\"…\" and inside url(…)", async () => {
-    const weirdDir = `${dir}/Christian's (alt)`;
+    const weirdDir = join(dir, "Christian's (alt)");
     await mkdir(join(weirdDir, "assets"), { recursive: true });
     await writeFile(join(weirdDir, "assets", "hero.png"), Buffer.from([1, 2, 3, 4]));
     const weirdStore = new FsStore(weirdDir);

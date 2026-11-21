@@ -52,11 +52,8 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  # Informational until CHR-1084 makes it required: shows every PR's Windows
-  # result without blocking merges on failures that belong to later Windows tickets.
   verify-windows:
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -67,8 +64,7 @@ jobs:
         run: |
           git config --global user.name "artisign CI"
           git config --global user.email "ci@artisign.dev"
-      # --force bypasses the os check until CHR-1084 adds win32.
-      - run: npm ci --force
+      - run: npm ci
       - run: npm run type-check
       - run: npm run lint
       - run: npm test

@@ -212,7 +212,7 @@ export function reservedSetAttrMessage(name: string, onFill = false): string {
   if (name === "id" || name === "data-node-id") {
     return `"${name}" is a stable node id — it cannot be changed`;
   }
-  return `"${name}" is ref-bearing — use update_refs instead`;
+  return `"${name}" is ref-bearing — use update_refs instead${onFill ? " (it takes a fill element with an authored id as <screen>.<id>)" : ""}`;
 }
 
 /** Every write response spreads this — `commit_skipped_reason` is present only when `sha` is `null`. */

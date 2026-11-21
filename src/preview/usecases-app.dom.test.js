@@ -125,7 +125,7 @@ describe("optionality", () => {
   it("adds a fourth tab and fetches nothing use-case related until it is opened", async () => {
     await import("./app.js");
     await flush();
-    expect($$(".view-tab").map((t) => t.textContent)).toEqual(["Screens", "Design System", "Board", "Use Cases"]);
+    expect($$(".view-tab").map((t) => t.textContent)).toEqual(["Screens", "Design System", "Board", "Use Cases, Beta"]);
     expect($("#usecases-view").hidden).toBe(true);
     // The only read is the Screens tab's reverse entry (list_use_cases scoped to the open screen); the Use Cases tab fetches nothing itself.
     expect(useCaseCalls().every((c) => c.tool === "list_use_cases" && c.body.screen === "editor")).toBe(true);

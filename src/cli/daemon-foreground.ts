@@ -17,7 +17,7 @@ export async function runDaemonForeground(opts: StartDaemonOptions): Promise<voi
     };
     process.on("SIGINT", shutdown);
     process.on("SIGTERM", shutdown);
-    // Windows: Ctrl+Break and closing the console window. (Ctrl+C arrives as SIGINT there too.)
+    // Windows: Ctrl+Break. (Ctrl+C arrives as SIGINT there too.)
     if (process.platform === "win32") process.on("SIGBREAK", shutdown);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -244,8 +244,8 @@ describe("MCP server — instructions budget", () => {
   // value is information, not a limit; a PR that grows it updates the pin and
   // states the delta in its description. The pin is exact (CHR-1143), so any
   // change, up or down, shows here and has to be stated.
-  it("pins the measured instructions size as information, not a limit (~1157 tokens, chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBe(1157);
+  it("pins the measured instructions size as information, not a limit (~1161 tokens, chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBe(1161);
   });
 });
 

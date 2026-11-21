@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Features
 
+- **Windows support:** `package.json` allows installs on `win32`. Project paths, atomic writes, browser discovery and cleanup, the daemon stop, `artisign setup`/`update`, opening the preview and the git auto-commit work with Windows paths and `.cmd` shims, and CI runs the full suite on `windows-latest` (Node 24, Edge and Firefox). Not part of a release yet.
+
 - **Use cases:** `suggest_use_case_variants` lists dimension values that no persona (or constellation) carries under a separate `unpooled` key, per dimension, with a hint to `generate_personas`; they are no longer silently missing from the response.
 
 - **Use cases:** specs that coding agents write and read. An optional `usecases/` folder holds personas, reusable
@@ -62,6 +64,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Bugfixes
 
 - **Tool contracts:** `get_screenshot` accepts a full `node` ref on its own (`<screen>.<id>`, `mockup:<name>#<variant>.<id>`, `component:`/`pattern:`); the screen or mockup is derived from it, and a contradicting `screen`, `mockup` or `variant` fails with `validation_failed`. `get_screen` no longer advertises `output_format: "jsx"`, and its `fields` accepts every key the response can carry (including `tags`), checked by a test against the schema enum.
+- **Flows:** `write_html`, `patch_html` and `set_flow` return an `unknown_flow_target` warning for a flow whose target screen or `<screen>.<node>` does not exist, naming the node and the target; the write still succeeds, and the warning stops once the target exists. `import_html` returns the same `repeated_pattern` warnings as `write_html`.
 - **Use cases (tool contract change for the omitted counts):** a persona's summary no longer repeats its role, a single remaining list row loads instead of "Show 1 more", an empty string shows as `""` in data changes, and `list_use_cases` / `delete_entity` (with `force`) report `invalid_file_omitted_count` (and `invalid_pool_entry_omitted_count`) beside the invalid counts.
 - `delete_entity` with `variant` on any kind other than `mockup` now fails with `validation_failed` and deletes
   nothing; before, the parameter was ignored for the use-case kinds and the whole entity was deleted.

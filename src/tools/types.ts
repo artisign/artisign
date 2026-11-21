@@ -11,6 +11,8 @@ export type WarningKind =
   | "lock_contention"
   | "suspicious_attr"
   | "dangling_flow"
+  // A flow written by write_html / patch_html / set_flow names a screen or node that does not exist (yet). Advisory: the edge is kept.
+  | "unknown_flow_target"
   | "load_failed"
   // A definition write touched a node with no explicit `id` in source
   // (ADR-004 §3). Deliberately its own kind, not folded into

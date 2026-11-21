@@ -15,7 +15,37 @@ import {
   BROWSER_ENV,
   NO_BROWSER_MESSAGE,
   noBrowserMessage,
+  killProfileProcesses,
 } from "./browser.js";
+
+describe("killProfileProcesses", () => {
+  it("on win32 runs PowerShell with the profile in the environment, not in the script", async () => {
+    const calls: { file: string; args: string[]; env: NodeJS.ProcessEnv }[] = [];
+    await killProfileProcesses("C:\\Users\\me\\artisign-browser-profiles\\1-abc", "win32", async (file, args, options) => {
+      calls.push({ file, args, env: options.env });
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.file).toBe("powershell.exe");
+    expect(calls[0]!.env.ARTISIGN_KILL_PROFILE).toBe("C:\\Users\\me\\artisign-browser-profiles\\1-abc");
+    expect(calls[0]!.args.join(" ")).not.toContain("artisign-browser-profiles");
+    expect(calls[0]!.args.join(" ")).toContain("Stop-Process");
+  });
+
+  it("swallows a failing PowerShell call", async () => {
+    await expect(
+      killProfileProcesses("p", "win32", () => Promise.reject(new Error("boom"))),
+    ).resolves.toBeUndefined();
+  });
+
+  it("does nothing off Windows", async () => {
+    let called = false;
+    await killProfileProcesses("p", "linux", async () => {
+      called = true;
+    });
+    expect(called).toBe(false);
+  });
+});
 
 const has =
   (...paths: string[]) =>

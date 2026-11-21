@@ -18,6 +18,7 @@ import { guardMappings } from "../usecases/index.js";
 import { loadScreen } from "./context.js";
 import { loadAllDocuments } from "./definitions.js";
 import { parseNodeRef, formatNodeRef, requireScreenNodeRef } from "./node-ref.js";
+import { repeatedPatternWarningsForWrite } from "./writes.js";
 import { syncScreenFlows, belongsToScreen, fillFlowWarnings } from "./flows.js";
 import { danglingBackdropWarnings } from "./backdrop.js";
 import { readVariantLinks } from "./variants.js";
@@ -213,11 +214,13 @@ export async function importHtml(store: Store, input: ImportHtmlInput): Promise<
   await syncScreenFlows(store, doc);
   const commitResult = await store.commit(`import_html: ${screenName}`);
 
+  const { warnings, omittedCount } = await repeatedPatternWarningsForWrite(store, registry, doc, screenName);
   return {
     ...commitFields(commitResult),
     imported: [{ screen: screenName, path: `screens/${screenName}.html` }],
     skipped_duplicate_count: 0,
-    warnings: [],
+    warnings,
+    ...(omittedCount > 0 ? { repeated_pattern_omitted_count: omittedCount } : {}),
   };
 }
 

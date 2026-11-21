@@ -28,7 +28,7 @@ export function defaultClientEnv(): ClientEnv {
     execPath: process.execPath,
     run: (command, args) => {
       const plan = spawnPlan(command, args);
-      return new Promise((resolve) => execFile(plan.command, plan.args, { timeout: 30_000, shell: plan.shell }, (err) => resolve(err === null)));
+      return new Promise((resolve) => execFile(plan.command, plan.args, { timeout: 30_000, shell: plan.shell, windowsHide: true }, (err) => resolve(err === null)));
     },
   };
 }

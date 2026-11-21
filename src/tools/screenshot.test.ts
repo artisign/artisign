@@ -444,6 +444,38 @@ describe.skipIf(!isBrowserAvailable())("getScreenshot — e2e (installed browser
   );
 
   it(
+    "derives the screen from a node ref alone and clips to the node, not the full page",
+    async () => {
+      const clipped = await getScreenshot(store, { node: "welcome.n4" });
+      const withScreen = await getScreenshot(store, { screen: "welcome", node: "welcome.n4" });
+      expect({ width: clipped.width, height: clipped.height }).toEqual({ width: withScreen.width, height: withScreen.height });
+      expect(clipped.width).toBeLessThan(390);
+      expect(clipped.height).toBeLessThan(844);
+    },
+    30_000,
+  );
+
+  it(
+    "derives mockup and variant from a mockup node ref alone and clips to the node, not the full page",
+    async () => {
+      await store.writeMockupVariant(
+        "welcome-hero",
+        "bold",
+        `<section style="padding: 40px"><button id="cta" style="width: 120px; height: 40px; padding: 0; border: none">Go</button></section>`,
+      );
+      const full = await getScreenshot(store, { mockup: "welcome-hero", variant: "bold" });
+      const clipped = await getScreenshot(store, { node: "mockup:welcome-hero#bold.cta" });
+      // The node's box plus NODE_SCREENSHOT_PADDING_PX on each side.
+      expect({ width: clipped.width, height: clipped.height }).toEqual({
+        width: 120 + 2 * NODE_SCREENSHOT_PADDING_PX,
+        height: 40 + 2 * NODE_SCREENSHOT_PADDING_PX,
+      });
+      expect(clipped.height).toBeLessThan(full.height);
+    },
+    30_000,
+  );
+
+  it(
     "rejects a node id that isn't in the rendered DOM",
     async () => {
       await expect(getScreenshot(store, { screen: "welcome", node: "welcome.does-not-exist" })).rejects.toMatchObject(

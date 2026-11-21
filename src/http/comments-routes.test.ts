@@ -1,3 +1,4 @@
+import { SSE_EVENT_BUDGET_MS } from "../../vitest.timeouts.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -205,9 +206,9 @@ describe("/api/comments", () => {
 
       const start = Date.now();
       await post("/api/comments", { screen: "home", node_id: "n2", text: "make this bigger" });
-      const evt = await waitForSseEvent(sse, (e) => e.kind === "comments", 1000);
+      const evt = await waitForSseEvent(sse, (e) => e.kind === "comments", SSE_EVENT_BUDGET_MS);
 
-      expect(Date.now() - start).toBeLessThan(1000);
+      expect(Date.now() - start).toBeLessThan(SSE_EVENT_BUDGET_MS);
       expect(evt.type).toBe("change");
     });
   });

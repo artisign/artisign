@@ -6,6 +6,7 @@ import { initProject } from "../init/init-project.js";
 import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
 import { startDaemon, type DaemonHandle } from "../daemon/start.js";
 import { FsStore } from "../store/index.js";
+import { SSE_EVENT_BUDGET_MS, TEST_TIMEOUT_MS } from "../../vitest.timeouts.js";
 
 async function waitForSseEvent(response: Response, predicate: (evt: Record<string, unknown>) => boolean, timeoutMs: number): Promise<Record<string, unknown>> {
   const reader = response.body!.getReader();
@@ -78,9 +79,9 @@ describe("GET /events (SSE)", () => {
 
     const start = Date.now();
     await store.writeScreen("home", `<div id="n1"></div>`);
-    const evt = await waitForSseEvent(res, (e) => e.kind === "screen" && e.name === "home", 1000);
+    const evt = await waitForSseEvent(res, (e) => e.kind === "screen" && e.name === "home", SSE_EVENT_BUDGET_MS);
 
-    expect(Date.now() - start).toBeLessThan(1000);
+    expect(Date.now() - start).toBeLessThan(SSE_EVENT_BUDGET_MS);
     expect(evt).toEqual({ type: "change", kind: "screen", name: "home" });
   });
 
@@ -249,5 +250,5 @@ describe("GET /events (SSE)", () => {
     expect(result).not.toBe(timedOut);
 
     await stopped; // afterEach also calls daemon.stop(); it's idempotent, so this just confirms it already settled.
-  }, 5000);
+  }, TEST_TIMEOUT_MS);
 });

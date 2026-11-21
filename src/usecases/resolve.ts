@@ -151,16 +151,20 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
   }
   // State subjects of a state trigger are inherited with the trigger; one the variant wrote itself is taken as written.
   if (variant.trigger === undefined && effective.trigger?.state !== undefined) effective.trigger = { ...effective.trigger, state: remapConditions(effective.trigger.state) };
-  // Inherited starting-state entries are remapped; entries the variant wrote (`change` set) stay as written and win a collision.
+  // Inherited starting-state entries are remapped. One entry per (subject, property) stays: a variant-written entry (`change` set)
+  // wins, then an inherited entry that was remapped onto the subject (the remapped persona now plays that role), then one that was
+  // already on it.
   if (effective.state !== undefined) {
-    const written = new Set(effective.state.filter((e) => e.change !== undefined).map((e) => JSON.stringify([e.subject, e.property])));
-    effective.state = effective.state.flatMap((entry) => {
-      if (entry.change !== undefined || mappedSubject(entry.subject) === entry.subject) return [entry];
-      const key = JSON.stringify([mappedSubject(entry.subject), entry.property]);
-      if (written.has(key)) return [];
-      written.add(key);
-      return [{ ...entry, subject: mappedSubject(entry.subject) }];
-    });
+    const out: { entry: EffectiveStateEntry; rank: number }[] = [];
+    for (const entry of effective.state) {
+      const remapped = entry.change === undefined && mappedSubject(entry.subject) !== entry.subject;
+      const next = remapped ? { ...entry, subject: mappedSubject(entry.subject) } : entry;
+      const rank = entry.change !== undefined ? 3 : remapped ? 2 : 1;
+      const at = out.findIndex((o) => o.entry.subject === next.subject && o.entry.property === next.property);
+      if (at === -1) out.push({ entry: next, rank });
+      else if (rank > out[at]!.rank) out[at] = { entry: next, rank };
+    }
+    effective.state = out.map((o) => o.entry);
   }
   if (variant.personas === undefined && Object.entries(actors).some(([key, value]) => key !== value)) {
     // The system is not a persona, so a value "system" drops the entry.

@@ -109,6 +109,15 @@ describe("variant actors map", () => {
     expect(r.state).toEqual([{ subject: "member-ana", property: "card", value: "valid", change: "changed" }]);
   });
 
+  it("keeps one start-state entry per key after the remap: remapped inherited beats inherited, variant-written beats both", () => {
+    const base = withMap({ "member-ana": "staff-lee" }, {}, { state: [{ subject: "member-ana", property: "card", value: "expired" }, { subject: "staff-lee", property: "card", value: "valid" }] });
+    const r = resolveUseCase(base, base.variants![0]).use_case;
+    expect(r.state).toEqual([{ subject: "staff-lee", property: "card", value: "expired" }]);
+
+    const written = withMap({ "member-ana": "staff-lee" }, { state: [{ subject: "staff-lee", property: "card", value: "blocked" }] }, { state: [{ subject: "member-ana", property: "card", value: "expired" }, { subject: "staff-lee", property: "card", value: "valid" }] });
+    expect(resolveUseCase(written, written.variants![0]).use_case.state).toEqual([{ subject: "staff-lee", property: "card", value: "blocked", change: "changed" }]);
+  });
+
   it("takes the variant's own personas as written", () => {
     const base = withMap({ "member-ana": "staff-lee" }, { personas: ["member-ana"] });
     expect(resolveUseCase(base, base.variants![0]).use_case.personas).toEqual(["member-ana"]);

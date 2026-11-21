@@ -13,6 +13,7 @@ import {
   fromRemoteValue,
   BROWSER_ENV,
   NO_BROWSER_MESSAGE,
+  noBrowserMessage,
 } from "./browser.js";
 
 const has =
@@ -53,6 +54,62 @@ describe("discoverBrowsers", () => {
 
   it("finds nothing without a PATH on Linux", () => {
     expect(discoverBrowsers({ platform: "linux", env: {}, exists: () => true })).toEqual([]);
+  });
+});
+
+describe("Windows discovery", () => {
+  const env = {
+    ProgramFiles: "C:\\Program Files",
+    "ProgramFiles(x86)": "C:\\Program Files (x86)",
+    LOCALAPPDATA: "C:\\Users\\me\\AppData\\Local",
+  };
+  const win = { platform: "win32" as const, env };
+
+  it("finds browsers under Program Files, Program Files (x86) and LocalAppData, in ADR-007 order", () => {
+    const edge = "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe";
+    const chrome = "C:\\Users\\me\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe";
+    const brave = "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe";
+    const firefox = "C:\\Program Files\\Mozilla Firefox\\firefox.exe";
+    expect(discoverBrowsers({ ...win, exists: has(firefox, brave, edge, chrome) })).toEqual([
+      { kind: "chrome", executable: chrome },
+      { kind: "edge", executable: edge },
+      { kind: "brave", executable: brave },
+      { kind: "firefox", executable: firefox },
+    ]);
+  });
+
+  it("finds nothing when no standard location has a browser", () => {
+    expect(discoverBrowsers({ ...win, exists: () => false })).toEqual([]);
+  });
+
+  it("honours ARTISIGN_BROWSER with spaces and backslashes, and infers the kind from it", () => {
+    const path = "D:\\My Tools\\Mozilla Firefox\\firefox.exe";
+    expect(
+      selectBrowser(undefined, { ...win, env: { ...env, [BROWSER_ENV]: path }, exists: has(path) }),
+    ).toEqual({ kind: "firefox", executable: path });
+    expect(
+      selectBrowser(undefined, {
+        ...win,
+        env: { ...env, [BROWSER_ENV]: `"${path}"` },
+        exists: has(path),
+      }),
+    ).toEqual({ kind: "firefox", executable: path });
+    expect(kindFromExecutable("C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe")).toBe(
+      "edge",
+    );
+  });
+
+  it("names the checked Windows locations and the override when nothing is installed", () => {
+    expect(() => selectBrowser(undefined, { ...win, exists: () => false })).toThrowError(
+      expect.objectContaining({
+        code: "io_error",
+        message: expect.stringContaining("C:\\Program Files (x86)"),
+      }),
+    );
+    const message = noBrowserMessage({ ...win, exists: () => false });
+    expect(message).toContain(BROWSER_ENV);
+    expect(message).toContain("C:\\Users\\me\\AppData\\Local");
+    expect(noBrowserMessage({ platform: "win32", env: {} })).toContain("%ProgramFiles%");
   });
 });
 

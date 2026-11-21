@@ -61,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Bugfixes
 
+- **Use cases:** when the daemon is gone (`artisign stop`), every view of the tab now says "artisign is not running. Start it with `artisign start`, then press Retry." instead of "Failed to fetch" and a hint to look at a terminal. HTTP error messages are unchanged.
 - **Use cases (tool contract change for the omitted counts):** a persona's summary no longer repeats its role, a single remaining list row loads instead of "Show 1 more", an empty string shows as `""` in data changes, and `list_use_cases` / `delete_entity` (with `force`) report `invalid_file_omitted_count` (and `invalid_pool_entry_omitted_count`) beside the invalid counts.
 - `delete_entity` with `variant` on any kind other than `mockup` now fails with `validation_failed` and deletes
   nothing; before, the parameter was ignored for the use-case kinds and the whole entity was deleted.

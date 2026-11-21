@@ -60,7 +60,7 @@ export async function openEntityDialog(options) {
   objectSelect.disabled = objects.length === 0 && draft.object === "";
 
   function refresh() {
-    const finalId = id || uniqueId(slugify(draft.label), options.takenIds());
+    const finalId = id || uniqueId(slugify(draft.name), options.takenIds());
     const built = buildEntityPayload({ id: finalId, draft, source });
     saveButton.disabled = Boolean(built.errors);
     const shared = pool.personasById?.has(finalId);
@@ -69,7 +69,7 @@ export async function openEntityDialog(options) {
     dialog.setMessage(built.errors && (dialog.isDirty() || finalId === "system") ? built.errors[0] : "", "error");
   }
   async function save() {
-    const finalId = id || uniqueId(slugify(draft.label), options.takenIds());
+    const finalId = id || uniqueId(slugify(draft.name), options.takenIds());
     if (mode === "new" && options.takenIds().has(finalId)) return dialog.setMessage(`The id ${finalId} is already taken.`, "error");
     const built = buildEntityPayload({ id: finalId, draft, source });
     if (built.errors) return;
@@ -325,7 +325,7 @@ export async function openConstellationDialog(options) {
 
   function refresh() {
     if (!ready) return;
-    const finalId = id || uniqueId(slugify(draft.label), options.takenIds());
+    const finalId = id || uniqueId(slugify(draft.name), options.takenIds());
     const built = buildConstellationPayload({ id: finalId, draft, source });
     showFieldErrors(dialog.body, built.fieldErrors ?? []);
     const warnings = [];
@@ -342,7 +342,7 @@ export async function openConstellationDialog(options) {
     dialog.setMessage(built.errors ? (dialog.isDirty() ? built.errors[0] : "") : warnings.length > 0 ? `${plural(warnings.length, "warning")} · you can save anyway` : "", built.errors ? "error" : "warning");
   }
   async function save() {
-    const finalId = id || uniqueId(slugify(draft.label), options.takenIds());
+    const finalId = id || uniqueId(slugify(draft.name), options.takenIds());
     if (mode === "new" && options.takenIds().has(finalId)) return dialog.setMessage(`The id ${finalId} is already taken.`, "error");
     const built = buildConstellationPayload({ id: finalId, draft, source });
     if (built.errors) return;

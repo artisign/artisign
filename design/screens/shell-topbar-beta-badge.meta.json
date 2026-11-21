@@ -1,0 +1,9 @@
+{
+  "notes": "CHR-1164 state sheet for the Use Cases view tab with its \"Beta\" badge: default, hover and pressed, each in light (top) and dark (bottom). Only the view tabs are drawn; the bars stand in for the 44px topbar (`size.bar-main`). Instances: `chrome-tab` `beta` / `beta-hover` / `beta-active`, each carrying a `chrome-badge`. The dark half rebinds the `--chrome-*` members to `chrome-dark.*` on its section, exactly as a dark screen root does. In context: `app-shell` (default state, light) and `usecases-list` (pressed, via `shell-topbar` `use-cases`). Spec: tag note `chr-1164`.",
+  "tags": [
+    "shell",
+    "chr-1164"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "state"
+}

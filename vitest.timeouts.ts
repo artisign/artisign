@@ -7,3 +7,6 @@ export const TEST_TIMEOUT_MS = isWindows ? 20_000 : 5_000;
 
 /** For tests that deliberately get more than the default (daemon start, registry, many projects). */
 export const LONG_TEST_TIMEOUT_MS = isWindows ? 30_000 : 10_000;
+
+/** Propagation budget for a file event reaching an SSE client (watcher latency is much higher on Windows). */
+export const SSE_EVENT_BUDGET_MS = isWindows ? 5_000 : 1_000;

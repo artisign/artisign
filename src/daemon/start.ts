@@ -4,6 +4,7 @@ import { findRunningDaemon, writeLock, removeLock } from "./lock.js";
 import { readGlobalConfig } from "./global-config.js";
 import { ProjectRegistry, type ProjectHandle } from "./project-registry.js";
 import { createUpdateChecker, type UpdateChecker } from "./update-status.js";
+import { randomBytes } from "node:crypto";
 import { DEFAULT_PORT } from "../init/artisign-config.js";
 
 export class DaemonAlreadyRunningError extends Error {
@@ -24,6 +25,11 @@ export type StartDaemonOptions = {
   projects?: string[];
   /** Replaces the registry-polling update checker (tests); the default honours `CI` / `ARTISIGN_NO_UPDATE_CHECK`. */
   updateChecker?: UpdateChecker;
+  /**
+   * Enables `POST /api/daemon/shutdown` (token in `daemon.lock`) and is called once a valid request arrived. Used by
+   * the foreground daemon so `stop` can shut it down gracefully where SIGTERM is a hard kill (Windows).
+   */
+  onShutdownRequest?: () => void;
 };
 
 export type DaemonHandle = {
@@ -63,6 +69,10 @@ export async function startDaemon(opts: StartDaemonOptions = {}): Promise<Daemon
   const registry = new ProjectRegistry();
   let server: Server | undefined;
   const updateChecker = opts.updateChecker ?? createUpdateChecker();
+  const onShutdownRequest = opts.onShutdownRequest;
+  const shutdownToken = onShutdownRequest ? randomBytes(32).toString("hex") : undefined;
+  const shutdownControl =
+    onShutdownRequest && shutdownToken ? { token: shutdownToken, onShutdown: onShutdownRequest } : undefined;
   try {
     // Bind the port before opening any project: a project
     // open can be a slow cold start (full index build), and there's no
@@ -71,7 +81,7 @@ export async function startDaemon(opts: StartDaemonOptions = {}): Promise<Daemon
     // work in bootstrap mode. Projects still open
     // sequentially, in `opts.projects` order, so `activeProject` (the first
     // one) stays deterministic.
-    ({ server } = createServer(registry, updateChecker));
+    ({ server } = createServer(registry, updateChecker, shutdownControl));
     const boundServer = server;
 
     const boundPort = await new Promise<number>((res, reject) => {
@@ -95,7 +105,7 @@ export async function startDaemon(opts: StartDaemonOptions = {}): Promise<Daemon
       await warnIfLegacyPortConfigured(handle);
     }
 
-    await writeLock({ pid: process.pid, port: boundPort });
+    await writeLock({ pid: process.pid, port: boundPort, ...(shutdownToken ? { shutdownToken } : {}) });
     // Not awaited: the first registry request must not delay startup.
     void updateChecker.start();
 

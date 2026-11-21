@@ -1,6 +1,7 @@
 import { createServer as createHttpServer, type Server, type ServerResponse, type IncomingMessage } from "node:http";
 import { readFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
+import { SHUTDOWN_PATH, SHUTDOWN_TOKEN_HEADER } from "../daemon/shutdown.js";
 import { fileURLToPath } from "node:url";
 import { dirname, extname, isAbsolute, resolve } from "node:path";
 import { isWithin } from "../store/paths.js";
@@ -95,6 +96,34 @@ function servePreviewFile(pathname: string, res: ServerResponse): void {
       res.writeHead(404, { "content-type": "text/plain" });
       res.end("Not found");
     });
+}
+
+/** Wires `POST /api/daemon/shutdown`; absent (404) when the daemon is started without it (tests, embedders). */
+export type ShutdownControl = { token: string; onShutdown: () => void };
+
+/**
+ * Graceful stop for platforms where SIGTERM is a hard kill (Windows). Runs after the Host guard. A browser request is
+ * refused outright (any Origin header, i.e. every cross-origin fetch), and the per-start token from `daemon.lock` —
+ * which a web page cannot read — is required on top.
+ */
+function handleShutdown(req: IncomingMessage, res: ServerResponse, shutdown: ShutdownControl): void {
+  if (req.method !== "POST") {
+    sendJson(res, 405, { code: "validation_failed", message: "method not allowed" });
+    return;
+  }
+  if (req.headers.origin !== undefined) {
+    rejectForbidden(res);
+    return;
+  }
+  const given = req.headers[SHUTDOWN_TOKEN_HEADER];
+  const a = Buffer.from(typeof given === "string" ? given : "");
+  const b = Buffer.from(shutdown.token);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    rejectForbidden(res, "forbidden: bad shutdown token");
+    return;
+  }
+  res.writeHead(202, { "content-type": "application/json", connection: "close" });
+  res.end(JSON.stringify({ status: "stopping" }), () => shutdown.onShutdown());
 }
 
 /** Sends a 500 if nothing was written yet — a last-resort net for a rejection that escaped a handler. */
@@ -261,11 +290,19 @@ const STARTED_CHANGELOG = readChangelog();
  * — see `handleMcpRoute` and `resolveUiProject` for the two different
  * resolution policies.
  */
-export function createServer(registry: ProjectRegistry, updateChecker: UpdateChecker = createUpdateChecker()): HttpServer {
+export function createServer(
+  registry: ProjectRegistry,
+  updateChecker: UpdateChecker = createUpdateChecker(),
+  shutdown?: ShutdownControl,
+): HttpServer {
   const server = createHttpServer((req, res) => {
     // First check, before /health and routing: blocks DNS rebinding (see isAllowedHost).
     if (!isAllowedHost(req)) {
       rejectForbidden(res, "forbidden: host not allowed");
+      return;
+    }
+    if (shutdown && req.url === SHUTDOWN_PATH) {
+      handleShutdown(req, res, shutdown);
       return;
     }
     if (req.method === "GET" && req.url === "/health") {

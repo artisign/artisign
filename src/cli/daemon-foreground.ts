@@ -7,14 +7,18 @@ import { startDaemon, type StartDaemonOptions } from "../daemon/start.js";
  */
 export async function runDaemonForeground(opts: StartDaemonOptions): Promise<void> {
   try {
-    const daemon = await startDaemon(opts);
+    // Only declared here, assigned below: the request handler can fire only after startDaemon resolved.
+    let shutdown = (): void => {};
+    const daemon = await startDaemon({ ...opts, onShutdownRequest: () => shutdown() });
     console.log(`artisign serving on http://127.0.0.1:${daemon.port}`);
 
-    const shutdown = (): void => {
+    shutdown = (): void => {
       void daemon.stop().then(() => process.exit(0));
     };
     process.on("SIGINT", shutdown);
     process.on("SIGTERM", shutdown);
+    // Windows: Ctrl+Break and closing the console window. (Ctrl+C arrives as SIGINT there too.)
+    if (process.platform === "win32") process.on("SIGBREAK", shutdown);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(message);

@@ -241,18 +241,14 @@ describe("setup: restarting a stale daemon", () => {
 });
 
 describe("setup: config files that must not be clobbered", () => {
-  it.skipIf(process.platform === "win32")("an unreadable ~/.claude.json is not replaced by a fresh one", async () => {
+  it("an unreadable ~/.claude.json is not replaced by a fresh one", async () => {
+    // A directory in its place cannot be read as a file (EISDIR) on every platform; chmod 000 means nothing on Windows.
     const file = join(home, ".claude.json");
-    await writeFile(file, JSON.stringify({ precious: true }));
-    await chmod(file, 0o000);
-    try {
-      const { d, err } = deps();
-      expect(await runSetup({ cliEntry: "e", yes: true }, d)).toBe(1);
-      expect(err.join("\n")).toContain("nothing was changed");
-    } finally {
-      await chmod(file, 0o600);
-    }
-    expect(await readFile(file, "utf8")).toBe(JSON.stringify({ precious: true }));
+    await mkdir(file);
+    const { d, err } = deps();
+    expect(await runSetup({ cliEntry: "e", yes: true }, d)).toBe(1);
+    expect(err.join("\n")).toContain("nothing was changed");
+    expect((await stat(file)).isDirectory()).toBe(true);
   });
 
   it("a symlinked config stays a symlink and the real file is updated", async () => {

@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setupProject, estimateTokens, type ProjectFixture } from "./test-fixtures.js";
 import { setMeta } from "./meta.js";
-import { getProject, getScreen, getNode, getDesignSystem, findNodes, listComments } from "./reads.js";
+import { TOOLS } from "./registry.js";
+import { getProject, SCREEN_FIELDS, getScreen, getNode, getDesignSystem, findNodes, listComments } from "./reads.js";
 import { renderScreenDocument } from "./render-context.js";
 import { FsStore } from "../store/index.js";
 import { ToolError } from "./types.js";
@@ -607,8 +608,26 @@ describe("get_screen", () => {
     expect(tree).not.toHaveProperty("tag_notes");
   });
 
-  it("rejects output_format jsx as unimplemented", async () => {
-    await expect(getScreen(fx.store, { screen: "home", output_format: "jsx" })).rejects.toThrow(ToolError);
+  it("fields: [\"tags\"] is accepted and the schema enum covers every response key", async () => {
+    await fx.store.writeScreenMeta("home", { notes: "n", tags: ["checkout"] });
+    await fx.store.writeTagMeta("checkout", { notes: "spec" });
+    const tagged = await getScreen(fx.store, { screen: "home", fields: ["tags"] });
+    expect(tagged.tags).toEqual(["checkout"]);
+
+    const tool = TOOLS.find((t) => t.name === "get_screen")!;
+    const allowed = new Set<string>(SCREEN_FIELDS);
+    const schemaOptions = (tool.inputShape.fields as unknown as { unwrap(): { element: { options: string[] } } }).unwrap().element.options;
+    expect(new Set(schemaOptions)).toEqual(allowed);
+    expect("output_format" in tool.inputShape).toBe(false);
+
+    const keys = new Set<string>();
+    for (const view of ["summary", "tree", "full"] as const) {
+      for (const fields of [undefined, [...SCREEN_FIELDS]]) {
+        Object.keys(await getScreen(fx.store, { screen: "home", view, fields: fields as string[] | undefined })).forEach((k) => keys.add(k));
+      }
+    }
+    for (const key of keys) expect(allowed.has(key), `response key "${key}" missing from fields enum`).toBe(true);
+    for (const field of SCREEN_FIELDS) await getScreen(fx.store, { screen: "home", view: "full", fields: [field] });
   });
 
   it("omits rendered_html unless explicitly requested, even at view full", async () => {

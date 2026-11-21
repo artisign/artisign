@@ -758,6 +758,50 @@ describe("update_refs", () => {
     expect(await fx.store.readScreen("home")).toContain("$color.secondary");
   });
 
+  describe("slot-fill elements (CHR-1141)", () => {
+    beforeEach(async () => {
+      await fx.store.writeComponent("card", `<div id="n1"><div data-slot="body"></div></div>`);
+      await fx.store.writeScreen(
+        "home",
+        `<div id="n1"><div id="c1" class="$card"><span id="lbl" data-slot="body" style="color: #000" data-flow-target="home">Hi</span></div></div>`,
+      );
+    });
+
+    it("changes a fill element's style in one call and keeps id and flow", async () => {
+      const res = await updateRefs(fx.store, { node: "home.lbl", refs: { token_refs: { color: "color.secondary" } } });
+      expect(res.applied_refs).toEqual({ token_refs: { color: "color.secondary" } });
+      const html = await fx.store.readScreen("home");
+      expect(html).toContain("$color.secondary");
+      expect(html).not.toContain("#000");
+      expect(html).toContain('id="lbl"');
+      expect(html).toContain('data-flow-target="home"');
+    });
+
+    it("validates refs on a fill element like on any node", async () => {
+      const res = await updateRefs(fx.store, { node: "home.lbl", refs: { token_refs: { color: "color.nope" } } });
+      expect(res.warnings).toContainEqual(expect.objectContaining({ kind: "unknown_ref", target: "home.lbl" }));
+    });
+
+    it("returns not_found for an unknown fill id", async () => {
+      await expect(updateRefs(fx.store, { node: "home.ghost", refs: { token_refs: { color: "color.primary" } } })).rejects.toMatchObject({ code: "not_found" });
+    });
+
+    it("keeps a fill without an authored id not addressable", async () => {
+      await fx.store.writeScreen("home", `<div id="n1"><div id="c1" class="$card"><span data-slot="body">Hi</span></div></div>`);
+      await expect(updateRefs(fx.store, { node: "home.n2", refs: { token_refs: { color: "color.primary" } } })).rejects.toMatchObject({ code: "not_found" });
+    });
+
+    it("refuses component_ref on a plain fill element", async () => {
+      await expect(updateRefs(fx.store, { node: "home.lbl", refs: { component_ref: "card" } })).rejects.toMatchObject({ code: "validation_failed" });
+    });
+
+    it("set_attr style on a fill element is refused and names update_refs", async () => {
+      await expect(
+        patchHtml(fx.store, { target: { kind: "node", node: "home.lbl" }, operation: "set_attr", attr: { name: "style", value: "color: red" } }),
+      ).rejects.toMatchObject({ code: "validation_failed", message: expect.stringContaining("update_refs") });
+    });
+  });
+
   it("deletes a binding with a null value", async () => {
     await updateRefs(fx.store, { node: "home.n1", refs: { token_refs: { color: null } } });
     expect(await fx.store.readScreen("home")).not.toContain("$color");

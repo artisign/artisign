@@ -244,8 +244,8 @@ describe("MCP server — instructions budget", () => {
   // value is information, not a limit; a PR that grows it updates the pin and
   // states the delta in its description. The pin is exact (CHR-1143), so any
   // change, up or down, shows here and has to be stated.
-  it("pins the measured instructions size as information, not a limit (~1157 tokens, chars/4 heuristic)", () => {
-    expect(INSTRUCTIONS.length / 4).toBe(1157);
+  it("pins the measured instructions size as information, not a limit (~1161.25 tokens, chars/4 heuristic)", () => {
+    expect(INSTRUCTIONS.length / 4).toBe(1161.25);
   });
 });
 
@@ -289,9 +289,11 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   // CHR-1129: "use case spec" in four descriptions: 24,941 to 24,976 (+35).
   // CHR-1168: set_use_cases advertises the typed shapes of all seven pools,
   // derived from the strict schemas: 24,976 to 41,778 (+16,802 chars, ~+4,200 tokens; set_use_cases entry 18,164 chars).
+  // CHR-1175: promote_to_system gains the property input and a longer token description: 41,778 to 41,919 (+141).
+  // CHR-1176: get_screenshot takes a full node ref alone (longer description, SCREEN_FIELDS enum on get_screen): 41,919 to 42,093 (+174).
   // The pin is exact (CHR-1143): any change, up or down, shows here.
-  it("pins the measured tools/list size as information, not a limit (41,778 chars, ~10,445 tokens)", () => {
-    expect(JSON.stringify(tools).length).toBe(41_778);
+  it("pins the measured tools/list size as information, not a limit (42,093 chars, ~10,523 tokens)", () => {
+    expect(JSON.stringify(tools).length).toBe(42_093);
   });
 
   // CHR-1168: set_use_cases carries every entity shape on purpose, so it has an exact size pin of its own

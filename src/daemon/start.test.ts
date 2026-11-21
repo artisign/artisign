@@ -8,6 +8,7 @@ import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtu
 import { startDaemon, DaemonAlreadyRunningError, type DaemonHandle } from "./start.js";
 import { writeLock } from "./lock.js";
 import { readVersion } from "../version.js";
+import { LONG_TEST_TIMEOUT_MS } from "../../vitest.timeouts.js";
 
 describe("startDaemon", () => {
   let dir: string;
@@ -204,5 +205,5 @@ describe("startDaemon", () => {
         }
       }, 20);
     });
-  }, 10000);
+  }, LONG_TEST_TIMEOUT_MS);
 });

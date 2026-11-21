@@ -6,6 +6,7 @@ import { initProject } from "../init/init-project.js";
 import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
 import { startDaemon, type DaemonHandle } from "../daemon/start.js";
 import { FsStore } from "../store/index.js";
+import { LONG_TEST_TIMEOUT_MS } from "../../vitest.timeouts.js";
 
 async function getJson(port: number, path: string): Promise<{ status: number; json: Record<string, unknown> }> {
   const res = await fetch(`http://127.0.0.1:${port}${path}`);
@@ -111,7 +112,7 @@ describe("/api/projects*", () => {
 
     expect((json.open as Array<{ root: string }>).map((p) => p.root)).not.toContain(fresh);
     expect(json.active).toBe(dir);
-  }, 10000);
+  }, LONG_TEST_TIMEOUT_MS);
 
   it("works with zero projects open: active is null, open is empty", async () => {
     daemon = await startDaemon({ port: 0 });

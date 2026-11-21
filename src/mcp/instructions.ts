@@ -44,11 +44,11 @@ NODE IDS:
   stable across writes (patches and comments address nodes by id).
 NODE REFS: "<screen>.<node-id>"; a definition node is
 "component:<name>#<variant>.<node-id>" or "pattern:<name>.<node-id>"; a mockup
-node (patch_html, inspect_node only) "mockup:<name>#<variant>.<node-id>". Taken by
+node (patch_html, inspect_node, get_screenshot only) "mockup:<name>#<variant>.<node-id>". Taken by
 get_node, update_refs, patch_html, inspect_node, get_screenshot; returned by
 find_nodes. A definition node without an explicit id keeps its ref for one call
 only (find_nodes: id_stability "derived"; writes warn missing_id). A node in a
-slot fill is no ref for get_node/update_refs; with an authored id,
+slot fill is no ref for get_node; with an authored id, update_refs/
 patch_html/inspect_node take "<screen>.<id>".
 
 EXAMPLE:

@@ -114,13 +114,29 @@ describe("autoCommit", () => {
   });
 
   it("commits a project in a directory with spaces and non-ASCII characters", async () => {
-    const projectDir = join(dir, "my projekt für café");
+    const projectDir = join(dir, "café naïve résumé");
     await mkdir(join(projectDir, "screens"), { recursive: true });
-    await writeFile(join(projectDir, "screens", "übersicht größe.html"), "<div id=\"n1\"></div>");
-    const result = await autoCommit(projectDir, "write_html: übersicht");
+    await writeFile(join(projectDir, "screens", "crème brûlée.html"), "<div id=\"n1\"></div>");
+    const result = await autoCommit(projectDir, "write_html: crème brûlée");
     expect(result.sha).toMatch(/^[0-9a-f]{40}$/);
-    const paths = await autoCommitPaths(projectDir, "write_html: übersicht", ["screens/übersicht größe.html"]);
+    const paths = await autoCommitPaths(projectDir, "write_html: crème brûlée", ["screens/crème brûlée.html"]);
     expect(paths.skipped_reason).toBe("nothing_to_commit");
+  });
+
+  it("returns sha null with a git_error reason when git is not on PATH", async () => {
+    await writeFile(join(dir, "screens.html"), "<div id=\"n1\"></div>");
+    const emptyBin = await mkdtemp(join(tmpdir(), "artisign-nogit-"));
+    const savedPath = process.env.PATH;
+    const pathKey = Object.keys(process.env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+    process.env[pathKey] = emptyBin;
+    try {
+      const result = await autoCommit(dir, "write_html: screens");
+      expect(result.sha).toBeNull();
+      expect(result.skipped_reason).toMatch(/^git_error: /);
+    } finally {
+      process.env[pathKey] = savedPath;
+      await rm(emptyBin, { recursive: true, force: true });
+    }
   });
 
   describe("with core.autocrlf=true in the repo", () => {

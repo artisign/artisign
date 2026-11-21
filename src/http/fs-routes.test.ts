@@ -231,7 +231,8 @@ describe("POST /api/fs/dirs", () => {
     await expect(stat(join(root, "clients"))).rejects.toThrow();
   });
 
-  it.skipIf(process.getuid?.() === 0)("403s permission_denied (not a 500) for a read-only parent", async () => {
+  // chmod does not make a directory read-only on Windows, so there is no permission error to map there.
+  it.skipIf(process.getuid?.() === 0 || process.platform === "win32")("403s permission_denied (not a 500) for a read-only parent", async () => {
     await chmod(root, 0o555);
 
     const { status, json } = await postDir({ parent: root, name: "clients" });

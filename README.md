@@ -51,7 +51,7 @@ artisign
 
 ### Unreleased — on `main`, not part of 2.2.1
 
-**Windows support.** `package.json` on `main` lists `win32` in `os`; the published `latest` still refuses to install on Windows until the next release. What is tested: CI runs the four quality gates on a `windows-latest` runner (Windows Server, Node 24) and the screenshot and inspect-node tests with Edge and with Firefox on that runner. Windows 11 smoke test: TBD after smoke test. Git for Windows is optional: it is only needed for the automatic commit of each write; without it artisign skips the commit and everything else works. No setup client is verified on Windows yet.
+**Windows support.** `package.json` on `main` lists `win32` in `os`; the published `latest` still refuses to install on Windows until the next release. What is tested: CI runs the four quality gates on a `windows-latest` runner (Windows Server, Node 24) and the screenshot and inspect-node tests with Edge and with Firefox on that runner. A manual smoke test passed on Windows 11 Pro 25H2 (build 26200) with Node 26 and Edge 158: install from a packed build, `artisign start`, `artisign setup` for Claude Code, `write_html` + `get_screenshot` with Edge, auto-commit with Git for Windows, and `artisign stop` (lock removed, no stray processes). Git for Windows is optional: it is only needed for the automatic commit of each write; without it artisign skips the commit and everything else works. Claude Code is verified on Windows; the other setup clients are not verified there yet. In Windows PowerShell with the default execution policy, npm's `artisign.ps1` shim is blocked — run `artisign.cmd …` instead, or allow local scripts with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
 ## Quickstart
 

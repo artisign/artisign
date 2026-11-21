@@ -358,7 +358,7 @@ function spawnBrowser(
   pattern: RegExp,
   profile: string,
 ): Promise<{ child: ChildProcess; wsUrl: string }> {
-  const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
   liveChildren.add(child);
   child.on("exit", () => liveChildren.delete(child));
   if (child.pid !== undefined) startWatchdog(child.pid, profile);

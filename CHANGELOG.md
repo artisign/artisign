@@ -36,6 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   The Use Cases tab has read views and editors for the world.
 - **Use cases:** `set_use_cases` warns `mapping_removed` (never blocking) when a rewritten step, base flow or branch, drops
   the `target` it had, or when a variant `replace` op's `step` has no `target` while the base step it replaces had one.
+- **Use cases:** `set_use_cases` warns `items_removed` (never blocking, one per case and list) naming the ids a replaced `steps`, `branches` or `variants` list dropped.
 
 ### Improvements
 

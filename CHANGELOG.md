@@ -39,6 +39,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Improvements
 
+- **Use cases: a dimension is named by `name`, not `label`:** like personas, entities, constellations and data objects.
+  `dimension: { id, name, description?, scope?, values: [{ id, label }] }`; `values[].label` and a relationship type's
+  `label` stay. There is no alias: a dimension written with `label` is `validation_failed`, and a stored dimension
+  with `label` is skipped on reads as `invalid_file` and makes writes to `personas.json` fail with `invalid_state`.
+  The pool view, the dimension dialog, `generate_personas` and `suggest_use_case_variants` follow.
 - **"Use case spec":** the README, the descriptions of `list_use_cases`, `get_use_case`, `set_use_cases` and `suggest_use_case_variants`, and the empty state of the Use Cases tab now introduce the term "use case spec", so "use case" is not read as "purpose". Names, tools and routes are unchanged.
 - **`delete_entity` refuses a referenced use-case pool entry unless `force: true`:** a `persona`, `dimension`,
   `data_object`, `entity`, `constellation` or `relationship_type` that a use case or another pool entry still names

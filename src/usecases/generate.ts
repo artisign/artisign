@@ -296,7 +296,7 @@ export function buildGeneratedPersona(combination: Combination, dimensions: Dime
   return {
     id: generatedId(combination, dimensions, takenIds, index),
     name: dimensions.map((d) => valueLabel(d, combination)).join(" · "),
-    description: `Generated from ${dimensions.map((d) => `${d.label}: ${valueLabel(d, combination)}`).join(", ")}.`,
+    description: `Generated from ${dimensions.map((d) => `${d.name}: ${valueLabel(d, combination)}`).join(", ")}.`,
     avatar: { emoji: "🧑", color: AVATAR_COLORS[index % AVATAR_COLORS.length]! },
     traits: { ...combination },
     generated: true,
@@ -383,7 +383,7 @@ export function suggestVariantGaps(
     for (const value of open) {
       suggestions.push({
         id: freeVariantId(`${dimension.id}-${value.id}`, taken),
-        title: `${useCase.title} — ${dimension.label}: ${value.label}`,
+        title: `${useCase.title} — ${dimension.name}: ${value.label}`,
         when: { [dimension.id]: [value.id] },
         ...(forConstellations
           ? { constellations: constellations.filter((c) => ownValue(c.traits, dimension.id) === value.id).map((c) => c.id) }

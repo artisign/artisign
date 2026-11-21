@@ -24,7 +24,7 @@ describe("step via and replace_branch id (ADR-011 review)", () => {
     await setUseCases(fx.store, {
       data_objects: [{ id: "loan", name: "Loan", fields: [{ name: "status", type: "string" }] }],
       personas: [{ id: "ana", name: "Ana" }],
-      dimensions: [{ id: "membership", label: "Membership", values: [{ id: "staff", label: "Staff" }] }],
+      dimensions: [{ id: "membership", name: "Membership", values: [{ id: "staff", label: "Staff" }] }],
     });
   });
   afterEach(() => fx.cleanup());

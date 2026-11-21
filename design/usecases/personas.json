@@ -2,7 +2,7 @@
   "dimensions": [
     {
       "id": "actor-type",
-      "label": "Actor type",
+      "name": "Actor type",
       "description": "Who performs the flow: a person in the browser preview, or an agent through MCP.",
       "scope": "personas",
       "values": [
@@ -18,7 +18,7 @@
     },
     {
       "id": "role",
-      "label": "Role",
+      "name": "Role",
       "description": "What the actor is responsible for in the project.",
       "scope": "personas",
       "values": [
@@ -46,7 +46,7 @@
     },
     {
       "id": "experience",
-      "label": "Experience",
+      "name": "Experience",
       "description": "How familiar the actor is with Artisign.",
       "scope": "personas",
       "values": [
@@ -62,7 +62,7 @@
     },
     {
       "id": "project-size",
-      "label": "Project size",
+      "name": "Project size",
       "description": "How many screens and use cases the project of a constellation holds. Decides whether lists need filters and paging.",
       "scope": "constellations",
       "values": [

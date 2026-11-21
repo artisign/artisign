@@ -104,6 +104,32 @@ describe("entity dialog", () => {
   });
 });
 
+describe("CHR-1170: clearing the id field derives it from the name again (entity, constellation)", () => {
+  it("entity", async () => {
+    const save = ok();
+    openEntityDialog({ mode: "new", source: null, pool: () => pool(), takenIds: () => new Set(), save, remove: vi.fn() });
+    await flush();
+    type($("dialog input[autofocus]"), "Household policy");
+    type($("dialog input.uc-mono"), "");
+    expect(button("Create entity").disabled).toBe(false);
+    button("Create entity").click();
+    await flush();
+    expect(save.mock.calls[0][0]).toMatchObject({ id: "household-policy", name: "Household policy" });
+  });
+
+  it("constellation", async () => {
+    const save = ok();
+    openConstellationDialog({ mode: "new", source: null, pool: () => pool(), takenIds: () => new Set(), save, remove: vi.fn() });
+    await flush();
+    type($("dialog input[autofocus]"), "Two parents");
+    type($("dialog input.uc-mono"), "");
+    expect(button("Create constellation").disabled).toBe(false);
+    button("Create constellation").click();
+    await flush();
+    expect(save.mock.calls[0][0]).toMatchObject({ id: "two-parents", name: "Two parents" });
+  });
+});
+
 describe("relationship type dialog", () => {
   const open = (extra = {}) => {
     const save = ok();

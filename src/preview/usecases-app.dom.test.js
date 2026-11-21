@@ -833,7 +833,7 @@ describe("world pool", () => {
   });
 
   it("Generate… on the World tab opens the constellations target and sends it", async () => {
-    store = { ...store, dimensions: [...dimensions, { id: "household", label: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "couple", label: "Couple" }] }] };
+    store = { ...store, dimensions: [...dimensions, { id: "household", name: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "couple", label: "Couple" }] }] };
     await import("./app.js");
     await flush();
     await openTab();

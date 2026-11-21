@@ -21,7 +21,7 @@ function useCase(overrides: Record<string, unknown> = {}): UseCase {
 }
 
 const dims = (...specs: [string, string[]][]): Dimension[] =>
-  specs.map(([id, values]) => dimensionSchema.parse({ id, label: id.toUpperCase(), values: values.map((v) => ({ id: v, label: v.toUpperCase() })) }));
+  specs.map(([id, values]) => dimensionSchema.parse({ id, name: id.toUpperCase(), values: values.map((v) => ({ id: v, label: v.toUpperCase() })) }));
 
 const persona = (id: string, traits: Record<string, string> = {}): Persona => personaSchema.parse({ id, name: id, traits });
 
@@ -394,7 +394,7 @@ describe("query helpers", () => {
 });
 
 describe("expansion work budget", () => {
-  const dim = (id: string, count: number): Dimension => ({ id, label: id, values: Array.from({ length: count }, (_, i) => ({ id: `v${i}`, label: `V${i}` })) });
+  const dim = (id: string, count: number): Dimension => ({ id, name: id, values: Array.from({ length: count }, (_, i) => ({ id: `v${i}`, label: `V${i}` })) });
 
   it("stops all at the budget and says the result is partial; the default budget leaves normal calls alone", () => {
     const dims = [dim("a", 10), dim("b", 10), dim("c", 10)];
@@ -429,7 +429,7 @@ describe("expansion work budget", () => {
 });
 
 describe("pairwise coverage work budget", () => {
-  const dim = (id: string, count: number): Dimension => ({ id, label: id, values: Array.from({ length: count }, (_, i) => ({ id: `v${i}`, label: `V${i}` })) });
+  const dim = (id: string, count: number): Dimension => ({ id, name: id, values: Array.from({ length: count }, (_, i) => ({ id: `v${i}`, label: `V${i}` })) });
 
   it("returns partial with nothing generated when the budget runs out before coverage is known", () => {
     const dims = [dim("a", 5), dim("b", 5), dim("c", 5)];
@@ -473,7 +473,7 @@ describe("pairwise coverage work budget", () => {
 });
 
 describe("variant skeleton ids", () => {
-  const dimension = (id: string, values: string[]): Dimension => ({ id, label: id, values: values.map((v) => ({ id: v, label: v })) });
+  const dimension = (id: string, values: string[]): Dimension => ({ id, name: id, values: values.map((v) => ({ id: v, label: v })) });
 
   it("stay valid kebab-case and unique among each other and against existing variants", () => {
     const dims = [dimension("plan", ["free", "pro", "team"])];

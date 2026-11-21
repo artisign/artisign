@@ -39,7 +39,7 @@ export function buildPersonaPayload({ id, draft, source }) {
 
 export function buildDimensionPayload({ id, draft, source }) {
   const errors = [];
-  if (draft.label.trim() === "") errors.push("A label is required.");
+  if (draft.name.trim() === "") errors.push("A name is required.");
   if (!isValidId(id)) errors.push("The id must be lowercase kebab-case (a-z, 0-9, -).");
   const taken = new Set();
   const values = draft.values
@@ -56,7 +56,7 @@ export function buildDimensionPayload({ id, draft, source }) {
   return {
     payload: {
       id,
-      label: draft.label.trim(),
+      name: draft.name.trim(),
       values,
       // `scope` is written when it is not the default or the dimension already stores one: a stored file never gains a key by accident.
       ...(draft.scope === "constellations" || source?.scope !== undefined ? { scope: draft.scope } : {}),
@@ -220,8 +220,8 @@ export async function openPersonaDialog(options) {
   const traitRows = pool.dimensions
     .filter((dimension) => (dimension.scope ?? "personas") === "personas" || draft.traits[dimension.id] !== undefined)
     .map((dimension) => {
-      const select = selectInput({ options: [{ value: "", label: "Any" }, ...dimension.values.map((v) => ({ value: v.id, label: v.label }))], value: draft.traits[dimension.id] ?? "", ariaLabel: dimension.label, onChange: (value) => { draft.traits[dimension.id] = value; touch(); } });
-      return h("div", { class: "uc-trait-row" }, h("span", { class: "uc-trait-label" }, dimension.label, (dimension.scope ?? "personas") === "personas" ? null : h("span", { class: "uc-label-hint" }, " · constellations")), select);
+      const select = selectInput({ options: [{ value: "", label: "Any" }, ...dimension.values.map((v) => ({ value: v.id, label: v.label }))], value: draft.traits[dimension.id] ?? "", ariaLabel: dimension.name, onChange: (value) => { draft.traits[dimension.id] = value; touch(); } });
+      return h("div", { class: "uc-trait-row" }, h("span", { class: "uc-trait-label" }, dimension.name, (dimension.scope ?? "personas") === "personas" ? null : h("span", { class: "uc-label-hint" }, " · constellations")), select);
     });
   const goalsArea = textArea({ value: draft.goals, rows: 4, placeholder: "Find a book to borrow", onInput: (value) => { draft.goals = value; touch(); } });
   const descArea = textArea({ value: draft.description, rows: 2, placeholder: "Borrows books and returns them on time.", onInput: (value) => { draft.description = value; touch(); } });
@@ -231,7 +231,7 @@ export async function openPersonaDialog(options) {
     const counts = {};
     for (const dimension of pool.dimensions) for (const value of dimension.values) counts[`${dimension.id}:${value.id}`] = pool.personas.filter((p) => p.id !== source?.id && p.traits?.[dimension.id] === value.id).length;
     const firsts = Object.entries(draft.traits).filter(([dimension, value]) => value !== "" && counts[`${dimension}:${value}`] === 0);
-    hint.textContent = firsts.length === 0 ? "" : `First persona with ${firsts.map(([dimension, value]) => `${pool.dimensionsById.get(dimension)?.label ?? dimension} ${pool.dimensionsById.get(dimension)?.values.find((v) => v.id === value)?.label ?? value}`).join(", ")}. It fills a gap in the pool.`;
+    hint.textContent = firsts.length === 0 ? "" : `First persona with ${firsts.map(([dimension, value]) => `${pool.dimensionsById.get(dimension)?.name ?? dimension} ${pool.dimensionsById.get(dimension)?.values.find((v) => v.id === value)?.label ?? value}`).join(", ")}. It fills a gap in the pool.`;
     hint.hidden = hint.textContent === "";
     const built = buildPersonaPayload({ id: id || uniqueId(slugify(draft.name), options.takenIds()), draft, source });
     saveButton.disabled = Boolean(built.errors);
@@ -286,7 +286,7 @@ export async function openPersonaDialog(options) {
 
 export async function openDimensionDialog(options) {
   const { mode, source } = options;
-  const draft = { label: source?.label ?? "", description: source?.description ?? "", scope: source?.scope ?? "personas", values: (source?.values ?? [{ id: "", label: "" }, { id: "", label: "" }]).map((v) => ({ id: v.id, label: v.label, fixed: Boolean(v.id) })) };
+  const draft = { name: source?.name ?? "", description: source?.description ?? "", scope: source?.scope ?? "personas", values: (source?.values ?? [{ id: "", label: "" }, { id: "", label: "" }]).map((v) => ({ id: v.id, label: v.label, fixed: Boolean(v.id) })) };
   const dialog = createDialog({ title: mode === "new" ? "New dimension" : "Edit dimension", chip: source?.id });
   let id = source?.id ?? "";
   let idTouched = mode === "edit";
@@ -295,8 +295,8 @@ export async function openDimensionDialog(options) {
     dialog.setDirty(true);
     refresh();
   };
-  const labelInput = textInput({ value: draft.label, autofocus: true, placeholder: "Project size", onInput: (value) => { draft.label = value; if (!idTouched) { id = uniqueId(slugify(value), options.takenIds()); idInput.value = id; } touch(); } });
-  const idInput = textInput({ value: id, mono: true, readonly: mode === "edit", placeholder: "derived from the label", onInput: (value) => { id = value; idTouched = true; touch(); } });
+  const nameInput = textInput({ value: draft.name, autofocus: true, placeholder: "Project size", onInput: (value) => { draft.name = value; if (!idTouched) { id = uniqueId(slugify(value), options.takenIds()); idInput.value = id; } touch(); } });
+  const idInput = textInput({ value: id, mono: true, readonly: mode === "edit", placeholder: "derived from the name", onInput: (value) => { id = value; idTouched = true; touch(); } });
   const descInput = textInput({ value: draft.description, onInput: (value) => { draft.description = value; touch(); } });
   const scopeControl = segmented({ label: "Describes", name: "scope", value: draft.scope, options: [{ value: "personas", label: "Personas" }, { value: "constellations", label: "Constellations" }], onChange: (value) => { draft.scope = value; touch(); } });
   const valuesBox = h("div", { class: "uc-values-edit" });
@@ -317,12 +317,12 @@ export async function openDimensionDialog(options) {
     if (focus !== null) valuesBox.querySelectorAll("input")[focus]?.focus();
   };
   function refresh() {
-    const built = buildDimensionPayload({ id: id || uniqueId(slugify(draft.label), options.takenIds()), draft: { ...draft, values: draft.values.map((v) => ({ id: v.fixed ? v.id : slugify(v.label), label: v.label })) }, source });
+    const built = buildDimensionPayload({ id: id || uniqueId(slugify(draft.name), options.takenIds()), draft: { ...draft, values: draft.values.map((v) => ({ id: v.fixed ? v.id : slugify(v.label), label: v.label })) }, source });
     saveButton.disabled = Boolean(built.errors);
     dialog.setMessage(built.errors && dialog.isDirty() ? built.errors[0] : "", "error");
   }
   async function save() {
-    const finalId = id || uniqueId(slugify(draft.label), options.takenIds());
+    const finalId = id || uniqueId(slugify(draft.name), options.takenIds());
     if (mode === "new" && options.takenIds().has(finalId)) return dialog.setMessage(`The id ${finalId} is already taken.`, "error");
     const built = buildDimensionPayload({ id: finalId, draft: { ...draft, values: draft.values.map((v) => ({ id: v.fixed ? v.id : slugify(v.label), label: v.label })) }, source });
     if (built.errors) return;
@@ -336,12 +336,12 @@ export async function openDimensionDialog(options) {
     dialog.setDirty(false);
     dialog.close(result);
   }
-  dialog.body.append(h("div", { class: "uc-form" }, h("div", { class: "uc-form-row" }, field("Label", labelInput), field("ID", idInput, { hint: mode === "edit" ? "fixed once used" : undefined })), field("Description", descInput), field("Describes", scopeControl, { hint: "personas are people and actors, constellations are starting worlds" }), h("div", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Values", h("span", { class: "uc-label-hint" }, " · the ways users differ along this dimension")), valuesBox)));
+  dialog.body.append(h("div", { class: "uc-form" }, h("div", { class: "uc-form-row" }, field("Name", nameInput), field("ID", idInput, { hint: mode === "edit" ? "fixed once used" : undefined })), field("Description", descInput), field("Describes", scopeControl, { hint: "personas are people and actors, constellations are starting worlds" }), h("div", { class: "uc-form-section" }, h("h2", { class: "uc-form-h" }, "Values", h("span", { class: "uc-label-hint" }, " · the ways users differ along this dimension")), valuesBox)));
   const saveButton = footer(dialog, {
     saveLabel: mode === "new" ? "Create dimension" : "Save dimension",
     onSave: save,
     deleteLabel: "Delete",
-    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.label, remove: (force) => (force ? options.remove(source.id, true) : options.remove(source.id)), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
+    onDelete: mode === "edit" ? () => confirmDeleteInline(dialog, { name: source.name, remove: (force) => (force ? options.remove(source.id, true) : options.remove(source.id)), done: (response) => (result = { id: source.id, data: response.data, deleted: true }) }) : undefined,
   });
   drawValues();
   const closed = dialog.open();
@@ -482,9 +482,9 @@ export async function openGenerateDialog(options) {
     const other = full.dimensions.filter((d) => !list.includes(d));
     fill(
       dims,
-      ...list.map((d) => h("label", { class: "uc-check" }, h("input", { type: "checkbox", checked: true, onChange: (e) => { if (e.target.checked) state.dimensions.add(d.id); else state.dimensions.delete(d.id); invalidate(); previewButton.disabled = state.dimensions.size === 0; } }), `${d.label} (${d.values.length})`)),
+      ...list.map((d) => h("label", { class: "uc-check" }, h("input", { type: "checkbox", checked: true, onChange: (e) => { if (e.target.checked) state.dimensions.add(d.id); else state.dimensions.delete(d.id); invalidate(); previewButton.disabled = state.dimensions.size === 0; } }), `${d.name} (${d.values.length})`)),
       list.length === 0 ? h("p", { class: "uc-muted", role: "status" }, text().none) : null,
-      other.length > 0 ? h("p", { class: "uc-form-note" }, `${other.map((d) => d.label).join(", ")} ${other.length === 1 ? "has" : "have"} the scope ${state.target === "personas" ? "Constellations" : "Personas"} and ${other.length === 1 ? "is" : "are"} not offered here.`) : null,
+      other.length > 0 ? h("p", { class: "uc-form-note" }, `${other.map((d) => d.name).join(", ")} ${other.length === 1 ? "has" : "have"} the scope ${state.target === "personas" ? "Constellations" : "Personas"} and ${other.length === 1 ? "is" : "are"} not offered here.`) : null,
     );
     fill(dimsField, h("span", { class: "uc-label" }, "Dimensions", h("span", { class: "uc-label-hint" }, ` · ${text().scopeText}`)), dims);
     lede.textContent = text().lede;

@@ -4,8 +4,8 @@
 import { indexById } from "./usecases-data.js";
 
 export const dimensions = [
-  { id: "channel", label: "Channel", values: [{ id: "app", label: "App" }, { id: "letter", label: "Letter" }] },
-  { id: "household", label: "Household", scope: "constellations", values: [{ id: "two-parents", label: "Two parents" }, { id: "single-parent", label: "Single parent" }, { id: "blended", label: "Blended family" }] },
+  { id: "channel", name: "Channel", values: [{ id: "app", label: "App" }, { id: "letter", label: "Letter" }] },
+  { id: "household", name: "Household", scope: "constellations", values: [{ id: "two-parents", label: "Two parents" }, { id: "single-parent", label: "Single parent" }, { id: "blended", label: "Blended family" }] },
 ];
 
 export const personas = [

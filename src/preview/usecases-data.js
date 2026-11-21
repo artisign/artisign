@@ -613,7 +613,7 @@ export function whenEntries(when, dimensionsById) {
     const dim = dimensionsById?.get?.(dimension);
     return {
       dimension,
-      label: dim?.label ?? dimension,
+      label: dim?.name ?? dimension,
       values: values.map((value) => ({ id: value, label: dim?.values.find((v) => v.id === value)?.label ?? value })),
     };
   });
@@ -661,7 +661,7 @@ export function coverageMatrix({ dimensions, pool, basePersonas, variants, uncov
       if (gap) gaps++;
       return { value: value.id, label: value.label, gap };
     });
-    columns.push({ dimension: dimension.id, label: dimension.label, scope, values: cols });
+    columns.push({ dimension: dimension.id, label: dimension.name, scope, values: cols });
   };
   // A dimension only matches what it describes (ADR-011): persona dimensions the personas, constellation dimensions the constellations —
   // and those only for a case that lists constellations.

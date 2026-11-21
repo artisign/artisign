@@ -19,8 +19,8 @@ import { tmpdir } from "node:os";
 const execFileAsync = promisify(execFile);
 
 const DIMENSIONS = [
-  { id: "membership", label: "Membership", values: [{ id: "student", label: "Student" }, { id: "staff", label: "Staff" }] },
-  { id: "branch-access", label: "Branch access", values: [{ id: "single", label: "Single" }, { id: "all-branches", label: "All branches" }] },
+  { id: "membership", name: "Membership", values: [{ id: "student", label: "Student" }, { id: "staff", label: "Staff" }] },
+  { id: "branch-access", name: "Branch access", values: [{ id: "single", label: "Single" }, { id: "all-branches", label: "All branches" }] },
 ];
 const PERSONAS = [
   { id: "member-ana", name: "Ana", role: "Member", traits: { membership: "student", "branch-access": "single" } },
@@ -191,7 +191,7 @@ describe("use case tools", () => {
 
   describe("generate_personas bounds", () => {
     const wide = (count: number, values: number): Record<string, unknown>[] =>
-      Array.from({ length: count }, (_, i) => ({ id: `dim-${i}`, label: `Dim ${i}`, values: Array.from({ length: values }, (_, v) => ({ id: `v${v}`, label: `V${v}` })) }));
+      Array.from({ length: count }, (_, i) => ({ id: `dim-${i}`, name: `Dim ${i}`, values: Array.from({ length: values }, (_, v) => ({ id: `v${v}`, label: `V${v}` })) }));
 
     it("refuses pairwise beyond the same space cap as all, without writing", async () => {
       await setUseCases(fx.store, { dimensions: wide(6, 300) }); // 15 dimension pairs x 90,000 = 1,350,000 value pairs
@@ -872,7 +872,7 @@ describe("use case tools", () => {
     });
 
     it("dry_run lists at most 50 personas, keeps the full would_create and flags the cut", async () => {
-      const dims = Array.from({ length: 2 }, (_, d) => ({ id: `d${d}`, label: `D${d}`, values: Array.from({ length: 8 }, (_, v) => ({ id: `v${v}`, label: `V${v}` })) }));
+      const dims = Array.from({ length: 2 }, (_, d) => ({ id: `d${d}`, name: `D${d}`, values: Array.from({ length: 8 }, (_, v) => ({ id: `v${v}`, label: `V${v}` })) }));
       await setUseCases(fx.store, { dimensions: dims });
       const big = (await generatePersonas(fx.store, { strategy: "all", dimensions: ["d0", "d1"], dry_run: true })) as GenRes & { personas_truncated?: boolean };
       expect(big.would_create).toBe(64);
@@ -886,7 +886,7 @@ describe("use case tools", () => {
     });
 
     it("refuses an all-strategy explosion", async () => {
-      const wide = Array.from({ length: 8 }, (_, d) => ({ id: `d${d}`, label: `D${d}`, values: Array.from({ length: 10 }, (_, v) => ({ id: `v${v}`, label: `V${v}` })) }));
+      const wide = Array.from({ length: 8 }, (_, d) => ({ id: `d${d}`, name: `D${d}`, values: Array.from({ length: 10 }, (_, v) => ({ id: `v${v}`, label: `V${v}` })) }));
       await setUseCases(fx.store, { dimensions: wide });
       await expect(generatePersonas(fx.store, { strategy: "all", dimensions: wide.map((d) => d.id) })).rejects.toMatchObject({ code: "validation_failed" });
       expect(((await generatePersonas(fx.store, { dimensions: wide.map((d) => d.id), limit: 5, dry_run: true })) as GenRes).would_create).toBe(5);
@@ -894,8 +894,8 @@ describe("use case tools", () => {
 
     describe("target constellations (CHR-1144)", () => {
       const WORLD_DIMS = [
-        { id: "household", label: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "family", label: "Family" }] },
-        { id: "branch", label: "Branch", scope: "constellations", values: [{ id: "main", label: "Main" }, { id: "annex", label: "Annex" }] },
+        { id: "household", name: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "family", label: "Family" }] },
+        { id: "branch", name: "Branch", scope: "constellations", values: [{ id: "main", label: "Main" }, { id: "annex", label: "Annex" }] },
       ];
       type ConRes = GenRes & { target?: string; constellations: { id: string; name: string; traits: Record<string, string> }[]; constellations_truncated?: boolean };
 
@@ -921,7 +921,7 @@ describe("use case tools", () => {
       });
 
       it("rejects a dimension with the wrong scope, both ways, and writes nothing", async () => {
-        await setUseCases(fx.store, { dimensions: [{ id: "role", label: "Role", values: [{ id: "a", label: "A" }] }] });
+        await setUseCases(fx.store, { dimensions: [{ id: "role", name: "Role", values: [{ id: "a", label: "A" }] }] });
         await expect(generatePersonas(fx.store, { target: "constellations", dimensions: ["role"] })).rejects.toMatchObject({ code: "validation_failed", message: expect.stringContaining("role") });
         await expect(generatePersonas(fx.store, { dimensions: ["household"] })).rejects.toMatchObject({ code: "validation_failed", message: expect.stringContaining("household") });
         expect((await fx.store.readWorld()).constellations).toEqual([]);
@@ -947,7 +947,7 @@ describe("use case tools", () => {
       });
 
       it("target constellations without any constellation-scoped dimension is validation_failed", async () => {
-        await setUseCases(fx.store, { dimensions: [{ id: "role", label: "Role", values: [{ id: "a", label: "A" }] }] });
+        await setUseCases(fx.store, { dimensions: [{ id: "role", name: "Role", values: [{ id: "a", label: "A" }] }] });
         await deleteEntity(fx.store, { kind: "dimension", name: "household", force: true });
         await deleteEntity(fx.store, { kind: "dimension", name: "branch", force: true });
         await expect(generatePersonas(fx.store, { target: "constellations", dry_run: true })).rejects.toMatchObject({
@@ -957,7 +957,7 @@ describe("use case tools", () => {
       });
 
       it("caps the dry-run list at 50 with constellations_truncated", async () => {
-        const big = [0, 1].map((i) => ({ id: `w${i}`, label: `W${i}`, scope: "constellations", values: Array.from({ length: 8 }, (_, v) => ({ id: `v${v}`, label: `V${v}` })) }));
+        const big = [0, 1].map((i) => ({ id: `w${i}`, name: `W${i}`, scope: "constellations", values: Array.from({ length: 8 }, (_, v) => ({ id: `v${v}`, label: `V${v}` })) }));
         await setUseCases(fx.store, { dimensions: big });
         const res = (await generatePersonas(fx.store, { strategy: "all", target: "constellations", dimensions: ["w0", "w1"], dry_run: true })) as ConRes;
         expect(res.would_create).toBe(64);
@@ -980,7 +980,7 @@ describe("use case tools", () => {
 
     it("covers constellation-scoped dimensions only for cases with constellations (CHR-1144)", async () => {
       await setUseCases(fx.store, {
-        dimensions: [...DIMENSIONS, { id: "household", label: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "family", label: "Family" }] }],
+        dimensions: [...DIMENSIONS, { id: "household", name: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "family", label: "Family" }] }],
         personas: PERSONAS,
         constellations: [
           { id: "solo", name: "Solo", traits: { household: "single" }, relationships: [] },
@@ -1000,7 +1000,7 @@ describe("use case tools", () => {
 
     it("a written-back constellation suggestion keeps the base personas when resolved (CHR-1144)", async () => {
       await setUseCases(fx.store, {
-        dimensions: [{ id: "household", label: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "family", label: "Family" }] }],
+        dimensions: [{ id: "household", name: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "family", label: "Family" }] }],
         personas: PERSONAS,
         constellations: [
           { id: "solo", name: "Solo", traits: { household: "single" }, relationships: [] },
@@ -1018,7 +1018,7 @@ describe("use case tools", () => {
 
     it("ignores constellation ids that do not resolve (CHR-1144)", async () => {
       await setUseCases(fx.store, {
-        dimensions: [{ id: "household", label: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }] }],
+        dimensions: [{ id: "household", name: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }] }],
         personas: PERSONAS,
         constellations: [{ id: "solo", name: "Solo", traits: { household: "single" }, relationships: [] }],
         use_cases: [{ ...borrowCase(), constellations: ["nowhere"] }],
@@ -1105,8 +1105,8 @@ describe("use case tools", () => {
     it("keeps generated persona ids within the id limit, collision suffix included, and the pool readable", async () => {
       const long = (tag: string): string => `${tag}-${"x".repeat(35)}`;
       const dims = [
-        { id: "a", label: "A", values: [{ id: long("a1"), label: "A1" }, { id: long("a2"), label: "A2" }] },
-        { id: "b", label: "B", values: Array.from({ length: 12 }, (_, i) => ({ id: `${long("b")}-${i}`, label: `B${i}` })) },
+        { id: "a", name: "A", values: [{ id: long("a1"), label: "A1" }, { id: long("a2"), label: "A2" }] },
+        { id: "b", name: "B", values: Array.from({ length: 12 }, (_, i) => ({ id: `${long("b")}-${i}`, label: `B${i}` })) },
       ];
       await setUseCases(fx.store, { dimensions: dims });
       await generatePersonas(fx.store, { strategy: "all" });
@@ -1136,7 +1136,7 @@ describe("use case tools", () => {
 
     it("survives ids that collide with Object.prototype members", async () => {
       await writeHtml(fx.store, { screen: "shelf", mode: "create", title: "Shelf", html_aug: `<section id="root"><button id="book-14">14</button></section>` });
-      const dims = [{ id: "constructor", label: "C", values: [{ id: "x", label: "X" }, { id: "y", label: "Y" }] }];
+      const dims = [{ id: "constructor", name: "C", values: [{ id: "x", label: "X" }, { id: "y", label: "Y" }] }];
       const res = await setUseCases(fx.store, {
         dimensions: dims,
         personas: [{ id: "ana", name: "Ana", traits: { constructor: "x" } }, { id: "anyone", name: "Any" }, { id: "yy", name: "YY", traits: { constructor: "y" } }],

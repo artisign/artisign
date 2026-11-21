@@ -181,7 +181,7 @@ describe("branch lanes", () => {
   it("a trait whose value equals the persona's role is left out of the line: each fact once", () => {
     const pool = makeWorldPool();
     pool.personasById = new Map(pool.personasById).set("maria", { ...pool.personasById.get("maria"), traits: { channel: "app", position: "policyholder" } });
-    pool.dimensionsById = new Map(pool.dimensionsById).set("position", { id: "position", label: "Role", values: [{ id: "policyholder", label: "policyholder" }] });
+    pool.dimensionsById = new Map(pool.dimensionsById).set("position", { id: "position", name: "Role", values: [{ id: "policyholder", label: "policyholder" }] });
     render({ pool });
     expect(text($(".uc-person-sub"))).toBe("Human · Policyholder · Channel App");
   });

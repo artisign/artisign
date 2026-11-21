@@ -385,9 +385,9 @@ describe("flow rows", () => {
 
 describe("variants and coverage", () => {
   const dimensions = [
-    { id: "size", label: "Project size", values: [{ id: "small", label: "Small project" }, { id: "large", label: "Large project" }, { id: "medium", label: "Medium project" }] },
-    { id: "actor", label: "Actor type", values: [{ id: "human", label: "Human" }, { id: "agent", label: "Agent" }, { id: "none", label: "None" }] },
-    { id: "unused", label: "Unused", values: [{ id: "x", label: "X" }] },
+    { id: "size", name: "Project size", values: [{ id: "small", label: "Small project" }, { id: "large", label: "Large project" }, { id: "medium", label: "Medium project" }] },
+    { id: "actor", name: "Actor type", values: [{ id: "human", label: "Human" }, { id: "agent", label: "Agent" }, { id: "none", label: "None" }] },
+    { id: "unused", name: "Unused", values: [{ id: "x", label: "X" }] },
   ];
   const pool = [
     { id: "dana", traits: { size: "small", actor: "human" } },

@@ -17,8 +17,8 @@ import {
 } from "./index.js";
 
 const dimensions: Dimension[] = [
-  { id: "membership", label: "Membership", values: [{ id: "member", label: "Member" }, { id: "staff", label: "Staff" }] },
-  { id: "branch", label: "Branch", scope: "constellations", values: [{ id: "north", label: "North" }, { id: "south", label: "South" }] },
+  { id: "membership", name: "Membership", values: [{ id: "member", label: "Member" }, { id: "staff", label: "Staff" }] },
+  { id: "branch", name: "Branch", scope: "constellations", values: [{ id: "north", label: "North" }, { id: "south", label: "South" }] },
 ];
 const persona = (id: string, traits: Record<string, string> = {}): Persona => ({ id, name: id, traits });
 const entity = (id: string, rest: Partial<Entity> = {}): Entity => ({ id, name: id, traits: {}, ...rest });

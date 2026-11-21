@@ -32,7 +32,7 @@ const dimensionOf = (pool, id) => pool.dimensionsById.get(id);
 function traits(pool, map) {
   const entries = Object.entries(map ?? {});
   if (entries.length === 0) return none();
-  return h("span", { class: "uc-cst-traits" }, entries.map(([dimension, value]) => traitChip(dimensionOf(pool, dimension)?.label ?? dimension, dimensionOf(pool, dimension)?.values.find((v) => v.id === value)?.label ?? value)));
+  return h("span", { class: "uc-cst-traits" }, entries.map(([dimension, value]) => traitChip(dimensionOf(pool, dimension)?.name ?? dimension, dimensionOf(pool, dimension)?.values.find((v) => v.id === value)?.label ?? value)));
 }
 
 export const isWorldEmpty = (world) => world.entities.length + world.relationship_types.length + world.constellations.length === 0;
@@ -108,7 +108,7 @@ export function renderWorldPage(root, { world, pool, selected, error = "", handl
       h("th", { scope: "row" }, editName(t.label, "relationship type", () => handlers.onEditRelationshipType(t.id))),
       h("td", null, t.inverse_label ?? none()),
       h("td", { class: "uc-mono" }, t.id),
-      h("td", null, (t.same_traits ?? []).length > 0 ? h("span", { class: "uc-cst-traits" }, t.same_traits.map((id) => h("span", { class: "uc-trait" }, h("span", { class: "uc-trait-value uc-world-share" }, dimensionOf(pool, id)?.label ?? id)))) : none()),
+      h("td", null, (t.same_traits ?? []).length > 0 ? h("span", { class: "uc-cst-traits" }, t.same_traits.map((id) => h("span", { class: "uc-trait" }, h("span", { class: "uc-trait-value uc-world-share" }, dimensionOf(pool, id)?.name ?? id)))) : none()),
       h("td", { class: "uc-mono" }, t.field ? `${t.field.object}.${t.field.name}` : none()),
     ),
   );

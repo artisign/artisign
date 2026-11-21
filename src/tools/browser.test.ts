@@ -274,30 +274,34 @@ describe("getBrowser — cached browser lifecycle", () => {
     expect(launches).toBe(2);
   });
 
-  it("kills a browser whose launch fails after it was spawned", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "artisign-fake-browser-"));
-    try {
-      // Prints a DevTools endpoint nobody listens on, then stays alive — the
-      // connect step fails after the spawn succeeded.
-      const fake = join(dir, "chrome");
-      const pidFile = join(dir, "pid");
-      await writeFile(
-        fake,
-        `#!${process.execPath}\nrequire("node:fs").writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n` +
-          `process.stderr.write("DevTools listening on ws://127.0.0.1:9/devtools/browser/x\\n");\nsetInterval(() => {}, 1000);\n`,
-      );
-      await chmod(fake, 0o755);
-      __setBrowserForTests({ select: () => ({ kind: "chrome", executable: fake }) });
+  // The fake browser is a shebang script, which Windows cannot execute.
+  it.skipIf(process.platform === "win32")(
+    "kills a browser whose launch fails after it was spawned",
+    async () => {
+      const dir = await mkdtemp(join(tmpdir(), "artisign-fake-browser-"));
+      try {
+        // Prints a DevTools endpoint nobody listens on, then stays alive — the
+        // connect step fails after the spawn succeeded.
+        const fake = join(dir, "chrome");
+        const pidFile = join(dir, "pid");
+        await writeFile(
+          fake,
+          `#!${process.execPath}\nrequire("node:fs").writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\n` +
+            `process.stderr.write("DevTools listening on ws://127.0.0.1:9/devtools/browser/x\\n");\nsetInterval(() => {}, 1000);\n`,
+        );
+        await chmod(fake, 0o755);
+        __setBrowserForTests({ select: () => ({ kind: "chrome", executable: fake }) });
 
-      await expect(getBrowser()).rejects.toMatchObject({
-        code: "io_error",
-        message: expect.stringContaining("Could not start Chrome"),
-      });
+        await expect(getBrowser()).rejects.toMatchObject({
+          code: "io_error",
+          message: expect.stringContaining("Could not start Chrome"),
+        });
 
-      const pid = Number(await readFile(pidFile, "utf8"));
-      expect(() => process.kill(pid, 0)).toThrow();
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
+        const pid = Number(await readFile(pidFile, "utf8"));
+        expect(() => process.kill(pid, 0)).toThrow();
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
+  );
 });

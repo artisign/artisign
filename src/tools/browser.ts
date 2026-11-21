@@ -10,7 +10,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, delimiter, join, win32 } from "node:path";
+import { basename, join, posix, win32 } from "node:path";
 import { randomUUID } from "node:crypto";
 import { ToolError } from "./types.js";
 
@@ -126,11 +126,14 @@ export function discoverBrowsers(options: DiscoveryOptions = {}): InstalledBrows
             WINDOWS_EXECUTABLES[kind].map((rel) => win32.join(root, rel)),
           )
         : platform === "darwin"
-          ? [join("/Applications", MAC_APPS[kind]), join(home, "Applications", MAC_APPS[kind])]
+          ? [
+              posix.join("/Applications", MAC_APPS[kind]),
+              posix.join(home, "Applications", MAC_APPS[kind]),
+            ]
           : (env.PATH ?? "")
-              .split(delimiter)
+              .split(posix.delimiter)
               .filter(Boolean)
-              .flatMap((dir) => LINUX_BINARIES[kind].map((bin) => join(dir, bin)));
+              .flatMap((dir) => LINUX_BINARIES[kind].map((bin) => posix.join(dir, bin)));
     const executable = candidates.find(exists);
     if (executable) found.push({ kind, executable });
   }

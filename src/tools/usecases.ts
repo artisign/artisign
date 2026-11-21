@@ -72,13 +72,15 @@ const DRY_RUN_PERSONA_CAP = 50;
 /**
  * De-duplicated and capped: a bulk write over thousands of cases must not answer with thousands of lines.
  * The same warning is one of the same kind, target and message. An "unknown_*" warning names the missing id in its
- * message and reads the same wherever it is used, so it counts once per message (the first location is kept);
- * the other kinds describe a place and keep one line per target.
+ * message and reads the same wherever it is used, so it counts once per message and owner (the first location is kept).
+ * The owner is the target up to its first "/": steps of one case or variant collapse, while different variants
+ * (`use_case:x#v1` / `#v2`) and pool entries (`persona:a` / `persona:b`) stay separate, as the preview marks
+ * orphaned conditions per variant. The other kinds describe a place and keep one line per target.
  */
 function reportWarnings(warnings: Warning[]): { warnings: Warning[]; warning_count?: number } {
   const seen = new Set<string>();
   const unique = warnings.filter((w) => {
-    const key = w.kind.startsWith("unknown_") ? `${w.kind}|${w.message}` : `${w.kind}|${w.target ?? ""}|${w.message}`;
+    const key = w.kind.startsWith("unknown_") ? `${w.kind}|${w.message}|${(w.target ?? "").split("/")[0]}` : `${w.kind}|${w.target ?? ""}|${w.message}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

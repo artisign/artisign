@@ -697,7 +697,8 @@ Writing: `set_use_cases` takes `{dimensions?, personas?, entities?,
 relationship_types?, constellations?, data_objects?, use_cases?}`, each a list of entities with an `id` (lowercase kebab-case,
 chosen by you, stable — a use case id is its filename). It upserts by id; an
 existing entity is merged at top level (given keys replace, arrays whole,
-`null` removes a key), so a status change is `{id, status: "ready"}`. The whole
+`null` removes a key; a `steps`, `branches` or `variants` list that drops stored ids comes back as an
+`items_removed` warning naming them, per case and list, and is still written), so a status change is `{id, status: "ready"}`. The whole
 call is validated before anything is written; unknown personas, data objects,
 dimensions, example fields or screens only come back as warnings. The
 response gives `created` and `updated` counts per kind, not the ids. Delete with
@@ -759,7 +760,7 @@ condition subject — per case and per variant), conflicting
 traits (`trait_conflict`), an entity in no constellation (`entity_unrelated`),
 a branch `from` / `rejoin` that is no main-flow step (`branch_from_missing`,
 `branch_rejoin_missing`), a step rewritten without the `target` it had, or a variant `replace` op whose
-step lacks the base step's `target` (`mapping_removed`, `set_use_cases` only — resend the `target` to keep the mapping). Data-object references are checked only when
+step lacks the base step's `target` (`mapping_removed`, `set_use_cases` only — resend the `target` to keep the mapping), or a replaced `steps`, `branches` or `variants` list that dropped stored ids (`items_removed`, `set_use_cases` only — one warning per case and list, ids in stored order). Data-object references are checked only when
 `data-objects.json` exists (an empty file counts). `get_use_case` also checks
 the world objects of its bundle; `set_use_cases` re-checks the constellations
 whose members or relationship types the call touches.

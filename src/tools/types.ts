@@ -57,6 +57,8 @@ export type WarningKind =
   // An element mapping onto a generated node id (n<counter>): a position, not an identity — it can silently point at another element after a rewrite.
   | "mapping_unstable"
   | "mapping_removed"
+  // A rewritten case dropped stored ids from its steps, branches or variants list (the list is replaced as a whole).
+  | "items_removed"
   | "duplicate_step_id"
   | "duplicate_branch_id"
   | "branch_empty"

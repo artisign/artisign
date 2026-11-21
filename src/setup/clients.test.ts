@@ -38,8 +38,7 @@ async function writeAt(path: string, content: string): Promise<void> {
 const readJson = async (path: string): Promise<Record<string, unknown>> => JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
 
 /** The shared contract of every client definition: write, replace, keep the rest, remove only ours. */
-async function expectContract(client: Client, file: string, key: string, platform: NodeJS.Platform = "darwin"): Promise<void> {
-  const e = env(platform);
+async function expectContract(client: Client, file: string, key: string, platform: NodeJS.Platform = "darwin", e: ClientEnv = env(platform)): Promise<void> {
   const before = { other: 1, [key]: { keep: { command: "k" }, artisign: { command: "STALE-ENTRY" } } };
   await writeAt(file, JSON.stringify(before));
   expect(await connectClients({ version: "5.0.0", env: e, clients: [client] })).toEqual([{ name: client.name, status: "done" }]);
@@ -291,3 +290,118 @@ describe("opencode detection", () => {
   });
 });
 
+
+describe("Windows", () => {
+  let appdata: string;
+  let winBin: string;
+  beforeEach(async () => {
+    appdata = join(root, "AppData", "Roaming");
+    winBin = join(root, "win bin");
+    await mkdir(winBin, { recursive: true });
+    // Plain files: Windows has no execute bit, so existence is all the lookup asks for.
+    for (const name of ["npx.cmd", "claude.cmd", "codex.CMD"]) await writeFile(join(winBin, name), "@echo off\r\n");
+  });
+  const winEnv = (vars: NodeJS.ProcessEnv = { APPDATA: appdata }): ClientEnv => ({
+    ...defaultClientEnv(),
+    home,
+    platform: "win32",
+    pathEnv: `${join(root, "nowhere")};${winBin}`,
+    vars,
+    execPath: join(winBin, "node.exe"),
+    run: async () => true,
+  });
+  const launcher = { command: "cmd", args: ["/c", "npx", "-y", "artisign@5.0.0", "mcp"] };
+
+  it("finds claude.cmd and npx.cmd through PATHEXT, in PATH order and with a space in the directory", async () => {
+    const e = winEnv({ APPDATA: appdata, PATHEXT: ".EXE;.CMD" });
+    expect(await claudeCode.detect(e)).toEqual({ found: true, hasEntry: false });
+    expect(await codex.detect({ ...e, vars: { ...e.vars, CODEX_HOME: join(root, "none") } })).toEqual({ found: true, hasEntry: false });
+  });
+
+  it("does not find a program without a PATHEXT extension, and uses the default list when PATHEXT is unset", async () => {
+    await writeFile(join(winBin, "opencode"), "#!/bin/sh\n");
+    expect((await opencode.detect(winEnv())).found).toBe(false);
+    await writeFile(join(winBin, "opencode.exe"), "");
+    expect((await opencode.detect(winEnv())).found).toBe(true);
+  });
+
+  it("Claude Desktop lives in %APPDATA%\\Claude and gets a cmd /c npx entry without a pinned PATH", async () => {
+    const file = join(appdata, "Claude", "claude_desktop_config.json");
+    expect((await claudeDesktop.detect(winEnv())).found).toBe(false);
+    await mkdir(join(appdata, "Claude"), { recursive: true });
+    expect((await claudeDesktop.detect(winEnv())).found).toBe(true);
+    await expectContract(claudeDesktop, file, "mcpServers", "win32", winEnv());
+    await rm(file);
+    await connectClients({ version: "5.0.0", env: winEnv(), clients: [claudeDesktop] });
+    expect((await readJson(file)).mcpServers).toEqual({ artisign: { ...launcher, env: {} } });
+    expect(await claudeDesktop.manual(winEnv(), "5.0.0")).toEqual({
+      kind: "config",
+      path: file,
+      text: JSON.stringify({ mcpServers: { artisign: { ...launcher, env: {} } } }, null, 2),
+    });
+  });
+
+  it("falls back to <home>\\AppData\\Roaming without %APPDATA%", async () => {
+    await mkdir(join(home, "AppData", "Roaming", "Code", "User"), { recursive: true });
+    expect((await vscode.detect(winEnv({}))).found).toBe(true);
+  });
+
+  it("VS Code lives in %APPDATA%\\Code\\User", async () => {
+    const dir = join(appdata, "Code", "User");
+    expect((await vscode.detect(winEnv())).found).toBe(false);
+    await mkdir(dir, { recursive: true });
+    await expectContract(vscode, join(dir, "mcp.json"), "servers", "win32", winEnv());
+    await rm(join(dir, "mcp.json"));
+    await connectClients({ version: "5.0.0", env: winEnv(), clients: [vscode] });
+    expect(((await readJson(join(dir, "mcp.json"))).servers as Record<string, unknown>).artisign).toEqual({ type: "stdio", ...launcher, env: {} });
+  });
+
+  it("an entry for a GUI client is refused when there is no npx", async () => {
+    await mkdir(join(appdata, "Claude"), { recursive: true });
+    const e = { ...winEnv(), pathEnv: join(root, "nowhere"), execPath: join(root, "nowhere", "node.exe") };
+    const [result] = await connectClients({ version: "5.0.0", env: e, clients: [claudeDesktop] });
+    expect(result?.status).toBe("failed");
+    expect(result?.error).toContain("npx was not found");
+    // The copy-only snippet still shows the same launcher form.
+    expect((await claudeDesktop.manual(e, "5.0.0")).kind === "config" && JSON.stringify(await claudeDesktop.manual(e, "5.0.0"))).toContain("cmd");
+  });
+
+  it("Claude Code drives claude.cmd with cmd /c npx, and edits ~/.claude.json the same way without it", async () => {
+    const calls: string[][] = [];
+    const e = { ...winEnv(), run: async (c: string, a: string[]) => (calls.push([c, ...a]), true) };
+    await claudeCode.write(e, "5.0.0");
+    expect(calls).toEqual([
+      [expect.stringMatching(/claude\.cmd$/i), "mcp", "remove", "artisign", "--scope", "user"],
+      [expect.stringMatching(/claude\.cmd$/i), "mcp", "add", "--scope", "user", "--transport", "stdio", "artisign", "--", "cmd", "/c", "npx", "-y", "artisign@5.0.0", "mcp"],
+    ]);
+    const manual = await claudeCode.manual(e, "5.0.0");
+    expect(manual).toEqual({ kind: "command", text: "claude mcp add --scope user --transport stdio artisign -- cmd /c npx -y artisign@5.0.0 mcp" });
+    const bare = { ...e, pathEnv: join(root, "nowhere") };
+    await writeAt(join(home, ".claude.json"), "{}");
+    await claudeCode.write(bare, "5.0.0");
+    expect(((await readJson(join(home, ".claude.json"))).mcpServers as Record<string, unknown>).artisign).toEqual({ type: "stdio", ...launcher, env: {} });
+  });
+
+  it("Cursor, Codex and opencode keep their home-relative locations and use the cmd /c launcher", async () => {
+    await mkdir(join(home, ".cursor"));
+    await mkdir(join(home, ".config", "opencode"), { recursive: true });
+    await connectClients({ version: "5.0.0", env: { ...winEnv(), pathEnv: "" }, clients: [cursor, opencode] });
+    expect(((await readJson(join(home, ".cursor", "mcp.json"))).mcpServers as Record<string, unknown>).artisign).toEqual({ type: "stdio", ...launcher, env: {} });
+    const oc = (await readJson(join(home, ".config", "opencode", "opencode.json"))).mcp as Record<string, unknown>;
+    expect(oc.artisign).toMatchObject({ type: "local", command: ["cmd", "/c", "npx", "-y", "artisign@5.0.0", "mcp"] });
+    const manual = await codex.manual(winEnv(), "5.0.0");
+    expect(manual).toMatchObject({ kind: "config", path: join(home, ".codex", "config.toml") });
+    expect((manual as { text: string }).text).toContain('command = "cmd"\nargs = ["/c","npx","-y","artisign@5.0.0","mcp"]');
+  });
+
+  it("Codex runs codex.CMD with the launcher", async () => {
+    const calls: string[][] = [];
+    const e = { ...winEnv(), run: async (c: string, a: string[]) => (calls.push([c, ...a]), true) };
+    await codex.write(e, "5.0.0");
+    expect(calls[1]).toEqual([expect.stringMatching(/codex\.cmd$/i), "mcp", "add", "artisign", "--", "cmd", "/c", "npx", "-y", "artisign@5.0.0", "mcp"]);
+  });
+
+  it("the macOS entry is still plain npx", async () => {
+    expect(await claudeCode.manual({ ...env(), pathEnv: "" }, "5.0.0")).toMatchObject({ text: expect.stringContaining('"command": "npx"') });
+  });
+});

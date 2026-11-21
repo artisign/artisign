@@ -6,6 +6,7 @@ import { refreshSkills } from "../setup/skill.js";
 import { defaultClientEnv } from "../setup/clients.js";
 import { isNewer, readVersion } from "../version.js";
 import { restartDaemon } from "./setup.js";
+import { spawnPlan } from "../setup/shell.js";
 
 type Run = { code: number; stdout: string; stderr: string };
 
@@ -23,9 +24,14 @@ export type UpdateDeps = {
   error: (line: string) => void;
 };
 
-function run(command: string, args: string[], stream: boolean): Promise<Run> {
+/** npm is `npm.cmd` on Windows; Node refuses to spawn it without a shell, so `spawnPlan` quotes every part for `cmd.exe`. */
+export function npmPlan(args: string[], platform: NodeJS.Platform = process.platform): ReturnType<typeof spawnPlan> {
+  return spawnPlan(platform === "win32" ? "npm.cmd" : "npm", args, platform);
+}
+
+function run(command: string, args: string[], stream: boolean, shell = false): Promise<Run> {
   return new Promise((resolve) => {
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"], shell });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d: Buffer) => {
@@ -52,7 +58,10 @@ function defaultDeps(): UpdateDeps {
         return entry;
       }
     })(),
-    npm: (args, stream) => run("npm", args, stream),
+    npm: (args, stream) => {
+      const plan = npmPlan(args);
+      return run(plan.command, plan.args, stream, plan.shell);
+    },
     exists: existsSync,
     repin: async (newEntry) => (await run(process.execPath, [newEntry, "__repin"], true)).code,
     log: (line) => console.log(line),
@@ -65,7 +74,8 @@ const FIX =
   "Do not use sudo.";
 
 /** How the running CLI was installed, best effort from its real path. */
-function otherInstaller(entryPath: string): { name: string; command: string } | "npx" | undefined {
+function otherInstaller(rawPath: string): { name: string; command: string } | "npx" | undefined {
+  const entryPath = rawPath.replaceAll("\\", "/");
   if (entryPath.includes("_npx")) return "npx";
   if (entryPath.includes("/pnpm/")) return { name: "pnpm", command: "pnpm add -g artisign@latest" };
   if (entryPath.includes("/.bun/")) return { name: "bun", command: "bun add -g artisign@latest" };

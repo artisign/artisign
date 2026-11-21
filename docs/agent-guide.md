@@ -235,8 +235,11 @@ When a design system already exists:
 
 After **every** `write_html` / `patch_html`:
 
-1. `get_screenshot` for the screen (or clipped to the changed `node` — much
-   cheaper) and look at the image.
+1. `get_screenshot` for the screen (or `get_screenshot {node}` clipped to the
+   changed node — much cheaper; a full ref such as `home.btn-login` or
+   `mockup:<name>#<variant>.<id>` is enough, the screen or mockup is derived
+   from it and a contradicting `screen`/`mockup`/`variant` fails with
+   `validation_failed`) and look at the image.
 2. Red outlines mark unresolved token/component/variant refs. Fix before the
    next edit.
 3. For geometry and computed-value questions ("is this 44px tall?", "what color

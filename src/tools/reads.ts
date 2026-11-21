@@ -279,23 +279,21 @@ export type GetScreenInput = {
   screen: string;
   view?: View;
   fields?: string[];
-  output_format?: "html" | "jsx";
 };
 
-const SCREEN_ALWAYS = ["screen", "path", "node_count", "ref_count", "flow_count", "open_comment_count", "last_commit", "mtime", "tags", "backdrop"];
+const SCREEN_ALWAYS = ["screen", "path", "node_count", "ref_count", "flow_count", "open_comment_count", "last_commit", "mtime", "tags", "backdrop"] as const;
 // `tag_notes` is its own field, not folded into `notes` — that would break
 // selectFields' one-name-one-key contract (fields:["notes","tag_notes"] would
 // read oddly if "notes" alone silently carried both). Instead the "notes"
 // request is expanded to also ask for "tag_notes" at the call boundary below
 // — a wart, kept rather than hidden, per the acceptance criterion that
 // fields:["notes"] alone still surfaces a tagged screen's spec.
-const SCREEN_OPTIONAL = ["nodes", "html_aug", "refs", "flows", "comments", "notes", "tag_notes", "rendered_html", "variants", "reached_from"];
+const SCREEN_OPTIONAL = ["nodes", "html_aug", "refs", "flows", "comments", "notes", "tag_notes", "rendered_html", "variants", "reached_from"] as const;
+
+/** Every key a get_screen response can carry — the `fields` enum of the tool schema. Always-kept keys are valid too (a no-op), so no response key is rejected. */
+export const SCREEN_FIELDS = [...SCREEN_ALWAYS, ...SCREEN_OPTIONAL] as const;
 
 export async function getScreen(store: Store, input: GetScreenInput): Promise<Record<string, unknown>> {
-  if (input.output_format === "jsx") {
-    throw new ToolError("validation_failed", "output_format \"jsx\" is not implemented (non-goal for v1 per PRD)");
-  }
-
   const view = input.view ?? "summary";
   const { doc } = await loadScreen(store, input.screen);
   const nodes = nodesInDocumentOrder(doc);
@@ -327,13 +325,13 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
     tags: meta.tags,
     ...(backdrop === undefined ? {} : { backdrop }),
   };
-  if (view === "summary") return selectFields(summary, SCREEN_ALWAYS, SCREEN_OPTIONAL, input.fields);
+  if (view === "summary") return selectFields(summary, SCREEN_ALWAYS, SCREEN_FIELDS, input.fields);
 
   const tree: Record<string, unknown> = {
     ...summary,
     nodes: nodes.map((n) => ({ id: n.id, tag: n.tag, parent_id: n.parentId, ref_count: refCount(n) })),
   };
-  if (view === "tree") return selectFields(tree, SCREEN_ALWAYS, SCREEN_OPTIONAL, input.fields);
+  if (view === "tree") return selectFields(tree, SCREEN_ALWAYS, SCREEN_FIELDS, input.fields);
 
   const full: Record<string, unknown> = {
     ...summary,
@@ -394,7 +392,7 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
   // the SCREEN_OPTIONAL comment above for why it isn't the same field).
   const fields =
     input.fields?.includes("notes") && !input.fields.includes("tag_notes") ? [...input.fields, "tag_notes"] : input.fields;
-  return selectFields(full, SCREEN_ALWAYS, SCREEN_OPTIONAL, fields);
+  return selectFields(full, SCREEN_ALWAYS, SCREEN_FIELDS, fields);
 }
 
 function commentsForScreen(records: CommentRecord[], screen: string, includeReplies: boolean): PublicComment[] {

@@ -13,13 +13,14 @@ export { __setBrowserForTests, __resetBrowserForTests } from "./browser.js";
 export { resolveViewport, type Viewport } from "./render-context.js";
 
 export type GetScreenshotInput = {
-  /** Exactly one of `screen` or `mockup`+`variant` is required. */
+  /** Exactly one of `node`, `screen` or `mockup`+`variant` is required. */
   screen?: string;
   /**
-   * Node ref, same addressing as every other tool: `"<screen>.<node-id>"`
-   * (its screen must match `screen`), or `"component:<name>#<variant>.<node-id>"`
-   * / `"pattern:<name>.<node-id>"` for a design-system definition — the
-   * latter stands alone and takes neither `screen` nor `mockup`/`variant`.
+   * Full node ref, same addressing as every other tool: `"<screen>.<node-id>"`,
+   * `"mockup:<name>#<variant>.<node-id>"`, `"component:<name>#<variant>.<node-id>"`
+   * or `"pattern:<name>.<node-id>"`. The screen / mockup / definition is derived
+   * from the ref; a `screen`, `mockup` or `variant` that contradicts it is a
+   * `validation_failed`.
    * Crops to that element's bounding box plus `NODE_SCREENSHOT_PADDING_PX`
    * on each side.
    */
@@ -82,44 +83,58 @@ export function computeNodeClip(box: ClipRect, padding: number): ClipRect {
 
 export async function getScreenshot(store: Store, input: GetScreenshotInput): Promise<ScreenshotResult> {
   const hasScreen = input.screen !== undefined;
-  const hasMockup = input.mockup !== undefined || input.variant !== undefined;
+  const hasMockupArg = input.mockup !== undefined || input.variant !== undefined;
   const ref = input.node !== undefined ? parseNodeRef(input.node) : undefined;
 
-  // A component/pattern node ref is self-addressing (its ref carries the
-  // name/variant loadAllDocuments needs) — it stands alone instead of
-  // pairing with `screen`, the way a screen node ref must.
+  // A full node ref is self-addressing: the screen, mockup+variant or
+  // definition is derived from it. A separate screen / mockup / variant that
+  // contradicts the ref is a validation error.
   if (ref?.kind === "mockup") {
-    throw new ToolError("validation_failed", "get_screenshot takes a mockup as mockup+variant, not a mockup node ref");
+    if (hasScreen) throw new ToolError("validation_failed", `node "${input.node}" addresses mockup "${ref.name}", not screen "${input.screen}"`);
+    if (input.mockup !== undefined && input.mockup !== ref.name) {
+      throw new ToolError("validation_failed", `node "${input.node}" belongs to mockup "${ref.name}", not "${input.mockup}"`);
+    }
+    if (input.variant !== undefined && input.variant !== ref.variant) {
+      throw new ToolError("validation_failed", `node "${input.node}" belongs to variant "${ref.variant}", not "${input.variant}"`);
+    }
+    return screenshotMockup(store, ref.name, ref.variant, clampWidth(input.width), clampScale(input.scale), input.browser, ref.nodeId, input.node!);
   }
   if (ref !== undefined && ref.kind !== "screen") {
     if (hasScreen) throw new ToolError("validation_failed", `node "${input.node}" addresses a component/pattern definition, not screen "${input.screen}"`);
-    if (hasMockup) throw new ToolError("validation_failed", "node addressing a component/pattern definition is not valid together with mockup");
+    if (hasMockupArg) throw new ToolError("validation_failed", "node addressing a component/pattern definition is not valid together with mockup");
     if (input.width !== undefined) throw new ToolError("validation_failed", "width is only valid together with mockup, not a definition node");
     return screenshotDefinition(store, ref, clampScale(input.scale), input.browser);
   }
-
-  if (hasScreen === hasMockup) {
-    throw new ToolError("validation_failed", "exactly one of screen or mockup+variant is required");
+  if (ref?.kind === "screen") {
+    if (hasMockupArg) throw new ToolError("validation_failed", "node is only valid together with screen, not mockup");
+    if (hasScreen && input.screen !== ref.screen) {
+      throw new ToolError("validation_failed", `node "${input.node}" belongs to screen "${ref.screen}", not "${input.screen}"`);
+    }
+    if (input.width !== undefined) throw widthOnScreenError();
+    return screenshotScreen(store, ref.screen, input.node, clampScale(input.scale), input.browser);
   }
 
-  if (hasMockup) {
+  if (hasScreen === hasMockupArg) {
+    throw new ToolError("validation_failed", "exactly one of node, screen or mockup+variant is required");
+  }
+
+  if (hasMockupArg) {
     if (input.mockup === undefined || input.variant === undefined) {
       throw new ToolError("validation_failed", "mockup and variant are both required together");
-    }
-    if (input.node !== undefined) {
-      throw new ToolError("validation_failed", "node is only valid together with screen, not mockup");
     }
     return screenshotMockup(store, input.mockup, input.variant, clampWidth(input.width), clampScale(input.scale), input.browser);
   }
 
-  if (input.width !== undefined) {
-    throw new ToolError(
-      "validation_failed",
-      "width is only valid together with mockup, not screen — a screen renders at its root element's declared " +
-        "width/height (e.g. style=\"width: 1440px\" on the root, or a $token), default 390x844 when undeclared",
-    );
-  }
-  return screenshotScreen(store, input.screen!, input.node, clampScale(input.scale), input.browser);
+  if (input.width !== undefined) throw widthOnScreenError();
+  return screenshotScreen(store, input.screen!, undefined, clampScale(input.scale), input.browser);
+}
+
+function widthOnScreenError(): ToolError {
+  return new ToolError(
+    "validation_failed",
+    "width is only valid together with mockup, not screen — a screen renders at its root element's declared " +
+      "width/height (e.g. style=\"width: 1440px\" on the root, or a $token), default 390x844 when undeclared",
+  );
 }
 
 /**
@@ -269,6 +284,8 @@ async function screenshotMockup(
   width: number,
   scale: number,
   kind: BrowserKind | undefined,
+  nodeId?: string,
+  nodeRef?: string,
 ): Promise<ScreenshotResult> {
   let documentHtml: string;
   try {
@@ -282,6 +299,7 @@ async function screenshotMockup(
 
   const viewport = { width, height: MOCKUP_VIEWPORT_HEIGHT };
   return withPage(documentHtml, viewport, scale, kind, async (page, browser) => {
+    if (nodeId) return captureNode(page, browser, nodeId, nodeRef!, viewport);
     // Full-page content can be taller (or, for a desktop-width variant,
     // wider) than the viewport; pngResult reports the size actually captured.
     return pngResult(await page.screenshot({ fullPage: true }), browser);

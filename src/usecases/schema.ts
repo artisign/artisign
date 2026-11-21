@@ -48,7 +48,7 @@ export const DIMENSION_SCOPES = ["personas", "constellations"] as const;
 
 export const dimensionSchema = z.strictObject({
   id: idSchema,
-  label: z.string(),
+  name: z.string(),
   description: z.string().optional(),
   scope: z.enum(DIMENSION_SCOPES).optional(),
   values: z.array(dimensionValueSchema).min(1).superRefine((values, ctx) => uniqueIds(values, ctx, "value")),

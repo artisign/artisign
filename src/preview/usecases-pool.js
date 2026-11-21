@@ -50,9 +50,9 @@ function personaCard(persona, pool, usage, handlers, selected) {
   const av = avatarOf(persona.id, pool.personasById);
   const traits = Object.entries(persona.traits ?? {}).map(([dimension, value]) => {
     const dim = pool.dimensionsById.get(dimension);
-    return traitChip(dim?.label ?? dimension, dim?.values.find((v) => v.id === value)?.label ?? value);
+    return traitChip(dim?.name ?? dimension, dim?.values.find((v) => v.id === value)?.label ?? value);
   });
-  const open = pool.dimensions.filter((d) => !(d.id in (persona.traits ?? {}))).slice(0, 4).map((d) => traitChip(d.label, "any", true));
+  const open = pool.dimensions.filter((d) => !(d.id in (persona.traits ?? {}))).slice(0, 4).map((d) => traitChip(d.name, "any", true));
   return h(
     "article",
     { class: `uc-persona-card${persona.generated ? " is-generated" : ""}${selected ? " is-selected" : ""}`, dataset: { persona: persona.id } },
@@ -79,7 +79,7 @@ export function renderPersonaPage(el, { pool, query, selectedId, limit, usage, h
     return h(
       "div",
       { class: "uc-dim-row", dataset: { dimension: dimension.id } },
-      h("div", { class: "uc-dim-id" }, h("button", { type: "button", class: "uc-dim-name", onClick: () => handlers.onEditDimension(dimension.id), title: "Edit dimension" }, dimension.label), h("span", { class: "uc-mono uc-muted" }, dimension.id)),
+      h("div", { class: "uc-dim-id" }, h("button", { type: "button", class: "uc-dim-name", onClick: () => handlers.onEditDimension(dimension.id), title: "Edit dimension" }, dimension.name), h("span", { class: "uc-mono uc-muted" }, dimension.id)),
       h(
         "div",
         { class: "uc-dim-values" },

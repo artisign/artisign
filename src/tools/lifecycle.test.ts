@@ -604,7 +604,7 @@ describe("delete_entity", () => {
 
   it("rejects variant for every kind except mockup before touching anything (use case, persona)", async () => {
     await setUseCases(fx.store, {
-      dimensions: [{ id: "membership", label: "Membership", values: [{ id: "student", label: "Student" }] }],
+      dimensions: [{ id: "membership", name: "Membership", values: [{ id: "student", label: "Student" }] }],
       personas: [{ id: "member-ana", name: "Ana", traits: { membership: "student" } }],
       data_objects: [{ id: "loan", name: "Loan", fields: [{ name: "status", type: "enum", values: ["available", "on-loan"] }] }],
       use_cases: [{

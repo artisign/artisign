@@ -3,7 +3,7 @@ import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { deleteEntity } from "./lifecycle.js";
 import { getUseCase, listUseCases, setUseCases } from "./usecases.js";
 
-const DIMENSIONS = [{ id: "membership", label: "Membership", values: [{ id: "member", label: "Member" }, { id: "staff", label: "Staff" }] }];
+const DIMENSIONS = [{ id: "membership", name: "Membership", values: [{ id: "member", label: "Member" }, { id: "staff", label: "Staff" }] }];
 const when = (subject: string, property = "open-loans", value: unknown = 5) => [{ subject, property, op: "gte", value }];
 
 function loanCase(overrides: Record<string, unknown> = {}): Record<string, unknown> {

@@ -651,7 +651,7 @@ export function createVariantEditor(env) {
           h(
             "div",
             { class: "uc-when-dim-edit" },
-            h("span", { class: "uc-when-dim" }, dimension.label, h("span", { class: "uc-when-scope" }, (dimension.scope ?? "personas") === "constellations" ? " world" : " personas")),
+            h("span", { class: "uc-when-dim" }, dimension.name, h("span", { class: "uc-when-scope" }, (dimension.scope ?? "personas") === "constellations" ? " world" : " personas")),
             dimension.values.map((value) => {
               const on = (variant.when[dimension.id] ?? []).includes(value.id);
               return h("button", { type: "button", class: "uc-value-toggle", "aria-pressed": on ? "true" : "false", onClick: () => {

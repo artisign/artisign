@@ -11,7 +11,7 @@ import type { Warning } from "./types.js";
 const DIMENSIONS = [
   {
     id: "membership",
-    label: "Membership",
+    name: "Membership",
     values: [
       { id: "student", label: "Student" },
       { id: "staff", label: "Staff" },
@@ -226,7 +226,7 @@ describe("delete_entity refuses a referenced pool entry unless force (CHR-1125)"
     it("fails closed for a dimension too (a dimension nobody uses still needs the case files to rule that out)", async () => {
       await setUseCases(fx.store, {
         dimensions: [
-          { id: "language", label: "Language", values: [{ id: "en", label: "English" }] },
+          { id: "language", name: "Language", values: [{ id: "en", label: "English" }] },
         ],
       });
       const err = await deleteEntity(fx.store, { kind: "dimension", name: "language" }).catch(

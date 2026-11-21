@@ -8,7 +8,7 @@ import type { Warning } from "./types.js";
 
 // CHR-1124: one invalid entry in a pool file is skipped and reported (like an invalid case file) instead of blocking every read.
 
-const DIMENSIONS = [{ id: "membership", label: "Membership", values: [{ id: "student", label: "Student" }, { id: "staff", label: "Staff" }] }];
+const DIMENSIONS = [{ id: "membership", name: "Membership", values: [{ id: "student", label: "Student" }, { id: "staff", label: "Staff" }] }];
 const PERSONAS = [{ id: "member-ana", name: "Ana", traits: { membership: "student" } }];
 const DATA_OBJECTS = [{ id: "loan", name: "Loan", fields: [{ name: "status", type: "enum", values: ["available", "on-loan"] }] }];
 const BORROW = {
@@ -52,7 +52,7 @@ describe("use-case pool files — invalid entries on the read path", () => {
 
   it("keeps the valid entries, names entries without an id by position and skips a repeated id", async () => {
     await poolJson({
-      dimensions: [{ id: "size", label: "Size", values: [] }, ...DIMENSIONS],
+      dimensions: [{ id: "size", name: "Size", values: [] }, ...DIMENSIONS],
       personas: [{ id: "BAD ID", name: "x" }, ...PERSONAS, { name: "no id" }, { id: "member-ana", name: "Again" }],
     });
     const list = (await listUseCases(fx.store, { include: ["personas", "dimensions"] })) as ListRes;
@@ -172,6 +172,22 @@ describe("use-case pool files — invalid entries on the read path", () => {
     await expect(setUseCases(fx.store, { personas: [{ id: "ok", name: "Ok" }] })).resolves.toMatchObject({ personas: { created: 1 } });
   });
 
+  it("CHR-1170: a dimension is named by name; label on a dimension is validation_failed and writes nothing", async () => {
+    await expect(setUseCases(fx.store, { dimensions: [{ id: "tier", label: "Tier", values: [{ id: "basic", label: "Basic" }] }] })).rejects.toMatchObject({
+      code: "validation_failed",
+      message: expect.stringMatching(/dimensions\[0\] \(tier\)\.name: .*Unrecognized key: "label"/),
+    });
+    await expect(setUseCases(fx.store, { dimensions: [{ id: "tier", name: "Tier", values: [{ id: "basic", label: "Basic" }] }] })).resolves.toMatchObject({ dimensions: { created: 1 } });
+  });
+
+  it("CHR-1170: a stored dimension with label is skipped on reads and blocks writes to personas.json", async () => {
+    await poolJson({ dimensions: [{ id: "tier", label: "Tier", values: [{ id: "basic", label: "Basic" }] }, ...DIMENSIONS], personas: PERSONAS });
+    const list = (await listUseCases(fx.store, { include: ["dimensions"] })) as ListRes;
+    expect(list.dimensions?.map((d) => d.id)).toEqual(["membership"]);
+    expect(list.warnings).toEqual([expect.objectContaining({ kind: "invalid_file", target: "dimension:tier" })]);
+    await expect(setUseCases(fx.store, { personas: [{ id: "ok", name: "Ok" }] })).rejects.toMatchObject({ code: "invalid_state", message: expect.stringContaining("usecases/personas.json") });
+  });
+
   it("get_use_case puts the case's own warnings first, so skipped pool entries never displace them", async () => {
     await poolJson({ dimensions: DIMENSIONS, personas: Array.from({ length: 60 }, (_, i) => ({ id: `p-${i}` })) });
     const bundle = (await getUseCase(fx.store, { id: "borrow-book" })) as GetRes & { warning_count?: number };
@@ -196,7 +212,7 @@ describe("use-case pool files — invalid entries on the read path", () => {
     const object = { id: "loan", name: "Loan", fields: [{ name: "status", type: "enum", values: ["a"] }] };
     const cases: [string, string, string, unknown[]][] = [
       ["personas.json", "personas", "persona", [{ id: "ok", name: "Ok" }, { id: "x" }, { id: "BAD", name: "x" }, { id: "system", name: "x" }, { id: "a", name: "A", kind: "alien" }, { id: "a", name: "A", extra: 1 }, { id: "a", name: "A", traits: { k: 1 } }, "text", null, []]],
-      ["personas.json", "dimensions", "dimension", [DIMENSIONS[0], { id: "d", label: "D", values: [] }, { id: "d", label: "D", values: [{ id: "v", label: "V" }, { id: "v", label: "W" }] }, { id: "d", label: "D", values: [{ id: "v", label: "V" }], scope: "nope" }]],
+      ["personas.json", "dimensions", "dimension", [DIMENSIONS[0], { id: "d", name: "D", values: [] }, { id: "d", name: "D", values: [{ id: "v", label: "V" }, { id: "v", label: "W" }] }, { id: "d", name: "D", values: [{ id: "v", label: "V" }], scope: "nope" }]],
       ["world.json", "entities", "entity", [entity, { id: "e" }, { id: "system", name: "S" }, { ...entity, traits: { k: 1 } }]],
       ["world.json", "relationship_types", "relationship_type", [type, { id: "t" }, { ...type, field: { object: "o" } }]],
       ["world.json", "constellations", "constellation", [constellation, { id: "c", name: "C" }, { ...constellation, relationships: [{ from: "a" }] }]],

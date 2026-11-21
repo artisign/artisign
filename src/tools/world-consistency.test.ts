@@ -7,8 +7,8 @@ import { getUseCase, listUseCases, setUseCases } from "./usecases.js";
 import type { Warning } from "./types.js";
 
 const DIMENSIONS = [
-  { id: "membership", label: "Membership", values: [{ id: "member", label: "Member" }, { id: "staff", label: "Staff" }] },
-  { id: "branch", label: "Branch", scope: "constellations", values: [{ id: "north", label: "North" }, { id: "south", label: "South" }] },
+  { id: "membership", name: "Membership", values: [{ id: "member", label: "Member" }, { id: "staff", label: "Staff" }] },
+  { id: "branch", name: "Branch", scope: "constellations", values: [{ id: "north", label: "North" }, { id: "south", label: "South" }] },
 ];
 const PERSONAS = [
   { id: "ana", name: "Ana", traits: { membership: "member" } },
@@ -98,7 +98,7 @@ describe("world consistency warnings (CHR-1149)", () => {
   });
 
   describe("after a member changes", () => {
-    const household = [{ id: "household", label: "Household", values: [{ id: "red", label: "Red" }, { id: "blue", label: "Blue" }] }];
+    const household = [{ id: "household", name: "Household", values: [{ id: "red", label: "Red" }, { id: "blue", label: "Blue" }] }];
     const pair = (traitOfB: string) => [
       { id: "ann", name: "Ann", traits: { household: "red" } },
       { id: "bob", name: "Bob", traits: { household: traitOfB } },

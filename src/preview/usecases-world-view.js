@@ -45,7 +45,7 @@ export function participantAvatar(p, size = "md") {
 function traitChips(ctx, traits) {
   return Object.entries(traits ?? {}).map(([dimension, value]) => {
     const dim = dimensionOf(ctx, dimension);
-    return traitChip(dim?.label ?? dimension, dim?.values.find((v) => v.id === value)?.label ?? value);
+    return traitChip(dim?.name ?? dimension, dim?.values.find((v) => v.id === value)?.label ?? value);
   });
 }
 

@@ -6,7 +6,7 @@ import { getUseCase, setUseCases } from "./usecases.js";
 import { MAPPING_STALE_CAP } from "../usecases/index.js";
 import type { Warning } from "./types.js";
 
-const DIMENSIONS = [{ id: "membership", label: "Membership", values: [{ id: "student", label: "Student" }, { id: "staff", label: "Staff" }] }];
+const DIMENSIONS = [{ id: "membership", name: "Membership", values: [{ id: "student", label: "Student" }, { id: "staff", label: "Staff" }] }];
 const PERSONAS = [{ id: "member-ana", name: "Ana", traits: { membership: "student" } }];
 
 const catalogHtml = (button: string): string => `<section id="root"><button id="${button}">Borrow</button><p id="note">Hi</p></section>`;

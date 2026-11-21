@@ -123,7 +123,7 @@ describe("MCP server — protocol-level", () => {
 
     // Use cases: the five new tools, plus the delete_entity kinds.
     await call("set_use_cases", {
-      dimensions: [{ id: "membership", label: "Membership", values: [{ id: "student", label: "Student" }, { id: "staff", label: "Staff" }] }],
+      dimensions: [{ id: "membership", name: "Membership", values: [{ id: "student", label: "Student" }, { id: "staff", label: "Staff" }] }],
       personas: [{ id: "member-ana", name: "Ana", traits: { membership: "student" } }],
       data_objects: [{ id: "loan", name: "Loan", fields: [{ name: "status", type: "string" }] }],
       use_cases: [

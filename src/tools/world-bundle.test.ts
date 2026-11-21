@@ -4,9 +4,9 @@ import { getUseCase, listUseCases, setUseCases } from "./usecases.js";
 
 // Neutral fixture: a household insurance world with one constellation and a second, unrelated one.
 const DIMENSIONS = [
-  { id: "household", label: "Household", scope: "constellations", values: [{ id: "two-parents", label: "Two" }, { id: "single-parent", label: "Single" }] },
-  { id: "age-group", label: "Age group", values: [{ id: "school", label: "School" }, { id: "adult", label: "Adult" }] },
-  { id: "region", label: "Region", values: [{ id: "north", label: "North" }, { id: "south", label: "South" }] },
+  { id: "household", name: "Household", scope: "constellations", values: [{ id: "two-parents", label: "Two" }, { id: "single-parent", label: "Single" }] },
+  { id: "age-group", name: "Age group", values: [{ id: "school", label: "School" }, { id: "adult", label: "Adult" }] },
+  { id: "region", name: "Region", values: [{ id: "north", label: "North" }, { id: "south", label: "South" }] },
 ];
 const PERSONAS = [
   { id: "maria", name: "Maria", kind: "human", traits: { household: "two-parents" } },

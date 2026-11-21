@@ -17,8 +17,8 @@ import { resolveParticipant } from "../usecases/index.js";
 const execFileAsync = promisify(execFile);
 
 const DIMENSIONS = [
-  { id: "household", label: "Household", scope: "constellations", values: [{ id: "two-parents", label: "Two parents" }, { id: "single-parent", label: "Single parent" }] },
-  { id: "age-group", label: "Age group", values: [{ id: "school", label: "School" }, { id: "adult", label: "Adult" }] },
+  { id: "household", name: "Household", scope: "constellations", values: [{ id: "two-parents", label: "Two parents" }, { id: "single-parent", label: "Single parent" }] },
+  { id: "age-group", name: "Age group", values: [{ id: "school", label: "School" }, { id: "adult", label: "Adult" }] },
 ];
 const PERSONAS = [
   { id: "maria", name: "Maria", kind: "human", traits: { household: "two-parents" } },
@@ -92,7 +92,7 @@ describe("world pool (ADR-011)", () => {
 
     it("leaves a stored file without kind and scope valid", async () => {
       await mkdir(join(fx.dir, "usecases"), { recursive: true });
-      await writeFile(join(fx.dir, "usecases", "personas.json"), JSON.stringify({ dimensions: [{ id: "d", label: "D", values: [{ id: "a", label: "A" }] }], personas: [{ id: "p", name: "P" }] }));
+      await writeFile(join(fx.dir, "usecases", "personas.json"), JSON.stringify({ dimensions: [{ id: "d", name: "D", values: [{ id: "a", label: "A" }] }], personas: [{ id: "p", name: "P" }] }));
       await expect(fx.store.readPersonaPool()).resolves.toMatchObject({ personas: [{ id: "p" }] });
       await expect(listUseCases(fx.store, {})).resolves.not.toHaveProperty("warnings");
     });

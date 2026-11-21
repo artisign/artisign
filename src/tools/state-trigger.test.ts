@@ -4,7 +4,7 @@ import { deleteEntity } from "./lifecycle.js";
 import { getUseCase, listUseCases, setUseCases } from "./usecases.js";
 import type { Warning } from "./types.js";
 
-const DIMENSIONS = [{ id: "membership", label: "Membership", values: [{ id: "member", label: "Member" }, { id: "staff", label: "Staff" }] }];
+const DIMENSIONS = [{ id: "membership", name: "Membership", values: [{ id: "member", label: "Member" }, { id: "staff", label: "Staff" }] }];
 
 function loanCase(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {

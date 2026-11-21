@@ -516,8 +516,8 @@ describe("persona dialog", () => {
 
 describe("dimension dialog and data object dialog", () => {
   it("builds dimension payloads: ids from the labels, unique, at least one value", () => {
-    const draft = { label: "Actor type", description: "", values: [{ id: "", label: "Human" }, { id: "agent", label: "Agent" }] };
-    expect(buildDimensionPayload({ id: "actor", draft, source: null }).payload).toEqual({ id: "actor", label: "Actor type", values: [{ id: "human", label: "Human" }, { id: "agent", label: "Agent" }] });
+    const draft = { name: "Actor type", description: "", values: [{ id: "", label: "Human" }, { id: "agent", label: "Agent" }] };
+    expect(buildDimensionPayload({ id: "actor", draft, source: null }).payload).toEqual({ id: "actor", name: "Actor type", values: [{ id: "human", label: "Human" }, { id: "agent", label: "Agent" }] });
     expect(buildDimensionPayload({ id: "actor", draft: { ...draft, values: [] }, source: null }).errors).toContain("Add at least one value.");
     expect(buildDimensionPayload({ id: "actor", draft: { ...draft, values: [{ id: "", label: "A" }, { id: "a", label: "Again" }] }, source: null }).errors).toContain("Two values share an id.");
   });
@@ -532,7 +532,7 @@ describe("dimension dialog and data object dialog", () => {
     type(values[1], "Shifts");
     button("Create dimension").click();
     await closed;
-    expect(save.mock.calls[0][0]).toEqual({ id: "work-schedule", label: "Work schedule", values: [{ id: "office-hours", label: "Office hours" }, { id: "shifts", label: "Shifts" }] });
+    expect(save.mock.calls[0][0]).toEqual({ id: "work-schedule", name: "Work schedule", values: [{ id: "office-hours", label: "Office hours" }, { id: "shifts", label: "Shifts" }] });
   });
 
   it("builds data object payloads: typed examples, enum values, ref target, undeclared field descriptions kept", () => {
@@ -600,7 +600,7 @@ describe("generate personas dialog", () => {
 
   it("starts with Preview disabled and a note when no persona-scoped dimension exists (CHR-1144)", async () => {
     const generate = vi.fn();
-    openGenerateDialog({ pool: () => makePool({ dimensions: [{ id: "household", label: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }] }] }), generate });
+    openGenerateDialog({ pool: () => makePool({ dimensions: [{ id: "household", name: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }] }] }), generate });
     await flush();
     expect($$("dialog button").find((b) => b.textContent.includes("Preview")).disabled).toBe(true);
     expect($("dialog").textContent).toContain("Only persona-scoped dimensions apply");

@@ -17,8 +17,8 @@ function traitRows(pool, traits, onChange) {
   const dims = [...pool.dimensions].sort((a, b) => Number((a.scope ?? "personas") === "personas") - Number((b.scope ?? "personas") === "personas"));
   if (dims.length === 0) return [h("p", { class: "uc-muted" }, "No dimensions yet. Add some in the Personas view to give entities traits.")];
   return dims.map((dimension) => {
-    const select = selectInput({ options: [{ value: "", label: "Any" }, ...dimension.values.map((v) => ({ value: v.id, label: v.label }))], value: traits[dimension.id] ?? "", ariaLabel: dimension.label, onChange: (value) => { traits[dimension.id] = value; onChange(); } });
-    return h("div", { class: "uc-trait-row" }, h("span", { class: "uc-trait-label" }, dimension.label, (dimension.scope ?? "personas") === "constellations" ? null : h("span", { class: "uc-label-hint" }, " · personas")), select);
+    const select = selectInput({ options: [{ value: "", label: "Any" }, ...dimension.values.map((v) => ({ value: v.id, label: v.label }))], value: traits[dimension.id] ?? "", ariaLabel: dimension.name, onChange: (value) => { traits[dimension.id] = value; onChange(); } });
+    return h("div", { class: "uc-trait-row" }, h("span", { class: "uc-trait-label" }, dimension.name, (dimension.scope ?? "personas") === "constellations" ? null : h("span", { class: "uc-label-hint" }, " · personas")), select);
   });
 }
 
@@ -60,7 +60,7 @@ export async function openEntityDialog(options) {
   objectSelect.disabled = objects.length === 0 && draft.object === "";
 
   function refresh() {
-    const finalId = id || uniqueId(slugify(draft.name), options.takenIds());
+    const finalId = id || uniqueId(slugify(draft.label), options.takenIds());
     const built = buildEntityPayload({ id: finalId, draft, source });
     saveButton.disabled = Boolean(built.errors);
     const shared = pool.personasById?.has(finalId);
@@ -69,7 +69,7 @@ export async function openEntityDialog(options) {
     dialog.setMessage(built.errors && (dialog.isDirty() || finalId === "system") ? built.errors[0] : "", "error");
   }
   async function save() {
-    const finalId = id || uniqueId(slugify(draft.name), options.takenIds());
+    const finalId = id || uniqueId(slugify(draft.label), options.takenIds());
     if (mode === "new" && options.takenIds().has(finalId)) return dialog.setMessage(`The id ${finalId} is already taken.`, "error");
     const built = buildEntityPayload({ id: finalId, draft, source });
     if (built.errors) return;
@@ -155,7 +155,7 @@ export async function openRelationshipTypeDialog(options) {
     fill(reads, h("span", { class: "uc-label-hint" }, "Reads as"), draft.label.trim() !== "" ? readLine(a, draft.label.trim(), b) : h("p", { class: "uc-muted" }, "Type a label to see how it reads."), draft.inverse.trim() !== "" ? readLine(b, draft.inverse.trim(), a) : null);
   };
 
-  const shareBox = h("div", { class: "uc-share-row" }, pool.dimensions.map((d) => h("label", { class: "uc-check" }, h("input", { type: "checkbox", checked: draft.sameTraits.includes(d.id), onChange: (e) => { draft.sameTraits = e.target.checked ? [...draft.sameTraits, d.id] : draft.sameTraits.filter((x) => x !== d.id); touch(); } }), d.label)));
+  const shareBox = h("div", { class: "uc-share-row" }, pool.dimensions.map((d) => h("label", { class: "uc-check" }, h("input", { type: "checkbox", checked: draft.sameTraits.includes(d.id), onChange: (e) => { draft.sameTraits = e.target.checked ? [...draft.sameTraits, d.id] : draft.sameTraits.filter((x) => x !== d.id); touch(); } }), d.name)));
   const objects = pool.objects ?? [];
   const fieldsOf = (objectId) => (pool.objectsById?.get(objectId)?.fields ?? []).filter((f) => f.type === "ref" || f.type === "list");
   const objectSelect = selectInput({ options: [{ value: "", label: objects.length === 0 ? "No data object" : "No data object" }, ...objects.map((o) => ({ value: o.id, label: o.name }))], value: draft.fieldObject, ariaLabel: "Data object of the field", onChange: (value) => { draft.fieldObject = value; draft.fieldName = ""; drawField(); touch(); } });
@@ -269,8 +269,8 @@ export async function openConstellationDialog(options) {
   fill(
     traitsBox,
     ...traitList.map((dimension) => {
-      const select = selectInput({ options: [{ value: "", label: "Any" }, ...dimension.values.map((v) => ({ value: v.id, label: v.label }))], value: draft.traits[dimension.id] ?? "", ariaLabel: dimension.label, onChange: (value) => { draft.traits[dimension.id] = value; touch(); } });
-      return h("div", { class: "uc-trait-row" }, h("span", { class: "uc-trait-label" }, dimension.label, (dimension.scope ?? "personas") === "constellations" ? null : h("span", { class: "uc-label-hint" }, " · personas")), select);
+      const select = selectInput({ options: [{ value: "", label: "Any" }, ...dimension.values.map((v) => ({ value: v.id, label: v.label }))], value: draft.traits[dimension.id] ?? "", ariaLabel: dimension.name, onChange: (value) => { draft.traits[dimension.id] = value; touch(); } });
+      return h("div", { class: "uc-trait-row" }, h("span", { class: "uc-trait-label" }, dimension.name, (dimension.scope ?? "personas") === "constellations" ? null : h("span", { class: "uc-label-hint" }, " · personas")), select);
     }),
   );
 
@@ -325,7 +325,7 @@ export async function openConstellationDialog(options) {
 
   function refresh() {
     if (!ready) return;
-    const finalId = id || uniqueId(slugify(draft.name), options.takenIds());
+    const finalId = id || uniqueId(slugify(draft.label), options.takenIds());
     const built = buildConstellationPayload({ id: finalId, draft, source });
     showFieldErrors(dialog.body, built.fieldErrors ?? []);
     const warnings = [];
@@ -342,7 +342,7 @@ export async function openConstellationDialog(options) {
     dialog.setMessage(built.errors ? (dialog.isDirty() ? built.errors[0] : "") : warnings.length > 0 ? `${plural(warnings.length, "warning")} · you can save anyway` : "", built.errors ? "error" : "warning");
   }
   async function save() {
-    const finalId = id || uniqueId(slugify(draft.name), options.takenIds());
+    const finalId = id || uniqueId(slugify(draft.label), options.takenIds());
     if (mode === "new" && options.takenIds().has(finalId)) return dialog.setMessage(`The id ${finalId} is already taken.`, "error");
     const built = buildConstellationPayload({ id: finalId, draft, source });
     if (built.errors) return;

@@ -658,7 +658,7 @@ named `parent.key`; `[]` is a list item. `traits` is `{dimension: value}`;
 `avatar` is `{emoji, color}`.
 
 ```shapes
-dimension: id label values | description scope
+dimension: id name values | description scope
 dimension.values[]: id label |
 persona: id name | kind role description avatar traits goals generated
 avatar: | emoji color

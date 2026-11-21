@@ -6,7 +6,7 @@
 // WebSocket. Artisign still has exactly one document renderer
 // (`renderScreenDocument`); the browser only lays out and captures it.
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -202,6 +202,57 @@ const RM_OPTIONS = { recursive: true, force: true, maxRetries: 10, retryDelay: 2
 const liveChildren = new Set<ChildProcess>();
 const liveProfiles = new Set<string>();
 
+/**
+ * Windows only: Chromium children (crashpad handler, utility processes) can
+ * outlive the main process and detach from its tree, so `taskkill /T` on the
+ * main pid misses them. Every one of them carries this capture's profile
+ * directory in its command line — the profile is ours and unique — so stop
+ * whatever still has it, except node processes (the watchdog carries the path
+ * in its argv and must live on to remove the profile). The path travels in the environment,
+ * never in the script text.
+ */
+const PROFILE_KILL_SCRIPT =
+  "Get-CimInstance Win32_Process | Where-Object { $_.Name -ne 'node.exe' -and $_.CommandLine -and $_.CommandLine.Contains($env:ARTISIGN_KILL_PROFILE) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }";
+const PROFILE_KILL_ARGS = ["-NoProfile", "-NonInteractive", "-Command", PROFILE_KILL_SCRIPT];
+
+export type ProfileKillExec = (
+  file: string,
+  args: string[],
+  options: { env: NodeJS.ProcessEnv; windowsHide: true; timeout: number },
+) => Promise<unknown>;
+
+const defaultProfileKillExec: ProfileKillExec = (file, args, options) =>
+  new Promise((resolve) => execFile(file, args, { ...options, stdio: "ignore" } as never, () => resolve(undefined)));
+
+/** Stops every process whose command line holds `profile` (Windows only; a no-op elsewhere). Best effort. */
+export async function killProfileProcesses(
+  profile: string,
+  platform: NodeJS.Platform = process.platform,
+  exec: ProfileKillExec = defaultProfileKillExec,
+): Promise<void> {
+  if (platform !== "win32") return;
+  await exec("powershell.exe", PROFILE_KILL_ARGS, {
+    env: { ...process.env, ARTISIGN_KILL_PROFILE: profile },
+    windowsHide: true,
+    timeout: 15_000,
+  }).catch(() => {});
+}
+
+/** Synchronous variant for the process "exit" handler. */
+function killProfileProcessesSync(profile: string): void {
+  if (process.platform !== "win32") return;
+  try {
+    execFileSync("powershell.exe", PROFILE_KILL_ARGS, {
+      env: { ...process.env, ARTISIGN_KILL_PROFILE: profile },
+      stdio: "ignore",
+      windowsHide: true,
+      timeout: 15_000,
+    });
+  } catch {
+    // Best effort.
+  }
+}
+
 // Generous on purpose: the first launch after a reboot reads the whole browser
 // install from a cold disk — on a fresh CI runner 5–25 s for Firefox (CHR-885).
 // The timeout only has to catch a browser that hangs, not one still loading.
@@ -277,6 +328,7 @@ const timer = setInterval(() => {
   // Windows: end the whole process tree; the profile may stay locked for a moment, so removal retries (EBUSY).
   if (process.platform === "win32") { try { require("node:child_process").execFileSync("taskkill", ["/PID", browser, "/T", "/F"], { stdio: "ignore", windowsHide: true }); } catch {} }
   try { process.kill(Number(browser)); } catch {}
+  if (process.platform === "win32") { try { require("node:child_process").execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", ${JSON.stringify(PROFILE_KILL_SCRIPT)}], { env: { ...process.env, ARTISIGN_KILL_PROFILE: profile }, stdio: "ignore", windowsHide: true, timeout: 15000 }); } catch {} }
   setTimeout(() => require("node:fs").rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }), 2000);
 }, 1000);`;
 
@@ -306,7 +358,7 @@ function spawnBrowser(
   pattern: RegExp,
   profile: string,
 ): Promise<{ child: ChildProcess; wsUrl: string }> {
-  const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"] });
+  const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
   liveChildren.add(child);
   child.on("exit", () => liveChildren.delete(child));
   if (child.pid !== undefined) startWatchdog(child.pid, profile);
@@ -751,6 +803,7 @@ async function launch(installed: InstalledBrowser): Promise<Browser> {
   liveProfiles.add(profile);
   const removeProfile = async (): Promise<void> => {
     liveProfiles.delete(profile);
+    await killProfileProcesses(profile);
     await rm(profile, RM_OPTIONS).catch(() => {});
   };
   let browser: Browser;
@@ -834,6 +887,7 @@ process.on("exit", () => {
   // An "exit" handler can't await a polite Browser.close — kill and clean up synchronously instead.
   for (const child of liveChildren) child.kill();
   for (const profile of liveProfiles) {
+    killProfileProcessesSync(profile);
     try {
       rmSync(profile, { recursive: true, force: true });
     } catch {

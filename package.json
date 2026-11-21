@@ -20,7 +20,8 @@
   },
   "os": [
     "darwin",
-    "linux"
+    "linux",
+    "win32"
   ],
   "bin": {
     "artisign": "./dist/cli/index.js"

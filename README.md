@@ -2,11 +2,11 @@
 
 An artificial artisan for UI design: agents build screens, a design system keeps them consistent. <!-- [TAGLINE von Christian] -->
 
-Local-first UX design tool for AI agents. Agents design through MCP, the human reviews in the browser, state lives in plain files.
+Local-first UX design tool for AI agents. Agents design through MCP, the human reviews and edits use-case data in the browser (use-case editing is merged, not yet in a release), state lives in plain files.
 
 One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
-**Status:** Stable (`2.2.1`) — CLI, store, parser/model, the 25-tool MCP surface, browser preview with live reload/flows/comments, screen variants with side-by-side compare, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
+**Status:** Stable (`2.2.1`) — CLI, store, parser/model, the MCP surface (25 tools in `2.2.1`; 30 on `main` with the unreleased use-case tools), browser preview with live reload/flows/comments, screen variants with side-by-side compare, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
 
 ## Why
 
@@ -105,7 +105,7 @@ Replace `/opt/homebrew/bin` with the directory `which npx` shows. Quit and reope
 
 **Just trying it.** `npx artisign` runs it once without installing.
 
-## The 25 tools
+## The 30 tools
 
 Every tool except `list_projects`, `init_project` and `get_guide` takes a required `project` input: a known project's name (as `list_projects` returns it) or an absolute path to a project folder. There is no implicit "current project" for agents.
 
@@ -139,7 +139,9 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 
 ### Unreleased — on `main`, not part of 2.2.1
 
-Specs that coding agents write and read: **use case specs**, an optional `usecases/` folder with personas, data objects and use cases whose steps map onto screens and elements (a use case spec describes a flow a user goes through, not a purpose). A project without it behaves exactly as before. These five tools and seven extra `delete_entity` kinds are merged but not yet in a release, so the tool count above is unchanged until one ships. The preview shows them in a fourth tab, **Use Cases**, where people can also create, edit and delete the same data.
+The five use-case tools below and the Use Cases tab are merged, not yet in a release. They bring the tool count from 25 (`2.2.1`) to 30.
+
+Specs that coding agents write and read: **use case specs**, an optional `usecases/` folder with personas, data objects and use cases whose steps map onto screens and elements (a use case spec describes a flow a user goes through, not a purpose). A project without it behaves exactly as before. These five tools and seven extra `delete_entity` kinds are listed below. The preview shows them in a fourth tab, **Use Cases**, where people can also create, edit and delete the same data.
 
 Optionally a use case plays in a **world model**, so the spec says who and what is there and what the case starts from, not only what the screen does. A library example: a *main entity* is a thing with identity that relates to a persona or another entity (a book copy held by a branch); a *constellation* is one fixed starting world (a member, a branch library and a copy, joined by `member-of` and `held-by` relationships that hold before the case starts; `borrows` would be its result); a *property state* is a value at the start of a case (`copy-0042.status = "available"`). A use case adds a `trigger` (an action of a persona, with `via` for the interface, or a state or point in time), a starting `state` (`copy-0042.status = "available"`), and **branches**: alternative paths that fork after a main-flow step, or before the first one, when conditions hold (`member-ana.open-loans` is at least 5) and either rejoin the flow or end the case. Variants can change the constellations, the state and the branches too. artisign stores, resolves, validates and shows states and conditions; it never evaluates them. World problems (an unknown participant, an entity acting as a persona, a participant outside the case's constellations, conflicting traits) come back as warnings and never block a write. Nothing new is needed in the tool list: `set_use_cases` takes `entities`, `relationship_types` and `constellations`, `get_use_case` returns the world of one case, and `list_use_cases` filters by `constellation` and `entity`. The Use Cases tab has read views and editors for it.
 
@@ -215,6 +217,7 @@ Served at `http://127.0.0.1:<port>` once the daemon is running — plain ES modu
 - **Design System** — token swatches by bucket, every component with every variant rendered side by side
 - **Mockup view** — a mockup's variants rendered live, side by side in columns, each with its title and description
 - **Follow mode** — off by default; the topbar's Follow toggle (three states: off / Following / Follow paused) makes the preview track a live agent session's own MCP tool calls, switching the view/selection to whatever it touches and briefly outlining the affected nodes (solid teal for a read, dashed violet + wash for a write, or a dashed border + "Updated" badge around the whole screen after `write_html`). Every tool call also lands in the right panel's new Activity tab (last 50, in-memory, newest first) regardless of follow's own state. Human navigation — a screen/tab click, clicking an entry in the Activity feed, or opening comment/inspect mode — pauses it; only the toggle's own "Resume" un-pauses it
+- **Use Cases tab** (merged, not yet in a release) — a fourth tab for the use-case specs: list, detail, variants, mapping onto screens and elements, world view, personas, dimensions and data objects, with dialogs to create, edit and delete them
 - Live reload over SSE — any file change on disk shows up in the browser within ~200 ms
 
 ## Deterministic render baseline

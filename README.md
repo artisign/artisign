@@ -2,11 +2,11 @@
 
 An artificial artisan for UI design: agents build screens, a design system keeps them consistent. <!-- [TAGLINE von Christian] -->
 
-Local-first UX design tool for AI agents. Agents design through MCP, the human reviews and edits use-case data in the browser (use-case editing is merged, not yet in a release), state lives in plain files.
+Local-first UX design tool for AI agents. Agents design through MCP, the human reviews and edits use-case data in the browser, state lives in plain files.
 
 One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
-**Status:** Stable (`2.2.1`) — CLI, store, parser/model, the MCP surface (25 tools in `2.2.1`; 30 on `main` with the unreleased use-case tools), browser preview with live reload/flows/comments, screen variants with side-by-side compare, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
+**Status:** Stable (`2.3.0`) — CLI, store, parser/model, the MCP surface (30 tools, including the use-case tools), browser preview with live reload/flows/comments, screen variants with side-by-side compare, the design system (tokens, variants, drift warnings, `promote_to_system`), and packaging are all implemented. artisign designs its own browser preview — see [Designed with itself](#designed-with-itself).
 
 ## Why
 
@@ -17,7 +17,7 @@ One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 
 ## Install
 
-**Requirements.** Node.js ≥ 22.4 on **macOS or Linux** — Windows is not supported (the store's atomic writes and path handling have never been verified there, so `package.json` makes `npm install` refuse the platform). For screenshots, a browser that is already installed: Chrome, Edge, Brave, Chromium or Firefox — see **Screenshots** below.
+**Requirements.** Node.js ≥ 22.4 on **macOS, Linux or Windows** (see [Windows support](#windows-support)). For screenshots, a browser that is already installed: Chrome, Edge, Brave, Chromium or Firefox — see **Screenshots** below.
 
 ```bash
 npm install -g artisign
@@ -49,9 +49,9 @@ artisign
 
 **Privacy.** artisign collects nothing — no telemetry, no account, no server beyond the local one it runs. These requests reach the network, none of them about you, and that is the complete list: the update check (at most once a day) asks `registry.npmjs.org` for the latest version and sends nothing else; `artisign update` runs `npm`, and the `npx` in your AI tool's entry fetches the pinned version from npm, both talking to the npm registry; and the first render of a project in each artisign run (and again when its typography tokens change) fetches the font families named in your tokens — plus the Material Symbols Rounded icon font, always (a copy shipped with the package is the fallback when that fails) — from Google Fonts, then caches them locally (see [Fonts & icons](#fonts--icons)). A remote `https://` URL that a screen's own HTML references (an image, a stylesheet) is loaded by the browser that renders it, like any web page. Everything else stays on `127.0.0.1`.
 
-### Unreleased — on `main`, not part of 2.2.1
+### Windows support
 
-**Windows support.** `package.json` on `main` lists `win32` in `os`; the published `latest` still refuses to install on Windows until the next release. What is tested: CI runs the four quality gates on a `windows-latest` runner (Windows Server, Node 24) and the screenshot and inspect-node tests with Edge and with Firefox on that runner. A manual smoke test passed on Windows 11 Pro 25H2 (build 26200) with Node 26 and Edge 158: install from a packed build, `artisign start`, `artisign setup` for Claude Code, `write_html` + `get_screenshot` with Edge, auto-commit with Git for Windows, and `artisign stop` (lock removed, no stray processes). Git for Windows is optional: it is only needed for the automatic commit of each write; without it artisign skips the commit and everything else works. Claude Code is verified on Windows; the other setup clients are not verified there yet. In Windows PowerShell with the default execution policy, npm's `artisign.ps1` shim is blocked — run `artisign.cmd …` instead, or allow local scripts with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+`package.json` lists `win32` in `os`. What is tested: CI runs the four quality gates on a `windows-latest` runner (Windows Server, Node 24) and the screenshot and inspect-node tests with Edge and with Firefox on that runner. A manual smoke test passed on Windows 11 Pro 25H2 (build 26200) with Node 26 and Edge 158: install from a packed build, `artisign start`, `artisign setup` for Claude Code, `write_html` + `get_screenshot` with Edge, auto-commit with Git for Windows, and `artisign stop` (lock removed, no stray processes). Git for Windows is optional: it is only needed for the automatic commit of each write; without it artisign skips the commit and everything else works. Claude Code is verified on Windows; the other setup clients are not verified there yet. In Windows PowerShell with the default execution policy, npm's `artisign.ps1` shim is blocked — run `artisign.cmd …` instead, or allow local scripts with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
 ## Quickstart
 
@@ -141,9 +141,9 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 | Visual review | `get_screenshot` | Screenshots a rendered screen (or one node), or one mockup variant, as a PNG — the write → screenshot → adjust loop. |
 | Visual review | `inspect_node` | Computed box and styles of one node as text — cheaper than vision for geometry questions. |
 
-### Unreleased — on `main`, not part of 2.2.1
+### Use cases
 
-The five use-case tools below and the Use Cases tab are merged, not yet in a release. They bring the tool count from 25 (`2.2.1`) to 30.
+The five use-case tools below and the Use Cases tab bring the tool count from 25 (`2.2.1`) to 30.
 
 Specs that coding agents write and read: **use case specs**, an optional `usecases/` folder with personas, data objects and use cases whose steps map onto screens and elements (a use case spec describes a flow a user goes through, not a purpose). A project without it behaves exactly as before. These five tools and seven extra `delete_entity` kinds are listed below. The preview shows them in a fourth tab, **Use Cases**, where people can also create, edit and delete the same data.
 
@@ -221,7 +221,7 @@ Served at `http://127.0.0.1:<port>` once the daemon is running — plain ES modu
 - **Design System** — token swatches by bucket, every component with every variant rendered side by side
 - **Mockup view** — a mockup's variants rendered live, side by side in columns, each with its title and description
 - **Follow mode** — off by default; the topbar's Follow toggle (three states: off / Following / Follow paused) makes the preview track a live agent session's own MCP tool calls, switching the view/selection to whatever it touches and briefly outlining the affected nodes (solid teal for a read, dashed violet + wash for a write, or a dashed border + "Updated" badge around the whole screen after `write_html`). Every tool call also lands in the right panel's new Activity tab (last 50, in-memory, newest first) regardless of follow's own state. Human navigation — a screen/tab click, clicking an entry in the Activity feed, or opening comment/inspect mode — pauses it; only the toggle's own "Resume" un-pauses it
-- **Use Cases tab** (merged, not yet in a release) — a fourth tab for the use-case specs: list, detail, variants, mapping onto screens and elements, world view, personas, dimensions and data objects, with dialogs to create, edit and delete them
+- **Use Cases tab** — a fourth tab for the use-case specs: list, detail, variants, mapping onto screens and elements, world view, personas, dimensions and data objects, with dialogs to create, edit and delete them
 - Live reload over SSE — any file change on disk shows up in the browser within ~200 ms
 
 ## Deterministic render baseline

@@ -26,6 +26,8 @@
   --chrome-ok: #16a34a;
   --chrome-warning: #d97706;
   --chrome-warning-subtle: #fdf1e0;
+  --chrome-info: #2a3edb;
+  --chrome-info-subtle: #dfe4ff;
   --chrome-error: #b91c1c;
   --chrome-danger: #c0392b;
   --chrome-activity-read: #0d9488;
@@ -58,6 +60,7 @@
   --size-panel-header: 40px;
   --size-bar-main: 44px;
   --size-chip-h: 16px;
+  --size-badge-h: 14px;
   --size-icon: 18px;
   --size-icon-sm: 16px;
   --size-icon-xs: 14px;
@@ -67,6 +70,7 @@
   --ui-xs: 11.5px;
   --ui-2xs: 11px;
   --ui-chip: 10.5px;
+  --ui-badge: 9.5px;
   --ui-title: 16px;
 
   /* Anything drawn over or inside the user's frame never themes: user screens, board thumbnails and the highlights on them keep the same literal look in light and dark. */
@@ -110,6 +114,8 @@
   --chrome-ok: #34d399;
   --chrome-warning: #f59e0b;
   --chrome-warning-subtle: #3a2a12;
+  --chrome-info: #a8b8ff;
+  --chrome-info-subtle: #22305a;
   --chrome-error: #f87171;
   --chrome-danger: #ef6b5b;
   --chrome-activity-read: #2dd4bf;
@@ -466,6 +472,42 @@
 .chrome-tab:focus-visible {
   outline: 2px solid var(--chrome-focus-ring);
   outline-offset: -2px;
+}
+
+/* CHR-1165 — a tab that carries a badge lays label and badge out in a row. */
+.chrome-tab:has(> .chrome-badge) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+/* CHR-1165 — "Beta" pill after a tab label, raised like a superscript (offset only, no layout effect). One look in every tab state. */
+.chrome-badge {
+  position: relative;
+  top: -4px;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: var(--size-badge-h);
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-info-subtle);
+  color: var(--chrome-info);
+  font-size: var(--ui-badge);
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* Shared utility: text for assistive tech only. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .chrome-pill {

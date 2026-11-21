@@ -303,3 +303,17 @@ describe("daemon-stored preferences (CHR-924)", () => {
     expect($("#zoom-label").textContent).toBe("Fit");
   });
 });
+
+describe("Use Cases tab beta badge (CHR-1165)", () => {
+  it("puts a Beta badge inside the tab button, named 'Use Cases, Beta', without extra focus stops or aria-label", async () => {
+    await boot();
+    const tab = $('.view-tab[data-view="usecases"]');
+    const badge = tab.querySelector(":scope > .chrome-badge");
+    expect(badge).not.toBeNull();
+    expect(badge.querySelector(".visually-hidden").textContent).toBe(", ");
+    expect(tab.textContent).toBe("Use Cases, Beta");
+    expect(tab.hasAttribute("aria-label")).toBe(false);
+    expect(tab.querySelector("button, a, [tabindex]")).toBeNull();
+    expect(document.querySelectorAll("#view-tabs .chrome-badge")).toHaveLength(1);
+  });
+});

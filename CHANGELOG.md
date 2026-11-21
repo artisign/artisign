@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Features
 
+- **Use cases:** a variant's `actors` map now also reaches the `when` subject of inherited branch conditions, the subjects of an inherited state trigger and of the inherited starting state (entity ids, `system` and anything the variant wrote itself stay as they are). The preview shows the same result.
 
 - **Slot fills:** `update_refs` takes a slot-fill element addressed as `<screen>.<id>` (authored id): change its `style` through `token_refs` or its `variant` in one call, without replacing the element; refs are validated as on any node and the id, flows and comments stay. `component_ref` only rebinds a fill that already is a component instance. The `patch_html` `set_attr` refusal of `style`/`class` on a fill names `update_refs`.
 - **Windows support:** `package.json` allows installs on `win32`. Project paths, atomic writes, browser discovery and cleanup, the daemon stop, `artisign setup`/`update`, opening the preview and the git auto-commit work with Windows paths and `.cmd` shims, and CI runs the full suite on `windows-latest` (Node 24, Edge and Firefox). Not part of a release yet.

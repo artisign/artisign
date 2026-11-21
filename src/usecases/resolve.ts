@@ -127,11 +127,16 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
       return remapped;
     });
   effective.steps = remap(effective.steps);
+  // A subject of a condition or state entry stands for a persona only when it is a map key; the system is no subject, so the
+  // key "system" and the value "system" leave a subject alone.
+  const mappedSubject = (subject: string): string => (subject !== SYSTEM_ACTOR && mapped(subject) !== SYSTEM_ACTOR ? mapped(subject) : subject);
+  const remapConditions = <T extends { subject: string }>(conditions: T[]): T[] => (conditions.some((c) => mappedSubject(c.subject) !== c.subject) ? conditions.map((c) => ({ ...c, subject: mappedSubject(c.subject) })) : conditions);
   if (effective.branches !== undefined) {
     effective.branches = effective.branches.map((branch) => {
       const steps = remap(branch.steps);
-      if (steps.every((step, i) => step === branch.steps[i])) return branch;
-      return { ...branch, steps } as EffectiveBranch;
+      const when = remapConditions(branch.when);
+      if (when === branch.when && steps.every((step, i) => step === branch.steps[i])) return branch;
+      return { ...branch, when, steps } as EffectiveBranch;
     });
     // Which base branch each effective branch stems from (by id), so a removal reports the pristine base branch.
     effective.branches.forEach((branch, index) => baseIdOf.set(branch, base.branches![index]!.id));
@@ -143,6 +148,23 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
     } else {
       effective.trigger = { ...effective.trigger, actor: mapped(effective.trigger.actor) };
     }
+  }
+  // State subjects of a state trigger are inherited with the trigger; one the variant wrote itself is taken as written.
+  if (variant.trigger === undefined && effective.trigger?.state !== undefined) effective.trigger = { ...effective.trigger, state: remapConditions(effective.trigger.state) };
+  // Inherited starting-state entries are remapped. One entry per (subject, property) stays: a variant-written entry (`change` set)
+  // wins, then an inherited entry that was remapped onto the subject (the remapped persona now plays that role), then one that was
+  // already on it.
+  if (effective.state !== undefined) {
+    const out: { entry: EffectiveStateEntry; rank: number }[] = [];
+    for (const entry of effective.state) {
+      const remapped = entry.change === undefined && mappedSubject(entry.subject) !== entry.subject;
+      const next = remapped ? { ...entry, subject: mappedSubject(entry.subject) } : entry;
+      const rank = entry.change !== undefined ? 3 : remapped ? 2 : 1;
+      const at = out.findIndex((o) => o.entry.subject === next.subject && o.entry.property === next.property);
+      if (at === -1) out.push({ entry: next, rank });
+      else if (rank > out[at]!.rank) out[at] = { entry: next, rank };
+    }
+    effective.state = out.map((o) => o.entry);
   }
   if (variant.personas === undefined && Object.entries(actors).some(([key, value]) => key !== value)) {
     // The system is not a persona, so a value "system" drops the entry.

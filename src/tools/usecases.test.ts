@@ -1043,6 +1043,41 @@ describe("use case tools", () => {
       expect(world).not.toHaveProperty("hint");
     });
 
+    it("reports values no pool entry carries in unpooled, not in coverage (CHR-1172, probe B7)", async () => {
+      const stock = { id: "stock", name: "Stock", scope: "personas", values: [{ id: "in", label: "In" }, { id: "low", label: "Low" }, { id: "out", label: "Out" }] };
+      const household = { id: "household", name: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "family", label: "Family" }] };
+      const ghost = { id: "ghost", name: "Ghost", scope: "personas", values: [{ id: "a", label: "A" }, { id: "b", label: "B" }] };
+      await setUseCases(fx.store, {
+        dimensions: [stock, household, ghost],
+        personas: [{ id: "p-in", name: "P In", traits: { stock: "in" } }, { id: "p-low", name: "P Low", traits: { stock: "low" } }, { id: "p-none", name: "P None" }],
+        constellations: [{ id: "solo", name: "Solo", traits: { household: "single" }, relationships: [] }],
+        use_cases: [
+          { ...borrowCase(), personas: ["p-in"] },
+          { ...borrowCase(), id: "with-world", personas: ["p-in"], constellations: ["solo"] },
+        ],
+      });
+      type Res = SuggestRes & { unpooled?: { dimension: string; values: string[]; hint: string }[] };
+      const plain = (await suggestVariants(fx.store, { id: "borrow-book", limit: 1 })) as Res;
+      expect(plain.unpooled).toEqual([
+        { dimension: "stock", values: ["out"], hint: "generate_personas creates personas for these values" },
+        { dimension: "ghost", values: ["a", "b"], hint: "generate_personas creates personas for these values" },
+      ]);
+      expect(plain.coverage.map((c) => c.dimension)).toEqual(["stock"]);
+      expect(plain.coverage[0]!.covered.concat(plain.coverage[0]!.uncovered)).not.toContain("out");
+      expect(plain.suggestions.some((s) => s.id === "stock-out")).toBe(false);
+      const world = (await suggestVariants(fx.store, { id: "with-world" })) as Res;
+      expect(world.unpooled).toEqual([
+        { dimension: "stock", values: ["out"], hint: "generate_personas creates personas for these values" },
+        { dimension: "household", values: ["family"], hint: 'generate_personas with target: "constellations" creates constellations for these values' },
+        { dimension: "ghost", values: ["a", "b"], hint: "generate_personas creates personas for these values" },
+      ]);
+    });
+
+    it("omits unpooled when every value is carried", async () => {
+      await setUseCases(fx.store, { dimensions: DIMENSIONS, personas: PERSONAS, use_cases: [borrowCase()] });
+      expect(await suggestVariants(fx.store, { id: "borrow-book" })).not.toHaveProperty("unpooled");
+    });
+
     it("a written-back constellation suggestion keeps the base personas when resolved (CHR-1144)", async () => {
       await setUseCases(fx.store, {
         dimensions: [{ id: "household", name: "Household", scope: "constellations", values: [{ id: "single", label: "Single" }, { id: "family", label: "Family" }] }],

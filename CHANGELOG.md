@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Features
 
+- **Use cases:** `suggest_use_case_variants` lists dimension values that no persona (or constellation) carries under a separate `unpooled` key, per dimension, with a hint to `generate_personas`; they are no longer silently missing from the response.
+
 - **Use cases:** specs that coding agents write and read. An optional `usecases/` folder holds personas, reusable
   data objects and one file per use case; a use case has inputs and outputs with example values, a flow of steps
   that can be mapped to screens and elements, and variants stored as differences. Five new tools

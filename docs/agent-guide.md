@@ -117,10 +117,15 @@ On a fresh project the order is: **tokens → base components → screens.**
   fill the slots, including with other component instances. Slot-fill content
   is readable — `get_node` (view `full`) lists it under `slots`, one entry per
   fill in document order with its slot name; `find_nodes` matches inside it
-  too. It never appears in `children`, and `get_node`/`update_refs` do not
-  take a ref into it. `patch_html` and `inspect_node` do: give the fill
+  too. It never appears in `children`, and `get_node` does not take a ref into
+  it. `update_refs`, `patch_html` and `inspect_node` do: give the fill
   element an explicit `id` and address it as `<screen>.<id>` (`patch_html`
-  also reaches fills by `css_selector`). The authored fill markup in the
+  also reaches fills by `css_selector`). Change a fill element's `style` or
+  token refs with `update_refs` — `token_refs` and `variant` work as on any
+  screen node, refs are validated the same way, and the element keeps its id,
+  flows and comments; `set_attr` still refuses `style`/`class`, and its error
+  names `update_refs`. `component_ref` only rebinds a fill that already is a
+  component instance (anything else: replace the fill). The authored fill markup in the
   screen file is what gets edited. A slot's top-level fill can be replaced by
   a single element or deleted, but has no siblings to insert next to; inside
   it, every operation works. A fill with no `id` has no ref — give it one.

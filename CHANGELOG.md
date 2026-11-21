@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Features
 
+- **Slot fills:** `update_refs` takes a slot-fill element addressed as `<screen>.<id>` (authored id): change its `style` through `token_refs` or its `variant` in one call, without replacing the element; refs are validated as on any node and the id, flows and comments stay. `component_ref` only rebinds a fill that already is a component instance. The `patch_html` `set_attr` refusal of `style`/`class` on a fill names `update_refs`.
+
 - **Use cases:** `suggest_use_case_variants` lists dimension values that no persona (or constellation) carries under a separate `unpooled` key, per dimension, with a hint to `generate_personas`; they are no longer silently missing from the response.
 
 - **Use cases:** specs that coding agents write and read. An optional `usecases/` folder holds personas, reusable

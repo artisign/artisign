@@ -497,8 +497,18 @@ export async function updateRefs(store: Store, input: UpdateRefsInput): Promise<
 
   const { screen, nodeId } = parsedRef;
   const { doc } = await loadScreen(store, screen);
-  const node = doc.nodes[nodeId];
-  if (!node) throw new ToolError("not_found", `node "${input.node}" was not found`);
+  const liveNode = doc.nodes[nodeId];
+  // A slot-fill element addressed by its authored id (CHR-1141): same ref, style and variant handling as a live node.
+  const fillLoc = liveNode ? undefined : findFillById(doc, nodeId);
+  const fill = fillLoc?.sub;
+  if (!liveNode && !fill) throw new ToolError("not_found", `node "${input.node}" was not found`);
+  const node = (liveNode ?? fill)!;
+  if (fill && input.refs.component_ref !== undefined && (input.refs.component_ref === null || fill.kind !== "component_instance")) {
+    throw new ToolError(
+      "validation_failed",
+      `"${input.node}" is slot-fill content — component_ref can only rebind a fill that already is a component instance; replace the fill (patch_html replace) to change what it is`,
+    );
+  }
 
   const registry = await loadRegistry(store);
   const warnings: Warning[] = [];
@@ -506,7 +516,7 @@ export async function updateRefs(store: Store, input: UpdateRefsInput): Promise<
 
   if (input.refs.component_ref !== undefined) {
     if (input.refs.component_ref === null) {
-      if (node.kind === "component_instance") revertComponentInstanceToElement(doc, node);
+      if (node.kind === "component_instance") revertComponentInstanceToElement(doc, liveNode!);
       else delete node.refs.component;
     } else {
       if (!registry.componentNames.has(input.refs.component_ref)) {
@@ -516,7 +526,7 @@ export async function updateRefs(store: Store, input: UpdateRefsInput): Promise<
         // Already an instance — just rebind which component it's an instance of.
         node.refs.component = input.refs.component_ref;
       } else {
-        convertToComponentInstance(doc, node, input.refs.component_ref);
+        convertToComponentInstance(doc, liveNode!, input.refs.component_ref);
       }
     }
     applied.component_ref = input.refs.component_ref;
@@ -562,7 +572,7 @@ export async function updateRefs(store: Store, input: UpdateRefsInput): Promise<
   await syncScreenFlows(store, doc);
   const commitResult = await store.commit(`update_refs: ${input.node}`);
 
-  warnings.push(...fillFlowWarnings(doc, new Set([nodeId])));
+  warnings.push(...fillFlowWarnings(doc, new Set([fillLoc ? fillLoc.owner.id : nodeId])));
   return { node: input.node, ...commitFields(commitResult), applied_refs: applied, warnings };
 }
 

@@ -73,3 +73,42 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      # CHR-1081: the run above uses whichever browser discovery picks first
+      # (Chrome). These steps run the browser e2e files once per remaining
+      # browser: Edge over CDP, Firefox over WebDriver BiDi.
+      - name: Screenshot and inspect-node e2e with Edge
+        shell: pwsh
+        run: |
+          $exe = Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'
+          if (-not (Test-Path $exe)) { $exe = Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe' }
+          if (-not (Test-Path $exe)) { throw 'msedge.exe not found' }
+          Write-Host "ARTISIGN_BROWSER=$exe"
+          $env:ARTISIGN_BROWSER = $exe
+          npx vitest run src/tools/screenshot.test.ts src/tools/inspect-node.test.ts src/tools/browser.test.ts
+      - name: No Edge process or profile left behind
+        if: always()
+        shell: pwsh
+        run: |
+          Start-Sleep -Seconds 5
+          $left = @(Get-Process msedge -ErrorAction SilentlyContinue)
+          $profiles = @(Get-ChildItem (Join-Path $HOME 'artisign-browser-profiles') -ErrorAction SilentlyContinue)
+          Write-Host "msedge processes: $($left.Count), profile dirs: $($profiles.Count)"
+          if ($left.Count -gt 0 -or $profiles.Count -gt 0) { throw 'leftover msedge process or artisign profile directory' }
+      - name: Screenshot and inspect-node e2e with Firefox
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:ProgramFiles 'Mozilla Firefox\firefox.exe'
+          if (-not (Test-Path $exe)) { $exe = Join-Path ${env:ProgramFiles(x86)} 'Mozilla Firefox\firefox.exe' }
+          if (-not (Test-Path $exe)) { throw 'firefox.exe not found' }
+          Write-Host "ARTISIGN_BROWSER=$exe"
+          $env:ARTISIGN_BROWSER = $exe
+          npx vitest run src/tools/screenshot.test.ts src/tools/inspect-node.test.ts src/tools/browser.test.ts
+      - name: No Firefox process or profile left behind
+        if: always()
+        shell: pwsh
+        run: |
+          Start-Sleep -Seconds 5
+          $left = @(Get-Process firefox -ErrorAction SilentlyContinue)
+          $profiles = @(Get-ChildItem (Join-Path $HOME 'artisign-browser-profiles') -ErrorAction SilentlyContinue)
+          Write-Host "firefox processes: $($left.Count), profile dirs: $($profiles.Count)"
+          if ($left.Count -gt 0 -or $profiles.Count -gt 0) { throw 'leftover firefox process or artisign profile directory' }

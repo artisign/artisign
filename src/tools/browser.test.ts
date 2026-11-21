@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
+import { chmod, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   getBrowser,
@@ -304,4 +305,48 @@ describe("getBrowser — cached browser lifecycle", () => {
       }
     },
   );
+});
+
+function browserInstalled(): boolean {
+  try {
+    selectBrowser(undefined);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+describe.skipIf(!browserInstalled())("owner killed (installed browser)", () => {
+  it("the watchdog removes the temp profile after the owning process is killed", async () => {
+    const root = join(homedir(), "artisign-browser-profiles");
+    const script = `import { getBrowser } from ${JSON.stringify(new URL("./browser.ts", import.meta.url).href)};
+      await getBrowser(); console.log("READY"); setInterval(() => {}, 1000);`;
+    const owner = spawn(
+      process.execPath,
+      ["--import", "tsx", "--input-type=module", "-e", script],
+      {
+        stdio: ["ignore", "pipe", "inherit"],
+      },
+    );
+    try {
+      await new Promise<void>((resolve, reject) => {
+        owner.stdout!.on("data", (d: Buffer) => d.toString().includes("READY") && resolve());
+        owner.on("exit", () => reject(new Error("owner exited before launching a browser")));
+      });
+      const mine = async (): Promise<string[]> =>
+        (await readdir(root).catch(() => [] as string[])).filter((e) =>
+          e.startsWith(`${owner.pid}-`),
+        );
+      expect(await mine()).toHaveLength(1);
+
+      owner.removeAllListeners("exit");
+      owner.kill("SIGKILL"); // no exit handler runs — only the watchdog can clean up
+      const deadline = Date.now() + 20_000;
+      while ((await mine()).length > 0 && Date.now() < deadline)
+        await new Promise((r) => setTimeout(r, 250));
+      expect(await mine()).toEqual([]);
+    } finally {
+      owner.kill("SIGKILL");
+    }
+  }, 60_000);
 });

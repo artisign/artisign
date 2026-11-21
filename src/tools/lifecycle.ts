@@ -34,9 +34,13 @@ function contentHash(html: string): string {
   return createHash("sha256").update(html).digest("hex");
 }
 
-function subtreeHasInlineStyleValue(subtree: NodeSubtree, value: string): boolean {
-  if (Object.values(subtree.inlineStyles).includes(value)) return true;
-  return subtree.children.some((child) => subtreeHasInlineStyleValue(child, value));
+function hasStyleValue(styles: Record<string, string>, value: string, property: string): boolean {
+  return styles[property] === value;
+}
+
+function subtreeHasInlineStyleValue(subtree: NodeSubtree, value: string, property: string): boolean {
+  if (hasStyleValue(subtree.inlineStyles, value, property)) return true;
+  return subtree.children.some((child) => subtreeHasInlineStyleValue(child, value, property));
 }
 
 /**
@@ -50,10 +54,10 @@ function subtreeHasInlineStyleValue(subtree: NodeSubtree, value: string): boolea
  * in `rewritten_nodes` — a structural gap in the canonical model, not
  * something this scan can paper over.
  */
-function docHasInlineStyleValue(doc: ScreenDocument, value: string): boolean {
+function docHasInlineStyleValue(doc: ScreenDocument, value: string, property: string): boolean {
   for (const node of Object.values(doc.nodes)) {
-    if (Object.values(node.inlineStyles).includes(value)) return true;
-    if (node.slotOverrides && Object.values(node.slotOverrides).some((s) => subtreeHasInlineStyleValue(s, value))) {
+    if (hasStyleValue(node.inlineStyles, value, property)) return true;
+    if (node.slotOverrides && Object.values(node.slotOverrides).some((s) => subtreeHasInlineStyleValue(s, value, property))) {
       return true;
     }
   }
@@ -61,7 +65,7 @@ function docHasInlineStyleValue(doc: ScreenDocument, value: string): boolean {
 }
 
 /**
- * Promotes every literal style declaration matching `value` inside a slot
+ * Promotes every literal `property` declaration matching `value` inside a slot
  * subtree to a `$path` ref, in place — the same treatment a screen's own
  * `doc.nodes` get, extended to slot-override content.
  * Returns whether anything changed. No node id exists for slot content
@@ -69,16 +73,15 @@ function docHasInlineStyleValue(doc: ScreenDocument, value: string): boolean {
  * be named in `rewritten_nodes` — only the enclosing screen is marked
  * affected.
  */
-function promoteInlineStyleInSubtree(subtree: NodeSubtree, value: string, path: string): boolean {
+function promoteInlineStyleInSubtree(subtree: NodeSubtree, value: string, path: string, property: string): boolean {
   let changed = false;
-  for (const [p, v] of Object.entries(subtree.inlineStyles)) {
-    if (v !== value) continue;
-    delete subtree.inlineStyles[p];
-    subtree.refs.tokens[p] = path;
+  if (subtree.inlineStyles[property] === value) {
+    delete subtree.inlineStyles[property];
+    subtree.refs.tokens[property] = path;
     changed = true;
   }
   for (const child of subtree.children) {
-    if (promoteInlineStyleInSubtree(child, value, path)) changed = true;
+    if (promoteInlineStyleInSubtree(child, value, path, property)) changed = true;
   }
   return changed;
 }
@@ -233,13 +236,37 @@ export type PromoteToSystemInput = {
   kind: "token" | "component" | "pattern";
   name: string;
   variants?: string[];
+  property?: string;
 };
 
-async function promoteToken(store: Store, doc: ScreenDocument, node: InternalNode, name: string): Promise<Record<string, unknown>> {
+async function promoteToken(
+  store: Store,
+  doc: ScreenDocument,
+  node: InternalNode,
+  name: string,
+  property?: string,
+): Promise<Record<string, unknown>> {
   const props = Object.keys(node.inlineStyles).sort();
-  const prop = props[0];
+  const ref = formatNodeRef(doc.id, node.id);
+  let prop: string | undefined;
+  if (property !== undefined) {
+    prop = props.find((p) => p.toLowerCase() === property.trim().toLowerCase());
+    if (!prop) {
+      throw new ToolError(
+        "not_found",
+        `node "${ref}" has no inline "${property}" value to promote${props.length ? ` (inline properties: ${props.join(", ")})` : ""}`,
+      );
+    }
+  } else if (props.length > 1) {
+    throw new ToolError(
+      "validation_failed",
+      `node "${ref}" has several inline properties (${props.join(", ")}); pass "property" to choose the one that becomes the token`,
+    );
+  } else {
+    prop = props[0];
+  }
   if (!prop) {
-    throw new ToolError("invalid_state", `node "${formatNodeRef(doc.id, node.id)}" has no inline style value to promote`);
+    throw new ToolError("invalid_state", `node "${ref}" has no inline style value to promote`);
   }
   const value = node.inlineStyles[prop]!;
 
@@ -284,16 +311,15 @@ async function promoteToken(store: Store, doc: ScreenDocument, node: InternalNod
       // definitions is the proven-correct path here.
       let changed = false;
       for (const n of Object.values(source.doc.nodes)) {
-        for (const [p, v] of Object.entries(n.inlineStyles)) {
-          if (v !== value) continue;
-          delete n.inlineStyles[p];
-          n.refs.tokens[p] = path;
+        if (n.inlineStyles[prop] === value) {
+          delete n.inlineStyles[prop];
+          n.refs.tokens[prop] = path;
           rewrittenNodes.push(formatNodeRef(source.address, n.id));
           changed = true;
         }
         if (n.slotOverrides) {
           for (const subtree of Object.values(n.slotOverrides)) {
-            if (promoteInlineStyleInSubtree(subtree, value, path)) changed = true;
+            if (promoteInlineStyleInSubtree(subtree, value, path, prop)) changed = true;
           }
         }
       }
@@ -308,7 +334,7 @@ async function promoteToken(store: Store, doc: ScreenDocument, node: InternalNod
     // outside doc.nodes and must be scanned too, or a match sitting only
     // there is never even detected as a reason to touch the file — see docHasInlineStyleValue's doc comment
     // for why it still can't appear in rewritten_nodes.
-    if (!docHasInlineStyleValue(source.doc, value)) continue;
+    if (!docHasInlineStyleValue(source.doc, value, prop)) continue;
     if (source.kind === "component") componentCandidates.add(source.name);
     else patternCandidates.add(source.name);
   }
@@ -325,7 +351,7 @@ async function promoteToken(store: Store, doc: ScreenDocument, node: InternalNod
 
   for (const componentName of componentCandidates) {
     const html = await store.readComponent(componentName);
-    const { html: rewritten, changed } = rewriteLiteralStyleValueInDefinition(html, value, path);
+    const { html: rewritten, changed } = rewriteLiteralStyleValueInDefinition(html, value, path, prop);
     if (!changed) {
       // The model-level scan above found a candidate, but the
       // source-preserving rewrite found nothing to touch — should be
@@ -346,13 +372,13 @@ async function promoteToken(store: Store, doc: ScreenDocument, node: InternalNod
     for (const source of sources) {
       if (source.kind !== "component" || source.name !== componentName) continue;
       for (const n of Object.values(source.doc.nodes)) {
-        if (Object.values(n.inlineStyles).includes(value)) rewrittenNodes.push(formatNodeRef(source.address, n.id));
+        if (n.inlineStyles[prop] === value) rewrittenNodes.push(formatNodeRef(source.address, n.id));
       }
     }
   }
   for (const patternName of patternCandidates) {
     const html = await store.readPattern(patternName);
-    const { html: rewritten, changed } = rewriteLiteralStyleValueInDefinition(html, value, path);
+    const { html: rewritten, changed } = rewriteLiteralStyleValueInDefinition(html, value, path, prop);
     if (!changed) {
       warnings.push({
         kind: "unknown_ref",
@@ -366,7 +392,7 @@ async function promoteToken(store: Store, doc: ScreenDocument, node: InternalNod
     for (const source of sources) {
       if (source.kind !== "pattern" || source.name !== patternName) continue;
       for (const n of Object.values(source.doc.nodes)) {
-        if (Object.values(n.inlineStyles).includes(value)) rewrittenNodes.push(formatNodeRef(source.address, n.id));
+        if (n.inlineStyles[prop] === value) rewrittenNodes.push(formatNodeRef(source.address, n.id));
       }
     }
   }
@@ -534,7 +560,7 @@ export async function promoteToSystem(store: Store, input: PromoteToSystemInput)
   if (!node) throw new ToolError("not_found", `node "${input.node}" was not found`);
 
   if (input.kind === "token") {
-    return promoteToken(store, doc, node, input.name);
+    return promoteToken(store, doc, node, input.name, input.property);
   }
   assertValidEntityName(input.kind, input.name);
   return promoteComponentOrPattern(store, doc, node, input.kind, input.name, input.variants);

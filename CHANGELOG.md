@@ -8,12 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [2.3.0] - 2026-11-21
 
-Use cases, a new way to describe what your app does before and while you design it, plus Windows support. The tool count grows from 25 to 30. Two breaking changes: `promote_to_system` needs a `property` when a node has several inline properties, and `delete_entity` rejects `variant` on everything except mockups.
+Use cases, a new way to describe what your app does before and while you design it, plus Windows support. Two breaking changes: `promote_to_system` needs a `property` when a node has several inline properties, and `delete_entity` rejects `variant` on everything except mockups.
 
 ### Features
 
-- **Use cases:** define the world your app operates in, then design and build against it. Use cases are the base for screen design, and coding agents read the same spec to build the app and to write its tests. Personas, entities and starting states describe the world, data objects define the data with example values, steps map onto screens and elements, and variants cover the cases that differ. Five new tools (`list_use_cases`, `get_use_case`, `set_use_cases`, `generate_personas`, `suggest_use_case_variants`) read and write them. A project without use cases behaves exactly as before.
-- **Use Cases tab (beta):** browse, search and edit use cases in the preview, see each step on the live screen, and manage personas, entities and data objects with dialogs. When artisign is not running, the tab says so and offers a retry.
+- **Use cases:** define the world your app operates in, then design and build against it. Use cases are the base for screen design, and coding agents read the same spec to build the app and to write its tests. Personas, entities and starting states describe the world, data objects define the data with example values, steps map onto screens and elements, and variants cover the cases that differ. A project without use cases behaves exactly as before.
+- **Use Cases tab (beta):** browse, search and edit use cases in the preview, see each step on the live screen, and manage personas, entities and data objects with dialogs.
 - **Windows support:** artisign installs and runs on Windows, including setup, update, screenshots and the git auto-commit. CI now runs the full suite on Windows.
 - **Slot fills:** `update_refs` can change the style or variant of an element inside a component slot, without replacing it.
 

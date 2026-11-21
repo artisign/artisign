@@ -71,6 +71,44 @@ describe("variant actors map", () => {
     expect(resolveUseCase(base, base.variants![0]).use_case.personas).toEqual(["a", "c", "e"]);
   });
 
+  it("remaps the subject of branch conditions, the trigger state and state subjects; entities and the system stay", () => {
+    const base = withMap(
+      { "member-ana": "staff-lee" },
+      {},
+      {
+        trigger: { text: "Member asks", state: [{ subject: "member-ana", property: "card", value: "expired" }, { subject: "loan", property: "status", value: "available" }] },
+        state: [{ subject: "member-ana", property: "card", value: "expired" }, { subject: "loan", property: "status", value: "available" }],
+        branches: [
+          {
+            id: "expired",
+            title: "Card expired",
+            from: "tap",
+            when: [{ subject: "member-ana", property: "card", value: "expired" }, { subject: "loan", property: "status", op: "ne", value: "lost" }, { subject: "system", property: "up", value: true }],
+            steps: [{ id: "renew", actor: "member-ana", action: "Renews" }],
+            outcome: "Renewed",
+          },
+        ],
+      },
+    );
+    const r = resolveUseCase(base, base.variants![0]).use_case;
+    expect(r.branches![0]!.when.map((c) => c.subject)).toEqual(["staff-lee", "loan", "system"]);
+    expect(r.branches![0]!.steps[0]!.actor).toBe("staff-lee");
+    expect(r.trigger!.state!.map((c) => c.subject)).toEqual(["staff-lee", "loan"]);
+    expect(r.state!.map((e) => e.subject)).toEqual(["staff-lee", "loan"]);
+    expect(base.branches![0]!.when[0]!.subject).toBe("member-ana");
+  });
+
+  it("remaps an inherited trigger actor but takes state the variant wrote as written", () => {
+    const base = withMap(
+      { "member-ana": "staff-lee" },
+      { state: [{ subject: "member-ana", property: "card", value: "valid" }] },
+      { trigger: { text: "Member asks", actor: "member-ana" }, state: [{ subject: "member-ana", property: "card", value: "expired" }] },
+    );
+    const r = resolveUseCase(base, base.variants![0]).use_case;
+    expect(r.trigger!.actor).toBe("staff-lee");
+    expect(r.state).toEqual([{ subject: "member-ana", property: "card", value: "valid", change: "changed" }]);
+  });
+
   it("takes the variant's own personas as written", () => {
     const base = withMap({ "member-ana": "staff-lee" }, { personas: ["member-ana"] });
     expect(resolveUseCase(base, base.variants![0]).use_case.personas).toEqual(["member-ana"]);

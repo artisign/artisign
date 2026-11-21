@@ -127,11 +127,16 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
       return remapped;
     });
   effective.steps = remap(effective.steps);
+  // A subject of a condition or state entry stands for a persona only when it is a map key; the system is no subject, so the
+  // key "system" and the value "system" leave a subject alone.
+  const mappedSubject = (subject: string): string => (subject !== SYSTEM_ACTOR && mapped(subject) !== SYSTEM_ACTOR ? mapped(subject) : subject);
+  const remapConditions = <T extends { subject: string }>(conditions: T[]): T[] => (conditions.some((c) => mappedSubject(c.subject) !== c.subject) ? conditions.map((c) => ({ ...c, subject: mappedSubject(c.subject) })) : conditions);
   if (effective.branches !== undefined) {
     effective.branches = effective.branches.map((branch) => {
       const steps = remap(branch.steps);
-      if (steps.every((step, i) => step === branch.steps[i])) return branch;
-      return { ...branch, steps } as EffectiveBranch;
+      const when = remapConditions(branch.when);
+      if (when === branch.when && steps.every((step, i) => step === branch.steps[i])) return branch;
+      return { ...branch, when, steps } as EffectiveBranch;
     });
     // Which base branch each effective branch stems from (by id), so a removal reports the pristine base branch.
     effective.branches.forEach((branch, index) => baseIdOf.set(branch, base.branches![index]!.id));
@@ -143,6 +148,19 @@ export function resolveUseCase(base: UseCase, variant?: UseCaseVariant): Resolve
     } else {
       effective.trigger = { ...effective.trigger, actor: mapped(effective.trigger.actor) };
     }
+  }
+  // State subjects of a state trigger are inherited with the trigger; one the variant wrote itself is taken as written.
+  if (variant.trigger === undefined && effective.trigger?.state !== undefined) effective.trigger = { ...effective.trigger, state: remapConditions(effective.trigger.state) };
+  // Inherited starting-state entries are remapped; entries the variant wrote (`change` set) stay as written and win a collision.
+  if (effective.state !== undefined) {
+    const written = new Set(effective.state.filter((e) => e.change !== undefined).map((e) => JSON.stringify([e.subject, e.property])));
+    effective.state = effective.state.flatMap((entry) => {
+      if (entry.change !== undefined || mappedSubject(entry.subject) === entry.subject) return [entry];
+      const key = JSON.stringify([mappedSubject(entry.subject), entry.property]);
+      if (written.has(key)) return [];
+      written.add(key);
+      return [{ ...entry, subject: mappedSubject(entry.subject) }];
+    });
   }
   if (variant.personas === undefined && Object.entries(actors).some(([key, value]) => key !== value)) {
     // The system is not a persona, so a value "system" drops the entry.

@@ -19,7 +19,7 @@ import { loadAllDocuments } from "./definitions.js";
 import { buildStyleOccurrenceIndex } from "./style-index.js";
 import { parseNodeRef, formatNodeRef, requireScreenNodeRef } from "./node-ref.js";
 import { assertValidBackdrop, backdropCandidateWarning, backdropHint } from "./backdrop.js";
-import { syncScreenFlows, fillFlowWarnings } from "./flows.js";
+import { syncScreenFlows, fillFlowWarnings, unknownFlowTargetWarnings } from "./flows.js";
 import { diffScreenDocuments } from "./diff.js";
 import { findBySelector, findFillById, findFillsBySelector, patchFill, spliceFragment, removeNode } from "./patch.js";
 import { convertToComponentInstance, revertComponentInstanceToElement } from "./node-convert.js";
@@ -71,6 +71,26 @@ function mapRepeatedPatternWarnings(
     message: w.message,
     suggestion: w.suggestion,
   }));
+}
+
+/**
+ * The `repeated_pattern` warnings of a whole-screen write (write_html,
+ * import_html), capped at REPEATED_PATTERN_CAP. A cheap pre-check first, before
+ * paying for buildStyleOccurrenceIndex's project-wide loadAllDocuments scan
+ * (CHR-635): most writes touch no visually-styled ad-hoc node at all (a
+ * component instance, a pure layout wrapper, plain text) and pay nothing.
+ */
+export async function repeatedPatternWarningsForWrite(
+  store: Store,
+  registry: Awaited<ReturnType<typeof loadRegistry>>,
+  doc: ScreenDocument,
+  screen: string,
+): Promise<{ warnings: Warning[]; omittedCount: number }> {
+  if (!Object.values(doc.nodes).some((n) => isRepeatedPatternCandidate(n))) return { warnings: [], omittedCount: 0 };
+  const styleIndex = await buildStyleOccurrenceIndex(store, registry);
+  const all = mapRepeatedPatternWarnings(computeRepeatedPatternWarnings(doc, screen, styleIndex), screen, doc.rootNodeId);
+  const warnings = all.slice(0, REPEATED_PATTERN_CAP);
+  return { warnings, omittedCount: all.length - warnings.length };
 }
 
 // ---------------------------------------------------------------------------
@@ -248,27 +268,18 @@ export async function writeHtml(store: Store, input: WriteHtmlInput): Promise<Re
     suggestion: w.suggestion,
   }));
 
-  // Cheap pre-check before paying for buildStyleOccurrenceIndex's
-  // project-wide loadAllDocuments scan (CHR-635): most writes touch no
-  // visually-styled ad-hoc node at all (a component instance, a pure
-  // layout wrapper, plain text) and pay nothing for repeated_pattern.
-  let repeatedPatternWarnings: Warning[] = [];
-  let repeatedPatternOmittedCount = 0;
-  if (Object.values(doc.nodes).some((n) => isRepeatedPatternCandidate(n))) {
-    const styleIndex = await buildStyleOccurrenceIndex(store, registry);
-    const allRepeatedPatternWarnings = mapRepeatedPatternWarnings(
-      computeRepeatedPatternWarnings(doc, input.screen, styleIndex),
-      input.screen,
-      doc.rootNodeId,
-    );
-    repeatedPatternWarnings = allRepeatedPatternWarnings.slice(0, REPEATED_PATTERN_CAP);
-    repeatedPatternOmittedCount = allRepeatedPatternWarnings.length - repeatedPatternWarnings.length;
-  }
+  const { warnings: repeatedPatternWarnings, omittedCount: repeatedPatternOmittedCount } = await repeatedPatternWarningsForWrite(
+    store,
+    registry,
+    doc,
+    input.screen,
+  );
 
   const backdropWarning = await backdropCandidateWarning(store, registry, input.screen, doc);
   const warnings = [
     ...refWarnings,
     ...fillFlowWarnings(doc),
+    ...(await unknownFlowTargetWarnings(store, doc)),
     ...driftWarnings,
     ...repeatedPatternWarnings,
     ...(backdropWarning ? [backdropWarning] : []),
@@ -460,6 +471,7 @@ export async function patchHtml(store: Store, input: PatchHtmlInput): Promise<Re
     warnings: [
       ...refWarnings,
       ...fillFlowWarnings(doc, new Set(affectedNodeIds)),
+      ...(await unknownFlowTargetWarnings(store, doc, new Set(affectedNodeIds))),
       ...scopedDriftWarnings,
       ...scopedRepeatedPatternWarnings,
       ...(backdropWarning ? [backdropWarning] : []),
@@ -767,5 +779,11 @@ export async function setFlow(store: Store, input: SetFlowInput): Promise<Record
   await syncScreenFlows(store, doc);
   const commitResult = await store.commit(`set_flow: ${input.node}`);
 
-  return { node: input.node, ...commitFields(commitResult), path: "flows.json", applied_flow: input.flow, warnings: [] };
+  return {
+    node: input.node,
+    ...commitFields(commitResult),
+    path: "flows.json",
+    applied_flow: input.flow,
+    warnings: input.flow ? await unknownFlowTargetWarnings(store, doc, new Set([nodeId])) : [],
+  };
 }

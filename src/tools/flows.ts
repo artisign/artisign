@@ -1,5 +1,7 @@
 import type { Store, FlowRecord } from "../store/index.js";
 import { collectFillFlows, collectFills, forEachFill, type Flow as InternalFlow, type NodeSubtree, type ScreenDocument } from "../model/index.js";
+import { loadScreen } from "./context.js";
+import { findFillById } from "./patch.js";
 import { formatNodeRef } from "./node-ref.js";
 import type { FlowEventName, PublicFlow, Warning } from "./types.js";
 
@@ -136,4 +138,56 @@ export function fillFlowWarnings(doc: ScreenDocument, touched?: ReadonlySet<stri
       suggestion: "add an id to the fill element that carries data-flow-target",
     };
   });
+}
+
+/**
+ * A flow whose target screen, or `<screen>.<node>`, does not exist (CHR-1177).
+ * Advisory only: the edge is still written, so a target created by a later
+ * write simply stops warning. `doc` is the screen just written; a target in
+ * that same screen is resolved against it. `onlyTriggers` (raw node and fill
+ * ids a patch or `set_flow` changed) narrows it to the edges that call touched.
+ */
+export async function unknownFlowTargetWarnings(
+  store: Store,
+  doc: ScreenDocument,
+  onlyTriggers?: ReadonlySet<string>,
+): Promise<Warning[]> {
+  const flows = [...doc.flows.filter((flow) => doc.nodes[flow.triggerNodeId]), ...collectFillFlows(doc).flows].filter(
+    (flow) => !onlyTriggers || onlyTriggers.has(flow.triggerNodeId),
+  );
+  if (flows.length === 0) return [];
+  const screens = new Set(await store.listScreens());
+  screens.add(doc.id);
+  const loaded = new Map<string, ScreenDocument | null>([[doc.id, doc]]);
+  const warnings: Warning[] = [];
+  for (const flow of flows) {
+    const dot = flow.targetId.indexOf(".");
+    const targetScreen = flow.targetKind === "node" && dot !== -1 ? flow.targetId.slice(0, dot) : flow.targetId;
+    const targetNode = flow.targetKind === "node" && dot !== -1 ? flow.targetId.slice(dot + 1) : null;
+    let missing: string | null = null;
+    if (!screens.has(targetScreen)) {
+      missing = `screen "${targetScreen}" does not exist`;
+    } else if (targetNode !== null) {
+      if (!loaded.has(targetScreen)) {
+        try {
+          loaded.set(targetScreen, (await loadScreen(store, targetScreen)).doc);
+        } catch {
+          loaded.set(targetScreen, null);
+        }
+      }
+      const target = loaded.get(targetScreen);
+      if (target && !target.nodes[targetNode] && !findFillById(target, targetNode)) {
+        missing = `node "${targetNode}" does not exist in screen "${targetScreen}"`;
+      }
+    }
+    if (missing === null) continue;
+    const from = formatNodeRef(doc.id, flow.triggerNodeId);
+    warnings.push({
+      kind: "unknown_flow_target",
+      target: from,
+      message: `flow from "${from}" targets "${flow.targetId}", but ${missing}`,
+      suggestion: "the edge is kept; create the target (a later write stops this warning) or point the flow elsewhere",
+    });
+  }
+  return warnings;
 }

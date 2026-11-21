@@ -288,17 +288,19 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   // and shorter (499 to 475 chars): 24,938 to 24,941 (+3).
   // CHR-1129: "use case spec" in four descriptions: 24,941 to 24,976 (+35).
   // CHR-1168: set_use_cases advertises the typed shapes of all seven pools,
-  // derived from the strict schemas: 24,976 to 40,395 (+15,419 chars, ~+3,855 tokens).
+  // derived from the strict schemas: 24,976 to 41,778 (+16,802 chars, ~+4,200 tokens; set_use_cases entry 18,164 chars).
   // The pin is exact (CHR-1143): any change, up or down, shows here.
-  it("pins the measured tools/list size as information, not a limit (40,395 chars, ~10,099 tokens)", () => {
-    expect(JSON.stringify(tools).length).toBe(40_395);
+  it("pins the measured tools/list size as information, not a limit (41,778 chars, ~10,445 tokens)", () => {
+    expect(JSON.stringify(tools).length).toBe(41_778);
   });
 
-  // set_use_cases is exempt since CHR-1168: its typed input schema carries every entity shape on purpose.
-  it("keeps every advertised tool entry within 2,000 chars", () => {
+  // CHR-1168: set_use_cases carries every entity shape on purpose, so it has an exact size pin of its own
+  // (information, not a limit) instead of the 2,000 char guard of the other tools.
+  it("keeps every other advertised tool entry within 2,000 chars and pins the set_use_cases entry", () => {
     for (const tool of tools.filter((t) => t.name !== "set_use_cases")) {
       expect(JSON.stringify(tool).length, tool.name).toBeLessThanOrEqual(2_000);
     }
+    expect(JSON.stringify(tools.find((t) => t.name === "set_use_cases")).length).toBe(18_164);
   });
 
   it("keeps every description within 500 chars", () => {

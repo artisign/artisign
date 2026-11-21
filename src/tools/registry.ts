@@ -84,10 +84,23 @@ const predicateSchema = z.discriminatedUnion("kind", [
  * *runtime* parse stays the permissive list of open records. The handler's own validation therefore remains the only
  * authority and a wrong write fails as the tool's `validation_failed` (path + rule), never as a client-side schema error of
  * another shape. `.meta({ items })` replaces only the `items` of the generated JSON schema; the zod parse is untouched.
+ *
+ * The write is a merge-by-id upsert (given keys replace, `null` removes a key), so at the top level only `id` is required
+ * and every other key is optional and nullable; the keys a NEW entity needs are listed in the item `description` (taken
+ * from the create schema). `null` on a key the create schema requires would remove it and fail validation, so those keys
+ * are not advertised as nullable. Nested shapes keep their full required keys (arrays are replaced whole).
  */
-function advertisedPool(entity: z.ZodType) {
+function advertisedPool(kind: string, entity: z.ZodType) {
   const items: Record<string, unknown> = z.toJSONSchema(entity, { io: "input", unrepresentable: "any", target: "draft-7" });
   delete items.$schema;
+  const properties = items.properties as Record<string, Record<string, unknown>>;
+  const createRequired = (items.required as string[] | undefined) ?? [];
+  for (const [key, schema] of Object.entries(properties)) {
+    if (!createRequired.includes(key)) properties[key] = { anyOf: [schema, { type: "null" }] };
+  }
+  items.required = ["id"];
+  const needed = createRequired.filter((key) => key !== "id");
+  items.description = `merge by id; a new ${kind} requires: ${["id", ...needed].join(", ")}`;
   return z.array(z.record(z.string(), z.unknown())).meta({ items }).optional();
 }
 
@@ -302,13 +315,13 @@ export const TOOLS: ToolDefinition[] = [
     "set_use_cases",
     "Bulk upsert by id of dimensions, personas, entities, relationship_types, constellations, data_objects, use_cases (the use case specs; shapes: get_guide). An existing entity merges at top level: given keys replace (arrays whole), null removes a key. Validated before anything is written; unknown references only warn.",
     {
-      dimensions: advertisedPool(dimensionSchema),
-      personas: advertisedPool(personaSchema),
-      entities: advertisedPool(entitySchema),
-      relationship_types: advertisedPool(relationshipTypeSchema),
-      constellations: advertisedPool(constellationSchema),
-      data_objects: advertisedPool(dataObjectSchema),
-      use_cases: advertisedPool(useCaseSchema),
+      dimensions: advertisedPool("dimension", dimensionSchema),
+      personas: advertisedPool("persona", personaSchema),
+      entities: advertisedPool("entity", entitySchema),
+      relationship_types: advertisedPool("relationship type", relationshipTypeSchema),
+      constellations: advertisedPool("constellation", constellationSchema),
+      data_objects: advertisedPool("data object", dataObjectSchema),
+      use_cases: advertisedPool("use case", useCaseSchema),
     },
     (store, input, ctx) => setUseCases(store, input as never, ctx),
   ),

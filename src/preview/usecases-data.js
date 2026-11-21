@@ -712,6 +712,9 @@ export function errorMessage(error) {
   return error?.message || error?.code || "Something went wrong.";
 }
 
+/** What every view shows when the daemon cannot be reached (a network error, not an HTTP error response; CHR-1179). */
+export const NOT_RUNNING_MESSAGE = "artisign is not running. Start it with `artisign start`, then press Retry.";
+
 /**
  * The reasons a failed read gives are written for agents ("invalid usecases/personas.json: personas.0.name: … — repair or remove the file by hand
  * (the one case where usecases/ may be edited directly)"). For the person looking at the tab: the file the read stopped at and what is wrong with it,

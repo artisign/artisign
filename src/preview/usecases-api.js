@@ -4,6 +4,13 @@
 // for the edit form, and the stored world pool (entities, relationship types, constellations) for the World tab and the filter.
 // Every call names its project (see api.js fetchScreens).
 
+/** The failed result for a request that never got an answer; status 0 marks it as "no HTTP response". @returns {{ ok: false, status: 0, message: string }} */
+function unreachable() {
+  return { ok: false, status: 0, message: NOT_RUNNING_MESSAGE };
+}
+
+import { NOT_RUNNING_MESSAGE } from "./usecases-data.js";
+
 /** @typedef {{ ok: true, data: Record<string, any> } | { ok: false, status: number, code?: string, message: string }} ToolResult */
 
 /**
@@ -20,8 +27,8 @@ async function callTool(project, tool, input = {}) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(input),
     });
-  } catch (error) {
-    return { ok: false, status: 0, message: error instanceof Error ? error.message : String(error) };
+  } catch {
+    return unreachable();
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return { ok: false, status: res.status, code: body.code, message: body.message ?? res.statusText };
@@ -64,8 +71,8 @@ export async function fetchUseCaseSource(project, id) {
   let res;
   try {
     res = await fetch(`/api/use-case?id=${encodeURIComponent(id)}&project=${encodeURIComponent(project)}`);
-  } catch (error) {
-    return { ok: false, status: 0, message: error instanceof Error ? error.message : String(error) };
+  } catch {
+    return unreachable();
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return { ok: false, status: res.status, code: body.code, message: body.message ?? res.statusText };
@@ -81,8 +88,8 @@ export async function fetchWorldSource(project) {
   let res;
   try {
     res = await fetch(`/api/world?project=${encodeURIComponent(project)}`);
-  } catch (error) {
-    return { ok: false, status: 0, message: error instanceof Error ? error.message : String(error) };
+  } catch {
+    return unreachable();
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) return { ok: false, status: res.status, code: body.code, message: body.message ?? res.statusText };

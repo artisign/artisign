@@ -5,7 +5,7 @@
 //   renderEntryNotice — single entries of a pool file were skipped: the rest is shown, the notice names what is missing.
 
 import { h, icon } from "./usecases-dom.js";
-import { describeLoadProblem, plural } from "./usecases-data.js";
+import { NOT_RUNNING_MESSAGE, describeLoadProblem, plural } from "./usecases-data.js";
 
 const SHOWN = 5;
 
@@ -23,7 +23,7 @@ export function renderLoadProblem(el, { message, onRetry }) {
       h("h2", { class: "uc-problem-title" }, file ? "A use case file could not be read" : "Use cases could not be loaded"),
       file ? h("p", { class: "uc-problem-file" }, h("code", null, file)) : null,
       h("p", { class: "uc-problem-detail" }, detail),
-      h("p", { class: "uc-problem-hint" }, file ? "Open the file in a text editor and fix it (or restore it from git), or ask your agent to, then press Retry." : "Press Retry. If it keeps failing, look at the terminal where artisign runs."),
+      detail === NOT_RUNNING_MESSAGE ? null : h("p", { class: "uc-problem-hint" }, file ? "Open the file in a text editor and fix it (or restore it from git), or ask your agent to, then press Retry." : "Press Retry. If it keeps failing, look at the terminal where artisign runs."),
       h("button", { type: "button", class: "chrome-btn", dataset: { action: "retry" }, onClick: onRetry }, icon("refresh"), "Retry"),
     ),
   );

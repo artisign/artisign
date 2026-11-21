@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { setupProject, type ProjectFixture } from "./test-fixtures.js";
 import { setUseCases, getUseCase, listUseCases } from "./usecases.js";
 import { deleteEntity } from "./lifecycle.js";
+// @ts-expect-error the preview modules are plain JS without declarations
+import { orphansOf } from "../preview/usecases-orphans.js";
 import type { Warning } from "./types.js";
 
 const OBJECTS = [{ id: "book", name: "Book", fields: [{ name: "status", type: "string" }] }];
@@ -57,5 +59,29 @@ describe("use cases: one warning per finding, persona facet", () => {
     expect(res.facets.persona).toEqual({ regular: 1 });
     const byGhost = (await listUseCases(fx.store, { persona: "ghost" })) as { total: number };
     expect(byGhost.total).toBe(1);
+  });
+
+  it("keeps one unknown_dimension warning per variant, and the preview marks both conditions", async () => {
+    const res = (await setUseCases(fx.store, {
+      dimensions: [],
+      personas: PERSONAS,
+      data_objects: OBJECTS,
+      use_cases: [{ ...libraryCase, variants: [{ id: "v1", title: "V1", when: { ghostdim: ["a"] } }, { id: "v2", title: "V2", when: { ghostdim: ["a"] } }] }],
+    })) as { warnings: Warning[] };
+    expect(count(res.warnings, "unknown_dimension", "ghostdim")).toBe(2);
+    const read = (await getUseCase(fx.store, { id: "borrow-book" })) as { warnings: Warning[] };
+    const orphans = orphansOf(read.warnings, "borrow-book");
+    expect(orphans.conditions.map((c: { variant: string }) => c.variant).sort()).toEqual(["v1", "v2"]);
+  });
+
+  it("keeps one warning per persona with the same stale trait", async () => {
+    const res = (await setUseCases(fx.store, {
+      dimensions: [],
+      personas: [{ id: "a", name: "A", traits: { ghostdim: "x" } }, { id: "b", name: "B", traits: { ghostdim: "x" } }],
+      data_objects: OBJECTS,
+      use_cases: [],
+    })) as { warnings: Warning[] };
+    const hits = res.warnings.filter((w) => w.kind.startsWith("unknown_") && w.message.includes("ghostdim"));
+    expect(hits.map((w) => w.target).sort()).toEqual(["persona:a", "persona:b"]);
   });
 });

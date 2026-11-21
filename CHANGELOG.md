@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [2.3.0] - 2026-11-21
 
-Use cases, a new way to describe what your app does before and while you design it, plus Windows support. Two breaking changes: `promote_to_system` needs a `property` when a node has several inline properties, and `delete_entity` rejects `variant` on everything except mockups.
+Use cases, a new way to describe what your app does before and while you design it, plus Windows support.
 
 ### Features
 
@@ -25,13 +25,9 @@ Use cases, a new way to describe what your app does before and while you design 
 
 ### Bugfixes
 
-- `promote_to_system` now rewrites only the property it promotes, not every equal value in the project.
+- `promote_to_system` asks which property to promote (`property`) when a node has several, instead of silently taking the first one, and rewrites only that property.
+- `delete_entity` refuses `variant` on a screen, component or pattern instead of ignoring it and deleting the whole entity.
 - The live preview no longer misses a file written into a folder at the moment it is created.
-
-### Breaking changes
-
-- **`promote_to_system` (token):** on a node with several inline properties, a call without `property` now fails and lists the candidates; before, it silently took the first one alphabetically. Pass `property`. Existing projects need no changes; the call fails with an error and writes nothing.
-- **`delete_entity`:** `variant` on a screen, component or pattern now fails; before, it was ignored and the whole entity was deleted. Use `variant` only with `mockup`. Existing projects need no changes; the call fails with an error and deletes nothing.
 
 ## [2.2.1] - 2026-11-14
 

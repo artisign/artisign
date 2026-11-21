@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { access, realpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { isWithin } from "./paths.js";
 import type { CommitResult, CommitSkippedReason, HeadCommitResult } from "./types.js";
 
 const execFileAsync = promisify(execFile);
@@ -18,7 +19,17 @@ const execFileAsync = promisify(execFile);
 // this holds across versions. Disabling maintenance instead would leave a
 // long-lived project accumulating loose objects nothing ever packs.
 // Passed per invocation, so the user's own config is untouched.
-const NO_DETACHED_MAINTENANCE = ["-c", "gc.autoDetach=false", "-c", "maintenance.autoDetach=false"];
+// `core.autocrlf=false` (also per invocation) keeps Git for Windows, which
+// defaults to `core.autocrlf=true`, from rewriting line endings: what Artisign
+// wrote is what lands in the commit, and a commit shows only the changed lines.
+const GIT_FLAGS = [
+  "-c",
+  "gc.autoDetach=false",
+  "-c",
+  "maintenance.autoDetach=false",
+  "-c",
+  "core.autocrlf=false",
+];
 
 /**
  * The identity Artisign's own commits carry when git has none to offer. Git
@@ -38,9 +49,10 @@ export const FALLBACK_IDENTITY = { name: "artisign", email: "noreply@artisign.de
 async function git(projectDir: string, args: string[]): Promise<string> {
   // Git translates its messages on gettext builds (most Linux distributions,
   // Homebrew), and the checks below recognise failures by their English text.
-  const { stdout } = await execFileAsync("git", [...NO_DETACHED_MAINTENANCE, ...args], {
+  const { stdout } = await execFileAsync("git", [...GIT_FLAGS, ...args], {
     cwd: projectDir,
     env: { ...process.env, LC_ALL: "C" },
+    windowsHide: true,
   });
   return stdout.trim();
 }
@@ -109,7 +121,7 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-/** Resolves symlinks so it compares on equal footing with `git rev-parse --show-toplevel`. */
+/** Resolves symlinks so it compares on equal footing with `git rev-parse --show-toplevel` (which prints `C:/…` on Windows). */
 async function realOrSelf(path: string): Promise<string> {
   try {
     return await realpath(path);
@@ -162,7 +174,8 @@ async function prepareRepo(projectDir: string): Promise<CommitResult | undefined
     git(projectDir, ["rev-parse", "--show-toplevel"]),
     realOrSelf(projectDir),
   ]);
-  return toplevel !== real ? { sha: null, skipped_reason: "nested_repo" } : undefined;
+  // Not `===`: on Windows git prints `C:/Work/proj` while realpath gives `C:\Work\proj`.
+  return !(isWithin(toplevel, real) && isWithin(real, toplevel)) ? { sha: null, skipped_reason: "nested_repo" } : undefined;
 }
 
 /** Runs a git commit, retried once with `FALLBACK_IDENTITY` when git refused only for want of an identity. */

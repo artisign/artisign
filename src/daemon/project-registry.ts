@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { realpathSync } from "node:fs";
+import { pathIdentity } from "../store/paths.js";
 import { FsStore } from "../store/index.js";
 import { watchAndReindex, type WatchAndReindexHandle } from "../model/index.js";
 import { clearFontMemo } from "../model/fonts.js";
@@ -72,7 +73,7 @@ export class ProjectRegistry {
       return existing.entry.handle;
     }
 
-    const key = projectKey(root);
+    const key = mapKey(root);
     const inFlight = this.pending.get(key);
     if (inFlight) return inFlight;
 
@@ -182,7 +183,7 @@ export class ProjectRegistry {
         // Stored as the canonical key so one folder never appears under two spellings.
         const known = config.knownProjects ?? config.recentProjects ?? [];
         const key = projectKey(root);
-        const knownProjects = known.includes(key) ? known : [...known, key];
+        const knownProjects = known.some((k) => pathIdentity(k) === pathIdentity(key)) ? known : [...known, key];
         const unchanged =
           config.recentProjects !== undefined &&
           config.recentProjects.length === recentProjects.length &&
@@ -217,13 +218,13 @@ export class ProjectRegistry {
    * handle's own root, which is fixed at open() and never recomputed.
    */
   private findEntry(root: string): { key: string; entry: OpenProject } | undefined {
-    const key = projectKey(root);
+    const key = mapKey(root);
     const direct = this.projects.get(key);
     if (direct) return { key, entry: direct };
 
     const resolved = resolve(root);
     for (const [k, entry] of this.projects) {
-      if (entry.handle.root === resolved) return { key: k, entry };
+      if (pathIdentity(entry.handle.root) === pathIdentity(resolved)) return { key: k, entry };
     }
     return undefined;
   }
@@ -241,7 +242,7 @@ export class ProjectRegistry {
     // Deduped by canonical key: entries stored before keys were canonical may name one folder twice.
     const byKey = new Map<string, string>();
     for (const root of [...(config.knownProjects ?? []), ...(config.recentProjects ?? [])]) {
-      if (!byKey.has(projectKey(root))) byKey.set(projectKey(root), root);
+      if (!byKey.has(mapKey(root))) byKey.set(mapKey(root), root);
     }
     const roots = [...byKey.values()];
     const entries = await Promise.all(
@@ -415,6 +416,11 @@ function projectKey(dir: string): string {
   } catch {
     return root;
   }
+}
+
+/** Lookup key for the registry's maps: the canonical spelling, case-folded on Windows. Never stored or shown. */
+function mapKey(dir: string): string {
+  return pathIdentity(projectKey(dir));
 }
 
 /**

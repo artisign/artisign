@@ -1,6 +1,7 @@
 import { watch as chokidarWatch } from "chokidar";
 import { readdir } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { join, sep } from "node:path";
+import { toProjectRelative } from "./paths.js";
 import { CONFIG_FILENAME, CACHE_DIR } from "../init/artisign-config.js";
 import type { ChangeCategory, ProjectChangeEvent } from "./types.js";
 
@@ -10,7 +11,7 @@ const DEBOUNCE_MS = 100;
 const NEW_DIR_RESCAN_MS = 250;
 
 function categorize(relativePath: string): ChangeCategory {
-  const segments = relativePath.split(sep);
+  const segments = relativePath.split("/");
   if (segments[0] === "screens") return "screen";
   if (segments[0] === "mockups") return "mockup";
   if (segments[0] === "design-system" && segments[1] === "components") return "component";
@@ -37,10 +38,10 @@ export function watchProject(
   onChange: (event: ProjectChangeEvent) => void,
 ): (() => void) & { ready: Promise<void> } {
   const isIgnored = (path: string): boolean => {
-    const rel = relative(projectDir, path);
+    const rel = toProjectRelative(projectDir, path);
     // Ignore the derived cache and .tmp files transiently created by atomicWrite
     // — otherwise every write would be observed twice (temp file + final rename).
-    const top = rel.split(sep)[0];
+    const top = rel.split("/")[0];
     return top === CACHE_DIR || top === ".git" || path.endsWith(".tmp");
   };
   const watcher = chokidarWatch(projectDir, { ignored: isIgnored, ignoreInitial: true });
@@ -49,7 +50,7 @@ export function watchProject(
 
   const timers = new Map<string, NodeJS.Timeout>();
   const emit = (type: ProjectChangeEvent["type"], path: string): void => {
-    const relPath = relative(projectDir, path);
+    const relPath = toProjectRelative(projectDir, path);
     const existing = timers.get(relPath);
     if (existing) clearTimeout(existing);
     timers.set(

@@ -67,7 +67,8 @@ jobs:
         run: |
           git config --global user.name "artisign CI"
           git config --global user.email "ci@artisign.dev"
-      - run: npm ci
+      # --force bypasses the os check until CHR-1084 adds win32.
+      - run: npm ci --force
       - run: npm run type-check
       - run: npm run lint
       - run: npm test

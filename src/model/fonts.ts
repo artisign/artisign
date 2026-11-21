@@ -1,8 +1,7 @@
-import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
-import { join, dirname } from "node:path";
-import { randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { CACHE_DIR } from "../init/artisign-config.js";
-import { ensureCacheGitignore } from "../store/index.js";
+import { atomicWrite, ensureCacheGitignore } from "../store/index.js";
 import type { Store, TokensDocument } from "../store/index.js";
 import { escapeProjectParam } from "./assets.js";
 
@@ -188,13 +187,6 @@ function manifestPath(projectRoot: string): string {
   return join(fontsDir(projectRoot), "manifest.json");
 }
 
-async function atomicWriteFile(path: string, content: string | Buffer): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  const tempPath = `${path}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
-  await writeFile(tempPath, content);
-  await rename(tempPath, path);
-}
-
 async function readManifest(projectRoot: string): Promise<FontManifest | undefined> {
   try {
     const raw = await readFile(manifestPath(projectRoot), "utf-8");
@@ -206,7 +198,7 @@ async function readManifest(projectRoot: string): Promise<FontManifest | undefin
 }
 
 async function writeManifest(projectRoot: string, manifest: FontManifest): Promise<void> {
-  await atomicWriteFile(manifestPath(projectRoot), `${JSON.stringify(manifest, null, 2)}\n`);
+  await atomicWrite(manifestPath(projectRoot), `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 function slugify(family: string): string {
@@ -284,7 +276,7 @@ async function fetchFamily(projectRoot: string, family: string, variants: string
     if (!res.ok) throw new Error(`woff2 download failed for "${family}": ${res.status}`);
     const buffer = Buffer.from(await res.arrayBuffer());
     const file = `${slugify(family)}-${block.weight.replace(/\s+/g, "_")}-${block.style}-${i}.woff2`;
-    await atomicWriteFile(join(fontsDir(projectRoot), file), buffer);
+    await atomicWrite(join(fontsDir(projectRoot), file), buffer);
 
     files.push({ file, weightRange: block.weight, style: block.style, unicodeRange: block.unicodeRange });
     cssParts.push(
@@ -300,7 +292,7 @@ async function fetchFamily(projectRoot: string, family: string, variants: string
 /** Copies the package's bundled Material Symbols Rounded woff2 into `.artisign/fonts/` — the fallback `fetchFamily` reaches for when the live Google Fonts fetch fails (offline, blocked, rate-limited). */
 async function bundledMaterialSymbolsEntry(projectRoot: string): Promise<FontManifestEntry> {
   const buffer = await readFile(BUNDLED_MATERIAL_SYMBOLS_URL);
-  await atomicWriteFile(join(fontsDir(projectRoot), BUNDLED_MATERIAL_SYMBOLS_FILE), buffer);
+  await atomicWrite(join(fontsDir(projectRoot), BUNDLED_MATERIAL_SYMBOLS_FILE), buffer);
   return {
     files: [{ file: BUNDLED_MATERIAL_SYMBOLS_FILE, weightRange: "400", style: "normal" }],
     css:

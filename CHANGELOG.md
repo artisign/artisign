@@ -30,8 +30,8 @@ Use cases, a new way to describe what your app does before and while you design 
 
 ### Breaking changes
 
-- **`promote_to_system` (token):** on a node with several inline properties, a call without `property` now fails and lists the candidates; before, it silently took the first one alphabetically. Pass `property`.
-- **`delete_entity`:** `variant` on a screen, component or pattern now fails; before, it was ignored and the whole entity was deleted. Use `variant` only with `mockup`.
+- **`promote_to_system` (token):** on a node with several inline properties, a call without `property` now fails and lists the candidates; before, it silently took the first one alphabetically. Pass `property`. Existing projects need no changes; the call fails with an error and writes nothing.
+- **`delete_entity`:** `variant` on a screen, component or pattern now fails; before, it was ignored and the whole entity was deleted. Use `variant` only with `mockup`. Existing projects need no changes; the call fails with an error and deletes nothing.
 
 ## [2.2.1] - 2026-11-14
 

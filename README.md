@@ -2,7 +2,7 @@
 
 An artificial artisan for UI design: agents build screens, a design system keeps them consistent. <!-- [TAGLINE von Christian] -->
 
-Local-first UX design tool for AI agents. Agents design through MCP, the human reviews and edits use-case data in the browser, state lives in plain files.
+Local-first design tool for AI agents: use case specs and UX design. Agents design through MCP, the human reviews and edits use-case data in the browser, state lives in plain files.
 
 One Node process on `127.0.0.1`. No database, no accounts, no hosting.
 

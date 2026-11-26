@@ -120,18 +120,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "init-project-dialog.init-dialog-newfolder",
-    "event": "tap",
-    "to": "init-project-dialog-new-folder",
-    "to_kind": "screen"
-  },
-  {
-    "from": "open-project-dialog.open-dialog-newfolder",
-    "event": "tap",
-    "to": "open-project-dialog-new-folder",
-    "to_kind": "screen"
-  },
-  {
     "from": "shell-settings-menu.item-mcp",
     "event": "tap",
     "to": "shell-mcp-setup-dialog",
@@ -315,30 +303,6 @@
     "from": "board-view-clusters-expanded.frame-cart-head",
     "event": "tap",
     "to": "board-view-clusters-collapsed",
-    "to_kind": "screen"
-  },
-  {
-    "from": "inspector-variant-reached-from.bar",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "screen-view-variant-breadcrumb-dark.bar",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "screen-view-variant-breadcrumb.bar",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "sidebar-variant-tree.bar",
-    "event": "tap",
-    "to": "app-shell",
     "to_kind": "screen"
   },
   {
@@ -1728,6 +1692,18 @@
     "to_kind": "screen"
   },
   {
+    "from": "chrome-c-compare.comments-row",
+    "event": "tap",
+    "to": "comments-mode-new",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-mockup-columns.comments-row",
+    "event": "tap",
+    "to": "comments-mode-new",
+    "to_kind": "screen"
+  },
+  {
     "from": "app-shell.project-picker",
     "event": "tap",
     "to": "open-project-dialog",
@@ -1794,13 +1770,13 @@
     "to_kind": "screen"
   },
   {
-    "from": "chrome-c-shell-dark.comments-row",
+    "from": "chrome-c-shell-menu.comments-row",
     "event": "tap",
     "to": "comments-mode-new",
     "to_kind": "screen"
   },
   {
-    "from": "chrome-c-shell-dark.pin-1",
+    "from": "chrome-c-shell-menu.pin-1",
     "event": "tap",
     "to": "comments-panel",
     "to_kind": "screen"
@@ -1830,13 +1806,13 @@
     "to_kind": "screen"
   },
   {
-    "from": "chrome-c-shell-menu.comments-row",
+    "from": "chrome-c-shell-dark.comments-row",
     "event": "tap",
     "to": "comments-mode-new",
     "to_kind": "screen"
   },
   {
-    "from": "chrome-c-shell-menu.pin-1",
+    "from": "chrome-c-shell-dark.pin-1",
     "event": "tap",
     "to": "comments-panel",
     "to_kind": "screen"
@@ -1878,15 +1854,39 @@
     "to_kind": "screen"
   },
   {
-    "from": "chrome-c-compare.comments-row",
+    "from": "inspector-variant-reached-from.bar",
     "event": "tap",
-    "to": "comments-mode-new",
+    "to": "app-shell",
     "to_kind": "screen"
   },
   {
-    "from": "chrome-c-mockup-columns.comments-row",
+    "from": "sidebar-variant-tree.bar",
     "event": "tap",
-    "to": "comments-mode-new",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog.init-dialog-newfolder",
+    "event": "tap",
+    "to": "init-project-dialog-new-folder",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog.open-dialog-newfolder",
+    "event": "tap",
+    "to": "open-project-dialog-new-folder",
+    "to_kind": "screen"
+  },
+  {
+    "from": "screen-view-variant-breadcrumb.bar",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "screen-view-variant-breadcrumb-dark.bar",
+    "event": "tap",
+    "to": "app-shell",
     "to_kind": "screen"
   }
 ]

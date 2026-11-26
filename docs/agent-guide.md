@@ -390,10 +390,20 @@ variants).
 
 ## Comments
 
-The human reviews in the browser and comments on nodes. Each design session:
-`list_comments` (`status: "open"`) for open comments, address them, answer with
-`reply_comment` and resolve when done. Keep node `id`s stable across writes —
-comments and flows anchor to them.
+The human reviews in the browser and comments on nodes; each thread shows as a
+numbered pin on its element. Each design session: `list_comments`
+(`status: "open"`) for open comments, address them, answer with
+`reply_comment` and resolve when done.
+
+Anchor model: a thread is anchored to a node id (`<screen>.<node-id>`, the ref
+`get_node` takes), never to coordinates. Every thread in `list_comments`
+carries its `screen` and `node`, so you can go straight to the element. When a
+write removes or renames the node, the thread is not deleted: it comes back
+with `detached: true` (`status: "detached"` lists those). Re-anchor it with
+`reply_comment` `reanchor: "<screen>.<node-id>"` to the node that replaced it,
+or resolve it. To raise a point yourself, `create_comment` starts a thread on a
+node. Keep node `id`s stable across writes — comments and flows anchor to them,
+and a generated id detaches its threads on the next rewrite.
 
 ## Handoff
 

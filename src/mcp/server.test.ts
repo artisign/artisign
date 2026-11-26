@@ -46,13 +46,13 @@ describe("MCP server — protocol-level", () => {
     expect(client.getServerVersion()).toMatchObject({ name: "artisign", version });
   });
 
-  it("lists all 30 tools", async () => {
+  it("lists all 31 tools", async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(TOOLS.map((t) => t.name).sort());
-    expect(tools).toHaveLength(30);
+    expect(tools).toHaveLength(31);
   });
 
-  it("successfully calls every one of the 26 tools that don't need a browser or daemon board-state context (get_screenshot/inspect_node/set_board_state excluded)", async () => {
+  it("successfully calls every one of the 27 tools that don't need a browser or daemon board-state context (get_screenshot/inspect_node/set_board_state excluded)", async () => {
     async function call(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
       const result = await client.callTool({ name, arguments: args });
       expect(result.isError, `${name} returned an error: ${JSON.stringify(result.content)}`).not.toBe(true);
@@ -111,6 +111,7 @@ describe("MCP server — protocol-level", () => {
       JSON.stringify({ id: "cmt_x1", parent_id: null, screen: "home", node_id: "home.n1", author: "human", text: "hi", resolved: false, ts: new Date().toISOString() }),
     );
     await call("reply_comment", { comment_id: "cmt_x1", body: "on it" });
+    await call("create_comment", { screen: "home", node: "home.n1", body: "spacing looks off" });
 
     // Reads.
     await call("get_project", {});
@@ -291,9 +292,11 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   // derived from the strict schemas: 24,976 to 41,778 (+16,802 chars, ~+4,200 tokens; set_use_cases entry 18,164 chars).
   // CHR-1175: promote_to_system gains the property input and a longer token description: 41,778 to 41,919 (+141).
   // CHR-1176: get_screenshot takes a full node ref alone (longer description, SCREEN_FIELDS enum on get_screen): 41,919 to 42,093 (+174).
+  // CHR-1254: comment anchor model — create_comment is new, list_comments and reply_comment
+  // describe node anchors, detached threads, reopen and reanchor: 42,093 to 43,375 (+1,282).
   // The pin is exact (CHR-1143): any change, up or down, shows here.
-  it("pins the measured tools/list size as information, not a limit (42,093 chars, ~10,523 tokens)", () => {
-    expect(JSON.stringify(tools).length).toBe(42_093);
+  it("pins the measured tools/list size as information, not a limit (43,375 chars, ~10,844 tokens)", () => {
+    expect(JSON.stringify(tools).length).toBe(43_375);
   });
 
   // CHR-1168: set_use_cases carries every entity shape on purpose, so it has an exact size pin of its own
@@ -312,7 +315,7 @@ describe("MCP server — advertised tool-definition overhead (CHR-884)", () => {
   });
 
   it("advertises no $schema key on any inputSchema", () => {
-    expect(tools).toHaveLength(30);
+    expect(tools).toHaveLength(31);
     for (const tool of tools) {
       expect(tool.inputSchema, tool.name).not.toHaveProperty("$schema");
     }

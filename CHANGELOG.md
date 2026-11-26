@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Features
+
+- **Comments anchored to elements:** every comment thread belongs to a node. When a rewrite removes that node, the thread is marked `detached` instead of disappearing, and it can be moved to another node. `list_comments` returns each thread's screen, node, detached state and the agent that wrote it, and filters by `status: "detached"`. `reply_comment` can reopen and re-anchor a thread, and agents can start threads with the new `create_comment` tool.
+
 ## [2.3.0] - 2026-11-21
 
 Use cases, a new way to describe what your app does before and while you design it, plus Windows support.

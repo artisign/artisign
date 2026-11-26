@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
 // CHR-1264 — the board's read-only comment overlay: markers, groups, the dot, the preview and its closing rules. jsdom has no layout, so the geometry is a stub whose documents answer getBoundingClientRect.
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createBoardComments } from "./board-comments.js";
 
 const TS = "2026-11-26T10:00:00.000Z";
@@ -206,6 +206,61 @@ describe("the preview", () => {
     board.setData(data());
     expect(preview().hidden).toBe(false);
     board.setData({ comments: [], threads: [thread("b", "one", "btn-b")] });
+    expect(preview().hidden).toBe(true);
+  });
+
+  it("Esc after a rebuild (tile load, refetch, zoom) still returns the focus to the new marker, chips included", () => {
+    const board = setup();
+    board.setData(data());
+    press(pins()[0]);
+    board.layout();
+    const fresh = pins()[0];
+    expect(fresh.getAttribute("aria-expanded")).toBe("true");
+    esc();
+    expect(document.activeElement).toBe(fresh);
+    press(chips()[0]);
+    board.layout();
+    expect(chips()[0].getAttribute("aria-expanded")).toBe("true");
+    esc();
+    expect(document.activeElement).toBe(chips()[0]);
+  });
+
+  describe("an outside press inside a tile", () => {
+    const realActive = Object.getOwnPropertyDescriptor(Document.prototype, "activeElement");
+    afterEach(() => {
+      delete document.activeElement;
+      if (realActive) Object.defineProperty(Document.prototype, "activeElement", realActive);
+    });
+
+    it("closes the preview when the focus moves into an iframe (no listener inside the tile)", () => {
+      const board = setup();
+      board.setData(data());
+      const frame = document.createElement("iframe");
+      document.body.append(frame);
+      press(pins()[0]);
+      Object.defineProperty(document, "activeElement", { configurable: true, get: () => frame });
+      window.dispatchEvent(new Event("blur"));
+      expect(preview().hidden).toBe(true);
+    });
+
+    it("ignores a window blur that does not land in an iframe", () => {
+      const board = setup();
+      board.setData(data());
+      press(pins()[0]);
+      window.dispatchEvent(new Event("blur"));
+      expect(preview().hidden).toBe(false);
+    });
+  });
+
+  it("leaves Esc alone while the board is not shown, and close() drops the preview", () => {
+    const board = setup();
+    board.setData(data());
+    press(pins()[0]);
+    surface.hidden = true;
+    const evt = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    document.body.dispatchEvent(evt);
+    expect(evt.defaultPrevented).toBe(false);
+    board.close();
     expect(preview().hidden).toBe(true);
   });
 

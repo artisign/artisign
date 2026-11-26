@@ -421,7 +421,7 @@ export function createBoardView({
 
   /**
    * Zooms to one tile and centres it — a group comment pin's click (CHR-1264).
-   * Zooms in at least to 100% (a tile fills the surface at most), never out.
+   * Zooms in: to at least 100 % and 1.5x the current zoom, more when the tile needs it to fill the surface (the 200 % cap applies); never out.
    * @param {string} screen
    */
   function zoomToTile(screen) {

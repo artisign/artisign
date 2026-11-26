@@ -120,6 +120,8 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
   let active = null;
   /** The element the open preview came from, so Esc can give the focus back. @type {HTMLElement | null} */
   let trigger = null;
+  /** Its marker key: layout() rebuilds the markers, so the element is looked up again by it. @type {string | null} */
+  let triggerKey = null;
   /** Marker key → the element drawn for it by the last layout(). @type {Map<string, HTMLElement>} */
   let markers = new Map();
   /** Thread id → the key of the marker that stands for it (its pin, else its group, dot or chip). @type {Map<string, string>} */
@@ -217,6 +219,7 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
       }
     }
     markersEl.replaceChildren(...nodes);
+    trigger = triggerKey ? (markers.get(triggerKey) ?? null) : null;
     if (active) syncActive();
     if (focusedKey) markers.get(focusedKey)?.focus();
     else if (focusInPreview && active) previewEl.focus();
@@ -341,6 +344,7 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     }
     active = next;
     trigger = from;
+    triggerKey = from.dataset.key ?? null;
     syncActive();
     previewEl.focus();
   }
@@ -543,6 +547,7 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     const from = trigger;
     active = null;
     trigger = null;
+    triggerKey = null;
     syncActive();
     if (returnFocus && from && from.isConnected) from.focus();
   }
@@ -551,13 +556,18 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
   document.addEventListener(
     "keydown",
     (evt) => {
-      if (evt.key !== "Escape" || !active) return;
+      // Only while the board shows: the capture listener must not swallow Esc in another view.
+      if (evt.key !== "Escape" || !active || layerEl.closest("[hidden]")) return;
       evt.preventDefault();
       evt.stopPropagation();
       closePreview(true);
     },
     true,
   );
+  // A press inside a tile never reaches this document (no listener goes into a tile iframe): the focus moving into the iframe is how it shows up here.
+  window.addEventListener("blur", () => {
+    if (active && document.activeElement?.tagName === "IFRAME") closePreview(false);
+  });
   document.addEventListener(
     "pointerdown",
     (evt) => {

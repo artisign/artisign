@@ -487,6 +487,7 @@ boardCommentsToggleBtn.addEventListener("click", () => {
   writeBoolPref(prefsStorage, BOARD_COMMENTS_KEY, boardCommentsOn);
   renderBoardCommentToggles();
   boardComments.setEnabled(boardCommentsOn);
+  renderBoardStatus(); // the status line's comment count follows the toggle
 });
 boardResolvedToggleBtn.addEventListener("click", () => {
   boardShowResolved = !boardShowResolved;
@@ -2514,6 +2515,7 @@ function setView(view) {
   if (view === "usecases") useCases.show();
   else useCases.hide();
   if (view === "screens") updateScreenUseCases(); // the reverse entry may have use cases to show now
+  if (view !== "board") boardComments.close(); // a preview must not outlive the board (its Esc handling is the board's)
   if (view === "board" && !boardBuilt) loadBoard();
   // CHR-623 review finding 5: an already-built board was `hidden` (clientWidth
   // 0) while another tab showed, so any relayout that ran while hidden used

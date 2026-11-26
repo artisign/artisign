@@ -153,6 +153,25 @@ describe("Board comments in the app", () => {
     expect($("#board-comment-layer").hidden).toBe(false);
   });
 
+  it("Comments: Off takes the count out of the status line, On brings it back", async () => {
+    seed();
+    await openBoard();
+    expect($("#board-toolbar-status").textContent).toContain("2 open comments");
+    $("#board-comments-toggle").click();
+    expect($("#board-toolbar-status").textContent).not.toContain("open comment");
+    $("#board-comments-toggle").click();
+    expect($("#board-toolbar-status").textContent).toContain("2 open comments");
+  });
+
+  it("closes the preview when the board is left, so Esc in Screens is not swallowed", async () => {
+    seed();
+    await openBoard();
+    press(boardPins()[0]);
+    expect($(".board-comment-preview").hidden).toBe(false);
+    $('.view-tab[data-view="screens"]').click();
+    expect($(".board-comment-preview").hidden).toBe(true);
+  });
+
   it("a pin opens the read-only preview; Open in Screens shows that screen with the thread open", async () => {
     seed();
     await openBoard();

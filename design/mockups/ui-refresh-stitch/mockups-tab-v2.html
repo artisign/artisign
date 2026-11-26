@@ -86,43 +86,96 @@ ul,ol{list-style:none}
 <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
 <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
 <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
-</defs></svg>
+</defs></svg><style id="round-3-style">
+.tools{width:52px;padding:4px 6px 6px;gap:2px}
+.tools-hd{width:40px;padding:0 0 0 4px}
+.tool{width:40px;height:40px;min-height:40px;border-radius:12px;gap:0}
+.tool .badge{top:1px;right:0}
+.tool:focus-visible{outline:2px solid #1f1f1d;outline-offset:2px}
+.tool[aria-disabled="true"]{color:#cbc7c0;cursor:not-allowed;background:none}
+.tool[aria-disabled="true"] .badge{background:#d9d5ce}
+[interestfor]{--interest-delay-start:2s;interest-delay-start:var(--interest-delay-start)}
+.find-row{display:flex;gap:6px;margin:2px 8px 6px;flex:none}
+.find-row .find{flex:1;margin:0}
+.tgl{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#6b6862;background:#f5f4f1;flex:none}
+.tgl[aria-pressed="true"]{background:#e3f2ef;color:#0b6b62;box-shadow:inset 0 0 0 1px #a9d8d0}
+.tgl:focus-visible{outline:2px solid #1f1f1d;outline-offset:2px}
+.var{display:grid;grid-template-columns:14px 1fr;column-gap:8px;align-items:start;height:auto;min-height:28px;padding:6px 10px}
+.var .vic{margin-top:1px;color:#8d8a84}
+.var .vn{line-height:16px}
+.var[aria-selected="true"] .vic{color:#0b6b62}
+.frames{position:absolute;display:flex;gap:32px;align-items:flex-start}
+.fcol{width:234px}
+.fcol .lbl{position:static;height:18px;margin-bottom:8px;max-width:234px;white-space:nowrap;overflow:hidden}
+.fcol .lbl .t{overflow:hidden;text-overflow:ellipsis}
+.fcol .lbl .v{font-weight:500;color:#8d8a84}
+.fcol .fr{position:relative;width:234px;height:506px;overflow:hidden}
+.fcol .fr .in{width:390px;height:844px;transform:scale(.6);transform-origin:0 0;background:#fff;color:#1d1c1a;font-size:15px;display:flex;flex-direction:column}
+.fcol.sel .lbl{color:#0b6b62}
+.fcol.sel .lbl .v{color:#3f8f85}
+.fcol.sel .fr{box-shadow:0 0 0 2px #0f8a7e,0 0 0 6px rgba(15,138,126,.14),0 16px 40px rgba(40,30,20,.12)}
+</style><svg width="0" height="0" style="position:absolute" aria-hidden="true" id="icon-sprite-r3"><defs><symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9-9-9Z"/><circle cx="7.5" cy="7.5" r="1.3"/></symbol><symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol></defs></svg>
 <div class="canvas" id="canvas"></div>
 
 <!-- the one open screen -->
-<div class="lbl" id="frame-label" style="left:368px;top:174px"><svg class="ic" id="frame-label-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-desktop"/></svg> home <span class="v" id="frame-label-variant">default</span> <span class="ex" id="frame-label-example">Example</span></div>
-<div class="fr" id="frame" style="left:368px;top:200px"><div id="frame-viewport" style="width:792px;height:504px;overflow:hidden;border-radius:16px"><div id="frame-home" style="width:880px;height:560px;transform:scale(.9);transform-origin:0 0;background:#ffffff;color:#1d1c1a;display:flex;flex-direction:column;font-size:12.5px">
-      <div class="row" id="frame-home-nav" style="height:52px;padding:0 30px;gap:22px;border-bottom:1px solid #eceae6">
-        <div id="frame-home-nav-logo" style="width:22px;height:22px;border-radius:7px;background:#0f8a7e"></div>
-        <div id="frame-home-nav-orders" style="font-weight:600">Orders</div><div id="frame-home-nav-products" style="color:#8d8a84">Products</div><div id="frame-home-nav-customers" style="color:#8d8a84">Customers</div>
-        <div id="frame-home-nav-spacer" style="flex:1"></div><div id="frame-home-nav-search" style="width:200px;height:30px;border-radius:9px;background:#f7f6f3"></div><div id="frame-home-nav-avatar" style="width:30px;height:30px;border-radius:50%;background:#e6e3de"></div></div>
-      <div id="frame-home-header" style="padding:26px 30px 0;display:flex;justify-content:space-between;align-items:flex-end">
-          <div id="frame-home-header-titles"><div id="frame-home-header-eyebrow" style="font-size:12px;color:#8d8a84;font-weight:500">Example shop</div><div id="frame-home-header-title" style="font-size:24px;font-weight:700;letter-spacing:-.02em;color:#1d1c1a">Orders</div></div>
-          <div class="row" id="frame-home-header-actions" style="gap:8px"><div id="frame-home-export" style="padding:8px 14px;border-radius:10px;border:1px solid #eceae6;font-weight:500">Export</div><div id="frame-home-new-order" style="padding:8px 14px;border-radius:10px;background:#0f8a7e;color:#fff;font-weight:600">New order</div></div></div>
-          <div id="frame-home-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:20px 30px;">
-            <div id="frame-home-stat-open" style="background:#f7f6f3;border-radius:14px;padding:14px 16px"><div id="frame-home-stat-open-label" style="font-size:11.5px;color:#8d8a84">Open</div><div id="frame-home-stat-open-value" style="height:14px;width:54px;margin-top:10px;border-radius:5px;background:#d6d2cb"></div></div><div id="frame-home-stat-packing" style="background:#f7f6f3;border-radius:14px;padding:14px 16px"><div id="frame-home-stat-packing-label" style="font-size:11.5px;color:#8d8a84">Packing</div><div id="frame-home-stat-packing-value" style="height:14px;width:40px;margin-top:10px;border-radius:5px;background:#d6d2cb"></div></div><div id="frame-home-stat-shipped" style="background:#f7f6f3;border-radius:14px;padding:14px 16px"><div id="frame-home-stat-shipped-label" style="font-size:11.5px;color:#8d8a84">Shipped</div><div id="frame-home-stat-shipped-value" style="height:14px;width:66px;margin-top:10px;border-radius:5px;background:#d6d2cb"></div></div>
-          </div>
-          <div id="frame-home-orders" style="padding:0 30px"><div id="frame-home-orders-row-1" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
-      <div class="row" id="frame-home-orders-row-1-customer" style="gap:10px"><div id="frame-home-orders-row-1-avatar" style="width:28px;height:28px;border-radius:8px;background:#ffe1c7"></div><div id="frame-home-orders-row-1-name" style="height:8px;width:120px;border-radius:4px;background:#dcd9d3"></div></div>
-      <div id="frame-home-orders-row-1-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
-      <div id="frame-home-orders-row-1-status"><span id="frame-home-orders-row-1-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#dcf0ed;color:#0b6b62;font-size:11px;font-weight:600">Shipped</span></div>
-      <div id="frame-home-orders-row-1-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-2" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
-      <div class="row" id="frame-home-orders-row-2-customer" style="gap:10px"><div id="frame-home-orders-row-2-avatar" style="width:28px;height:28px;border-radius:8px;background:#dfe4ff"></div><div id="frame-home-orders-row-2-name" style="height:8px;width:96px;border-radius:4px;background:#dcd9d3"></div></div>
-      <div id="frame-home-orders-row-2-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
-      <div id="frame-home-orders-row-2-status"><span id="frame-home-orders-row-2-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#fdf1e0;color:#a35a00;font-size:11px;font-weight:600">Packing</span></div>
-      <div id="frame-home-orders-row-2-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-3" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
-      <div class="row" id="frame-home-orders-row-3-customer" style="gap:10px"><div id="frame-home-orders-row-3-avatar" style="width:28px;height:28px;border-radius:8px;background:#e9dcff"></div><div id="frame-home-orders-row-3-name" style="height:8px;width:134px;border-radius:4px;background:#dcd9d3"></div></div>
-      <div id="frame-home-orders-row-3-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
-      <div id="frame-home-orders-row-3-status"><span id="frame-home-orders-row-3-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#dcf0ed;color:#0b6b62;font-size:11px;font-weight:600">Shipped</span></div>
-      <div id="frame-home-orders-row-3-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-4" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
-      <div class="row" id="frame-home-orders-row-4-customer" style="gap:10px"><div id="frame-home-orders-row-4-avatar" style="width:28px;height:28px;border-radius:8px;background:#d9f2e3"></div><div id="frame-home-orders-row-4-name" style="height:8px;width:88px;border-radius:4px;background:#dcd9d3"></div></div>
-      <div id="frame-home-orders-row-4-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
-      <div id="frame-home-orders-row-4-status"><span id="frame-home-orders-row-4-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#eceae6;color:#5b5853;font-size:11px;font-weight:600">Open</span></div>
-      <div id="frame-home-orders-row-4-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-5" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
-      <div class="row" id="frame-home-orders-row-5-customer" style="gap:10px"><div id="frame-home-orders-row-5-avatar" style="width:28px;height:28px;border-radius:8px;background:#ffd9de"></div><div id="frame-home-orders-row-5-name" style="height:8px;width:110px;border-radius:4px;background:#dcd9d3"></div></div>
-      <div id="frame-home-orders-row-5-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
-      <div id="frame-home-orders-row-5-status"><span id="frame-home-orders-row-5-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#fdf1e0;color:#a35a00;font-size:11px;font-weight:600">Packing</span></div>
-      <div id="frame-home-orders-row-5-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div></div></div></div></div>
+
+<div class="frames" id="mockup-frames" role="list" aria-label="Variants of onboarding-ideas" style="left:375px;top:174px">
+  <figure class="fcol" id="frame-col-checklist" role="listitem" style="margin:0">
+    <figcaption class="lbl" id="frame-label"><svg class="ic" id="frame-label-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mockup"><use href="#i-layers"/></svg><span class="t" id="frame-label-text">Onboarding ideas: <span class="v" id="frame-label-variant">Checklist</span></span></figcaption>
+    <div class="fr" id="frame"><div class="in" id="frame-checklist">
+      <div class="row" id="frame-checklist-bar" style="height:56px;padding:0 22px;gap:10px;border-bottom:1px solid #eceae6"><div id="frame-checklist-logo" style="width:24px;height:24px;border-radius:7px;background:#0f8a7e"></div><b id="frame-checklist-shop" style="font-size:15px">Example shop</b></div>
+      <div id="frame-checklist-body" style="padding:28px 22px 0">
+        <div id="frame-checklist-title" style="font-size:26px;font-weight:700;letter-spacing:-.02em">Set up your shop</div>
+        <div id="frame-checklist-sub" style="color:#8d8a84;margin-top:6px">2 of 5 done</div>
+        <div id="frame-checklist-progress" style="height:8px;border-radius:4px;background:#eceae6;margin-top:14px"><div id="frame-checklist-progress-fill" style="width:40%;height:8px;border-radius:4px;background:#0f8a7e"></div></div>
+        <ol id="frame-checklist-steps" style="margin-top:22px;display:flex;flex-direction:column;gap:10px">
+          <li class="row" id="frame-checklist-step-1" style="gap:12px;padding:14px;border-radius:14px;background:#f7f6f3;color:#8d8a84"><span id="frame-checklist-step-1-check" style="width:26px;height:26px;border-radius:50%;background:#0f8a7e;color:#fff;display:flex;align-items:center;justify-content:center"><svg class="ic" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="frame-checklist-step-1-svg"><use href="#i-check"/></svg></span>Name your shop</li>
+          <li class="row" id="frame-checklist-step-2" style="gap:12px;padding:14px;border-radius:14px;background:#f7f6f3;color:#8d8a84"><span id="frame-checklist-step-2-check" style="width:26px;height:26px;border-radius:50%;background:#0f8a7e;color:#fff;display:flex;align-items:center;justify-content:center"><svg class="ic" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="frame-checklist-step-2-svg"><use href="#i-check"/></svg></span>Add a logo</li>
+          <li class="row" id="frame-checklist-step-3" style="gap:12px;padding:14px;border-radius:14px;border:1.5px solid #0f8a7e;font-weight:600"><span id="frame-checklist-step-3-check" style="width:26px;height:26px;border-radius:50%;border:2px solid #0f8a7e"></span>Add your first product</li>
+          <li class="row" id="frame-checklist-step-4" style="gap:12px;padding:14px;border-radius:14px;border:1px solid #eceae6"><span id="frame-checklist-step-4-check" style="width:26px;height:26px;border-radius:50%;border:2px solid #d6d2cb"></span>Set shipping rates</li>
+          <li class="row" id="frame-checklist-step-5" style="gap:12px;padding:14px;border-radius:14px;border:1px solid #eceae6"><span id="frame-checklist-step-5-check" style="width:26px;height:26px;border-radius:50%;border:2px solid #d6d2cb"></span>Open the shop</li>
+        </ol>
+      </div>
+      <div id="frame-checklist-cta" style="margin:auto 22px 34px;height:52px;border-radius:14px;background:#0f8a7e;color:#fff;font-weight:600;display:flex;align-items:center;justify-content:center">Add product</div>
+    </div></div>
+  </figure>
+  <figure class="fcol sel" id="frame-col-guided-tour" role="listitem" aria-current="true" style="margin:0">
+    <figcaption class="lbl" id="frame-label-guided-tour"><svg class="ic" id="frame-label-guided-tour-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mockup"><use href="#i-layers"/></svg><span class="t" id="frame-label-guided-tour-text">Onboarding ideas: <span class="v" id="frame-label-guided-tour-variant">Guided tour</span></span></figcaption>
+    <div class="fr" id="frame-guided-tour"><div class="in" id="frame-guided-tour-screen" style="position:relative">
+      <div class="row" id="frame-guided-tour-bar" style="height:56px;padding:0 22px;gap:10px;border-bottom:1px solid #eceae6"><div id="frame-guided-tour-logo" style="width:24px;height:24px;border-radius:7px;background:#0f8a7e"></div><b id="frame-guided-tour-shop" style="font-size:15px">Example shop</b></div>
+      <div id="frame-guided-tour-body" style="padding:28px 22px 0">
+        <div id="frame-guided-tour-title" style="font-size:26px;font-weight:700;letter-spacing:-.02em">Products</div>
+        <div id="frame-guided-tour-empty" style="margin-top:22px;height:220px;border-radius:16px;background:#f7f6f3"></div>
+        <div id="frame-guided-tour-line-1" style="margin-top:18px;height:12px;width:70%;border-radius:6px;background:#eceae6"></div>
+        <div id="frame-guided-tour-line-2" style="margin-top:10px;height:12px;width:50%;border-radius:6px;background:#eceae6"></div>
+      </div>
+      <div id="frame-guided-tour-scrim" style="position:absolute;inset:0;background:rgba(29,28,26,.55)"></div>
+      <div id="frame-guided-tour-spot" style="position:absolute;right:16px;bottom:24px;width:68px;height:68px;border-radius:50%;background:#0f8a7e;box-shadow:0 0 0 8px rgba(255,255,255,.9);color:#fff;font-size:34px;display:flex;align-items:center;justify-content:center">+</div>
+      <div id="frame-guided-tour-coach" style="position:absolute;left:22px;right:22px;bottom:124px;padding:20px;border-radius:18px;background:#fff">
+        <div id="frame-guided-tour-coach-step" style="color:#8d8a84;font-size:13px">Step 1 of 4</div>
+        <div id="frame-guided-tour-coach-title" style="font-size:19px;font-weight:700;margin-top:4px">Add your first product</div>
+        <div id="frame-guided-tour-coach-text" style="color:#5b5853;margin-top:6px;line-height:1.4">Tap the plus button to add a name, a price and a photo.</div>
+        <div class="row" id="frame-guided-tour-coach-actions" style="justify-content:space-between;margin-top:16px"><span id="frame-guided-tour-coach-skip" style="color:#8d8a84">Skip tour</span><span id="frame-guided-tour-coach-next" style="padding:10px 18px;border-radius:12px;background:#0f8a7e;color:#fff;font-weight:600">Next</span></div>
+      </div>
+    </div></div>
+  </figure>
+  <figure class="fcol" id="frame-col-sample-project" role="listitem" style="margin:0">
+    <figcaption class="lbl" id="frame-label-sample-project"><svg class="ic" id="frame-label-sample-project-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mockup"><use href="#i-layers"/></svg><span class="t" id="frame-label-sample-project-text">Onboarding ideas: <span class="v" id="frame-label-sample-project-variant">Sample project</span></span></figcaption>
+    <div class="fr" id="frame-sample-project"><div class="in" id="frame-sample-project-screen">
+      <div class="row" id="frame-sample-project-bar" style="height:56px;padding:0 22px;gap:10px;border-bottom:1px solid #eceae6"><div id="frame-sample-project-logo" style="width:24px;height:24px;border-radius:7px;background:#0f8a7e"></div><b id="frame-sample-project-shop" style="font-size:15px">Example shop</b></div>
+      <div id="frame-sample-project-body" style="padding:28px 22px 0">
+        <div id="frame-sample-project-title" style="font-size:26px;font-weight:700;letter-spacing:-.02em">Start from a sample</div>
+        <div id="frame-sample-project-sub" style="color:#8d8a84;margin-top:6px">Pick one and change it later.</div>
+        <div id="frame-sample-project-cards" style="margin-top:22px;display:flex;flex-direction:column;gap:12px">
+          <div id="frame-sample-project-card-1" style="border-radius:16px;border:1.5px solid #0f8a7e;overflow:hidden"><div id="frame-sample-project-card-1-img" style="height:96px;background:#ffe1c7"></div><div id="frame-sample-project-card-1-name" style="padding:12px 14px;font-weight:600">Bakery</div></div>
+          <div id="frame-sample-project-card-2" style="border-radius:16px;border:1px solid #eceae6;overflow:hidden"><div id="frame-sample-project-card-2-img" style="height:96px;background:#dfe4ff"></div><div id="frame-sample-project-card-2-name" style="padding:12px 14px;font-weight:600">Bookshop</div></div>
+          <div id="frame-sample-project-card-3" style="border-radius:16px;border:1px solid #eceae6;overflow:hidden"><div id="frame-sample-project-card-3-img" style="height:96px;background:#d9f2e3"></div><div id="frame-sample-project-card-3-name" style="padding:12px 14px;font-weight:600">Plant store</div></div>
+        </div>
+      </div>
+      <div id="frame-sample-project-cta" style="margin:auto 22px 34px;height:52px;border-radius:14px;background:#0f8a7e;color:#fff;font-weight:600;display:flex;align-items:center;justify-content:center">Use Bakery</div>
+    </div></div>
+  </figure>
+</div>
 
 <!-- top left: brand + project -->
 <div class="float pill row" id="topbar-left" style="left:16px;top:16px;padding:4px 6px 4px 16px;gap:10px">
@@ -149,15 +202,15 @@ ul,ol{list-style:none}
     <button type="button" class="ib" id="nav-card-fold" style="width:28px;height:28px" aria-label="Fold card" aria-expanded="true" title="Fold card"><svg class="ic" id="nav-card-fold-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-up"/></svg></button>
   </div>
   <div role="tabpanel" id="nav-card-panel" aria-labelledby="tab-mockups" class="card" style="flex:1;min-height:0">
-    <div class="find" id="mockups-find"><svg class="ic" id="mockups-find-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-search"/></svg>Find a mockup or tag</div>
+    <div class="find-row" id="mockups-find-row"><div class="find" id="mockups-find"><svg class="ic" id="mockups-find-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-search"/></svg>Find a mockup or tag</div><button type="button" class="tgl" id="mockups-tags-toggle" aria-pressed="true" aria-label="Show tags" aria-controls="mockups-list"><svg class="ic" id="mockups-tags-toggle-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-tag"/></svg></button></div>
     <ul class="scroll" id="mockups-list" role="tree" aria-label="Mockups">
       <li role="treeitem" aria-expanded="true" id="mockups-item-onboarding-ideas">
         <div class="node open" id="mockups-row-onboarding-ideas"><button type="button" class="chev" id="mockups-row-onboarding-ideas-toggle" aria-label="Collapse variants of onboarding-ideas" tabindex="-1"><svg class="ic" id="mockups-row-onboarding-ideas-toggle-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-down"/></svg></button><svg class="ic kind" id="mockups-row-onboarding-ideas-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mockup"><use href="#i-layers"/></svg><div id="mockups-row-onboarding-ideas-main"><div class="nm" id="mockups-row-onboarding-ideas-name">onboarding-ideas</div><div class="tags" id="mockups-row-onboarding-ideas-tags"><span class="tag" id="mockups-row-onboarding-ideas-tag-1">onboarding</span><span class="tag" id="mockups-row-onboarding-ideas-tag-2">explore</span></div></div><span class="cnt" id="mockups-row-onboarding-ideas-count">3</span></div>
         <ul class="vars" role="group" id="mockups-row-onboarding-ideas-variants">
-          <li class="var" role="treeitem" aria-selected="false" id="mockups-row-onboarding-ideas-variant-checklist"><span class="d" id="mockups-row-onboarding-ideas-variant-checklist-dot"></span>checklist</li>
-          <li class="var" role="treeitem" aria-selected="false" id="mockups-row-onboarding-ideas-variant-guided-tour"><span class="d" id="mockups-row-onboarding-ideas-variant-guided-tour-dot"></span>guided-tour</li>
-          <li class="var" role="treeitem" aria-selected="false" id="mockups-row-onboarding-ideas-variant-sample-project"><span class="d" id="mockups-row-onboarding-ideas-variant-sample-project-dot"></span>sample-project</li>
-        </ul>
+  <li class="var" role="treeitem" aria-selected="false" id="mockups-row-onboarding-ideas-variant-checklist"><svg class="ic vic" id="mockups-row-onboarding-ideas-variant-checklist-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mockup variant"><use href="#i-layers"/></svg><div class="vn" id="mockups-row-onboarding-ideas-variant-checklist-name">checklist</div></li>
+  <li class="var" role="treeitem" aria-selected="true" id="mockups-row-onboarding-ideas-variant-guided-tour"><svg class="ic vic" id="mockups-row-onboarding-ideas-variant-guided-tour-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mockup variant"><use href="#i-layers"/></svg><div class="vn" id="mockups-row-onboarding-ideas-variant-guided-tour-name">guided-tour</div></li>
+  <li class="var" role="treeitem" aria-selected="false" id="mockups-row-onboarding-ideas-variant-sample-project"><svg class="ic vic" id="mockups-row-onboarding-ideas-variant-sample-project-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mockup variant"><use href="#i-layers"/></svg><div class="vn" id="mockups-row-onboarding-ideas-variant-sample-project-name">sample-project</div></li>
+</ul>
       </li>
       <li role="treeitem" aria-expanded="false" id="mockups-item-order-list-layouts"><div class="node" id="mockups-row-order-list-layouts"><button type="button" class="chev" id="mockups-row-order-list-layouts-toggle" aria-label="Expand variants of order-list-layouts" tabindex="-1"><svg class="ic" id="mockups-row-order-list-layouts-toggle-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-right"/></svg></button><svg class="ic kind" id="mockups-row-order-list-layouts-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mockup"><use href="#i-layers"/></svg><div id="mockups-row-order-list-layouts-main"><div class="nm" id="mockups-row-order-list-layouts-name">order-list-layouts</div><div class="tags" id="mockups-row-order-list-layouts-tags"><span class="tag" id="mockups-row-order-list-layouts-tag-1">orders</span></div></div><span class="cnt" id="mockups-row-order-list-layouts-count">2</span></div></li>
       <li role="treeitem" aria-expanded="false" id="mockups-item-checkout-steps"><div class="node" id="mockups-row-checkout-steps"><button type="button" class="chev" id="mockups-row-checkout-steps-toggle" aria-label="Expand variants of checkout-steps" tabindex="-1"><svg class="ic" id="mockups-row-checkout-steps-toggle-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-right"/></svg></button><svg class="ic kind" id="mockups-row-checkout-steps-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mockup"><use href="#i-layers"/></svg><div id="mockups-row-checkout-steps-main"><div class="nm" id="mockups-row-checkout-steps-name">checkout-steps</div><div class="tags" id="mockups-row-checkout-steps-tags"><span class="tag" id="mockups-row-checkout-steps-tag-1">checkout</span><span class="tag more" id="mockups-row-checkout-steps-tag-more" title="payments">+1</span></div></div><span class="cnt" id="mockups-row-checkout-steps-count">4</span></div></li>
@@ -168,20 +221,20 @@ ul,ol{list-style:none}
 </div>
 
 <!-- left side: vertical tool bar, draggable and foldable -->
-<div class="float tools" id="tool-bar" role="toolbar" aria-orientation="vertical" aria-label="Screen tools" aria-controls="frame" style="left:288px;top:200px">
+<div class="float tools" id="tool-bar" role="toolbar" focusgroup="toolbar wrap block" aria-orientation="vertical" aria-label="Canvas tools" aria-controls="canvas" style="left:288px;top:200px">
   <div class="tools-hd" id="tool-bar-header">
     <span class="grip" id="tool-bar-grip" title="Drag tool bar"><svg class="ic" id="tool-bar-grip-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-grip-h"/></svg></span>
-    <button type="button" class="ib" id="tool-bar-fold" style="width:22px;height:22px" aria-label="Fold tool bar" aria-expanded="true" title="Fold tool bar"><svg class="ic" id="tool-bar-fold-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-up"/></svg></button>
+    <button type="button" class="ib" id="tool-bar-fold" style="width:20px;height:22px" aria-label="Fold tool bar" aria-expanded="true"><svg class="ic" id="tool-bar-fold-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-up"/></svg></button>
   </div>
-  <button type="button" class="tool" id="toolbar-side-comment" aria-pressed="false" title="Comment (C)"><svg class="ic" id="toolbar-side-comment-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-pin"/></svg><span id="toolbar-side-comment-label">Comment</span></button>
-  <button type="button" class="tool" id="toolbar-side-inspect" aria-pressed="false" title="Inspect (I)"><svg class="ic" id="toolbar-side-inspect-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-inspect"/></svg><span id="toolbar-side-inspect-label">Inspect</span></button>
+  <button type="button" class="tool" id="toolbar-side-comment" aria-pressed="false" aria-label="Comment" aria-keyshortcuts="C"><svg class="ic" id="toolbar-side-comment-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-pin"/></svg></button>
+  <button type="button" class="tool" id="toolbar-side-inspect" aria-pressed="false" aria-disabled="true" aria-label="Inspect, not available for mockups"><svg class="ic" id="toolbar-side-inspect-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-inspect"/></svg></button>
   <span class="sep" id="toolbar-side-separator" role="separator"></span>
-  <button type="button" class="tool" id="toolbar-side-notes" aria-pressed="false" title="Notes (N)"><svg class="ic" id="toolbar-side-notes-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-notes"/></svg><span id="toolbar-side-notes-label">Notes</span></button>
-  <button type="button" class="tool" id="toolbar-side-comments" aria-pressed="false" aria-label="Comments, 3 open" title="Comments (M)"><svg class="ic" id="toolbar-side-comments-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-bubble"/></svg><span id="toolbar-side-comments-label">Comments</span><b class="badge" id="toolbar-side-comments-badge" aria-hidden="true">3</b></button>
-  <button type="button" class="tool" id="toolbar-side-flow" aria-pressed="false" title="Flow (F)"><svg class="ic" id="toolbar-side-flow-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-flow"/></svg><span id="toolbar-side-flow-label">Flow</span></button>
-  <button type="button" class="tool" id="toolbar-side-design-system" aria-pressed="false" title="Design system (D)" style="min-height:56px"><svg class="ic" id="toolbar-side-design-system-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-palette"/></svg><span id="toolbar-side-design-system-label">Design<br>system</span></button>
+  <button type="button" class="tool" id="toolbar-side-notes" aria-pressed="false" aria-disabled="true" aria-label="Notes, not available for mockups"><svg class="ic" id="toolbar-side-notes-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-notes"/></svg></button>
+  <button type="button" class="tool" id="toolbar-side-comments" aria-pressed="false" aria-label="Comments, 2 open" aria-keyshortcuts="M"><svg class="ic" id="toolbar-side-comments-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-bubble"/></svg><b class="badge" id="toolbar-side-comments-badge" aria-hidden="true">2</b></button>
+  <button type="button" class="tool" id="toolbar-side-flow" aria-pressed="false" aria-disabled="true" aria-label="Flow, not available for mockups"><svg class="ic" id="toolbar-side-flow-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-flow"/></svg></button>
+  <button type="button" class="tool" id="toolbar-side-design-system" aria-pressed="false" aria-disabled="true" aria-label="Design system, not available for mockups"><svg class="ic" id="toolbar-side-design-system-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-palette"/></svg></button>
   <span class="sep" id="toolbar-side-separator-2" role="separator"></span>
-  <button type="button" class="tool" id="toolbar-side-more" style="min-height:40px" aria-label="More actions" aria-haspopup="menu" aria-expanded="false" title="More actions"><svg class="ic" id="toolbar-side-more-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-more"/></svg></button>
+  <button type="button" class="tool" id="toolbar-side-more" aria-disabled="true" aria-label="More actions, not available for mockups" aria-haspopup="menu" aria-expanded="false"><svg class="ic" id="toolbar-side-more-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-more"/></svg></button>
 </div>
 
 <!-- right: Agent bar (live status + Follow, activity, note for the agent) -->
@@ -211,7 +264,7 @@ ul,ol{list-style:none}
   <form class="note" id="agent-note" aria-label="Note for the agent">
     <textarea id="agent-note-field" aria-label="Note for the agent" placeholder="Leave a note for the agent"></textarea>
     <div class="row" id="agent-note-footer" style="justify-content:space-between">
-      <span class="row" id="agent-note-scope" style="gap:6px;font-size:11.5px;color:#6b6862"><svg class="ic" id="agent-note-scope-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-desktop"/></svg>On home, default</span>
+      <span class="row" id="agent-note-scope" style="gap:6px;font-size:11.5px;color:#6b6862;white-space:nowrap"><svg class="ic" id="agent-note-scope-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-layers"/></svg>On onboarding-ideas</span>
       <button type="submit" class="ib" id="agent-note-send" aria-label="Send note" style="width:28px;height:28px;background:#1f1f1d;color:#fff"><svg class="ic" id="agent-note-send-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-send"/></svg></button>
     </div>
   </form>
@@ -219,7 +272,7 @@ ul,ol{list-style:none}
 
 <!-- bottom: zoom, centred on the canvas area -->
 <div class="float pill row" id="zoom-pill" style="left:764px;transform:translateX(-50%);bottom:18px;padding:4px;gap:2px">
-  <div class="ib" id="zoom-pill-out"><svg class="ic" id="zoom-pill-out-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></div><span id="zoom-pill-value" style="width:46px;text-align:center;font-weight:600">90%</span><div class="ib" id="zoom-pill-in"><svg class="ic" id="zoom-pill-in-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></div>
+  <div class="ib" id="zoom-pill-out"><svg class="ic" id="zoom-pill-out-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></div><span id="zoom-pill-value" style="width:46px;text-align:center;font-weight:600">60%</span><div class="ib" id="zoom-pill-in"><svg class="ic" id="zoom-pill-in-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></div>
   <div id="zoom-pill-divider" style="width:1px;height:20px;background:#e3e0db;margin:0 4px"></div><div class="btn" id="zoom-pill-fit"><svg class="ic" id="zoom-pill-fit-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Fit</div>
 </div>
 </body></html>

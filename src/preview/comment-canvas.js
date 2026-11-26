@@ -259,6 +259,7 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
   const outlineEl = div("comment-target-outline");
   const hoverOutlineEl = div("comment-hover-outline");
   const pinsEl = div("comment-pins");
+  const dimsEl = div("comment-dims");
   // A native non-modal <dialog>, opened with show(): it must stay out of the top layer to scroll with the canvas next to its element.
   const popoverEl = document.createElement("dialog");
   popoverEl.className = "comment-popover";
@@ -367,6 +368,8 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
     if (activeId === null) return;
     const target = /** @type {Node} */ (evt.target);
     if (popoverEl.contains(target) || pinsEl.contains(target) || toolbarEl.contains(target)) return;
+    // A column header's count chip opens a thread itself: closing first would rebuild it away from under the press.
+    if (typeof (/** @type {Element} */ (target).closest) === "function" && /** @type {Element} */ (target).closest(".comment-count-chip")) return;
     close(false);
   };
   document.addEventListener("pointerdown", onOutsidePress, true);
@@ -403,7 +406,7 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
 
   /** Puts the layer parts, the toolbar and the banner where the host says (the host's layer, its stage). */
   function mount() {
-    host.layerEl.replaceChildren(outlineEl, hoverOutlineEl, pinsEl, popoverEl);
+    host.layerEl.replaceChildren(dimsEl, outlineEl, hoverOutlineEl, pinsEl, popoverEl);
     host.stageEl.append(toolbarEl, bannerEl);
     bannerEl.dataset.placement = host.placement ?? "top";
   }
@@ -415,6 +418,11 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
 
   /** A thread's frame key: its variant for a mockup thread, null on a screen. */
   const keyOf = (t) => t.variant ?? null;
+
+  /** The frame a thread's pin sits in: its own, or — when its variant no longer exists — the first one, in the detached stack. @returns {CommentFrame | null} */
+  function homeFrame(t) {
+    return frameOf(keyOf(t)) ?? (keyOf(t) === null ? null : (host.frames()[0] ?? null));
+  }
 
   /** @param {CommentFrame} frame @returns {{ left: number, top: number, right: number, bottom: number } | null} the whole frame's box in layer coordinates */
   function wholeBox(frame) {
@@ -463,9 +471,27 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
     renderToolbar();
     renderBanner();
     renderPins();
+    renderDims();
     renderOutline();
     renderPopover();
     renderHover();
+  }
+
+  /** While a re-anchor pick waits, the frames it may not pick from dim fully. */
+  function renderDims() {
+    dimsEl.replaceChildren();
+    if (reanchorFor === null) return;
+    for (const frame of host.frames()) {
+      if (pickable(frame.key)) continue;
+      const box = wholeBox(frame);
+      if (!box) continue;
+      const dim = div("comment-dim");
+      dim.style.left = `${box.left}px`;
+      dim.style.top = `${box.top}px`;
+      dim.style.width = `${box.right - box.left}px`;
+      dim.style.height = `${box.bottom - box.top}px`;
+      dimsEl.append(dim);
+    }
   }
 
   function renderToolbar() {
@@ -482,7 +508,7 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
       bannerEl.append(icon("my_location"), `Click the element to move #${number} to`, kbd("Esc"), muted("cancels"));
       bannerEl.hidden = false;
     } else if (modeOn) {
-      bannerEl.append(icon("chat_bubble"), "Comment mode — click an element to start a thread", kbd("Esc"), muted("to exit"));
+      bannerEl.append(icon("chat_bubble"), host.modeText ?? "Comment mode — click an element to start a thread", kbd("Esc"), muted("to exit"));
       bannerEl.hidden = false;
     } else {
       bannerEl.hidden = true;
@@ -509,12 +535,12 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
     const perElement = new Map();
     const pinned = pinnedThreads(threads, { showResolved, hidePins });
     // DOM order follows the frames (a mockup's columns A, B, C), then the log.
-    const ordered = host.frames().flatMap((frame) => pinned.filter((t) => keyOf(t) === frame.key));
+    const ordered = host.frames().flatMap((frame) => pinned.filter((t) => homeFrame(t)?.key === frame.key));
     for (const t of ordered) {
       let x;
       let y;
-      const frame = /** @type {CommentFrame} */ (frameOf(keyOf(t)));
-      if (!t.detached) {
+      const frame = /** @type {CommentFrame} */ (homeFrame(t));
+      if (!t.detached && frameOf(keyOf(t)) !== null) {
         const domId = bareId(t.node_id);
         const box = boxFor(keyOf(t), domId);
         if (!box) continue; // not in this document (yet): the next layout() places it
@@ -527,7 +553,7 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
         // Detached pins stack at the frame's top-left.
         const box = wholeBox(frame);
         if (!box) continue;
-        const slot = `${keyOf(t) ?? ""}/detached`;
+        const slot = `${frame.key ?? ""}/detached`;
         const index = perElement.get(slot) ?? 0;
         perElement.set(slot, index + 1);
         x = box.left;
@@ -980,10 +1006,11 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
   // ---------------------------------------------------------------------------
   // The documents: hover outline, new-thread and re-anchor clicks
 
-  /** The frame a click or hover may pick in right now: any frame, or — while re-anchoring — the thread's own. */
+  /** The frame a click or hover may pick in right now: any frame, or — while re-anchoring — the thread's own (any, if its variant is gone). */
   function pickable(key) {
     if (reanchorFor === null) return true;
-    return key === (keyOf(thread(reanchorFor) ?? {}) ?? null);
+    const own = keyOf(thread(reanchorFor) ?? {});
+    return frameOf(own) === null || key === own; // a thread whose variant is gone may move to any frame
   }
 
   /**
@@ -1126,6 +1153,7 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
     /** Re-measures pins, outline and popover — after a frame load, zoom, scroll or resize. */
     layout() {
       renderPins();
+      renderDims();
       renderOutline();
       placeNow();
       renderHover();
@@ -1160,7 +1188,7 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
      * @param {"open" | "detached" | "resolved"} kind
      */
     openFirst(key, kind) {
-      const match = threads.find((t) => keyOf(t) === key && threadKind(t) === kind);
+      const match = threads.find((t) => homeFrame(t)?.key === key && threadKind(t) === kind);
       if (!match) return;
       showPins();
       open(match.id);

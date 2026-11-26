@@ -228,4 +228,51 @@ describe("mockup comments", () => {
     docs.a.getElementById("a-card").dispatchEvent(new Event("pointermove", { bubbles: true }));
     expect(docs.a.documentElement.outerHTML).toBe(before);
   });
+
+  it("a count chip still opens its thread while another popover is open (pointerdown first, then click)", async () => {
+    seedThreads();
+    await boot();
+    loadColumns();
+    pins()[0].click();
+    expect(popover().open).toBe(true);
+    const chip = chips(1)[1]; // detached chip of column B
+    chip.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+    expect(document.contains(chip)).toBe(true); // not rebuilt by the press
+    chip.click();
+    expect($(".comment-popover-alert").textContent).toContain("b-gone");
+  });
+
+  it("the banner names any variant on a mockup and keeps the screen text on a screen", async () => {
+    await boot();
+    loadColumns();
+    $("#comment-mode-toggle").click();
+    expect($("#comment-banner").textContent).toContain("click an element in any variant to start a thread");
+  });
+
+  it("dims the other columns while a re-anchor pick waits", async () => {
+    seedThreads();
+    await boot();
+    loadColumns();
+    expect(document.querySelectorAll(".comment-dim")).toHaveLength(0);
+    pins()[1].click();
+    $(".comment-popover-alert button").click();
+    expect(document.querySelectorAll("#mockup-comment-layer .comment-dim")).toHaveLength(1); // A dims, B (the thread's own) does not
+  });
+
+  it("a thread whose variant is gone stays reachable as a detached pin in the first column and counts in its detached chip", async () => {
+    seedThreads();
+    threadData.comments.push({ id: "c9", mockup: "cart", variant: "gone", node_id: ref("gone", "x"), text: "Orphan", author: "human", parent_id: null, resolved: false, ts: TS });
+    threadData.threads.push({ id: "c9", variant: "gone", node_id: ref("gone", "x"), author: "human", status: "open", detached: true, reply_count: 0 });
+    await boot();
+    const docs = loadColumns();
+    const orphan = pins().find((p) => p.dataset.variant === "gone");
+    expect(orphan.dataset.state).toBe("detached");
+    expect(chips(0).map((c) => c.getAttribute("aria-label"))).toEqual(["1 open comment", "1 detached comment"]);
+    orphan.click();
+    expect(popover().open).toBe(true);
+    $(".comment-popover-alert button").click();
+    docs.b.getElementById("b-card").click(); // any frame takes it
+    await flush();
+    expect(posts).toEqual([{ action: "reanchor", comment_id: "c9", mockup: "cart", variant: "b", node_id: "b-card" }]);
+  });
 });

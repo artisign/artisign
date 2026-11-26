@@ -1840,11 +1840,12 @@ function renderMockupChips() {
   const activeId = commentCanvas.activeThread();
   const active = mockupThreads.find((t) => t.id === activeId) ?? null;
   for (const column of mockupColumns) {
-    const mine = mockupThreads.filter((t) => t.variant === column.variantId);
+    // A thread whose variant is gone sits in the first column's detached stack.
+    const mine = mockupThreads.filter((t) => (mockupColumns.some((c) => c.variantId === t.variant) ? t.variant : mockupColumns[0].variantId) === column.variantId);
     const count = (kind) => mine.filter((t) => threadKind(t) === kind).length;
     renderColumnChips(column.countsEl, { open: count("open"), detached: count("detached"), resolved: count("resolved") }, {
       showResolved,
-      activeKind: active && active.variant === column.variantId ? threadKind(active) : null,
+      activeKind: active && mine.includes(active) ? threadKind(active) : null,
       onOpen: (kind) => {
         if (activeMode !== "comment") setMode("comment");
         commentCanvas.openFirst(column.variantId, kind);

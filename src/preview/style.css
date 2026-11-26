@@ -10891,6 +10891,12 @@ button.uc-target:hover {
   bottom: calc(var(--space-xl) + 48px);
 }
 
+.comment-dim {
+  position: absolute;
+  background: color-mix(in srgb, var(--chrome-canvas) 85%, transparent);
+  pointer-events: none;
+}
+
 #mockup-comment-layer {
   position: absolute;
   inset: 0;

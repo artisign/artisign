@@ -23,6 +23,7 @@ import { commentTarget, mockupCommentTarget } from "./comment-canvas.js";
  *   layerEl: HTMLElement,
  *   stageEl: HTMLElement,
  *   placement?: "top" | "bottom",
+ *   modeText?: string,
  *   frames: () => CommentFrame[],
  *   view: () => Rect,
  * }} CommentHost
@@ -79,6 +80,7 @@ export function createMockupHost({ layerEl, stageEl, getColumns }) {
     layerEl,
     stageEl,
     placement: "bottom",
+    modeText: "Comment mode — click an element in any variant to start a thread",
     frames: () =>
       getColumns().map(({ variantId, letter, iframe }) => ({
         key: variantId,

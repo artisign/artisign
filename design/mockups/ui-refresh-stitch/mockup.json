@@ -1,0 +1,20 @@
+{
+  "variants": [
+    {
+      "id": "base",
+      "title": "Stitch refined: one screen, Screens tab",
+      "description": "Stitch direction as chosen by Christian, refined. The canvas shows only the open screen and gives it most of the room. One floating card on the left switches between Screens and Mockups with a segmented control (Screens active here). A floating vertical tool bar between the card and the screen holds Comment, Variants (with count), Inspect, Preview and More; the toolbar above the frame is gone. Top groups, right icon rail and zoom pill as in 1-stitch. Example data only."
+    },
+    {
+      "id": "mockups-tab",
+      "title": "Stitch refined: one screen, Mockups tab",
+      "description": "Same layout as base with the card's segmented control on Mockups: the card lists the project's mockups (name, variant count) instead of the screens. The open screen, the side tool bar and all other chrome stay as they are; picking a mockup opens it on the canvas in place of the screen. Example data only."
+    }
+  ],
+  "tags": [
+    "chr-1257",
+    "ui-refresh"
+  ],
+  "title": "App UI refresh — Stitch direction refined",
+  "description": "CHR-1257. Christian chose the Stitch direction (1-stitch in mockup ui-refresh). Refinements: the canvas shows exactly one screen, the open one, at 110% so it gets most of the room; one floating card on the left switches Screens | Mockups with a segmented control (the separate Mockups card is gone, search moved into the card as a field); a floating vertical tool bar between the card and the screen holds Comment, Variants (count badge), Inspect, Preview and More, with short labels under the icons; the toolbar above the frame is removed. Top groups, right icon rail and zoom pill unchanged from 1-stitch. Variants: base (Screens tab), mockups-tab (Mockups tab). Example data only. Not reviewed or approved yet."
+}

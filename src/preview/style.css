@@ -1739,13 +1739,79 @@ button.chrome-section-header:focus-visible {
   width: max-content;
 }
 
-.mockup-column-index {
+/* The variant's letter: the mockup-column-header's variant-badge (CHR-1263). */
+.mockup-column-index,
+.comment-variant-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-xs);
+  background: var(--chrome-text);
+  color: var(--chrome-bar);
   font-size: var(--ui-chip);
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--chrome-text-tertiary);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.mockup-column-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
   margin-bottom: var(--space-2xs);
+}
+
+.mockup-column-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: none;
+  margin-left: auto;
+}
+
+/* A column header's count chip: open (blue), detached (amber), resolved (muted). */
+.comment-count-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: var(--size-chip-h, 18px);
+  padding: 0 var(--space-sm) 0 5px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--comment-human) 12%, transparent);
+  color: var(--comment-human);
+  font: inherit;
+  font-size: var(--ui-chip);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.comment-count-chip .icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.comment-count-chip[data-kind="detached"] {
+  background: var(--chrome-warning-subtle);
+  color: var(--chrome-warning);
+}
+
+.comment-count-chip[data-kind="resolved"] {
+  background: var(--chrome-field);
+  color: var(--chrome-text-secondary);
+}
+
+.comment-count-chip:focus-visible,
+.comment-count-chip[aria-expanded="true"] {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
 }
 
 /* Counter-scaled against the row's zoom (--zoom, set by applyMockupZoom): the header paints at native chrome size, laid out at width x zoom so its wrapping matches the column. */
@@ -1764,20 +1830,28 @@ button.chrome-section-header:focus-visible {
 }
 
 .mockup-column-title {
+  min-width: 0;
   font-size: var(--ui-base);
   font-weight: 500;
   color: var(--chrome-text);
-  margin-bottom: var(--space-2xs);
-  overflow-wrap: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mockup-column-description {
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
   line-height: 1.5;
-  white-space: pre-line;
-  overflow-wrap: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   margin-bottom: var(--space-md);
+}
+
+.mockup-column-description > * {
+  display: inline;
+  margin: 0;
 }
 
 .mockup-column-error {
@@ -10809,6 +10883,30 @@ button.uc-target:hover {
   box-shadow: var(--chrome-shadow-float);
   z-index: 6;
   pointer-events: none;
+}
+
+/* On the mockup columns the banner sits at the bottom of the stage, above the toolbar. */
+#comment-banner[data-placement="bottom"] {
+  top: auto;
+  bottom: calc(var(--space-xl) + 48px);
+}
+
+.comment-dim {
+  position: absolute;
+  background: color-mix(in srgb, var(--chrome-canvas) 85%, transparent);
+  pointer-events: none;
+}
+
+#mockup-comment-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 5;
+  pointer-events: none;
+}
+
+#mockup-comment-layer[hidden] {
+  display: none;
 }
 
 #comment-banner[hidden] {

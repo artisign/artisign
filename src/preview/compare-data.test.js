@@ -121,7 +121,7 @@ describe("modeToggleStates", () => {
     expect(states.flow.title).toContain("Single");
   });
 
-  it("is the old rule otherwise: board and mockup disable comment and inspect, a mockup disables flow", () => {
+  it("is the old rule otherwise: board disables comment and inspect, a mockup disables flow and inspect but not comment (CHR-1263), the design system and use cases disable comment", () => {
     expect(modeToggleStates({ view: "screens", showMockup: false, comparing: false })).toEqual({
       flow: { disabled: false, title: "" },
       comment: { disabled: false, title: "" },
@@ -130,6 +130,8 @@ describe("modeToggleStates", () => {
     const board = modeToggleStates({ view: "board", showMockup: false, comparing: false });
     expect([board.flow.disabled, board.comment.disabled, board.inspect.disabled]).toEqual([false, true, true]);
     const mockup = modeToggleStates({ view: "screens", showMockup: true, comparing: false });
-    expect([mockup.flow.disabled, mockup.comment.disabled, mockup.inspect.disabled]).toEqual([true, true, true]);
+    expect([mockup.flow.disabled, mockup.comment.disabled, mockup.inspect.disabled]).toEqual([true, false, true]);
+    expect(modeToggleStates({ view: "design-system", showMockup: false, comparing: false }).comment.disabled).toBe(true);
+    expect(modeToggleStates({ view: "usecases", showMockup: false, comparing: false }).comment.disabled).toBe(true);
   });
 });

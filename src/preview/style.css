@@ -10490,6 +10490,10 @@ button.uc-target:hover {
 /* The popover: a raised card next to its element (placePopover picks the side). */
 .comment-popover {
   position: absolute;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  border: none;
   width: 320px;
   max-width: calc(100vw - 32px);
   border-radius: var(--radius-md);
@@ -10499,10 +10503,6 @@ button.uc-target:hover {
   font-size: var(--ui-sm);
   pointer-events: auto;
   z-index: 2;
-}
-
-.comment-popover[hidden] {
-  display: none;
 }
 
 .comment-popover-header {

@@ -2,23 +2,23 @@
   "variants": [
     {
       "id": "thread-open",
-      "title": "1 · Thread offen (Pin + Popover)",
-      "description": "CHR-1250/1251: nummerierte Pins (Human blau, Agent lila), aktiver Pin mit Ring, Element-Outline, Popover rechts vom Element. Context-Sidebar zeigt nur noch die Zählzeile (CHR-1253)."
+      "title": "1 · Thread open (pin + popover)",
+      "description": "CHR-1250/1251: numbered pins (Human blue, Agent purple), active pin with a ring, element outline, popover to the right of the element. The Context sidebar keeps only the count row (CHR-1253)."
     },
     {
       "id": "comment-mode-new",
-      "title": "2 · Kommentar-Modus + neuer Thread",
-      "description": "CHR-1252: Modus über Top-Bar-Icon oder C, Hinweisleiste mit Esc. Hover zeigt Outline + Node-id-Label, Klick öffnet leeren Popover am Node, @-Mention-Liste für Agents. Vorhandene Pins werden gedimmt."
+      "title": "2 · Comment mode + new thread",
+      "description": "CHR-1252: the mode starts from the top-bar icon or C, with a hint bar that names Esc. Hover shows an outline and a node id label; a click opens an empty popover at the node, with an @-mention list for agents. Existing pins are dimmed."
     },
     {
       "id": "detached",
-      "title": "3 · Detached-Thread + Mehr-Menü",
-      "description": "CHR-1249/1250: Node n184 existiert nach dem Re-Render nicht mehr. Der Thread wird nicht gelöscht: Sein Pin landet gestrichelt und in Amber in einer „Detached“-Ablage links neben dem Screen. Der Popover erklärt den Zustand und bietet Re-anchor an, das Mehr-Menü ist geöffnet."
+      "title": "3 · Detached thread + more menu",
+      "description": "CHR-1249/1250: node n184 no longer exists after the re-render. The thread is not deleted: its pin moves, dashed and amber, to a \"Detached\" tray left of the screen. The popover explains the state and offers re-anchor; the more menu is open."
     },
     {
       "id": "flip-resolved",
-      "title": "4 · Popover-Flip + Show resolved",
-      "description": "CHR-1251/1252: Element am rechten Rand, der Popover öffnet sich nach links. „Show resolved“ ist an: Erledigte Threads erscheinen als graue Pins mit Häkchen. Ein Thread ist erledigt und lässt sich wieder öffnen (Reopen)."
+      "title": "4 · Popover flip + show resolved",
+      "description": "CHR-1251/1252: the element sits at the right edge, so the popover opens to the left. \"Show resolved\" is on: resolved threads appear as grey pins with a check mark. One thread is resolved and can be reopened (Reopen)."
     }
   ]
 }

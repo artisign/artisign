@@ -51,6 +51,10 @@ function stubDaemon() {
   });
 }
 
+// jsdom has no HTMLDialogElement.show()/close(); the comment popover is a non-modal <dialog>.
+HTMLDialogElement.prototype.show ??= function () { this.setAttribute("open", ""); };
+HTMLDialogElement.prototype.close ??= function () { this.removeAttribute("open"); };
+
 const flush = async () => {
   for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0));
 };
@@ -440,7 +444,7 @@ describe("Escape in a text field", () => {
     key("c");
     doc.getElementById("child").click();
     const input = $(".comment-popover-input");
-    expect($(".comment-popover").hidden).toBe(false);
+    expect($(".comment-popover").open).toBe(true);
     input.focus();
     input.dispatchEvent(new KeyboardEvent("keydown", { key: "c", bubbles: true, cancelable: true }));
     expect(pressed("comment-mode-toggle")).toBe("true"); // C while typing is a letter, not the shortcut

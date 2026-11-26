@@ -53,6 +53,10 @@ function stubDaemon() {
   });
 }
 
+// jsdom has no HTMLDialogElement.show()/close(); the comment popover is a non-modal <dialog>.
+HTMLDialogElement.prototype.show ??= function () { this.setAttribute("open", ""); };
+HTMLDialogElement.prototype.close ??= function () { this.removeAttribute("open"); };
+
 const flush = async () => {
   for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0));
 };
@@ -171,7 +175,7 @@ describe("canvas comments", () => {
     await boot("one");
     loadFrame();
     pins()[0].click();
-    expect(popover().hidden).toBe(false);
+    expect(popover().open).toBe(true);
     expect($(".comment-popover-header b").textContent).toBe("#1");
     expect($(".comment-popover-node").textContent).toBe("card-goal");
     const metas = [...document.querySelectorAll(".comment-message-meta")].map((m) => [m.querySelector("b").textContent, m.querySelector(".comment-badge").textContent]);
@@ -197,7 +201,7 @@ describe("canvas comments", () => {
     await flush();
     expect(posts).toEqual([{ parent_id: "c1", text: "Two lines" }]);
     escape(input);
-    expect(popover().hidden).toBe(true);
+    expect(popover().open).toBe(false);
     expect(document.activeElement).toBe(pins()[0]);
   });
 
@@ -209,6 +213,7 @@ describe("canvas comments", () => {
     $('.comment-popover-header [aria-label="Resolve"]').click();
     await flush();
     expect(posts.at(-1)).toEqual({ parent_id: "c1", text: "", resolved: true });
+    expect(document.activeElement).toBe(pins()[0]); // focus lands on a pin, not on <body>
     pins()[0].click();
     $('.comment-popover-header [aria-label="More actions"]').click();
     const del = [...document.querySelectorAll(".comment-popover-menu .chrome-menu-item")].find((b) => b.textContent.includes("Delete"));
@@ -224,7 +229,7 @@ describe("canvas comments", () => {
     const doc = loadFrame();
     $("#comment-mode-toggle").click();
     doc.querySelector("#card-trigger span").click(); // no id of its own: the nearest ancestor with one
-    expect(popover().hidden).toBe(false);
+    expect(popover().open).toBe(true);
     expect(popover().dataset.mode).toBe("new");
     expect($(".comment-popover-node").textContent).toBe("card-trigger");
     const input = $(".comment-popover-input");
@@ -232,7 +237,7 @@ describe("canvas comments", () => {
     enter(input);
     await flush();
     expect(posts).toEqual([{ screen: "one", node_id: "card-trigger", text: "Shorter copy" }]);
-    expect(popover().hidden).toBe(true);
+    expect(popover().open).toBe(false);
     doc.getElementById("root").click(); // the screen root is a screen-level thread
     expect($(".comment-popover-node").textContent).toBe("screen");
   });
@@ -243,7 +248,7 @@ describe("canvas comments", () => {
     $("#comment-mode-toggle").click();
     doc.getElementById("card-goal").click();
     escape();
-    expect(popover().hidden).toBe(true);
+    expect(popover().open).toBe(false);
     expect($("#comment-mode-toggle").getAttribute("aria-pressed")).toBe("true");
     escape();
     expect($("#comment-mode-toggle").getAttribute("aria-pressed")).toBe("false");
@@ -259,6 +264,17 @@ describe("canvas comments", () => {
     doc.getElementById("card-trigger").click();
     await flush();
     expect(posts).toEqual([{ action: "reanchor", comment_id: "c2", screen: "one", node_id: "card-trigger" }]);
+  });
+
+  it("the toolbar is one tab stop with arrow-key movement", async () => {
+    await boot("one");
+    loadFrame();
+    const tools = ["#comment-tool-select", "#comment-tool-comment", "#comment-tool-resolved", "#comment-tool-hide"].map($);
+    expect(tools.map((b) => b.tabIndex)).toEqual([0, -1, -1, -1]);
+    tools[0].focus();
+    tools[0].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(tools[3]);
+    expect(tools.map((b) => b.tabIndex)).toEqual([-1, -1, -1, 0]);
   });
 
   it("the toolbar shows resolved pins muted, and hides pins without leaving the mode", async () => {

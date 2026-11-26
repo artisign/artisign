@@ -140,6 +140,34 @@ export function commentTarget(doc, target) {
   return { el, id: el === doc.body.firstElementChild ? null : el.id };
 }
 
+/**
+ * Roving-tabindex fallback for a horizontal toolbar where `focusgroup` is
+ * unsupported: one item in the tab order, arrow keys (reversed in RTL),
+ * Home/End, wrapping at the ends.
+ * @param {HTMLElement} toolbar
+ * @param {HTMLElement[]} items
+ */
+function installRovingTabindex(toolbar, items) {
+  items.forEach((b, i) => (b.tabIndex = i ? -1 : 0));
+  toolbar.addEventListener("focusin", (evt) => {
+    const target = /** @type {HTMLElement} */ (evt.target);
+    if (items.includes(target)) items.forEach((b) => (b.tabIndex = b === target ? 0 : -1));
+  });
+  toolbar.addEventListener("keydown", (evt) => {
+    const rtl = getComputedStyle(toolbar).direction === "rtl";
+    const steps = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1 };
+    const current = items.indexOf(/** @type {HTMLElement} */ (evt.target));
+    if (current === -1) return;
+    let next;
+    if (evt.key === "Home") next = 0;
+    else if (evt.key === "End") next = items.length - 1;
+    else if (evt.key in steps) next = (current + steps[/** @type {"ArrowRight" | "ArrowLeft"} */ (evt.key)] + items.length) % items.length;
+    else return;
+    evt.preventDefault();
+    items[next].focus();
+  });
+}
+
 /** @param {string | null} ref `<screen>.<node-id>` or null */
 function bareId(ref) {
   if (ref === null) return null;
@@ -211,9 +239,9 @@ export function createCommentCanvas({ canvasEl, holderEl, layerEl, toolbarEl, ba
   const outlineEl = div("comment-target-outline");
   const hoverOutlineEl = div("comment-hover-outline");
   const pinsEl = div("comment-pins");
-  const popoverEl = div("comment-popover");
-  popoverEl.setAttribute("role", "dialog");
-  popoverEl.hidden = true;
+  // A native non-modal <dialog>, opened with show(): it must stay out of the top layer to scroll with the canvas next to its element.
+  const popoverEl = document.createElement("dialog");
+  popoverEl.className = "comment-popover";
   outlineEl.hidden = true;
   hoverOutlineEl.hidden = true;
   layerEl.append(outlineEl, hoverOutlineEl, pinsEl, popoverEl);
@@ -267,10 +295,14 @@ export function createCommentCanvas({ canvasEl, holderEl, layerEl, toolbarEl, ba
   const commentBtn = toolBtn("chat_bubble", "Comment (C)", "comment-tool-comment");
   const divider = document.createElement("span");
   divider.className = "comment-toolbar-divider";
-  divider.setAttribute("aria-hidden", "true");
+  divider.setAttribute("role", "separator");
+  divider.setAttribute("aria-orientation", "vertical");
   const resolvedBtn = textBtn("Show resolved", "comment-tool-resolved");
   const hideBtn = textBtn("Hide pins", "comment-tool-hide");
   toolbarEl.append(selectBtn, commentBtn, divider, resolvedBtn, hideBtn);
+  // One tab stop: the browser's focusgroup where supported, else a roving tabindex with the arrow keys.
+  toolbarEl.setAttribute("focusgroup", "toolbar wrap");
+  if (!("focusGroup" in HTMLElement.prototype)) installRovingTabindex(toolbarEl, [selectBtn, commentBtn, resolvedBtn, hideBtn]);
   selectBtn.addEventListener("click", () => actions.setMode(false));
   commentBtn.addEventListener("click", () => actions.setMode(true));
   resolvedBtn.addEventListener("click", () => {
@@ -387,11 +419,6 @@ export function createCommentCanvas({ canvasEl, holderEl, layerEl, toolbarEl, ba
     return `Comment ${number} on ${target}${t.detached ? ", detached" : ""}${t.status === "resolved" ? ", resolved" : ""}`;
   }
 
-  /** A screen-level thread, or one whose element is in the current document, sits on its element; a detached one in the screen's top-left corner. */
-  function isPlacedOnElement(t) {
-    return !t.detached;
-  }
-
   // ---------------------------------------------------------------------------
   // Rendering
 
@@ -448,7 +475,7 @@ export function createCommentCanvas({ canvasEl, holderEl, layerEl, toolbarEl, ba
     for (const t of pinnedThreads(threads, { showResolved, hidePins })) {
       let x;
       let y;
-      if (isPlacedOnElement(t)) {
+      if (!t.detached) {
         const domId = bareId(t.node_id);
         const box = boxFor(domId);
         if (!box) continue; // not in this document (yet): the next layout() places it
@@ -513,7 +540,7 @@ export function createCommentCanvas({ canvasEl, holderEl, layerEl, toolbarEl, ba
 
   function renderPopover() {
     if (activeId === null) {
-      popoverEl.hidden = true;
+      if (popoverEl.open) popoverEl.close();
       return;
     }
     const isNew = activeId === "new";
@@ -522,7 +549,7 @@ export function createCommentCanvas({ canvasEl, holderEl, layerEl, toolbarEl, ba
       close(false);
       return;
     }
-    popoverEl.hidden = false;
+    if (!popoverEl.open) popoverEl.show();
     popoverEl.dataset.mode = isNew ? "new" : "thread";
     popoverEl.setAttribute("aria-label", isNew ? `New comment on ${newTarget ?? "screen"}` : threadLabel(/** @type {ThreadInfo} */ (t)));
 
@@ -557,7 +584,9 @@ export function createCommentCanvas({ canvasEl, holderEl, layerEl, toolbarEl, ba
       moreBtn.setAttribute("aria-haspopup", "menu");
       moreBtn.setAttribute("aria-expanded", String(menuOpen));
       moreBtn.addEventListener("click", () => setMenu(!menuOpen));
-      popHeader.append(statusBtn, moreBtn);
+      const closeBtn = headerBtn("close", "Close");
+      closeBtn.addEventListener("click", () => close(true));
+      popHeader.append(statusBtn, moreBtn, closeBtn);
     } else {
       const discard = headerBtn("close", "Discard");
       discard.addEventListener("click", () => close(true));
@@ -699,7 +728,7 @@ export function createCommentCanvas({ canvasEl, holderEl, layerEl, toolbarEl, ba
 
   /** Places the popover next to its element (or its pin, for a detached thread) inside the visible canvas area. */
   function placeNow() {
-    if (popoverEl.hidden) return;
+    if (!popoverEl.open) return;
     let anchor = null;
     if (activeId === "new") anchor = newTarget === undefined ? null : boxFor(newTarget);
     else {
@@ -891,9 +920,11 @@ export function createCommentCanvas({ canvasEl, holderEl, layerEl, toolbarEl, ba
     confirmDelete = false;
     errorText = "";
     mentionList.hidden = true;
-    popoverEl.hidden = true;
     render();
-    if (returnFocus && was && was !== "new") pinFor(was)?.focus();
+    if (!returnFocus) return;
+    // Back to the thread's pin; after a resolve or delete that pin is gone, so the first pin (or the Comment tool) takes focus instead.
+    const target = (was && was !== "new" ? pinFor(was) : null) ?? /** @type {HTMLElement | null} */ (pinsEl.querySelector(".comment-pin")) ?? commentBtn;
+    target.focus();
   }
 
   // ---------------------------------------------------------------------------

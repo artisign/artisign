@@ -1,0 +1,137 @@
+<style>
+*{box-sizing:border-box}
+.app{width:1440px;height:900px;background:#e8e6e2;font:13px/1.4 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1d1c1a;display:flex;flex-direction:column;overflow:hidden;position:relative}
+button{font:inherit;color:inherit;cursor:pointer}
+.top{height:44px;flex:none;background:#fbfaf9;border-bottom:1px solid #e3e0db;display:flex;align-items:center;gap:14px;padding:0 12px}
+.logo{font-weight:700;font-size:14px}
+.proj{height:28px;padding:0 10px;border:0;border-radius:6px;background:none}
+.vr{width:1px;height:18px;background:#e3e0db}
+.tab{color:#6b6863;height:44px;display:inline-flex;align-items:center;border:0;background:none;padding:0 2px;font-size:13px}
+.tab.on{color:#1d1c1a;box-shadow:inset 0 -2px 0 #1d1c1a}
+.sp{flex:1}
+.ib{width:28px;height:28px;border:0;border-radius:6px;background:none;color:#6b6863;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.ib.on{background:#dcf0ed;color:#0f8a7e}
+.live{display:inline-flex;align-items:center;gap:6px;color:#6b6863;font-size:12px}
+.live i{width:7px;height:7px;border-radius:4px;background:#16a34a}
+.tbar{height:40px;flex:none;background:#fbfaf9;border-bottom:1px solid #e3e0db;display:flex;align-items:center;gap:8px;padding:0 16px}
+.tb{height:28px;padding:0 10px;border:1px solid #d1cec8;border-radius:6px;background:#fff;display:inline-flex;align-items:center;gap:6px;font-size:12.5px}
+.tb.on{background:#dcf0ed;border-color:#a9d9d2;color:#0f8a7e}
+.sl{width:140px;height:4px;border-radius:2px;background:#e2dfda;position:relative}
+.sl b{position:absolute;left:0;top:0;height:4px;border-radius:2px;background:#0f8a7e}
+.sl i{position:absolute;top:-4px;width:12px;height:12px;border-radius:6px;background:#0f8a7e;border:2px solid #fff;box-shadow:0 0 0 1px #0f8a7e}
+.stat{font-size:12px;color:#9a968f}
+.body{flex:1;display:flex;min-height:0}
+.side{width:264px;flex:none;background:#f4f3f0;border-right:1px solid #e3e0db}
+.sh{height:40px;display:flex;align-items:center;gap:8px;padding:0 12px;font-weight:600;border-bottom:1px solid #e3e0db}
+.field{margin:12px 8px 6px;height:28px;border-radius:6px;background:#efede9;color:#9a968f;display:flex;align-items:center;padding:0 10px;font-size:12px}
+.meta{font-size:11px;color:#9a968f;padding:0 10px 10px;border-bottom:1px solid #e3e0db}
+.row{display:flex;align-items:center;gap:8px;height:34px;margin:2px 8px;padding:0 8px;border-radius:6px}
+.row.on{background:#e2dfda}
+.row .n{flex:1}.row .c{font-size:11px;color:#9a968f}
+.pb{width:22px;height:22px;border-radius:6px;border:1px solid #d1cec8;background:#fff;color:#9a968f;display:inline-flex;align-items:center;justify-content:center;padding:0;flex:none}
+.pb.pn{background:#0f8a7e;border-color:#0f8a7e;color:#fff}
+.cv{flex:1;position:relative;overflow:hidden}
+.tile{position:absolute;width:250px;background:#fff;border:1px solid #d1cec8;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 6px 16px rgba(40,30,20,.06)}
+.tile.sel{outline:2px solid #0f8a7e;outline-offset:2px}
+.tile>.pb{position:absolute;top:-9px;right:-9px}
+.thumb{height:232px;background:#fafaf8;border-bottom:1px solid #e3e0db;border-radius:8px 8px 0 0;position:relative}
+.ph{position:absolute;left:72px;top:10px;width:104px;height:212px;background:#fff;border:1px solid #e3e0db;border-radius:8px;padding:10px 8px;display:flex;flex-direction:column;gap:6px}
+.ph i{display:block}
+.ph .h{height:8px;width:55%;background:#d9d6d0;border-radius:2px;margin-bottom:6px}
+.ph .r{height:26px;background:#f3f1ed;border:1px solid #ebe8e3;border-radius:4px}
+.ph .bt{margin-top:auto;height:18px;background:#2a3edb;border-radius:4px}
+.ph .hl{outline:2px solid #2563eb;outline-offset:1px}
+.nm{height:34px;display:flex;align-items:center;gap:6px;padding:0 10px;font-size:12px}
+.cc{margin-left:auto;display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:600;background:#e6edfd;color:#1d4ed8;border:0}
+.cc+.cc{margin-left:0}
+.cc.dt{background:#fdf1e0;color:#92400e}
+.cc.rs{background:#efede9;color:#6b6863}
+.cc.ex{box-shadow:0 0 0 2px #1d4ed8}
+.pin{position:absolute;width:24px;height:24px;border-radius:12px 12px 12px 4px;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 0 0 4px rgba(37,99,235,.35),0 1px 4px rgba(0,0,0,.28);padding:0;z-index:3;background:#2563eb}
+.dr{width:340px;flex:none;background:#fbfaf9;border-left:1px solid #e3e0db;display:flex;flex-direction:column;overflow:hidden}
+.seg{display:flex;gap:2px;margin:8px 12px;padding:2px;background:#efede9;border-radius:6px}
+.seg span{flex:1;text-align:center;height:26px;line-height:26px;border-radius:5px;font-size:12px;color:#6b6863}
+.seg .on{background:#fff;color:#1d1c1a;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.gh{height:32px;display:flex;align-items:center;gap:8px;padding:0 12px;font-size:12px;font-weight:600;background:#f4f3f0;border-top:1px solid #e3e0db;border-bottom:1px solid #e3e0db}
+.gh .c{font-weight:400;color:#9a968f}
+.gh a{margin-left:auto;font-weight:400;color:#0f8a7e;font-size:11.5px}
+.th{padding:10px 12px;border-bottom:1px solid #efede9;background:#fff}
+.th.hov{background:#f5f7ff;box-shadow:inset 3px 0 0 #2563eb}
+.tr{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.num{font-weight:700;font-size:12px}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:#efede9;color:#6b6863;padding:1px 6px;border-radius:4px}
+.mono.gone{text-decoration:line-through;color:#b45309;background:#fdf1e0}
+.tm{margin-left:auto;font-size:11px;color:#9a968f}
+.who{display:flex;align-items:center;gap:6px;margin:8px 0 3px}
+.av{width:20px;height:20px;border-radius:10px;color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.bd{font-size:10px;padding:0 5px;border-radius:3px;line-height:16px}
+.bh{background:#dfe4ff;color:#2a3edb}.ba{background:#ede5ff;color:#6d28d9}.bdt{background:#fdf1e0;color:#92400e}
+.tx{padding-left:26px;font-size:12.5px}
+.one{font-size:12.5px;color:#1d1c1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{font-size:11px;color:#9a968f;margin-top:2px}
+.rep{display:flex;gap:6px;margin-top:10px}
+.inp{flex:1;height:32px;border-radius:6px;border:1px solid #d1cec8;background:#efede9;color:#9a968f;display:flex;align-items:center;padding:0 10px;font-size:12px}
+.send{width:32px;height:32px;border-radius:6px;border:0;background:#2563eb;color:#fff;display:inline-flex;align-items:center;justify-content:center}
+.btn{height:26px;padding:0 10px;border-radius:6px;border:1px solid #d1cec8;background:#fff;font-size:12px;display:inline-flex;align-items:center;gap:5px}
+.warn{margin-top:6px;padding:8px 10px;border-radius:6px;background:#fdf1e0;color:#92400e;font-size:12px}
+.ann{position:absolute;border:1px dashed #b8b3ab;border-radius:10px;background:rgba(251,250,249,.55)}
+.ann>.at{position:absolute;left:12px;top:-10px;background:#e8e6e2;padding:0 6px;font-size:11.5px;color:#6b6863}
+.mini{position:absolute;width:70px;height:62px;background:#fff;border:1px solid #d1cec8;border-radius:4px}
+.mini i{position:absolute;left:0;right:0;bottom:0;height:20px;border-top:1px solid #e3e0db;display:flex;align-items:center;justify-content:flex-end;padding-right:3px}
+.mc{height:15px;min-width:15px;padding:0 4px;border-radius:8px;font-size:9.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;background:#e6edfd;color:#1d4ed8;font-style:normal}
+.mc.dt{background:#fdf1e0;color:#92400e}
+</style>
+<div class="app">
+<div class="top"><span class="logo">artisign</span><button class="proj">artisign-ui</button><span class="vr"></span>
+<button class="tab">Screens</button><button class="tab">Design System</button><button class="tab on">Board</button><button class="tab">Use Cases</button><span class="vr"></span><span class="live">Follow</span>
+<span class="sp"></span>
+<button class="ib" aria-label="Theme"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/></svg></button><span class="live"><i></i>Live</span></div>
+<div class="tbar"><button class="tb">Fit all</button><button class="tb">100%</button><span class="vr"></span><button class="tb" style="width:28px;padding:0;justify-content:center">−</button><span class="sl"><b style="width:84px"></b><i style="left:78px"></i></span><button class="tb" style="width:28px;padding:0;justify-content:center">+</button><span style="font-size:12.5px">170%</span><button class="tb">Edges: Off</button>
+<span class="sp"></span><span class="stat">6 shown</span><button class="tb on" aria-expanded="true" aria-controls="drawer"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Comments 17</button></div>
+<div class="body">
+<div class="side"><div class="sh">Screens</div><div class="field">Search screens, mockups and tags</div><div class="meta">6 screens · 6 on board</div>
+<div class="row on"><span class="n">cart-l2</span><span class="c">10</span><span class="pb pn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">dashboard</span><span class="c">9</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">menu-today</span><span class="c">37</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">order-l3</span><span class="c">8</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">drink-l3</span><span class="c">3</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">cafes-l2</span><span class="c">1</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+</div>
+<div class="cv">
+<div class="tile sel" style="left:24px;top:32px"><span class="pb pn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r hl"></i><i class="r"></i><i class="bt"></i></div><span class="pin" style="left:155px;top:61px" aria-hidden="true">2</span></div>
+<div class="nm">cart-l2<button class="cc ex" aria-label="3 open comments, shown in the drawer" aria-expanded="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>3</button></div></div>
+<div class="tile" style="left:298px;top:32px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div></div><div class="nm">dashboard</div></div>
+<div class="tile" style="left:572px;top:32px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div></div>
+<div class="nm">menu-today<button class="cc"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>12</button></div></div>
+<div class="tile" style="left:24px;top:330px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div></div>
+<div class="nm">order-l3<button class="cc"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>2</button><button class="cc dt"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3l10 18H2z"/><path d="M12 10v5"/></svg>1</button></div></div>
+<div class="tile" style="left:298px;top:330px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div></div>
+<div class="nm">drink-l3<span style="margin-left:auto;font-size:11px;color:#9a968f">no open comments</span></div></div>
+<div class="tile" style="left:572px;top:330px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div></div><div class="nm">cafes-l2</div></div>
+<div class="ann" style="left:24px;top:640px;width:798px;height:150px"><span class="at">The same board at 38%: tiles shrink, chips stay readable (chrome, counter-scaled)</span>
+<div class="mini" style="left:24px;top:30px"><i><b class="mc">3</b></i></div><div class="mini" style="left:106px;top:30px"><i></i></div><div class="mini" style="left:188px;top:30px"><i><b class="mc">12</b></i></div><div class="mini" style="left:270px;top:30px"><i><b class="mc">2</b><b class="mc dt" style="margin-left:2px">1</b></i></div><div class="mini" style="left:352px;top:30px"><i></i></div><div class="mini" style="left:434px;top:30px"><i></i></div><div class="mini" style="left:516px;top:30px"><i><b class="mc">5</b></i></div><div class="mini" style="left:598px;top:30px"><i></i></div><div class="mini" style="left:680px;top:30px"><i><b class="mc">99+</b></i></div>
+<div style="position:absolute;left:24px;bottom:14px;font-size:11.5px;color:#6b6863">A collapsed cluster shows the sum of its screens in its header; the drawer lists them under the main screen.</div></div>
+</div>
+<aside class="dr" id="drawer" aria-label="Comments on the board">
+<div class="sh">Comments<span style="font-weight:400;color:#9a968f;font-size:12px">6 screens on the board</span><span class="sp"></span><button class="ib" aria-label="Close comments"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<div class="seg" role="tablist"><span class="on" role="tab" aria-selected="true">Open 17</span><span role="tab">Resolved 2</span></div>
+<div class="gh">cart-l2<span class="c">3 open</span><a>Open screen</a></div>
+<div class="th"><div class="tr"><span class="num">#1</span><span class="mono">btn-checkout</span><span class="tm">3d</span></div><div class="one">You: Checkout should say the total, not only “Checkout”.</div><div class="sub">1 reply · ux-agent</div></div>
+<div class="th hov"><div class="tr"><span class="num">#2</span><span class="mono">item-2-name</span><span class="sp"></span><button class="btn" aria-label="Resolve thread 2"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg>Resolve</button></div>
+<div class="who"><span class="av" style="background:#2563eb">YO</span><b>You</b><span class="bd bh">Human</span><span class="tm">2h</span></div><div class="tx">Long names wrap to two lines and push the quantity down. Can we clamp the name to one line?</div>
+<div class="who"><span class="av" style="background:#7c3aed">UX</span><b>ux-agent</b><span class="bd ba">Agent</span><span class="tm">1h</span></div><div class="tx">Done as a proposal: one line with an ellipsis, the full name in the item sheet.</div>
+<div class="rep"><div class="inp">Reply, @ to mention an agent</div><button class="send" aria-label="Send"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l16-8-6 16-2-7-8-1z"/></svg></button></div></div>
+<div class="th"><div class="tr"><span class="num">#3</span><span class="mono">item-1</span><span class="tm">40m</span></div><div class="one">ux-agent: Should the price column align to the right edge?</div><div class="sub">Waiting for you</div></div>
+<div class="gh">menu-today<span class="c">12 open</span><a>Show all</a></div>
+<div class="th"><div class="tr"><span class="num">#1</span><span class="mono">hero-title</span><span class="tm">5h</span></div><div class="one">You: Title too long for 390 px, cut “today's”.</div><div class="sub">+ 11 more threads</div></div>
+<div class="gh">order-l3<span class="c">2 open · 1 detached</span><a>Open screen</a></div>
+<div class="th"><div class="tr"><span class="num">#2</span><span class="mono gone">order-eta</span><span class="bd bdt">Detached</span><span class="tm">1d</span></div><div class="one">You: Show the pickup time in large type.</div>
+<div class="warn">order-eta is no longer on this screen. Open the screen to move the thread to another element.</div></div>
+</aside>
+</div></div>

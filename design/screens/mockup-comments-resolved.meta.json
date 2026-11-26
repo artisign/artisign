@@ -1,0 +1,11 @@
+{
+  "notes": "**Mockup comments: Show resolved on, resolved thread open** (CHR-1260 / CHR-1261). The toolbar's \"Show resolved\" is on (`comment-toolbar` variant `resolved`). Resolved threads appear as grey check pins (`comment-pin` variant `resolved`). Column C gains a `resolved` count chip, and the Context row hint reads \"1 detached · 1 resolved\".\n\nThread #4 (C · c-item-2) is open: `comment-popover` variant `resolved` (Resolved badge, Reopen via the undo icon, composer kept, since a reply reopens the thread). The pin sits near the right edge of the stage, so the popover flips left (`position-try-fallbacks: flip-inline`) over column C/B. The active resolved pin shows the selection ring.\n\nTurning Show resolved off hides the resolved pins and the resolved chip again; open counts never include resolved threads. Behaviour, focus and positioning are as described in `mockup-comments-thread`.",
+  "tags": [
+    "chr-1260",
+    "chr-1261",
+    "mockups",
+    "comments"
+  ],
+  "variant_of": "chrome-c-mockup-columns",
+  "variant_kind": "state"
+}

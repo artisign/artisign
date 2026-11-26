@@ -1,0 +1,229 @@
+{
+  "id": "review-comments-on-board",
+  "title": "Read comment threads on the Board and answer them in Screens",
+  "group": "board",
+  "tags": [
+    "chr-1260",
+    "chr-1261"
+  ],
+  "status": "draft",
+  "personas": [
+    "designer-dana",
+    "design-agent-dex"
+  ],
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dex presented a ticket's screens on the Board and answered Dana's earlier comments.",
+    "actor": "design-agent-dex",
+    "via": "MCP"
+  },
+  "goal": "Dana sees which screens still have open threads and reads them on the Board without opening every screen; she answers in the Screens view.",
+  "outcome": "Every thread on the ticket's screens is answered or resolved; the Board shows no open count for them.",
+  "state": [
+    {
+      "subject": "system",
+      "property": "board_filter",
+      "value": "chr-123"
+    },
+    {
+      "subject": "system",
+      "property": "board_screens_shown",
+      "value": 4
+    },
+    {
+      "subject": "project-shop",
+      "property": "open_comment_count",
+      "value": 5
+    }
+  ],
+  "inputs": [
+    {
+      "object": "board-state",
+      "source": "Shared board state set by the agent",
+      "example": {
+        "filter": "chr-123",
+        "pinned": [
+          "checkout"
+        ]
+      }
+    },
+    {
+      "object": "comment",
+      "source": "comments.jsonl",
+      "example": {
+        "node": "checkout.btn-pay",
+        "body": "Button label should say the amount.",
+        "status": "open"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "comment",
+      "target": "comments.jsonl",
+      "example": {
+        "node": "checkout.btn-pay",
+        "body": "Looks right now.",
+        "status": "resolved"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open-board",
+      "actor": "system",
+      "action": "Shows the ticket's screens on the Board; each tile shows pins on its elements and count chips in its name bar",
+      "target": {
+        "screen": "board-comments"
+      }
+    },
+    {
+      "id": "spot-tile",
+      "actor": "designer-dana",
+      "action": "Scans the count chips and picks the tile with unanswered and detached threads",
+      "target": {
+        "screen": "board-comments",
+        "node": "bc-open-count"
+      }
+    },
+    {
+      "id": "read-threads",
+      "actor": "designer-dana",
+      "action": "Clicks a pin (never hover); a read-only preview at the pin shows the latest messages, author and status",
+      "target": {
+        "screen": "board-comments-preview",
+        "node": "preview"
+      },
+      "note": "Click, Enter or Space opens it; Esc or a click outside closes it. No reply or resolve on the Board."
+    },
+    {
+      "id": "open-in-screens",
+      "actor": "designer-dana",
+      "action": "Chooses Open in Screens in the preview",
+      "target": {
+        "screen": "board-comments-preview",
+        "node": "pv-open"
+      }
+    },
+    {
+      "id": "reply",
+      "actor": "designer-dana",
+      "action": "Replies to the thread in the Screens view, mentioning the agent",
+      "target": {
+        "screen": "comments-panel"
+      },
+      "data": [
+        {
+          "object": "comment",
+          "before": {
+            "status": "open"
+          },
+          "after": {
+            "status": "open"
+          }
+        }
+      ]
+    },
+    {
+      "id": "resolve",
+      "actor": "designer-dana",
+      "action": "Resolves the threads that are done; back on the Board the tile's count drops",
+      "target": {
+        "screen": "comments-panel"
+      },
+      "data": [
+        {
+          "object": "comment",
+          "before": {
+            "status": "open"
+          },
+          "after": {
+            "status": "resolved"
+          }
+        }
+      ]
+    }
+  ],
+  "branches": [
+    {
+      "id": "thread-detached",
+      "title": "A thread lost its element",
+      "from": "read-threads",
+      "when": [
+        {
+          "subject": "system",
+          "property": "thread_detached",
+          "value": true
+        }
+      ],
+      "steps": [
+        {
+          "id": "see-detached",
+          "actor": "designer-dana",
+          "action": "Clicks the amber pin at the frame's top-left; the preview names the last known node and says the thread lost its element",
+          "target": {
+            "screen": "board-comments-detached",
+            "node": "bc-open-c5"
+          }
+        },
+        {
+          "id": "open-screen-to-reanchor",
+          "actor": "designer-dana",
+          "action": "Chooses Open in Screens to move the thread to another element there",
+          "target": {
+            "screen": "board-comments-detached",
+            "node": "pv-open"
+          },
+          "note": "Opens comments-detached in the Screens view."
+        }
+      ],
+      "outcome": "The thread is re-anchored or deleted on the canvas; the Board count follows."
+    },
+    {
+      "id": "low-zoom",
+      "title": "The Board is zoomed out below 60%",
+      "from": "open-board",
+      "when": [
+        {
+          "subject": "system",
+          "property": "board_zoom_percent",
+          "op": "lt",
+          "value": 60
+        }
+      ],
+      "steps": [
+        {
+          "id": "count-only",
+          "actor": "system",
+          "action": "Shows one count dot per screen inside the tile's top-left instead of per-element pins",
+          "target": {
+            "screen": "board-comments-zoomed-out",
+            "node": "bz-8-dot"
+          }
+        },
+        {
+          "id": "open-list",
+          "actor": "designer-dana",
+          "action": "Clicks a dot; the screen's read-only thread list opens at the dot",
+          "target": {
+            "screen": "board-comments-zoomed-out-list",
+            "node": "list"
+          }
+        },
+        {
+          "id": "pick-row",
+          "actor": "designer-dana",
+          "action": "Picks a row; that thread opens in the Screens view",
+          "target": {
+            "screen": "board-comments-zoomed-out-list",
+            "node": "lr-1"
+          }
+        }
+      ],
+      "rejoin": "reply",
+      "outcome": "Dana answers the thread in Screens without zooming the Board in."
+    }
+  ]
+}

@@ -1888,5 +1888,197 @@
     "event": "tap",
     "to": "app-shell",
     "to_kind": "screen"
+  },
+  {
+    "from": "board-comments.bc-init",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments.bc-init-c1",
+    "event": "tap",
+    "to": "board-comments-preview",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments.bc-empty",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments.bc-open",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments.bc-open-c5",
+    "event": "tap",
+    "to": "board-comments-detached",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments.bc-1",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-preview.bc-init",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-preview.bc-init-c1",
+    "event": "tap",
+    "to": "board-comments",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-preview.bc-empty",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-preview.bc-open",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-preview.bc-1",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-preview.pv-open",
+    "event": "tap",
+    "to": "comments-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-detached.bc-init",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-detached.bc-empty",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-detached.bc-open",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-detached.bc-open-c5",
+    "event": "tap",
+    "to": "board-comments",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-detached.bc-1",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-detached.pv-open",
+    "event": "tap",
+    "to": "comments-detached",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-zoomed-out.bz-8-dot",
+    "event": "tap",
+    "to": "board-comments-zoomed-out-list",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-zoomed-out-list.bz-8-dot",
+    "event": "tap",
+    "to": "board-comments-zoomed-out",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-zoomed-out-list.lr-1",
+    "event": "tap",
+    "to": "comments-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-comments-zoomed-out-list.list-open",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "mockup-comments-thread.mode-comment",
+    "event": "tap",
+    "to": "mockup-comments-mode",
+    "to_kind": "screen"
+  },
+  {
+    "from": "mockup-comments-thread.comments-row",
+    "event": "tap",
+    "to": "mockup-comments-mode",
+    "to_kind": "screen"
+  },
+  {
+    "from": "mockup-comments-thread.pin-5",
+    "event": "tap",
+    "to": "mockup-comments-detached",
+    "to_kind": "screen"
+  },
+  {
+    "from": "mockup-comments-thread.comment-toolbar",
+    "event": "tap",
+    "to": "mockup-comments-resolved",
+    "to_kind": "screen"
+  },
+  {
+    "from": "mockup-comments-mode.mode-comment",
+    "event": "tap",
+    "to": "mockup-comments-thread",
+    "to_kind": "screen"
+  },
+  {
+    "from": "mockup-comments-resolved.mode-comment",
+    "event": "tap",
+    "to": "mockup-comments-mode",
+    "to_kind": "screen"
+  },
+  {
+    "from": "mockup-comments-resolved.comment-toolbar",
+    "event": "tap",
+    "to": "mockup-comments-thread",
+    "to_kind": "screen"
+  },
+  {
+    "from": "mockup-comments-detached.mode-comment",
+    "event": "tap",
+    "to": "mockup-comments-mode",
+    "to_kind": "screen"
+  },
+  {
+    "from": "mockup-comments-detached.pin-5",
+    "event": "tap",
+    "to": "mockup-comments-thread",
+    "to_kind": "screen"
+  },
+  {
+    "from": "mockup-comments-detached.btn-pick-element",
+    "event": "tap",
+    "to": "mockup-comments-mode",
+    "to_kind": "screen"
   }
 ]

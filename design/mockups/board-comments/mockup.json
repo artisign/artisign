@@ -1,0 +1,25 @@
+{
+  "variants": [
+    {
+      "id": "a1-read-only-pins",
+      "title": "A1 · Read-only pins and counts on tiles",
+      "description": "Each tile shows its open threads as the same numbered pins as the canvas (Human blue, Agent violet, detached amber in the frame's top-left), drawn over the thumbnail at a fixed size, plus a count chip in the name bar. Hover on a pin peeks the latest message; a click opens the screen in the Screens view with that thread's popover open. No reply, resolve or new thread on the Board; the Comment icon is disabled there. Overlapping pins on a small tile merge into one dark count bubble. Below the 60% label threshold each tile keeps only one count dot (amber if any thread is detached). A Comments toggle in the board toolbar hides everything. Trade-off: cheapest to build (no comment listeners in tile iframes, only positions), never clutters review, but every answer costs a switch to the Screens view."
+    },
+    {
+      "id": "a2-full-interaction",
+      "title": "A2 · Full interaction on the Board (pins, popover, comment mode)",
+      "description": "The canvas comment model moves onto the Board unchanged: the same pins on every tile, the same comment-popover (reply, resolve, reopen, more menu, re-anchor) opening next to the pin at a fixed, counter-scaled size, and the same floating comment toolbar (Select, Comment, Show resolved, Hide pins). Comment mode (C) works inside tiles: hover outlines an element with its node id, a click opens the new-thread popover. It needs at least 100% zoom; below that the Comment button is disabled with the reason, pins merge into one count dot per tile, and a click on the dot zooms in. Trade-off: everything without leaving the Board, but each tile iframe needs comment listeners (the PRD's reason for excluding comment mode), popovers cover neighbouring tiles, and picking 30px elements on a scaled thumbnail is error-prone."
+    },
+    {
+      "id": "a3-counts-and-drawer",
+      "title": "A3 · Count chips on tiles + comments drawer",
+      "description": "Tiles carry only a count chip in the name bar (blue open count, amber detached count, grey resolved count when Show resolved is on) — no pins on the thumbnails. The chip, or the Comments button in the board toolbar, opens a right-hand drawer that lists the threads of every screen on the Board, grouped by screen in board order; clicking a tile scrolls to its group. In the drawer the human reads, replies, resolves and reopens with the same comment-message rows and composer as the popover. Hovering a thread highlights its element and pin on the tile. Detached threads sit in their group with the amber badge and an Open screen action (re-anchoring needs the full-size canvas). New threads start in the Screens view (Open screen, then C). Chips are chrome, counter-scaled, so they read the same at 38%. Trade-off: works at every zoom and needs no comment listeners in tile iframes; reading and answering a whole ticket happens in one place, but the spatial link is only shown on hover and the drawer takes 340px of board width."
+    }
+  ],
+  "tags": [
+    "chr-1260",
+    "chr-1261"
+  ],
+  "title": "Board comments: directions",
+  "description": "CHR-1261 phase 1. How the comment threads of each screen tile show on the Board. A1 read-only pins + counts (answer in the Screens view), A2 full canvas interaction on tiles, A3 count chips + a comments drawer. Each variant shows the states none, open, resolved, detached, many threads on a small tile and low zoom. Use cases: review-comments-on-board, open-thread-from-board."
+}

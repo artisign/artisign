@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { numberThreads, pinnedThreads, placePopover, relativeTime, mentionAt, authorLabel, countRow } from "./comment-canvas.js";
+import { numberThreads, pinnedThreads, placePopover, relativeTime, mentionAt, authorLabel, countRow, mockupCommentTarget, threadKind } from "./comment-canvas.js";
 
 // CHR-1248 — the pure parts of the canvas comment layer.
 describe("numberThreads", () => {
@@ -90,5 +90,23 @@ describe("countRow", () => {
         { status: "open", detached: false },
       ]),
     ).toEqual({ label: "2 open comments", open: 2, detached: 1 });
+  });
+});
+
+describe("threadKind", () => {
+  it("is resolved first, then detached, else open", () => {
+    expect(threadKind({ status: "resolved", detached: true })).toBe("resolved");
+    expect(threadKind({ status: "open", detached: true })).toBe("detached");
+    expect(threadKind({ status: "open", detached: false })).toBe("open");
+  });
+});
+
+describe("mockupCommentTarget", () => {
+  const el = (id, parent) => ({ id, closest: (sel) => (sel === "[id]" ? (id ? { id } : parent?.closest(sel) ?? null) : null) });
+  it("picks the nearest element with an authored id, the whole variant when there is none", () => {
+    const card = el("a-card");
+    expect(mockupCommentTarget(el("", card))).toEqual({ el: { id: "a-card" }, id: "a-card" });
+    expect(mockupCommentTarget(el(""))).toEqual({ el: null, id: null });
+    expect(mockupCommentTarget(null)).toEqual({ el: null, id: null });
   });
 });

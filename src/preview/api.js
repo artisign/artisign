@@ -110,8 +110,23 @@ export async function fetchDesignSystem(project) {
  * @returns {Promise<{ comments: { id: string, screen: string, node_id: string | null, text: string, author: "human" | "agent", agent?: string, parent_id: string | null, resolved: boolean, ts: string }[], threads: { id: string, node_id: string | null, author: "human" | "agent", agent?: string, status: "open" | "resolved", detached: boolean, reply_count: number }[] }>}
  */
 export async function fetchComments(screen, project) {
+  return fetchCommentsAt(`screen=${encodeURIComponent(screen)}`, project);
+}
+
+/**
+ * The comment threads of one mockup (CHR-1263): the same shape as
+ * fetchComments, each thread and comment also naming its `variant`.
+ * @param {string} mockup
+ * @param {string} project see fetchScreens's own note — required here too.
+ */
+export async function fetchMockupComments(mockup, project) {
+  return fetchCommentsAt(`mockup=${encodeURIComponent(mockup)}`, project);
+}
+
+/** @param {string} selector @param {string} project */
+async function fetchCommentsAt(selector, project) {
   try {
-    const res = await fetch(`/api/comments?screen=${encodeURIComponent(screen)}&project=${encodeURIComponent(project)}`);
+    const res = await fetch(`/api/comments?${selector}&project=${encodeURIComponent(project)}`);
     const body = await res.json();
     return { comments: body.comments ?? [], threads: body.threads ?? [] };
   } catch {
@@ -243,7 +258,7 @@ export async function fetchCompare(base, others, project) {
  * ("reanchor" | "reopen" | "delete") and `comment_id` it applies a thread
  * event instead; reanchor also takes `screen` and the DOM `node_id`.
  * Agents use the `reply_comment` / `create_comment` MCP tools.
- * @param {{ screen: string, node_id: string | null, text: string } | { parent_id: string, text: string, resolved?: boolean } | { action: "reanchor" | "reopen" | "delete", comment_id: string, screen?: string, node_id?: string }} input
+ * @param {{ screen: string, node_id: string | null, text: string } | { mockup: string, variant: string, node_id: string | null, text: string } | { parent_id: string, text: string, resolved?: boolean } | { action: "reanchor" | "reopen" | "delete", comment_id: string, screen?: string, mockup?: string, variant?: string, node_id?: string }} input
  * @param {string} project see fetchScreens's own note — required here too.
  * @returns {Promise<{ ok: true } | { ok: false, message: string }>}
  */

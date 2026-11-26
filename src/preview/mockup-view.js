@@ -12,14 +12,18 @@ import { setMarkdown } from "./markdown.js";
  * @param {{
  *   fetchRenderFor: (variantId: string) => Promise<{ ok: true, html: string } | { ok: false, message: string }>,
  *   onColumnMeasured?: () => void,
+ *   onFrameLoad?: (variantId: string, iframe: HTMLIFrameElement) => void,
  * }} deps `onColumnMeasured` fires once per column, each time its iframe's
  *   FINAL size (width and height, via createFittingIframe's `onFitted`) is
  *   known — the caller (app.js) uses it to re-apply mockup zoom as columns
  *   arrive asynchronously. Must not fire any earlier: at `load`,
  *   before iframe-fit.js's own rAF has set the real height, every column
- *   still reports its CSS-default placeholder height.
+ *   still reports its CSS-default placeholder height. `onFrameLoad` fires
+ *   on every load of a column's iframe (the comment layer attaches to the
+ *   fresh document there).
+ * @returns {{ variantId: string, letter: string, iframe: HTMLIFrameElement, countsEl: HTMLElement }[]} the columns, in order
  */
-export function renderMockupView(container, mockup, { fetchRenderFor, onColumnMeasured }) {
+export function renderMockupView(container, mockup, { fetchRenderFor, onColumnMeasured, onFrameLoad }) {
   container.innerHTML = "";
 
   const header = document.createElement("div");
@@ -40,7 +44,7 @@ export function renderMockupView(container, mockup, { fetchRenderFor, onColumnMe
     empty.className = "mockup-view-empty";
     empty.textContent = "No variants yet.";
     container.appendChild(empty);
-    return;
+    return [];
   }
 
   // The wrap is the zoom target's parent — see applyMockupZoom (mockup-zoom.js),
@@ -50,11 +54,52 @@ export function renderMockupView(container, mockup, { fetchRenderFor, onColumnMe
   columnsWrap.className = "mockup-columns-wrap";
   const columns = document.createElement("div");
   columns.className = "mockup-columns";
-  mockup.variants.forEach((variant, index) =>
-    columns.appendChild(renderColumn(variant, index, fetchRenderFor, onColumnMeasured)),
-  );
+  const rendered = mockup.variants.map((variant, index) => {
+    const column = renderColumn(variant, index, fetchRenderFor, onColumnMeasured, onFrameLoad);
+    columns.appendChild(column.el);
+    return column.handle;
+  });
   columnsWrap.appendChild(columns);
   container.appendChild(columnsWrap);
+  return rendered;
+}
+
+/** A column's letter: A, B, C … — the number once the alphabet runs out. @param {number} index */
+export function variantLetter(index) {
+  return index < 26 ? String.fromCharCode(65 + index) : String(index + 1);
+}
+
+/**
+ * The count chips in a column header: open, detached, and resolved (only
+ * while Show resolved is on). Each is a button that opens the first thread of
+ * its kind; the one holding the open thread is aria-expanded.
+ * @param {HTMLElement} countsEl
+ * @param {{ open: number, detached: number, resolved: number }} counts
+ * @param {{ showResolved: boolean, activeKind: "open" | "detached" | "resolved" | null, onOpen: (kind: "open" | "detached" | "resolved") => void }} opts
+ */
+export function renderColumnChips(countsEl, counts, { showResolved, activeKind, onOpen }) {
+  countsEl.replaceChildren();
+  const specs = [
+    ["open", counts.open, "chat_bubble", "open comment"],
+    ["detached", counts.detached, "warning", "detached comment"],
+    ...(showResolved ? [["resolved", counts.resolved, "check", "resolved comment"]] : []),
+  ];
+  for (const [kind, count, glyph, noun] of specs) {
+    if (!count) continue;
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "comment-count-chip";
+    chip.dataset.kind = kind;
+    chip.setAttribute("aria-label", `${count} ${noun}${count === 1 ? "" : "s"}`);
+    chip.setAttribute("aria-expanded", String(activeKind === kind));
+    const icon = document.createElement("span");
+    icon.className = "icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = glyph;
+    chip.append(icon, String(count));
+    chip.addEventListener("click", () => onOpen(/** @type {"open" | "detached" | "resolved"} */ (kind)));
+    countsEl.appendChild(chip);
+  }
 }
 
 /**
@@ -63,8 +108,9 @@ export function renderMockupView(container, mockup, { fetchRenderFor, onColumnMe
  *   ADR-003 — rendered as the 1-based "Variant N" label.
  * @param {(variantId: string) => Promise<{ ok: true, html: string } | { ok: false, message: string }>} fetchRenderFor
  * @param {(() => void) | undefined} onColumnMeasured
+ * @param {((variantId: string, iframe: HTMLIFrameElement) => void) | undefined} onFrameLoad
  */
-function renderColumn(variant, index, fetchRenderFor, onColumnMeasured) {
+function renderColumn(variant, index, fetchRenderFor, onColumnMeasured, onFrameLoad) {
   const column = document.createElement("div");
   column.className = "mockup-column";
 
@@ -73,20 +119,32 @@ function renderColumn(variant, index, fetchRenderFor, onColumnMeasured) {
   head.className = "mockup-column-head";
   column.appendChild(head);
 
-  const indexEl = document.createElement("div");
-  indexEl.className = "mockup-column-index";
-  indexEl.textContent = `Variant ${index + 1}`;
-  head.appendChild(indexEl);
+  // The mockup-column-header: letter badge, title, count chips; the description below.
+  const row = document.createElement("div");
+  row.className = "mockup-column-row";
+  head.appendChild(row);
+
+  const letter = variantLetter(index);
+  const indexEl = document.createElement("span");
+  indexEl.className = "mockup-column-index variant-badge";
+  indexEl.textContent = letter;
+  indexEl.title = `Variant ${index + 1}`;
+  row.appendChild(indexEl);
 
   const title = document.createElement("div");
   title.className = "mockup-column-title";
   title.textContent = variant.title;
-  head.appendChild(title);
+  row.appendChild(title);
+
+  const countsEl = document.createElement("div");
+  countsEl.className = "mockup-column-counts";
+  row.appendChild(countsEl);
 
   if (variant.description) {
     const description = document.createElement("div");
     description.className = "mockup-column-description md";
     setMarkdown(description, variant.description);
+    description.title = variant.description;
     head.appendChild(description);
   }
 
@@ -120,6 +178,7 @@ function renderColumn(variant, index, fetchRenderFor, onColumnMeasured) {
     // The column just changed width, which re-wraps its header: the fit pass that already ran (it fires first) measured the row at the old width.
     onColumnMeasured?.();
   });
+  iframe.addEventListener("load", () => onFrameLoad?.(variant.id, iframe));
   column.appendChild(iframe);
 
   fetchRenderFor(variant.id).then((result) => {
@@ -131,5 +190,5 @@ function renderColumn(variant, index, fetchRenderFor, onColumnMeasured) {
     }
   });
 
-  return column;
+  return { el: column, handle: { variantId: variant.id, letter, iframe, countsEl } };
 }

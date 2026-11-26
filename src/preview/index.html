@@ -300,6 +300,8 @@
             </div>
           </div>
           <div id="mockup-view" class="main-view" hidden></div>
+          <!-- CHR-1263: the comment layer of the mockup columns — PARENT document, over #mockup-view, clipped to it; pins are placed from each column iframe's own rect (comment-hosts.js). -->
+          <div id="mockup-comment-layer" hidden></div>
           <div id="design-system-view" class="main-view" hidden></div>
           <!-- Use Cases tab (see the use-case spec): built by usecases.js, filled only after the tab is first opened. Its own list panel lives inside; the Screens/Context sidebars and the Elements panel are hidden while it shows. -->
           <div id="usecases-view" class="main-view" hidden></div>

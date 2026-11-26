@@ -9,6 +9,7 @@ import {
   fetchMockupRender,
   fetchDesignSystem,
   fetchComments,
+  fetchMockupComments,
   fetchFlows,
   fetchTags,
   fetchScreenNodes,
@@ -38,11 +39,12 @@ import { createCompareView } from "./compare.js";
 import { modeToggleStates } from "./compare-data.js";
 import { renderMockupList, filterMockups } from "./mockups.js";
 import { renderScreenChips, renderTagNotes } from "./notes-panel.js";
-import { renderMockupView } from "./mockup-view.js";
+import { renderMockupView, renderColumnChips } from "./mockup-view.js";
 import { applyMockupZoom } from "./mockup-zoom.js";
 import { applyFlowMode } from "./flows.js";
 import { bareNodeId } from "./comments.js";
-import { createCommentCanvas, countRow } from "./comment-canvas.js";
+import { createCommentCanvas, countRow, threadKind } from "./comment-canvas.js";
+import { createScreenHost, createMockupHost } from "./comment-hosts.js";
 import {
   pushActivityEntry,
   activityTargetExists,
@@ -160,6 +162,8 @@ function refreshVariantUI() {
   }
 }
 const screensStageEl = document.getElementById("screens-stage");
+const mainEl = document.getElementById("main");
+const mockupCommentLayerEl = document.getElementById("mockup-comment-layer");
 const compareViewEl = document.getElementById("compare-view");
 const comparePanelEl = document.getElementById("compare-panel");
 const comparePanelTitleEl = document.getElementById("compare-panel-title");
@@ -766,7 +770,10 @@ function resetProjectState() {
   warningBadgeCleanup();
   warningBadgeCleanup = () => {};
   warningCount = 0;
-  commentCanvas.setData({ screen: null, comments: [], threads: [] });
+  commentCanvas.setHost(screenHost);
+  commentCanvas.setData({ scope: null, comments: [], threads: [] });
+  mockupColumns = [];
+  mockupThreads = [];
   screens = [];
   screenFlows = [];
   tagNotes = []; // else one project's tag notes leak into the panel of the next
@@ -964,8 +971,10 @@ async function resyncCurrentProject() {
     loadInspectorEntries();
   }
   if (currentMockup && mockupsOk) {
-    if (mockups.some((m) => m.name === currentMockup)) loadCurrentMockup();
-    else await fallbackFromVanishedMockup();
+    if (mockups.some((m) => m.name === currentMockup)) {
+      loadCurrentMockup();
+      loadComments();
+    } else await fallbackFromVanishedMockup();
   }
   if (currentView === "design-system") loadDesignSystem();
   if (boardBuilt) loadBoard();
@@ -1058,8 +1067,10 @@ async function handleChangeEvent(event) {
     // A delete fires multiple "mockup" events for the same name (server-side,
     // one per file removed), so the vanished branch may run more than once;
     // fallbackFromVanishedMockup is idempotent.
-    if (mockups.some((m) => m.name === currentMockup)) await loadCurrentMockup();
-    else await fallbackFromVanishedMockup();
+    if (mockups.some((m) => m.name === currentMockup)) {
+      await loadCurrentMockup();
+      await loadComments(); // a thread is detached when its variant or id is gone: the flag comes from the server, per variant file
+    } else await fallbackFromVanishedMockup();
   } else if (event.kind === "comments") {
     await loadComments(); // refreshes the panel and, if comment mode is active, the open-thread markers
   } else if (event.kind === "flows") {
@@ -1709,7 +1720,8 @@ emptyGuideCopyBtn.addEventListener("click", async () => {
 async function selectScreen(screen) {
   if (compare.isOn() && !compare.inFamily(screen)) compare.leave(); // compare belongs to one variant family (CHR-738)
   // Node ids are only unique within one screen: the previous screen's pins and popover must not survive onto this one, even where a same-named id exists here too.
-  commentCanvas.setData({ screen, comments: [], threads: [] });
+  commentCanvas.setHost(screenHost);
+  commentCanvas.setData({ scope: `screen:${screen}`, comments: [], threads: [] });
   clearActivityHighlights(); // CHR-631 — an old highlight must never linger over a screen it no longer describes; navigateToActivity schedules THIS screen's own highlight only after this call returns (see its own comment)
   pendingActivityHighlight = null;
   clearTimeout(activityHighlightGraceTimer);
@@ -1759,13 +1771,17 @@ async function updateScreenUseCases() {
  */
 async function selectMockup(name) {
   compare.leave();
-  setMode(activeMode); // passing the CURRENT mode always resolves to "none" — see setMode
+  if (activeMode !== "none" && activeMode !== "comment") setMode(activeMode); // flow and inspect have no mockup counterpart; comment mode carries over (CHR-1263). Passing the CURRENT mode always resolves to "none" — see setMode
   clearInspectFocus();
   clearActivityHighlights(); // CHR-631 — no screen highlight applies to the mockup view
   pendingActivityHighlight = null;
   clearTimeout(activityHighlightGraceTimer);
   currentScreen = null;
   currentMockup = name;
+  commentCanvas.setHost(mockupHost);
+  commentCanvas.setData({ scope: `mockup:${name}`, comments: [], threads: [] });
+  mockupThreads = [];
+  mockupColumns = [];
   if (activeProjectRoot) writeStringPref(prefsStorage, lastScreenKey(activeProjectRoot), `mockup:${name}`);
   // Discards whatever the PREVIOUS screen's loadCurrentScreen()/loadInspectorEntries()
   // may still have in flight — neither is re-run here (there's no screen to
@@ -1802,10 +1818,40 @@ async function loadCurrentScreen() {
 async function loadComments() {
   const requestId = ++commentsRequestId;
   const screen = currentScreen;
-  const result = screen ? await fetchComments(screen, activeProjectRoot) : { comments: [], threads: [] };
+  const mockup = currentMockup;
+  const result = screen
+    ? await fetchComments(screen, activeProjectRoot)
+    : mockup
+      ? await fetchMockupComments(mockup, activeProjectRoot)
+      : { comments: [], threads: [] };
   if (requestId !== commentsRequestId) return; // a newer request has since started — drop this stale result
-  commentCanvas.setData({ screen, comments: result.comments, threads: result.threads });
+  commentCanvas.setData({ scope: screen ? `screen:${screen}` : mockup ? `mockup:${mockup}` : null, comments: result.comments, threads: result.threads });
   renderCommentsRow(result.threads);
+  if (mockup) {
+    mockupThreads = result.threads;
+    renderMockupChips();
+  }
+}
+
+/** The count chips of every column header, from the mockup's current threads (CHR-1263). */
+function renderMockupChips() {
+  if (mockupColumns.length === 0) return;
+  const { showResolved } = commentCanvas.prefs();
+  const activeId = commentCanvas.activeThread();
+  const active = mockupThreads.find((t) => t.id === activeId) ?? null;
+  for (const column of mockupColumns) {
+    const mine = mockupThreads.filter((t) => t.variant === column.variantId);
+    const count = (kind) => mine.filter((t) => threadKind(t) === kind).length;
+    renderColumnChips(column.countsEl, { open: count("open"), detached: count("detached"), resolved: count("resolved") }, {
+      showResolved,
+      activeKind: active && active.variant === column.variantId ? threadKind(active) : null,
+      onOpen: (kind) => {
+        if (activeMode !== "comment") setMode("comment");
+        commentCanvas.openFirst(column.variantId, kind);
+      },
+    });
+  }
+  commentCanvas.layout(); // a chip row can change the header's height
 }
 
 /** CHR-1253 — the Context sidebar's one-line summary of the screen's threads. */
@@ -1856,13 +1902,27 @@ async function commentAction(input) {
 }
 
 /** The canvas comment layer (CHR-1248): pins, popover, comment mode's hover/click, the floating toolbar. */
-const commentCanvas = createCommentCanvas({
+const screenHost = createScreenHost({
   canvasEl,
   holderEl: screenHolderEl,
   layerEl: commentLayerEl,
+  stageEl: screensStageEl,
+  getDoc: () => (iframeRenderedScreen === currentScreen ? screenFrame.contentDocument : null),
+});
+/** The mockup columns' host: its frames are the rendered columns (CHR-1263). */
+const mockupHost = createMockupHost({
+  layerEl: mockupCommentLayerEl,
+  stageEl: mainEl,
+  getColumns: () => mockupColumns,
+});
+/** @type {{ variantId: string, letter: string, iframe: HTMLIFrameElement, countsEl: HTMLElement }[]} */
+let mockupColumns = [];
+let mockupThreads = [];
+const commentCanvas = createCommentCanvas({
+  host: screenHost,
   toolbarEl: commentToolbarEl,
   bannerEl: commentBannerEl,
-  getDoc: () => (iframeRenderedScreen === currentScreen ? screenFrame.contentDocument : null),
+  onActiveChange: () => renderMockupChips(),
   prefs: {
     showResolved: readBoolPref(prefsStorage, "artisign.comments.showResolved", false),
     hidePins: readBoolPref(prefsStorage, "artisign.comments.hidePins", false),
@@ -1870,12 +1930,14 @@ const commentCanvas = createCommentCanvas({
   onPrefsChange: ({ showResolved, hidePins }) => {
     writeBoolPref(prefsStorage, "artisign.comments.showResolved", showResolved);
     writeBoolPref(prefsStorage, "artisign.comments.hidePins", hidePins);
+    if (currentMockup !== null) renderMockupChips(); // Show resolved adds or drops the resolved chip
   },
   actions: {
     setMode: (on) => {
       if (on !== (activeMode === "comment")) setMode("comment");
     },
-    create: (nodeId, text) => {
+    create: (nodeId, text, variant) => {
+      if (currentMockup !== null && variant !== null) return commentAction({ mockup: currentMockup, variant, node_id: nodeId, text });
       if (!currentScreen) return Promise.resolve({ ok: false, message: "No screen is open." });
       return commentAction({ screen: currentScreen, node_id: nodeId, text });
     },
@@ -1883,7 +1945,10 @@ const commentCanvas = createCommentCanvas({
     resolve: (rootId) => commentAction({ parent_id: rootId, text: "", resolved: true }),
     reopen: (rootId) => commentAction({ action: "reopen", comment_id: rootId }),
     remove: (rootId) => commentAction({ action: "delete", comment_id: rootId }),
-    reanchor: (rootId, domId) => commentAction({ action: "reanchor", comment_id: rootId, screen: currentScreen ?? "", node_id: domId }),
+    reanchor: (rootId, domId, variant) =>
+      currentMockup !== null && variant !== null
+        ? commentAction({ action: "reanchor", comment_id: rootId, mockup: currentMockup, variant, node_id: domId })
+        : commentAction({ action: "reanchor", comment_id: rootId, screen: currentScreen ?? "", node_id: domId }),
     copy: (text) => {
       void navigator.clipboard?.writeText(text).catch(() => {});
     },
@@ -1946,6 +2011,7 @@ function isMockupZoomActive() {
 function updateMockupZoom() {
   const columnsEl = mockupViewEl.querySelector(".mockup-columns");
   if (columnsEl) applyMockupZoom({ paneEl: mockupViewEl, columnsEl, zoom: mockupZoom });
+  if (currentMockup !== null) commentCanvas.layout(); // pins follow the zoomed and re-fitted columns
 }
 
 /** Re-fits whichever of the screen canvas / mockup row is actually showing — shared by every trigger whose available space can change without a view/selection switch of its own (pane resize, side-panel collapse). */
@@ -2029,7 +2095,7 @@ screenFrame.addEventListener("load", () => {
   syncInspectOverlay(); // repositions the overlay if something's still focused on this same screen, hides it otherwise
   applyPendingActivityHighlight(); // CHR-631 — the re-render a pending write/navigate highlight was waiting for has now landed
   applyActiveMode();
-  commentCanvas.attachDoc(iframeRenderOk ? doc : null);
+  commentCanvas.attachDoc(null, iframeRenderOk ? doc : null);
   updateCanvas();
   warningBadgeCleanup();
   const badgeUpdate = updateWarningBadge(warningBadge, screenFrame.contentDocument);
@@ -2047,6 +2113,7 @@ screenFrame.addEventListener("load", () => {
 
 // Only "fit" needs to react to the pane resizing — a fixed zoom level keeps
 // its scale regardless of the available space.
+mockupViewEl.addEventListener("scroll", () => commentCanvas.layout(), { passive: true }); // the layer is not part of the scrolled content: pins are re-placed per scroll
 window.addEventListener("resize", () => {
   if (compare.isOn()) {
     if (compare.getZoom() === "fit") compare.relayout();
@@ -2188,7 +2255,7 @@ flowModeToggle.addEventListener("click", () => {
 commentModeToggle.addEventListener("click", () => setMode("comment"));
 // CHR-1253 — the sidebar row: comment mode on, then the first pin focused.
 commentsRowBtn.addEventListener("click", () => {
-  if (!currentScreen) return;
+  if (!currentScreen && currentMockup === null) return;
   if (activeMode !== "comment") setMode("comment");
   commentCanvas.focusFirstPin();
 });
@@ -2220,13 +2287,18 @@ async function loadCurrentMockup() {
   if (!mockup) return; // vanished — the SSE mockup handler/resync fall back themselves
   const mockupName = currentMockup;
   const projectRoot = activeProjectRoot;
-  renderMockupView(mockupViewEl, mockup, {
+  mockupColumns = renderMockupView(mockupViewEl, mockup, {
     fetchRenderFor: async (variantId) => {
       const result = await fetchMockupRender(mockupName, variantId, projectRoot);
       return requestId === mockupRequestId ? result : { ok: false, message: "stale mockup selection" };
     },
     onColumnMeasured: updateMockupZoom,
+    onFrameLoad: (variantId, iframe) => {
+      commentCanvas.attachDoc(variantId, iframe.contentDocument);
+      commentCanvas.layout();
+    },
   });
+  renderMockupChips(); // the new header's chips, from the threads already loaded
   updateMockupZoom(); // initial pass — columns start at their CSS default width, before any iframe has measured its variant
 }
 
@@ -2312,9 +2384,9 @@ function applyMainVisibility() {
   const toggles = modeToggleStates({ view: currentView, showMockup, comparing });
   flowModeToggle.disabled = toggles.flow.disabled;
   commentModeToggle.disabled = toggles.comment.disabled;
-  commentsRowBtn.disabled = toggles.comment.disabled || !currentScreen;
-  // The comment layer and its toolbar belong to the single-screen canvas only.
-  commentCanvas.setToolbarHidden(currentView !== "screens" || showMockup || comparing || !currentScreen);
+  commentsRowBtn.disabled = toggles.comment.disabled || (!currentScreen && !showMockup);
+  // The comment layer and its toolbar belong to the single-screen canvas and the mockup columns.
+  commentCanvas.setToolbarHidden(currentView !== "screens" || comparing || (showMockup ? false : !currentScreen));
   inspectModeToggle.disabled = toggles.inspect.disabled;
   // The disabled reason (or the label) is the shared tooltip, not a native title.
   flowModeToggle.dataset.tooltip = toggles.flow.title || "Flow mode";
@@ -2353,7 +2425,7 @@ function setView(view) {
   // Comment/inspect mode have no board counterpart (see board-view.js) —
   // picking the board while either is active turns it off, same as
   // clicking its own toggle.
-  if (view === "board" && activeMode === "comment") setMode("comment");
+  if ((view === "board" || view === "design-system") && activeMode === "comment") setMode("comment");
   if (view === "board" && activeMode === "inspect") setMode("inspect");
   // None of the three modes has a Use Cases counterpart either.
   if (view === "usecases" && activeMode !== "none") setMode(activeMode);

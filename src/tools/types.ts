@@ -175,10 +175,12 @@ export type PublicFlow = {
 export type CommentStatus = "open" | "resolved";
 export type CommentAuthor = "human" | "agent";
 
-export type PublicComment = {
+/** A comment names a screen, or (CHR-1262, ADR-012) one variant of a mockup. */
+export type PublicCommentTarget = { screen: string } | { mockup: string; variant: string };
+
+export type PublicComment = PublicCommentTarget & {
   id: string;
   parent_id: string | null;
-  screen: string;
   node: string | null;
   author: CommentAuthor;
   /** The agent's name on agent-authored comments (CHR-1249). */

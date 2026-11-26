@@ -6,6 +6,7 @@ import { parse, serializeOuter, defaultTreeAdapter, html as p5html } from "parse
 import type { DefaultTreeAdapterTypes } from "parse5";
 import type { Store, MockupMeta } from "../store/index.js";
 import { writeHtml } from "./writes.js";
+import { groupThreads, isMockupTarget, readCommentRecords } from "./comments.js";
 import { ToolError, commitFields, type Warning } from "./types.js";
 
 const NAME_RE = /^[\w-]+$/;
@@ -146,12 +147,25 @@ export async function getMockup(store: Store, input: GetMockupInput): Promise<Re
     variant_count: meta.variants.length,
   };
 
+  // Only a variant with open threads carries the count (ADR-012), so a mockup without comments answers byte-identically.
+  const openByVariant = new Map<string, number>();
+  for (const thread of groupThreads(await readCommentRecords(store))) {
+    const root = thread.root;
+    if (thread.status === "open" && isMockupTarget(root) && root.mockup === input.mockup) {
+      openByVariant.set(root.variant, (openByVariant.get(root.variant) ?? 0) + 1);
+    }
+  }
+  const openCount = (id: string): { open_comment_count?: number } => {
+    const open = openByVariant.get(id) ?? 0;
+    return open > 0 ? { open_comment_count: open } : {};
+  };
+
   if (view === "summary") {
-    return { ...base, variants: variants.map(({ id, title, description }) => ({ id, title, description })) };
+    return { ...base, variants: variants.map(({ id, title, description }) => ({ id, title, description, ...openCount(id) })) };
   }
 
   const variantsWithHtml = await Promise.all(
-    variants.map(async (v) => ({ ...v, html: await store.readMockupVariant(input.mockup, v.id) })),
+    variants.map(async (v) => ({ ...v, ...openCount(v.id), html: await store.readMockupVariant(input.mockup, v.id) })),
   );
   return { ...base, variants: variantsWithHtml };
 }

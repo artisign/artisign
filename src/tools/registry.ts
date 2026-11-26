@@ -176,9 +176,11 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "list_comments",
-    "Comment threads, filtered by screen, node or status. A thread is anchored to a node, never to coordinates: each root carries screen and node (<screen>.<node-id>, as get_node takes it), author (human|agent) plus agent, and detached: true when its node no longer exists. status \"detached\" lists open threads that lost their node.",
+    "Comment threads on screens and mockup variants, filtered by screen, mockup (+ variant), node or status. A thread is anchored to a node, never to coordinates: each root carries screen, or mockup and variant, and node (as get_node / patch_html take it), author (human|agent) plus agent, and detached: true when its node no longer exists. status \"detached\" lists open threads that lost their node.",
     {
       screen: z.string().optional(),
+      mockup: z.string().optional(),
+      variant: z.string().optional(),
       node: z.string().optional(),
       status: z.enum(["open", "resolved", "detached", "any"]).optional(),
       include_replies: z.boolean().optional(),
@@ -448,14 +450,14 @@ export const TOOLS: ToolDefinition[] = [
   // Comments ---------------------------------------------------------------
   tool(
     "reply_comment",
-    "Answer a comment thread. Accepts any id from list_comments (root or reply); the answer lands on the thread root. resolve / reopen change its status; reanchor (<screen>.<node-id> or a bare id on its screen) moves it to another node, e.g. a detached thread to the node that replaced its own. body may be left out when only resolving, reopening or re-anchoring. agent: your name, default the MCP client's.",
+    "Answer a comment thread. Accepts any id from list_comments (root or reply); the answer lands on the thread root. resolve / reopen change its status; reanchor (a node ref of the thread's kind, or a bare id on its screen / variant) moves it to another node, e.g. a detached thread to the node that replaced its own; never between a screen and a mockup. body may be left out when only resolving, reopening or re-anchoring. agent: your name, default the MCP client's.",
     { comment_id: z.string(), body: z.string().optional(), resolve: z.boolean().optional(), reopen: z.boolean().optional(), reanchor: z.string().optional(), agent: z.string().optional() },
     (store, input, ctx) => replyComment(store, input as never, ctx?.clientName),
   ),
   tool(
     "create_comment",
-    "Start a comment thread for the human to see as a pin on the canvas. node: <screen>.<node-id> or a bare id on screen; leave it out for a screen-level thread. Anchor to a node with an authored id: a generated one may change on rewrite and detach the thread. agent: your name, default the MCP client's.",
-    { screen: z.string(), node: z.string().optional(), body: z.string(), agent: z.string().optional() },
+    "Start a comment thread for the human to see as a pin: on a screen (screen) or a mockup variant (mockup + variant). node: a node ref or a bare id on the target; leave it out for a whole-screen / whole-variant thread. Anchor to an authored id: a generated one may change on rewrite and detach the thread; mockups take authored ids only. agent: your name, default the MCP client's.",
+    { screen: z.string().optional(), mockup: z.string().optional(), variant: z.string().optional(), node: z.string().optional(), body: z.string(), agent: z.string().optional() },
     (store, input, ctx) => createAgentComment(store, input as never, ctx?.clientName),
   ),
 ];

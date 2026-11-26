@@ -1,0 +1,9 @@
+{
+  "notes": "**Popover flip + resolved pins** (CHR-1248 / CHR-1258).\n\n- Pin 4 sits on `item-3-price` near the frame's right edge; there is no room on the right, so `comment-popover` flips to the left of the anchor (order: right → left → below → above, 14px gap).\n- \"Show resolved\" is on (`comment-toolbar` variant `resolved`): resolved threads show as `comment-pin` variant `resolved` (check icon, muted). With it off they are hidden.\n- Count row counts open threads only: \"4 open comments · shown on canvas\".",
+  "tags": [
+    "CHR-1248",
+    "CHR-1258"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "state"
+}

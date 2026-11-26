@@ -10,6 +10,7 @@ import {
   fetchDesignSystem,
   fetchComments,
   fetchMockupComments,
+  fetchScreenComments,
   fetchFlows,
   fetchTags,
   fetchScreenNodes,
@@ -67,6 +68,7 @@ import { connectEvents } from "./sse.js";
 import { applyCanvas } from "./canvas.js";
 import { updateWarningBadge } from "./warnings.js";
 import { createBoardView } from "./board-view.js";
+import { createBoardComments } from "./board-comments.js";
 import { createUseCasesView } from "./usecases.js";
 import { renderScreenUseCases } from "./usecases-screen-link.js";
 import {
@@ -197,6 +199,9 @@ const boardToolbarStatusEl = document.getElementById("board-toolbar-status");
 const boardClearPinsBtn = document.getElementById("board-clear-pins-btn");
 const boardClustersToggleBtn = document.getElementById("board-clusters-toggle");
 const boardCollapseAllBtn = document.getElementById("board-collapse-all-btn");
+const boardCommentsToggleBtn = document.getElementById("board-comments-toggle");
+const boardResolvedToggleBtn = document.getElementById("board-resolved-toggle");
+const boardCommentLayerEl = document.getElementById("board-comment-layer");
 const boardPresentedBannerEl = document.getElementById("board-presented-banner");
 const boardPresentedTextEl = document.getElementById("board-presented-text");
 const boardPresentedDismissBtn = document.getElementById("board-presented-dismiss");
@@ -451,8 +456,70 @@ const board = createBoardView({
     updateBoardToolbar();
   },
   onTogglePin: (screen) => toggleScreenPin(screen),
+  onLayout: () => boardComments.layout(),
 });
 board.mount();
+
+// CHR-1264 — read-only comment pins on the tiles (overlay in this document; nothing inside a tile iframe).
+const BOARD_COMMENTS_KEY = "artisign.board.comments";
+const BOARD_RESOLVED_KEY = "artisign.board.showResolved";
+let boardCommentsOn = readBoolPref(prefsStorage, BOARD_COMMENTS_KEY, true);
+let boardShowResolved = readBoolPref(prefsStorage, BOARD_RESOLVED_KEY, false);
+let boardCommentsRequestId = 0;
+const boardComments = createBoardComments({
+  layerEl: boardCommentLayerEl,
+  surfaceEl: boardSurfaceEl,
+  geometry: () => board.commentGeometry(),
+  enabled: boardCommentsOn,
+  showResolved: boardShowResolved,
+  onZoomToTile: (screen) => board.zoomToTile(screen),
+  onOpenInScreens: (screen, threadId) => void openScreenThread(screen, threadId),
+});
+
+function renderBoardCommentToggles() {
+  boardCommentsToggleBtn.setAttribute("aria-pressed", String(boardCommentsOn));
+  boardCommentsToggleBtn.textContent = boardCommentsOn ? "Comments: On" : "Comments: Off";
+  boardResolvedToggleBtn.setAttribute("aria-pressed", String(boardShowResolved));
+}
+renderBoardCommentToggles();
+boardCommentsToggleBtn.addEventListener("click", () => {
+  boardCommentsOn = !boardCommentsOn;
+  writeBoolPref(prefsStorage, BOARD_COMMENTS_KEY, boardCommentsOn);
+  renderBoardCommentToggles();
+  boardComments.setEnabled(boardCommentsOn);
+  renderBoardStatus(); // the status line's comment count follows the toggle
+});
+boardResolvedToggleBtn.addEventListener("click", () => {
+  boardShowResolved = !boardShowResolved;
+  writeBoolPref(prefsStorage, BOARD_RESOLVED_KEY, boardShowResolved);
+  renderBoardCommentToggles();
+  boardComments.setShowResolved(boardShowResolved);
+  renderBoardStatus();
+});
+
+/** One request for every screen's threads; the board's markers and status line follow. */
+async function loadBoardComments() {
+  const project = activeProjectRoot;
+  if (!project) return;
+  const requestId = ++boardCommentsRequestId;
+  const result = await fetchScreenComments(project);
+  if (requestId !== boardCommentsRequestId || project !== activeProjectRoot) return; // a newer request or a project switch moved on
+  boardComments.setData({ comments: result.comments, threads: result.threads });
+  renderBoardStatus();
+}
+
+/**
+ * "Open in Screens" from a board preview: the Screens view on that screen with the thread's popover open.
+ * @param {string} screen
+ * @param {string | null} threadId
+ */
+async function openScreenThread(screen, threadId) {
+  pauseFollow(); // a human navigation, like a tab or sidebar click
+  if (compare.isOn()) compare.leave();
+  setView("screens");
+  if (currentScreen !== screen || currentMockup !== null) await selectScreen(screen);
+  if (threadId !== null) commentCanvas.openThread(threadId);
+}
 
 // Use Cases tab: nothing is fetched until the tab is first shown. Opening a mapped screen leaves the tab for Screens.
 const useCases = createUseCasesView({
@@ -549,7 +616,11 @@ function updateAgentPresentedBannerText() {
 /** Re-renders the board toolbar's status text + Clear pins visibility from the current screens/screenFilter/pinnedScreens — cheap and pure, so it's fine to call unconditionally on every board-state-relevant change, not just while the Board tab is actually showing. */
 function renderBoardStatus() {
   const visibility = computeBoardVisibility(screens, screenFilter, pinnedScreens);
-  boardToolbarStatusEl.textContent = formatBoardStatusText(visibility);
+  const comments = boardComments.summary(visibility.visibleNames);
+  boardToolbarStatusEl.textContent =
+    formatBoardStatusText(visibility) +
+    (boardCommentsOn && comments.open > 0 ? ` · ${comments.open} open comment${comments.open === 1 ? "" : "s"}${comments.detached > 0 ? ` · ${comments.detached} detached` : ""}` : "");
+  boardToolbarStatusEl.dataset.tooltip = boardToolbarStatusEl.textContent; // the full line, for when a crowded toolbar cuts it short
   // Gated on the raw pin list, not `visibility.pinnedCount` (review fix 5):
   // the latter is the CLEANED count (a pin whose screen no longer exists is
   // dropped from it), so a project whose pins are entirely ghosts — the
@@ -787,6 +858,8 @@ function resetProjectState() {
   clearTimeout(boardFilterWriteTimer);
   hideAgentPresentedBanner(); // CHR-625 — a presentation is per-project; don't carry it over to the next
   boardBuilt = false;
+  boardCommentsRequestId++; // an answer still on its way belongs to the project we just left
+  boardComments.setData({ comments: [], threads: [] });
   activeMode = "none";
   flowModeToggle.setAttribute("aria-pressed", "false");
   commentModeToggle.setAttribute("aria-pressed", "false");
@@ -1037,7 +1110,11 @@ async function handleChangeEvent(event) {
       // plain tile and a cluster without touching visibility.
       const variantLinks = (list) => list.map((s) => `${s.name}>${s.variant_of ?? ""}:${s.variant_kind ?? ""}`).join("|");
       if (visibilityChanged || variantLinks(previousScreens) !== variantLinks(screens)) await loadBoard();
-      else await board.refreshScreen(event.name, activeProjectRoot);
+      else {
+        await board.refreshScreen(event.name, activeProjectRoot);
+        // A screen with threads can lose or regain a thread's node: the server recomputes `detached`.
+        if (boardComments.threadScreens().has(event.name)) await loadBoardComments();
+      }
     }
   } else if (event.kind === "tokens" || event.kind === "component" || event.kind === "pattern" || event.kind === "asset") {
     // Tokens/components/patterns can affect any screen's render (refs
@@ -1073,6 +1150,7 @@ async function handleChangeEvent(event) {
     } else await fallbackFromVanishedMockup();
   } else if (event.kind === "comments") {
     await loadComments(); // refreshes the panel and, if comment mode is active, the open-thread markers
+    if (boardBuilt) await loadBoardComments();
   } else if (event.kind === "flows") {
     // The single-screen view reads data-flow-target straight off the
     // rendered HTML (see flows.js), which a "screen" event above already
@@ -2336,6 +2414,7 @@ async function loadBoard() {
   // visibility, but board.setScreens also needs the pin/outside-filter
   // classification per tile, not just the counts renderBoardStatus keeps.
   const visibility = computeBoardVisibility(screens, screenFilter, pinnedScreens);
+  const commentsLoaded = loadBoardComments(); // one request, in parallel with the tiles' renders
   await board.setScreens(visibility.visibleNames, flows, project, {
     pinned: visibility.pinnedNames,
     outsideFilter: visibility.outsideFilterNames,
@@ -2345,6 +2424,8 @@ async function loadBoard() {
     clusters: boardClustersOn,
   });
   boardBuilt = true;
+  await commentsLoaded;
+  boardComments.layout(); // the tiles' documents are loading: measure what is there now
 }
 
 // Whether the previous applyMainVisibility() showed compare — leaving it re-fits the screen canvas, which was measured while hidden.
@@ -2434,6 +2515,7 @@ function setView(view) {
   if (view === "usecases") useCases.show();
   else useCases.hide();
   if (view === "screens") updateScreenUseCases(); // the reverse entry may have use cases to show now
+  if (view !== "board") boardComments.close(); // a preview must not outlive the board (its Esc handling is the board's)
   if (view === "board" && !boardBuilt) loadBoard();
   // CHR-623 review finding 5: an already-built board was `hidden` (clientWidth
   // 0) while another tab showed, so any relayout that ran while hidden used

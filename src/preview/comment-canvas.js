@@ -187,10 +187,48 @@ function installRovingTabindex(toolbar, items) {
 }
 
 /** @param {string | null} ref `<screen>.<node-id>` or null */
-function bareId(ref) {
+export function bareId(ref) {
   if (ref === null) return null;
   const dot = ref.indexOf(".");
   return dot === -1 ? ref : ref.slice(dot + 1);
+}
+
+/**
+ * One message of a thread: avatar, author, badge, age, text. Shared with the
+ * board's read-only preview (CHR-1264).
+ * @param {{ author: "human" | "agent", agent?: string, ts: string, text: string }} record
+ * @returns {HTMLLIElement}
+ */
+export function renderCommentMessage(record) {
+  const li = document.createElement("li");
+  li.className = "comment-message";
+  const meta = divEl("comment-message-meta");
+  const avatar = document.createElement("span");
+  avatar.className = "comment-avatar";
+  avatar.dataset.kind = record.author;
+  avatar.setAttribute("aria-hidden", "true");
+  const name = authorLabel(record);
+  avatar.textContent = name.slice(0, 2).toUpperCase();
+  const who = document.createElement("b");
+  who.textContent = name;
+  const badge = document.createElement("span");
+  badge.className = `comment-badge comment-badge--${record.author}`;
+  badge.textContent = record.author === "agent" ? "Agent" : "Human";
+  const time = document.createElement("time");
+  time.dateTime = record.ts;
+  time.title = record.ts;
+  time.textContent = relativeTime(record.ts);
+  meta.append(avatar, who, badge, time);
+  const body = divEl("comment-message-body");
+  body.textContent = record.text;
+  li.append(meta, body);
+  return li;
+}
+
+function divEl(className) {
+  const el = document.createElement("div");
+  el.className = className;
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -692,7 +730,7 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
     popMessages.hidden = isNew;
     if (t) {
       const records = comments.filter((c) => c.id === t.id || c.parent_id === t.id);
-      for (const record of records) popMessages.append(renderMessage(record));
+      for (const record of records) popMessages.append(renderCommentMessage(record));
     }
 
     // Composer.
@@ -738,33 +776,6 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
     b.dataset.tooltip = label;
     b.append(icon(iconName));
     return b;
-  }
-
-  /** @param {CommentRecord} record */
-  function renderMessage(record) {
-    const li = document.createElement("li");
-    li.className = "comment-message";
-    const meta = div("comment-message-meta");
-    const avatar = document.createElement("span");
-    avatar.className = "comment-avatar";
-    avatar.dataset.kind = record.author;
-    avatar.setAttribute("aria-hidden", "true");
-    const name = authorLabel(record);
-    avatar.textContent = name.slice(0, 2).toUpperCase();
-    const who = document.createElement("b");
-    who.textContent = name;
-    const badge = document.createElement("span");
-    badge.className = `comment-badge comment-badge--${record.author}`;
-    badge.textContent = record.author === "agent" ? "Agent" : "Human";
-    const time = document.createElement("time");
-    time.dateTime = record.ts;
-    time.title = record.ts;
-    time.textContent = relativeTime(record.ts);
-    meta.append(avatar, who, badge, time);
-    const body = div("comment-message-body");
-    body.textContent = record.text;
-    li.append(meta, body);
-    return li;
   }
 
   /** @param {ThreadInfo | null} t */
@@ -1194,6 +1205,12 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
       open(match.id);
     },
     open,
+    /** Opens one thread by id — the Board's "Open in Screens" (CHR-1264); pins hidden by "Hide pins" come back first. @param {string} id */
+    openThread(id) {
+      if (!threads.some((t) => t.id === id)) return;
+      showPins();
+      open(id);
+    },
     isOpen: () => activeId !== null,
     /** The open thread's id, or null (also for a new thread). */
     activeThread: () => (activeId === "new" ? null : activeId),

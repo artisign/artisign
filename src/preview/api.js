@@ -123,6 +123,15 @@ export async function fetchMockupComments(mockup, project) {
   return fetchCommentsAt(`mockup=${encodeURIComponent(mockup)}`, project);
 }
 
+/**
+ * Every screen's comment threads in one request (CHR-1264, the Board): the
+ * same shape as fetchComments, each thread also naming its `screen`.
+ * @param {string} project see fetchScreens's own note — required here too.
+ */
+export async function fetchScreenComments(project) {
+  return fetchCommentsAt("scope=screens", project);
+}
+
 /** @param {string} selector @param {string} project */
 async function fetchCommentsAt(selector, project) {
   try {

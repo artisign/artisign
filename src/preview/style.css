@@ -2905,6 +2905,10 @@ button.chrome-section-header:focus-visible {
 }
 
 #board-toolbar-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--ui-2xs);
   color: var(--chrome-text-tertiary);
 }
@@ -10998,4 +11002,250 @@ button.uc-target:hover {
 
 .comment-toolbar-text[aria-pressed="true"] .comment-toolbar-check {
   visibility: visible;
+}
+
+/* ---------------------------------------------------------------------------
+   CHR-1264 — read-only comment pins on the Board. #board-comment-layer sits in
+   #board-canvas (the zoomed size, never transformed), so markers keep their
+   native size while their positions follow the tiles. Pins reuse .comment-pin;
+   a hover changes nothing (the message shows only on a click).
+   --------------------------------------------------------------------------- */
+#board-comment-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  z-index: 5;
+  pointer-events: none;
+}
+
+#board-comment-layer[hidden] {
+  display: none;
+}
+
+.board-comment-markers {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.board-comment-pin:hover {
+  transform: none;
+}
+
+/* Several pins that overlap at this zoom: a dark pill with the count; a click zooms to the tile. */
+.board-comment-group {
+  width: auto;
+  min-width: 30px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-text);
+  color: var(--chrome-bar);
+}
+
+.board-comment-pin:focus-visible,
+.board-comment-chips .comment-count-chip:focus-visible,
+.board-comment-dot:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The tile's name-bar chips: right-aligned in the label row above the tile, left of its pin button, scaled with the tile like the label. The solid backdrop keeps a long name legible underneath. */
+.board-comment-chips {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-left: var(--space-sm);
+  margin-top: calc(-4px * var(--board-scale, 1));
+  transform: translate(-100%, -100%) scale(var(--board-scale, 1));
+  transform-origin: 100% 100%;
+  background: var(--chrome-canvas);
+  pointer-events: auto;
+}
+
+/* Below 60 % zoom: one count dot inside the tile's top-left corner. */
+.board-comment-dot {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--space-xs);
+  border: 2px solid var(--comment-on);
+  border-radius: var(--radius-pill);
+  background: var(--comment-human);
+  color: var(--comment-on);
+  font: 600 10px/1 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.board-comment-dot[data-state="detached"] {
+  background: var(--comment-detached);
+}
+
+.board-comment-dot[data-active="true"] {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--comment-human) 35%, transparent), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.comment-pin[data-active="true"].board-comment-pin[data-state="detached"] {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--comment-detached) 35%, transparent), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* The read-only preview (comment-preview): a pin's thread or a dot's thread list. */
+.board-comment-preview {
+  position: absolute;
+  width: var(--size-popover, 320px);
+  max-width: calc(100vw - 32px);
+  border-radius: var(--radius-md);
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-float);
+  color: var(--chrome-text);
+  font-size: var(--ui-sm);
+  line-height: 1.4;
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.board-comment-preview[hidden] {
+  display: none;
+}
+
+.board-comment-preview:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 2px;
+}
+
+.board-comment-preview-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--size-panel-header);
+  padding: 0 var(--space-sm) 0 var(--space-lg);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.board-comment-preview-head b {
+  font-weight: 600;
+}
+
+.board-comment-preview-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-comment-preview-count,
+.board-comment-preview-meta {
+  color: var(--chrome-text-tertiary);
+  font-size: var(--ui-2xs);
+  white-space: nowrap;
+}
+
+.board-comment-preview-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--chrome-border);
+}
+
+.board-comment-preview[data-mode="list"] .board-comment-preview-foot {
+  border-top: none;
+}
+
+.board-comment-preview-meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-comment-rows {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.board-comment-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  border: none;
+  border-bottom: 1px solid var(--chrome-border);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.board-comment-row:hover {
+  background: var(--chrome-hover);
+}
+
+.board-comment-row:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
+.board-comment-row-no {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50% 50% 50% var(--radius-xs);
+  background: var(--comment-human);
+  color: var(--comment-on);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.board-comment-row-no[data-kind="agent"] {
+  background: var(--comment-agent);
+}
+
+.board-comment-row-no[data-state="detached"] {
+  border: 2px dashed var(--comment-detached);
+  background: var(--chrome-raised);
+  color: var(--comment-detached);
+}
+
+.board-comment-row-no[data-state="resolved"] {
+  background: var(--chrome-text-tertiary);
+}
+
+.board-comment-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.board-comment-row-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.board-comment-row-time {
+  margin-left: auto;
+  flex: none;
+  color: var(--chrome-text-tertiary);
+  font-size: var(--ui-2xs);
+}
+
+.board-comment-row-text {
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -120,6 +120,35 @@ describe("/api/comments", () => {
       expect(reply.resolved).toBe(true);
     });
 
+    it("resolves a thread without words (the popover's Resolve), but never posts an empty plain reply", async () => {
+      const { json: root } = await post("/api/comments", { screen: "home", node_id: "n2", text: "make this bigger" });
+      expect((await post("/api/comments", { parent_id: root.id, text: "" })).status).toBe(400);
+      expect((await post("/api/comments", { screen: "home", node_id: "n2", text: "", resolved: true })).status).toBe(400);
+      expect((await post("/api/comments", { parent_id: root.id, text: "", resolved: true })).status).toBe(201);
+
+      const { json } = await get("/api/comments?screen=home");
+      expect(json.threads).toEqual([{ id: root.id, node_id: "home.n2", author: "human", status: "resolved", detached: false, reply_count: 0 }]);
+      expect((json.comments as unknown[]).length).toBe(1); // the wordless resolve line is no message
+    });
+
+    it("applies thread actions: reanchor to a DOM id, reopen, delete (CHR-1248)", async () => {
+      const { json: root } = await post("/api/comments", { screen: "home", node_id: "n2", text: "make this bigger" });
+      expect((await post("/api/comments", { action: "reanchor", comment_id: root.id, screen: "home", node_id: "nope" })).status).toBe(404);
+      expect((await post("/api/comments", { action: "reanchor", comment_id: root.id, screen: "home", node_id: "n1" })).status).toBe(200);
+      let { json } = await get("/api/comments?screen=home");
+      expect(json.threads).toMatchObject([{ id: root.id, node_id: "home.n1", status: "open" }]);
+
+      await post("/api/comments", { parent_id: root.id, text: "", resolved: true });
+      expect((await post("/api/comments", { action: "reopen", comment_id: root.id })).status).toBe(200);
+      ({ json } = await get("/api/comments?screen=home"));
+      expect(json.threads).toMatchObject([{ status: "open" }]);
+
+      expect((await post("/api/comments", { action: "delete", comment_id: root.id })).status).toBe(200);
+      ({ json } = await get("/api/comments?screen=home"));
+      expect([json.comments, json.threads]).toEqual([[], []]);
+      expect((await post("/api/comments", { action: "explode", comment_id: root.id })).status).toBe(400);
+    });
+
     it("rejects a reply to an unknown parent_id", async () => {
       const { status, json } = await post("/api/comments", { parent_id: "cmt_missing", text: "x" });
       expect(status).toBe(404);

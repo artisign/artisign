@@ -194,24 +194,13 @@
                 <div id="notes-panel-tags"></div>
               </div>
             </section>
+            <!-- CHR-1253: threads live on the canvas now; the sidebar keeps one row that counts them and opens comment mode. -->
             <section id="comments-panel">
-              <div id="comments-header" class="chrome-section-header">
-                <h2 id="comments-title">Comments</h2>
-                <span id="comments-count"></span>
-                <button type="button" id="comment-add" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Add comment" data-tooltip="Add comment" data-shortcut="">
-                  <span class="icon" aria-hidden="true">add_comment</span>
-                </button>
-              </div>
-              <form id="comment-compose" hidden>
-                <p id="comment-target-label"></p>
-                <textarea id="comment-body-input" class="chrome-field" placeholder="Write a comment…" required></textarea>
-                <p id="comment-error" hidden></p>
-                <div id="comment-compose-actions">
-                  <button type="submit" class="chrome-btn chrome-btn--primary chrome-btn--compact">Post</button>
-                  <button type="button" id="comment-cancel" class="chrome-btn chrome-btn--compact">Cancel</button>
-                </div>
-              </form>
-              <ul id="comments-list"></ul>
+              <button type="button" id="comments-row" class="comments-row">
+                <span class="icon" aria-hidden="true">chat_bubble</span>
+                <span id="comments-row-label">No open comments</span>
+                <span id="comments-row-hint" hidden>shown on canvas</span>
+              </button>
             </section>
           </div>
         </aside>
@@ -287,8 +276,19 @@
                   <span id="activity-screen-highlight-badge">Updated</span>
                 </div>
               </div>
+              <!--
+                CHR-1248 — comment pins, the active element's outline, comment
+                mode's hover box and the thread popover. Same layering rule as
+                #inspect-overlay (PARENT document, never the srcdoc), but outside
+                #screen-holder: it clips, and a popover must be free to sit next
+                to the frame. Positioned in #canvas's scrolled content box.
+              -->
+              <div id="comment-layer"></div>
             </div>
             <aside id="variant-map" aria-label="Variant tree" hidden></aside>
+            <!-- CHR-1252: comment mode's banner and the floating canvas toolbar (filled by comment-canvas.js). -->
+            <div id="comment-banner" role="status" hidden></div>
+            <div id="comment-toolbar"></div>
             </div>
             <!-- CHR-738: side-by-side variant compare — a mode of this view, filled and shown by compare.js in place of #screens-stage. The columns' iframes are sandboxed like #screen-frame (iframe-fit.js). -->
             <div id="compare-view" hidden>

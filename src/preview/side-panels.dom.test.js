@@ -99,14 +99,14 @@ describe("side panel defaults", () => {
     expect(settings.prefs["artisign.inspector.collapsed"]).toBe("false");
   });
 
-  it("comment mode opens Context, inspect mode opens Elements", async () => {
+  it("comment mode leaves Context as it is (CHR-1248), inspect mode opens Elements", async () => {
     await boot();
     const comment = document.getElementById("comment-mode-toggle");
     const inspect = document.getElementById("inspect-mode-toggle");
     comment.disabled = false;
     inspect.disabled = false;
     comment.click();
-    expect([state("sidebar-context"), state("inspector")]).toEqual(["false", "true"]);
+    expect([state("sidebar-context"), state("inspector")]).toEqual(["true", "true"]);
     inspect.click();
     expect(state("inspector")).toBe("false");
     await flush();

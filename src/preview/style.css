@@ -1509,8 +1509,7 @@ button.chrome-section-header:focus-visible {
   display: none;
 }
 
-#notes-panel-screen,
-#comments-count {
+#notes-panel-screen {
   margin-left: auto;
   min-width: 0;
   overflow: hidden;
@@ -1600,223 +1599,58 @@ button.chrome-section-header:focus-visible {
   overflow-wrap: anywhere;
 }
 
-/* Comments: the header carries the open count and the add action; a divider above it only when Notes is shown (the panel header's own border covers the other case). */
-#notes-panel:not([hidden]) + #comments-panel #comments-header {
+/* CHR-1253 — the Comments section is one row: threads live on the canvas. A divider above it only when Notes is shown. */
+#notes-panel:not([hidden]) + #comments-panel {
   border-top: 1px solid var(--chrome-border);
 }
 
-#comments-title {
-  flex: 1;
-  margin: 0;
-  font-size: inherit;
-  font-weight: inherit;
-}
-
-/* The title takes the free space, so the count sits against the add button; an empty count leaves no gap. */
-#comments-count {
-  margin-left: 0;
-}
-
-#comments-count:empty {
-  display: none;
-}
-
-#comment-compose {
+.comments-row {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  margin: var(--space-pad) var(--space-pad) 0;
-  padding: var(--space-pad);
-  border: 1px solid var(--chrome-accent);
-  border-radius: var(--radius-sm);
-  background: var(--chrome-raised);
-}
-
-#comment-compose[hidden] {
-  display: none;
-}
-
-#comment-target-label {
-  margin: 0;
-  font-size: var(--ui-xs);
-  font-weight: 500;
-  color: var(--chrome-text);
-  overflow-wrap: anywhere;
-}
-
-/* Textareas share the field look but not its fixed single-line height. */
-#comment-body-input.chrome-field,
-.comment-reply-form textarea.chrome-field {
-  width: 100%;
-  box-sizing: border-box;
-  height: auto;
-  padding: var(--space-sm) var(--space-md);
-  resize: vertical;
-}
-
-#comment-body-input.chrome-field {
-  min-height: 60px;
-}
-
-.comment-reply-form textarea.chrome-field {
-  min-height: 44px;
-}
-
-#comment-error,
-.comment-reply-error {
-  margin: 0;
-  font-size: var(--ui-xs);
-  color: var(--chrome-error);
-}
-
-#comment-error[hidden],
-.comment-reply-error[hidden] {
-  display: none;
-}
-
-#comment-compose-actions {
-  display: flex;
+  align-items: center;
   gap: var(--space-md);
-}
-
-#comments-list {
-  list-style: none;
-  margin: 0;
-  padding: var(--space-pad);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-/* A thread is a raised card, its replies indented field-coloured cards below it, then a ghost Reply button. */
-.comment-item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  padding: var(--space-pad);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  background: var(--chrome-raised);
-}
-
-.comment-item.comment-reply {
-  margin-left: var(--space-xl);
-  background: var(--chrome-field);
-}
-
-.comment-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  min-width: 0;
-  font-size: var(--ui-xs);
-  color: var(--chrome-text-secondary);
-}
-
-.comment-author {
-  font-weight: 500;
-  color: var(--chrome-text);
-}
-
-/* The node chip is a .chrome-chip (flex: none); here it may shrink, and the id inside truncates with an ellipsis (full id in the title). */
-.comment-target {
-  flex: 0 1 auto;
-  margin-left: auto;
-  min-width: 0;
-  max-width: 60%;
-  font-family: ui-monospace, Menlo, monospace;
-}
-
-.comment-target-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.comment-body {
-  font-size: var(--ui-base);
-  line-height: 1.4;
-  color: var(--chrome-text);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.comments-empty {
-  font-size: var(--ui-sm);
-  color: var(--chrome-text-tertiary);
-  padding: var(--space-xs) 0;
-}
-
-.comment-reply-affordance {
-  margin-top: calc(-1 * var(--space-xs));
-}
-
-.comment-reply-toggle {
-  color: var(--chrome-text);
-}
-
-.comment-reply-toggle:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: 1px;
-}
-
-.comment-reply-form {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
-}
-
-.comment-reply-form[hidden] {
-  display: none;
-}
-
-/* The "N resolved" row: dashed, collapsed until opened. */
-.comments-resolved {
-  list-style: none;
-}
-
-.comments-resolved-toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
   width: 100%;
-  padding: var(--space-pad);
-  border: 1px dashed var(--chrome-border-strong);
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--chrome-text-tertiary);
+  height: var(--size-row-section);
+  padding: 0 var(--space-lg);
+  border: none;
+  background: transparent;
+  color: var(--chrome-text);
   font: inherit;
-  font-size: var(--ui-base);
+  font-size: var(--ui-sm);
   text-align: left;
   cursor: pointer;
 }
 
-.comments-resolved-toggle .icon {
+.comments-row .icon {
   font-size: var(--size-icon-sm);
+  color: var(--chrome-text-secondary);
 }
 
-.comments-resolved-toggle:hover {
+.comments-row:hover:not(:disabled) {
   background: var(--chrome-hover);
 }
 
-.comments-resolved-toggle:focus-visible {
+.comments-row:focus-visible {
   outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: 1px;
+  outline-offset: -2px;
 }
 
-.comments-resolved-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  margin: var(--space-sm) 0 0;
-  padding: 0;
-  list-style: none;
+.comments-row:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
-.comments-resolved-list[hidden] {
+.comments-row[data-empty="true"] #comments-row-label {
+  color: var(--chrome-text-secondary);
+}
+
+#comments-row-hint {
+  margin-left: auto;
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+  white-space: nowrap;
+}
+
+#comments-row-hint[hidden] {
   display: none;
 }
 
@@ -1841,6 +1675,7 @@ button.chrome-section-header:focus-visible {
   flex: 1;
   min-height: 0;
   display: flex;
+  position: relative; /* anchors the comment banner and the floating canvas toolbar (CHR-1252) */
 }
 
 #screens-stage > #canvas {
@@ -10527,4 +10362,542 @@ button.uc-target:hover {
 
 .uc-lock-note .icon {
   font-size: var(--size-icon-xs);
+}
+
+/* ---------------------------------------------------------------------------
+   CHR-1248 — comments on the canvas. Everything lives in #comment-layer, the
+   PARENT document's overlay inside #canvas (scrolled content coordinates),
+   never inside the screen's srcdoc. Pins: Human blue, Agent purple; detached
+   amber and dashed; resolved muted with a check.
+   --------------------------------------------------------------------------- */
+:root {
+  --comment-human: #2563eb;
+  --comment-agent: #7c3aed;
+  --comment-detached: #f59e0b;
+  --comment-on: #ffffff;
+}
+
+#comment-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: visible;
+  z-index: 5;
+  pointer-events: none;
+}
+
+#comment-layer[hidden] {
+  display: none;
+}
+
+.comment-target-outline,
+.comment-hover-outline {
+  position: absolute;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.comment-target-outline {
+  outline: 2px solid var(--comment-human);
+  outline-offset: 2px;
+}
+
+.comment-target-outline[data-kind="agent"] {
+  outline-color: var(--comment-agent);
+}
+
+.comment-hover-outline {
+  outline: 1.5px dashed var(--comment-human);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--comment-human) 6%, transparent);
+}
+
+.comment-hover-outline[data-label]::after {
+  content: attr(data-label);
+  position: absolute;
+  left: -2px;
+  bottom: calc(100% + 4px);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-xs);
+  background: var(--comment-human);
+  color: var(--comment-on);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.comment-target-outline[hidden],
+.comment-hover-outline[hidden] {
+  display: none;
+}
+
+.comment-pin {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid var(--comment-on);
+  border-radius: 50% 50% 50% 4px;
+  background: var(--comment-human);
+  color: var(--comment-on);
+  font: 600 11px/1 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.12s ease;
+}
+
+.comment-pin[data-kind="agent"] {
+  background: var(--comment-agent);
+}
+
+.comment-pin:hover {
+  transform: scale(1.08);
+}
+
+.comment-pin:focus-visible,
+.comment-pin[data-active="true"] {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--comment-human) 35%, transparent), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.comment-pin[data-kind="agent"]:focus-visible,
+.comment-pin[data-kind="agent"][data-active="true"] {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--comment-agent) 35%, transparent), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.comment-pin[data-state="detached"] {
+  background: var(--chrome-raised);
+  border: 2px dashed var(--comment-detached);
+  color: var(--comment-detached);
+}
+
+.comment-pin[data-state="resolved"] {
+  background: var(--chrome-text-tertiary);
+  opacity: 0.7;
+}
+
+.comment-pin .icon {
+  font-size: 14px;
+}
+
+/* The popover: a raised card next to its element (placePopover picks the side). */
+.comment-popover {
+  position: absolute;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  border-radius: var(--radius-md);
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-float);
+  color: var(--chrome-text);
+  font-size: var(--ui-sm);
+  pointer-events: auto;
+  z-index: 2;
+}
+
+.comment-popover[hidden] {
+  display: none;
+}
+
+.comment-popover-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--size-panel-header);
+  padding: 0 var(--space-sm) 0 var(--space-lg);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.comment-popover-header b {
+  font-weight: 600;
+}
+
+.comment-popover-node {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px var(--space-sm);
+  border-radius: var(--radius-xs);
+  background: var(--chrome-field);
+  color: var(--chrome-text-secondary);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+}
+
+.comment-popover-node.is-detached {
+  text-decoration: line-through;
+  color: var(--chrome-warning);
+}
+
+.comment-popover-spacer {
+  flex: 1;
+}
+
+.comment-badge {
+  display: inline-flex;
+  align-items: center;
+  height: var(--size-badge-h);
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.comment-badge--human {
+  background: color-mix(in srgb, var(--comment-human) 12%, transparent);
+  color: var(--comment-human);
+}
+
+.comment-badge--agent {
+  background: color-mix(in srgb, var(--comment-agent) 12%, transparent);
+  color: var(--comment-agent);
+}
+
+.comment-badge--detached {
+  background: var(--chrome-warning-subtle);
+  color: var(--chrome-warning);
+}
+
+.comment-badge--resolved {
+  background: var(--chrome-field);
+  color: var(--chrome-text-secondary);
+}
+
+.comment-popover-alert {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-xs) var(--space-md);
+  margin: var(--space-md) var(--space-lg) 0;
+  padding: var(--space-md) var(--space-pad);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-warning-subtle);
+  color: var(--chrome-text);
+}
+
+.comment-popover-alert[hidden] {
+  display: none;
+}
+
+.comment-popover-alert .icon {
+  color: var(--chrome-warning);
+  font-size: var(--size-icon-sm);
+}
+
+.comment-popover-alert p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.comment-popover-alert button {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.comment-popover-messages {
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-xs) 0;
+  list-style: none;
+}
+
+.comment-popover-messages[hidden] {
+  display: none;
+}
+
+.comment-message {
+  padding: var(--space-md) var(--space-lg);
+}
+
+.comment-message + .comment-message {
+  border-top: 1px solid var(--chrome-border);
+}
+
+.comment-message-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.comment-message-meta time {
+  margin-left: auto;
+  color: var(--chrome-text-tertiary);
+  font-size: var(--ui-2xs);
+}
+
+.comment-avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--comment-human);
+  color: var(--comment-on);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.comment-avatar[data-kind="agent"] {
+  background: var(--comment-agent);
+}
+
+.comment-message-body {
+  padding-left: 26px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comment-popover-composer {
+  padding: var(--space-md) var(--space-lg) var(--space-pad);
+  border-top: 1px solid var(--chrome-border);
+}
+
+.comment-popover[data-mode="new"] .comment-popover-composer {
+  border-top: none;
+}
+
+.comment-popover-composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-sm);
+}
+
+.comment-popover-input.chrome-field {
+  flex: 1;
+  min-height: 32px;
+  max-height: 160px;
+  resize: none;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.comment-popover[data-mode="new"] .comment-popover-input.chrome-field {
+  min-height: 64px;
+}
+
+.comment-popover-send {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--comment-human);
+  color: var(--comment-on);
+  cursor: pointer;
+}
+
+.comment-popover-send[hidden] {
+  display: none;
+}
+
+.comment-popover-send:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.comment-popover-send .icon {
+  font-size: var(--size-icon-sm);
+}
+
+.comment-mention-list {
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-xs);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-sm);
+  list-style: none;
+}
+
+.comment-mention-list[hidden] {
+  display: none;
+}
+
+.comment-mention {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: 28px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.comment-mention[aria-selected="true"],
+.comment-mention:hover {
+  background: var(--chrome-hover);
+}
+
+.comment-mention .comment-badge {
+  margin-left: auto;
+}
+
+.comment-popover-error {
+  margin: var(--space-sm) 0 0;
+  color: var(--chrome-error);
+}
+
+.comment-popover-error[hidden] {
+  display: none;
+}
+
+.comment-popover-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.comment-popover-hint {
+  flex: 1;
+  margin: 0;
+  color: var(--chrome-text-tertiary);
+  font-size: var(--ui-2xs);
+}
+
+.comment-popover-cancel[hidden] {
+  display: none;
+}
+
+.comment-popover-menu {
+  position: absolute;
+  top: calc(var(--size-panel-header) - 4px);
+  right: var(--space-sm);
+  min-width: 200px;
+  z-index: 3;
+}
+
+.comment-popover-menu[hidden] {
+  display: none;
+}
+
+.chrome-menu-item.is-danger {
+  color: var(--chrome-danger);
+}
+
+.chrome-menu-item .icon {
+  font-size: var(--size-icon-sm);
+}
+
+/* CHR-1252 — comment mode's banner (top) and the floating canvas toolbar (bottom). */
+#comment-banner {
+  position: absolute;
+  top: var(--space-lg);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  height: 32px;
+  padding: 0 var(--space-lg);
+  border-radius: var(--radius-pill);
+  background: var(--comment-human);
+  color: var(--comment-on);
+  font-size: var(--ui-sm);
+  white-space: nowrap;
+  box-shadow: var(--chrome-shadow-float);
+  z-index: 6;
+  pointer-events: none;
+}
+
+#comment-banner[hidden] {
+  display: none;
+}
+
+#comment-banner .icon {
+  font-size: var(--size-icon-sm);
+}
+
+#comment-banner kbd {
+  padding: 0 5px;
+  border-radius: var(--radius-xs);
+  background: rgba(255, 255, 255, 0.22);
+  font: inherit;
+  font-size: var(--ui-2xs);
+}
+
+.comment-banner-muted {
+  opacity: 0.8;
+}
+
+#comment-toolbar {
+  position: absolute;
+  bottom: var(--space-xl);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-xs);
+  border-radius: var(--radius-md);
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-float);
+  white-space: nowrap;
+  z-index: 6;
+}
+
+#comment-toolbar[hidden] {
+  display: none;
+}
+
+.comment-toolbar-btn[aria-pressed="true"] {
+  background: var(--chrome-active);
+  color: var(--chrome-text);
+}
+
+.comment-toolbar-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 var(--space-xs);
+  background: var(--chrome-border);
+}
+
+.comment-toolbar-text {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  height: var(--size-control);
+  padding: 0 var(--space-md) 0 var(--space-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--chrome-text-secondary);
+  font: inherit;
+  font-size: var(--ui-sm);
+  cursor: pointer;
+}
+
+.comment-toolbar-text:hover {
+  background: var(--chrome-hover);
+}
+
+.comment-toolbar-text:focus-visible,
+.comment-toolbar-btn:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+.comment-toolbar-check {
+  font-size: var(--size-icon-xs);
+  visibility: hidden;
+}
+
+.comment-toolbar-text[aria-pressed="true"] {
+  color: var(--chrome-text);
+}
+
+.comment-toolbar-text[aria-pressed="true"] .comment-toolbar-check {
+  visibility: visible;
 }

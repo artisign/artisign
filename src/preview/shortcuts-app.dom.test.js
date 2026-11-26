@@ -112,7 +112,7 @@ describe("modes", () => {
     expect(pressed("flow-mode-toggle")).toBe("true");
     key("c");
     expect([pressed("flow-mode-toggle"), pressed("comment-mode-toggle")]).toEqual(["false", "true"]);
-    expect($("#sidebar-context").dataset.collapsed).toBe("false"); // CHR-888: comment mode opens Context
+    expect($("#sidebar-context").dataset.collapsed).toBe("true"); // CHR-1248: comment mode works on the canvas, Context stays as it was
     key("i");
     expect([pressed("comment-mode-toggle"), pressed("inspect-mode-toggle")]).toEqual(["false", "true"]);
     expect($("#inspector").dataset.collapsed).toBe("false"); // inspect opens Elements
@@ -434,16 +434,16 @@ describe("Escape in a text field", () => {
     expect(pressed("inspect-mode-toggle")).toBe("true");
   });
 
-  it("does nothing to comment mode or the compose form", async () => {
+  it("does nothing to comment mode or the new-comment popover", async () => {
     await boot();
-    frameDoc();
+    const doc = frameDoc();
     key("c");
-    $("#comment-add").click();
-    const input = $("#comment-body-input");
+    doc.getElementById("child").click();
+    const input = $(".comment-popover-input");
+    expect($(".comment-popover").hidden).toBe(false);
     input.focus();
-    key("Escape", {}, input);
-    expect(pressed("comment-mode-toggle")).toBe("true");
-    expect($("#comment-compose").hidden).toBe(false);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "c", bubbles: true, cancelable: true }));
+    expect(pressed("comment-mode-toggle")).toBe("true"); // C while typing is a letter, not the shortcut
   });
 });
 

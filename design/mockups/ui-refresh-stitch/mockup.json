@@ -9,10 +9,20 @@
       "id": "mockups-tab",
       "title": "Stitch refined: one screen, Mockups tab",
       "description": "Same layout as base with the card's segmented control on Mockups: the card lists the project's mockups (name, variant count) instead of the screens. The open screen, the side tool bar and all other chrome stay as they are; picking a mockup opens it on the canvas in place of the screen. Example data only."
+    },
+    {
+      "id": "base-v2",
+      "title": "Stitch round 2: agent bar, context tools in the tool bar, screen tree",
+      "description": "Round 2 from Christian's comments on base. The right icon rail is gone; its tools (Notes, Comments with badge, Flow, Design system) sit in the left tool bar, which now has a grip and a fold control. On the right a slim, foldable Agent bar: live status with a Follow switch, the activity feed (newest first) and a note field for the agent; the top-right group shrinks to settings. The Screens card runs down to the zoom pill's bottom edge and scrolls inside; each screen row shows its tags and the desktop/mobile icon, variants are a collapsible tree (home expanded, default selected). Preview and Variants are removed from the tool bar. Example data only."
+    },
+    {
+      "id": "mockups-tab-v2",
+      "title": "Stitch round 2: Mockups tab",
+      "description": "Same chrome as base-v2 (Agent bar on the right, tool bar with grip, fold and context tools, card down to the zoom pill's bottom edge) with the card's segmented control on Mockups. The mockup list mirrors the screen list: each row shows its tags (overflow as +N) and a variant count, variants are a collapsible tree (onboarding-ideas expanded, the others collapsed). Mockups keep the stacked-layers icon because they declare no viewport. The open screen stays on the canvas; picking a mockup variant opens it in its place. Example data only."
     }
   ],
   "title": "App UI refresh — Stitch direction refined",
-  "description": "CHR-1257. Christian chose the Stitch direction (1-stitch in mockup ui-refresh). Refinements: the canvas shows exactly one screen, the open one, at 110% so it gets most of the room; one floating card on the left switches Screens | Mockups with a segmented control (the separate Mockups card is gone, search moved into the card as a field); a floating vertical tool bar between the card and the screen holds Comment, Variants (count badge), Inspect, Preview and More, with short labels under the icons; the toolbar above the frame is removed. Top groups, right icon rail and zoom pill unchanged from 1-stitch. Variants: base (Screens tab), mockups-tab (Mockups tab). Example data only. Not reviewed or approved yet.",
+  "description": "CHR-1257. Christian chose the Stitch direction (1-stitch in mockup ui-refresh). Round 1 (variants base, mockups-tab): the canvas shows exactly one screen, the open one; one floating card on the left switches Screens | Mockups; a floating vertical tool bar between the card and the screen; the toolbar above the frame is removed. Round 2 from Christian's comments (variants base-v2, mockups-tab-v2): the right icon rail is replaced by a slim, foldable Agent bar (live status with a Follow switch, activity feed newest first, note field for the agent), and the top-right group shrinks to settings; Notes, Comments (badge), Flow and Design system move into the left tool bar, which gets a grip and a fold control; Preview and Variants leave the tool bar; the Screens/Mockups card runs down to the zoom pill's bottom edge and scrolls inside; each row shows its tags and the desktop/mobile icon, variants are a collapsible tree. base and mockups-tab stay unchanged as the anchors of the round 1 comments. Example data only. Not reviewed or approved yet.",
   "tags": [
     "chr-1257",
     "ui-refresh"

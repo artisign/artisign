@@ -1,0 +1,235 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Stitch round 2 — Screens tab</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden}
+body{font-family:Inter,system-ui,sans-serif;font-size:13px;-webkit-font-smoothing:antialiased;position:relative;background:#f3f3f1;color:#1f1f1d}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+ul,ol{list-style:none}
+.ic{flex:none;display:block}
+.row{display:flex;align-items:center}
+.ex{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;font-size:10.5px;font-weight:600;letter-spacing:.02em;background:#fff3d6;color:#8a5a00}
+.canvas{position:absolute;inset:0;background-image:radial-gradient(#d3d1cc 1.1px,transparent 1.2px);background-size:22px 22px}
+.float{position:absolute;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-radius:20px;box-shadow:0 0 0 1px rgba(0,0,0,.05),0 8px 30px rgba(40,30,20,.10)}
+.pill{border-radius:999px}
+.btn{display:flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:999px;color:#4a4844;font-weight:500}
+.btn.on{background:#1f1f1d;color:#fff}
+.ib{width:34px;height:34px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#55524d}
+.hd{display:flex;align-items:center;gap:6px;padding:10px 8px 6px 10px}
+.grip{color:#b3afa8;cursor:grab}
+.seg{display:flex;flex:1;height:32px;padding:3px;border-radius:999px;background:#efeeea}
+.seg button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:999px;font-weight:500;color:#6b6862;font-size:12.5px}
+.seg button[aria-selected="true"]{background:#fff;color:#1f1f1d;font-weight:600;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 1px 3px rgba(40,30,20,.12)}
+.seg .n{font-size:11px;color:#9a968f;font-weight:500}
+.find{display:flex;align-items:center;gap:8px;height:32px;margin:2px 8px 6px;padding:0 10px;border-radius:10px;background:#f5f4f1;color:#9a968f;font-size:12.5px;flex:none}
+.card{display:flex;flex-direction:column}
+.scroll{flex:1;min-height:0;overflow:hidden;padding:0 8px 10px;-webkit-mask-image:linear-gradient(#000 calc(100% - 36px),transparent);mask-image:linear-gradient(#000 calc(100% - 36px),transparent)}
+.node{display:grid;grid-template-columns:16px 15px 1fr auto;column-gap:7px;align-items:start;padding:7px 10px 7px 4px;border-radius:12px;color:#3b3935}
+.node .chev{width:16px;height:16px;display:flex;align-items:center;justify-content:center;color:#9a968f;margin-top:1px;border-radius:5px}
+.node .ic.kind{margin-top:1px;color:#6b6862}
+.node .nm{font-weight:500;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node.open .nm{font-weight:600;color:#1f1f1d}
+.tags{display:flex;gap:4px;margin-top:4px;flex-wrap:nowrap}
+.tag{display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:6px;background:#efeee9;color:#6b6862;font-size:10.5px;font-weight:500;white-space:nowrap}
+.tag.more{background:none;color:#9a968f;padding:0 2px}
+.cnt{font-size:11.5px;color:#9a968f;line-height:17px}
+.vars{position:relative;margin:0 0 4px 0;padding-left:0}
+.vars:before{content:"";position:absolute;left:11px;top:0;bottom:12px;border-left:1px solid #e3e0db}
+.var{display:flex;align-items:center;gap:8px;height:28px;margin-left:26px;padding:0 10px;border-radius:10px;color:#55524d;font-size:12.5px}
+.var .d{width:5px;height:5px;border-radius:50%;background:#cfcbc4;flex:none}
+.var[aria-selected="true"]{background:#e3f2ef;color:#0b6b62;font-weight:600}
+.var[aria-selected="true"] .d{background:#0f8a7e}
+.lbl{position:absolute;font-size:12px;font-weight:600;color:#5b5853;display:flex;gap:6px;align-items:center}
+.lbl .v{font-weight:500;color:#9a968f}
+.fr{position:absolute;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.06),0 16px 40px rgba(40,30,20,.12)}
+.tools{position:absolute;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 6px 6px;width:64px}
+.tools-hd{display:flex;align-items:center;justify-content:space-between;width:52px;height:24px;padding:0 2px 0 6px}
+.tool{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:52px;min-height:50px;border-radius:14px;color:#4a4844}
+.tool span{font-size:11px;font-weight:500;line-height:1.1;text-align:center}
+.tool[aria-pressed="true"]{background:#1f1f1d;color:#fff}
+.tool .badge{position:absolute;top:4px;right:7px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#0f8a7e;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.sep{width:28px;height:0;border-top:1px solid #e3e0db;margin:4px 0}
+.agent{--ag:#6a4bd6;--ag-bg:#f2eeff}
+.status{margin:2px 10px 0;padding:11px 12px 10px;border-radius:14px;background:var(--ag-bg)}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--ag);box-shadow:0 0 0 4px rgba(106,75,214,.18);flex:none}
+.sw{appearance:none;-webkit-appearance:none;width:30px;height:18px;border-radius:9px;background:var(--ag);position:relative;cursor:pointer;flex:none}
+.sw:after{content:"";position:absolute;top:2px;left:14px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.sw:focus-visible{outline:3px solid #1f1f1d;outline-offset:2px}
+.feed-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;font-size:12px;font-weight:600;color:#5b5853}
+.feed-hd span{font-weight:400;color:#9a968f}
+.act{display:grid;grid-template-columns:22px 1fr;column-gap:9px;padding:7px 6px;border-radius:10px}
+.act .ai{width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:#f1f0ed;color:#6b6862}
+.act .ai.w{background:var(--ag-bg);color:var(--ag)}
+.act .ai.c{background:#e3f2ef;color:#0b6b62}
+.act .ai.u{background:#e8efff;color:#2f5bd3}
+.act p{font-size:12.5px;line-height:1.35;color:#3b3935}
+.act p b{font-weight:600;color:#1f1f1d}
+.act time{display:block;font-size:11px;color:#9a968f;margin-top:2px}
+.note{margin:8px 10px 10px;padding:10px 10px 8px 12px;border-radius:14px;background:#fff;box-shadow:0 0 0 1px #e6e3de;flex:none}
+.note textarea{display:block;width:100%;height:44px;border:0;resize:none;font:inherit;font-size:12.5px;color:#1f1f1d;background:none;outline:none}
+.note textarea::placeholder{color:#9a968f}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" id="icon-sprite"><defs>
+<symbol id="i-desktop" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4"/></symbol>
+<symbol id="i-mobile" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
+<symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></symbol>
+<symbol id="i-grip-h" viewBox="0 0 24 24"><circle cx="6" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="18" cy="9" r="1"/><circle cx="6" cy="15" r="1"/><circle cx="12" cy="15" r="1"/><circle cx="18" cy="15" r="1"/></symbol>
+<symbol id="i-bubble" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-8 8h8v-8Z"/><path d="M12 8v6M9 11h6"/></symbol>
+<symbol id="i-inspect" viewBox="0 0 24 24"><path d="M4 4h6M4 4v6M20 4h-6M20 4v6M4 20h6M4 20v-6"/><path d="m13 13 7 3-3 1-1 3-3-7Z"/></symbol>
+<symbol id="i-notes" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
+<symbol id="i-flow" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 14h6v6h-6zM7 10v4a3 3 0 0 0 3 3h4"/></symbol>
+<symbol id="i-palette" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="10" r="1.2"/><circle cx="12" cy="7.5" r="1.2"/><circle cx="16" cy="10" r="1.2"/><path d="M12 21a2.5 2.5 0 0 1 0-5h2a3 3 0 0 0 3-3"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+</defs></svg>
+<div class="canvas" id="canvas"></div>
+
+<!-- the one open screen -->
+<div class="lbl" id="frame-label" style="left:368px;top:174px"><svg class="ic" id="frame-label-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-desktop"/></svg> home <span class="v" id="frame-label-variant">default</span> <span class="ex" id="frame-label-example">Example</span></div>
+<div class="fr" id="frame" style="left:368px;top:200px"><div id="frame-viewport" style="width:792px;height:504px;overflow:hidden;border-radius:16px"><div id="frame-home" style="width:880px;height:560px;transform:scale(.9);transform-origin:0 0;background:#ffffff;color:#1d1c1a;display:flex;flex-direction:column;font-size:12.5px">
+      <div class="row" id="frame-home-nav" style="height:52px;padding:0 30px;gap:22px;border-bottom:1px solid #eceae6">
+        <div id="frame-home-nav-logo" style="width:22px;height:22px;border-radius:7px;background:#0f8a7e"></div>
+        <div id="frame-home-nav-orders" style="font-weight:600">Orders</div><div id="frame-home-nav-products" style="color:#8d8a84">Products</div><div id="frame-home-nav-customers" style="color:#8d8a84">Customers</div>
+        <div id="frame-home-nav-spacer" style="flex:1"></div><div id="frame-home-nav-search" style="width:200px;height:30px;border-radius:9px;background:#f7f6f3"></div><div id="frame-home-nav-avatar" style="width:30px;height:30px;border-radius:50%;background:#e6e3de"></div></div>
+      <div id="frame-home-header" style="padding:26px 30px 0;display:flex;justify-content:space-between;align-items:flex-end">
+          <div id="frame-home-header-titles"><div id="frame-home-header-eyebrow" style="font-size:12px;color:#8d8a84;font-weight:500">Example shop</div><div id="frame-home-header-title" style="font-size:24px;font-weight:700;letter-spacing:-.02em;color:#1d1c1a">Orders</div></div>
+          <div class="row" id="frame-home-header-actions" style="gap:8px"><div id="frame-home-export" style="padding:8px 14px;border-radius:10px;border:1px solid #eceae6;font-weight:500">Export</div><div id="frame-home-new-order" style="padding:8px 14px;border-radius:10px;background:#0f8a7e;color:#fff;font-weight:600">New order</div></div></div>
+          <div id="frame-home-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:20px 30px;">
+            <div id="frame-home-stat-open" style="background:#f7f6f3;border-radius:14px;padding:14px 16px"><div id="frame-home-stat-open-label" style="font-size:11.5px;color:#8d8a84">Open</div><div id="frame-home-stat-open-value" style="height:14px;width:54px;margin-top:10px;border-radius:5px;background:#d6d2cb"></div></div><div id="frame-home-stat-packing" style="background:#f7f6f3;border-radius:14px;padding:14px 16px"><div id="frame-home-stat-packing-label" style="font-size:11.5px;color:#8d8a84">Packing</div><div id="frame-home-stat-packing-value" style="height:14px;width:40px;margin-top:10px;border-radius:5px;background:#d6d2cb"></div></div><div id="frame-home-stat-shipped" style="background:#f7f6f3;border-radius:14px;padding:14px 16px"><div id="frame-home-stat-shipped-label" style="font-size:11.5px;color:#8d8a84">Shipped</div><div id="frame-home-stat-shipped-value" style="height:14px;width:66px;margin-top:10px;border-radius:5px;background:#d6d2cb"></div></div>
+          </div>
+          <div id="frame-home-orders" style="padding:0 30px"><div id="frame-home-orders-row-1" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-1-customer" style="gap:10px"><div id="frame-home-orders-row-1-avatar" style="width:28px;height:28px;border-radius:8px;background:#ffe1c7"></div><div id="frame-home-orders-row-1-name" style="height:8px;width:120px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-1-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-1-status"><span id="frame-home-orders-row-1-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#dcf0ed;color:#0b6b62;font-size:11px;font-weight:600">Shipped</span></div>
+      <div id="frame-home-orders-row-1-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-2" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-2-customer" style="gap:10px"><div id="frame-home-orders-row-2-avatar" style="width:28px;height:28px;border-radius:8px;background:#dfe4ff"></div><div id="frame-home-orders-row-2-name" style="height:8px;width:96px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-2-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-2-status"><span id="frame-home-orders-row-2-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#fdf1e0;color:#a35a00;font-size:11px;font-weight:600">Packing</span></div>
+      <div id="frame-home-orders-row-2-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-3" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-3-customer" style="gap:10px"><div id="frame-home-orders-row-3-avatar" style="width:28px;height:28px;border-radius:8px;background:#e9dcff"></div><div id="frame-home-orders-row-3-name" style="height:8px;width:134px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-3-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-3-status"><span id="frame-home-orders-row-3-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#dcf0ed;color:#0b6b62;font-size:11px;font-weight:600">Shipped</span></div>
+      <div id="frame-home-orders-row-3-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-4" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-4-customer" style="gap:10px"><div id="frame-home-orders-row-4-avatar" style="width:28px;height:28px;border-radius:8px;background:#d9f2e3"></div><div id="frame-home-orders-row-4-name" style="height:8px;width:88px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-4-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-4-status"><span id="frame-home-orders-row-4-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#eceae6;color:#5b5853;font-size:11px;font-weight:600">Open</span></div>
+      <div id="frame-home-orders-row-4-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-5" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-5-customer" style="gap:10px"><div id="frame-home-orders-row-5-avatar" style="width:28px;height:28px;border-radius:8px;background:#ffd9de"></div><div id="frame-home-orders-row-5-name" style="height:8px;width:110px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-5-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-5-status"><span id="frame-home-orders-row-5-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#fdf1e0;color:#a35a00;font-size:11px;font-weight:600">Packing</span></div>
+      <div id="frame-home-orders-row-5-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div></div></div></div></div>
+
+<!-- top left: brand + project -->
+<div class="float pill row" id="topbar-left" style="left:16px;top:16px;padding:4px 6px 4px 16px;gap:10px">
+  <b id="topbar-brand" style="font-size:14px;letter-spacing:-.01em">artisign</b>
+  <div class="btn" id="project-switcher" style="background:#f1f0ed"><svg class="ic" id="project-switcher-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>Example project<svg class="ic" id="project-switcher-chevron" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-down"/></svg></div>
+</div>
+<!-- top center: views -->
+<div class="float pill row" id="views" style="left:50%;transform:translateX(-50%);top:16px;padding:4px;gap:2px">
+  <div class="btn on" id="views-tab-screens">Screens</div><div class="btn" id="views-tab-board">Board</div><div class="btn" id="views-tab-design-system">Design System</div><div class="btn" id="views-tab-use-cases">Use Cases</div>
+</div>
+<!-- top right: settings only; live status and Follow moved into the Agent bar -->
+<div class="float pill row" id="topbar-right" style="right:16px;top:16px;padding:4px">
+  <button type="button" class="ib" id="settings-button" aria-label="Settings" title="Settings"><svg class="ic" id="settings-button-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
+</div>
+
+<!-- left: one card, Screens | Mockups; runs down to the zoom pill's bottom edge -->
+<div class="float card" id="nav-card" style="left:16px;top:78px;bottom:18px;width:256px">
+  <div class="hd" id="nav-card-header">
+    <span class="grip" id="nav-card-grip" title="Drag card"><svg class="ic" id="nav-card-grip-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-grip"/></svg></span>
+    <div class="seg" id="nav-card-tabs" role="tablist" aria-label="Project content">
+      <button type="button" role="tab" id="tab-screens" aria-selected="true">Screens <span class="n" id="tab-screens-count">14</span></button>
+      <button type="button" role="tab" id="tab-mockups" aria-selected="false">Mockups <span class="n" id="tab-mockups-count">5</span></button>
+    </div>
+    <button type="button" class="ib" id="nav-card-fold" style="width:28px;height:28px" aria-label="Fold card" aria-expanded="true" title="Fold card"><svg class="ic" id="nav-card-fold-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-up"/></svg></button>
+  </div>
+  <div role="tabpanel" id="nav-card-panel" aria-labelledby="tab-screens" class="card" style="flex:1;min-height:0">
+    <div class="find" id="screens-find"><svg class="ic" id="screens-find-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-search"/></svg>Find a screen or tag</div>
+    <ul class="scroll" id="screens-list" role="tree" aria-label="Screens">
+      <li role="treeitem" aria-expanded="true" id="screens-item-home">
+        <div class="node open" id="screens-row-home"><button type="button" class="chev" id="screens-row-home-toggle" aria-label="Collapse variants of home" tabindex="-1"><svg class="ic" id="screens-row-home-toggle-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-down"/></svg></button><svg class="ic kind" id="screens-row-home-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Desktop"><use href="#i-desktop"/></svg><div id="screens-row-home-main"><div class="nm" id="screens-row-home-name">home</div><div class="tags" id="screens-row-home-tags"><span class="tag" id="screens-row-home-tag-1">orders</span><span class="tag" id="screens-row-home-tag-2">dashboard</span><span class="tag more" id="screens-row-home-tag-more" title="launch">+1</span></div></div><span class="cnt" id="screens-row-home-count">4</span></div>
+        <ul class="vars" role="group" id="screens-row-home-variants">
+          <li class="var" role="treeitem" aria-selected="true" id="screens-row-home-variant-default"><span class="d" id="screens-row-home-variant-default-dot"></span>default</li>
+          <li class="var" role="treeitem" aria-selected="false" id="screens-row-home-variant-empty"><span class="d" id="screens-row-home-variant-empty-dot"></span>empty</li>
+          <li class="var" role="treeitem" aria-selected="false" id="screens-row-home-variant-error"><span class="d" id="screens-row-home-variant-error-dot"></span>error</li>
+          <li class="var" role="treeitem" aria-selected="false" id="screens-row-home-variant-loading"><span class="d" id="screens-row-home-variant-loading-dot"></span>loading</li>
+        </ul>
+      </li>
+      <li role="treeitem" aria-expanded="false" id="screens-item-checkout"><div class="node" id="screens-row-checkout"><button type="button" class="chev" id="screens-row-checkout-toggle" aria-label="Expand variants of checkout" tabindex="-1"><svg class="ic" id="screens-row-checkout-toggle-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-right"/></svg></button><svg class="ic kind" id="screens-row-checkout-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mobile"><use href="#i-mobile"/></svg><div id="screens-row-checkout-main"><div class="nm" id="screens-row-checkout-name">checkout</div><div class="tags" id="screens-row-checkout-tags"><span class="tag" id="screens-row-checkout-tag-1">checkout</span><span class="tag" id="screens-row-checkout-tag-2">payments</span></div></div><span class="cnt" id="screens-row-checkout-count">2</span></div></li>
+      <li role="treeitem" id="screens-item-order-placed"><div class="node" id="screens-row-order-placed"><span class="chev" id="screens-row-order-placed-toggle"></span><svg class="ic kind" id="screens-row-order-placed-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mobile"><use href="#i-mobile"/></svg><div id="screens-row-order-placed-main"><div class="nm" id="screens-row-order-placed-name">order-placed</div><div class="tags" id="screens-row-order-placed-tags"><span class="tag" id="screens-row-order-placed-tag-1">checkout</span></div></div><span class="cnt" id="screens-row-order-placed-count"></span></div></li>
+      <li role="treeitem" aria-expanded="false" id="screens-item-settings"><div class="node" id="screens-row-settings"><button type="button" class="chev" id="screens-row-settings-toggle" aria-label="Expand variants of settings" tabindex="-1"><svg class="ic" id="screens-row-settings-toggle-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-right"/></svg></button><svg class="ic kind" id="screens-row-settings-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Desktop"><use href="#i-desktop"/></svg><div id="screens-row-settings-main"><div class="nm" id="screens-row-settings-name">settings</div><div class="tags" id="screens-row-settings-tags"><span class="tag" id="screens-row-settings-tag-1">account</span><span class="tag more" id="screens-row-settings-tag-more" title="preferences, billing">+2</span></div></div><span class="cnt" id="screens-row-settings-count">3</span></div></li>
+      <li role="treeitem" aria-expanded="false" id="screens-item-product-list"><div class="node" id="screens-row-product-list"><button type="button" class="chev" id="screens-row-product-list-toggle" aria-label="Expand variants of product-list" tabindex="-1"><svg class="ic" id="screens-row-product-list-toggle-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-right"/></svg></button><svg class="ic kind" id="screens-row-product-list-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Desktop"><use href="#i-desktop"/></svg><div id="screens-row-product-list-main"><div class="nm" id="screens-row-product-list-name">product-list</div><div class="tags" id="screens-row-product-list-tags"><span class="tag" id="screens-row-product-list-tag-1">catalog</span></div></div><span class="cnt" id="screens-row-product-list-count">2</span></div></li>
+      <li role="treeitem" id="screens-item-product-detail"><div class="node" id="screens-row-product-detail"><span class="chev" id="screens-row-product-detail-toggle"></span><svg class="ic kind" id="screens-row-product-detail-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mobile"><use href="#i-mobile"/></svg><div id="screens-row-product-detail-main"><div class="nm" id="screens-row-product-detail-name">product-detail</div><div class="tags" id="screens-row-product-detail-tags"><span class="tag" id="screens-row-product-detail-tag-1">catalog</span><span class="tag more" id="screens-row-product-detail-tag-more" title="reviews">+1</span></div></div><span class="cnt" id="screens-row-product-detail-count"></span></div></li>
+      <li role="treeitem" aria-expanded="false" id="screens-item-cart"><div class="node" id="screens-row-cart"><button type="button" class="chev" id="screens-row-cart-toggle" aria-label="Expand variants of cart" tabindex="-1"><svg class="ic" id="screens-row-cart-toggle-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-right"/></svg></button><svg class="ic kind" id="screens-row-cart-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mobile"><use href="#i-mobile"/></svg><div id="screens-row-cart-main"><div class="nm" id="screens-row-cart-name">cart</div><div class="tags" id="screens-row-cart-tags"><span class="tag" id="screens-row-cart-tag-1">checkout</span></div></div><span class="cnt" id="screens-row-cart-count">3</span></div></li>
+      <li role="treeitem" aria-expanded="false" id="screens-item-sign-in"><div class="node" id="screens-row-sign-in"><button type="button" class="chev" id="screens-row-sign-in-toggle" aria-label="Expand variants of sign-in" tabindex="-1"><svg class="ic" id="screens-row-sign-in-toggle-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-right"/></svg></button><svg class="ic kind" id="screens-row-sign-in-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mobile"><use href="#i-mobile"/></svg><div id="screens-row-sign-in-main"><div class="nm" id="screens-row-sign-in-name">sign-in</div><div class="tags" id="screens-row-sign-in-tags"><span class="tag" id="screens-row-sign-in-tag-1">auth</span></div></div><span class="cnt" id="screens-row-sign-in-count">2</span></div></li>
+      <li role="treeitem" id="screens-item-account"><div class="node" id="screens-row-account"><span class="chev" id="screens-row-account-toggle"></span><svg class="ic kind" id="screens-row-account-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Desktop"><use href="#i-desktop"/></svg><div id="screens-row-account-main"><div class="nm" id="screens-row-account-name">account</div><div class="tags" id="screens-row-account-tags"><span class="tag" id="screens-row-account-tag-1">account</span></div></div><span class="cnt" id="screens-row-account-count"></span></div></li>
+      <li role="treeitem" id="screens-item-order-history"><div class="node" id="screens-row-order-history"><span class="chev" id="screens-row-order-history-toggle"></span><svg class="ic kind" id="screens-row-order-history-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Desktop"><use href="#i-desktop"/></svg><div id="screens-row-order-history-main"><div class="nm" id="screens-row-order-history-name">order-history</div><div class="tags" id="screens-row-order-history-tags"><span class="tag" id="screens-row-order-history-tag-1">orders</span><span class="tag" id="screens-row-order-history-tag-2">account</span></div></div><span class="cnt" id="screens-row-order-history-count"></span></div></li>
+      <li role="treeitem" aria-expanded="false" id="screens-item-search"><div class="node" id="screens-row-search"><button type="button" class="chev" id="screens-row-search-toggle" aria-label="Expand variants of search" tabindex="-1"><svg class="ic" id="screens-row-search-toggle-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-right"/></svg></button><svg class="ic kind" id="screens-row-search-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Desktop"><use href="#i-desktop"/></svg><div id="screens-row-search-main"><div class="nm" id="screens-row-search-name">search</div><div class="tags" id="screens-row-search-tags"><span class="tag" id="screens-row-search-tag-1">catalog</span></div></div><span class="cnt" id="screens-row-search-count">2</span></div></li>
+      <li role="treeitem" id="screens-item-returns"><div class="node" id="screens-row-returns"><span class="chev" id="screens-row-returns-toggle"></span><svg class="ic kind" id="screens-row-returns-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mobile"><use href="#i-mobile"/></svg><div id="screens-row-returns-main"><div class="nm" id="screens-row-returns-name">returns</div><div class="tags" id="screens-row-returns-tags"><span class="tag" id="screens-row-returns-tag-1">orders</span><span class="tag" id="screens-row-returns-tag-2">support</span></div></div><span class="cnt" id="screens-row-returns-count"></span></div></li>
+      <li role="treeitem" aria-expanded="false" id="screens-item-notifications"><div class="node" id="screens-row-notifications"><button type="button" class="chev" id="screens-row-notifications-toggle" aria-label="Expand variants of notifications" tabindex="-1"><svg class="ic" id="screens-row-notifications-toggle-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-right"/></svg></button><svg class="ic kind" id="screens-row-notifications-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Mobile"><use href="#i-mobile"/></svg><div id="screens-row-notifications-main"><div class="nm" id="screens-row-notifications-name">notifications</div><div class="tags" id="screens-row-notifications-tags"><span class="tag" id="screens-row-notifications-tag-1">account</span></div></div><span class="cnt" id="screens-row-notifications-count">2</span></div></li>
+      <li role="treeitem" id="screens-item-help"><div class="node" id="screens-row-help"><span class="chev" id="screens-row-help-toggle"></span><svg class="ic kind" id="screens-row-help-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="Desktop"><use href="#i-desktop"/></svg><div id="screens-row-help-main"><div class="nm" id="screens-row-help-name">help</div><div class="tags" id="screens-row-help-tags"><span class="tag" id="screens-row-help-tag-1">support</span></div></div><span class="cnt" id="screens-row-help-count"></span></div></li>
+    </ul>
+  </div>
+</div>
+
+<!-- left side: vertical tool bar, draggable and foldable -->
+<div class="float tools" id="tool-bar" role="toolbar" aria-orientation="vertical" aria-label="Screen tools" aria-controls="frame" style="left:288px;top:200px">
+  <div class="tools-hd" id="tool-bar-header">
+    <span class="grip" id="tool-bar-grip" title="Drag tool bar"><svg class="ic" id="tool-bar-grip-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-grip-h"/></svg></span>
+    <button type="button" class="ib" id="tool-bar-fold" style="width:22px;height:22px" aria-label="Fold tool bar" aria-expanded="true" title="Fold tool bar"><svg class="ic" id="tool-bar-fold-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-up"/></svg></button>
+  </div>
+  <button type="button" class="tool" id="toolbar-side-comment" aria-pressed="false" title="Comment (C)"><svg class="ic" id="toolbar-side-comment-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-pin"/></svg><span id="toolbar-side-comment-label">Comment</span></button>
+  <button type="button" class="tool" id="toolbar-side-inspect" aria-pressed="false" title="Inspect (I)"><svg class="ic" id="toolbar-side-inspect-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-inspect"/></svg><span id="toolbar-side-inspect-label">Inspect</span></button>
+  <span class="sep" id="toolbar-side-separator" role="separator"></span>
+  <button type="button" class="tool" id="toolbar-side-notes" aria-pressed="false" title="Notes (N)"><svg class="ic" id="toolbar-side-notes-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-notes"/></svg><span id="toolbar-side-notes-label">Notes</span></button>
+  <button type="button" class="tool" id="toolbar-side-comments" aria-pressed="false" aria-label="Comments, 3 open" title="Comments (M)"><svg class="ic" id="toolbar-side-comments-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-bubble"/></svg><span id="toolbar-side-comments-label">Comments</span><b class="badge" id="toolbar-side-comments-badge" aria-hidden="true">3</b></button>
+  <button type="button" class="tool" id="toolbar-side-flow" aria-pressed="false" title="Flow (F)"><svg class="ic" id="toolbar-side-flow-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-flow"/></svg><span id="toolbar-side-flow-label">Flow</span></button>
+  <button type="button" class="tool" id="toolbar-side-design-system" aria-pressed="false" title="Design system (D)" style="min-height:56px"><svg class="ic" id="toolbar-side-design-system-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-palette"/></svg><span id="toolbar-side-design-system-label">Design<br>system</span></button>
+  <span class="sep" id="toolbar-side-separator-2" role="separator"></span>
+  <button type="button" class="tool" id="toolbar-side-more" style="min-height:40px" aria-label="More actions" aria-haspopup="menu" aria-expanded="false" title="More actions"><svg class="ic" id="toolbar-side-more-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-more"/></svg></button>
+</div>
+
+<!-- right: Agent bar (live status + Follow, activity, note for the agent) -->
+<aside class="float card agent" id="agent-bar" aria-label="Agent" style="right:16px;top:78px;bottom:18px;width:248px">
+  <div class="hd" id="agent-bar-header" style="padding:10px 8px 8px 10px">
+    <span class="grip" id="agent-bar-grip" title="Drag card"><svg class="ic" id="agent-bar-grip-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-grip"/></svg></span>
+    <h2 id="agent-bar-title" style="font-size:13px;font-weight:600;flex:1">Agent</h2>
+    <span class="row" id="agent-bar-live" style="gap:5px;color:#16a34a;font-weight:600;font-size:11.5px"><span id="agent-bar-live-dot" style="width:7px;height:7px;border-radius:50%;background:#16a34a"></span>Live</span>
+    <button type="button" class="ib" id="agent-bar-fold" style="width:28px;height:28px" aria-label="Fold Agent bar" aria-expanded="true" title="Fold card"><svg class="ic" id="agent-bar-fold-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-up"/></svg></button>
+  </div>
+  <div class="status" id="agent-status" role="status">
+    <div class="row" id="agent-status-now" style="gap:9px"><span class="pulse" id="agent-status-dot"></span><p id="agent-status-text" style="font-size:13px;color:#1f1f1d">Writing <b id="agent-status-target">checkout</b></p></div>
+    <p id="agent-status-detail" style="font-size:11.5px;color:#6b6862;margin:3px 0 0 17px">Replacing the payment section</p>
+    <label class="row" id="agent-follow" for="agent-follow-switch" style="justify-content:space-between;margin-top:10px;padding-top:9px;border-top:1px solid rgba(106,75,214,.16);font-size:12.5px;font-weight:500;color:#3b3935"><span class="row" id="agent-follow-label" style="gap:7px"><svg class="ic" id="agent-follow-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-eye"/></svg>Follow the agent</span><input type="checkbox" switch role="switch" class="sw" id="agent-follow-switch" checked></label>
+  </div>
+  <div class="feed-hd" id="agent-feed-header"><h3 id="agent-feed-title" style="font-size:12px;font-weight:600">Activity</h3><span id="agent-feed-filter">Newest first</span></div>
+  <ol class="scroll" id="agent-feed" style="padding:0 8px">
+    <li class="act" id="agent-feed-item-1"><span class="ai w" id="agent-feed-item-1-icon"><svg class="ic" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="agent-feed-item-1-svg"><use href="#i-pen"/></svg></span><p id="agent-feed-item-1-text">Writing <b>checkout</b><time id="agent-feed-item-1-time">now</time></p></li>
+    <li class="act" id="agent-feed-item-2"><span class="ai" id="agent-feed-item-2-icon"><svg class="ic" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="agent-feed-item-2-svg"><use href="#i-eye"/></svg></span><p id="agent-feed-item-2-text">Read the design system tokens<time id="agent-feed-item-2-time">1 min ago</time></p></li>
+    <li class="act" id="agent-feed-item-3"><span class="ai w" id="agent-feed-item-3-icon"><svg class="ic" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="agent-feed-item-3-svg"><use href="#i-pen"/></svg></span><p id="agent-feed-item-3-text">Wrote <b>home</b>, variant empty<time id="agent-feed-item-3-time">4 min ago</time></p></li>
+    <li class="act" id="agent-feed-item-4"><span class="ai c" id="agent-feed-item-4-icon"><svg class="ic" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="agent-feed-item-4-svg"><use href="#i-bubble"/></svg></span><p id="agent-feed-item-4-text">Replied to your comment on <b>settings</b><time id="agent-feed-item-4-time">6 min ago</time></p></li>
+    <li class="act" id="agent-feed-item-5"><span class="ai u" id="agent-feed-item-5-icon"><svg class="ic" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="agent-feed-item-5-svg"><use href="#i-bubble"/></svg></span><p id="agent-feed-item-5-text">You commented on <b>home</b><time id="agent-feed-item-5-time">9 min ago</time></p></li>
+    <li class="act" id="agent-feed-item-6"><span class="ai" id="agent-feed-item-6-icon"><svg class="ic" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="agent-feed-item-6-svg"><use href="#i-eye"/></svg></span><p id="agent-feed-item-6-text">Read <b>home</b><time id="agent-feed-item-6-time">11 min ago</time></p></li>
+    <li class="act" id="agent-feed-item-7"><span class="ai w" id="agent-feed-item-7-icon"><svg class="ic" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="agent-feed-item-7-svg"><use href="#i-pen"/></svg></span><p id="agent-feed-item-7-text">Wrote <b>order-placed</b><time id="agent-feed-item-7-time">18 min ago</time></p></li>
+    <li class="act" id="agent-feed-item-8"><span class="ai" id="agent-feed-item-8-icon"><svg class="ic" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="agent-feed-item-8-svg"><use href="#i-eye"/></svg></span><p id="agent-feed-item-8-text">Read the project<time id="agent-feed-item-8-time">20 min ago</time></p></li>
+  </ol>
+  <form class="note" id="agent-note" aria-label="Note for the agent">
+    <textarea id="agent-note-field" aria-label="Note for the agent" placeholder="Leave a note for the agent"></textarea>
+    <div class="row" id="agent-note-footer" style="justify-content:space-between">
+      <span class="row" id="agent-note-scope" style="gap:6px;font-size:11.5px;color:#6b6862"><svg class="ic" id="agent-note-scope-icon" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-desktop"/></svg>On home, default</span>
+      <button type="submit" class="ib" id="agent-note-send" aria-label="Send note" style="width:28px;height:28px;background:#1f1f1d;color:#fff"><svg class="ic" id="agent-note-send-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#i-send"/></svg></button>
+    </div>
+  </form>
+</aside>
+
+<!-- bottom: zoom, centred on the canvas area -->
+<div class="float pill row" id="zoom-pill" style="left:764px;transform:translateX(-50%);bottom:18px;padding:4px;gap:2px">
+  <div class="ib" id="zoom-pill-out"><svg class="ic" id="zoom-pill-out-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></div><span id="zoom-pill-value" style="width:46px;text-align:center;font-weight:600">90%</span><div class="ib" id="zoom-pill-in"><svg class="ic" id="zoom-pill-in-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></div>
+  <div id="zoom-pill-divider" style="width:1px;height:20px;background:#e3e0db;margin:0 4px"></div><div class="btn" id="zoom-pill-fit"><svg class="ic" id="zoom-pill-fit-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Fit</div>
+</div>
+</body></html>

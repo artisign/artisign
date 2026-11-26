@@ -1,0 +1,35 @@
+{
+  "variants": [
+    {
+      "id": "1-stitch",
+      "title": "1 · Stitch direction: floating cards on an open canvas",
+      "description": "Inspired by Google Stitch (AI-native infinite canvas, March 2026 redesign). The three fixed side panels become rounded cards that float over a dotted canvas. Screens is a card you can drag by its grip and fold with the chevron; Mockups starts folded. Context shrinks to a fixed icon rail with a count badge. Tools for the selected frame (Comment, Variants, Inspect, Preview) appear in a toolbar right above it. Solves: boxy, dated look (a); panels taking two thirds of the width, now the canvas runs full width under them (b); tools sit next to the object they act on (c); panel content stays folded until asked for (d). Trade-off: floating cards can cover frames, so they need snap positions. All screen content is example data."
+    },
+    {
+      "id": "2-dupe",
+      "title": "2 · Dupe direction: compare view with a design DNA rail",
+      "description": "Reference uncertain: the closest clear hit for \"Dupe Design\" is dupe.design (\"Design DNA for AI Agents\"), a product that sells brand token packs for coding agents, not a design editor. This variant borrows its visual language: dark surface, one mint signal colour, monospace labels and the extraction card with token bars. Applied to artisign as a compare view: one large screen with a before/after handle between two variants, and a design DNA rail that lists only the tokens this screen uses. Solves: the screen gets most of the width (b); compare, comment and inspect sit in one pill (c); rail sections stay folded except Colors and Type (d). Trade-off: dark chrome next to light screens is high contrast, and the layout is built around comparing. All screen content and tokens are example data."
+    },
+    {
+      "id": "3-stage",
+      "title": "3 · Stage: the screen alone, tools in a command palette",
+      "description": "The open screen fills the stage, about 80 percent of the width. There are no side panels. A thin breadcrumb sits at the top, a filmstrip of screens at the bottom. Every tool lives in a command palette (Cmd+K) that lists the single-key shortcut next to each entry, grouped into This screen and Project. Solves: maximum room for the screen (b) and nothing on screen that is not needed right now (d); tools are one shortcut away (c). Trade-off: mouse users only find tools through the palette, and reading notes or comments needs an extra sheet. All screen content is example data."
+    },
+    {
+      "id": "4-dock",
+      "title": "4 · Dock: one rounded tool dock, one sheet at a time",
+      "description": "A rounded dock on the left holds the tools: Screens, Comments, Notes, Elements, Design System, Settings. A click opens one rounded sheet next to it; only one sheet is open at a time. The pin keeps a sheet open, and a sheet can be dragged to the other side. Views shrink to Screens, Board and Use Cases; Design System moves into the dock. Variants become chips under the screen, comments become numbered pins on the screen. Solves: calm, rounded look (a); the screen keeps about 70 percent of the width with a sheet open and about 90 percent with none (b); every tool is one click away at a fixed place (c); Notes and Elements stay hidden until asked for (d). All screen content and the comment are example data."
+    },
+    {
+      "id": "5-review",
+      "title": "5 · Review changes: what the agent changed, on a timeline",
+      "description": "A switch in the top bar flips between Browse and Review changes. In review mode the screen outlines the region the latest agent write changed, a Changes list on the right shows the writes and reads for this screen (newest first), and a timeline under the screen steps through the writes. Two actions remain: Before and after, and Comment. Solves: the core job of reviewing what the agent builds, with the screen still taking most of the width (b); two clear actions instead of a full toolbar (c); only changes are shown, everything else stays out (d). Trade-off: needs a per-screen write history; the Follow feed covers part of it. All screen content and changes are example data."
+    }
+  ],
+  "tags": [
+    "chr-1257",
+    "ui-refresh"
+  ],
+  "title": "App UI refresh — five directions",
+  "description": "CHR-1257. The current chrome feels boxy, angular and dated, and three fixed side panels leave the canvas about a third of the width. Five directions for a rounder, calmer UI that gives the screen most of the room: 1 Stitch (floating cards), 2 Dupe (compare view with a design DNA rail, reference uncertain), 3 Stage (command palette), 4 Dock (one sheet at a time), 5 Review changes (timeline). Requirements for all: (a) pleasing to the eye, (b) the screen gets the most space, (c) tools easy to reach, (d) hide what is not needed. Rendered PNGs in renders/. Not reviewed or approved yet."
+}

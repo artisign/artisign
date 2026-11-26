@@ -12,7 +12,7 @@ import {
 } from "./reads.js";
 import { writeHtml, patchHtml, updateRefs, setTokens, setFlow } from "./writes.js";
 import { initProjectTool, listProjects, importHtml, promoteToSystem, deleteEntity } from "./lifecycle.js";
-import { replyComment } from "./comments.js";
+import { replyComment, createAgentComment } from "./comments.js";
 import { getScreenshot } from "./screenshot.js";
 import { inspectNode } from "./inspect-node.js";
 import { BROWSER_KINDS } from "./browser.js";
@@ -176,11 +176,11 @@ export const TOOLS: ToolDefinition[] = [
   ),
   tool(
     "list_comments",
-    "Open/resolved comments, filtered by screen or node.",
+    "Comment threads, filtered by screen, node or status. A thread is anchored to a node, never to coordinates: each root carries screen and node (<screen>.<node-id>, as get_node takes it), author (human|agent) plus agent, and detached: true when its node no longer exists. status \"detached\" lists open threads that lost their node.",
     {
       screen: z.string().optional(),
       node: z.string().optional(),
-      status: z.enum(["open", "resolved", "any"]).optional(),
+      status: z.enum(["open", "resolved", "detached", "any"]).optional(),
       include_replies: z.boolean().optional(),
       cursor: z.string().optional(),
       limit: z.number().int().positive().optional(),
@@ -448,9 +448,15 @@ export const TOOLS: ToolDefinition[] = [
   // Comments ---------------------------------------------------------------
   tool(
     "reply_comment",
-    "Answer a comment, optionally resolving it. Accepts any id from list_comments (root or reply); the answer lands on the thread root.",
-    { comment_id: z.string(), body: z.string(), resolve: z.boolean().optional() },
-    (store, input) => replyComment(store, input as never),
+    "Answer a comment thread. Accepts any id from list_comments (root or reply); the answer lands on the thread root. resolve / reopen change its status; reanchor (<screen>.<node-id> or a bare id on its screen) moves it to another node, e.g. a detached thread to the node that replaced its own. body may be left out when only resolving, reopening or re-anchoring. agent: your name, default the MCP client's.",
+    { comment_id: z.string(), body: z.string().optional(), resolve: z.boolean().optional(), reopen: z.boolean().optional(), reanchor: z.string().optional(), agent: z.string().optional() },
+    (store, input, ctx) => replyComment(store, input as never, ctx?.clientName),
+  ),
+  tool(
+    "create_comment",
+    "Start a comment thread for the human to see as a pin on the canvas. node: <screen>.<node-id> or a bare id on screen; leave it out for a screen-level thread. Anchor to a node with an authored id: a generated one may change on rewrite and detach the thread. agent: your name, default the MCP client's.",
+    { screen: z.string(), node: z.string().optional(), body: z.string(), agent: z.string().optional() },
+    (store, input, ctx) => createAgentComment(store, input as never, ctx?.clientName),
   ),
 ];
 

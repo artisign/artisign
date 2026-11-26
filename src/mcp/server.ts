@@ -110,6 +110,8 @@ export function createMcpServer(
           if (!callStore && toolDef.requiresProject !== false) {
             throw new ToolError("invalid_state", "no project open — call init_project to create one");
           }
+          const clientName = server.server.getClientVersion()?.name;
+          if (clientName) callCtx = { ...callCtx, clientName };
           result = await toolDef.handler(callStore as Store, input, callCtx);
           if (isImageResult(result)) {
             const { __image, ...rest } = result;

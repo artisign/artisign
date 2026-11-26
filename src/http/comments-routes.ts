@@ -1,13 +1,16 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Store } from "../store/index.js";
-import { createComment, readCommentRecordsWithStats } from "../tools/comments.js";
+import { applyThreadAction, createComment, detachedRootIds, groupThreads, readCommentRecordsWithStats } from "../tools/comments.js";
+import { formatNodeRef } from "../tools/node-ref.js";
 import { ToolError } from "../tools/types.js";
 import { loadScreen } from "../tools/context.js";
 import { findFillById } from "../tools/patch.js";
 import type { ScreenDocument } from "../model/index.js";
 import { sendJson, readJsonBody, PayloadTooLargeError } from "./json.js";
 
-type CreateCommentBody = { screen?: unknown; node_id?: unknown; text?: unknown; parent_id?: unknown; resolved?: unknown };
+type CreateCommentBody = { screen?: unknown; node_id?: unknown; text?: unknown; parent_id?: unknown; resolved?: unknown; action?: unknown; comment_id?: unknown };
+
+const THREAD_ACTIONS = new Set(["reanchor", "reopen", "delete"]);
 
 /**
  * Maps the DOM id comment mode clicked to the screen node a comment anchors
@@ -33,9 +36,15 @@ function resolveAnchorId(doc: ScreenDocument, domId: string): string | undefined
  * preview's comment surface. Reading returns the screen's comments flat
  * (with `resolved` and `parent_id` so the UI can group threads itself).
  * Creating covers both a new root comment and — via an optional
- * `parent_id` — a human reply on an existing thread; agents always use the
- * `reply_comment` MCP tool instead (there is no `create_comment` tool by
- * design: humans author comments in the browser, agents only reply).
+ * `parent_id` — a human reply on an existing thread; agents use the
+ * `create_comment`/`reply_comment` MCP tools instead.
+ *
+ * CHR-1249: the GET also returns `threads` — one entry per thread with its
+ * current anchor, status and `detached` flag — and `comments` leaves out
+ * event lines and deleted threads, so the canvas pins need no event logic of
+ * their own. `POST` with `action` ("reanchor" | "reopen" | "delete") and
+ * `comment_id` applies a thread event; reanchor takes `node_id` (a DOM id on
+ * the thread's screen, mapped like a new comment's).
  */
 export async function handleCommentsRoutes(req: IncomingMessage, res: ServerResponse, store: Store): Promise<boolean> {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
@@ -48,7 +57,20 @@ export async function handleCommentsRoutes(req: IncomingMessage, res: ServerResp
       return true;
     }
     const { records, skippedMalformedLines } = await readCommentRecordsWithStats(store);
-    const body: Record<string, unknown> = { comments: records.filter((r) => r.screen === screen) };
+    const threads = groupThreads(records).filter((t) => t.root.screen === screen);
+    const detached = await detachedRootIds(store, threads);
+    const body: Record<string, unknown> = {
+      comments: threads.flatMap((t) => [{ ...t.root, resolved: t.status === "resolved" }, ...t.replies]),
+      threads: threads.map((t) => ({
+        id: t.root.id,
+        node_id: t.root.node_id,
+        author: t.root.author,
+        ...(t.root.agent ? { agent: t.root.agent } : {}),
+        status: t.status,
+        detached: detached.has(t.root.id),
+        reply_count: t.replies.length,
+      })),
+    };
     if (skippedMalformedLines > 0) body.skipped_malformed_lines = skippedMalformedLines;
     sendJson(res, 200, body);
     return true;
@@ -65,6 +87,11 @@ export async function handleCommentsRoutes(req: IncomingMessage, res: ServerResp
     } else {
       sendJson(res, 400, { code: "validation_failed", message: "request body is not valid JSON" });
     }
+    return true;
+  }
+
+  if (body.action !== undefined) {
+    await handleThreadAction(res, store, body);
     return true;
   }
 
@@ -123,4 +150,36 @@ export async function handleCommentsRoutes(req: IncomingMessage, res: ServerResp
     throw err;
   }
   return true;
+}
+
+async function handleThreadAction(res: ServerResponse, store: Store, body: CreateCommentBody): Promise<void> {
+  if (typeof body.action !== "string" || !THREAD_ACTIONS.has(body.action)) {
+    sendJson(res, 400, { code: "validation_failed", message: "action must be reanchor, reopen or delete" });
+    return;
+  }
+  if (typeof body.comment_id !== "string" || body.comment_id.length === 0) {
+    sendJson(res, 400, { code: "validation_failed", message: "comment_id is required" });
+    return;
+  }
+  const action = body.action as "reanchor" | "reopen" | "delete";
+  try {
+    let anchor: { screen: string; node_id: string } | undefined;
+    if (action === "reanchor") {
+      if (typeof body.node_id !== "string" || typeof body.screen !== "string") {
+        sendJson(res, 400, { code: "validation_failed", message: "reanchor needs screen and node_id" });
+        return;
+      }
+      const { doc } = await loadScreen(store, body.screen);
+      const anchorId = resolveAnchorId(doc, body.node_id);
+      if (anchorId === undefined) throw new ToolError("not_found", `node "${body.node_id}" was not found on screen "${body.screen}"`);
+      anchor = { screen: body.screen, node_id: formatNodeRef(body.screen, anchorId) };
+    }
+    sendJson(res, 200, await applyThreadAction(store, { comment_id: body.comment_id, action, anchor }));
+  } catch (err) {
+    if (err instanceof ToolError) {
+      sendJson(res, err.code === "not_found" ? 404 : 400, { code: err.code, message: err.message });
+      return;
+    }
+    throw err;
+  }
 }

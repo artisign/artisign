@@ -137,7 +137,7 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 | Lifecycle | `promote_to_system` | Lift an inline value or a repeated element into a token, component, or pattern. |
 | Lifecycle | `promote_mockup` | Copy a chosen mockup variant into a new, design-system-bound screen (the mockup stays). |
 | Lifecycle | `delete_entity` | Delete a screen, component, pattern, or mockup; refuses a component still referenced by a screen, and a screen that still has variants (`has_variants`) unless `cascade: true` deletes the whole subtree. |
-| Comments | `reply_comment` | Answer a comment and optionally resolve it. |
+| Comments | `reply_comment`, `create_comment` | Answer, resolve, reopen or re-anchor a thread; start a thread on a node. |
 | Visual review | `get_screenshot` | Screenshots a rendered screen (or one node), or one mockup variant, as a PNG — the write → screenshot → adjust loop. |
 | Visual review | `inspect_node` | Computed box and styles of one node as text — cheaper than vision for geometry questions. |
 
@@ -215,7 +215,7 @@ Served at `http://127.0.0.1:<port>` once the daemon is running — plain ES modu
 - **Elements panel** — the selected screen's nodes listed by the id an agent addresses them with
 - **Notes panel** — the screen's own notes plus any tag notes that apply to it, both rendered as Markdown
 - **Flow mode** — click an element with `data-flow-target` to jump to the screen it points at
-- **Comment mode** — click an element to anchor a comment; appended to `comments.jsonl`, picked up by `list_comments` / answered via `reply_comment`
+- **Comment mode** — click an element to anchor a comment; threads show as pins on the canvas, are appended to `comments.jsonl`, picked up by `list_comments` / answered via `reply_comment`
 - **Design System** — token swatches by bucket, every component with every variant rendered side by side
 - **Mockup view** — a mockup's variants rendered live, side by side in columns, each with its title and description
 - **Follow mode** — off by default; the topbar's Follow toggle (three states: off / Following / Follow paused) makes the preview track a live agent session's own MCP tool calls, switching the view/selection to whatever it touches and briefly outlining the affected nodes (solid teal for a read, dashed violet + wash for a write, or a dashed border + "Updated" badge around the whole screen after `write_html`). Every tool call also lands in the right panel's new Activity tab (last 50, in-memory, newest first) regardless of follow's own state. Human navigation — a screen/tab click, clicking an entry in the Activity feed, or opening comment/inspect mode — pauses it; only the toggle's own "Resume" un-pauses it

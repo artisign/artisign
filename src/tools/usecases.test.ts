@@ -185,7 +185,7 @@ describe("use case tools", () => {
     it("registers the five use-case tools next to the existing ones", () => {
       const names = TOOLS.map((t) => t.name);
       for (const name of ["list_use_cases", "get_use_case", "set_use_cases", "generate_personas", "suggest_use_case_variants"]) expect(names).toContain(name);
-      expect(names).toHaveLength(30);
+      expect(names).toHaveLength(31);
     });
   });
 

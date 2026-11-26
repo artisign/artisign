@@ -25,7 +25,7 @@ import { backdropHint, rootBackdrop } from "./backdrop.js";
 import { renderScreenDocument, describeViewport } from "./render-context.js";
 import { parseNodeRef, formatNodeRef } from "./node-ref.js";
 import { readAllFlows, readScreenFlows, toPublicFlowRecord } from "./flows.js";
-import { readCommentRecords, readCommentRecordsWithStats, groupThreads, threadStatus, toPublicComment, type CommentRecord } from "./comments.js";
+import { readCommentRecords, readCommentRecordsWithStats, groupThreads, threadStatus, toPublicComment, detachedRootIds, type CommentRecord } from "./comments.js";
 import { selectFields } from "./fields.js";
 import { variantLinks, variantFields } from "./variants.js";
 import { isValidTagName } from "./name-validation.js";
@@ -378,7 +378,7 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
     if (reachedFrom.size > 0) full.reached_from = [...reachedFrom].sort();
   }
   if (input.fields?.includes("comments")) {
-    full.comments = commentsForScreen(commentRecords, input.screen, true);
+    full.comments = commentsForScreen(commentRecords, input.screen, true, doc.nodes);
   }
   if (input.fields?.includes("rendered_html")) {
     // Only rendered on explicit request — a resolved DOM is far heavier
@@ -395,11 +395,13 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
   return selectFields(full, SCREEN_ALWAYS, SCREEN_FIELDS, fields);
 }
 
-function commentsForScreen(records: CommentRecord[], screen: string, includeReplies: boolean): PublicComment[] {
+function commentsForScreen(records: CommentRecord[], screen: string, includeReplies: boolean, nodes: Record<string, unknown>): PublicComment[] {
   const threads = groupThreads(records).filter((t) => t.root.screen === screen);
   const out: PublicComment[] = [];
   for (const thread of threads) {
-    out.push(toPublicComment(thread.root, thread.replies.length));
+    const nodeId = thread.root.node_id?.slice(screen.length + 1);
+    const detached = nodeId !== undefined && nodes[nodeId] === undefined;
+    out.push(toPublicComment(thread.root, thread.replies.length, { status: thread.status, detached }));
     if (includeReplies) {
       for (const reply of thread.replies) out.push(toPublicComment(reply, 0));
     }
@@ -521,7 +523,7 @@ export async function getNode(store: Store, input: GetNodeInput): Promise<Record
       const commentRecords = await readCommentRecords(store);
       const threads = groupThreads(commentRecords).filter((t) => t.root.node_id === input.node);
       full.comments = threads.flatMap((t) => [
-        toPublicComment(t.root, t.replies.length),
+        toPublicComment(t.root, t.replies.length, { status: t.status, detached: false }),
         ...t.replies.map((r) => toPublicComment(r, 0)),
       ]);
     }
@@ -787,8 +789,9 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
   const registry = await loadRegistry(store);
   const [commentRecords, flowRecords] = await Promise.all([readCommentRecords(store), readAllFlows(store)]);
   const commentedNodes = new Map<string, boolean>();
-  for (const record of commentRecords) {
-    if (record.node_id) commentedNodes.set(record.node_id, true);
+  // Current anchors only (CHR-1249): a re-anchored thread marks its new node, a deleted one none.
+  for (const thread of groupThreads(commentRecords)) {
+    if (thread.root.node_id) commentedNodes.set(thread.root.node_id, true);
   }
   const flowFroms = new Set(flowRecords.map((f) => f.from));
 
@@ -899,12 +902,18 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
 export type ListCommentsInput = {
   screen?: string;
   node?: string;
-  status?: "open" | "resolved" | "any";
+  status?: "open" | "resolved" | "detached" | "any";
   include_replies?: boolean;
   cursor?: string;
   limit?: number;
 };
 
+/**
+ * Threads with their CURRENT anchor (CHR-1254): every root carries `screen`
+ * and `node` (the same `<screen>.<node-id>` ref get_node/find_nodes use),
+ * `detached: true` when that node no longer exists, and `agent` on agent
+ * comments. `status: "detached"` lists the open threads that lost their node.
+ */
 export async function listComments(store: Store, input: ListCommentsInput): Promise<Record<string, unknown>> {
   const status = input.status ?? "open";
   const includeReplies = input.include_replies ?? false;
@@ -918,13 +927,16 @@ export async function listComments(store: Store, input: ListCommentsInput): Prom
   } else if (input.screen) {
     threads = threads.filter((t) => t.root.screen === input.screen);
   }
-  if (status !== "any") {
+  const detached = await detachedRootIds(store, threads);
+  if (status === "detached") {
+    threads = threads.filter((t) => threadStatus(t) === "open" && detached.has(t.root.id));
+  } else if (status !== "any") {
     threads = threads.filter((t) => threadStatus(t) === status);
   }
 
   const flattened: PublicComment[] = [];
   for (const thread of threads) {
-    flattened.push(toPublicComment(thread.root, thread.replies.length));
+    flattened.push(toPublicComment(thread.root, thread.replies.length, { status: thread.status, detached: detached.has(thread.root.id) }));
     if (includeReplies) {
       for (const reply of thread.replies) flattened.push(toPublicComment(reply, 0));
     }

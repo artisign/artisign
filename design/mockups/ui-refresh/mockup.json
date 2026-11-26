@@ -6,11 +6,6 @@
       "description": "Inspired by Google Stitch (AI-native infinite canvas, March 2026 redesign). The three fixed side panels become rounded cards that float over a dotted canvas. Screens is a card you can drag by its grip and fold with the chevron; Mockups starts folded. Context shrinks to a fixed icon rail with a count badge. Tools for the selected frame (Comment, Variants, Inspect, Preview) appear in a toolbar right above it. Solves: boxy, dated look (a); panels taking two thirds of the width, now the canvas runs full width under them (b); tools sit next to the object they act on (c); panel content stays folded until asked for (d). Trade-off: floating cards can cover frames, so they need snap positions. All screen content is example data."
     },
     {
-      "id": "2-dupe",
-      "title": "2 · Dupe direction: compare view with a design DNA rail",
-      "description": "Reference uncertain: the closest clear hit for \"Dupe Design\" is dupe.design (\"Design DNA for AI Agents\"), a product that sells brand token packs for coding agents, not a design editor. This variant borrows its visual language: dark surface, one mint signal colour, monospace labels and the extraction card with token bars. Applied to artisign as a compare view: one large screen with a before/after handle between two variants, and a design DNA rail that lists only the tokens this screen uses. Solves: the screen gets most of the width (b); compare, comment and inspect sit in one pill (c); rail sections stay folded except Colors and Type (d). Trade-off: dark chrome next to light screens is high contrast, and the layout is built around comparing. All screen content and tokens are example data."
-    },
-    {
       "id": "3-stage",
       "title": "3 · Stage: the screen alone, tools in a command palette",
       "description": "The open screen fills the stage, about 80 percent of the width. There are no side panels. A thin breadcrumb sits at the top, a filmstrip of screens at the bottom. Every tool lives in a command palette (Cmd+K) that lists the single-key shortcut next to each entry, grouped into This screen and Project. Solves: maximum room for the screen (b) and nothing on screen that is not needed right now (d); tools are one shortcut away (c). Trade-off: mouse users only find tools through the palette, and reading notes or comments needs an extra sheet. All screen content is example data."
@@ -24,12 +19,17 @@
       "id": "5-review",
       "title": "5 · Review changes: what the agent changed, on a timeline",
       "description": "A switch in the top bar flips between Browse and Review changes. In review mode the screen outlines the region the latest agent write changed, a Changes list on the right shows the writes and reads for this screen (newest first), and a timeline under the screen steps through the writes. Two actions remain: Before and after, and Comment. Solves: the core job of reviewing what the agent builds, with the screen still taking most of the width (b); two clear actions instead of a full toolbar (c); only changes are shown, everything else stays out (d). Trade-off: needs a per-screen write history; the Follow feed covers part of it. All screen content and changes are example data."
+    },
+    {
+      "id": "2-doop",
+      "title": "2 · Doop direction: floating groups, tool rail, live agent activity",
+      "description": "Inspired by Doop (doop.design), an MCP design canvas whose app UI is shown on its homepage (the app itself needs a login). Borrowed layout and logic: the top bar splits into three floating groups (project, live agent status with Follow, views and Present); a tabbed left panel (Screens, Components, Use cases) with search at the bottom and a write badge on the screen the agent is changing; a slim vertical tool rail (Select, Comment, Inspect, Compare, Desktop, Mobile); frames on a dotted canvas with name labels, a dashed outline plus agent cursor where the agent is writing; a tabbed right panel (Activity, Comments, Notes, Design System) with a note field for the agent at the bottom. Solves: rounded, light, calm chrome (a); tools sit in one rail at a fixed place (c); what the agent is doing right now is visible without opening anything (d, only live state is shown). Trade-off for (b): two open panels still take about 35 percent of the width, so both need to fold away. All content is example data."
     }
   ],
+  "title": "App UI refresh — five directions",
+  "description": "CHR-1257. The current chrome feels boxy, angular and dated, and three fixed side panels leave the canvas about a third of the width. Five directions for a rounder, calmer UI that gives the screen most of the room: 1 Stitch (floating cards), 2 Doop (floating groups, tool rail, live agent activity), 3 Stage (command palette), 4 Dock (one sheet at a time), 5 Review changes (timeline). Requirements for all: (a) pleasing to the eye, (b) the screen gets the most space, (c) tools easy to reach, (d) hide what is not needed. Rendered PNGs in renders/. Not reviewed or approved yet.",
   "tags": [
     "chr-1257",
     "ui-refresh"
-  ],
-  "title": "App UI refresh — five directions",
-  "description": "CHR-1257. The current chrome feels boxy, angular and dated, and three fixed side panels leave the canvas about a third of the width. Five directions for a rounder, calmer UI that gives the screen most of the room: 1 Stitch (floating cards), 2 Dupe (compare view with a design DNA rail, reference uncertain), 3 Stage (command palette), 4 Dock (one sheet at a time), 5 Review changes (timeline). Requirements for all: (a) pleasing to the eye, (b) the screen gets the most space, (c) tools easy to reach, (d) hide what is not needed. Rendered PNGs in renders/. Not reviewed or approved yet."
+  ]
 }

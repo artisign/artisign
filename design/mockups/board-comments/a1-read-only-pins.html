@@ -1,0 +1,124 @@
+<style>
+*{box-sizing:border-box}
+.app{width:1440px;height:900px;background:#e8e6e2;font:13px/1.4 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1d1c1a;display:flex;flex-direction:column;overflow:hidden;position:relative}
+button{font:inherit;color:inherit;cursor:pointer}
+.top{height:44px;flex:none;background:#fbfaf9;border-bottom:1px solid #e3e0db;display:flex;align-items:center;gap:14px;padding:0 12px}
+.logo{font-weight:700;font-size:14px}
+.proj{height:28px;padding:0 10px;border:0;border-radius:6px;background:none;display:inline-flex;align-items:center;gap:6px}
+.vr{width:1px;height:18px;background:#e3e0db}
+.tab{color:#6b6863;height:44px;display:inline-flex;align-items:center;border:0;background:none;padding:0 2px;font-size:13px}
+.tab.on{color:#1d1c1a;box-shadow:inset 0 -2px 0 #1d1c1a}
+.sp{flex:1}
+.ib{width:28px;height:28px;border:0;border-radius:6px;background:none;color:#6b6863;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.ib.dis{opacity:.35}
+.live{display:inline-flex;align-items:center;gap:6px;color:#6b6863;font-size:12px}
+.live i{width:7px;height:7px;border-radius:4px;background:#16a34a}
+.tbar{height:40px;flex:none;background:#fbfaf9;border-bottom:1px solid #e3e0db;display:flex;align-items:center;gap:8px;padding:0 16px}
+.tb{height:28px;padding:0 10px;border:1px solid #d1cec8;border-radius:6px;background:#fff;display:inline-flex;align-items:center;gap:6px;font-size:12.5px}
+.tb.on{background:#dcf0ed;border-color:#a9d9d2;color:#0f8a7e}
+.sl{width:140px;height:4px;border-radius:2px;background:#e2dfda;position:relative}
+.sl b{position:absolute;left:0;top:0;height:4px;border-radius:2px;background:#0f8a7e}
+.sl i{position:absolute;top:-4px;width:12px;height:12px;border-radius:6px;background:#0f8a7e;border:2px solid #fff;box-shadow:0 0 0 1px #0f8a7e}
+.stat{font-size:12px;color:#9a968f}
+.body{flex:1;display:flex;min-height:0}
+.side{width:264px;flex:none;background:#f4f3f0;border-right:1px solid #e3e0db}
+.sh{height:40px;display:flex;align-items:center;padding:0 12px;font-weight:600;border-bottom:1px solid #e3e0db}
+.field{margin:12px 8px 6px;height:28px;border-radius:6px;background:#efede9;color:#9a968f;display:flex;align-items:center;padding:0 10px;font-size:12px}
+.meta{font-size:11px;color:#9a968f;padding:0 10px 10px;border-bottom:1px solid #e3e0db}
+.row{display:flex;align-items:center;gap:8px;height:34px;margin:2px 8px;padding:0 8px;border-radius:6px}
+.row .n{flex:1}
+.row .c{font-size:11px;color:#9a968f}
+.pb{width:22px;height:22px;border-radius:6px;border:1px solid #d1cec8;background:#fff;color:#9a968f;display:inline-flex;align-items:center;justify-content:center;padding:0;flex:none}
+.pb.pn{background:#0f8a7e;border-color:#0f8a7e;color:#fff}
+.cv{flex:1;position:relative;overflow:hidden}
+.tile{position:absolute;width:250px;background:#fff;border:1px solid #d1cec8;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 6px 16px rgba(40,30,20,.06)}
+.tile>.pb{position:absolute;top:-9px;right:-9px}
+.thumb{height:232px;background:#fafaf8;border-bottom:1px solid #e3e0db;border-radius:8px 8px 0 0;position:relative}
+.ph{position:absolute;left:72px;top:10px;width:104px;height:212px;background:#fff;border:1px solid #e3e0db;border-radius:8px;padding:10px 8px;display:flex;flex-direction:column;gap:6px}
+.ph i{display:block}
+.ph .h{height:8px;width:55%;background:#d9d6d0;border-radius:2px;margin-bottom:6px}
+.ph .r{height:26px;background:#f3f1ed;border:1px solid #ebe8e3;border-radius:4px}
+.ph .bt{margin-top:auto;height:18px;background:#2a3edb;border-radius:4px}
+.ph .hl{outline:2px solid #2563eb;outline-offset:1px}
+.nm{height:34px;display:flex;align-items:center;gap:6px;padding:0 10px;font-size:12px}
+.cc{margin-left:auto;display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:600;background:#e6edfd;color:#1d4ed8;border:0}
+.cc+.cc{margin-left:0}
+.cc.dt{background:#fdf1e0;color:#92400e}
+.pin{position:absolute;width:24px;height:24px;border-radius:12px 12px 12px 4px;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.28);padding:0;z-index:3}
+.hu{background:#2563eb}.ag{background:#7c3aed}
+.dtp{background:#fff;color:#b45309;border:2px dashed #f59e0b}
+.act{box-shadow:0 0 0 4px rgba(37,99,235,.35),0 1px 4px rgba(0,0,0,.28)}
+.grp{position:absolute;height:24px;min-width:30px;padding:0 7px;border-radius:12px;background:#1d1c1a;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.28);z-index:3}
+.ann{position:absolute;border:1px dashed #b8b3ab;border-radius:10px;background:rgba(251,250,249,.55)}
+.ann>.at{position:absolute;left:12px;top:-10px;background:#e8e6e2;padding:0 6px;font-size:11.5px;color:#6b6863}
+.mini{position:absolute;width:58px;height:42px;background:#efede9;border:1px solid #d1cec8;border-radius:4px}
+.mini .pb{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:4px}
+.dot{position:absolute;left:-7px;top:-7px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#2563eb;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff}
+.dot.dt{background:#f59e0b}
+.peek{position:absolute;width:272px;background:#fff;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,.07),0 10px 28px rgba(40,30,20,.14);font-size:12px;z-index:10;padding:10px 12px}
+.who{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.av{width:20px;height:20px;border-radius:10px;color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.bd{font-size:10px;padding:0 5px;border-radius:3px;line-height:16px}
+.ba{background:#ede5ff;color:#6d28d9}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:#efede9;color:#6b6863;padding:1px 6px;border-radius:4px}
+.tm{margin-left:auto;font-size:11px;color:#9a968f}
+.pf{margin-top:8px;padding-top:8px;border-top:1px solid #efede9;font-size:11px;color:#6b6863;display:flex;justify-content:space-between}
+</style>
+<div class="app">
+<div class="top"><span class="logo">artisign</span><button class="proj">artisign-ui</button><span class="vr"></span>
+<button class="tab">Screens</button><button class="tab">Design System</button><button class="tab on">Board</button><button class="tab">Use Cases</button><span class="vr"></span><span class="live">Follow</span>
+<span class="sp"></span>
+<button class="ib dis" aria-label="Comment mode is available in the Screens view" title="Comment in the Screens view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></button>
+<button class="ib" aria-label="Theme"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/></svg></button><span class="live"><i></i>Live</span></div>
+<div class="tbar"><button class="tb">Fit all</button><button class="tb">100%</button><span class="vr"></span><button class="tb" style="width:28px;padding:0;justify-content:center">−</button><span class="sl"><b style="width:84px"></b><i style="left:78px"></i></span><button class="tb" style="width:28px;padding:0;justify-content:center">+</button><span style="font-size:12.5px">170%</span>
+<button class="tb">Edges: Off</button><button class="tb on" aria-pressed="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Comments: On</button><button class="tb" aria-pressed="false">Show resolved</button>
+<span class="sp"></span><span class="stat">6 shown · 17 open comments · 1 detached</span></div>
+<div class="body">
+<div class="side"><div class="sh">Screens</div><div class="field">Search screens, mockups and tags</div><div class="meta">6 screens · 6 on board</div>
+<div class="row"><span class="n">cart-l2</span><span class="c">10</span><span class="pb pn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">dashboard</span><span class="c">9</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">menu-today</span><span class="c">37</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">order-l3</span><span class="c">8</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">drink-l3</span><span class="c">3</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">cafes-l2</span><span class="c">1</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+</div>
+<div class="cv">
+<div class="tile" style="left:32px;top:32px"><span class="pb pn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r hl"></i><i class="r"></i><i class="bt"></i></div>
+<button class="pin ag" style="left:155px;top:29px" aria-label="Comment 3 on item-1, by ux-agent">3</button>
+<button class="pin hu act" style="left:155px;top:61px" aria-label="Comment 2 on item-2-name">2</button>
+<button class="pin hu" style="left:155px;top:181px" aria-label="Comment 1 on btn-checkout">1</button></div>
+<div class="nm">cart-l2<button class="cc" aria-label="3 open comments"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>3</button></div></div>
+<div class="peek" style="left:218px;top:96px"><div class="who"><b>#2</b><span class="mono">item-2-name</span><span class="tm">2 messages</span></div>
+<div class="who" style="margin-top:8px"><span class="av" style="background:#7c3aed">UX</span><b>ux-agent</b><span class="bd ba">Agent</span><span class="tm">1h</span></div>
+<div style="padding-left:26px">Done as a proposal: one line with an ellipsis, the full name in the item sheet.</div>
+<div class="pf"><span>Click to open in Screens view</span><span>Open</span></div></div>
+<div class="tile" style="left:312px;top:32px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div></div>
+<div class="nm">dashboard</div></div>
+<div class="tile" style="left:592px;top:32px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div>
+<button class="pin hu" style="left:155px;top:29px">1</button>
+<button class="grp" style="left:146px;top:76px" aria-label="10 comments overlap here, zoom in to separate them">10</button>
+<button class="pin ag" style="left:155px;top:181px">12</button></div>
+<div class="nm">menu-today<button class="cc"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>12</button></div></div>
+<div class="tile" style="left:872px;top:32px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div>
+<button class="pin dtp" style="left:58px;top:2px" aria-label="Comment 2, detached: its element is gone">2</button>
+<button class="pin hu" style="left:155px;top:93px">1</button></div>
+<div class="nm">order-l3<button class="cc">1</button><button class="cc dt"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3l10 18H2z"/><path d="M12 10v5"/></svg>1 detached</button></div></div>
+<div class="tile" style="left:32px;top:330px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div></div>
+<div class="nm">drink-l3<span style="margin-left:auto;font-size:11px;color:#9a968f">2 resolved, hidden</span></div></div>
+<div class="tile" style="left:312px;top:330px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div></div>
+<div class="nm">cafes-l2</div></div>
+<div class="ann" style="left:600px;top:340px;width:540px;height:420px"><span class="at">The same project at 38% (Fit all): one count dot per tile, amber if a thread is detached</span>
+<div class="mini" style="left:28px;top:36px"><span class="dot">3</span><span class="pb pn"></span></div><div class="mini" style="left:100px;top:36px"></div><div class="mini" style="left:172px;top:36px"><span class="dot">12</span></div><div class="mini" style="left:244px;top:36px"><span class="dot dt">2</span></div><div class="mini" style="left:316px;top:36px"></div><div class="mini" style="left:388px;top:36px"><span class="dot">1</span></div><div class="mini" style="left:460px;top:36px"></div>
+<div class="mini" style="left:28px;top:96px"></div><div class="mini" style="left:100px;top:96px"></div><div class="mini" style="left:172px;top:96px"><span class="dot">5</span></div><div class="mini" style="left:244px;top:96px"></div><div class="mini" style="left:316px;top:96px"></div><div class="mini" style="left:388px;top:96px"></div><div class="mini" style="left:460px;top:96px"><span class="dot">2</span></div>
+<div class="mini" style="left:28px;top:156px"></div><div class="mini" style="left:100px;top:156px"><span class="dot">1</span></div><div class="mini" style="left:172px;top:156px"></div><div class="mini" style="left:244px;top:156px"></div><div class="mini" style="left:316px;top:156px"><span class="dot dt">4</span></div><div class="mini" style="left:388px;top:156px"></div><div class="mini" style="left:460px;top:156px"></div>
+<div class="mini" style="left:28px;top:216px"></div><div class="mini" style="left:100px;top:216px"></div><div class="mini" style="left:172px;top:216px"></div><div class="mini" style="left:244px;top:216px"><span class="dot">99+</span></div><div class="mini" style="left:316px;top:216px"></div><div class="mini" style="left:388px;top:216px"></div><div class="mini" style="left:460px;top:216px"></div>
+<div class="mini" style="left:28px;top:276px"></div><div class="mini" style="left:100px;top:276px"><span class="dot">2</span></div><div class="mini" style="left:172px;top:276px"></div><div class="mini" style="left:244px;top:276px"></div><div class="mini" style="left:316px;top:276px"></div><div class="mini" style="left:388px;top:276px"></div><div class="mini" style="left:460px;top:276px"></div>
+<div style="position:absolute;left:28px;right:28px;bottom:18px;font-size:11.5px;color:#6b6863;line-height:1.5">Dots sit top-left so they never collide with the board pin top-right. A click on a dot zooms to that tile. A collapsed cluster shows the sum of its screens.</div>
+</div>
+</div></div></div>

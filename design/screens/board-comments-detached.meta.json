@@ -1,0 +1,11 @@
+{
+  "notes": "**Board comments: detached thread clicked** (CHR-1260 / CHR-1261). Thread #5 on open-project-dialog lost its node (`path-hint` was removed). Its pin sits dashed amber at the frame's top-left, now `comment-pin` variant `detached-active`.\n\n**Preview:** `comment-preview` variant `detached` shows the node id struck through, a \"Detached\" badge, and a warning note: \"This element is no longer on the screen. Open the screen to move the thread to another element.\" Below it come the latest messages, as in the default preview. Re-anchoring is **not possible on the Board**. \"Open in Screens\" opens the screen with this thread's detached popover open (→ `comments-detached`), where Pick element does the re-anchor.\n\n**Placement:** the pin sits at the frame's top-left, so the preview opens below it (`position-area: block-end span-inline-end`) and flips like the default preview. It never covers the teal pin button of the same tile (that button keeps the top-right corner).\n\nBehaviour, focus and the popover/anchor implementation are the same as in `board-comments-preview`.",
+  "tags": [
+    "chr-1260",
+    "chr-1261",
+    "board",
+    "comments"
+  ],
+  "variant_of": "board-view",
+  "variant_kind": "overlay"
+}

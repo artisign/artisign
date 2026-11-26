@@ -1,0 +1,183 @@
+{
+  "id": "discuss-mockup-thread",
+  "title": "Read, reply to and resolve a thread on a mockup variant",
+  "group": "mockups",
+  "tags": [
+    "chr-1260",
+    "chr-1261"
+  ],
+  "status": "draft",
+  "personas": [
+    "designer-dana"
+  ],
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "The agent revised a variant and replied to Dana's thread on it.",
+    "actor": "design-agent-dex",
+    "via": "MCP"
+  },
+  "goal": "Dana closes the loop on a variant without leaving the compare view.",
+  "outcome": "The thread is resolved; the variant's count drops and the pin only shows with Show resolved.",
+  "state": [
+    {
+      "subject": "system",
+      "property": "mockup_variants",
+      "value": 3
+    },
+    {
+      "subject": "system",
+      "property": "mockup_open_comments",
+      "value": 4
+    }
+  ],
+  "inputs": [
+    {
+      "object": "comment",
+      "source": "comments.jsonl",
+      "example": {
+        "node": "mockup:cart-summary-options#a-sticky.item-1",
+        "status": "open"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "comment",
+      "target": "comments.jsonl",
+      "example": {
+        "node": "mockup:cart-summary-options#a-sticky.item-1",
+        "status": "resolved"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "see-counts",
+      "actor": "designer-dana",
+      "action": "Sees the open count per variant in the column headers and the total in the Context panel",
+      "target": {
+        "screen": "mockup-comments-thread",
+        "node": "mk-a-count"
+      }
+    },
+    {
+      "id": "open-thread",
+      "actor": "designer-dana",
+      "action": "Clicks the pin at its element in variant A; the popover opens",
+      "target": {
+        "screen": "mockup-comments-thread",
+        "node": "pin-1"
+      }
+    },
+    {
+      "id": "read-reply",
+      "actor": "designer-dana",
+      "action": "Reads the agent's reply and checks the revised variant",
+      "target": {
+        "screen": "mockup-comments-thread",
+        "node": "msg-2"
+      }
+    },
+    {
+      "id": "resolve",
+      "actor": "designer-dana",
+      "action": "Resolves the thread in the popover",
+      "target": {
+        "screen": "mockup-comments-thread",
+        "node": "popover"
+      },
+      "data": [
+        {
+          "object": "comment",
+          "before": {
+            "status": "open"
+          },
+          "after": {
+            "status": "resolved"
+          }
+        }
+      ]
+    },
+    {
+      "id": "find-resolved",
+      "actor": "designer-dana",
+      "action": "Turns on Show resolved to see resolved threads again, marked with a ring",
+      "target": {
+        "screen": "mockup-comments-resolved",
+        "node": "comment-toolbar"
+      }
+    }
+  ],
+  "branches": [
+    {
+      "id": "not-done-yet",
+      "title": "The revision does not solve it",
+      "from": "read-reply",
+      "when": [
+        {
+          "subject": "designer-dana",
+          "property": "satisfied_with_revision",
+          "value": false
+        }
+      ],
+      "steps": [
+        {
+          "id": "reply-again",
+          "actor": "designer-dana",
+          "action": "Replies with what is still wrong and mentions the agent",
+          "target": {
+            "screen": "mockup-comments-thread",
+            "node": "popover"
+          },
+          "data": [
+            {
+              "object": "comment",
+              "before": {
+                "status": "open"
+              },
+              "after": {
+                "status": "open"
+              }
+            }
+          ]
+        }
+      ],
+      "outcome": "The thread stays open for the next revision."
+    },
+    {
+      "id": "element-gone",
+      "title": "The revised variant no longer has the element",
+      "from": "open-thread",
+      "when": [
+        {
+          "subject": "system",
+          "property": "thread_detached",
+          "value": true
+        }
+      ],
+      "steps": [
+        {
+          "id": "see-detached",
+          "actor": "system",
+          "action": "Shows the thread as detached at its column's top-left, with its last known node id",
+          "target": {
+            "screen": "mockup-comments-detached",
+            "node": "pin-5"
+          }
+        },
+        {
+          "id": "reanchor",
+          "actor": "designer-dana",
+          "action": "Chooses Pick element and moves the thread to the element that replaced it in the same variant, or resolves it",
+          "target": {
+            "screen": "mockup-comments-detached",
+            "node": "btn-pick-element"
+          }
+        }
+      ],
+      "outcome": "No thread stays detached without a decision."
+    }
+  ]
+}

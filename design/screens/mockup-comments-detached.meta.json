@@ -1,0 +1,11 @@
+{
+  "notes": "**Mockup comments: detached thread in variant C** (CHR-1260 / CHR-1261). Variant C was revised and `c-subtotal` no longer exists. Thread #5 detaches: a dashed amber pin at C's frame top-left (`comment-pin` variant `detached-active` while open), plus a `detached` chip in C's column header and in the Context hint.\n\n**Popover:** `comment-popover` variant `detached` (node struck through, Detached badge) with `comment-detached-alert`: \"c-subtotal no longer exists in variant C. Move the thread to the element that replaced it, or resolve it.\" It also offers **Pick element**, which enters comment mode limited to variant C (other columns dim fully). The next click re-anchors the thread, and Esc cancels. A thread cannot move to another variant by picking; moving between variants is out of scope.\n\n**Placement:** the pin sits at the top-left of the rightmost column. To the right there is no room, and to the left the popover would cover pin #1 in column A, so it opens **below** the pin (`flip-block` fallback order: inline-end → inline-start → block-end).\n\nOpen questions for the architect (not designed here): what happens to a mockup's threads when the mockup is promoted to a screen or a variant is deleted.",
+  "tags": [
+    "chr-1260",
+    "chr-1261",
+    "mockups",
+    "comments"
+  ],
+  "variant_of": "chrome-c-mockup-columns",
+  "variant_kind": "overlay"
+}

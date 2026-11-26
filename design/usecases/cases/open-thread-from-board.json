@@ -1,0 +1,78 @@
+{
+  "id": "open-thread-from-board",
+  "title": "Jump from a Board tile to a thread on the canvas",
+  "group": "board",
+  "tags": [
+    "chr-1260",
+    "chr-1261"
+  ],
+  "status": "draft",
+  "personas": [
+    "designer-dana"
+  ],
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana sees an open thread on a Board tile and needs the full-size screen to judge it.",
+    "actor": "designer-dana",
+    "via": "browser preview"
+  },
+  "goal": "The thread opens on the full-size screen without searching for it.",
+  "outcome": "The Screens view shows the screen with that thread's popover open.",
+  "inputs": [
+    {
+      "object": "comment",
+      "source": "Thread on a Board tile",
+      "example": {
+        "node": "checkout.btn-pay",
+        "status": "open"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "screen",
+      "target": "Screens view",
+      "example": {
+        "screen": "checkout"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "click-pin",
+      "actor": "designer-dana",
+      "action": "Clicks the thread's pin on the tile; the read-only preview opens",
+      "target": {
+        "screen": "board-comments",
+        "node": "bc-init-c1"
+      }
+    },
+    {
+      "id": "pick-thread",
+      "actor": "designer-dana",
+      "action": "Chooses Open in Screens in the preview",
+      "target": {
+        "screen": "board-comments-preview",
+        "node": "pv-open"
+      }
+    },
+    {
+      "id": "switch-view",
+      "actor": "system",
+      "action": "Switches to the Screens view, selects the screen and opens the thread's popover at its element",
+      "target": {
+        "screen": "comments-panel"
+      }
+    },
+    {
+      "id": "back",
+      "actor": "designer-dana",
+      "action": "Returns to the Board with the same filter and zoom",
+      "target": {
+        "screen": "board-comments"
+      }
+    }
+  ]
+}

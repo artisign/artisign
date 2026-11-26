@@ -1,0 +1,97 @@
+{
+  "id": "agent-answers-mockup-comments",
+  "title": "Agent answers comments on mockup variants",
+  "group": "mockups",
+  "tags": [
+    "chr-1260",
+    "chr-1261"
+  ],
+  "status": "draft",
+  "personas": [
+    "design-agent-dex"
+  ],
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana left comments on two variants of a mockup and asks Dex to address them.",
+    "actor": "designer-dana",
+    "via": "chat"
+  },
+  "goal": "Each comment is addressed in the variant it is about.",
+  "outcome": "The variants are revised and every thread has an agent reply.",
+  "inputs": [
+    {
+      "object": "comment",
+      "source": "list_comments",
+      "example": {
+        "node": "mockup:cart-summary-options#a-sticky.item-1",
+        "body": "Item rows feel heavy in A.",
+        "status": "open"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "mockup",
+      "target": "mockups/",
+      "example": {
+        "mockup": "cart-summary-options",
+        "variants": [
+          "a-sticky",
+          "b-sheet",
+          "c-inline"
+        ]
+      }
+    },
+    {
+      "object": "comment",
+      "target": "comments.jsonl",
+      "example": {
+        "node": "mockup:cart-summary-options#a-sticky.item-1",
+        "body": "Updated A with 42 px rows.",
+        "status": "open"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "list",
+      "actor": "design-agent-dex",
+      "action": "Lists the open threads of the mockup, each with its variant and element",
+      "via": "MCP"
+    },
+    {
+      "id": "revise",
+      "actor": "design-agent-dex",
+      "action": "Revises the variant the thread is about and checks it with a screenshot",
+      "via": "MCP"
+    },
+    {
+      "id": "reply",
+      "actor": "design-agent-dex",
+      "action": "Replies on the thread with what changed",
+      "data": [
+        {
+          "object": "comment",
+          "before": {
+            "status": "open"
+          },
+          "after": {
+            "status": "open"
+          }
+        }
+      ],
+      "via": "MCP"
+    },
+    {
+      "id": "see-reply",
+      "actor": "system",
+      "action": "Shows the reply live in the thread's popover in the compare view",
+      "target": {
+        "screen": "mockup-comments-thread",
+        "node": "msg-2"
+      }
+    }
+  ]
+}

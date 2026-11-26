@@ -1,0 +1,127 @@
+<style>
+*{box-sizing:border-box}
+.app{width:1440px;height:900px;background:#e8e6e2;font:13px/1.4 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1d1c1a;display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+.top{height:44px;flex:none;background:#fbfaf9;border-bottom:1px solid #e3e0db;display:flex;align-items:center;gap:14px;padding:0 12px}
+.logo{font-weight:700;font-size:14px}
+.proj{height:28px;padding:0 10px;border:0;border-radius:6px;background:#efede9}
+.vr{width:1px;height:18px;background:#e3e0db}
+.tab{color:#6b6863;height:44px;display:inline-flex;align-items:center;border:0;background:none;padding:0 2px;font-size:13px}
+.tab.on{color:#1d1c1a;box-shadow:inset 0 -2px 0 #1d1c1a}
+.sp{flex:1}
+.ib{width:28px;height:28px;border:0;border-radius:6px;background:none;color:#6b6863;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.live{display:inline-flex;align-items:center;gap:6px;color:#6b6863;font-size:12px}
+.live i{width:7px;height:7px;border-radius:4px;background:#16a34a}
+.body{flex:1;display:flex;min-height:0}
+.side{width:264px;flex:none;background:#f4f3f0;border-right:1px solid #e3e0db}
+.sh{height:40px;display:flex;align-items:center;gap:8px;padding:0 12px;font-weight:600;border-bottom:1px solid #e3e0db}
+.field{margin:12px 8px 6px;height:28px;border-radius:6px;background:#efede9;color:#9a968f;display:flex;align-items:center;padding:0 10px;font-size:12px}
+.meta{font-size:11px;color:#9a968f;padding:0 10px 8px}
+.lbl{font-size:11px;color:#9a968f;padding:8px 18px 4px}
+.mr{margin:2px 8px;padding:7px 10px;border-radius:6px}
+.mr.on{background:#e2dfda}
+.mr .t{display:flex;align-items:center;gap:6px}
+.mr .c{margin-left:auto;font-size:11px;color:#9a968f}
+.chip{font-size:10.5px;padding:0 6px;border-radius:4px;background:#efede9;color:#6b6863;line-height:16px;display:inline-block;margin:4px 4px 0 0}
+.ctx{width:252px;flex:none;background:#fbfaf9;border-right:1px solid #e3e0db;display:flex;flex-direction:column}
+.sec{height:32px;display:flex;align-items:center;gap:6px;padding:0 12px;font-weight:600;font-size:12.5px;border-bottom:1px solid #e3e0db}
+.note{padding:12px;color:#6b6863;line-height:1.55;font-size:12.5px;border-bottom:1px solid #e3e0db}
+.note b{color:#1d1c1a;font-weight:600}
+.cnt{height:40px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid #e3e0db;font-size:12.5px;white-space:nowrap}
+.cnt .h{margin-left:auto;font-size:11px;color:#9a968f}
+.cv{flex:1;position:relative;overflow:hidden;min-width:0}
+.cbar{height:36px;display:flex;align-items:center;gap:8px;padding:0 12px;background:#fbfaf9;border-bottom:1px solid #e3e0db}
+.vc{font-size:11px;padding:0 6px;border-radius:4px;background:#efede9;color:#6b6863;line-height:18px}
+.col{position:absolute;top:52px;width:280px}
+.chd{height:66px}
+.ct{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px}
+.cd{font-size:11.5px;color:#6b6863;margin-top:2px;line-height:1.35}
+.cc{display:inline-flex;align-items:center;gap:3px;height:18px;padding:0 6px;border-radius:999px;font-size:10.5px;font-weight:600;background:#e6edfd;color:#1d4ed8}
+.cc:first-of-type{margin-left:auto}
+.cc.dt{background:#fdf1e0;color:#92400e}
+.fr{position:relative;width:280px;height:596px;background:#fff;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 8px 24px rgba(40,30,20,.10);padding:16px 14px;display:flex;flex-direction:column;gap:8px}
+.fr h4{margin:0 0 6px;font-size:16px}
+.it{position:relative;height:50px;border:1px solid #ebe8e3;border-radius:8px;display:flex;align-items:center;gap:10px;padding:0 10px;font-size:12px}
+.it i{width:30px;height:30px;border-radius:6px;background:#efede9;flex:none}
+.it .p{margin-left:auto;font-weight:600}
+.tot{position:relative;display:flex;justify-content:space-between;font-size:13px;padding:8px 2px;border-top:1px solid #ebe8e3}
+.cta{position:relative;height:40px;border-radius:8px;background:#2a3edb;color:#fff;font-weight:600;font-size:13px;display:flex;align-items:center;justify-content:center}
+.sheet{position:relative;margin:auto -14px -16px;border-radius:14px 14px 12px 12px;background:#f7f6f3;border-top:1px solid #e3e0db;padding:14px;display:flex;flex-direction:column;gap:8px}
+.grab{width:36px;height:4px;border-radius:2px;background:#d1cec8;margin:0 auto 4px}
+.ol{outline:2px solid #2563eb;outline-offset:2px}
+.pin{position:absolute;width:24px;height:24px;border-radius:12px 12px 12px 4px;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.28);padding:0;z-index:4;top:-12px;right:-12px}
+.hu{background:#2563eb}.ag{background:#7c3aed}.rs{background:#a8a49d}
+.dtp{background:#fff;color:#b45309;border:2px dashed #f59e0b}
+.act{box-shadow:0 0 0 4px rgba(37,99,235,.35),0 1px 4px rgba(0,0,0,.28)}
+.pop{position:absolute;width:320px;background:#fff;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,.07),0 10px 28px rgba(40,30,20,.14);font-size:12.5px;z-index:10}
+.phd{height:40px;display:flex;align-items:center;gap:6px;padding:0 6px 0 12px;border-bottom:1px solid #e3e0db}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:#efede9;color:#6b6863;padding:1px 6px;border-radius:4px}
+.vt{font-size:10.5px;font-weight:600;padding:0 5px;border-radius:3px;background:#1d1c1a;color:#fff;line-height:16px}
+.msg{padding:10px 12px 8px;border-bottom:1px solid #efede9}
+.who{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.av{width:20px;height:20px;border-radius:10px;color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.bd{font-size:10px;padding:0 5px;border-radius:3px;line-height:16px}
+.bh{background:#dfe4ff;color:#2a3edb}.ba{background:#ede5ff;color:#6d28d9}
+.tm{margin-left:auto;font-size:11px;color:#9a968f}
+.tx{padding-left:26px}
+.rep{display:flex;gap:6px;padding:10px 12px 6px}
+.inp{flex:1;height:32px;border-radius:6px;border:1px solid #d1cec8;background:#efede9;color:#9a968f;display:flex;align-items:center;padding:0 10px;font-size:12px}
+.send{width:32px;height:32px;border-radius:6px;border:0;background:#2563eb;color:#fff;display:inline-flex;align-items:center;justify-content:center}
+.hint{font-size:11px;color:#9a968f;padding:0 12px 10px}
+.ctb{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);display:flex;align-items:center;gap:4px;padding:4px;background:#fff;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,.07),0 10px 28px rgba(40,30,20,.14);z-index:8}
+.ctb .ib{width:32px;height:32px}
+.ctb .pr{background:#e2dfda;color:#1d1c1a}
+.tt{border:0;background:none;color:#6b6863;padding:0 10px;height:32px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;font-size:12.5px}
+.tt.on{color:#1d1c1a}
+.vs{width:1px;height:20px;background:#e3e0db;margin:0 4px}
+</style>
+<div class="app">
+<div class="top"><span class="logo">artisign</span><button class="proj">artisign-ui</button><span class="vr"></span>
+<button class="tab on">Screens</button><button class="tab">Design System</button><button class="tab">Board</button><button class="tab">Use Cases</button><span class="vr"></span><span class="live">Follow</span>
+<span class="sp"></span>
+<button class="ib" aria-label="Comment mode (C)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></button>
+<button class="ib" aria-label="Theme"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/></svg></button><span class="live"><i></i>Live</span></div>
+<div class="body">
+<div class="side"><div class="sh">Screens</div><div class="field">Search screens, mockups and tags</div><div class="meta">197 screens · 3 mockups</div><div class="lbl">Mockups</div>
+<div class="mr on"><div class="t">cart-summary-options<span class="c">3</span></div><span class="chip">mockup</span><span class="chip">chr-379</span></div>
+<div class="mr"><div class="t">variants-compare<span class="c">2</span></div><span class="chip">mockup</span></div>
+<div class="mr"><div class="t">variants-board<span class="c">4</span></div><span class="chip">mockup</span></div></div>
+<div class="ctx"><div class="sh">Context</div><div class="sec">Notes</div>
+<div class="note"><b>Where the total lives.</b> Three options for showing the cart total before checkout. Pick one to promote into cart-l2.</div>
+<div class="cnt"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6b6863" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>3 open comments<span class="h">1 detached</span></div></div>
+<div class="cv">
+<div class="cbar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b6863" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg><b style="font-weight:600">cart-summary-options</b><span class="vc">3 variants</span><span class="sp"></span><span style="font-size:12.5px">72%</span></div>
+<div class="col" style="left:24px"><div class="chd"><div class="ct">A · Sticky total<span class="cc">2</span></div><div class="cd">Total and Checkout stay pinned to the bottom edge.</div></div>
+<div class="fr"><h4>Your cart</h4>
+<div class="it ol"><i></i><span>Ceramic mug</span><span class="p">€24.00</span><button class="pin hu act" aria-label="Comment 1 on A, item-1, open">1</button></div>
+<div class="it"><i></i><span>Linen tote bag</span><span class="p">€18.50</span></div>
+<div class="it"><i></i><span>Notebook, dotted</span><span class="p">€9.00</span></div>
+<div style="margin-top:auto"></div><div class="tot"><span>Total</span><b>€51.50</b></div>
+<div class="cta">Checkout<button class="pin ag" aria-label="Comment 2 on A, btn-checkout, by ux-agent">2</button></div></div></div>
+<div class="pop" style="left:318px;top:156px" role="dialog" aria-label="Comment 1 on variant A, item-1">
+<div class="phd"><b>#1</b><span class="vt">A</span><span class="mono">item-1</span><span class="sp"></span>
+<button class="ib" aria-label="Resolve"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12l5 5L20 7"/></svg></button>
+<button class="ib" aria-label="More"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+<button class="ib" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<div class="msg"><div class="who"><span class="av" style="background:#2563eb">YO</span><b>You</b><span class="bd bh">Human</span><span class="tm">20m</span></div><div class="tx">Item rows feel heavy in A. Try the thinner rows from C here.</div></div>
+<div class="msg"><div class="who"><span class="av" style="background:#7c3aed">UX</span><b>ux-agent</b><span class="bd ba">Agent</span><span class="tm">5m</span></div><div class="tx">Updated A with 44 px rows. C stays as is for comparison.</div></div>
+<div class="rep"><div class="inp">Reply, @ to mention an agent</div><button class="send" aria-label="Send"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l16-8-6 16-2-7-8-1z"/></svg></button></div>
+<div class="hint">Enter to send · Shift+Enter for a new line · Esc to close</div></div>
+<div class="col" style="left:328px"><div class="chd"><div class="ct">B · Summary sheet</div><div class="cd">Total opens in a bottom sheet.</div></div>
+<div class="fr"><h4>Your cart</h4>
+<div class="it"><i></i><span>Ceramic mug</span><span class="p">€24.00</span></div>
+<div class="it"><i></i><span>Linen tote bag</span><span class="p">€18.50</span></div>
+<div class="it"><i></i><span>Notebook, dotted</span><span class="p">€9.00</span></div>
+<div class="sheet"><div class="grab"></div><div class="tot" style="border:0"><span>Subtotal</span><span>€51.50</span></div><div class="tot"><span>Total</span><b>€51.50</b></div><div class="cta">Checkout</div></div></div></div>
+<div class="col" style="left:632px"><div class="chd"><div class="ct">C · Inline totals<span class="cc">1</span><span class="cc dt">1 detached</span></div><div class="cd">Line totals per row, the sum under the list.</div></div>
+<div class="fr"><button class="pin dtp" style="top:-12px;left:-12px;right:auto" aria-label="Comment 5 on C, detached">5</button><h4>Your cart</h4>
+<div class="it" style="height:42px"><i></i><span>Ceramic mug ×2</span><span class="p">€24.00</span></div>
+<div class="it" style="height:42px"><i></i><span>Linen tote bag</span><span class="p">€18.50</span><button class="pin rs" aria-label="Comment 4 on C, resolved"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+<div class="it" style="height:42px"><i></i><span>Notebook ×3</span><span class="p">€9.00</span></div>
+<div class="tot" style="border-top:1px dashed #d1cec8"><span>Total</span><b>€51.50</b><button class="pin hu" aria-label="Comment 3 on C, total-row">3</button></div>
+<div style="margin-top:auto"></div><div class="cta">Checkout</div></div></div>
+<div class="ctb" role="toolbar" aria-label="Comment tools">
+<button class="ib pr" aria-label="Select (V)" aria-pressed="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 8-6 2-2 6z"/></svg></button>
+<button class="ib" aria-label="Comment (C)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></button>
+<span class="vs"></span><button class="tt on" aria-pressed="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg>Show resolved</button><button class="tt">Hide pins</button></div>
+</div></div></div>

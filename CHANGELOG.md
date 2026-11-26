@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Features
 
 - **Comments anchored to elements:** every comment thread belongs to a node. When a rewrite removes that node, the thread is marked `detached` instead of disappearing, and it can be moved to another node. `list_comments` returns each thread's screen, node, detached state and the agent that wrote it, and filters by `status: "detached"`. `reply_comment` can reopen and re-anchor a thread, and agents can start threads with the new `create_comment` tool.
+- **Comments on the canvas:** every open thread shows as a numbered pin on its element, blue for a human and purple for an agent; a detached thread waits in amber at the screen's top-left corner. A pin opens the thread in a popover next to the element, where you reply (with @-mentions for agents), resolve, re-anchor or delete. Comment mode (C, or the canvas toolbar) outlines the element under the pointer and starts a thread on a click. The floating toolbar also shows resolved threads or hides the pins. The Comments section in the Context panel is now a single row with the open count.
 
 ## [2.3.0] - 2026-11-21
 

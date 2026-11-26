@@ -41,7 +41,8 @@ import { renderScreenChips, renderTagNotes } from "./notes-panel.js";
 import { renderMockupView } from "./mockup-view.js";
 import { applyMockupZoom } from "./mockup-zoom.js";
 import { applyFlowMode } from "./flows.js";
-import { applyCommentMode, highlightSelection, bareNodeId, openNodeIds, openThreadCount, renderCommentsPanel, resolveSelectionAfterReload } from "./comments.js";
+import { bareNodeId } from "./comments.js";
+import { createCommentCanvas, countRow } from "./comment-canvas.js";
 import {
   pushActivityEntry,
   activityTargetExists,
@@ -218,14 +219,12 @@ const statusBarToggle = document.getElementById("status-bar-toggle");
 const warningBadge = document.getElementById("warning-badge");
 const connectionStatus = document.getElementById("connection-status");
 const viewTabs = document.querySelectorAll(".view-tab");
-const commentsListEl = document.getElementById("comments-list");
-const commentComposeForm = document.getElementById("comment-compose");
-const commentTargetLabel = document.getElementById("comment-target-label");
-const commentBodyInput = document.getElementById("comment-body-input");
-const commentErrorEl = document.getElementById("comment-error");
-const commentsCountEl = document.getElementById("comments-count");
-const commentAddButton = document.getElementById("comment-add");
-const commentCancelButton = document.getElementById("comment-cancel");
+const commentsRowBtn = document.getElementById("comments-row");
+const commentsRowLabel = document.getElementById("comments-row-label");
+const commentsRowHint = document.getElementById("comments-row-hint");
+const commentLayerEl = document.getElementById("comment-layer");
+const commentToolbarEl = document.getElementById("comment-toolbar");
+const commentBannerEl = document.getElementById("comment-banner");
 const bodyEl = document.getElementById("body");
 const sidebarScreensEl = document.getElementById("sidebar-screens");
 const sidebarScreensCollapseBtn = document.getElementById("sidebar-screens-collapse");
@@ -288,16 +287,6 @@ let activeMode = "none";
 let modeCleanup = () => {}; // click handling + outlines/markers inside the iframe
 let warningBadgeCleanup = () => {}; // click-to-cycle listener on the warning badge
 let warningCount = 0;
-let comments = [];
-let selectedNode; // undefined = nothing selected; null = screen-level target
-// The screen `selectedNode` was selected on — set by restoreSelection.
-// A reload only re-resolves a selection made on the SAME screen it applies
-// to (see resolveSelectionAfterReload); this also catches a screen switch
-// racing a click on the still-attached old screen's document, which would
-// otherwise tag the click's target with whichever screen the app has since
-// switched to.
-let selectedNodeScreen = null;
-let selectionCleanup = () => {}; // highlight on the currently selected target
 /** @type {"fit" | number} */
 let zoom = "fit";
 // Separate zoom state for the mockup comparison row (see applyMockupZoom in
@@ -777,7 +766,7 @@ function resetProjectState() {
   warningBadgeCleanup();
   warningBadgeCleanup = () => {};
   warningCount = 0;
-  clearSelection();
+  commentCanvas.setData({ screen: null, comments: [], threads: [] });
   screens = [];
   screenFlows = [];
   tagNotes = []; // else one project's tag notes leak into the panel of the next
@@ -790,7 +779,6 @@ function resetProjectState() {
   // activeProjectRoot has already moved on to the new project.
   clearTimeout(boardFilterWriteTimer);
   hideAgentPresentedBanner(); // CHR-625 — a presentation is per-project; don't carry it over to the next
-  comments = [];
   boardBuilt = false;
   activeMode = "none";
   flowModeToggle.setAttribute("aria-pressed", "false");
@@ -1720,13 +1708,8 @@ emptyGuideCopyBtn.addEventListener("click", async () => {
 
 async function selectScreen(screen) {
   if (compare.isOn() && !compare.inFamily(screen)) compare.leave(); // compare belongs to one variant family (CHR-738)
-  // Node ids are only unique within one screen (see the iframeRenderedScreen
-  // comment above) — a comment target selected on the previous screen must
-  // not survive onto this one, even if a same-named id happens to exist
-  // here too. The reload's `load` handler only re-resolves a SAME-screen
-  // reload (see resolveSelectionAfterReload); an actual screen switch has to
-  // clear it up front instead.
-  clearSelection();
+  // Node ids are only unique within one screen: the previous screen's pins and popover must not survive onto this one, even where a same-named id exists here too.
+  commentCanvas.setData({ screen, comments: [], threads: [] });
   clearActivityHighlights(); // CHR-631 — an old highlight must never linger over a screen it no longer describes; navigateToActivity schedules THIS screen's own highlight only after this call returns (see its own comment)
   pendingActivityHighlight = null;
   clearTimeout(activityHighlightGraceTimer);
@@ -1818,17 +1801,20 @@ async function loadCurrentScreen() {
 
 async function loadComments() {
   const requestId = ++commentsRequestId;
-  const result = currentScreen ? await fetchComments(currentScreen, activeProjectRoot) : [];
+  const screen = currentScreen;
+  const result = screen ? await fetchComments(screen, activeProjectRoot) : { comments: [], threads: [] };
   if (requestId !== commentsRequestId) return; // a newer request has since started — drop this stale result
-  comments = result;
-  renderCommentsPanel(commentsListEl, comments, handleReply, `${activeProjectRoot}\n${currentScreen}`);
-  const open = openThreadCount(comments);
-  commentsCountEl.textContent = comments.length === 0 ? "" : `${open} open`;
-  // Markers depend on `comments`, not on the iframe's load event — refresh
-  // them here, right when the data they're derived from actually changes,
-  // rather than relying on applyActiveMode() being re-triggered by
-  // something else that happens to run afterward.
-  if (activeMode === "comment") applyActiveMode();
+  commentCanvas.setData({ screen, comments: result.comments, threads: result.threads });
+  renderCommentsRow(result.threads);
+}
+
+/** CHR-1253 — the Context sidebar's one-line summary of the screen's threads. */
+function renderCommentsRow(threads) {
+  const row = countRow(threads);
+  commentsRowLabel.textContent = row.label;
+  commentsRowHint.hidden = row.open === 0;
+  commentsRowHint.textContent = row.detached > 0 ? `${row.detached} detached · shown on canvas` : "shown on canvas";
+  commentsRowBtn.dataset.empty = String(row.open === 0);
 }
 
 /** Rebuilds the Elements panel's list from the current screen's nodes (see fetchScreenNodes/buildEntries). */
@@ -1858,58 +1844,51 @@ function syncInspectOverlay() {
   updateInspectOverlay(inspectOverlayEl, domId ? getRenderedDocForScreen(currentScreen) : null, domId, inspectorPanel.getFocusedLabel());
 }
 
-/** @type {(rootId: string, text: string, onError: (message: string) => void) => void} */
-async function handleReply(rootId, text, onError) {
-  const result = await postComment({ parent_id: rootId, text }, activeProjectRoot);
-  if (!result.ok) {
-    onError(result.message);
-    return;
-  }
-  await loadComments(); // a reply can resolve the thread — loadComments() itself refreshes markers
-}
-
-function clearSelection() {
-  selectionCleanup();
-  selectionCleanup = () => {};
-  selectedNode = undefined;
-  selectedNodeScreen = null;
-  commentComposeForm.hidden = true;
-  commentErrorEl.hidden = true;
-  commentBodyInput.value = "";
-}
-
 /**
- * Applies (or re-applies) a comment-mode selection: highlights `nodeId` in
- * the current document, updates the target label, and tags it with `screen`
- * (see selectedNodeScreen) so a later reload can tell whether it still
- * applies. Used both for a fresh click (via selectCommentTarget, which also
- * opens the compose form) and to silently re-apply an already-open
- * selection after an SSE-triggered reload, without touching the compose
- * form/error state or stealing focus.
- * @param {string | null} nodeId
- * @param {string | null} screen
+ * Posts one thread action for the canvas popover, then reloads the screen's
+ * comments (the SSE "comments" event would too, a moment later).
+ * @param {Parameters<typeof postComment>[0]} input
  */
-function restoreSelection(nodeId, screen) {
-  selectionCleanup();
-  const doc = screenFrame.contentDocument;
-  selectedNode = nodeId;
-  selectedNodeScreen = screen;
-  selectionCleanup = doc ? highlightSelection(doc, nodeId) : () => {};
-  commentTargetLabel.textContent = nodeId === null ? "New comment on screen" : `New comment on ${nodeId}`;
+async function commentAction(input) {
+  const result = await postComment(input, activeProjectRoot);
+  if (result.ok) await loadComments();
+  return result;
 }
 
-function selectCommentTarget(nodeId, screen = iframeRenderedScreen) {
-  // The screen this click's doc actually renders — see the module comment
-  // on iframeRenderedScreen. Tagging with it here (not `currentScreen`)
-  // matters if a screen switch is racing this click: `currentScreen` may
-  // already read the NEW screen while this doc (whose listeners are what
-  // just fired) is still the OLD one; `iframeRenderedScreen` only changes
-  // once that new screen's own `load` event lands.
-  restoreSelection(nodeId, screen);
-  commentErrorEl.hidden = true;
-  commentComposeForm.hidden = false;
-  commentBodyInput.focus();
-}
+/** The canvas comment layer (CHR-1248): pins, popover, comment mode's hover/click, the floating toolbar. */
+const commentCanvas = createCommentCanvas({
+  canvasEl,
+  holderEl: screenHolderEl,
+  layerEl: commentLayerEl,
+  toolbarEl: commentToolbarEl,
+  bannerEl: commentBannerEl,
+  getDoc: () => (iframeRenderedScreen === currentScreen ? screenFrame.contentDocument : null),
+  prefs: {
+    showResolved: readBoolPref(prefsStorage, "artisign.comments.showResolved", false),
+    hidePins: readBoolPref(prefsStorage, "artisign.comments.hidePins", false),
+  },
+  onPrefsChange: ({ showResolved, hidePins }) => {
+    writeBoolPref(prefsStorage, "artisign.comments.showResolved", showResolved);
+    writeBoolPref(prefsStorage, "artisign.comments.hidePins", hidePins);
+  },
+  actions: {
+    setMode: (on) => {
+      if (on !== (activeMode === "comment")) setMode("comment");
+    },
+    create: (nodeId, text) => {
+      if (!currentScreen) return Promise.resolve({ ok: false, message: "No screen is open." });
+      return commentAction({ screen: currentScreen, node_id: nodeId, text });
+    },
+    reply: (rootId, text) => commentAction({ parent_id: rootId, text }),
+    resolve: (rootId) => commentAction({ parent_id: rootId, text: "", resolved: true }),
+    reopen: (rootId) => commentAction({ action: "reopen", comment_id: rootId }),
+    remove: (rootId) => commentAction({ action: "delete", comment_id: rootId }),
+    reanchor: (rootId, domId) => commentAction({ action: "reanchor", comment_id: rootId, screen: currentScreen ?? "", node_id: domId }),
+    copy: (text) => {
+      void navigator.clipboard?.writeText(text).catch(() => {});
+    },
+  },
+});
 
 // The iframe document is replaced wholesale on every srcdoc assignment, so
 // flow/comment-mode listeners and outlines have to be reapplied after each
@@ -1922,7 +1901,7 @@ function applyActiveMode() {
   } else if (activeMode === "flow") {
     modeCleanup = applyFlowMode(doc, true, selectScreenHuman); // a flow click-through is human navigation too (ADR-005 pause rule 1)
   } else if (activeMode === "comment") {
-    modeCleanup = applyCommentMode(doc, true, openNodeIds(comments), selectCommentTarget);
+    modeCleanup = () => {}; // comment-canvas.js listens on the document itself (attachDoc) and gates on its own mode flag
   } else if (activeMode === "inspect") {
     modeCleanup = applyInspectMode(doc, true, {
       getModelIds: () => inspectorPanel.getModelIds(),
@@ -1951,6 +1930,7 @@ function updateCanvas() {
   const { width, height } = applyCanvas({ canvasEl, holderEl: screenHolderEl, iframeEl: screenFrame, zoom, topInset: showCaption ? FRAME_CAPTION_BAND : 0 });
   frameCaptionEl.hidden = !showCaption;
   if (showCaption) frameCaptionEl.textContent = `${iframeRenderedScreen} · ${width} × ${height}`;
+  commentCanvas.layout(); // pins follow zoom, resize and every re-render
 }
 
 /** Whether the zoom buttons currently control the mockup row instead of the screen canvas — see applyMainVisibility. */
@@ -2011,7 +1991,7 @@ function setupSidePanel(panelEl, collapseBtn, prefKey, defaultCollapsed = false)
 }
 
 setupSidePanel(sidebarScreensEl, sidebarScreensCollapseBtn, "artisign.sidebar-screens.collapsed");
-const expandContextPanel = setupSidePanel(sidebarContextEl, sidebarContextCollapseBtn, "artisign.sidebar-context.collapsed", true);
+setupSidePanel(sidebarContextEl, sidebarContextCollapseBtn, "artisign.sidebar-context.collapsed", true);
 const expandInspectorPanel = setupSidePanel(inspectorEl, inspectorCollapseBtn, "artisign.inspector.collapsed", true);
 
 zoom = parseZoomPref(readStringPref(prefsStorage, "artisign.zoom", null), zoom);
@@ -2028,11 +2008,9 @@ updateCanvas();
 screenFrame.addEventListener("load", () => {
   // An SSE-triggered change event reloads the iframe every time the
   // watched project's files change while the human is looking — often every
-  // few seconds while an agent is actively editing. Re-resolve the comment
-  // selection against the freshly loaded document instead of dropping it
-  // unconditionally: decide it up front (selectedNodeScreen
-  // guards against a screen switch racing a click on the old doc — review
-  // fix 2), but apply the decision below only AFTER applyActiveMode(). The
+  // few seconds while an agent is actively editing. The comment layer keeps
+  // its open popover across a same-screen reload and re-measures its pins
+  // against the fresh document (attachDoc + updateCanvas's layout). The
   // Elements panel's inspect-mode focus survives on its own via
   // createInspectorPanel.setEntries' same-screen carry-over (see its own
   // comment) — nothing to redo for it here.
@@ -2041,13 +2019,6 @@ screenFrame.addEventListener("load", () => {
   doc?.addEventListener("keydown", onShortcutKeydown);
   doc?.addEventListener("pointerdown", closeOverlaysOnFramePress, true);
   doc?.addEventListener("click", closeOverlaysOnFramePress, true);
-  const nodeExists = typeof selectedNode === "string" && !!doc?.getElementById(selectedNode);
-  const resolvedSelection = resolveSelectionAfterReload({
-    selectedNode,
-    selectionScreen: selectedNodeScreen,
-    reloadedScreen: pendingRenderScreen,
-    nodeExists,
-  });
   // Which screen this document actually is — see the module comment on
   // iframeRenderedScreen. Setting it before refreshExpanded()/
   // syncInspectOverlay() below lets both correctly read this (now current)
@@ -2058,16 +2029,7 @@ screenFrame.addEventListener("load", () => {
   syncInspectOverlay(); // repositions the overlay if something's still focused on this same screen, hides it otherwise
   applyPendingActivityHighlight(); // CHR-631 — the re-render a pending write/navigate highlight was waiting for has now landed
   applyActiveMode();
-  // Restoring the selection AFTER applyActiveMode matters when the selected
-  // node also anchors an open thread marker: applyCommentMode must capture
-  // the marker-only style as this element's "original" before
-  // highlightSelection appends the selection outline on top — otherwise
-  // clearing the selection later strips the marker along with it, and the
-  // stale modeCleanup closure re-applies a style still carrying the
-  // selection outline on the NEXT reload, with nothing selected (review
-  // fix 1).
-  if (resolvedSelection === undefined) clearSelection();
-  else restoreSelection(resolvedSelection, iframeRenderedScreen);
+  commentCanvas.attachDoc(iframeRenderOk ? doc : null);
   updateCanvas();
   warningBadgeCleanup();
   const badgeUpdate = updateWarningBadge(warningBadge, screenFrame.contentDocument);
@@ -2205,17 +2167,16 @@ function setMode(next) {
   // it turns off), so gating on `next` alone would never clean up state
   // for a self-toggle-off, only for switching to a *different* mode.
   const resulting = activeMode === next ? "none" : next;
-  if (activeMode === "comment" && resulting !== "comment") clearSelection();
   if (activeMode === "inspect" && resulting !== "inspect") clearInspectFocus();
   // ADR-005 pause rule 1 — an open comment or inspect mode pauses follow.
   if (resulting === "comment" || resulting === "inspect") pauseFollow();
-  // CHR-888 — both panels start collapsed; a mode whose output lands in one opens it.
-  if (resulting === "comment") expandContextPanel();
+  // CHR-888 — both panels start collapsed; a mode whose output lands in one opens it. Comment mode's output is on the canvas (CHR-1248).
   if (resulting === "inspect") expandInspectorPanel();
   activeMode = resulting;
   flowModeToggle.setAttribute("aria-pressed", String(activeMode === "flow"));
   commentModeToggle.setAttribute("aria-pressed", String(activeMode === "comment"));
   inspectModeToggle.setAttribute("aria-pressed", String(activeMode === "inspect"));
+  commentCanvas.setMode(activeMode === "comment");
   applyActiveMode();
   board.setFlowMode(activeMode === "flow");
 }
@@ -2225,30 +2186,13 @@ flowModeToggle.addEventListener("click", () => {
   setMode("flow");
 });
 commentModeToggle.addEventListener("click", () => setMode("comment"));
-// The Comments header's add action: comment mode on (once), then a screen-level compose — a click on an element in the frame retargets it.
-commentAddButton.addEventListener("click", () => {
+// CHR-1253 — the sidebar row: comment mode on, then the first pin focused.
+commentsRowBtn.addEventListener("click", () => {
   if (!currentScreen) return;
   if (activeMode !== "comment") setMode("comment");
-  // A screen-wide compose belongs to the screen being shown now, not to the document still in the frame: right after a screen switch the old srcdoc is still there, and tagging with it would make that screen's own load drop the compose form.
-  selectCommentTarget(null, currentScreen);
+  commentCanvas.focusFirstPin();
 });
 inspectModeToggle.addEventListener("click", () => setMode("inspect"));
-
-commentCancelButton.addEventListener("click", () => clearSelection());
-
-commentComposeForm.addEventListener("submit", async (evt) => {
-  evt.preventDefault();
-  const text = commentBodyInput.value.trim();
-  if (!text || !currentScreen) return;
-  const result = await postComment({ screen: currentScreen, node_id: selectedNode ?? null, text }, activeProjectRoot);
-  if (!result.ok) {
-    commentErrorEl.textContent = result.message;
-    commentErrorEl.hidden = false;
-    return;
-  }
-  clearSelection();
-  await loadComments(); // the new comment may need an open-thread marker — loadComments() refreshes it
-});
 
 /**
  * @returns {Promise<boolean>} false on a fetch error (network/5xx) — the
@@ -2368,12 +2312,13 @@ function applyMainVisibility() {
   const toggles = modeToggleStates({ view: currentView, showMockup, comparing });
   flowModeToggle.disabled = toggles.flow.disabled;
   commentModeToggle.disabled = toggles.comment.disabled;
-  commentAddButton.disabled = toggles.comment.disabled;
+  commentsRowBtn.disabled = toggles.comment.disabled || !currentScreen;
+  // The comment layer and its toolbar belong to the single-screen canvas only.
+  commentCanvas.setToolbarHidden(currentView !== "screens" || showMockup || comparing || !currentScreen);
   inspectModeToggle.disabled = toggles.inspect.disabled;
   // The disabled reason (or the label) is the shared tooltip, not a native title.
   flowModeToggle.dataset.tooltip = toggles.flow.title || "Flow mode";
   commentModeToggle.dataset.tooltip = toggles.comment.title || "Comment mode";
-  commentAddButton.dataset.tooltip = toggles.comment.title || "Add comment";
   inspectModeToggle.dataset.tooltip = toggles.inspect.title || "Inspect mode";
   if (comparing || currentView !== "screens") setZoomMenuOpen(false);
   // The compare panel replaces the Elements/Activity panel while comparing.
@@ -2608,6 +2553,8 @@ function runShortcut(id) {
       shortcutsDialog.show();
       return true;
     case "leave":
+      // The comment layer's Escape first cancels a re-anchor pick or closes the popover; the next one leaves comment mode.
+      if (commentCanvas.handleEscape()) return true;
       // Inspect mode's Escape first clears the focused element, the next one leaves the mode.
       if (activeMode === "inspect" && inspectorPanel.getFocusedDomId()) clearInspectFocus();
       else if (activeMode !== "none") setMode(activeMode);

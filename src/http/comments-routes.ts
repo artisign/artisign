@@ -100,7 +100,9 @@ export async function handleCommentsRoutes(req: IncomingMessage, res: ServerResp
     sendJson(res, 400, { code: "validation_failed", message: "screen is required" });
     return true;
   }
-  if (typeof body.text !== "string" || body.text.length === 0) {
+  // A bare resolve on a thread (the popover's Resolve button) carries no words.
+  const bareResolve = hasParent && body.resolved === true && (body.text === undefined || body.text === "");
+  if (!bareResolve && (typeof body.text !== "string" || body.text.length === 0)) {
     sendJson(res, 400, { code: "validation_failed", message: "text is required" });
     return true;
   }
@@ -137,7 +139,7 @@ export async function handleCommentsRoutes(req: IncomingMessage, res: ServerResp
     const comment = await createComment(store, {
       screen: typeof body.screen === "string" ? body.screen : "",
       node_id: nodeId,
-      text: body.text,
+      text: typeof body.text === "string" ? body.text : "",
       parent_id: (body.parent_id as string | undefined) ?? null,
       resolved: body.resolved as boolean | undefined,
     });

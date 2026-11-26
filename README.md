@@ -121,7 +121,7 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 | Reads | `get_node` | Subtree of one node, addressed as `<screen>.<node-id>`. Tiered + field selection. |
 | Reads | `get_design_system` | Tokens, components (with variants and the default variant's slot names), and patterns. `tree` carries every token value, grouped by bucket. |
 | Reads | `find_nodes` | Where-query across screens (style ref, component ref, variant, comments, text, flow). |
-| Reads | `list_comments` | Open/resolved comments, filtered by screen or node. |
+| Reads | `list_comments` | Open/resolved comments on screens and mockup variants, filtered by screen, mockup, variant or node. |
 | Reads | `get_mockup` | A mockup's variants — raw HTML, outside the ref model. |
 | Writes | `write_html` | Create or fully replace a screen from augmented HTML. |
 | Writes | `patch_html` | Surgical patch by node ref or CSS selector: replace, insert, delete, set attr. |
@@ -137,7 +137,7 @@ Every tool except `list_projects`, `init_project` and `get_guide` takes a requir
 | Lifecycle | `promote_to_system` | Lift an inline value or a repeated element into a token, component, or pattern. |
 | Lifecycle | `promote_mockup` | Copy a chosen mockup variant into a new, design-system-bound screen (the mockup stays). |
 | Lifecycle | `delete_entity` | Delete a screen, component, pattern, or mockup; refuses a component still referenced by a screen, and a screen that still has variants (`has_variants`) unless `cascade: true` deletes the whole subtree. |
-| Comments | `reply_comment`, `create_comment` | Answer, resolve, reopen or re-anchor a thread; start a thread on a node. |
+| Comments | `reply_comment`, `create_comment` | Answer, resolve, reopen or re-anchor a thread; start a thread on a screen or mockup node. |
 | Visual review | `get_screenshot` | Screenshots a rendered screen (or one node), or one mockup variant, as a PNG — the write → screenshot → adjust loop. |
 | Visual review | `inspect_node` | Computed box and styles of one node as text — cheaper than vision for geometry questions. |
 

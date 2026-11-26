@@ -200,6 +200,12 @@ variant (a derived id is only stable for one call, and the response warns
 way; the rest of the document stays byte-for-byte unchanged. `class` and `style`
 can be set with `set_attr` on a mockup node, since mockups have no `update_refs`.
 
+Give every element you want reviewed an authored `id` (`write_mockup` or
+`patch_html` `replace`): the human's comments on a mockup anchor to authored
+ids, and a comment on an element without one lands on the nearest ancestor that
+has one, else on the whole variant. Threads stay on the mockup when you
+`promote_mockup`; the new screen starts without comments.
+
 Once a direction wins, `promote_mockup {mockup, variant, screen}` copies that
 one variant into a real screen via the normal `write_html` path — the mockup
 itself stays on disk as exploration history; delete it with `delete_entity`
@@ -347,8 +353,8 @@ These tools are built for small contexts — use the levers:
   the same element for the one call you got it from — including the call
   right after your own edit. Add an explicit `id` to any definition node you
   intend to address again; a write that touches one without an explicit id
-  returns a `missing_id` warning saying so. `reply_comment` stays
-  screen-only — comments anchor to what the browser renders, not to a
+  returns a `missing_id` warning saying so. The comment tools take no
+  definition node — comments anchor to what the browser renders, not to a
   definition. A `find_nodes` match found inside a component instance's slot
   fill carries `node: null`, `addressable: false`, `inside` pointing at
   the enclosing instance, and (screen matches only) its authored `id` when it has one — use that as
@@ -404,6 +410,21 @@ with `detached: true` (`status: "detached"` lists those). Re-anchor it with
 or resolve it. To raise a point yourself, `create_comment` starts a thread on a
 node. Keep node `id`s stable across writes — comments and flows anchor to them,
 and a generated id detaches its threads on the next rewrite.
+
+Mockup variants take threads too. A mockup thread carries `mockup` and
+`variant` instead of `screen`, and `node` is the mockup node ref
+(`mockup:<name>#<variant>.<node-id>`, the form `patch_html` takes) or `null`
+for the whole variant. `list_comments` filters with `mockup` (all its variants)
+and `variant`; `create_comment` takes `screen` or `mockup` + `variant`, and
+`reply_comment` `reanchor` takes a mockup ref or a bare id on the thread's
+variant. Mockup threads anchor to authored `id` attributes only: a generated
+id (`n3`) is refused with `not_found`, because it shifts with any earlier
+insert. A thread is detached when its variant file is gone or its id is no
+longer in the file; it survives `write_mockup`, `patch_html`, `delete_entity`
+and `promote_mockup`. A thread never moves between a screen and a mockup.
+`get_project` counts open mockup threads in `open_comment_count`, and
+`get_mockup` and the `mockups` of `get_project` (`tree`, `full`) carry an
+`open_comment_count` for every mockup or variant that has open threads.
 
 ## Handoff
 

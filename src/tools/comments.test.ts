@@ -170,7 +170,7 @@ describe("createComment", () => {
     const reply = await createComment(fx.store, { screen: "ignored", node_id: "ignored", parent_id: root.id, text: "still waiting" });
 
     expect(reply.parent_id).toBe(root.id);
-    expect(reply.screen).toBe("home");
+    expect(reply).toMatchObject({ screen: "home" });
     expect(reply.node_id).toBe("home.n2");
 
     const list = await listComments(fx.store, { node: "home.n2", include_replies: true });

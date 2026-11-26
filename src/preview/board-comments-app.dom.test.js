@@ -1,0 +1,192 @@
+// @vitest-environment jsdom
+//
+// CHR-1264 end to end through app.js: the Board's read-only comment pins — one request for all screens, the toolbar toggles, a pin's preview and "Open in Screens", and the refresh on SSE events.
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import html from "./index.html?raw";
+
+const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
+const SCREENS = [
+  { name: "one", tags: [], notes: "" },
+  { name: "two", tags: [], notes: "" },
+];
+const TS = "2026-11-26T10:00:00.000Z";
+
+const memoryStorage = new Map();
+const storageStub = {
+  getItem: (k) => memoryStorage.get(k) ?? null,
+  setItem: (k, v) => void memoryStorage.set(k, String(v)),
+  removeItem: (k) => void memoryStorage.delete(k),
+  get length() { return memoryStorage.size; },
+  key: (i) => [...memoryStorage.keys()][i] ?? null,
+  clear: () => memoryStorage.clear(),
+};
+
+let boardData;
+let requests;
+let sources;
+
+function stubDaemon() {
+  boardData = { comments: [], threads: [] };
+  requests = [];
+  sources = [];
+  vi.stubGlobal("localStorage", storageStub);
+  Object.defineProperty(window, "localStorage", { configurable: true, value: storageStub });
+  vi.stubGlobal("EventSource", class { constructor() { sources.push(this); } close() {} });
+  vi.stubGlobal("requestAnimationFrame", (cb) => cb());
+  vi.stubGlobal("CSS", { escape: (s) => s });
+  vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
+  vi.stubGlobal("fetch", async (url) => {
+    const [path, query] = String(url).split("?");
+    const json = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => "" });
+    if (path === "/api/comments") {
+      requests.push(query);
+      const screen = new URLSearchParams(query).get("screen");
+      return json(screen ? { comments: boardData.comments.filter((c) => c.screen === screen), threads: boardData.threads.filter((t) => t.screen === screen) } : boardData);
+    }
+    if (path === "/api/projects") return json({ active: "/p", open: [{ root: "/p", name: "p" }], recent: [] });
+    if (path === "/api/screens") return json({ screens: SCREENS });
+    if (path === "/api/board-state") return json({ filter: null, pinned: [], expanded: [] });
+    if (path === "/api/mockups") return json({ mockups: [] });
+    if (path === "/api/tags") return json({ tags: [] });
+    if (path === "/api/flows") return json({ flows: [] });
+    if (path === "/api/tools/get_screen") return json({ nodes: [] });
+    if (path.startsWith("/api/render/")) return { ok: true, status: 200, text: async () => `<div id="root"><p id="btn-a">A</p></div>` };
+    return json({});
+  });
+}
+
+HTMLDialogElement.prototype.show ??= function () { this.setAttribute("open", ""); };
+HTMLDialogElement.prototype.close ??= function () { this.removeAttribute("open"); };
+
+const flush = async () => {
+  for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0));
+};
+const $ = (sel) => document.querySelector(sel);
+const press = (el) => {
+  el.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+  el.click();
+};
+const emit = (event) => sources.at(-1).onmessage({ data: JSON.stringify(event) });
+
+const seed = () => {
+  boardData = {
+    comments: [
+      { id: "c1", screen: "one", node_id: "one.btn-a", text: "Make it primary", author: "human", parent_id: null, resolved: false, ts: TS },
+      { id: "c2", screen: "two", node_id: "two.btn-a", text: "Check spacing", author: "agent", agent: "ux-agent", parent_id: null, resolved: false, ts: TS },
+      { id: "c3", screen: "two", node_id: "two.btn-a", text: "Fixed earlier", author: "human", parent_id: null, resolved: true, ts: TS },
+    ],
+    threads: [
+      { id: "c1", screen: "one", node_id: "one.btn-a", author: "human", status: "open", detached: false, reply_count: 0 },
+      { id: "c2", screen: "two", node_id: "two.btn-a", author: "agent", agent: "ux-agent", status: "open", detached: false, reply_count: 0 },
+      { id: "c3", screen: "two", node_id: "two.btn-a", author: "human", status: "resolved", detached: false, reply_count: 0 },
+    ],
+  };
+};
+
+async function openBoard() {
+  localStorage.setItem("artisign.last-screen:/p", "one");
+  await import("./app.js");
+  await flush();
+  $('.view-tab[data-view="board"]').click();
+  await flush();
+  // The tile documents load from srcdoc; give them an element to measure.
+  for (const iframe of document.querySelectorAll(".board-tile-iframe")) {
+    iframe.contentDocument.body.innerHTML = '<div id="root"><p id="btn-a">A</p></div>';
+    iframe.dispatchEvent(new Event("load"));
+  }
+  await new Promise((r) => setTimeout(r, 120));
+}
+
+beforeEach(() => {
+  memoryStorage.clear();
+  vi.resetModules();
+  document.body.innerHTML = bodyHtml;
+  stubDaemon();
+});
+let documentListeners = [];
+const nativeAddEventListener = document.addEventListener.bind(document);
+beforeEach(() => {
+  documentListeners = [];
+  document.addEventListener = (type, fn, opts) => {
+    documentListeners.push([type, fn, opts]);
+    nativeAddEventListener(type, fn, opts);
+  };
+});
+afterEach(() => {
+  for (const [type, fn, opts] of documentListeners) document.removeEventListener(type, fn, opts);
+  document.addEventListener = nativeAddEventListener;
+  vi.unstubAllGlobals();
+});
+
+const boardPins = () => [...document.querySelectorAll("#board-comment-layer .comment-pin")];
+const boardRequests = () => requests.filter((q) => q.includes("scope=screens"));
+
+describe("Board comments in the app", () => {
+  it("fetches every screen's threads with one request and draws their pins and chips", async () => {
+    seed();
+    await openBoard();
+    expect(boardRequests()).toHaveLength(1);
+    expect(boardPins().map((p) => p.getAttribute("aria-label"))).toEqual(["Comment 1 on btn-a, open", "Comment 1 on btn-a, open"]);
+    expect([...document.querySelectorAll("#board-comment-layer .comment-count-chip")].map((c) => c.getAttribute("aria-label"))).toEqual(["1 open comment", "1 open comment"]);
+    expect($("#board-toolbar-status").textContent).toContain("2 open comments");
+  });
+
+  it("has no comment listener or marker inside a tile document", async () => {
+    seed();
+    await openBoard();
+    for (const iframe of document.querySelectorAll(".board-tile-iframe")) {
+      expect(iframe.contentDocument.querySelector(".comment-pin, .comment-count-chip, .board-comment-dot")).toBeNull();
+    }
+  });
+
+  it("toggles Comments off and on, and adds resolved pins with Show resolved", async () => {
+    seed();
+    await openBoard();
+    expect($("#board-comments-toggle").textContent).toBe("Comments: On");
+    $("#board-resolved-toggle").click();
+    expect($("#board-resolved-toggle").getAttribute("aria-pressed")).toBe("true");
+    expect(boardPins().some((p) => p.dataset.state === "resolved")).toBe(true);
+    $("#board-comments-toggle").click();
+    expect($("#board-comments-toggle").textContent).toBe("Comments: Off");
+    expect($("#board-comment-layer").hidden).toBe(true);
+    $("#board-comments-toggle").click();
+    expect($("#board-comment-layer").hidden).toBe(false);
+  });
+
+  it("a pin opens the read-only preview; Open in Screens shows that screen with the thread open", async () => {
+    seed();
+    await openBoard();
+    const secondTilePin = boardPins()[1];
+    press(secondTilePin);
+    const preview = $(".board-comment-preview");
+    expect(preview.hidden).toBe(false);
+    expect(preview.textContent).toContain("Check spacing");
+    expect(preview.textContent).toContain("ux-agent");
+    [...preview.querySelectorAll("button")].find((b) => b.textContent === "Open in Screens").click();
+    await flush();
+    expect($('.view-tab[data-view="screens"]').getAttribute("aria-pressed")).toBe("true");
+    expect($('.view-tab[data-view="board"]').getAttribute("aria-pressed")).toBe("false");
+    expect($("#board-comment-layer .board-comment-preview").hidden).toBe(true);
+    // The Screens canvas shows screen "two" with its own thread popover open.
+    const popover = $("#comment-layer .comment-popover");
+    expect(popover.hasAttribute("open")).toBe(true);
+    expect(popover.textContent).toContain("Check spacing");
+  });
+
+  it("an SSE comments event refetches with one more request; a screen event refetches only for a screen with threads", async () => {
+    seed();
+    await openBoard();
+    expect(boardRequests()).toHaveLength(1);
+    boardData = { ...boardData, threads: boardData.threads.slice(0, 1) };
+    emit({ type: "change", kind: "comments", name: "comments" });
+    await flush();
+    expect(boardRequests()).toHaveLength(2);
+    expect(boardPins()).toHaveLength(1);
+    emit({ type: "change", kind: "screen", name: "one" });
+    await flush();
+    expect(boardRequests()).toHaveLength(3);
+    emit({ type: "change", kind: "screen", name: "two" });
+    await flush();
+    expect(boardRequests()).toHaveLength(3); // "two" has no threads left in the answer above
+  });
+});

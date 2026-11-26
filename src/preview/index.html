@@ -330,6 +330,8 @@
               <span id="board-toolbar-spacer"></span>
               <span id="board-toolbar-status"></span>
               <span id="board-toolbar-actions">
+                <button type="button" id="board-comments-toggle" class="toggle-button" aria-pressed="true">Comments: On</button>
+                <button type="button" id="board-resolved-toggle" class="toggle-button" aria-pressed="false">Show resolved</button>
                 <button type="button" id="board-clear-pins-btn" class="board-quickjump" hidden>Clear pins</button>
               </span>
             </div>
@@ -381,6 +383,8 @@
                   <div id="board-tiles"></div>
                   <svg id="board-edges"></svg>
                 </div>
+                <!-- CHR-1264: the read-only comment overlay (board-comments.js), in the parent document at the zoomed size, next to the transformed inner box. -->
+                <div id="board-comment-layer"></div>
               </div>
             </div>
           </div>

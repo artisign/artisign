@@ -1,0 +1,9 @@
+{
+  "notes": "**Detached thread** (CHR-1248 / CHR-1258 · anchoring from CHR-1249/1254).\n\n- A thread whose node id no longer exists on the screen gets a `comment-pin` variant `detached` (dashed amber ring). Detached pins stack at the frame's top-left corner, 30px apart per extra pin.\n- `comment-popover` variant `detached`: amber alert \"<id> no longer exists on this screen. Move the thread to the element that replaced it, or resolve it.\" plus \"Pick element\" (chrome-btn primary-compact).\n- The More menu is open: \"Re-anchor to element…\" (hover), \"Copy node ref\", \"Delete thread\" (danger).\n- Count row hint: \"1 detached · shown on canvas\" (truncates with an ellipsis in the narrow Context panel).",
+  "tags": [
+    "CHR-1248",
+    "CHR-1258"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "state"
+}

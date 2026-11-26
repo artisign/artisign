@@ -4,7 +4,8 @@
     "CHR-905",
     "CHR-909",
     "chr-1004",
-    "chr-1068"
+    "chr-1068",
+    "CHR-1258"
   ],
   "variant_of": "app-shell",
   "variant_kind": "overlay"

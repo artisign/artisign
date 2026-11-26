@@ -1,0 +1,9 @@
+{
+  "notes": "**Comment mode — new thread** (CHR-1248 / CHR-1258).\n\n- Topbar comment mode is active; the blue banner reads \"Comment mode — click an element to start a thread · Esc to exit\". `comment-toolbar` variant `comment` (Comment pressed).\n- Hovering an element shows a hover outline with its node id label (here `item-1`); the clicked element (`item-3-name`) gets the target outline.\n- `comment-popover` variant `new`: header shows the node id and Discard only; the composer is focused, typing `@u` opens the mention list (agents: ux-agent). Footer: \"Enter to send\", Cancel, Comment (primary compact).\n- No pending pin is drawn until the thread is posted (as in the app).\n- Leaving comment mode (topbar toggle) returns to `comments-panel`.",
+  "tags": [
+    "CHR-1248",
+    "CHR-1258"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "state"
+}

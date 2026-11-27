@@ -1,6 +1,7 @@
 {
-  "notes": "**Popover flip + resolved pins** (CHR-1248 / CHR-1258).\n\n- Pin 4 sits on `item-3-price` near the frame's right edge; there is no room on the right, so `comment-popover` flips to the left of the anchor (order: right → left → below → above, 14px gap).\n- \"Show resolved\" is on (`comment-toolbar` variant `resolved`): resolved threads show as `comment-pin` variant `resolved` (check icon, muted). With it off they are hidden.\n- Count row counts open threads only: \"4 open comments · shown on canvas\".",
+  "notes": "**CHR-1257, Stitch chrome (2026-11-27, awaiting Christian's approval).** \"Show resolved\" is the Resolved tab of the Comments card (`comments-filter` `second`; Open → `comments-panel`). While it is selected the card lists the resolved threads (`comment-thread-row` `resolved`) and the canvas shows the resolved pins; with the Open tab they are hidden. Comments tool pressed, Agent bar folded above the card.\n\n---\n**Popover flip + resolved pins** (CHR-1248 / CHR-1258).\n\n- Pin 4 sits on `item-3-price` near the frame's right edge; there is no room on the right, so `comment-popover` flips to the left of the anchor (order: right → left → below → above, 14px gap).\n- Resolved threads show as `comment-pin` variant `resolved` (check icon, muted). *(CHR-1257: the toggle is the Resolved tab, not `comment-toolbar` `resolved`.)*\n- Open counts never include resolved threads: the Comments tool badge and the Open tab count open threads only.",
   "tags": [
+    "chr-1257",
     "CHR-1248",
     "CHR-1258"
   ],

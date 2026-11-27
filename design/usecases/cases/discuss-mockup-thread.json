@@ -19,7 +19,7 @@
     "via": "MCP"
   },
   "goal": "Dana closes the loop on a variant without leaving the compare view.",
-  "outcome": "The thread is resolved; the variant's count drops and the pin only shows with Show resolved.",
+  "outcome": "The thread is resolved; the variant's count drops and the pin only shows in the Resolved tab.",
   "state": [
     {
       "subject": "system",
@@ -56,7 +56,7 @@
     {
       "id": "see-counts",
       "actor": "designer-dana",
-      "action": "Sees the open count per variant in the column headers and the total in the Context panel",
+      "action": "Sees the open count per variant in the column headers and the total on the Comments tool's badge",
       "target": {
         "screen": "mockup-comments-thread",
         "node": "mk-a-count"
@@ -103,10 +103,10 @@
     {
       "id": "find-resolved",
       "actor": "designer-dana",
-      "action": "Turns on Show resolved to see resolved threads again, marked with a ring",
+      "action": "Switches the Comments card to the Resolved tab to see resolved threads again, marked with a check",
       "target": {
         "screen": "mockup-comments-resolved",
-        "node": "comment-toolbar"
+        "node": "comments-filter"
       }
     }
   ],

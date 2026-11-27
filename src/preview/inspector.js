@@ -171,10 +171,17 @@ export function createInspectorPanel({ listEl, emptyEl, errorEl, summaryEl, deta
     return out;
   }
 
+  /** The row that holds the tab stop (roving tabindex): the keyboard cursor, else the selection, else the first visible row. */
+  let cursorId = null;
+
   function renderTree() {
     const byId = new Map(entries.map((e) => [e.id, e]));
+    const visible = visibleIds();
+    const hadFocus = listEl.contains(document.activeElement);
+    const tabStop = [cursorId, focusedId].find((id) => id && visible.includes(id)) ?? visible[0];
+    cursorId = tabStop ?? null;
     listEl.replaceChildren(
-      ...visibleIds().map((id) => {
+      ...visible.map((id) => {
         const entry = /** @type {NonNullable<ReturnType<typeof byId.get>>} */ (byId.get(id));
         const kids = childrenOf.get(id) ?? [];
         const li = el("li", id === focusedId ? "inspector-entry inspector-entry-focused node-row is-selected" : "inspector-entry node-row");
@@ -183,6 +190,7 @@ export function createInspectorPanel({ listEl, emptyEl, errorEl, summaryEl, deta
         li.setAttribute("aria-selected", String(id === focusedId));
         if (kids.length > 0) li.setAttribute("aria-expanded", String(expanded.has(id)));
         li.dataset.entry = id;
+        li.tabIndex = id === tabStop ? 0 : -1;
         li.style.paddingLeft = `calc(var(--space-md) + ${depthOf(id)} * 12px)`;
         const chev = el("span", "node-row-chev");
         if (kids.length > 0) {
@@ -205,7 +213,61 @@ export function createInspectorPanel({ listEl, emptyEl, errorEl, summaryEl, deta
       }),
     );
     emptyEl.hidden = entries.length > 0;
+    if (hadFocus && cursorId) rowEl(cursorId)?.focus(); // focus stays on the row across a re-render
   }
+
+  /** @param {string} id @returns {HTMLElement | null} */
+  function rowEl(id) {
+    return /** @type {HTMLElement | null} */ ([...listEl.children].find((li) => /** @type {HTMLElement} */ (li).dataset.entry === id) ?? null);
+  }
+
+  /** Moves the keyboard cursor (and the tab stop) to a row and focuses it. */
+  function moveCursor(id) {
+    if (!id) return;
+    cursorId = id;
+    for (const li of listEl.children) /** @type {HTMLElement} */ (li).tabIndex = /** @type {HTMLElement} */ (li).dataset.entry === id ? 0 : -1;
+    rowEl(id)?.focus();
+  }
+
+  // Whichever row has focus holds the tab stop.
+  listEl.addEventListener("focusin", (evt) => {
+    const row = /** @type {HTMLElement | null} */ (evt.target instanceof Element ? evt.target.closest("[role=treeitem]") : null);
+    if (row?.dataset.entry && row.dataset.entry !== cursorId) moveCursor(row.dataset.entry);
+  });
+
+  // The tree keyboard pattern: Up/Down walk the visible rows, Right opens or enters, Left closes or goes to the parent, Home/End jump, Enter/Space select.
+  listEl.addEventListener("keydown", (evt) => {
+    if (evt.ctrlKey || evt.metaKey || evt.altKey) return;
+    const row = /** @type {HTMLElement | null} */ (evt.target instanceof Element ? evt.target.closest("[role=treeitem]") : null);
+    if (!row?.dataset.entry) return;
+    const id = row.dataset.entry;
+    const visible = visibleIds();
+    const index = visible.indexOf(id);
+    const kids = childrenOf.get(id) ?? [];
+    let handled = true;
+    switch (evt.key) {
+      case "ArrowDown": moveCursor(visible[Math.min(index + 1, visible.length - 1)]); break;
+      case "ArrowUp": moveCursor(visible[Math.max(index - 1, 0)]); break;
+      case "Home": moveCursor(visible[0]); break;
+      case "End": moveCursor(visible[visible.length - 1]); break;
+      case "ArrowRight":
+        if (kids.length === 0) break;
+        if (!expanded.has(id)) toggle(id);
+        else moveCursor(kids[0]);
+        break;
+      case "ArrowLeft":
+        if (kids.length > 0 && expanded.has(id)) toggle(id);
+        else moveCursor(parentOf.get(id) ?? undefined);
+        break;
+      case "Enter":
+      case " ":
+        if (onSelect) onSelect(id);
+        else focusEntry(id);
+        break;
+      default: handled = false;
+    }
+    if (handled) evt.preventDefault();
+  });
 
   function toggle(id) {
     if (expanded.has(id)) expanded.delete(id);
@@ -301,6 +363,7 @@ export function createInspectorPanel({ listEl, emptyEl, errorEl, summaryEl, deta
   function focusEntry(id, clickedDomId) {
     if (!modelIds.has(id)) return;
     focusedId = id;
+    cursorId = id; // the selection takes the tab stop
     lastClickedDomId = clickedDomId ?? id;
     for (const ancestor of ancestors(id)) expanded.add(ancestor);
     renderTree();

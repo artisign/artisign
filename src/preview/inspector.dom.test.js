@@ -114,6 +114,74 @@ describe("createInspectorPanel — the Layers tree", () => {
   });
 });
 
+describe("createInspectorPanel — the Layers tree keyboard pattern", () => {
+  const key = (el, k) => el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+  const row = (listEl, id) => listEl.querySelector(`[data-entry="${id}"]`);
+  const tabbable = (listEl) => [...listEl.querySelectorAll("[role=treeitem]")].filter((li) => li.tabIndex === 0).map((li) => li.dataset.entry);
+
+  it("roving tabindex: exactly one row is tabbable, the first (or the selected one)", () => {
+    const { panel, listEl } = makePanel();
+    document.body.append(listEl);
+    panel.setEntries(entries, "home");
+    expect(tabbable(listEl)).toEqual(["root"]);
+    panel.focusEntry("label");
+    expect(tabbable(listEl)).toEqual(["label"]);
+  });
+
+  it("Up/Down/Home/End walk the visible rows and move focus with the tab stop", () => {
+    const { panel, listEl } = makePanel();
+    document.body.append(listEl);
+    panel.setEntries(entries, "home"); // root, btn-1 visible
+    row(listEl, "root").focus();
+    key(row(listEl, "root"), "ArrowDown");
+    expect(document.activeElement.dataset.entry).toBe("btn-1");
+    expect(tabbable(listEl)).toEqual(["btn-1"]);
+    key(row(listEl, "btn-1"), "ArrowDown"); // already last
+    expect(document.activeElement.dataset.entry).toBe("btn-1");
+    key(row(listEl, "btn-1"), "ArrowUp");
+    expect(document.activeElement.dataset.entry).toBe("root");
+    key(row(listEl, "root"), "End");
+    expect(document.activeElement.dataset.entry).toBe("btn-1");
+    key(row(listEl, "btn-1"), "Home");
+    expect(document.activeElement.dataset.entry).toBe("root");
+  });
+
+  it("Right opens a closed parent, then enters its first child; Left closes an open one, then goes to the parent; aria-expanded follows and focus stays on the row", () => {
+    const { panel, listEl } = makePanel();
+    document.body.append(listEl);
+    panel.setEntries(entries, "home");
+    row(listEl, "btn-1").focus();
+    key(row(listEl, "btn-1"), "ArrowRight");
+    expect(row(listEl, "btn-1").getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement.dataset.entry).toBe("btn-1"); // re-rendered, focus kept
+    key(row(listEl, "btn-1"), "ArrowRight");
+    expect(document.activeElement.dataset.entry).toBe("label");
+    key(row(listEl, "label"), "ArrowRight"); // a leaf: nothing
+    expect(document.activeElement.dataset.entry).toBe("label");
+    key(row(listEl, "label"), "ArrowLeft"); // a leaf goes to its parent
+    expect(document.activeElement.dataset.entry).toBe("btn-1");
+    key(row(listEl, "btn-1"), "ArrowLeft");
+    expect(row(listEl, "btn-1").getAttribute("aria-expanded")).toBe("false");
+    expect(ids(listEl)).toEqual(["root", "btn-1"]);
+    expect(document.activeElement.dataset.entry).toBe("btn-1");
+  });
+
+  it("Enter and Space select the row (onSelect) and aria-selected marks it", () => {
+    const picked = [];
+    const { panel, listEl } = makePanel(() => null, (id) => picked.push(id));
+    document.body.append(listEl);
+    panel.setEntries(entries, "home");
+    key(row(listEl, "btn-1"), "Enter");
+    key(row(listEl, "root"), " ");
+    expect(picked).toEqual(["btn-1", "root"]);
+    const bare = makePanel();
+    document.body.append(bare.listEl);
+    bare.panel.setEntries(entries, "home");
+    key(row(bare.listEl, "btn-1"), "Enter");
+    expect(row(bare.listEl, "btn-1").getAttribute("aria-selected")).toBe("true");
+  });
+});
+
 describe("createInspectorPanel — Box, Design system, Type", () => {
   it("lists the box, the refs with their resolved values and the font of the selection", () => {
     const doc = document.implementation.createHTMLDocument("x");

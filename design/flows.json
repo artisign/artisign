@@ -2418,39 +2418,75 @@
     "to_kind": "screen"
   },
   {
-    "from": "notes-panel.toolbar-side-inspect",
+    "from": "flow-mode.flow-hint-products",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "flow-mode.flow-hint-new-order",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "flow-mode.flow-hint-row-1",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "flow-mode.flow-hint-row-2",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "flow-mode.flow-hint-row-3",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "flow-mode.flow-hint-row-4",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "flow-mode.flow-hint-row-5",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "flow-mode.toolbar-side-inspect",
     "event": "tap",
     "to": "inspector-selected",
     "to_kind": "screen"
   },
   {
-    "from": "notes-panel.toolbar-side-notes",
+    "from": "flow-mode.toolbar-side-notes",
     "event": "tap",
-    "to": "app-shell",
+    "to": "notes-panel",
     "to_kind": "screen"
   },
   {
-    "from": "notes-panel.comments-header",
+    "from": "flow-mode.comments-header",
     "event": "tap",
     "to": "comments-panel",
     "to_kind": "screen"
   },
   {
-    "from": "notes-panel.notes-close",
+    "from": "flow-mode.toolbar-side-flow",
     "event": "tap",
     "to": "app-shell",
     "to_kind": "screen"
   },
   {
-    "from": "notes-panel.su-row-1",
+    "from": "flow-mode.toolbar-side-design-system",
     "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "notes-panel.su-row-2",
-    "event": "tap",
-    "to": "usecases-detail",
+    "to": "design-system-view",
     "to_kind": "screen"
   },
   {
@@ -2508,6 +2544,18 @@
     "to_kind": "screen"
   },
   {
+    "from": "app-shell.toolbar-side-flow",
+    "event": "tap",
+    "to": "flow-mode",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.toolbar-side-design-system",
+    "event": "tap",
+    "to": "design-system-view",
+    "to_kind": "screen"
+  },
+  {
     "from": "comments-panel.toolbar-side-notes",
     "event": "tap",
     "to": "notes-panel",
@@ -2517,6 +2565,18 @@
     "from": "comments-panel.comments-header",
     "event": "tap",
     "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "comments-panel.toolbar-side-flow",
+    "event": "tap",
+    "to": "flow-mode",
+    "to_kind": "screen"
+  },
+  {
+    "from": "comments-panel.toolbar-side-design-system",
+    "event": "tap",
+    "to": "design-system-view",
     "to_kind": "screen"
   },
   {
@@ -2544,6 +2604,18 @@
     "to_kind": "screen"
   },
   {
+    "from": "inspector-selected.toolbar-side-flow",
+    "event": "tap",
+    "to": "flow-mode",
+    "to_kind": "screen"
+  },
+  {
+    "from": "inspector-selected.toolbar-side-design-system",
+    "event": "tap",
+    "to": "design-system-view",
+    "to_kind": "screen"
+  },
+  {
     "from": "inspector-selected.inspect-close",
     "event": "tap",
     "to": "app-shell",
@@ -2553,6 +2625,18 @@
     "from": "inspector-variant-reached-from.toolbar-side-notes",
     "event": "tap",
     "to": "notes-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "inspector-variant-reached-from.toolbar-side-flow",
+    "event": "tap",
+    "to": "flow-mode",
+    "to_kind": "screen"
+  },
+  {
+    "from": "inspector-variant-reached-from.toolbar-side-design-system",
+    "event": "tap",
+    "to": "design-system-view",
     "to_kind": "screen"
   },
   {
@@ -2580,9 +2664,69 @@
     "to_kind": "screen"
   },
   {
+    "from": "chrome-c-compare.toolbar-side-flow",
+    "event": "tap",
+    "to": "flow-mode",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-compare.toolbar-side-design-system",
+    "event": "tap",
+    "to": "design-system-view",
+    "to_kind": "screen"
+  },
+  {
     "from": "chrome-c-compare.compare-close",
     "event": "tap",
     "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.toolbar-side-inspect",
+    "event": "tap",
+    "to": "inspector-selected",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.toolbar-side-notes",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.comments-header",
+    "event": "tap",
+    "to": "comments-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.toolbar-side-flow",
+    "event": "tap",
+    "to": "flow-mode",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.toolbar-side-design-system",
+    "event": "tap",
+    "to": "design-system-view",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.notes-close",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.su-row-1",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.su-row-2",
+    "event": "tap",
+    "to": "usecases-detail",
     "to_kind": "screen"
   }
 ]

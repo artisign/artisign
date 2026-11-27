@@ -49,7 +49,7 @@ export function panelRows(threads, comments, tab, { now = Date.now(), variantLab
  * @returns {string}
  */
 export function panelFootText(rows, tab) {
-  if (tab === "resolved") return "Resolved threads show as check pins on the canvas. Open one to reopen it.";
+  if (tab === "resolved") return "Resolved pins show on the canvas while this tab is open. Reopen a thread from its popover.";
   if (rows.some((r) => r.kind === "detached")) return "Detached threads lost their element. Open one to move it or resolve it.";
   return "Select a thread to open it on the canvas. Reply and resolve in its popover.";
 }

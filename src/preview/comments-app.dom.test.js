@@ -292,6 +292,24 @@ describe("canvas comments", () => {
     expect($("#comments-foot").textContent).toContain("Detached threads lost their element");
   });
 
+  it("a row opens its thread even while another popover is open: the press does not close it first and rebuild the row away from the click", async () => {
+    seedThreads();
+    await boot("one");
+    loadFrame();
+    $("#comments-tool-toggle").click();
+    pins()[0].click(); // #1 is open
+    const row = $('#comments-list .comment-row[data-thread="c2"]');
+    row.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    expect(popover().open).toBe(true); // still there: the row is not an "outside" press
+    expect($('#comments-list .comment-row[data-thread="c2"]')).toBe(row); // and the same element is still in the list
+    row.click();
+    expect($(".comment-popover-header b").textContent).toBe("#2");
+    expect($("#comments-list .comment-row.is-active").dataset.thread).toBe("c2");
+    expect($("#comments-list .comment-row.is-active").getAttribute("aria-current")).toBe("true");
+    $(".comment-popover-header [aria-label=\"Close\"]")?.click();
+    expect(document.querySelector("#comments-list .comment-row.is-active")).toBeNull();
+  });
+
   it("Resolved lists the resolved threads and puts a check pin on each; Open takes them away again", async () => {
     seedThreads();
     await boot("one");

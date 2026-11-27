@@ -11999,3 +11999,72 @@ body {
   border-radius: var(--radius-menu);
   padding: var(--space-md) var(--space-sm);
 }
+
+/* Inspect: the variant cards (design `inspector-variant-reached-from`) */
+#variant-inspector[hidden] {
+  display: none;
+}
+
+.inspect-card {
+  margin: 0 0 var(--space-md);
+  padding: var(--space-md) var(--space-lg) var(--space-sm);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-item);
+  font-size: var(--ui-xs);
+}
+
+.inspect-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding-bottom: var(--space-xs);
+}
+
+.inspect-card-head b {
+  font-size: var(--ui-sm);
+  font-weight: 600;
+}
+
+.inspect-card-meta {
+  color: var(--chrome-text-tertiary);
+}
+
+.inspect-kv {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-md);
+  padding: var(--space-xs) 0;
+}
+
+.inspect-kv-label {
+  color: var(--chrome-text-secondary);
+}
+
+.inspect-kv-value {
+  min-width: 0;
+  overflow: hidden;
+  font-family: ui-monospace, Menlo, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspect-kv-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--chrome-accent);
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.inspect-kv-link:hover {
+  text-decoration: underline;
+}
+
+.inspect-kv-link:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}

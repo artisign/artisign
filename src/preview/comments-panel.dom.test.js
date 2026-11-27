@@ -47,7 +47,7 @@ describe("panelFootText", () => {
   it("explains what a row does, and what detached means when there is one", () => {
     expect(panelFootText([{ kind: "open" }], "open")).toBe("Select a thread to open it on the canvas. Reply and resolve in its popover.");
     expect(panelFootText([{ kind: "detached" }], "open")).toBe("Detached threads lost their element. Open one to move it or resolve it.");
-    expect(panelFootText([{ kind: "resolved" }], "resolved")).toContain("check pins");
+    expect(panelFootText([{ kind: "resolved" }], "resolved")).toBe("Resolved pins show on the canvas while this tab is open. Reopen a thread from its popover.");
   });
 });
 

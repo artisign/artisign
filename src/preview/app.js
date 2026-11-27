@@ -44,7 +44,8 @@ import { renderScreenUseCases } from "./usecases-screen-link.js";
 import { setMarkdown } from "./markdown.js";
 import { renderScreenList, filterScreens, buildScreenTree, flattenTree, ancestorNames, displayName, viewportIconName } from "./screens.js";
 import { icon } from "./icons.js";
-import { createVariantUI } from "./variants.js";
+import { createVariantUI, variantContext } from "./variants.js";
+import { renderVariantInspector } from "./variant-inspector.js";
 import { createCompareView } from "./compare.js";
 import { toolStates } from "./tool-states.js";
 import { renderMockupList, filterMockups } from "./mockups.js";
@@ -145,6 +146,8 @@ const variantUI = createVariantUI({
 
 function refreshVariantUI() {
   const shown = variantUI.update(screens, screenFlows, currentScreen);
+  // The Inspect panel's "Variant" and "Also reached from" cards follow the same data.
+  renderVariantInspector(variantInspectorEl, variantContext(buildScreenTree(screens), currentScreen), screenFlows, currentScreen, selectScreenHuman);
   // The breadcrumb takes a band above the frame, so the fit zoom has to be recomputed when it appears or goes.
   if (shown !== variantLayoutShown) {
     variantLayoutShown = shown;
@@ -230,6 +233,8 @@ const inspectModeToggle = document.getElementById("inspect-mode-toggle");
 // CHR-1268 — the Inspect panel (right column) holds the inspector's list; it is also inspect mode's selection source (outline + label on the canvas).
 const inspectorListEl = document.getElementById("inspector-list");
 const inspectorEmptyEl = document.getElementById("inspector-empty");
+const inspectorCountEl = document.getElementById("inspector-count");
+const variantInspectorEl = document.getElementById("variant-inspector");
 const inspectorErrorEl = document.getElementById("inspector-error");
 const inspectOverlayEl = document.getElementById("inspect-overlay");
 const flowOverlayEl = document.getElementById("flow-overlay");
@@ -1992,6 +1997,16 @@ function renderCommentCount(threads) {
   syncToolStates();
 }
 
+/** Marks the open thread's row in place — rebuilding the list on every open or close would remove the very row a press is on before its click lands. */
+function markActiveCommentRow() {
+  const active = commentCanvas.activeThread();
+  for (const row of document.querySelectorAll("#comments-list .comment-row")) {
+    const on = row.dataset.thread === active;
+    row.classList.toggle("is-active", on);
+    row.setAttribute("aria-current", String(on));
+  }
+}
+
 /** The Comments panel's list: the shown scope's threads, the tab's half of them; a row opens its pin's popover. */
 function renderCommentsList() {
   renderCommentsPanel(
@@ -2020,13 +2035,20 @@ async function loadInspectorEntries() {
   const requestId = ++inspectorRequestId;
   if (!currentScreen) {
     inspectorPanel.setEntries([], null);
+    inspectorCountEl.textContent = "";
     syncInspectOverlay();
     return;
   }
   const result = await fetchScreenNodes(currentScreen, activeProjectRoot);
   if (requestId !== inspectorRequestId) return; // a newer request has since started — drop this stale result
-  if (result.ok) inspectorPanel.setEntries(buildEntries(result.nodes), currentScreen);
-  else inspectorPanel.setError(result.message);
+  if (result.ok) {
+    const entries = buildEntries(result.nodes);
+    inspectorPanel.setEntries(entries, currentScreen);
+    inspectorCountEl.textContent = `${entries.length} node${entries.length === 1 ? "" : "s"}`;
+  } else {
+    inspectorPanel.setError(result.message);
+    inspectorCountEl.textContent = "";
+  }
   syncInspectOverlay();
 }
 
@@ -2075,7 +2097,7 @@ const commentCanvas = createCommentCanvas({
   bannerEl: commentBannerEl,
   onActiveChange: () => {
     renderMockupChips();
-    renderCommentsList(); // the open thread's row is marked
+    markActiveCommentRow();
   },
   // Show resolved is the Comments panel's Resolved tab (CHR-1268): the pins follow the tab.
   prefs: { showResolved: readBoolPref(prefsStorage, "artisign.comments.showResolved", false) },

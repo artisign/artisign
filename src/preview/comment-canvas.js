@@ -347,8 +347,8 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
     if (activeId === null) return;
     const target = /** @type {Node} */ (evt.target);
     if (popoverEl.contains(target) || pinsEl.contains(target)) return;
-    // A column header's count chip opens a thread itself: closing first would rebuild it away from under the press.
-    if (typeof (/** @type {Element} */ (target).closest) === "function" && /** @type {Element} */ (target).closest(".comment-count-chip")) return;
+    // A column header's count chip and a row of the Comments panel open a thread themselves: closing first would rebuild them away from under the press.
+    if (typeof (/** @type {Element} */ (target).closest) === "function" && /** @type {Element} */ (target).closest(".comment-count-chip, .comment-row")) return;
     close(false);
   };
   document.addEventListener("pointerdown", onOutsidePress, true);

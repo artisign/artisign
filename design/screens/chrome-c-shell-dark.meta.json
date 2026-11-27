@@ -1,11 +1,11 @@
 {
   "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Dark theme of `app-shell` in the Stitch chrome: same layout, the root binds `--chrome-*` from `chrome-dark.*`. Shows the Inspect tool in `hover` with its hint tooltip (key I). The user-screen frame stays light. `chrome-dark.float` was darkened in this phase (a CHR-1257 token, used only by CHR-1257 dark screens) so the floating cards read as one surface against the dark workspace.\n\n---\nEarlier notes (history):\n\nCHR-905 direction C, dark theme of app-shell: identical markup, root binds `--chrome-*` from `chrome-dark.*` instead of `chrome-light.*`. The phone frame stays light (user screen, never themed). See app-shell notes and decisions chr905-chrome-themes-parallel-token-groups / chr905-preview-var-mapping.",
   "tags": [
+    "chr-1257",
     "CHR-905",
     "CHR-909",
     "chr-1004",
-    "chr-1068",
-    "chr-1257"
+    "chr-1068"
   ],
   "variant_of": "app-shell",
   "variant_kind": "state"

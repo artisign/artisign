@@ -1,11 +1,11 @@
 {
   "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Overlay on `app-shell`: the shortcuts dialog (opened with ?). Native `<dialog>` opened with `showModal()`, `closedby=\"any\"`; scrim and Close flow back to `app-shell`.\n\n- Rows are `shortcut-row` with `kbd-key` keys, grouped Tools, Zoom, Views, Agent, Board, Fold cards, Project, General.\n- Changes against CHR-905: the modes became tools (C Comment, I Inspect, N Notes, M Comments, F Flow, D Design system); S Status bar is gone (no status bar); Views follow the view bar order (1 Screens, 2 Board, 3 Design System, 4 Use Cases); panels became fold cards ([ project card, \\ tool bar, ] Agent bar); Board edges are now called \"Flow arrows\" and keep E; the Elements panel is gone. Browser-safe rules unchanged (decision `chr905-shortcuts`).\n\n---\nEarlier notes (history):\n\nCHR-905 direction C: reference dialog opened with ? listing every shortcut by area. Browser-safe rules (single keys, no text-field focus, nothing with Ctrl/Cmd/Alt) are in decision chr905-shortcuts.",
   "tags": [
+    "chr-1257",
     "CHR-905",
     "CHR-909",
     "chr-1004",
-    "chr-1068",
-    "chr-1257"
+    "chr-1068"
   ],
   "variant_of": "app-shell",
   "variant_kind": "overlay"

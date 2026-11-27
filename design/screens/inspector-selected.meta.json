@@ -1,11 +1,11 @@
 {
   "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** The Inspect tool with the New order button selected.\n\n- Tool bar: Inspect pressed (flow back to `app-shell`). The Agent bar folds, the Inspect panel opens below it (same convention as Comments; close flows to `app-shell`).\n- Canvas: `inspect-outline` (hint-blue ring plus size badge \"93 × 34\") around the selected node.\n- Panel sections: node summary, Layers (`node-row`, selected row in the hint tint), Box, Design system (`prop-row` `token`: ref chip on top, resolved value below), Type. The old Elements tab is now the Inspect panel.\n- Intended drift: 8px radius on the user-screen stand-in.\n\n---\nEarlier notes (history):\n\nInspect mode with one element focused. The focused entry takes an accent left border and loses 3px of left padding so its content still lines up with the unfocused rows, and expands to show the box metrics and the design-system refs the element resolves to.",
   "tags": [
+    "chr-1257",
     "inspector",
     "chr-739",
     "CHR-905",
-    "CHR-909",
-    "chr-1257"
+    "CHR-909"
   ],
   "variant_of": "app-shell",
   "variant_kind": "state"

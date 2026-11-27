@@ -1,6 +1,7 @@
 {
   "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Every cluster collapsed: a `board-cluster` card shows the main frame and a thumb strip, one per variant. **Redesigned as equivalent:** the old `cluster-header` with micro-thumbs, depth and `+N` is replaced by the phase-1 `board-cluster` card. With the pointer over the cart cluster, `cluster-toggle` \"Expand\" appears beside its header (`frame-cart-head`, flows to `board-view-clusters-expanded`). \"Collapse all\" in the tool bar is disabled because everything is collapsed. Edges dock on the cluster cards.\n\n---\nEarlier notes (history):\n\nBoard with every variant cluster collapsed (the \"Fit all\" shape). Approved direction C (mockup `variants-board` / `c-clusters-collapsed`), implemented in CHR-733.\n\n- Each cluster is a frame: `$cluster-header` (name, subtree size, depth), the main tile and a row of `$micro-thumb` (grey = state, blue foot = overlay, dashed = deeper level), capped with a `+N` count.\n- Edges keep their true endpoints and dock on the frame; the label pill names the variant inside (`→ dashboard-empty`, `→ sheet-edit`; the menu-sheet-drink-pick pill is grey because it is the source).\n- Toolbar as in the expanded screen (`Clusters: On`, `Collapse all`).\n- Flow: tap on the cart-l2 cluster header opens `board-view-clusters-expanded`.\n- Below ~50% zoom the micro thumbnails can look noisy; that trade-off was accepted with direction C.",
   "tags": [
+    "chr-1257",
     "chr-727",
     "chr-736",
     "chr-733",
@@ -8,8 +9,7 @@
     "chr-739",
     "CHR-905",
     "CHR-909",
-    "chr-1068",
-    "chr-1257"
+    "chr-1068"
   ],
   "variant_of": "board-view",
   "variant_kind": "state"

@@ -1,11 +1,11 @@
 {
   "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Compare mode: `home` default (base) next to `empty`.\n\n- A `float-pill` above the frames: Single | Compare `seg-tabs` (Compare on), chips for the base and the member count.\n- Frames are `canvas-frame`s at 48 %, the compared variant `selected`. Diff outlines on the frames: red = removed in the variant, green = added; amber marks a changed node in the panel. A strip below offers more columns (Add variant).\n- Right column: Agent bar folded, the Compare panel (\"Differences\") as a `float-card` with `diff-row`s (`removed`, `added`, default = changed), node ids in mono. Close leaves Compare (flow to `app-shell`).\n\n---\nEarlier notes (history):\n\nCHR-905 direction C: Compare mode of the screens view (CHR-734 exploration, new as a real screen). Single | Compare toggle and member chips above the canvas; members as columns with a node-level diff in amber (theme-independent, drawn on user screens); the right panel becomes the Compare panel listing the diff by node id. Frames are user-screen stand-ins (literal light values, intended drift warnings).",
   "tags": [
+    "chr-1257",
     "CHR-905",
     "CHR-909",
     "chr-1004",
-    "chr-1068",
-    "chr-1257"
+    "chr-1068"
   ],
   "variant_of": "app-shell",
   "variant_kind": "state"

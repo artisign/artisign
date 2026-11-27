@@ -1,11 +1,11 @@
 {
   "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Overlay on `app-shell` (`data-backdrop`): the project menu open under the project picker.\n\n- `float-popover` with `popover=\"auto\"`, items in a `focusgroup=\"menu\"` list: open projects (current `checked`, one in `hover`), Recent, then Open project… (O, flows to `open-project-dialog`) and New project… (N, flows to `init-project-dialog`). Key P opens the menu.\n- The picker shows its open state as a focus ring. Built from `float-popover` + `float-menu-item`; the old `chrome-menu` / `chrome-menu-item` stay for the out-of-scope dialogs.\n\n---\nEarlier notes (history):\n\nCHR-905 direction C, light: project menu open (its own overlay screen so it no longer hides the sidebar header). Built from the `chrome-menu` pattern + `chrome-menu-item` (checked-hover, default, action). Trigger shows `chrome-dropdown` open. Same intended drift as app-shell (user-screen stand-in).",
   "tags": [
+    "chr-1257",
     "CHR-905",
     "CHR-909",
     "chr-1004",
-    "chr-1068",
-    "chr-1257"
+    "chr-1068"
   ],
   "variant_of": "app-shell",
   "variant_kind": "overlay"

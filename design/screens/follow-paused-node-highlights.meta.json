@@ -1,12 +1,12 @@
 {
   "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Follow paused because the human moved away (ADR-005 precedence rule 1). The Agent bar shows `agent-status` `follow-paused`: pause icon, \"Follow paused\" and Resume (key R). The canvas shows both node highlights side by side: read (teal, solid) on the first order row, write (violet, dashed with wash) on the New order button; the other rows stay plain for contrast. The feed lists the two matching calls. **Redesigned as equivalent:** \"Follow paused, Resume\" moved from the top bar into the Agent bar status.\n\n---\nEarlier notes (history):\n\nCHR-628/CHR-629: follow paused (topbar `follow-paused` variant, \"Follow paused | Resume\" — human navigated away, per ADR-005 precedence rule 1). Canvas shows the two node-level highlight kinds side by side on the same mock for direct comparison: `line-1` = read highlight (solid 2px teal outline, appears immediately), `line-2` = write highlight (2px dashed violet outline + translucent violet wash, appears after the write's re-render or a 1s grace). `line-3` is unhighlighted, for contrast. Feed shows the two corresponding calls.",
   "tags": [
+    "chr-1257",
     "chr-628",
     "chr-629",
     "chr-739",
     "CHR-905",
-    "CHR-909",
-    "chr-1257"
+    "CHR-909"
   ],
   "variant_of": "follow-active-feed",
   "variant_kind": "state"

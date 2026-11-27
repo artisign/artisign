@@ -1,6 +1,7 @@
 {
   "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Dark theme of `board-view-clusters-expanded`: identical markup, the root binds `--chrome-*` from `chrome-dark.*` including `cluster`. The accent ring of the expanded cluster and of the `current` member, and the Collapse pill, read on the dark workspace; frames stay white.",
   "tags": [
+    "chr-1257",
     "CHR-905",
     "chr-727",
     "chr-736",
@@ -8,8 +9,7 @@
     "view",
     "chr-739",
     "CHR-909",
-    "chr-1068",
-    "chr-1257"
+    "chr-1068"
   ],
   "variant_of": "board-view-clusters-expanded",
   "variant_kind": "state"

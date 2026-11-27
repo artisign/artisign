@@ -1,12 +1,12 @@
 {
   "notes": "**CHR-1257 phase 2b, Stitch chrome (2026-11-27, awaiting Christian's approval).** New project (no project open) as a floating dialog (pattern `float-dialog`) over `no-project-empty-state`. Same folder picker as `open-project-dialog` and the same dialog as `chrome-c-dialog` (opened inside a project). Behaviour unchanged (history below).\n\n- h1 \"New project\" + sub (`aria-describedby`), close / Cancel / scrim back to the empty state.\n- Places chips, `nav` breadcrumbs, `new-folder-btn` (flow to `init-project-dialog-new-folder`), folder tray `role=listbox` with portfolio `selected`.\n- `text-field` `empty` \"Project name\": the placeholder my-new-project in tertiary, hint \"Will create: ~/Workspace/portfolio/my-new-project\" linked by `aria-describedby`.\n- \"Create & open\" is `confirm-disabled` until a name is typed.\n\n---\nEarlier notes (history):\n\nCreating a new project: the same folder browser plus a name field. Confirm stays disabled until both a parent folder and a name are chosen.\n\nCHR-831: the name field is labelled \"Project name\" (was \"New folder / project name\") so it is not confused with the new \"+ New folder\" button in the path row, which creates intermediate folders such as ~/work/clients. States: `init-project-dialog-new-folder` (typing) and its `-exists`, `-invalid`, `-permission`, `-created` variants.",
   "tags": [
+    "chr-1257",
     "dialog",
     "chr-739",
     "chr-831",
     "CHR-905",
-    "CHR-909",
-    "chr-1257"
+    "CHR-909"
   ],
   "variant_of": "no-project-empty-state",
   "variant_kind": "overlay"

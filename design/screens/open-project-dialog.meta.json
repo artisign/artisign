@@ -1,12 +1,12 @@
 {
   "notes": "**CHR-1257 phase 2b, Stitch chrome (2026-11-27, awaiting Christian's approval).** Open project as a floating dialog (pattern `float-dialog`) over `no-project-empty-state`. Behaviour unchanged (history below).\n\n- Native `<dialog>`, `aria-labelledby` = h1 \"Open project\", `closedby=\"any\"`; sub line \"Pick the folder that holds the project.\"; close, Cancel and the scrim flow back to the empty state.\n- Places: `quick-chip`s in a `role=group` \"Places\" (`aria-pressed`, Workspace current).\n- Path: `nav` \"Folder path\" with an `ol` of crumbs; chevrons are `aria-hidden`, the current folder has `aria-current`. `new-folder-btn` on the right (flow to `open-project-dialog-new-folder`).\n- Folders: a `chrome-field` tray, `role=listbox`, of `chrome-list-row` options; notes-app is `selected-project` (badge \"Project\").\n- Hint (`aria-live=\"polite\"`) names the selected path. Footer: `btn` Cancel, `btn` `confirm` \"Open\".\n\n---\nEarlier notes (history):\n\nOpening an existing project. Browsing happens in-app rather than through the native folder picker, because a browser never reveals an absolute path to the page and the daemon could not act on the selection. Folders that already hold a project are badged.\n\nCHR-831: the path row carries a \"+ New folder\" button (`$new-folder-btn`) right of the breadcrumbs. Click opens an inline row at the top of the list; see `open-project-dialog-new-folder` and its `-exists` / `-created` states.",
   "tags": [
+    "chr-1257",
     "dialog",
     "chr-739",
     "chr-831",
     "CHR-905",
-    "CHR-909",
-    "chr-1257"
+    "CHR-909"
   ],
   "variant_of": "no-project-empty-state",
   "variant_kind": "overlay"

@@ -1,0 +1,10 @@
+{
+  "notes": "**CHR-1257, Stitch chrome (2026-11-27, awaiting Christian's approval).** The Notes tool open on `home`. Replaces the Notes part of the old Context panel (2.2.1), which the redesign removed; answers Christian's comment on `app-shell.tool-bar`.\n\n- Tool bar: `toolbar-side-notes` pressed (`aria-controls=\"notes-card\"`); pressing it again flows back to `app-shell`. Inspect flows to `inspector-selected`, Comments (badge) to `comments-panel`, as on the sibling panel screens.\n- Right column: the Agent bar folds to `agent-bar-folded`, the Notes panel opens below it as a `float-card` (decision `chr1257-tool-panels-fold-agent-bar`). Close (`notes-close`) flows to `app-shell`. Header scope names the open screen (the build fills in its id).\n- Content, top to bottom, same meaning as the old panel:\n  1. **Screen notes** (`screen-notes`): the screen's own `notes` rendered as Markdown (headings, paragraphs, bold, lists, inline code as `md-code`), then the screen's tags as `chrome-chip`s. Hidden when the screen has no notes; the tag chips still show.\n  2. **Tag notes** (`tag-notes`): one `tag-note` per screen tag that carries a tag note, collapsed by default; the reader's open/closed choice survives re-renders (as in 2.2.1). Native adjacent `<details>`/`<summary>`, not exclusive, no heading inside `summary`. Meta shows how many screens carry the tag. Tags without notes get no section.\n  3. **Use cases** (`screen-usecases`): use cases with a step mapped to this screen (CHR-1062), `float-menu-item` rows with status (Ready / Draft) as hint; a row opens `usecases-detail`. Hidden when nothing maps or the project has no use cases.\n- The Comments row of the old Context panel is not repeated here: comments are their own tool (`comments-panel`).\n- The panel is read-only, like 2.2.1: notes are written by agents through `set_meta`. When the screen has no notes, no tag notes and no tags, the Notes tool stays enabled and the panel shows only its header (empty state not drawn).\n- Example content is neutral (Example shop).",
+  "tags": [
+    "chr-1257",
+    "shell",
+    "screens"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "state"
+}

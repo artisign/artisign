@@ -1290,48 +1290,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "comments-panel.comments-header",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "comments-panel.comments-close",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "inspector-selected.toolbar-side-inspect",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "inspector-selected.comments-header",
-    "event": "tap",
-    "to": "comments-panel",
-    "to_kind": "screen"
-  },
-  {
-    "from": "inspector-selected.inspect-close",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
-    "from": "inspector-variant-reached-from.inspect-close",
-    "event": "tap",
-    "to": "screen-view-variant-breadcrumb",
-    "to_kind": "screen"
-  },
-  {
-    "from": "inspector-variant-reached-from.variant-path-root",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
     "from": "screen-view-variant-breadcrumb.crumb-home",
     "event": "tap",
     "to": "app-shell",
@@ -1413,18 +1371,6 @@
     "from": "shell-empty-project.screens-collapse",
     "event": "tap",
     "to": "sidebars-collapsed",
-    "to_kind": "screen"
-  },
-  {
-    "from": "chrome-c-compare.comments-header",
-    "event": "tap",
-    "to": "comments-panel",
-    "to_kind": "screen"
-  },
-  {
-    "from": "chrome-c-compare.compare-close",
-    "event": "tap",
-    "to": "app-shell",
     "to_kind": "screen"
   },
   {
@@ -2184,54 +2130,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "app-shell.project-picker",
-    "event": "tap",
-    "to": "open-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.tab-board",
-    "event": "tap",
-    "to": "board-view",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.tab-ds",
-    "event": "tap",
-    "to": "design-system-view",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.tab-usecases",
-    "event": "tap",
-    "to": "usecases-list",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.settings-button",
-    "event": "tap",
-    "to": "shell-settings-menu",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.left-header",
-    "event": "tap",
-    "to": "sidebars-collapsed",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.toolbar-side-inspect",
-    "event": "tap",
-    "to": "inspector-selected",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.comments-header",
-    "event": "tap",
-    "to": "comments-panel",
-    "to_kind": "screen"
-  },
-  {
     "from": "no-project-empty-state.project-picker",
     "event": "tap",
     "to": "open-project-dialog",
@@ -2517,6 +2415,174 @@
     "from": "init-project-dialog-new-folder-created.init-dialog-cancel",
     "event": "tap",
     "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.toolbar-side-inspect",
+    "event": "tap",
+    "to": "inspector-selected",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.toolbar-side-notes",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.comments-header",
+    "event": "tap",
+    "to": "comments-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.notes-close",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.su-row-1",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "notes-panel.su-row-2",
+    "event": "tap",
+    "to": "usecases-detail",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.project-picker",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-board",
+    "event": "tap",
+    "to": "board-view",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-ds",
+    "event": "tap",
+    "to": "design-system-view",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-usecases",
+    "event": "tap",
+    "to": "usecases-list",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.settings-button",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.left-header",
+    "event": "tap",
+    "to": "sidebars-collapsed",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.toolbar-side-inspect",
+    "event": "tap",
+    "to": "inspector-selected",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.toolbar-side-notes",
+    "event": "tap",
+    "to": "notes-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.comments-header",
+    "event": "tap",
+    "to": "comments-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "comments-panel.toolbar-side-notes",
+    "event": "tap",
+    "to": "notes-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "comments-panel.comments-header",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "comments-panel.comments-close",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "inspector-selected.toolbar-side-inspect",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "inspector-selected.toolbar-side-notes",
+    "event": "tap",
+    "to": "notes-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "inspector-selected.comments-header",
+    "event": "tap",
+    "to": "comments-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "inspector-selected.inspect-close",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "inspector-variant-reached-from.toolbar-side-notes",
+    "event": "tap",
+    "to": "notes-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "inspector-variant-reached-from.inspect-close",
+    "event": "tap",
+    "to": "screen-view-variant-breadcrumb",
+    "to_kind": "screen"
+  },
+  {
+    "from": "inspector-variant-reached-from.variant-path-root",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-compare.toolbar-side-notes",
+    "event": "tap",
+    "to": "notes-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-compare.comments-header",
+    "event": "tap",
+    "to": "comments-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-compare.compare-close",
+    "event": "tap",
+    "to": "app-shell",
     "to_kind": "screen"
   }
 ]

@@ -1477,6 +1477,45 @@ button.chrome-section-header:focus-visible {
   border-radius: 0 0 0 3px;
 }
 
+/* CHR-1268 — flow mode's hover (design `flow-hint`, hover): the outline with a tint and the chip naming the target under the corner. Sits in the zoomed #screen-holder like the inspect overlay, so the chip counter-scales to a constant size. */
+#flow-overlay {
+  position: absolute;
+  z-index: 2;
+  outline: 2px solid var(--chrome-info);
+  outline-offset: 1px;
+  background: color-mix(in srgb, var(--chrome-info) 10%, transparent);
+  pointer-events: none;
+}
+
+#flow-overlay[hidden] {
+  display: none;
+}
+
+#flow-overlay-chip {
+  position: absolute;
+  right: -3px;
+  top: calc(100% + 7px);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  height: var(--size-chip-h);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-xs);
+  background: var(--chrome-info);
+  color: var(--chrome-hint-text);
+  font-size: var(--ui-2xs);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: var(--chrome-shadow-raised);
+  transform: scale(calc(1 / var(--zoom, 1)));
+  transform-origin: top right;
+}
+
+#flow-overlay-chip .icon {
+  font-size: var(--size-icon-sm);
+}
+
 /* CHR-631 — follow mode's whole-screen write highlight, shown after
    write_html on the currently displayed screen ($activity-highlight's
    `write-screen` variant). Sized with `inset: 0`, not a copied bounding
@@ -3740,7 +3779,8 @@ li.has-compare > .screen-item {
   outline-offset: 1px;
 }
 
-.settings-toggle-row {
+.settings-toggle-row,
+.more-toggle-row {
   justify-content: space-between;
 }
 
@@ -3764,11 +3804,13 @@ li.has-compare > .screen-item {
   background: #fff;
 }
 
-.settings-toggle-row[aria-checked="true"] .settings-switch {
+.settings-toggle-row[aria-checked="true"] .settings-switch,
+.more-toggle-row[aria-checked="true"] .settings-switch {
   background: var(--chrome-accent);
 }
 
-.settings-toggle-row[aria-checked="true"] .settings-switch::after {
+.settings-toggle-row[aria-checked="true"] .settings-switch::after,
+.more-toggle-row[aria-checked="true"] .settings-switch::after {
   left: 14px;
 }
 
@@ -9931,10 +9973,11 @@ button.uc-target:hover {
   font-size: var(--size-icon-sm);
 }
 
-/* CHR-1252 — comment mode's banner (top) and the floating canvas toolbar (bottom). */
+/* CHR-1252 — comment mode's banner (above the zoom pill; the tools are in the side tool bar, CHR-1268). */
 #comment-banner {
   position: absolute;
-  top: var(--space-lg);
+  top: auto;
+  bottom: var(--space-sm);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -9952,10 +9995,9 @@ button.uc-target:hover {
   pointer-events: none;
 }
 
-/* On the mockup columns the banner sits at the bottom of the stage, above the toolbar. */
+/* On the mockup columns the banner sits at the bottom of the stage too. */
 #comment-banner[data-placement="bottom"] {
   top: auto;
-  bottom: calc(var(--space-xl) + 48px);
 }
 
 .comment-dim {
@@ -9994,77 +10036,6 @@ button.uc-target:hover {
 
 .comment-banner-muted {
   opacity: 0.8;
-}
-
-#comment-toolbar {
-  position: absolute;
-  bottom: var(--space-xl);
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2xs);
-  padding: var(--space-xs);
-  border-radius: var(--radius-md);
-  background: var(--chrome-raised);
-  box-shadow: var(--chrome-shadow-float);
-  white-space: nowrap;
-  z-index: 6;
-}
-
-#comment-toolbar[hidden] {
-  display: none;
-}
-
-.comment-toolbar-btn[aria-pressed="true"] {
-  background: var(--chrome-active);
-  color: var(--chrome-text);
-}
-
-.comment-toolbar-divider {
-  width: 1px;
-  height: 18px;
-  margin: 0 var(--space-xs);
-  background: var(--chrome-border);
-}
-
-.comment-toolbar-text {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  height: var(--size-control);
-  padding: 0 var(--space-md) 0 var(--space-sm);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--chrome-text-secondary);
-  font: inherit;
-  font-size: var(--ui-sm);
-  cursor: pointer;
-}
-
-.comment-toolbar-text:hover {
-  background: var(--chrome-hover);
-}
-
-.comment-toolbar-text:focus-visible,
-.comment-toolbar-btn:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: 1px;
-}
-
-.comment-toolbar-check {
-  font-size: var(--size-icon-xs);
-  visibility: hidden;
-}
-
-.comment-toolbar-text[aria-pressed="true"] {
-  color: var(--chrome-text);
-}
-
-.comment-toolbar-text[aria-pressed="true"] .comment-toolbar-check {
-  visibility: visible;
 }
 
 /* ---------------------------------------------------------------------------
@@ -10315,9 +10286,8 @@ button.uc-target:hover {
 
 /* ==========================================================================================================
    CHR-1267 — the Stitch chrome shell: a dotted workspace, three floating top groups, the left floating card,
-   the zoom pill. Everything floats over #main, which fills the window. The side tool bar, the right column
-   and the agent bar are later slices (CHR-1268…1272); #interim-tools and #compare-card hold what they will
-   replace. All values come from the chrome-light / chrome-dark groups and the radius / size tokens above.
+   the zoom pill. Everything floats over #main, which fills the window. The side tool bar and the right column's
+   panel are CHR-1268; the agent bar and the rest are later slices (CHR-1269…1272). All values come from the chrome-light / chrome-dark groups and the radius / size tokens above.
    ========================================================================================================== */
 
 html,
@@ -10341,7 +10311,7 @@ body {
   --reserve-right: 16px;
 }
 
-/* A folded card frees the width; the interim tools slide under it (as the side tool bar will). */
+/* A folded card frees the width; the tool bar slides under it. */
 #app[data-card-folded="true"] {
   --reserve-left: 88px;
 }
@@ -10355,9 +10325,9 @@ body {
   --reserve-left: 0px;
 }
 
-/* Compare shows its Differences panel in a card on the right. */
-#app[data-comparing="true"] {
-  --reserve-right: 312px;
+/* The right column's panel (Inspect, Notes, Comments, Compare's Differences) takes its width from the canvas: card + the gap on both sides. */
+#app[data-panel-open="true"] {
+  --reserve-right: calc(var(--size-agent-bar) + 2 * var(--space-xl));
 }
 
 .float-pill {
@@ -10467,8 +10437,7 @@ body {
   padding-left: var(--space-md);
 }
 
-#topbar-end .chrome-icon-btn,
-#interim-tools .chrome-icon-btn {
+#topbar-end .chrome-icon-btn {
   position: relative;
   width: var(--size-float-control);
   height: var(--size-float-control);
@@ -11190,48 +11159,6 @@ body {
   color: var(--chrome-accent);
 }
 
-/* ---- Comment layer, banner and canvas toolbar over the new canvas ---- */
-
-#comment-toolbar {
-  bottom: var(--space-md);
-  border-radius: var(--radius-pill);
-  background: var(--chrome-float);
-  backdrop-filter: blur(10px);
-  box-shadow: var(--chrome-shadow-card);
-}
-
-/* ---- Interim tools (modes + status bar) until the side tool bar (CHR-1268) ---- */
-
-#interim-tools {
-  position: absolute;
-  z-index: 20;
-  top: var(--shell-top);
-  left: calc(var(--space-xl) + var(--size-nav-card) + var(--space-xl));
-  flex-direction: column;
-  padding: var(--space-md) var(--space-sm);
-  border-radius: calc(var(--size-toolbar) / 2);
-}
-
-#app[data-card-folded="true"] #interim-tools {
-  top: 138px;
-  left: var(--space-xl);
-}
-
-#app[data-shell-view="usecases"] #interim-tools,
-#app[data-shell-view="design-system"] #interim-tools {
-  display: none;
-}
-
-#interim-tools .chrome-icon-btn {
-  width: var(--size-tool);
-  height: var(--size-tool);
-}
-
-#interim-tools .chrome-icon-btn[aria-pressed="true"] {
-  background: var(--chrome-primary);
-  color: var(--chrome-primary-text);
-}
-
 .tool-badge {
   position: absolute;
   top: 2px;
@@ -11251,17 +11178,6 @@ body {
 
 .tool-badge[hidden] {
   display: none;
-}
-
-/* ---- Compare card (Differences panel) ---- */
-
-#compare-card {
-  position: absolute;
-  z-index: 20;
-  top: var(--shell-top);
-  right: var(--space-xl);
-  bottom: 18px;
-  width: 280px;
 }
 
 /* ---- Zoom pill and its popover ---- */
@@ -11546,4 +11462,540 @@ body {
   border: none;
   border-radius: var(--radius-md);
   background: var(--chrome-field);
+}
+
+/* ==========================================================================================================
+   CHR-1268 — the side tool bar (design `tool-bar`, `tool-btn`, `tool-sep`, `hint-tooltip`) and the right
+   column's panel (Inspect, Notes, Comments, Compare's Differences).
+   ========================================================================================================== */
+
+#tool-bar {
+  position: absolute;
+  z-index: 20;
+  top: var(--shell-top);
+  left: calc(var(--space-xl) + var(--size-nav-card) + var(--space-xl));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2xs);
+  width: var(--size-toolbar);
+  padding: var(--space-xs) var(--space-sm) var(--space-sm);
+  border-radius: var(--radius-card);
+  background: var(--chrome-float);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--chrome-shadow-card);
+}
+
+#tool-bar[data-collapsed="true"] {
+  padding-bottom: var(--space-xs);
+}
+
+/* A folded left card frees the width; the bar slides under it. */
+#app[data-card-folded="true"] #tool-bar {
+  top: 138px;
+  left: var(--space-xl);
+}
+
+#app[data-shell-view="usecases"] #tool-bar,
+#app[data-shell-view="design-system"] #tool-bar {
+  display: none;
+}
+
+#tool-bar.is-dragging {
+  box-shadow: var(--chrome-shadow-card), 0 0 0 2px var(--chrome-focus-ring);
+  user-select: none;
+}
+
+#tool-bar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: var(--size-tool);
+  height: var(--size-control-sm);
+  padding-left: var(--space-2xs);
+}
+
+/* The grip lies on its side: the dots read as a horizontal handle on a vertical bar. */
+#tool-bar-grip .icon {
+  transform: rotate(90deg);
+}
+
+#tool-bar-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+
+#tool-bar-tools[hidden] {
+  display: none;
+}
+
+.tool-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: var(--size-tool);
+  min-height: var(--size-tool);
+  width: var(--size-tool);
+  height: var(--size-tool);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-item);
+  background: none;
+  color: var(--chrome-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tool-btn .icon {
+  font-size: var(--size-icon);
+}
+
+@media (hover: hover) {
+  .tool-btn:hover {
+    background: var(--chrome-hover);
+    color: var(--chrome-text);
+  }
+}
+
+.tool-btn[aria-pressed="true"],
+.tool-btn[aria-expanded="true"] {
+  background: var(--chrome-primary);
+  color: var(--chrome-primary-text);
+}
+
+/* Greyed out, not hidden: still focusable, its hint says why. */
+.tool-btn[aria-disabled="true"] {
+  background: none;
+  color: var(--chrome-border-strong);
+  cursor: not-allowed;
+}
+
+.tool-btn[aria-disabled="true"] .tool-badge {
+  background: var(--chrome-border-strong);
+}
+
+.tool-btn:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+@media (pointer: coarse) {
+  .tool-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+.tool-btn .tool-badge {
+  top: 1px;
+  right: 0;
+}
+
+.tool-sep {
+  display: block;
+  flex: none;
+  width: 28px;
+  height: 0;
+  margin: var(--space-xs) 0;
+  border-top: 1px solid var(--chrome-border);
+}
+
+/* Hint tooltips: blue, after ~2 s of hover, to the right of the tool. The popover is only drawn while open (display is set for :popover-open alone, so the UA's closed state stays). */
+#tool-bar [interestfor] {
+  --interest-delay-start: 2s;
+  interest-delay-start: var(--interest-delay-start);
+  --interest-delay-end: 0.1s;
+  interest-delay-end: var(--interest-delay-end);
+}
+
+/* Moving from one tool to the next while a hint shows: the next one needs no new wait. */
+#tool-bar:has([interestfor]:is(:interest-source, .interest-source)) [interestfor] {
+  --interest-delay-start: 0s;
+}
+
+.tool-hint {
+  inset: auto;
+  margin: 0;
+  margin-inline-start: var(--space-md);
+  position-area: inline-end;
+  position-try-fallbacks: flip-inline;
+  width: auto;
+  border: 1px solid transparent;
+  background: var(--chrome-hint);
+  color: var(--chrome-hint-text);
+  overflow: visible;
+}
+
+.tool-hint:popover-open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-md);
+  height: var(--size-control);
+  padding: 0 var(--space-md) 0 var(--space-lg);
+  border-radius: var(--radius-pill);
+  font-size: var(--ui-sm);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: var(--chrome-shadow-float);
+}
+
+.tool-hint-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--chrome-hint-text) 22%, transparent);
+  font: inherit;
+  font-size: var(--ui-2xs);
+}
+
+/* The More menu opens to the right of its tool, like the hints. */
+#more-menu {
+  inset: auto;
+  margin: 0;
+  margin-inline-start: var(--space-md);
+  position-area: inline-end span-block-end;
+  position-try-fallbacks: flip-inline;
+  min-width: 200px;
+  border: none;
+}
+
+/* ---- The right column's panel ---- */
+
+#tool-panel {
+  position: absolute;
+  z-index: 20;
+  top: var(--shell-top);
+  right: var(--space-xl);
+  bottom: 18px;
+  width: var(--size-agent-bar);
+}
+
+.tool-panel-context {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+#tool-panel-close[hidden] {
+  display: none;
+}
+
+.tool-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--space-md) var(--space-lg);
+}
+
+.tool-panel-body[hidden] {
+  display: none;
+}
+
+#compare-panel {
+  padding: 0 0 var(--space-lg);
+}
+
+/* The design's `section-head`: a bold title left, a quiet count right. */
+.tool-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-xl) var(--space-xs) var(--space-xs);
+  font-size: var(--ui-xs);
+  font-weight: 600;
+  color: var(--chrome-text-secondary);
+}
+
+.tool-section-meta {
+  font-weight: 500;
+  color: var(--chrome-text-tertiary);
+}
+
+/* Comments */
+#comments-panel:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+
+#comments-tabs {
+  flex: none;
+  margin-bottom: var(--space-md);
+}
+
+#comments-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#comments-empty,
+#comments-foot {
+  margin: 0;
+  padding: var(--space-md) var(--space-xs);
+  font-size: var(--ui-xs);
+  line-height: 1.45;
+  color: var(--chrome-text-tertiary);
+}
+
+#comments-empty[hidden],
+#comments-foot[hidden] {
+  display: none;
+}
+
+#comments-foot {
+  margin-top: auto;
+  font-size: var(--ui-2xs);
+}
+
+.comment-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-md);
+  row-gap: var(--space-2xs);
+  width: 100%;
+  padding: var(--space-md) var(--space-md) var(--space-md) var(--space-md);
+  border: none;
+  border-radius: var(--radius-item);
+  background: none;
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.comment-row:hover {
+  background: var(--chrome-hover);
+}
+
+.comment-row.is-active {
+  background: var(--chrome-accent-subtle);
+}
+
+.comment-row:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
+.comment-row-num {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--comment-on);
+  border-radius: 50%;
+  background: var(--comment-human);
+  color: var(--comment-on);
+  font: 600 11px/1 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.comment-row-num[data-kind="agent"] {
+  background: var(--comment-agent);
+}
+
+.comment-row-num[data-state="detached"] {
+  background: var(--chrome-raised);
+  border: 2px dashed var(--comment-detached);
+  color: var(--comment-detached);
+}
+
+.comment-row-num[data-state="resolved"] {
+  background: var(--chrome-text-tertiary);
+  opacity: 0.7;
+}
+
+.comment-row-num .icon {
+  font-size: var(--size-icon-xs);
+}
+
+.comment-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.comment-row-node {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-xs);
+  background: var(--chrome-field);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-2xs);
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comment-row[data-state="detached"] .comment-row-node {
+  text-decoration: line-through;
+  color: var(--chrome-text-tertiary);
+}
+
+.comment-row-variant {
+  flex: none;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-xs);
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+  font-size: var(--ui-2xs);
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.comment-row-tag {
+  flex: none;
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--comment-detached) 22%, transparent);
+  color: var(--chrome-warning);
+  font-size: var(--ui-2xs);
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.comment-row-time {
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.comment-row-text {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Inspect */
+.inspect-panel-note {
+  padding: var(--space-md) var(--space-xs);
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+#inspector-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#inspector-empty,
+#inspector-error {
+  margin: 0;
+  padding: var(--space-md) var(--space-xs);
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+#inspector-error {
+  color: var(--chrome-error);
+}
+
+#inspector-empty[hidden],
+#inspector-error[hidden] {
+  display: none;
+}
+
+/* Notes */
+#notes-panel-text {
+  padding: var(--space-lg) var(--space-xs) 0;
+  font-size: var(--ui-sm);
+  line-height: 1.5;
+  color: var(--chrome-text);
+}
+
+#notes-panel-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-xs) 0;
+}
+
+#notes-panel-chips:empty {
+  display: none;
+}
+
+#notes-panel-empty {
+  margin: 0;
+  padding: var(--space-xl) var(--space-xs);
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-tertiary);
+}
+
+#notes-panel-empty[hidden] {
+  display: none;
+}
+
+#notes-panel-tags .tag-notes-section {
+  margin-top: var(--space-sm);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--radius-item);
+  overflow: hidden;
+}
+
+#notes-panel-tags .tag-notes-header {
+  gap: var(--space-md);
+  height: auto;
+  padding: var(--space-md) var(--space-lg) var(--space-md) var(--space-md);
+  font-size: var(--ui-sm);
+  font-weight: 600;
+}
+
+#notes-panel-tags .tag-notes-icon {
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.tag-notes-meta {
+  margin-left: auto;
+  flex: none;
+  font-size: var(--ui-2xs);
+  font-weight: 500;
+  color: var(--chrome-text-tertiary);
+}
+
+#notes-panel-tags .tag-notes-body {
+  margin: 0;
+  padding: 0 var(--space-lg) var(--space-lg) var(--space-xl);
+  border-radius: 0;
+  background: none;
+}
+
+#screen-usecases {
+  padding: 0;
+  border: 0;
+}
+
+#screen-usecases .screen-usecases-title {
+  padding: var(--space-xl) var(--space-xs) var(--space-xs);
+  font-size: var(--ui-xs);
+  font-weight: 600;
+  color: var(--chrome-text-secondary);
+}
+
+#screen-usecases .screen-usecases-sub {
+  display: none;
+}
+
+#screen-usecases .screen-usecases-row {
+  border-radius: var(--radius-menu);
+  padding: var(--space-md) var(--space-sm);
 }

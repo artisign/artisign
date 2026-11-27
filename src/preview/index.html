@@ -143,22 +143,31 @@
             </div>
           </div>
         </aside>
-        <!-- CHR-1267: interim home of the Flow, Comment and Inspect modes and the status bar until the side tool bar lands (CHR-1268). -->
-        <div id="interim-tools" class="float-pill project-only" role="toolbar" aria-label="Canvas tools" aria-orientation="vertical">
-          <!-- CHR-912: icon-only mode toggles. aria-label is the accessible name; data-tooltip is the shared tooltip (app.js swaps it for the disabled reason while comparing). CHR-916: data-shortcut-id names the entry of the shortcut mapping (shortcuts.js); the key shown in the tooltip is filled in at boot. -->
-          <button type="button" id="comment-mode-toggle" class="chrome-icon-btn" aria-pressed="false" aria-label="Comment mode" data-tooltip="Comment mode" data-shortcut-id="comment">
-            <span class="icon" aria-hidden="true">chat_bubble</span>
-            <span id="comment-count-badge" class="tool-badge" hidden></span>
-          </button>
-          <button type="button" id="inspect-mode-toggle" class="chrome-icon-btn" aria-pressed="false" aria-label="Inspect mode" data-tooltip="Inspect mode" data-shortcut-id="inspect">
-            <span class="icon" aria-hidden="true">frame_inspect</span>
-          </button>
-          <button type="button" id="flow-mode-toggle" class="chrome-icon-btn" aria-pressed="false" aria-label="Flow mode" data-tooltip="Flow mode" data-shortcut-id="flow">
-            <span class="icon" aria-hidden="true">route</span>
-          </button>
-          <button type="button" id="status-bar-toggle" class="chrome-icon-btn" aria-pressed="false" aria-label="Status bar" data-tooltip="Status bar" data-shortcut-id="status-bar">
-            <span class="icon" aria-hidden="true">smartphone</span>
-          </button>
+        <!-- CHR-1268: the side tool bar between the left card and the screen (design `tool-bar` + `tool-btn`). Icon-only: aria-label is the accessible name, tool-bar.js adds the hint tooltips (popover="hint" + interestfor, ~2 s hover) and the roving focus. aria-disabled tools stay focusable; the tooltip says why. The grip drags the bar (position remembered), the chevron folds it. data-shortcut-id names the entry of the shortcut mapping (shortcuts.js); the key in the tooltip is filled in at boot. -->
+        <div id="tool-bar" class="project-only" role="toolbar" aria-label="Screen tools" aria-orientation="vertical" focusgroup="toolbar wrap block" data-collapsed="false">
+          <div id="tool-bar-head">
+            <button type="button" id="tool-bar-grip" class="float-grip" aria-label="Tool bar handle. Use arrow keys to move." data-tooltip="Drag to move"><span class="icon" aria-hidden="true">drag_indicator</span></button>
+            <button type="button" id="tool-bar-fold" class="chrome-icon-btn chrome-icon-btn--sm" aria-expanded="true" aria-label="Fold tool bar" data-tooltip="Fold tool bar" data-shortcut-id="tool-bar-fold"><span class="icon" aria-hidden="true">keyboard_arrow_up</span></button>
+          </div>
+          <span id="tool-bar-live" class="visually-hidden" role="status" aria-live="polite"></span>
+          <div id="tool-bar-tools">
+            <button type="button" id="comment-mode-toggle" class="tool-btn" aria-pressed="false" aria-label="Comment" data-tool-hint="Comment" data-shortcut-id="comment"><span class="icon" aria-hidden="true">add_comment</span></button>
+            <button type="button" id="inspect-mode-toggle" class="tool-btn" aria-pressed="false" aria-label="Inspect" data-tool-hint="Inspect" data-shortcut-id="inspect"><span class="icon" aria-hidden="true">frame_inspect</span></button>
+            <span class="tool-sep" role="separator" aria-orientation="horizontal"></span>
+            <button type="button" id="notes-tool-toggle" class="tool-btn" aria-pressed="false" aria-label="Notes" data-tool-hint="Notes" data-shortcut-id="notes"><span class="icon" aria-hidden="true">description</span></button>
+            <button type="button" id="comments-tool-toggle" class="tool-btn" aria-pressed="false" aria-label="Comments" data-tool-hint="Comments" data-shortcut-id="comments">
+              <span class="icon" aria-hidden="true">chat_bubble</span>
+              <span id="comment-count-badge" class="tool-badge" hidden></span>
+            </button>
+            <button type="button" id="flow-mode-toggle" class="tool-btn" aria-pressed="false" aria-label="Flow" data-tool-hint="Flow" data-shortcut-id="flow"><span class="icon" aria-hidden="true">route</span></button>
+            <button type="button" id="design-system-tool" class="tool-btn" aria-label="Design system" data-tool-hint="Design system" data-shortcut-id="design-system"><span class="icon" aria-hidden="true">palette</span></button>
+            <span class="tool-sep" role="separator" aria-orientation="horizontal"></span>
+            <button type="button" id="more-tool-toggle" class="tool-btn" aria-label="More actions" aria-haspopup="menu" aria-expanded="false" aria-controls="more-menu" popovertarget="more-menu" data-tool-hint="More actions"><span class="icon" aria-hidden="true">more_horiz</span></button>
+          </div>
+          <!-- The overflow menu: a native popover="auto" (light dismiss, Esc), opened by the More tool's popovertarget. -->
+          <div id="more-menu" popover="auto" class="chrome-menu" role="menu" aria-label="More actions">
+            <button type="button" id="status-bar-toggle" class="chrome-menu-item more-toggle-row" role="menuitemcheckbox" aria-checked="false" data-shortcut-id="status-bar"><span>Status bar</span><span class="settings-switch" aria-hidden="true"></span></button>
+          </div>
         </div>
         <main id="main">
           <div id="screens-view" class="main-view">
@@ -219,6 +228,8 @@
                   #screen-holder carries the zoom transform both share.
                 -->
                 <div id="inspect-overlay" hidden></div>
+                <!-- CHR-1268 — flow mode's hover: the outline plus a chip naming the target screen (design `flow-hint`). Same layering as #inspect-overlay. -->
+                <div id="flow-overlay" hidden><span id="flow-overlay-chip"><span class="icon" aria-hidden="true">route</span><span id="flow-overlay-target"></span></span></div>
                 <!--
                   CHR-631 — the whole-screen follow-mode write highlight, shown
                   after a write_html on the currently displayed screen. Same
@@ -241,9 +252,8 @@
               -->
               <div id="comment-layer"></div>
             </div>
-            <!-- CHR-1252: comment mode's banner and the floating canvas toolbar (filled by comment-canvas.js). -->
+            <!-- CHR-1252: comment mode's banner (filled by comment-canvas.js). -->
             <div id="comment-banner" role="status" hidden></div>
-            <div id="comment-toolbar"></div>
             </div>
             <!-- CHR-738: side-by-side variant compare — a mode of this view, filled and shown by compare.js in place of #screens-stage. The columns' iframes are sandboxed like #screen-frame (iframe-fit.js). -->
             <div id="compare-view" hidden>
@@ -355,13 +365,39 @@
             </div>
           </div>
         </main>
-        <!-- CHR-1267: the Elements panel is gone. Compare mode keeps its Differences panel in a small card on the right until the right column slices land (CHR-1269/CHR-1270). -->
-        <aside id="compare-card" class="float-card" hidden>
+        <!-- CHR-1268: the right column's floating panel — Inspect, Notes, Comments or Compare's Differences, one at a time (tool-panels.js). Until the Agent bar (CHR-1269) lands it takes the whole column. The grip drags it (position remembered), the cross closes it. -->
+        <aside id="tool-panel" class="float-card" hidden aria-labelledby="tool-panel-title">
           <div class="float-card-head">
-            <h2 id="compare-panel-title" class="float-card-title">Compare</h2>
+            <button type="button" id="tool-panel-grip" class="float-grip" aria-label="Panel handle. Use arrow keys to move." data-tooltip="Drag to move"><span class="icon" aria-hidden="true">drag_indicator</span></button>
+            <h2 id="tool-panel-title" class="float-card-title">Comments</h2>
+            <span id="tool-panel-context" class="tool-panel-context"></span>
+            <button type="button" id="tool-panel-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close panel" data-tooltip="Close panel"><span class="icon" aria-hidden="true">close</span></button>
           </div>
-          <div class="float-card-body float-card-scroll">
-            <section id="compare-panel" hidden></section>
+          <span id="tool-panel-live" class="visually-hidden" role="status" aria-live="polite"></span>
+          <div class="float-card-body">
+            <section id="inspect-panel" class="tool-panel-body" hidden>
+              <div id="inspect-panel-note" class="inspect-panel-note">Click an element on the screen to inspect it.</div>
+              <ul id="inspector-list"></ul>
+              <p id="inspector-empty" hidden>No elements.</p>
+              <p id="inspector-error" hidden></p>
+            </section>
+            <section id="notes-panel" class="tool-panel-body" hidden>
+              <div id="notes-panel-text" class="md"></div>
+              <div id="notes-panel-chips"></div>
+              <div id="notes-panel-tags"></div>
+              <section id="screen-usecases" hidden></section>
+              <p id="notes-panel-empty" hidden>This screen has no notes, tag notes or use cases yet.</p>
+            </section>
+            <section id="comments-panel" class="tool-panel-body" hidden>
+              <div id="comments-tabs" class="seg-tabs" role="tablist" aria-label="Comment status">
+                <button type="button" id="comments-tab-open" class="seg-tab" role="tab" aria-selected="true" aria-controls="comments-list">Open<span id="comments-count-open" class="seg-count">0</span></button>
+                <button type="button" id="comments-tab-resolved" class="seg-tab" role="tab" aria-selected="false" aria-controls="comments-list">Resolved<span id="comments-count-resolved" class="seg-count">0</span></button>
+              </div>
+              <ul id="comments-list" role="tabpanel" aria-labelledby="comments-tab-open"></ul>
+              <p id="comments-empty" hidden></p>
+              <p id="comments-foot"></p>
+            </section>
+            <section id="compare-panel" class="tool-panel-body" hidden></section>
           </div>
         </aside>
         <!-- CHR-1267: the zoom pill (− / % / + / Fit). The % value opens a popover with a continuous 5–200 % slider and the presets. -->

@@ -133,7 +133,8 @@ describe("modes", () => {
   it("S toggles the status bar, W the follow toggle", async () => {
     await boot();
     key("s");
-    expect(pressed("status-bar-toggle")).toBe("true");
+    expect($("#status-bar-toggle").getAttribute("aria-checked")).toBe("true"); // a menu item of the More menu now
+    expect($("#status-bar-overlay").hidden).toBe(false);
     key("w");
     expect($("#follow-toggle").dataset.state).toBe("following");
     key("r"); // not paused: nothing to resume
@@ -333,10 +334,10 @@ describe("reference dialog", () => {
     key("?", { shiftKey: true });
     expect($("#shortcuts-scrim").hidden).toBe(false);
     const rows = [...document.querySelectorAll("#shortcuts-dialog .shortcuts-row")].map((r) => [r.firstChild.textContent, r.lastChild.textContent]);
-    expect(rows).toContainEqual(["Flow mode", "F"]);
+    for (const row of [["Comment", "C"], ["Inspect", "I"], ["Notes", "N"], ["Comments", "M"], ["Flow", "F"], ["Design system", "D"], ["Tool bar", "\\"]]) expect(rows).toContainEqual(row);
     expect(rows).toContainEqual(["Fit", "Shift+1"]);
     expect(rows).toContainEqual(["Collapse all", "Shift+G"]);
-    expect(rows).toContainEqual(["Close, leave mode", "Esc"]);
+    expect(rows).toContainEqual(["Close, leave a tool", "Esc"]);
     key("f");
     expect(pressed("flow-mode-toggle")).toBe("false");
     key("Escape");
@@ -375,7 +376,7 @@ describe("Escape consumed by an overlay does not also leave the mode", () => {
     await boot();
     $("#flow-mode-toggle").click();
     // Chrome focuses a clicked toggle, so its tooltip is up while the mode is on.
-    $("#flow-mode-toggle").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    $("#zoom-out").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
     expect($("#chrome-tooltip").hidden).toBe(false);
     key("Escape");
     expect($("#chrome-tooltip").hidden).toBe(true);

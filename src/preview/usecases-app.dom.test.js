@@ -127,8 +127,9 @@ describe("optionality", () => {
     await flush();
     expect($$(".view-tab").map((t) => t.textContent)).toEqual(["Screens", "Board", "Design System", "Use Cases, Beta"]);
     expect($("#usecases-view").hidden).toBe(true);
-    // Nothing use-case related is read until the tab opens (the per-screen reverse entry waits for the Notes panel slice, CHR-1269).
-    expect(useCaseCalls()).toEqual([]);
+    // The only read is the Notes panel's reverse entry (list_use_cases scoped to the open screen); the Use Cases tab fetches nothing itself.
+    expect(useCaseCalls().every((c) => c.tool === "list_use_cases" && c.body.screen === "editor")).toBe(true);
+    expect(calls.some((c) => c.tool === "list_use_cases" && c.body.include)).toBe(false);
     expect($(".uc-guide")).toBeNull(); // nothing is rendered either, not even the empty guide
   });
 
@@ -154,16 +155,16 @@ describe("optionality", () => {
     await openTab();
     expect($("#sidebar-screens").hidden).toBe(true);
     expect($("#screens-view").hidden).toBe(true);
-    expect($("#flow-mode-toggle").disabled).toBe(true);
-    expect($("#comment-mode-toggle").disabled).toBe(true);
-    expect($("#inspect-mode-toggle").disabled).toBe(true);
+    expect($("#flow-mode-toggle").getAttribute("aria-disabled")).toBe("true");
+    expect($("#comment-mode-toggle").getAttribute("aria-disabled")).toBe("true");
+    expect($("#inspect-mode-toggle").getAttribute("aria-disabled")).toBe("true");
     $('[data-view="screens"]').click();
     await flush();
     expect($("#usecases-view").hidden).toBe(true);
     expect($("#sidebar-screens").hidden).toBe(false);
     expect($("#screens-view").hidden).toBe(false);
-    expect($("#flow-mode-toggle").disabled).toBe(false);
-    expect($("#inspect-mode-toggle").disabled).toBe(false);
+    expect($("#flow-mode-toggle").getAttribute("aria-disabled")).toBe(null);
+    expect($("#inspect-mode-toggle").getAttribute("aria-disabled")).toBe(null);
     $('[data-view="board"]').click();
     await flush();
     expect($("#usecases-view").hidden).toBe(true);
@@ -174,7 +175,7 @@ describe("optionality", () => {
     await import("./app.js");
     await flush();
     await openTab();
-    const tabCalls = () => useCaseCalls().length;
+    const tabCalls = () => useCaseCalls().filter((c) => !c.body?.screen).length; // the Screens tab's own reverse-entry reads are not the tab's
     const before = tabCalls();
     $('[data-view="screens"]').click();
     await openTab();
@@ -522,6 +523,40 @@ describe("with use cases", () => {
 
 });
 
+describe("reverse entry", () => {
+  it("a screen lists the use cases that map to it, on a cold load too; one click opens it in the tab", async () => {
+    store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements", "ready"), caseOf(2, "personas")] };
+    await import("./app.js");
+    await flush();
+    expect($("#screen-usecases").hidden).toBe(false); // straight into Screens, the Use Cases tab never opened (it lives in the Notes panel, CHR-1268)
+    expect(calls.some((c) => c.tool === "list_use_cases" && c.body.include)).toBe(false);
+    expect($(".screen-usecases-sub").textContent).toBe("Steps that map to editor");
+    expect($$(".screen-usecases-row").map((r) => r.textContent)).toEqual(["Case 1", "Case 2"]);
+    calls.length = 0;
+    $$(".screen-usecases-row")[1].click();
+    await flush();
+    expect($("#usecases-view").hidden).toBe(false);
+    expect($(".uc-list-row.is-selected .uc-list-title").textContent).toBe("Case 2");
+  });
+
+  it("stays hidden when nothing maps to the screen", async () => {
+    store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements")] };
+    screens = [{ name: "other", tags: [], notes: "" }];
+    await import("./app.js");
+    await flush();
+    expect($("#screen-usecases").hidden).toBe(true);
+  });
+
+  it("stays out of the way for a project without use cases", async () => {
+    await import("./app.js");
+    await flush();
+    await openTab();
+    $('[data-view="screens"]').click();
+    await flush();
+    expect($("#screen-usecases").hidden).toBe(true);
+  });
+});
+
 describe("review round 1", () => {
   it("global shortcuts do not fire behind an open use case dialog", async () => {
     store = { personas, dimensions, objects, cases: [caseOf(1, "mapping/elements")] };
@@ -548,6 +583,7 @@ describe("review fixes", () => {
     await flush();
     const ids = $$("[id]").map((e) => e.id);
     expect(ids.filter((id, i) => ids.indexOf(id) !== i)).toEqual([]);
+    expect($("#notes-panel").contains($("#screen-usecases"))).toBe(true);
   });
 
   it("events that arrive while the tab is hidden are applied: coming back shows the new state", async () => {

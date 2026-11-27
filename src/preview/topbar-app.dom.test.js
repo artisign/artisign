@@ -81,22 +81,29 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("topbar markup", () => {
-  it("has no glyph icons and an accessible name plus tooltip on every icon toggle", async () => {
+  it("has no glyph icons and an accessible name, a title (no interest invokers in jsdom) and the key on every tool", async () => {
     await boot();
     expect($("#topbar").textContent.replaceAll(/[a-z_]+(?=\b)/g, "")).not.toMatch(GLYPH_ICON);
-    for (const sel of ["#interim-tools", "#canvas-controls"]) expect($(sel).textContent.replaceAll(/[a-z_]+(?=\b)/g, "")).not.toMatch(GLYPH_ICON);
+    for (const sel of ["#tool-bar", "#canvas-controls"]) expect($(sel).textContent.replaceAll(/[a-z_]+(?=\b)/g, "")).not.toMatch(GLYPH_ICON);
     for (const [id, label, icon, key] of [
-      ["flow-mode-toggle", "Flow mode", "route", "F"],
-      ["comment-mode-toggle", "Comment mode", "chat_bubble", "C"],
-      ["inspect-mode-toggle", "Inspect mode", "frame_inspect", "I"],
-      ["status-bar-toggle", "Status bar", "smartphone", "S"],
+      ["comment-mode-toggle", "Comment", "add_comment", "C"],
+      ["inspect-mode-toggle", "Inspect", "frame_inspect", "I"],
+      ["notes-tool-toggle", "Notes", "description", "N"],
+      ["comments-tool-toggle", "Comments", "chat_bubble", "M"],
+      ["flow-mode-toggle", "Flow", "route", "F"],
+      ["design-system-tool", "Design system", "palette", "D"],
+      ["more-tool-toggle", "More actions", "more_horiz", undefined],
     ]) {
       const btn = document.getElementById(id);
-      expect(btn.getAttribute("aria-label")).toBe(label);
-      expect(btn.dataset.tooltip).toBe(label);
-      expect(btn.querySelector(".icon").textContent).toBe(icon);
-      expect(btn.dataset.shortcut).toBe(key); // filled from the shortcut mapping (CHR-916)
+      expect(btn.getAttribute("aria-label"), id).toBe(label);
+      expect(btn.querySelector(".icon").textContent, id).toBe(icon);
+      expect(btn.dataset.shortcut, id).toBe(key); // filled from the shortcut mapping (CHR-916)
+      expect(btn.title, id).toBe(key ? `${label} (${key})` : label); // the baseline tooltip where interest invokers are missing
     }
+    // Status bar lives in the More menu now.
+    const status = document.getElementById("status-bar-toggle");
+    expect(status.closest("#more-menu")).not.toBeNull();
+    expect(status.dataset.shortcut).toBe("S");
   });
 });
 

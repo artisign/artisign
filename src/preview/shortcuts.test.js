@@ -43,8 +43,11 @@ describe("resolveShortcut", () => {
     expect(press("2")).toBe("view-design-system");
     expect(press("3")).toBe("view-board");
     expect(press("[")).toBe("panel-screens");
-    expect(press("\\")).toBeNull(); // the Context and Elements panels are gone (CHR-1267)
-    expect(press("]")).toBeNull();
+    expect(press("\\")).toBe("tool-bar-fold"); // the tool bar's fold (CHR-1268)
+    expect(press("]")).toBeNull(); // the Agent bar's fold waits for CHR-1269
+    expect(press("n")).toBe("notes");
+    expect(press("m")).toBe("comments");
+    expect(press("d")).toBe("design-system");
     expect(press("p")).toBe("project-menu");
     expect(press("/")).toBe("filter");
     expect(press("t")).toBe("theme");
@@ -78,9 +81,9 @@ describe("resolveShortcut", () => {
     expect(press("G", { shiftKey: true })).toBeNull();
   });
 
-  it("O and N exist only while the project menu is open", () => {
+  it("O exists only while the project menu is open, and N means Notes outside it", () => {
     expect(press("o")).toBeNull();
-    expect(press("n")).toBeNull();
+    expect(press("n")).toBe("notes");
     expect(press("o", {}, { overlay: "project-menu" })).toBe("menu-open");
     expect(press("n", {}, { overlay: "project-menu" })).toBe("menu-new");
   });

@@ -132,22 +132,24 @@ describe("canvas comments", () => {
     expect(pins().every((p) => p.tagName === "BUTTON")).toBe(true);
     expect($("#comment-count-badge").textContent).toBe("2");
     expect($("#comment-count-badge").hidden).toBe(false);
-    expect($("#comment-mode-toggle").getAttribute("aria-label")).toBe("Comment mode, 2 open comments");
+    expect($("#comments-tool-toggle").getAttribute("aria-label")).toBe("Comments, 2 open"); // the count is the Comments tool's badge
+    expect($("#comments-tool-toggle").contains($("#comment-count-badge"))).toBe(true);
+    expect($("#comment-mode-toggle").getAttribute("aria-label")).toBe("Comment");
   });
 
-  it("the Comment tool carries no count without threads", async () => {
+  it("the Comments tool carries no count without threads", async () => {
     await boot("one");
     loadFrame();
     expect($("#comment-count-badge").hidden).toBe(true);
-    expect($("#comment-mode-toggle").getAttribute("aria-label")).toBe("Comment mode");
+    expect($("#comments-tool-toggle").getAttribute("aria-label")).toBe("Comments");
     expect(pins()).toEqual([]);
   });
 
-  it("the Comment tool turns comment mode on and shows the banner; the Context panel's comments row is gone (CHR-1267)", async () => {
+  it("the Comment tool turns comment mode on and shows the banner; there is no floating canvas toolbar any more (CHR-1268)", async () => {
     seedThreads();
     await boot("one");
     loadFrame();
-    expect($("#comments-row")).toBeNull();
+    expect($("#comment-toolbar")).toBeNull();
     $("#comment-mode-toggle").click();
     expect($("#comment-mode-toggle").getAttribute("aria-pressed")).toBe("true");
     expect($("#comment-banner").hidden).toBe(false);
@@ -249,30 +251,98 @@ describe("canvas comments", () => {
     expect(posts).toEqual([{ action: "reanchor", comment_id: "c2", screen: "one", node_id: "card-trigger" }]);
   });
 
-  it("the toolbar is one tab stop with arrow-key movement", async () => {
+  it("the tool bar is one vertical toolbar and one tab stop, arrows walk down and up (the roving fallback where the browser has no focusgroup)", async () => {
     await boot("one");
     loadFrame();
-    const tools = ["#comment-tool-select", "#comment-tool-comment", "#comment-tool-resolved", "#comment-tool-hide"].map($);
-    expect(tools.map((b) => b.tabIndex)).toEqual([0, -1, -1, -1]);
+    const bar = $("#tool-bar");
+    expect([bar.getAttribute("role"), bar.getAttribute("aria-orientation"), bar.getAttribute("focusgroup")]).toEqual(["toolbar", "vertical", "toolbar wrap block"]);
+    const tools = [...document.querySelectorAll("#tool-bar-tools .tool-btn")];
+    expect(tools.map((b) => b.id)).toEqual(["comment-mode-toggle", "inspect-mode-toggle", "notes-tool-toggle", "comments-tool-toggle", "flow-mode-toggle", "design-system-tool", "more-tool-toggle"]);
+    expect(tools.map((b) => b.tabIndex)).toEqual([0, -1, -1, -1, -1, -1, -1]);
     tools[0].focus();
-    tools[0].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
-    expect(document.activeElement).toBe(tools[3]);
-    expect(tools.map((b) => b.tabIndex)).toEqual([-1, -1, -1, 0]);
+    tools[0].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(tools[6]); // wraps
+    tools[6].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(tools[0]);
+    expect(tools.map((b) => b.tabIndex)).toEqual([0, -1, -1, -1, -1, -1, -1]);
   });
 
-  it("the toolbar shows resolved pins muted, and hides pins without leaving the mode", async () => {
+  it("the Comments tool opens the thread list: detached first, then the log order; a row opens that thread's popover", async () => {
     seedThreads();
     await boot("one");
     loadFrame();
-    $("#comment-tool-comment").click();
-    $("#comment-tool-resolved").click();
+    expect($("#tool-panel").hidden).toBe(true);
+    $("#comments-tool-toggle").click();
+    expect($("#tool-panel").hidden).toBe(false);
+    expect($("#tool-panel-title").textContent).toBe("Comments");
+    expect($("#tool-panel-context").textContent).toBe("one");
+    expect($("#comments-tool-toggle").getAttribute("aria-pressed")).toBe("true");
+    expect($("#comments-count-open").textContent).toBe("2");
+    expect($("#comments-count-resolved").textContent).toBe("1");
+    const rows = [...document.querySelectorAll("#comments-list .comment-row")];
+    expect(rows.map((r) => [r.dataset.thread, r.dataset.state, r.querySelector(".comment-row-node").textContent, r.querySelector(".comment-row-text").textContent])).toEqual([
+      ["c2", "detached", "gone", "ux-agent: Old button"],
+      ["c1", "open", "card-goal", "ux-agent: On it"], // the last message of the thread
+    ]);
+    expect(rows[0].querySelector(".comment-row-tag").textContent).toBe("Detached");
+    rows[1].click();
+    expect(popover().open).toBe(true);
+    expect($(".comment-popover-header b").textContent).toBe("#1");
+    expect(document.querySelector("#comments-list .comment-row.is-active").dataset.thread).toBe("c1");
+    expect($("#comments-foot").textContent).toContain("Detached threads lost their element");
+  });
+
+  it("Resolved lists the resolved threads and puts a check pin on each; Open takes them away again", async () => {
+    seedThreads();
+    await boot("one");
+    loadFrame();
+    $("#comments-tool-toggle").click();
+    expect(pins().map((p) => p.dataset.state)).toEqual(["open", "detached"]);
+    $("#comments-tab-resolved").click();
+    expect($("#comments-tab-resolved").getAttribute("aria-selected")).toBe("true");
+    expect([...document.querySelectorAll("#comments-list .comment-row")].map((r) => [r.dataset.thread, r.dataset.state])).toEqual([["c3", "resolved"]]);
     expect(pins().map((p) => p.dataset.state)).toEqual(["open", "detached", "resolved"]);
     expect(pins()[2].getAttribute("aria-label")).toBe("Comment 3 on card-goal, resolved");
-    $("#comment-tool-hide").click();
-    expect(pins()).toEqual([]);
-    expect($("#comment-mode-toggle").getAttribute("aria-pressed")).toBe("true");
-    $("#comment-tool-select").click();
-    expect($("#comment-mode-toggle").getAttribute("aria-pressed")).toBe("false");
+    $("#comments-tab-open").click();
+    expect(pins().map((p) => p.dataset.state)).toEqual(["open", "detached"]);
+  });
+
+  it("closing the panel returns focus to its tool; Esc closes it after a mode; one panel at a time", async () => {
+    seedThreads();
+    await boot("one");
+    loadFrame();
+    $("#comments-tool-toggle").click();
+    $("#tool-panel-close").click();
+    expect($("#tool-panel").hidden).toBe(true);
+    expect($("#comments-tool-toggle").getAttribute("aria-pressed")).toBe("false");
+    expect(document.activeElement).toBe($("#comments-tool-toggle"));
+    $("#comments-tool-toggle").click();
+    $("#notes-tool-toggle").click(); // replaces it
+    expect($("#tool-panel-title").textContent).toBe("Notes");
+    expect([$("#comments-panel").hidden, $("#notes-panel").hidden]).toEqual([true, false]);
+    expect([$("#comments-tool-toggle"), $("#notes-tool-toggle")].map((b) => b.getAttribute("aria-pressed"))).toEqual(["false", "true"]);
+    escape();
+    expect($("#tool-panel").hidden).toBe(true);
+  });
+
+  it("Inspect is the panel of inspect mode: mode and panel open and close together, and another panel ends the mode", async () => {
+    await boot("one");
+    loadFrame();
+    $("#inspect-mode-toggle").click();
+    expect($("#tool-panel-title").textContent).toBe("Inspect");
+    expect($("#inspect-panel").hidden).toBe(false);
+    $("#tool-panel-close").click();
+    expect($("#inspect-mode-toggle").getAttribute("aria-pressed")).toBe("false");
+    expect($("#tool-panel").hidden).toBe(true);
+    $("#inspect-mode-toggle").click();
+    $("#notes-tool-toggle").click();
+    expect($("#inspect-mode-toggle").getAttribute("aria-pressed")).toBe("false");
+    expect($("#tool-panel-title").textContent).toBe("Notes");
+    $("#flow-mode-toggle").click(); // modes stay exclusive: flow does not touch the open Notes panel
+    expect($("#tool-panel-title").textContent).toBe("Notes");
+    $("#inspect-mode-toggle").click();
+    expect($("#flow-mode-toggle").getAttribute("aria-pressed")).toBe("false");
+    expect($("#tool-panel-title").textContent).toBe("Inspect");
   });
 
   it("never writes into the screen document", async () => {
@@ -287,10 +357,20 @@ describe("canvas comments", () => {
   });
 });
 
-describe("Context panel (CHR-1267)", () => {
-  it("is gone: the Notes panel and its tag specs wait for the right-column slice", async () => {
+describe("Notes panel (CHR-1268)", () => {
+  it("shows the tag chips for a tagged screen with no notes, without an empty text band", async () => {
     await boot("two");
-    expect($("#notes-panel")).toBeNull();
-    expect($("#sidebar-context")).toBeNull();
+    $("#notes-tool-toggle").click();
+    expect($("#notes-panel").hidden).toBe(false);
+    expect($("#tool-panel-context").textContent).toBe("two");
+    expect([...document.querySelectorAll("#notes-panel-chips .chrome-chip")].map((c) => c.textContent)).toEqual(["alpha", "beta"]);
+    expect($("#notes-panel-text").hidden).toBe(true);
+    expect($("#notes-panel-empty").hidden).toBe(true);
+  });
+
+  it("says so for a screen with neither notes, tags, tag notes nor use cases", async () => {
+    await boot("one");
+    $("#notes-tool-toggle").click();
+    expect($("#notes-panel-empty").hidden).toBe(false);
   });
 });

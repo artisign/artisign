@@ -77,20 +77,3 @@ export function diffRows(compare) {
 export function overlapPercent(member) {
   return Math.round(member.overlap.ratio * 100);
 }
-
-/**
- * Which of the flow / comment / inspect toggles are usable, and their tooltips.
- * Comment and inspect are off while comparing (there is no single canvas to
- * pick from); flow stays available because turning it on leaves compare —
- * flow mode navigates, and only Single does. A `null` title means "keep the
- * toggle's own".
- * @param {{ view: string, showMockup: boolean, comparing: boolean }} where
- */
-export function modeToggleStates({ view, showMockup, comparing }) {
-  const unavailable = "Not available while comparing variants";
-  return {
-    flow: { disabled: showMockup || view === "usecases", title: comparing ? "Leaves Compare and follows flows in Single" : "" },
-    comment: { disabled: view === "board" || view === "design-system" || view === "usecases" || comparing, title: comparing ? unavailable : "" },
-    inspect: { disabled: view === "board" || view === "usecases" || showMockup || comparing, title: comparing ? unavailable : null },
-  };
-}

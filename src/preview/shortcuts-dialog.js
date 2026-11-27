@@ -4,7 +4,7 @@ import { SHORTCUTS, formatShortcut } from "./shortcuts.js";
 import { isShown, trapFocus } from "./menu-keys.js";
 
 /** Group order per column, as drawn. */
-const COLUMNS = [["Modes", "Views"], ["Zoom", "Board"], ["Panels", "Project", "General"]];
+const COLUMNS = [["Tools", "Agent", "Project"], ["Zoom", "Board", "General"], ["Views", "Fold cards"]];
 
 /** Same keys as the Screens zoom presets; the Board applies them as Fit all / 100%, so the reference lists each key once. */
 const SHARED_WITH_ZOOM = new Set(["board-fit-all", "board-100"]);

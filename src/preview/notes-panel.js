@@ -34,11 +34,25 @@ export function renderScreenChips(container, screenTags) {
  *   `screenTags` are not rendered here.
  * @param {Set<string>} [expandedTags] — tags the reader has opened, mutated
  *   in place as they toggle, so the state survives the next re-render.
+ * @param {{ tags: string[] }[]} [screens] — every screen of the project; with
+ *   it each section says how many screens carry its tag (CHR-1268).
  */
-export function renderTagNotes(container, screenTags, allTagNotes, expandedTags = new Set()) {
+export function renderTagNotes(container, screenTags, allTagNotes, expandedTags = new Set(), screens = []) {
   container.innerHTML = "";
   const screenTagsLower = new Set(screenTags.map((t) => t.toLowerCase()));
   const matches = allTagNotes.filter((t) => screenTagsLower.has(t.tag.toLowerCase()));
+  if (matches.length > 0) {
+    // The design's `section-head`: title left, count right.
+    const head = document.createElement("div");
+    head.className = "tool-section-head";
+    const title = document.createElement("span");
+    title.textContent = "Tag notes";
+    const count = document.createElement("span");
+    count.className = "tool-section-meta";
+    count.textContent = String(matches.length);
+    head.append(title, count);
+    container.appendChild(head);
+  }
 
   for (const { tag, notes } of matches) {
     const section = document.createElement("section");
@@ -57,11 +71,20 @@ export function renderTagNotes(container, screenTags, allTagNotes, expandedTags 
     header.setAttribute("aria-expanded", String(isExpanded));
 
     header.appendChild(icon("expand_more", "section-chevron tag-notes-chevron"));
+    header.appendChild(icon("sell", "tag-notes-icon"));
 
     const title = document.createElement("span");
     title.className = "tag-notes-title";
     title.textContent = tag;
     header.appendChild(title);
+
+    if (screens.length > 0) {
+      const carried = screens.filter((s) => s.tags.some((t) => t.toLowerCase() === tag.toLowerCase())).length;
+      const meta = document.createElement("span");
+      meta.className = "tag-notes-meta";
+      meta.textContent = `${carried} screen${carried === 1 ? "" : "s"}`;
+      header.appendChild(meta);
+    }
 
     header.addEventListener("click", () => {
       const expanded = header.getAttribute("aria-expanded") === "true";

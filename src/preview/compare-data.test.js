@@ -8,7 +8,6 @@ import {
   toggleMember,
   diffRows,
   overlapPercent,
-  modeToggleStates,
 } from "./compare-data.js";
 
 const s = (name, variant_of) => ({ name, tags: [], ...(variant_of ? { variant_of, variant_kind: "state" } : {}) });
@@ -109,29 +108,5 @@ describe("overlapPercent", () => {
   it("rounds the shared-id ratio to a whole percent", () => {
     expect(overlapPercent({ overlap: { ratio: 0.784 } })).toBe(78);
     expect(overlapPercent({ overlap: { ratio: 0 } })).toBe(0);
-  });
-});
-
-describe("modeToggleStates", () => {
-  it("disables comment and inspect with a tooltip while comparing; flow stays usable", () => {
-    const states = modeToggleStates({ view: "screens", showMockup: false, comparing: true });
-    expect(states.comment).toEqual({ disabled: true, title: "Not available while comparing variants" });
-    expect(states.inspect).toEqual({ disabled: true, title: "Not available while comparing variants" });
-    expect(states.flow.disabled).toBe(false);
-    expect(states.flow.title).toContain("Single");
-  });
-
-  it("is the old rule otherwise: board disables comment and inspect, a mockup disables flow and inspect but not comment (CHR-1263), the design system and use cases disable comment", () => {
-    expect(modeToggleStates({ view: "screens", showMockup: false, comparing: false })).toEqual({
-      flow: { disabled: false, title: "" },
-      comment: { disabled: false, title: "" },
-      inspect: { disabled: false, title: null },
-    });
-    const board = modeToggleStates({ view: "board", showMockup: false, comparing: false });
-    expect([board.flow.disabled, board.comment.disabled, board.inspect.disabled]).toEqual([false, true, true]);
-    const mockup = modeToggleStates({ view: "screens", showMockup: true, comparing: false });
-    expect([mockup.flow.disabled, mockup.comment.disabled, mockup.inspect.disabled]).toEqual([true, false, true]);
-    expect(modeToggleStates({ view: "design-system", showMockup: false, comparing: false }).comment.disabled).toBe(true);
-    expect(modeToggleStates({ view: "usecases", showMockup: false, comparing: false }).comment.disabled).toBe(true);
   });
 });

@@ -40,6 +40,7 @@ const BADGES = { added: "+ added", changed: "~ changed", removed: "− removed" 
 
 /** The diff row's leading mark, by kind — a shape per kind, matching the badge drawn on the frame. */
 const DIFF_ICONS = { added: "add", changed: "edit", removed: "remove" };
+const DIFF_VERBS = { added: "Added", changed: "Changed", removed: "Removed" };
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -288,29 +289,33 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
       panelEl.appendChild(el("p", "compare-panel-empty", `Pick 1–${COMPARE_MAX_MEMBERS} screens to compare with ${reference}.`));
       return;
     }
-    const summary = el("div", "compare-summary");
-    summary.appendChild(el("h3", "", `vs. reference ${reference}`));
-    for (const name of selected) {
+    // Design `chrome-c-compare`: one summary line, then `diff-row`s — a tinted icon square, the node id, the change on a second line.
+    const rows = diff ? diffRows(data) : [];
+    const total = selected.reduce((sum, name) => {
       const member = memberData(name);
-      const row = el("div", "compare-summary-row");
-      row.dataset.screen = name;
-      const count = member ? diffRows({ members: [member] }).length : 0;
-      const value = !member ? "…" : member.status === "low_overlap" ? "unavailable" : `${count} node${count === 1 ? "" : "s"}`;
-      row.append(el("span", "compare-summary-name", name), el("b", "", value));
-      summary.appendChild(row);
-    }
+      return sum + (member && member.status !== "low_overlap" ? diffRows({ members: [member] }).length : 0);
+    }, 0);
+    const summary = el("p", "compare-summary-line", data ? `${total} node${total === 1 ? "" : "s"} differ from the base` : "Comparing…");
     panelEl.appendChild(summary);
+    for (const name of selected) {
+      if (memberData(name)?.status !== "low_overlap") continue;
+      const note = el("p", "compare-summary-note", `${name}: diff unavailable, too few shared node ids`);
+      note.dataset.screen = name;
+      panelEl.appendChild(note);
+    }
     if (dataError) panelEl.appendChild(el("p", "compare-panel-error", dataError));
     if (!diff) return;
     const list = el("div", "compare-diff-list");
-    for (const row of diffRows(data)) {
-      const item = button("compare-diff-row", "", () => highlight(row.id));
+    for (const row of rows) {
+      const item = button("compare-diff-row diff-row", "", () => highlight(row.id));
       item.dataset.id = row.id;
       item.dataset.kind = row.kind;
       item.dataset.member = row.member;
       item.classList.toggle("selected", row.id === highlightedId);
       item.setAttribute("aria-pressed", String(row.id === highlightedId));
-      item.append(icon(DIFF_ICONS[row.kind], "compare-diff-sign icon-xs"), el("code", "compare-diff-id", row.id), el("i", "compare-diff-member", row.member));
+      const main = el("span", "diff-row-main");
+      main.append(el("code", "compare-diff-id", row.id), el("span", "diff-row-change", `${DIFF_VERBS[row.kind]} in ${row.member}`));
+      item.append(icon(DIFF_ICONS[row.kind], "compare-diff-sign"), main);
       list.appendChild(item);
     }
     panelEl.appendChild(list);

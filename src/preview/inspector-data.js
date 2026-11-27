@@ -74,41 +74,19 @@ export function rgbToHex(value) {
   return a !== undefined && Number(a) < 1 ? `${hex} / ${Math.round(Number(a) * 100)}%` : hex;
 }
 
-/** @param {string} family a CSS font-family computed value, e.g. `system-ui, -apple-system, sans-serif` */
-export function shortFontFamily(family) {
-  if (!family) return "";
-  return family.split(",")[0].trim().replace(/^["']|["']$/g, "");
-}
-
-/** @param {{ x: number, y: number, w: number, h: number }} rect */
-export function formatPosition(rect) {
-  return `X ${rect.x} · Y ${rect.y} · W ${rect.w} · H ${rect.h}`;
-}
-
-/** @param {{ fontFamily: string, fontSize: string, fontWeight: string, lineHeight: string }} computed */
-export function formatTypography({ fontFamily, fontSize, fontWeight, lineHeight }) {
-  const parts = [shortFontFamily(fontFamily), fontSize, fontWeight].filter(Boolean);
-  if (lineHeight && lineHeight !== "normal") parts.push(`lh ${lineHeight}`);
-  return parts.join(" · ");
-}
-
-/** @param {{ padding: string, margin: string, radius: string }} computed */
-export function formatSpacing({ padding, margin, radius }) {
-  return `pad ${padding} · margin ${margin} · radius ${radius}`;
-}
-
 /**
  * Maps the server's per-node `refs` (the same shape `get_node`'s summary
  * view returns, present on `get_screen`'s "full" view nodes too — see
  * reads.ts) into the Elements panel's entry shape. A node with no `refs`
  * key just gets empty refs.
- * @param {{ id: string, tag: string, refs?: { component_ref?: string, variant?: string, token_refs?: Record<string, unknown> } }[]} nodes
- * @returns {{ id: string, tag: string, componentRef: string | null, variant: string | null, tokenRefs: { property: string, ref: unknown }[] }[]}
+ * @param {{ id: string, tag: string, parent_id?: string | null, refs?: { component_ref?: string, variant?: string, token_refs?: Record<string, unknown> } }[]} nodes
+ * @returns {{ id: string, tag: string, parentId: string | null, componentRef: string | null, variant: string | null, tokenRefs: { property: string, ref: unknown }[] }[]}
  */
 export function buildEntries(nodes) {
   return nodes.map((n) => ({
     id: n.id,
     tag: n.tag,
+    parentId: n.parent_id ?? null,
     componentRef: n.refs?.component_ref ?? null,
     variant: n.refs?.variant ?? null,
     tokenRefs: Object.entries(n.refs?.token_refs ?? {}).map(([property, ref]) => ({ property, ref })),

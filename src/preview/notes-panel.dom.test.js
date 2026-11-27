@@ -121,3 +121,21 @@ describe("renderScreenChips", () => {
     expect(container.children).toHaveLength(0);
   });
 });
+
+describe("renderTagNotes — the Notes panel's section head and screen counts (CHR-1268)", () => {
+  it("puts a 'Tag notes' head with the section count above the sections, and each section says how many screens carry its tag", () => {
+    const container = document.createElement("div");
+    const screens = [{ tags: ["orders"] }, { tags: ["Orders", "dashboard"] }, { tags: [] }];
+    renderTagNotes(container, ["orders", "dashboard"], [{ tag: "orders", notes: "a" }, { tag: "dashboard", notes: "b" }], new Set(), screens);
+    expect(container.querySelector(".tool-section-head").textContent).toBe("Tag notes2");
+    expect([...container.querySelectorAll(".tag-notes-meta")].map((m) => m.textContent)).toEqual(["2 screens", "1 screen"]);
+  });
+
+  it("has no head and no counts without matching tag notes or without the screen list", () => {
+    const container = document.createElement("div");
+    renderTagNotes(container, ["orders"], [{ tag: "other", notes: "x" }]);
+    expect(container.childElementCount).toBe(0);
+    renderTagNotes(container, ["orders"], [{ tag: "orders", notes: "x" }]);
+    expect(container.querySelector(".tag-notes-meta")).toBeNull();
+  });
+});

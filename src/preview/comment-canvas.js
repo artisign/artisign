@@ -1,7 +1,8 @@
 // CHR-1248 — comments on the canvas: one numbered pin per thread on its
 // anchored element, a popover with the thread next to it, comment mode's
-// hover outline and new-thread flow, re-anchoring, and the floating canvas
-// toolbar (Select, Comment, Show resolved, Hide pins).
+// hover outline and new-thread flow, and re-anchoring. The tools that drive it
+// (Comment, the thread list with its Open | Resolved tabs) live in the side tool
+// bar and the right column (CHR-1268); app.js calls setMode and setShowResolved.
 //
 // Everything here is an editor overlay in the PARENT document (#comment-layer
 // inside #canvas, in the canvas's scrolled content coordinates). The screen
@@ -41,14 +42,13 @@ export function numberThreads(threads) {
 
 /**
  * The threads that get a pin: open ones, plus resolved ones when "Show
- * resolved" is on; none at all while "Hide pins" is on.
+ * resolved" is on.
  * @template {{ status: "open" | "resolved" }} T
  * @param {T[]} threads
- * @param {{ showResolved: boolean, hidePins: boolean }} opts
+ * @param {{ showResolved: boolean }} opts
  * @returns {T[]}
  */
-export function pinnedThreads(threads, { showResolved, hidePins }) {
-  if (hidePins) return [];
+export function pinnedThreads(threads, { showResolved }) {
   return threads.filter((t) => t.status === "open" || showResolved);
 }
 
@@ -158,34 +158,6 @@ export function mockupCommentTarget(target) {
   return { el, id: el ? el.id : null };
 }
 
-/**
- * Roving-tabindex fallback for a horizontal toolbar where `focusgroup` is
- * unsupported: one item in the tab order, arrow keys (reversed in RTL),
- * Home/End, wrapping at the ends.
- * @param {HTMLElement} toolbar
- * @param {HTMLElement[]} items
- */
-function installRovingTabindex(toolbar, items) {
-  items.forEach((b, i) => (b.tabIndex = i ? -1 : 0));
-  toolbar.addEventListener("focusin", (evt) => {
-    const target = /** @type {HTMLElement} */ (evt.target);
-    if (items.includes(target)) items.forEach((b) => (b.tabIndex = b === target ? 0 : -1));
-  });
-  toolbar.addEventListener("keydown", (evt) => {
-    const rtl = getComputedStyle(toolbar).direction === "rtl";
-    const steps = { ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1 };
-    const current = items.indexOf(/** @type {HTMLElement} */ (evt.target));
-    if (current === -1) return;
-    let next;
-    if (evt.key === "Home") next = 0;
-    else if (evt.key === "End") next = items.length - 1;
-    else if (evt.key in steps) next = (current + steps[/** @type {"ArrowRight" | "ArrowLeft"} */ (evt.key)] + items.length) % items.length;
-    else return;
-    evt.preventDefault();
-    items[next].focus();
-  });
-}
-
 /** @param {string | null} ref `<screen>.<node-id>` or null */
 export function bareId(ref) {
   if (ref === null) return null;
@@ -257,15 +229,15 @@ function divEl(className) {
 /**
  * @param {{
  *   host: CommentHost,
- *   toolbarEl: HTMLElement,
  *   bannerEl: HTMLElement,
  *   actions: CanvasActions,
- *   prefs?: { showResolved: boolean, hidePins: boolean },
- *   onPrefsChange?: (prefs: { showResolved: boolean, hidePins: boolean }) => void,
+ *   fallbackFocus?: (threadId: string | null) => HTMLElement | null,
+ *   prefs?: { showResolved: boolean },
+ *   onPrefsChange?: (prefs: { showResolved: boolean }) => void,
  *   onActiveChange?: () => void,
  * }} opts
  */
-export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, actions, prefs, onPrefsChange, onActiveChange }) {
+export function createCommentCanvas({ host: initialHost, bannerEl, actions, prefs, onPrefsChange, onActiveChange, fallbackFocus }) {
   let host = initialHost;
   /** @type {string | null} what the data belongs to ("screen:<name>" / "mockup:<name>"); a change closes the popover */
   let scope = null;
@@ -275,7 +247,6 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
   let threads = [];
   let modeOn = false;
   let showResolved = prefs?.showResolved ?? false;
-  let hidePins = prefs?.hidePins ?? false;
   /** @type {string | null} the open thread's id, or "new" for a new thread */
   let activeId = null;
   /** @type {string | null | undefined} the new thread's DOM id (null = whole screen / whole variant) */
@@ -346,36 +317,6 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
   menuEl.hidden = true;
   popoverEl.append(popHeader, popAlert, popMessages, popComposer, menuEl);
 
-  // Toolbar.
-  toolbarEl.replaceChildren();
-  toolbarEl.setAttribute("role", "toolbar");
-  toolbarEl.setAttribute("aria-label", "Canvas tools");
-  const selectBtn = toolBtn("arrow_selector_tool", "Select", "comment-tool-select");
-  const commentBtn = toolBtn("chat_bubble", "Comment (C)", "comment-tool-comment");
-  const divider = document.createElement("span");
-  divider.className = "comment-toolbar-divider";
-  divider.setAttribute("role", "separator");
-  divider.setAttribute("aria-orientation", "vertical");
-  const resolvedBtn = textBtn("Show resolved", "comment-tool-resolved");
-  const hideBtn = textBtn("Hide pins", "comment-tool-hide");
-  toolbarEl.append(selectBtn, commentBtn, divider, resolvedBtn, hideBtn);
-  // One tab stop: the browser's focusgroup where supported, else a roving tabindex with the arrow keys.
-  toolbarEl.setAttribute("focusgroup", "toolbar wrap");
-  if (!("focusGroup" in HTMLElement.prototype)) installRovingTabindex(toolbarEl, [selectBtn, commentBtn, resolvedBtn, hideBtn]);
-  selectBtn.addEventListener("click", () => actions.setMode(false));
-  commentBtn.addEventListener("click", () => actions.setMode(true));
-  resolvedBtn.addEventListener("click", () => {
-    showResolved = !showResolved;
-    onPrefsChange?.({ showResolved, hidePins });
-    render();
-  });
-  hideBtn.addEventListener("click", () => {
-    hidePins = !hidePins;
-    if (hidePins && activeId !== null && activeId !== "new") close(false);
-    onPrefsChange?.({ showResolved, hidePins });
-    render();
-  });
-
   // Popover wiring.
   popComposer.addEventListener("submit", (evt) => {
     evt.preventDefault();
@@ -405,9 +346,9 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
   const onOutsidePress = (evt) => {
     if (activeId === null) return;
     const target = /** @type {Node} */ (evt.target);
-    if (popoverEl.contains(target) || pinsEl.contains(target) || toolbarEl.contains(target)) return;
-    // A column header's count chip opens a thread itself: closing first would rebuild it away from under the press.
-    if (typeof (/** @type {Element} */ (target).closest) === "function" && /** @type {Element} */ (target).closest(".comment-count-chip")) return;
+    if (popoverEl.contains(target) || pinsEl.contains(target)) return;
+    // A column header's count chip and a row of the Comments panel open a thread themselves: closing first would rebuild them away from under the press.
+    if (typeof (/** @type {Element} */ (target).closest) === "function" && /** @type {Element} */ (target).closest(".comment-count-chip, .comment-row")) return;
     close(false);
   };
   document.addEventListener("pointerdown", onOutsidePress, true);
@@ -420,32 +361,10 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
     return el;
   }
 
-  function toolBtn(iconName, label, id) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.id = id;
-    b.className = "chrome-icon-btn comment-toolbar-btn";
-    b.setAttribute("aria-label", label);
-    b.dataset.tooltip = label;
-    b.setAttribute("aria-pressed", "false");
-    b.append(icon(iconName));
-    return b;
-  }
-
-  function textBtn(label, id) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.id = id;
-    b.className = "comment-toolbar-text";
-    b.setAttribute("aria-pressed", "false");
-    b.append(icon("check", "comment-toolbar-check"), label);
-    return b;
-  }
-
   /** Puts the layer parts, the toolbar and the banner where the host says (the host's layer, its stage). */
   function mount() {
     host.layerEl.replaceChildren(dimsEl, outlineEl, hoverOutlineEl, pinsEl, popoverEl);
-    host.stageEl.append(toolbarEl, bannerEl);
+    host.stageEl.append(bannerEl);
     bannerEl.dataset.placement = host.placement ?? "top";
   }
 
@@ -506,7 +425,6 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
   // Rendering
 
   function render() {
-    renderToolbar();
     renderBanner();
     renderPins();
     renderDims();
@@ -530,13 +448,6 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
       dim.style.height = `${box.bottom - box.top}px`;
       dimsEl.append(dim);
     }
-  }
-
-  function renderToolbar() {
-    selectBtn.setAttribute("aria-pressed", String(!modeOn));
-    commentBtn.setAttribute("aria-pressed", String(modeOn));
-    resolvedBtn.setAttribute("aria-pressed", String(showResolved));
-    hideBtn.setAttribute("aria-pressed", String(hidePins));
   }
 
   function renderBanner() {
@@ -571,7 +482,7 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
     pinsEl.replaceChildren();
     const numbers = numberThreads(threads);
     const perElement = new Map();
-    const pinned = pinnedThreads(threads, { showResolved, hidePins });
+    const pinned = pinnedThreads(threads, { showResolved });
     // DOM order follows the frames (a mockup's columns A, B, C), then the log.
     const ordered = host.frames().flatMap((frame) => pinned.filter((t) => homeFrame(t)?.key === frame.key));
     for (const t of ordered) {
@@ -626,7 +537,7 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
     if (activeId === "new" && newTarget !== undefined) box = boxFor(newKey, newTarget);
     else if (activeId !== null && activeId !== "new") {
       const t = thread(activeId);
-      if (t && !t.detached && !hidePins) box = boxFor(keyOf(t), bareId(t.node_id));
+      if (t && !t.detached) box = boxFor(keyOf(t), bareId(t.node_id));
       if (t) outlineEl.dataset.kind = t.author;
     }
     if (activeId === "new") outlineEl.dataset.kind = "human";
@@ -1009,9 +920,9 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
     render();
     onActiveChange?.();
     if (!returnFocus) return;
-    // Back to the thread's pin; after a resolve or delete that pin is gone, so the first pin (or the Comment tool) takes focus instead.
-    const target = (was && was !== "new" ? pinFor(was) : null) ?? /** @type {HTMLElement | null} */ (pinsEl.querySelector(".comment-pin")) ?? commentBtn;
-    target.focus();
+    // Back to the thread's pin; after a resolve or delete that pin is gone, so the first pin takes focus, else what the owner names (the Comments row or tool it was opened from, the Comment tool).
+    const target = (was && was !== "new" ? pinFor(was) : null) ?? /** @type {HTMLElement | null} */ (pinsEl.querySelector(".comment-pin")) ?? fallbackFocus?.(was && was !== "new" ? was : null) ?? null;
+    target?.focus();
   }
 
   // ---------------------------------------------------------------------------
@@ -1187,11 +1098,6 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
       }
       return false;
     },
-    /** Focuses the first pin (the sidebar count row). */
-    focusFirstPin() {
-      showPins();
-      /** @type {HTMLElement | null} */ (pinsEl.querySelector(".comment-pin"))?.focus();
-    },
     /**
      * Opens the first thread of one kind in one frame (a column header's
      * count chip): "open" (not detached), "detached" or "resolved".
@@ -1201,35 +1107,32 @@ export function createCommentCanvas({ host: initialHost, toolbarEl, bannerEl, ac
     openFirst(key, kind) {
       const match = threads.find((t) => homeFrame(t)?.key === key && threadKind(t) === kind);
       if (!match) return;
-      showPins();
       open(match.id);
     },
     open,
-    /** Opens one thread by id — the Board's "Open in Screens" (CHR-1264); pins hidden by "Hide pins" come back first. @param {string} id */
+    /** Opens one thread by id — the Board's "Open in Screens" (CHR-1264); @param {string} id */
     openThread(id) {
       if (!threads.some((t) => t.id === id)) return;
-      showPins();
       open(id);
     },
     isOpen: () => activeId !== null,
     /** The open thread's id, or null (also for a new thread). */
     activeThread: () => (activeId === "new" ? null : activeId),
-    prefs: () => ({ showResolved, hidePins }),
-    setToolbarHidden(hidden) {
-      toolbarEl.hidden = hidden;
+    prefs: () => ({ showResolved }),
+    /** Resolved threads get a pin too (the Comments panel's Resolved tab). @param {boolean} on */
+    setShowResolved(on) {
+      if (on === showResolved) return;
+      showResolved = on;
+      onPrefsChange?.({ showResolved });
+      render();
+    },
+    /** Hides the whole comment layer and the banner (no screen to comment on, Compare, another view). @param {boolean} hidden */
+    setLayerHidden(hidden) {
       host.layerEl.hidden = hidden;
       if (hidden) bannerEl.hidden = true;
       else renderBanner();
     },
   };
-
-  /** Hide pins would leave a chip or the sidebar row pointing at nothing: turn it off first. */
-  function showPins() {
-    if (!hidePins) return;
-    hidePins = false;
-    onPrefsChange?.({ showResolved, hidePins });
-    render();
-  }
 
   return api;
 }

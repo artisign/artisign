@@ -153,7 +153,7 @@ describe("mockup comments", () => {
     expect($("#comment-count-badge").hidden).toBe(false);
   });
 
-  it("each column header carries its count chips; Show resolved adds the resolved one", async () => {
+  it("each column header carries its count chips; the Resolved tab adds the resolved one", async () => {
     seedThreads();
     await boot();
     loadColumns();
@@ -162,7 +162,8 @@ describe("mockup comments", () => {
       ["open", "1 open comment"],
       ["detached", "1 detached comment"],
     ]);
-    $("#comment-tool-resolved").click();
+    $("#comments-tool-toggle").click();
+    $("#comments-tab-resolved").click();
     expect(chips(0).map((c) => c.dataset.kind)).toEqual(["open", "resolved"]);
     expect(pins().map((p) => p.dataset.state)).toContain("resolved");
   });
@@ -183,7 +184,7 @@ describe("mockup comments", () => {
   it("comment mode spans all columns: a click picks the nearest authored id, none gives a whole-variant thread, and the post names mockup and variant", async () => {
     await boot();
     const docs = loadColumns();
-    expect($("#comment-mode-toggle").disabled).toBe(false);
+    expect($("#comment-mode-toggle").getAttribute("aria-disabled")).toBeNull();
     $("#comment-mode-toggle").click();
     expect($("#comment-banner").dataset.placement).toBe("bottom");
     docs.a.querySelector("em").click();

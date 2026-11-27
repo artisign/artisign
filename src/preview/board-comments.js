@@ -182,7 +182,7 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     for (const tile of g.tiles) {
       const all = threadsOf(tile.screen);
       if (all.length === 0) continue;
-      const shown = pinnedThreads(all, { showResolved, hidePins: false });
+      const shown = pinnedThreads(all, { showResolved });
       const numbers = numberThreads(all);
       const scale = g.zoom / 100;
       const box = { left: tile.x * scale, top: tile.y * scale, right: (tile.x + tile.width) * scale };
@@ -444,7 +444,7 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
   /** @param {string} screen */
   function buildListPreview(screen) {
     const all = threadsOf(screen);
-    const shown = pinnedThreads(all, { showResolved, hidePins: false });
+    const shown = pinnedThreads(all, { showResolved });
     const numbers = numberThreads(all);
     previewEl.setAttribute("aria-label", "Comments of this screen, read only");
     previewEl.dataset.mode = "list";

@@ -116,10 +116,11 @@ describe("compare mode in the screen view", () => {
     expect($("#compare-bar .compare-chip-reference").textContent).toContain("reference");
     expect(seg("compare").textContent).toBe("Compare · 2");
     expect(calls.some((u) => u.startsWith("/api/compare?base=family&others=a&"))).toBe(true);
-    // the Differences panel opens in its own card
+    // the Differences panel opens in the right column
     expect($("#compare-panel").hidden).toBe(false);
-    expect($("#compare-card").hidden).toBe(false);
-    expect($("#compare-panel .compare-summary h3").textContent).toBe("vs. reference family");
+    expect($("#tool-panel").hidden).toBe(false);
+    expect($("#tool-panel-title").textContent).toBe("Differences");
+    expect($("#compare-panel .compare-summary-line").textContent).toMatch(/differ from the base|Comparing/);
   });
 
   it("Single goes back to the screen that was open before compare", async () => {
@@ -134,7 +135,7 @@ describe("compare mode in the screen view", () => {
     expect($("#compare-view").hidden).toBe(true);
     expect($("#screens-stage").hidden).toBe(false);
     expect(rowButton("a1").getAttribute("aria-current")).toBe("true");
-    expect($("#compare-card").hidden).toBe(true);
+    expect($("#tool-panel").hidden).toBe(true);
   });
 
   it("navigating to a screen outside the family ends compare", async () => {
@@ -191,18 +192,19 @@ describe("picking members", () => {
 describe("other modes", () => {
   it("comment and inspect are disabled with a tooltip while comparing, and back afterwards", async () => {
     await boot("a");
-    const inspectTooltip = $("#inspect-mode-toggle").dataset.tooltip;
     seg("compare").click();
     await flush();
-    for (const id of ["comment-mode-toggle", "inspect-mode-toggle"]) {
-      expect($(`#${id}`).disabled).toBe(true);
-      expect($(`#${id}`).dataset.tooltip).toBe("Not available while comparing variants");
+    for (const id of ["comment-mode-toggle", "inspect-mode-toggle", "comments-tool-toggle"]) {
+      expect($(`#${id}`).getAttribute("aria-disabled")).toBe("true");
+      expect($(`#${id}`).dataset.toolReason).toBe("Not available while comparing variants");
     }
+    expect($("#notes-tool-toggle").getAttribute("aria-disabled")).toBeNull(); // Notes still apply
     seg("single").click();
     await flush();
-    expect($("#comment-mode-toggle").disabled).toBe(false);
-    expect($("#inspect-mode-toggle").disabled).toBe(false);
-    expect($("#inspect-mode-toggle").dataset.tooltip).toBe(inspectTooltip);
+    for (const id of ["comment-mode-toggle", "inspect-mode-toggle", "comments-tool-toggle"]) {
+      expect($(`#${id}`).getAttribute("aria-disabled")).toBeNull();
+      expect($(`#${id}`).dataset.toolReason).toBeUndefined();
+    }
   });
 
   it("turning flow mode on leaves compare first", async () => {

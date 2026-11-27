@@ -1,5 +1,5 @@
 // Preview canvas: clips, scales and centers the screen iframe inside a
-// neutral pane, and positions the optional status-bar chrome over it. All
+// neutral pane. All
 // measurement/positioning happens on the PARENT document's elements — the
 // iframe's own document (srcdoc) is never read from or written to beyond
 // measuring its already-rendered root, per render determinism: nothing here

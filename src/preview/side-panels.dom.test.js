@@ -100,16 +100,16 @@ describe("left card (CHR-1267)", () => {
     expect([card.style.left, card.style.top]).toEqual(["120px", "90px"]);
   });
 
-  it("comment mode and inspect mode work without a panel to open", async () => {
+  it("with no screen open the screen tools are greyed out, stay focusable and do nothing", async () => {
     await boot();
-    const comment = document.getElementById("comment-mode-toggle");
-    const inspect = document.getElementById("inspect-mode-toggle");
-    comment.disabled = false;
-    inspect.disabled = false;
-    comment.click();
-    expect(comment.getAttribute("aria-pressed")).toBe("true");
-    inspect.click();
-    expect(inspect.getAttribute("aria-pressed")).toBe("true");
-    expect(comment.getAttribute("aria-pressed")).toBe("false");
+    for (const id of ["comment-mode-toggle", "inspect-mode-toggle", "notes-tool-toggle", "comments-tool-toggle", "flow-mode-toggle"]) {
+      const tool = document.getElementById(id);
+      expect(tool.getAttribute("aria-disabled"), id).toBe("true");
+      expect(tool.disabled, id).toBe(false); // focusable
+      expect(tool.dataset.toolReason, id).toBe("No screen is open");
+      tool.click();
+      expect(tool.getAttribute("aria-pressed"), id).toBe("false");
+    }
+    expect(document.getElementById("design-system-tool").getAttribute("aria-disabled")).toBeNull();
   });
 });

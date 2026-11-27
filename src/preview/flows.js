@@ -13,6 +13,27 @@ function targetScreen(flowTarget) {
 }
 
 /**
+ * Places the flow hover overlay (design `flow-hint`, hover state) over `el`: the outline with a tint, and the chip naming the target screen under its bottom-right corner. The overlay sits in the zoomed #screen-holder, in the iframe's own (unscaled) coordinates, so the chip counter-scales to a constant on-screen size (style.css).
+ * @param {HTMLElement} overlayEl
+ * @param {Element | null} el the hovered flow-source element, null to hide the overlay
+ * @param {string} target the screen it leads to
+ */
+export function updateFlowOverlay(overlayEl, el, target) {
+  if (!el) {
+    overlayEl.hidden = true;
+    return;
+  }
+  const rect = el.getBoundingClientRect();
+  overlayEl.style.left = `${Math.round(rect.left)}px`;
+  overlayEl.style.top = `${Math.round(rect.top)}px`;
+  overlayEl.style.width = `${Math.round(rect.width)}px`;
+  overlayEl.style.height = `${Math.round(rect.height)}px`;
+  const targetEl = overlayEl.querySelector("#flow-overlay-target");
+  if (targetEl) targetEl.textContent = target;
+  overlayEl.hidden = false;
+}
+
+/**
  * Marks every flow-source element in the iframe document and wires clicks
  * to `onNavigate` when flow mode is on. Called after every iframe load
  * (fresh document each time) and on every flow-mode toggle.
@@ -20,9 +41,10 @@ function targetScreen(flowTarget) {
  * @param {Document} doc
  * @param {boolean} enabled
  * @param {(targetScreen: string) => void} onNavigate
+ * @param {{ onHover?: (el: Element | null, targetScreen: string) => void }} [opts] `onHover` follows the pointer: the flow-source element under it and where it leads, or null when the pointer leaves it
  * @returns {() => void} cleanup, removes listeners and outlines
  */
-export function applyFlowMode(doc, enabled, onNavigate) {
+export function applyFlowMode(doc, enabled, onNavigate, { onHover } = {}) {
   const elements = Array.from(doc.querySelectorAll("[data-flow-target]"));
   if (!enabled) return () => {};
 
@@ -46,8 +68,30 @@ export function applyFlowMode(doc, enabled, onNavigate) {
   }
   doc.addEventListener("click", handleClick, true);
 
+  /** The tap-triggered flow source an event's target sits in, if any (the click only follows those). */
+  const sourceOf = (evt) => {
+    const el = /** @type {HTMLElement} */ (evt.target)?.closest?.("[data-flow-target]") ?? null;
+    return el && (el.getAttribute("data-flow-trigger") ?? "tap") === "tap" ? el : null;
+  };
+  const handleOver = (evt) => {
+    const el = sourceOf(evt);
+    if (el) onHover?.(el, targetScreen(el.getAttribute("data-flow-target")));
+  };
+  const handleOut = (evt) => {
+    const el = sourceOf(evt);
+    // Moving into a child of the same element is not leaving it.
+    if (el && !(evt.relatedTarget instanceof Node && el.contains(evt.relatedTarget))) onHover?.(null, "");
+  };
+  if (onHover) {
+    doc.addEventListener("pointerover", handleOver, true);
+    doc.addEventListener("pointerout", handleOut, true);
+  }
+
   return () => {
     doc.removeEventListener("click", handleClick, true);
+    doc.removeEventListener("pointerover", handleOver, true);
+    doc.removeEventListener("pointerout", handleOut, true);
+    onHover?.(null, "");
     elements.forEach((el, i) => {
       const original = originalStyles[i];
       if (original === null) el.removeAttribute("style");

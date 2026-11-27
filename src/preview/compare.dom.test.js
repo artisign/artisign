@@ -227,8 +227,8 @@ describe("diff marks", () => {
       ["remove", "old-card", "a"],
       ["remove", "gone", "a"],
     ]);
-    expect(els.panelEl.querySelector(".compare-summary h3").textContent).toBe("vs. reference family");
-    expect(els.panelEl.querySelector(".compare-summary-row").textContent).toContain("4 nodes");
+    expect(els.panelEl.querySelector(".compare-summary-line").textContent).toBe("4 nodes differ from the base");
+    expect(rows.map((r) => r.querySelector(".diff-row-change").textContent)).toEqual(["Added in a", "Changed in a", "Removed in a", "Removed in a"]);
     expect(els.columnsEl.querySelector('.compare-column[data-screen="a"] .compare-label-note').textContent).toBe("4 diffs");
     expect(els.columnsEl.querySelector('.compare-column[data-screen="family"] .compare-label-note').textContent).toBe("reference");
   });
@@ -283,7 +283,7 @@ describe("low_overlap", () => {
     expect(marks("a")).toHaveLength(0);
     expect(els.panelEl.querySelectorAll(".compare-diff-row")).toHaveLength(0);
     expect(els.barEl.querySelector('.compare-chip[data-screen="a"] .compare-chip-overlap').textContent).toBe("11%");
-    expect(els.panelEl.querySelector(".compare-summary-row").textContent).toContain("unavailable");
+    expect(els.panelEl.querySelector(".compare-summary-note").textContent).toContain("diff unavailable");
   });
 });
 

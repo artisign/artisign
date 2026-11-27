@@ -24,20 +24,22 @@
  * }} ShortcutDef
  */
 
-export const SHORTCUT_GROUPS = ["Modes", "Views", "Zoom", "Board", "Panels", "Project", "General"];
+export const SHORTCUT_GROUPS = ["Tools", "Views", "Zoom", "Board", "Agent", "Fold cards", "Project", "General"];
 
 /** @type {ShortcutDef[]} */
 export const SHORTCUTS = [
-  { id: "flow", group: "Modes", label: "Flow mode", key: "f", display: "F" },
-  { id: "comment", group: "Modes", label: "Comment mode", key: "c", display: "C" },
-  { id: "inspect", group: "Modes", label: "Inspect mode", key: "i", display: "I" },
-  { id: "status-bar", group: "Modes", label: "Status bar", key: "s", display: "S" },
-  { id: "follow", group: "Modes", label: "Follow", key: "w", display: "W" },
-  { id: "follow-resume", group: "Modes", label: "Resume follow", key: "r", display: "R" },
+  // The side tool bar (CHR-1268), in its order.
+  { id: "comment", group: "Tools", label: "Comment", key: "c", display: "C" },
+  { id: "inspect", group: "Tools", label: "Inspect", key: "i", display: "I" },
+  { id: "notes", group: "Tools", label: "Notes", key: "n", display: "N" },
+  { id: "comments", group: "Tools", label: "Comments", key: "m", display: "M" },
+  { id: "flow", group: "Tools", label: "Flow", key: "f", display: "F" },
+  { id: "design-system", group: "Tools", label: "Design system", key: "d", display: "D" },
 
   { id: "view-screens", group: "Views", label: "Screens", key: "1", display: "1", target: "screens" },
-  { id: "view-design-system", group: "Views", label: "Design System", key: "2", display: "2", target: "design-system" },
-  { id: "view-board", group: "Views", label: "Board", key: "3", display: "3", target: "board" },
+  { id: "view-board", group: "Views", label: "Board", key: "2", display: "2", target: "board" },
+  { id: "view-design-system", group: "Views", label: "Design System", key: "3", display: "3", target: "design-system" },
+  { id: "view-usecases", group: "Views", label: "Use Cases", key: "4", display: "4", target: "usecases" },
 
   { id: "zoom-fit", group: "Zoom", label: "Fit", code: "Digit1", shift: true, display: "1", zoom: "fit", view: "screens" },
   { id: "zoom-50", group: "Zoom", label: "50%", code: "Digit5", shift: true, display: "5", zoom: 0.5, view: "screens" },
@@ -53,7 +55,11 @@ export const SHORTCUTS = [
   { id: "board-clusters", group: "Board", label: "Clusters", key: "g", display: "G", view: "board" },
   { id: "board-collapse-all", group: "Board", label: "Collapse all", key: "g", shift: true, display: "G", view: "board" },
 
-  { id: "panel-screens", group: "Panels", label: "Screens panel", key: "[", char: true, display: "[" },
+  { id: "follow", group: "Agent", label: "Follow the agent", key: "w", display: "W" },
+  { id: "follow-resume", group: "Agent", label: "Resume following", key: "r", display: "R" },
+
+  { id: "panel-screens", group: "Fold cards", label: "Project card", key: "[", char: true, display: "[" },
+  { id: "tool-bar-fold", group: "Fold cards", label: "Tool bar", key: "\\", char: true, display: "\\" },
 
   { id: "project-menu", group: "Project", label: "Project menu", key: "p", display: "P" },
   { id: "menu-open", group: "Project", label: "Open project (in menu)", key: "o", display: "O", overlay: "project-menu" },
@@ -61,7 +67,7 @@ export const SHORTCUTS = [
 
   { id: "filter", group: "General", label: "Filter screens", key: "/", char: true, display: "/" },
   { id: "theme", group: "General", label: "Cycle theme", key: "t", display: "T" },
-  { id: "leave", group: "General", label: "Close, leave mode", key: "Escape", display: "Esc", aria: "Escape" },
+  { id: "leave", group: "General", label: "Close, leave a tool", key: "Escape", display: "Esc", aria: "Escape" },
   { id: "help", group: "General", label: "This list", key: "?", char: true, display: "?" },
 ];
 
@@ -145,10 +151,17 @@ export function resolveShortcut(event, { view, overlay, mac }) {
     if (def.view === "board" && view !== "board") continue;
     if (def.view === "screens" && view === "board") continue;
     if (event.repeat && def.id !== "zoom-in" && def.id !== "zoom-out") return null;
-    if (def.overlay) return overlay === def.overlay ? def.id : null;
+    // An overlay-only key (N in the project menu) shares its letter with a tool: keep looking when this entry is not the one that applies.
+    if (def.overlay) {
+      if (overlay === def.overlay) return def.id;
+      continue;
+    }
     // While a menu or dialog is open only its own keys act: the zoom presets and +/- belong to the zoom menu.
-    if (overlay === "zoom-menu") return def.group === "Zoom" ? def.id : null;
-    if (overlay) return null;
+    if (overlay === "zoom-menu") {
+      if (def.group === "Zoom") return def.id;
+      continue;
+    }
+    if (overlay) continue;
     return def.id;
   }
   return null;

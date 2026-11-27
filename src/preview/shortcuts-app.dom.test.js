@@ -130,10 +130,10 @@ describe("modes", () => {
     expect(pressed("flow-mode-toggle")).toBe("false");
   });
 
-  it("S toggles the status bar, W the follow toggle", async () => {
+  it("W toggles follow; S does nothing (no status bar any more)", async () => {
     await boot();
-    key("s");
-    expect(pressed("status-bar-toggle")).toBe("true");
+    expect(key("s")).toBe(true); // not handled: the key is left alone
+    expect($("#status-bar-overlay")).toBeNull();
     key("w");
     expect($("#follow-toggle").dataset.state).toBe("following");
     key("r"); // not paused: nothing to resume
@@ -174,9 +174,28 @@ describe("guards", () => {
     $("#dialog-scrim").hidden = false;
     $("#open-project-dialog").hidden = false;
     key("f");
-    key("3");
+    key("2");
     expect(pressed("flow-mode-toggle")).toBe("false");
     expect($('[data-view="board"]').getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("an open native popover menu (the Use Cases filter and sort menus) holds the keys, like any open menu", async () => {
+    await boot();
+    const menu = document.createElement("div");
+    menu.className = "chrome-menu";
+    menu.setAttribute("popover", "manual"); // closed popovers carry no `hidden`
+    document.body.append(menu);
+    let open = false;
+    const matches = menu.matches.bind(menu);
+    menu.matches = (selector) => (selector === ":popover-open" ? open : matches(selector)); // jsdom has no :popover-open
+    key("f");
+    expect(pressed("flow-mode-toggle")).toBe("true"); // closed: the key acts
+    open = true;
+    key("f");
+    expect(pressed("flow-mode-toggle")).toBe("true"); // open: the key is the menu's, F does not turn the mode off
+    open = false;
+    key("f");
+    expect(pressed("flow-mode-toggle")).toBe("false");
   });
 
   it("while the zoom menu is open only the zoom keys act", async () => {
@@ -190,13 +209,15 @@ describe("guards", () => {
 });
 
 describe("views, panels, filter, theme", () => {
-  it("1 / 2 / 3 switch the view like the tabs", async () => {
+  it("1 / 2 / 3 / 4 switch the view like the tabs, in the view bar's order", async () => {
     await boot();
-    key("3");
+    key("2");
     expect($('[data-view="board"]').getAttribute("aria-pressed")).toBe("true");
     expect($("#board-view").hidden).toBe(false);
-    key("2");
+    key("3");
     expect($('[data-view="design-system"]').getAttribute("aria-pressed")).toBe("true");
+    key("4");
+    expect($('[data-view="usecases"]').getAttribute("aria-pressed")).toBe("true");
     key("1");
     expect($('[data-view="screens"]').getAttribute("aria-pressed")).toBe("true");
   });
@@ -270,7 +291,7 @@ describe("zoom", () => {
 
   it("is a no-op where there is no zoom control (Design System)", async () => {
     await boot();
-    key("2");
+    key("3");
     shift("%", "Digit5");
     key("1");
     expect($("#zoom-fit").getAttribute("aria-pressed")).toBe("true");
@@ -279,7 +300,7 @@ describe("zoom", () => {
 
   it("Board: E / G toggle edges and clusters, +/- drive the slider, Shift+1 is Fit all", async () => {
     await boot();
-    key("3");
+    key("2");
     await flush();
     expect(pressed("board-edges-toggle")).toBe("true");
     key("e");
@@ -333,10 +354,10 @@ describe("reference dialog", () => {
     key("?", { shiftKey: true });
     expect($("#shortcuts-scrim").hidden).toBe(false);
     const rows = [...document.querySelectorAll("#shortcuts-dialog .shortcuts-row")].map((r) => [r.firstChild.textContent, r.lastChild.textContent]);
-    expect(rows).toContainEqual(["Flow mode", "F"]);
+    for (const row of [["Comment", "C"], ["Inspect", "I"], ["Notes", "N"], ["Comments", "M"], ["Flow", "F"], ["Design system", "D"], ["Tool bar", "\\"]]) expect(rows).toContainEqual(row);
     expect(rows).toContainEqual(["Fit", "Shift+1"]);
     expect(rows).toContainEqual(["Collapse all", "Shift+G"]);
-    expect(rows).toContainEqual(["Close, leave mode", "Esc"]);
+    expect(rows).toContainEqual(["Close, leave a tool", "Esc"]);
     key("f");
     expect(pressed("flow-mode-toggle")).toBe("false");
     key("Escape");
@@ -375,7 +396,7 @@ describe("Escape consumed by an overlay does not also leave the mode", () => {
     await boot();
     $("#flow-mode-toggle").click();
     // Chrome focuses a clicked toggle, so its tooltip is up while the mode is on.
-    $("#flow-mode-toggle").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    $("#zoom-out").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
     expect($("#chrome-tooltip").hidden).toBe(false);
     key("Escape");
     expect($("#chrome-tooltip").hidden).toBe(true);

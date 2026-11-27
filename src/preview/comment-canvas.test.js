@@ -17,10 +17,9 @@ describe("pinnedThreads", () => {
     { id: "a", status: "open" },
     { id: "b", status: "resolved" },
   ];
-  it("pins open threads, resolved ones only with Show resolved, none with Hide pins", () => {
-    expect(pinnedThreads(threads, { showResolved: false, hidePins: false }).map((t) => t.id)).toEqual(["a"]);
-    expect(pinnedThreads(threads, { showResolved: true, hidePins: false }).map((t) => t.id)).toEqual(["a", "b"]);
-    expect(pinnedThreads(threads, { showResolved: true, hidePins: true })).toEqual([]);
+  it("pins open threads, resolved ones only with Show resolved", () => {
+    expect(pinnedThreads(threads, { showResolved: false }).map((t) => t.id)).toEqual(["a"]);
+    expect(pinnedThreads(threads, { showResolved: true }).map((t) => t.id)).toEqual(["a", "b"]);
   });
 });
 

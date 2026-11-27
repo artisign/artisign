@@ -21,16 +21,14 @@ const flows = [
 ];
 
 function setup(current, opts = {}) {
-  document.body.innerHTML = '<nav id="bar"></nav><aside id="map"></aside><section id="insp"></section>';
+  document.body.innerHTML = '<nav id="bar"></nav>';
   const selected = [];
   const ui = createVariantUI({
     barEl: document.getElementById("bar"),
-    mapEl: document.getElementById("map"),
-    inspectorEl: document.getElementById("insp"),
     onSelect: (n) => selected.push(n),
   });
   const shown = ui.update(opts.screens ?? screens, opts.flows ?? flows, current);
-  return { ui, selected, shown, bar: document.getElementById("bar"), map: document.getElementById("map"), insp: document.getElementById("insp") };
+  return { ui, selected, shown, bar: document.getElementById("bar") };
 }
 const crumbNames = (bar) => [...bar.querySelectorAll(".crumb-group")].map((g) => g.dataset.screen);
 
@@ -146,13 +144,17 @@ describe("variant breadcrumb", () => {
     expect(bar.querySelector(".variant-chip").textContent).toBe("6 variants");
   });
 
-  it("a plain screen shows no breadcrumb, map or variant section", () => {
-    const { bar, map, insp, shown } = setup("plain");
+  it("a plain screen shows no breadcrumb", () => {
+    const { bar, shown } = setup("plain");
     expect(shown).toBe(false);
     expect(bar.hidden).toBe(true);
-    expect(map.hidden).toBe(true);
-    expect(insp.hidden).toBe(true);
     expect(bar.children).toHaveLength(0);
+  });
+
+  it("has no variant map or its toggle any more (CHR-1267): the nav tree carries the variants", () => {
+    const { bar } = setup("confirm");
+    expect(bar.querySelector(".variant-map-toggle")).toBeNull();
+    expect(document.querySelector(".map-node")).toBeNull();
   });
 
   it("re-renders on a new current screen from the stored chain (not the arrival path)", () => {
@@ -162,77 +164,12 @@ describe("variant breadcrumb", () => {
   });
 });
 
-describe("variant inspector section", () => {
-  it("renders path, kind, depth, siblings and flow counts", () => {
-    const { insp } = setup("confirm");
-    expect(insp.hidden).toBe(false);
-    const kv = Object.fromEntries([...insp.querySelectorAll(".variant-kv")].map((r) => [r.children[0].textContent, r.children[1].textContent]));
-    expect(kv).toEqual({ Path: "cart › clear", Kind: "step", Depth: "3", Siblings: "1", "Flows in / out": "2 / 1" });
-  });
-
-  it("lists 'Also reached from' sources as links that navigate, excluding the parent", () => {
-    const { insp, selected } = setup("confirm");
-    const card = insp.querySelector(".also-reached");
-    expect(card.querySelector("h3").textContent).toBe("Also reached from · 2 flow sources");
-    const links = [...card.querySelectorAll(".variant-link")];
-    expect(links.map((l) => l.textContent)).toEqual(["feed", "menu-today"]);
-    links[1].click();
-    expect(selected).toEqual(["menu-today"]);
-  });
-
-  it("omits 'Also reached from' when there is no other source", () => {
-    const { insp } = setup("clear");
-    expect(insp.querySelector(".also-reached")).toBeNull();
-    expect(insp.querySelector(".variant-card")).not.toBeNull();
-  });
-
-  it("has no Variant section for a cluster root", () => {
-    const { insp } = setup("cart");
-    expect(insp.hidden).toBe(true);
-    expect(insp.children).toHaveLength(0);
-  });
-});
-
-describe("variant tree map", () => {
-  const nodes = (map) => [...map.querySelectorAll(".map-node")].map((n) => n.dataset.screen);
-
-  it("renders the cluster with the current path expanded and the current node highlighted", () => {
-    const { map } = setup("confirm");
-    expect(map.querySelector("h3").textContent).toBe("Variant tree · cart");
-    // cart's children, clear's children, confirm's children; two-items and name-sheet are leaves
-    expect(nodes(map)).toEqual(["cart", "clear", "confirm", "confirm-error", "all", "two-items", "name-sheet"]);
-    expect(map.querySelector(".map-node.on").dataset.screen).toBe("confirm");
-    expect(map.querySelector('.map-node[data-screen="all"]').classList.contains("dim")).toBe(true);
-    expect(map.querySelector('.map-node[data-screen="clear"]').classList.contains("dim")).toBe(false);
-  });
-
-  it("keeps off-path subtrees collapsed with a count", () => {
-    const { map } = setup("two-items");
-    expect(nodes(map)).toEqual(["cart", "clear", "two-items", "name-sheet"]);
-    const note = map.querySelector('.map-node[data-screen="clear"] .map-node-note');
-    expect(note.querySelector(".icon").textContent).toBe("chevron_right");
-    expect(note.textContent).toBe("chevron_right3");
-  });
-
-  it("an entry click navigates", () => {
-    const { map, selected } = setup("confirm");
-    map.querySelector('.map-node[data-screen="all"]').click();
-    expect(selected).toEqual(["all"]);
-  });
-
-  it("is hidden for plain screens", () => {
-    expect(setup("plain").map.hidden).toBe(true);
-  });
-});
-
 describe("compare mode controls (CHR-738)", () => {
   function setupCompare(current, state) {
-    document.body.innerHTML = '<nav id="bar"></nav><aside id="map"></aside><section id="insp"></section>';
+    document.body.innerHTML = '<nav id="bar"></nav>';
     const calls = [];
     const ui = createVariantUI({
       barEl: document.getElementById("bar"),
-      mapEl: document.getElementById("map"),
-      inspectorEl: document.getElementById("insp"),
       onSelect: (name) => calls.push(["select", name]),
       compare: {
         state: () => ({ cap: 3, selected: [], on: false, ...state }),
@@ -264,25 +201,6 @@ describe("compare mode controls (CHR-738)", () => {
     ]);
     seg(bar)[0].click();
     expect(calls).toEqual([["mode", false]]);
-  });
-
-  it("hides the variant-map toggle while comparing, shows it otherwise", () => {
-    const map = { visible: () => true, onToggle: () => {} };
-    const make = (state) => {
-      document.body.innerHTML = '<nav id="bar"></nav><aside id="map"></aside><section id="insp"></section>';
-      const ui = createVariantUI({
-        barEl: document.getElementById("bar"),
-        mapEl: document.getElementById("map"),
-        inspectorEl: document.getElementById("insp"),
-        onSelect: () => {},
-        map,
-        compare: { state: () => ({ cap: 3, selected: [], on: false, ...state }), onMode: () => {}, onPick: () => {} },
-      });
-      ui.update(screens, flows, "confirm");
-      return document.getElementById("bar");
-    };
-    expect(make({}).querySelector(".variant-map-toggle")).not.toBeNull();
-    expect(make({ on: true, selected: ["all"] }).querySelector(".variant-map-toggle")).toBeNull();
   });
 
   it("the compare checkboxes are part of the arrow order: each one, then its row, in DOM order", () => {

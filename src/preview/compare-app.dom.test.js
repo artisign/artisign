@@ -116,10 +116,9 @@ describe("compare mode in the screen view", () => {
     expect($("#compare-bar .compare-chip-reference").textContent).toContain("reference");
     expect(seg("compare").textContent).toBe("Compare · 2");
     expect(calls.some((u) => u.startsWith("/api/compare?base=family&others=a&"))).toBe(true);
-    // the compare panel replaces the Elements/Activity panel
+    // the Differences panel opens in its own card
     expect($("#compare-panel").hidden).toBe(false);
-    expect($("#panel-tabs").hidden).toBe(true);
-    expect($("#panel-body-elements").hidden).toBe(true);
+    expect($("#compare-card").hidden).toBe(false);
     expect($("#compare-panel .compare-summary h3").textContent).toBe("vs. reference family");
   });
 
@@ -135,7 +134,7 @@ describe("compare mode in the screen view", () => {
     expect($("#compare-view").hidden).toBe(true);
     expect($("#screens-stage").hidden).toBe(false);
     expect(rowButton("a1").getAttribute("aria-current")).toBe("true");
-    expect($("#panel-tabs").hidden).toBe(false);
+    expect($("#compare-card").hidden).toBe(true);
   });
 
   it("navigating to a screen outside the family ends compare", async () => {

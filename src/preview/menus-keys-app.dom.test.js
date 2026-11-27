@@ -159,48 +159,46 @@ describe("project menu", () => {
   });
 });
 
-describe("zoom menu", () => {
-  const rows = () => [...document.querySelectorAll("#zoom-menu button")];
+describe("zoom popover (CHR-1267)", () => {
+  const open = () => $("#zoom-menu").hasAttribute("data-open"); // jsdom has no Popover API, so the fallback toggles data-open
+  const presets = () => [...document.querySelectorAll("#zoom-menu .zoom-button")];
 
-  it("is an ARIA menu: opening focuses the current level, arrows move, Escape and a keyboard Tab close it", async () => {
+  it("is a labelled dialog off the % value: opening focuses the slider, Escape and a press outside close it, the trigger keeps focus", () => {
     const trigger = $("#zoom-trigger");
-    expect($("#zoom-menu").getAttribute("role")).toBe("menu");
+    expect($("#zoom-menu").getAttribute("role")).toBe("dialog");
+    expect($("#zoom-menu").getAttribute("aria-label")).toBe("Zoom");
+    expect(trigger.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(trigger.getAttribute("aria-controls")).toBe("zoom-menu");
     trigger.focus();
     trigger.click();
-    expect(rows().map((r) => r.getAttribute("role"))).toEqual(["menuitemradio", "menuitemradio", "menuitemradio", "menuitemradio", "menuitem", "menuitem"]);
-    expect(rows().map((r) => r.getAttribute("aria-checked"))).toEqual(["true", "false", "false", "false", null, null]);
-    expect(document.activeElement).toBe(rows()[0]); // Fit is the current level
-    expect(rows().map((r) => r.tabIndex)).toEqual([0, -1, -1, -1, -1, -1]);
-    keydown(document.activeElement, "ArrowDown");
-    expect(document.activeElement).toBe(rows()[1]);
-    keydown(document.activeElement, "End");
-    expect(document.activeElement).toBe(rows()[5]);
+    expect(open()).toBe(true);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement).toBe($("#zoom-range"));
     keydown(document.activeElement, "Escape");
-    expect($("#zoom-menu").hidden).toBe(true);
+    expect(open()).toBe(false);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
     expect(document.activeElement).toBe(trigger);
     trigger.click();
-    const outside = $("#flow-mode-toggle");
-    keydown(document.activeElement, "Tab");
-    outside.focus();
-    await later();
-    expect($("#zoom-menu").hidden).toBe(true);
-    expect(document.activeElement).toBe(outside);
-    // Shift+Tab from the first row onto the trigger closes it as well.
-    trigger.click();
-    keydown(document.activeElement, "Tab", { shiftKey: true });
-    trigger.focus();
-    await later();
-    expect($("#zoom-menu").hidden).toBe(true);
-    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(open()).toBe(false);
   });
 
-  it("picking a level checks it and the next open starts on it", () => {
+  it("the slider is continuous from 5% to 200% and its value reads as a percentage", () => {
+    const range = $("#zoom-range");
+    expect([range.min, range.max, range.step]).toEqual(["5", "200", "1"]);
+    expect(range.getAttribute("aria-label")).toBe("Zoom");
+    range.value = "64";
+    range.dispatchEvent(new Event("input", { bubbles: true }));
+    expect($("#zoom-label").textContent).toBe("64%");
+    expect(range.getAttribute("aria-valuetext")).toBe("64%");
+  });
+
+  it("picking a preset marks it, closes the popover and returns focus to the % value", () => {
     $("#zoom-trigger").click();
-    rows()[2].click();
-    expect($("#zoom-menu").hidden).toBe(true);
-    expect(rows()[2].getAttribute("aria-checked")).toBe("true");
-    $("#zoom-trigger").click();
-    expect(document.activeElement).toBe(rows()[2]);
+    presets()[2].click(); // 100%
+    expect(open()).toBe(false);
+    expect(presets()[2].getAttribute("aria-pressed")).toBe("true");
+    expect(document.activeElement).toBe($("#zoom-trigger"));
   });
 });
 

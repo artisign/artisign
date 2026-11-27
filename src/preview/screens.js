@@ -182,12 +182,11 @@ function matchesFilter(screen, needle) {
   );
 }
 
-// Material Symbols per screen kind; "main" is a screen without a `variant_kind` (a root of the tree).
+// Material Symbols per screen kind; "main" is a screen without a `variant_kind` (a root of the tree). The screen view's breadcrumb and its popover use these.
 const KIND_ICONS = { main: "phone_iphone", state: "description", overlay: "web_asset", step: "subdirectory_arrow_right" };
 
 /**
- * The kind icon (main / state / overlay / step) shared by the sidebar tree
- * and the screen view's breadcrumb, popover and tree map.
+ * The kind icon (main / state / overlay / step) shared by the screen view's breadcrumb and its popover.
  * @param {string | undefined} kind
  * @returns {HTMLSpanElement | null} null for an unknown or absent kind
  */
@@ -198,7 +197,66 @@ export function createKindIcon(kind) {
   return node;
 }
 
+/** Frames at least this wide (a tablet and up) read as desktop in the nav tree (CHR-1267); a phone frame is about 390 wide. */
+export const DESKTOP_MIN_WIDTH = 700;
+
 /**
+ * The icon name for a screen's viewport: a monitor for a wide frame, a phone otherwise — also when the size is unknown (the default frame is a phone).
+ * @param {{ width: number } | undefined} viewport
+ * @returns {"desktop_windows" | "smartphone"}
+ */
+export function viewportIconName(viewport) {
+  return viewport && viewport.width >= DESKTOP_MIN_WIDTH ? "desktop_windows" : "smartphone";
+}
+
+/**
+ * The leading icon of a nav tree row: an overlay and a step variant keep their own glyph, everything else shows the viewport.
+ * @param {{ variant_kind?: string } | undefined} screen
+ * @param {boolean} isVariant
+ * @param {{ width: number } | undefined} viewport
+ * @returns {HTMLSpanElement}
+ */
+function rowIcon(screen, isVariant, viewport) {
+  const kind = isVariant ? screen?.variant_kind : undefined;
+  if (kind === "overlay" || kind === "step") return icon(KIND_ICONS[kind], "kind-icon");
+  const node = icon(viewportIconName(viewport), "kind-icon");
+  node.dataset.viewport = viewportIconName(viewport) === "desktop_windows" ? "desktop" : "mobile";
+  return node;
+}
+
+/**
+ * Appends the tag chips of one row: matching ones first while filtering, the overflow folded into a "+N" chip.
+ * @param {HTMLElement} parent
+ * @param {string[]} tags
+ * @param {string} needle lower-cased filter
+ */
+function appendTagRow(parent, tags, needle) {
+  const tagRow = document.createElement("div");
+  tagRow.className = "tag-row";
+  const tagMatches = (tag) => needle !== "" && tag.toLowerCase().includes(needle);
+  const ordered = [...tags].sort((a, b) => Number(tagMatches(b)) - Number(tagMatches(a)));
+  const rest = ordered.length > MAX_VISIBLE_TAGS ? ordered.length - MAX_VISIBLE_TAGS : 0;
+  for (const tag of ordered.slice(0, ordered.length - rest)) {
+    const chip = document.createElement("span");
+    chip.className = "tag-chip";
+    if (tagMatches(tag)) chip.classList.add("match");
+    chip.textContent = tag;
+    chip.title = tag;
+    tagRow.appendChild(chip);
+  }
+  if (rest > 0) {
+    const more = document.createElement("span");
+    more.className = "tag-chip tag-more";
+    if (ordered.slice(MAX_VISIBLE_TAGS).some(tagMatches)) more.classList.add("match");
+    more.textContent = `+${rest}`;
+    more.title = ordered.join(", ");
+    tagRow.appendChild(more);
+  }
+  parent.appendChild(tagRow);
+}
+
+/**
+ * The nav tree (CHR-1267): a flat `role="tree"` list whose rows carry `aria-level`; screens that name a `variant_of` parent nest under it, a chevron collapses them. Each row has the viewport icon, the name, its tag chips and the variant count; the open screen is the teal row. Filter and expand state live in app.js — this module only filters/renders what it's given.
  * @param {HTMLElement} listEl
  * @param {{ name: string, tags: string[], variant_of?: string, variant_kind?: "state" | "overlay" | "step" }[]} screens
  * @param {string | null} activeScreen
@@ -210,25 +268,12 @@ export function createKindIcon(kind) {
  *   expanded?: Set<string>,
  *   onToggleExpand?: (screen: string) => void,
  *   showTags?: boolean,
+ *   viewports?: Map<string, { width: number, height: number }>,
  *   compare?: { reference: string, family: string[], selected: string[], cap: number, onToggle: (screen: string) => void },
  * }} [opts]
- *   CHR-624 — omitting `onTogglePin` (the default) renders no pin button at
- *   all, so every OTHER caller of this widely-used function (and its
- *   existing tests) is unaffected. `pinned` only needs to cover screens
- *   actually rendered here — the sidebar only ever shows filter MATCHES
- *   (plus their ancestor path as context), never a pinned-but-non-matching
- *   screen; that distinction is the board's own `outside-filter` tile
- *   treatment.
+ *   CHR-624 — omitting `onTogglePin` (the default) renders no pin button at all. `onTogglePin` receives the screen plus its whole subtree (just `[screen]` on a leaf); a group row counts as pinned only once every member is.
  *
- *   CHR-731 — `onTogglePin` receives the screen plus its whole subtree
- *   (just `[screen]` on a leaf); a group row counts as pinned only once
- *   every member is. A project without any `variant_of` renders the flat
- *   list: no disclosure, no depth guides, no kind icons.
- *
- *   CHR-738 — while compare is on, `compare` puts a checkbox on every row of
- *   the reference's family: the reference's is ticked and locked, the others
- *   toggle their membership until `cap` members are ticked, then the unticked
- *   ones are disabled. Rows outside the family get none.
+ *   CHR-738 — while compare is on, `compare` puts a checkbox on every row of the reference's family: the reference's is ticked and locked, the others toggle their membership until `cap` members are ticked, then the unticked ones are disabled. Rows outside the family get none.
  */
 export function renderScreenList(
   listEl,
@@ -236,25 +281,23 @@ export function renderScreenList(
   activeScreen,
   onSelect,
   filter = "",
-  { pinned, onTogglePin, expanded = new Set(), onToggleExpand, showTags = true, compare } = {},
+  { pinned, onTogglePin, expanded = new Set(), onToggleExpand, showTags = true, viewports = new Map(), compare } = {},
 ) {
   listEl.innerHTML = "";
   const tree = buildScreenTree(screens);
-  const treeMode = tree.roots.length !== screens.length;
   const needle = filter.trim().toLowerCase();
   const { rows } = flattenTree(tree, { expanded, filter });
 
   for (const row of rows) {
     const li = document.createElement("li");
     li.className = "screen-item-row";
-    if (treeMode) {
-      li.dataset.depth = String(row.depth);
-      li.style.setProperty("--depth", String(row.depth));
-    }
+    li.setAttribute("role", "none");
+    li.dataset.depth = String(row.depth);
+    li.style.setProperty("--depth", String(row.depth));
 
     if (row.type === "hidden") {
       li.classList.add("screen-hidden-row");
-      li.textContent = `${row.count} hidden`;
+      li.textContent = `${row.count} hidden by the filter`;
       listEl.appendChild(li);
       continue;
     }
@@ -268,22 +311,22 @@ export function renderScreenList(
     const button = document.createElement("button");
     button.type = "button";
     button.className = "screen-item";
-    button.setAttribute("aria-current", String(screen.name === activeScreen));
+    button.setAttribute("role", "treeitem");
+    button.setAttribute("aria-level", String(row.depth + 1));
+    const isActive = screen.name === activeScreen;
+    button.setAttribute("aria-current", String(isActive));
+    button.setAttribute("aria-selected", String(isActive));
+    if (node.children.length > 0) button.setAttribute("aria-expanded", String(row.expanded));
 
     const shown = displayName(node);
-    if (treeMode) {
-      button.classList.add("in-tree");
-      if (shown !== node.name) {
-        button.title = `${node.name}\n${[...ancestorNames(tree, node.name), node.name].join(" › ")}`;
-      }
-    }
+    if (shown !== node.name) button.title = `${node.name}\n${[...ancestorNames(tree, node.name), node.name].join(" › ")}`;
 
+    button.appendChild(rowIcon(screen, node.parent !== null, viewports.get(screen.name)));
+
+    const mainEl = document.createElement("div");
+    mainEl.className = "screen-item-main";
     const nameEl = document.createElement("div");
     nameEl.className = "screen-item-name";
-    if (treeMode) {
-      const kindIcon = createKindIcon(node.parent ? screen.variant_kind : "main");
-      if (kindIcon) nameEl.appendChild(kindIcon);
-    }
     const textEl = document.createElement("span");
     textEl.className = "screen-item-text";
     for (const part of highlightParts(shown, state === "match" ? needle : "")) {
@@ -296,65 +339,36 @@ export function renderScreenList(
       }
     }
     nameEl.appendChild(textEl);
+    mainEl.appendChild(nameEl);
+    if (showTags && screen.tags.length > 0) appendTagRow(mainEl, screen.tags, needle);
+    button.appendChild(mainEl);
+
     if (node.children.length > 0) {
       const total = document.createElement("span");
       total.className = "screen-item-total";
       total.textContent = String(node.total);
       total.title = `${node.total} variant${node.total === 1 ? "" : "s"}`;
-      nameEl.appendChild(total);
-    }
-    button.appendChild(nameEl);
-
-    if (showTags && screen.tags.length > 0) {
-      const tagRow = document.createElement("div");
-      tagRow.className = "tag-row";
-      // While filtering, the chips that match come first so the reason for
-      // the row is visible without opening the "+N".
-      const tagMatches = (tag) => needle !== "" && tag.toLowerCase().includes(needle);
-      const ordered = [...screen.tags].sort(
-        (a, b) => Number(tagMatches(b)) - Number(tagMatches(a)),
-      );
-      const rest = ordered.length > MAX_VISIBLE_TAGS ? ordered.length - MAX_VISIBLE_TAGS : 0;
-      for (const tag of ordered.slice(0, ordered.length - rest)) {
-        const chip = document.createElement("span");
-        chip.className = "tag-chip";
-        if (tagMatches(tag)) chip.classList.add("match");
-        chip.textContent = tag;
-        chip.title = tag;
-        tagRow.appendChild(chip);
-      }
-      if (rest > 0) {
-        const more = document.createElement("span");
-        more.className = "tag-chip tag-more";
-        if (ordered.slice(MAX_VISIBLE_TAGS).some(tagMatches)) more.classList.add("match");
-        more.textContent = `+${rest}`;
-        more.title = ordered.join(", ");
-        tagRow.appendChild(more);
-      }
-      button.appendChild(tagRow);
+      button.appendChild(total);
     }
 
     button.addEventListener("click", () => onSelect(screen.name));
     li.appendChild(button);
 
     if (node.children.length > 0) {
-      // Sibling of the select button for the same reason as the pin button
-      // below — nested interactive elements are invalid HTML.
+      // Sibling of the select button for the same reason as the pin button below — nested interactive elements are invalid HTML.
       const toggle = document.createElement("button");
       toggle.type = "button";
       toggle.className = "screen-item-toggle";
       toggle.setAttribute("aria-expanded", String(row.expanded));
       toggle.setAttribute("aria-label", `${row.expanded ? "Collapse" : "Expand"} ${screen.name}`);
       toggle.appendChild(icon(row.expanded ? "expand_more" : "chevron_right", "icon-xs"));
-      // Disabled while the filter holds the row open — a click would change
-      // the saved expand state without any visible effect.
+      // Disabled while the filter holds the row open — a click would change the saved expand state without any visible effect.
       if (row.forcedOpen) toggle.disabled = true;
       toggle.addEventListener("click", (evt) => {
         evt.stopPropagation();
         onToggleExpand?.(screen.name);
       });
-      // Before the select button in DOM order so Tab follows the visual
-      // order (the toggle is positioned at the row's left edge).
+      // Before the select button in DOM order so Tab follows the visual order (the toggle sits at the row's left edge).
       li.insertBefore(toggle, button);
     }
 
@@ -377,13 +391,8 @@ export function renderScreenList(
     if (onTogglePin) {
       const subtree = subtreeNames(node);
       const isPinned = subtree.every((name) => pinned?.has(name));
-      const label =
-        node.children.length > 0
-          ? `${screen.name} and its ${node.total} variant${node.total === 1 ? "" : "s"}`
-          : screen.name;
-      // A sibling of `button.screen-item`, not a child — two nested
-      // interactive elements would be invalid HTML (and unfocusable via
-      // keyboard for the inner one in most browsers).
+      const label = node.children.length > 0 ? `${screen.name} and its ${node.total} variant${node.total === 1 ? "" : "s"}` : screen.name;
+      // A sibling of `button.screen-item`, not a child — two nested interactive elements would be invalid HTML (and unfocusable via keyboard for the inner one in most browsers).
       const pinButton = document.createElement("button");
       pinButton.type = "button";
       pinButton.className = "screen-item-pin pin-button";
@@ -392,11 +401,6 @@ export function renderScreenList(
       pinButton.setAttribute("aria-pressed", String(isPinned));
       pinButton.innerHTML = PIN_ICON_SVG;
       pinButton.addEventListener("click", (evt) => {
-        // NOT guarding `button.screen-item`'s own select handler — it's a
-        // SIBLING of this button, not an ancestor, so bubbling from here
-        // could never reach it regardless. This stops the click at `li`
-        // instead, in case a delegated click handler is ever added on the
-        // row or the list (review fix 7).
         evt.stopPropagation();
         onTogglePin(screen.name, subtree);
       });

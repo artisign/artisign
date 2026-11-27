@@ -163,14 +163,14 @@ describe("menu structure and keyboard", () => {
     await boot();
     expect(menu().getAttribute("role")).toBe("menu");
     expect($$(".settings-seg-button").map((b) => b.getAttribute("role"))).toEqual(["menuitemradio", "menuitemradio", "menuitemradio"]);
-    expect($$(".settings-toggle-row").map((b) => b.getAttribute("role"))).toEqual(Array(5).fill("menuitemcheckbox"));
+    expect($$(".settings-toggle-row").map((b) => b.getAttribute("role"))).toEqual(Array(4).fill("menuitemcheckbox"));
     expect($("#settings-mcp").getAttribute("role")).toBe("menuitem");
   });
 
   it("Up and Down walk the rows with the theme control as one stop; Home and End jump", async () => {
     await boot();
     await openMenu();
-    const order = ["follow", "clusters", "edges", "variant-map", "sidebar-tags"];
+    const order = ["follow", "clusters", "edges", "sidebar-tags"];
     for (const name of order) {
       press("ArrowDown");
       expect(document.activeElement).toBe(row(name));
@@ -246,7 +246,7 @@ describe("toggles", () => {
     settings = fakeSettings({ prefs: { "artisign.boardClusters": "false", "artisign.sidebarTags": "false", "artisign.followEnabled": "true" }, migrated: true });
     await boot();
     await openMenu();
-    expect($$(".settings-toggle-row").map((b) => b.getAttribute("aria-checked"))).toEqual(["true", "false", "true", "true", "false"]);
+    expect($$(".settings-toggle-row").map((b) => b.getAttribute("aria-checked"))).toEqual(["true", "false", "true", "false"]);
   });
 
   it("Follow agent by default does what the Follow pill does", async () => {
@@ -286,18 +286,11 @@ describe("toggles", () => {
     expect(row("edges").getAttribute("aria-checked")).toBe("false");
   });
 
-  it("Variant map hides and shows the map and the bar's own button follows", async () => {
+  it("has no Variant map switch any more: the variant bar it switched is gone (CHR-1267)", async () => {
     await boot();
-    expect($("#variant-map").hidden).toBe(false);
     await openMenu();
-    row("variant-map").click();
-    expect($("#variant-map").hidden).toBe(true);
-    expect($("#variant-bar .variant-map-toggle").getAttribute("aria-pressed")).toBe("false");
-    await flush();
-    expect(settings.prefs["artisign.variantMap"]).toBe("false");
-    row("variant-map").click();
-    expect($("#variant-map").hidden).toBe(false);
-    expect($("#variant-bar .variant-map-toggle").getAttribute("aria-pressed")).toBe("true");
+    expect($('[data-setting="variant-map"]')).toBeNull();
+    expect($("#variant-map")).toBeNull();
   });
 
   it("Tags in sidebar drives the Tags button", async () => {

@@ -43,8 +43,8 @@ describe("resolveShortcut", () => {
     expect(press("2")).toBe("view-design-system");
     expect(press("3")).toBe("view-board");
     expect(press("[")).toBe("panel-screens");
-    expect(press("\\")).toBe("panel-context");
-    expect(press("]")).toBe("panel-elements");
+    expect(press("\\")).toBeNull(); // the Context and Elements panels are gone (CHR-1267)
+    expect(press("]")).toBeNull();
     expect(press("p")).toBe("project-menu");
     expect(press("/")).toBe("filter");
     expect(press("t")).toBe("theme");
@@ -106,18 +106,16 @@ describe("resolveShortcut", () => {
   it("non-US layouts: the produced character counts, with Shift / Option / AltGr as the layout needs", () => {
     // German Mac: [ is Option+5, ] is Option+6, / is Shift+7, ? is Shift+ß.
     expect(press("[", { altKey: true, code: "Digit5" }, { mac: true })).toBe("panel-screens");
-    expect(press("]", { altKey: true, code: "Digit6" }, { mac: true })).toBe("panel-elements");
     expect(press("/", { shiftKey: true, code: "Digit7" })).toBe("filter");
     expect(press("?", { shiftKey: true, code: "Minus" })).toBe("help");
     // German Windows: AltGr+8 is [, reported as ctrl+alt with AltGraph set.
     expect(press("[", { ctrlKey: true, altKey: true, altGraph: true, code: "Digit8" })).toBe("panel-screens");
-    expect(press("\\", { ctrlKey: true, altKey: true, altGraph: true, code: "Minus" })).toBe("panel-context");
     // ...but a real Ctrl+Alt without AltGraph is not.
     expect(press("[", { ctrlKey: true, altKey: true })).toBeNull();
   });
 
   it("a plain Alt/Option on a character key is accepted on macOS only", () => {
-    for (const [k, id] of [["/", "filter"], ["+", "zoom-in"], ["-", "zoom-out"], ["[", "panel-screens"], ["]", "panel-elements"]]) {
+    for (const [k, id] of [["/", "filter"], ["+", "zoom-in"], ["-", "zoom-out"], ["[", "panel-screens"]]) {
       expect(press(k, { altKey: true }, { mac: true })).toBe(id);
       expect(press(k, { altKey: true }, { mac: false })).toBeNull(); // Alt+/ etc. belong to the browser or OS elsewhere
     }

@@ -54,8 +54,6 @@ export const SHORTCUTS = [
   { id: "board-collapse-all", group: "Board", label: "Collapse all", key: "g", shift: true, display: "G", view: "board" },
 
   { id: "panel-screens", group: "Panels", label: "Screens panel", key: "[", char: true, display: "[" },
-  { id: "panel-context", group: "Panels", label: "Context panel", key: "\\", char: true, display: "\\" },
-  { id: "panel-elements", group: "Panels", label: "Elements panel", key: "]", char: true, display: "]" },
 
   { id: "project-menu", group: "Project", label: "Project menu", key: "p", display: "P" },
   { id: "menu-open", group: "Project", label: "Open project (in menu)", key: "o", display: "O", overlay: "project-menu" },

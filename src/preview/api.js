@@ -467,3 +467,28 @@ export async function fetchWhatsNew(since) {
     return null;
   }
 }
+
+/**
+ * Each screen's declared frame size, from `get_project` in its tree view (CHR-1267: the nav tree's desktop / mobile icon). A failed read answers an empty map, so the tree falls back to the mobile icon instead of breaking.
+ * @param {string} project see fetchScreens's own note — required here too.
+ * @returns {Promise<Map<string, { width: number, height: number }>>} by screen name
+ */
+export async function fetchScreenViewports(project) {
+  try {
+    const res = await fetch(`/api/tools/get_project?project=${encodeURIComponent(project)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ view: "tree" }),
+    });
+    if (!res.ok) return new Map();
+    const body = await res.json();
+    const sizes = new Map();
+    for (const screen of body.screens ?? []) {
+      const { width, height } = screen.viewport ?? {};
+      if (typeof screen.screen === "string" && Number.isFinite(width) && Number.isFinite(height)) sizes.set(screen.screen, { width, height });
+    }
+    return sizes;
+  } catch {
+    return new Map();
+  }
+}

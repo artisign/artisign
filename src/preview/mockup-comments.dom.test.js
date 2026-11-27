@@ -149,7 +149,8 @@ describe("mockup comments", () => {
       ["3", "b", "open", "Comment 3 on B"],
     ]);
     expect($("#mockup-comment-layer").contains(pins()[0])).toBe(true);
-    expect($("#comments-row-label").textContent).toBe("3 open comments");
+    expect($("#comment-count-badge").textContent).toBe("3");
+    expect($("#comment-count-badge").hidden).toBe(false);
   });
 
   it("each column header carries its count chips; Show resolved adds the resolved one", async () => {

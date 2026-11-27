@@ -104,7 +104,7 @@ describe("project picker is tab-local (CHR-775)", () => {
     await flush();
 
     expect(calls.some((c) => c.includes("activate"))).toBe(false);
-    expect(calls.some((c) => c.startsWith("POST"))).toBe(false);
+    expect(calls.some((c) => c.startsWith("POST") && !c.includes("/api/tools/get_project"))).toBe(false); // the nav tree reads each frame size through get_project
     expect(liveSource().url).toBe("/events?project=%2Fq");
     expect(pickerName()).toBe("beta");
     expect(calls).toContain("GET /api/screens?project=%2Fq");

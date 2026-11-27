@@ -6,8 +6,7 @@ import {
   ancestorNames,
   subtreeNames,
   highlightParts,
-  flattenTree,
-} from "./screens.js";
+  flattenTree, viewportIconName, DESKTOP_MIN_WIDTH } from "./screens.js";
 
 // renderScreenList itself isn't tested here — this file stays on the fast
 // node default; its DOM smoke test lives in screens.dom.test.js. Filtering —
@@ -224,5 +223,15 @@ describe("flattenTree", () => {
 
   it("with a filter: unrelated roots disappear", () => {
     expect(names(flattenTree(tree, { filter: "dash" }).rows)).toEqual(["dashboard:match"]);
+  });
+});
+
+describe("viewportIconName (CHR-1267)", () => {
+  it("is a monitor from the desktop width up and a phone below it, also for an unknown size", () => {
+    expect(viewportIconName({ width: 1280 })).toBe("desktop_windows");
+    expect(viewportIconName({ width: DESKTOP_MIN_WIDTH })).toBe("desktop_windows");
+    expect(viewportIconName({ width: 768 })).toBe("desktop_windows");
+    expect(viewportIconName({ width: 390 })).toBe("smartphone");
+    expect(viewportIconName(undefined)).toBe("smartphone");
   });
 });

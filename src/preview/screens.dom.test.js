@@ -123,7 +123,7 @@ describe("renderScreenList — variant tree", () => {
       (li) => li.dataset.screen,
     );
 
-  it("renders exactly the flat list when no screen has a variant_of (no tree chrome)", () => {
+  it("a flat project has no chevron or count, but every row carries a viewport icon and tree semantics", () => {
     const listEl = document.createElement("ul");
     renderScreenList(
       listEl,
@@ -134,11 +134,23 @@ describe("renderScreenList — variant tree", () => {
       null,
       () => {},
       "",
+      { viewports: new Map([["a", { width: 1280, height: 800 }]]) },
     );
-    expect(
-      listEl.querySelector(".screen-item-toggle, .kind-icon, .screen-item-total, [data-depth]"),
-    ).toBeNull();
-    expect(listEl.querySelector(".screen-item.in-tree")).toBeNull();
+    expect(listEl.querySelector(".screen-item-toggle, .screen-item-total")).toBeNull();
+    const icons = [...listEl.querySelectorAll(".kind-icon")].map((i) => [i.textContent, i.dataset.viewport]);
+    expect(icons).toEqual([
+      ["desktop_windows", "desktop"],
+      ["smartphone", "mobile"], // an unknown size reads as the default phone frame
+    ]);
+    const items = [...listEl.querySelectorAll(".screen-item")];
+    expect(items.every((i) => i.getAttribute("role") === "treeitem" && i.getAttribute("aria-level") === "1")).toBe(true);
+  });
+
+  it("marks the open screen as the selected tree item", () => {
+    const listEl = document.createElement("ul");
+    renderScreenList(listEl, [{ name: "a", tags: [] }, { name: "b", tags: [] }], "b", () => {}, "");
+    const states = [...listEl.querySelectorAll(".screen-item")].map((i) => [i.getAttribute("aria-selected"), i.getAttribute("aria-current")]);
+    expect(states).toEqual([["false", "false"], ["true", "true"]]);
   });
 
   it("shows only roots collapsed, with the subtree count badge", () => {
@@ -183,9 +195,11 @@ describe("renderScreenList — variant tree", () => {
     const row = (n) => listEl.querySelector(`[data-screen="${n}"]`);
     expect(row("cart-sheet").dataset.depth).toBe("1");
     expect(row("cart-sheet-confirm-error").dataset.depth).toBe("3");
-    expect(row("cart-sheet").querySelector(".kind-icon").dataset.kind).toBe("overlay");
+    expect(row("cart-sheet").querySelector(".kind-icon").textContent).toBe("web_asset"); // an overlay keeps its own glyph
     expect(row("cart-sheet-confirm").querySelector(".kind-icon").textContent).toBe("subdirectory_arrow_right");
-    expect(row("cart").querySelector(".kind-icon").dataset.kind).toBe("main");
+    expect(row("cart").querySelector(".kind-icon").dataset.viewport).toBe("mobile");
+    expect(row("cart-sheet-confirm-error").querySelector(".kind-icon").dataset.viewport).toBe("mobile"); // a state variant shows its viewport
+    expect(row("cart-sheet-confirm-error").querySelector(".screen-item").getAttribute("aria-level")).toBe("4");
     expect(row("cart-sheet-confirm").querySelector(".screen-item-text").textContent).toBe(
       "…-confirm",
     );

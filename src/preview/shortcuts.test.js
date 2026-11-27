@@ -45,7 +45,7 @@ describe("resolveShortcut", () => {
     expect(press("4")).toBe("view-usecases");
     expect(press("[")).toBe("panel-screens");
     expect(press("\\")).toBe("tool-bar-fold"); // the tool bar's fold (CHR-1268)
-    expect(press("]")).toBeNull(); // the Agent bar's fold waits for CHR-1269
+    expect(press("]")).toBe("panel-agent"); // the Agent bar's fold (CHR-1269)
     expect(press("n")).toBe("notes");
     expect(press("m")).toBe("comments");
     expect(press("d")).toBe("design-system");

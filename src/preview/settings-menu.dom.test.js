@@ -110,11 +110,12 @@ afterEach(() => {
 });
 
 describe("settings trigger", () => {
-  it("sits after the Live chip, and the interim theme toggle is gone", async () => {
+  it("is the top-right group's control, and the interim theme toggle is gone; the Live chip lives in the Agent bar", async () => {
     await boot();
     expect($("#theme-toggle")).toBeNull();
-    const chip = $("#connection-status");
-    expect(chip.nextElementSibling.id).toBe("settings-controls");
+    expect($("#topbar-end #connection")).toBeNull();
+    expect($("#agent-bar #connection")).not.toBeNull();
+    expect($("#topbar-end").lastElementChild.id).toBe("settings-controls");
     expect(trigger().getAttribute("aria-label")).toBe("Settings");
     expect(trigger().dataset.tooltip).toBe("Settings");
     expect(trigger().querySelector(".icon").textContent).toBe("settings");
@@ -249,16 +250,16 @@ describe("toggles", () => {
     expect($$(".settings-toggle-row").map((b) => b.getAttribute("aria-checked"))).toEqual(["true", "false", "true", "false"]);
   });
 
-  it("Follow agent by default does what the Follow pill does", async () => {
+  it("Follow agent by default does what the Follow switch does", async () => {
     await boot();
     await openMenu();
     row("follow").click();
     expect(row("follow").getAttribute("aria-checked")).toBe("true");
-    expect($("#follow-toggle-toggle").getAttribute("aria-pressed")).toBe("true");
+    expect($("#follow-switch").checked).toBe(true);
     expect(menu().hidden).toBe(false);
     await flush();
     expect(settings.prefs["artisign.followEnabled"]).toBe("true");
-    $("#follow-toggle-toggle").click(); // and the other way round, seen on the next open
+    $("#follow-switch").click(); // and the other way round, seen on the next open
     trigger().click();
     trigger().click();
     expect(row("follow").getAttribute("aria-checked")).toBe("false");

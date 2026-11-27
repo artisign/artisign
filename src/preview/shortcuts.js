@@ -60,6 +60,7 @@ export const SHORTCUTS = [
 
   { id: "panel-screens", group: "Fold cards", label: "Project card", key: "[", char: true, display: "[" },
   { id: "tool-bar-fold", group: "Fold cards", label: "Tool bar", key: "\\", char: true, display: "\\" },
+  { id: "panel-agent", group: "Fold cards", label: "Agent bar", key: "]", char: true, display: "]" },
 
   { id: "project-menu", group: "Project", label: "Project menu", key: "p", display: "P" },
   { id: "menu-open", group: "Project", label: "Open project (in menu)", key: "o", display: "O", overlay: "project-menu" },

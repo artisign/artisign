@@ -64,7 +64,8 @@ const componentWrite = (name) => activity("write_html", "write", { kind: "compon
 const tab = (view) => $(`.view-tab[data-view="${view}"]`);
 const pressed = () => [...document.querySelectorAll(".view-tab")].find((t) => t.getAttribute("aria-pressed") === "true").dataset.view;
 const rowButton = (name) => $(`#screen-list li[data-screen="${name}"] button.screen-item`);
-const followState = () => $("#follow-toggle").dataset.state;
+// The Agent bar says it: the Resume row while paused, else the switch.
+const followState = () => (!$("#agent-follow-paused-row").hidden ? "paused" : $("#follow-switch").checked ? "following" : "off");
 
 async function boot() {
   localStorage.setItem("artisign.last-screen:/p", "a");
@@ -89,7 +90,7 @@ describe("follow switches to the target's view", () => {
     expect(followState()).toBe("following");
     tab("design-system").click(); // human navigation pauses follow...
     await flush();
-    $("#follow-toggle-resume").click(); // ...Resume re-arms it
+    $("#follow-resume").click(); // ...Resume re-arms it
     expect(followState()).toBe("following");
     expect(pressed()).toBe("design-system");
     screenActivity("b");
@@ -104,7 +105,7 @@ describe("follow switches to the target's view", () => {
     await boot();
     tab("board").click();
     await flush();
-    $("#follow-toggle-resume").click();
+    $("#follow-resume").click();
     screenActivity("b");
     await flush();
     expect(pressed()).toBe("screens");
@@ -130,7 +131,7 @@ describe("follow switches to the target's view", () => {
     await boot();
     tab("design-system").click();
     await flush();
-    $("#follow-toggle-resume").click();
+    $("#follow-resume").click();
     activity("get_mockup", "read", { kind: "mockup", name: "m" });
     await flush();
     expect(pressed()).toBe("screens");
@@ -246,7 +247,7 @@ describe("follow bookkeeping", () => {
     await flush();
     tab("screens").click(); // pauses
     await flush();
-    $("#follow-toggle-resume").click();
+    $("#follow-resume").click();
     await flush();
     expect(pressed()).toBe("design-system");
   });

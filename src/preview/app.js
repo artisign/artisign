@@ -48,6 +48,7 @@ import { createVariantUI, variantContext } from "./variants.js";
 import { renderVariantInspector } from "./variant-inspector.js";
 import { createCompareView } from "./compare.js";
 import { toolStates } from "./tool-states.js";
+import { createAgentBar, noteState, IDLE_AFTER_MS } from "./agent-bar.js";
 import { renderMockupList, filterMockups } from "./mockups.js";
 import { renderMockupView, renderColumnChips } from "./mockup-view.js";
 import { applyMockupZoom } from "./mockup-zoom.js";
@@ -63,7 +64,7 @@ import {
   highlightDurationMs,
   highlightNodes,
   highlightScreen,
-  renderFollowToggle,
+  activityTargetExists,
   nextFollowState,
   followToggleClickAction,
   FOLLOW_OFF,
@@ -197,10 +198,6 @@ const boardCommentLayerEl = document.getElementById("board-comment-layer");
 const boardPresentedBannerEl = document.getElementById("board-presented-banner");
 const boardPresentedTextEl = document.getElementById("board-presented-text");
 const boardPresentedDismissBtn = document.getElementById("board-presented-dismiss");
-const followToggleEl = document.getElementById("follow-toggle");
-const followToggleToggleEl = document.getElementById("follow-toggle-toggle");
-const followToggleResumeEl = document.getElementById("follow-toggle-resume");
-const followToggleLabelEl = document.getElementById("follow-toggle-label");
 const activityScreenHighlightEl = document.getElementById("activity-screen-highlight");
 const flowModeToggle = document.getElementById("flow-mode-toggle");
 const commentModeToggle = document.getElementById("comment-mode-toggle");
@@ -216,7 +213,6 @@ const zoomLabel = document.getElementById("zoom-label");
 const zoomRange = document.getElementById("zoom-range");
 const commentCountBadge = document.getElementById("comment-count-badge");
 const warningBadge = document.getElementById("warning-badge");
-const connectionStatus = document.getElementById("connection-status");
 const viewTabs = document.querySelectorAll(".view-tab");
 const commentLayerEl = document.getElementById("comment-layer");
 const commentBannerEl = document.getElementById("comment-banner");
@@ -343,6 +339,7 @@ let zoomPill = null;
 
 let boardBuilt = false; // built lazily on first activation, then kept in sync via SSE — see loadBoard()
 let activeProjectRoot = null; // the project root currently displayed; null while the empty state shows
+let eventsConnected = true; // whether /events is open — the Live chip and the Agent bar's status
 let eventSource; // current /events connection — closed and reopened with a fresh ?project= on every switch
 
 // Which screen the iframe's CURRENT document actually renders — set from
@@ -880,6 +877,7 @@ function resetProjectState() {
   // followState), so only `paused` resets here — nothing is pending a
   // resume for in the project we're leaving.
   activityFeed = [];
+  agentBar.reset();
   clearActivityHighlights();
   mockupCueCleanup();
   mockupCueCleanup = () => {};
@@ -1222,7 +1220,7 @@ function handleBoardStateEvent(event) {
 
 /** Re-renders the follow toggle from the current `followState`, and persists its `enabled` bit (never `paused`, which is session-local — see the module-level doc comment) only when it actually changed (review fix 7) — this runs on every pauseFollow() call, most of which are a sidebar/tab/mode click that never touches `enabled` at all. */
 function renderFollowUI() {
-  renderFollowToggle(followToggleEl, followToggleToggleEl, followToggleLabelEl, followState);
+  renderAgentBar();
   if (followState.enabled !== persistedFollowEnabled) {
     writeBoolPref(prefsStorage, "artisign.followEnabled", followState.enabled);
     persistedFollowEnabled = followState.enabled;
@@ -1241,7 +1239,7 @@ function pauseFollow() {
   renderFollowUI();
 }
 
-/** Applies a follow-toggle action (see followToggleClickAction) — shared by the toggle button and the separate Resume button (review fix 4: two sibling buttons, not one button with "Resume" nested inside it — see index.html's own comment on why). */
+/** Applies a follow action — the Follow switch (see followToggleClickAction), the Resume button, the settings menu and the W key all end here. */
 function applyFollowToggleAction(action) {
   const wasOff = !followState.enabled;
   followState = nextFollowState(followState, action);
@@ -1253,9 +1251,6 @@ function applyFollowToggleAction(action) {
   // feed already has a target waiting).
   if (action === "resume" || (action === "toggle-on" && wasOff)) jumpToLatestActivity();
 }
-
-followToggleToggleEl.addEventListener("click", () => applyFollowToggleAction(followToggleClickAction(followState, false)));
-followToggleResumeEl.addEventListener("click", () => applyFollowToggleAction(followToggleClickAction(followState, true)));
 
 /** Finds the most recent feed entry with a live, navigable target and jumps to it — used when follow is turned on or resumed. A no-op if the feed has nothing navigable yet. */
 function jumpToLatestActivity() {
@@ -1281,6 +1276,42 @@ function currentActivityLists() {
   return { screenNames: screens.map((s) => s.name), mockupNames: mockups.map((m) => m.name) };
 }
 
+/** Re-draws the Agent bar — status, Follow, feed, note field — from the current follow state, feed, connection and open view. The feed's rows look at the live screens/mockups lists (a target's existence changes independently of the feed itself — see activityTargetExists). */
+function renderAgentBar() {
+  const showMockup = currentView === "screens" && currentMockup !== null;
+  const lists = currentActivityLists();
+  agentBar.render({
+    feed: activityFeed,
+    follow: followState,
+    connected: eventsConnected,
+    exists: (event) => activityTargetExists(event, lists),
+    note: noteState({
+      view: currentView,
+      showMockup,
+      comparing: compare.isOn() && currentView === "screens" && !showMockup,
+      screen: currentScreen,
+      screenLabel: currentScreen === null ? "" : screenContext(currentScreen),
+      mockup: currentMockup,
+      boardCount: computeBoardVisibility(screens, screenFilter, pinnedScreens).shownCount,
+    }),
+  });
+}
+
+/** A feed row's click is human navigation like any other (ADR-005 pause rule 1) — it pauses follow the way a sidebar click or a tab switch does, then goes to that entry's target. Without the pause the next live call would pull the view straight back. */
+function handleActivityFeedSelect(event) {
+  pauseFollow();
+  navigateToActivity(event);
+}
+
+/** The note field: a new comment thread on the screen it was written for, anchored to the screen itself (`node_id: null`) — the comments API as it is, human author. The thread shows in the Comments tool and its badge. @param {string} text @param {string} noteKey "screen:<name>" */
+async function sendAgentNote(text, noteKey) {
+  const screen = noteKey.startsWith("screen:") ? noteKey.slice("screen:".length) : null;
+  if (screen === null) return { ok: false, message: "no screen is open" };
+  const result = await postComment({ screen, node_id: null, text }, activeProjectRoot);
+  if (result.ok && screen === currentScreen) await loadComments(); // the SSE "comments" event would too, a moment later
+  return result;
+}
+
 /**
  * One per MCP tool call (src/mcp/activity.ts), regardless of follow's own
  * state — the feed fills even while follow is off/paused; only navigation
@@ -1289,6 +1320,7 @@ function currentActivityLists() {
  */
 function handleActivityEvent(event) {
   activityFeed = pushActivityEntry(activityFeed, event);
+  renderAgentBar();
   // A failed call never navigates or highlights — by design, not an
   // oversight (ADR-005: "never navigate or highlight — there is nothing
   // confirmed to point at").
@@ -1563,11 +1595,10 @@ function reconnectSse(project) {
   });
 }
 
-/** The Live chip: dot + "Live" / "Offline" (decision chr905-c-rollout-details). Informational, never a button. */
+/** The Live chip in the Agent bar head: dot + "Live" / "Offline"; the status box says it too. Informational, never a button. */
 function renderConnectionStatus(connected) {
-  connectionStatus.classList.toggle("disconnected", !connected);
-  document.getElementById("connection-status-label").textContent = connected ? "Live" : "Offline";
-  connectionStatus.dataset.tooltip = connected ? "Live reload: connected" : "Live reload disconnected, retrying";
+  eventsConnected = connected;
+  renderAgentBar();
 }
 
 // Bumped on every loadCurrentScreen()/loadComments() call; a fetch only
@@ -1713,6 +1744,7 @@ function refreshSidebar() {
   updateNotesPanel();
   syncPanelContext();
   renderBoardStatus();
+  renderAgentBar(); // a feed row's target may have appeared or gone, and the Board's screen count moves with the list
 }
 
 /** Fills the Notes panel for the open screen: its notes as Markdown, its tag chips, the notes of the tags it carries (collapsible), the use cases that map to it. */
@@ -2145,6 +2177,20 @@ const toolBar = createToolBar({
 /** The tool button that opens each panel. */
 const PANEL_TOOLS = { inspect: inspectModeToggle, notes: notesToolToggle, comments: commentsToolToggle };
 
+// CHR-1269 — the Agent bar. It folds above whichever tool panel takes the right column (the panel's onChange below).
+const agentBar = createAgentBar({
+  barEl: document.getElementById("agent-bar"),
+  storage: prefsStorage,
+  onFollow: (on) => applyFollowToggleAction(on ? "toggle-on" : "toggle-off"),
+  onResume: () => applyFollowToggleAction("resume"),
+  onSelect: handleActivityFeedSelect,
+  onSend: sendAgentNote,
+});
+// The status goes idle on its own, and the feed's relative times move on.
+setInterval(() => {
+  if (activityFeed.length > 0) renderAgentBar();
+}, Math.min(IDLE_AFTER_MS, 15_000));
+
 const toolPanels = createToolPanels({
   panelEl: toolPanelEl,
   titleEl: document.getElementById("tool-panel-title"),
@@ -2167,6 +2213,7 @@ const toolPanels = createToolPanels({
   onLeaveCompare: () => leaveCompare(),
   onChange: (shown) => {
     appEl.dataset.panelOpen = String(shown !== null);
+    agentBar.setPanelOpen(shown !== null);
     syncPanelContext();
     if (shown === "notes") updateNotesPanel();
     if (shown === "comments") renderCommentsList();
@@ -2223,6 +2270,7 @@ function syncToolStates() {
   toolBar.setState(flowModeToggle, { ...states.flow, pressed: activeMode === "flow" });
   toolBar.setState(designSystemTool, { ...states.designSystem });
   for (const id of ["notes", "comments"]) if (states[id].disabled && toolPanels.opened() === id) toolPanels.close(false);
+  renderAgentBar(); // the note field's scope follows the same view state
 }
 
 for (const [id, button] of [["notes", notesToolToggle], ["comments", commentsToolToggle]]) {
@@ -2785,7 +2833,7 @@ const settingsMenu = createSettingsMenu({
     follow: {
       get: () => followState.enabled,
       set: (on) => {
-        if (on !== followState.enabled) applyFollowToggleAction(followToggleClickAction(followState, false));
+        if (on !== followState.enabled) applyFollowToggleAction(followToggleClickAction(followState));
       },
     },
     clusters: { get: () => boardClustersOn, set: setBoardClusters },
@@ -2866,6 +2914,11 @@ function runShortcut(id) {
     case "theme":
       setThemePref(nextThemePref(themePref));
       settingsMenu.sync();
+      return true;
+    case "follow":
+      // A paused follow has no switch on screen (Resume stands in its place): the key still turns follow off.
+      if (followState.paused) applyFollowToggleAction(followToggleClickAction(followState));
+      else if (!pressControl(controlFor(id))) return false;
       return true;
     case "follow-resume": return followState.paused && pressControl(controlFor(id));
     case "zoom-in":

@@ -105,7 +105,9 @@ describe("hints", () => {
     await boot();
     expect($("#flow-mode-toggle").dataset.shortcut).toBe("F");
     expect($("#sidebar-screens-collapse").dataset.shortcut).toBe("[");
-    expect($("#follow-toggle-toggle").dataset.shortcut).toBe("W");
+    expect($("#follow-label").dataset.shortcut).toBe("W");
+    expect($("#follow-resume").dataset.shortcut).toBe("R");
+    expect($("#agent-bar-fold").dataset.shortcut).toBe("]");
     expect($('#zoom-menu .zoom-button[data-zoom="fit"] .zoom-preset-hint').textContent).toBe("Shift+1");
     expect($("#zoom-out").dataset.shortcut).toBe("−");
     expect($("#zoom-in").dataset.shortcut).toBe("+");
@@ -135,11 +137,11 @@ describe("modes", () => {
     expect(key("s")).toBe(true); // not handled: the key is left alone
     expect($("#status-bar-overlay")).toBeNull();
     key("w");
-    expect($("#follow-toggle").dataset.state).toBe("following");
+    expect($("#follow-switch").checked).toBe(true);
     key("r"); // not paused: nothing to resume
-    expect($("#follow-toggle").dataset.state).toBe("following");
+    expect($("#follow-switch").checked).toBe(true);
     key("w");
-    expect($("#follow-toggle").dataset.state).toBe("off");
+    expect($("#follow-switch").checked).toBe(false);
   });
 });
 

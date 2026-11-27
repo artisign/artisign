@@ -669,28 +669,6 @@
   outline-offset: 1px;
 }
 
-/* Live chip: dot + label, informational (never a button). */
-.chrome-live {
-  display: inline-flex;
-  align-items: center;
-  flex: none;
-  gap: var(--space-sm);
-  padding: 0 var(--space-sm);
-  color: var(--chrome-text-secondary);
-  font-size: var(--ui-xs);
-}
-
-.chrome-live-dot {
-  width: var(--size-indicator);
-  height: var(--size-indicator);
-  border-radius: var(--radius-pill);
-  background: var(--chrome-ok);
-}
-
-.chrome-live.disconnected .chrome-live-dot {
-  background: var(--chrome-danger);
-}
-
 * {
   box-sizing: border-box;
 }
@@ -705,78 +683,6 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--chrome-text);
   background: var(--chrome-canvas);
-}
-
-/* CHR-628/CHR-629/CHR-631 — the follow toggle: a pill with two SIBLING <button>s (toggle, "Resume") inside a non-interactive <span> (review fix 4 — no interactive descendants inside a button, and a keyboard activation's target is the button itself). The pill look lives on the outer span; the buttons are UA-reset to read as plain content. */
-.follow-toggle-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
-  border: none;
-  background: none;
-  padding: 0;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-}
-
-.follow-toggle-dot {
-  width: var(--size-indicator);
-  height: var(--size-indicator);
-  border-radius: var(--radius-pill);
-  background: var(--chrome-text-tertiary);
-}
-
-.follow-toggle[data-state="following"] {
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-  font-weight: 500;
-}
-
-.follow-toggle[data-state="following"] .follow-toggle-dot {
-  background: var(--chrome-accent);
-}
-
-.follow-toggle[data-state="paused"] {
-  background: var(--chrome-warning-subtle);
-  color: var(--chrome-warning);
-}
-
-.follow-toggle[data-state="paused"] .follow-toggle-dot {
-  background: var(--chrome-warning);
-}
-
-/* Only meaningful while paused — the "Follow paused | Resume" split. */
-.follow-toggle-divider {
-  display: none;
-  width: 1px;
-  align-self: stretch;
-  margin: var(--space-sm) 0;
-  background: var(--chrome-warning);
-  opacity: 0.35;
-}
-
-.follow-toggle-resume {
-  display: none;
-  border: none;
-  background: none;
-  padding: 0;
-  font: inherit;
-  font-weight: 500;
-  color: var(--chrome-accent);
-  cursor: pointer;
-}
-
-.follow-toggle[data-state="paused"] .follow-toggle-divider,
-.follow-toggle[data-state="paused"] .follow-toggle-resume {
-  display: inline-flex;
-}
-
-.follow-toggle-toggle:focus-visible,
-.follow-toggle-resume:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: 2px;
-  border-radius: var(--radius-xs);
 }
 
 .chrome-icon-btn:disabled {
@@ -1532,112 +1438,6 @@ button.chrome-section-header:focus-visible {
   font-weight: 600;
   padding: 2px var(--space-sm);
   border-radius: var(--radius-pill);
-}
-
-/* CHR-628/CHR-629/CHR-631 — activity feed ($activity-entry). */
-
-/* .activity-entry is now the <button> itself (review fix 4 — a real button gets keyboard focus/activation for free), so it needs the same UA-reset properties as .screen-item/.mockup-item's own list-row buttons on top of its existing look. */
-.activity-entry {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  width: 100%;
-  padding: var(--space-sm) var(--space-lg);
-  border: none;
-  border-bottom: 1px solid var(--chrome-border);
-  background: none;
-  font: inherit;
-  text-align: left;
-  color: inherit;
-  cursor: pointer;
-}
-
-.activity-entry[aria-disabled="true"] {
-  cursor: default;
-}
-
-.activity-entry:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: -2px;
-}
-
-.activity-entry-mark {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--chrome-activity-read);
-}
-
-.activity-entry-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.activity-entry-tool {
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: var(--ui-xs);
-  color: var(--chrome-text);
-}
-
-.activity-entry-target {
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.activity-entry-time {
-  flex: none;
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-}
-
-/* write — a square dot instead of a circle (shape, not just hue, keeps it distinct for colorblind users), same activity-write color as the write node/screen highlight. */
-.activity-entry-write .activity-entry-mark {
-  border-radius: 2px;
-  background: var(--chrome-activity-write);
-}
-
-/* error (ok:false) — never navigates; a scanning eye should catch it without reading the text. */
-.activity-entry-error {
-  cursor: default;
-  background: color-mix(in srgb, var(--chrome-error) 6%, transparent);
-  border-left: 3px solid var(--chrome-error);
-}
-
-.activity-entry-error .activity-entry-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border-radius: var(--radius-pill);
-  background: var(--chrome-error);
-  color: var(--chrome-primary-text);
-  font-size: 10px;
-}
-
-.activity-entry-error .activity-entry-tool {
-  color: var(--chrome-error);
-}
-
-/* deleted (the call's own target no longer exists) — dimmed, never navigates. */
-.activity-entry-deleted {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.activity-entry-deleted .activity-entry-mark {
-  background: var(--chrome-text-tertiary);
-}
-
-.activity-entry-deleted .activity-entry-target {
-  font-style: italic;
 }
 
 /* CHR-631 — a transient cue on a sidebar mockup row / design-system card
@@ -10215,7 +10015,7 @@ button.uc-target:hover {
 /* ==========================================================================================================
    CHR-1267 — the Stitch chrome shell: a dotted workspace, three floating top groups, the left floating card,
    the zoom pill. Everything floats over #main, which fills the window. The side tool bar and the right column's
-   panel are CHR-1268; the agent bar and the rest are later slices (CHR-1269…1272). All values come from the chrome-light / chrome-dark groups and the radius / size tokens above.
+   panel are CHR-1268; the Agent bar is CHR-1269, the rest later slices (CHR-1270…1272). All values come from the chrome-light / chrome-dark groups and the radius / size tokens above.
    ========================================================================================================== */
 
 html,
@@ -10236,7 +10036,10 @@ body {
   --shell-top: 76px;
   --shell-bottom: 80px;
   --reserve-left: 356px;
-  --reserve-right: 16px;
+  /* The Agent bar folded to its head: the tool panel below it starts a gap under this. */
+  --agent-folded-height: 48px;
+  /* The right column (the Agent bar, and the tool panel under it) takes its width from the canvas: card + the gap on both sides. */
+  --reserve-right: calc(var(--size-agent-bar) + 2 * var(--space-xl));
 }
 
 /* A folded card frees the width; the tool bar slides under it. */
@@ -10253,9 +10056,10 @@ body {
   --reserve-left: 0px;
 }
 
-/* The right column's panel (Inspect, Notes, Comments, Compare's Differences) takes its width from the canvas: card + the gap on both sides. */
-#app[data-panel-open="true"] {
-  --reserve-right: calc(var(--size-agent-bar) + 2 * var(--space-xl));
+/* No right column in the Design System view and Use Cases: no Agent bar there. */
+#app[data-shell-view="design-system"],
+#app[data-shell-view="usecases"] {
+  --reserve-right: 16px;
 }
 
 .float-pill {
@@ -11594,6 +11398,527 @@ body {
   right: var(--space-xl);
   bottom: 18px;
   width: var(--size-agent-bar);
+}
+
+/* The Agent bar above it is folded to its head while a panel is open, so the panel starts a gap below it. */
+#app[data-panel-open="true"] #tool-panel {
+  top: calc(var(--shell-top) + var(--agent-folded-height) + var(--space-md));
+}
+
+/* ---- The Agent bar (CHR-1269): status, Follow, Activity, note ---- */
+
+#agent-bar {
+  position: absolute;
+  z-index: 20;
+  top: var(--shell-top);
+  right: var(--space-xl);
+  bottom: 18px;
+  width: var(--size-agent-bar);
+}
+
+#agent-bar[data-collapsed="true"] {
+  bottom: auto;
+}
+
+/* Folded, the bar is its head alone (the panel below starts a gap under it). */
+#agent-bar[data-collapsed="true"] .float-card-head {
+  min-height: var(--agent-folded-height);
+  padding-bottom: var(--space-pad);
+}
+
+#app[data-shell-view="design-system"] #agent-bar,
+#app[data-shell-view="usecases"] #agent-bar {
+  display: none;
+}
+
+#agent-bar .float-card-title {
+  flex: 1;
+}
+
+#agent-bar[data-collapsed="true"] .float-card-title {
+  flex: none;
+}
+
+#agent-bar [hidden] {
+  display: none;
+}
+
+/* The Live chip: green dot + "Live"; offline it becomes a red pill. */
+.live-chip {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-sm);
+  font-size: var(--ui-xs);
+  font-weight: 600;
+  color: var(--chrome-ok);
+  white-space: nowrap;
+}
+
+.live-chip-dot {
+  width: var(--size-indicator);
+  height: var(--size-indicator);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-ok);
+}
+
+.live-chip[data-state="offline"] {
+  height: 20px;
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--chrome-error) 12%, transparent);
+  color: var(--chrome-error);
+}
+
+.live-chip[data-state="offline"] .live-chip-dot {
+  background: var(--chrome-error);
+}
+
+/* The folded head's own status: dot + what the agent does, cut with an ellipsis. */
+.agent-folded-status {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: var(--space-sm);
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
+}
+
+.agent-folded-dot {
+  flex: none;
+  width: var(--size-indicator);
+  height: var(--size-indicator);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-agent);
+}
+
+.agent-folded-status[data-look="idle"] {
+  color: var(--chrome-text-tertiary);
+}
+
+.agent-folded-status[data-look="idle"] .agent-folded-dot {
+  background: var(--chrome-border-strong);
+}
+
+#agent-bar-folded-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#agent-bar #agent-bar-fold[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* The status box: pulse dot, what the agent does now, the Follow switch. */
+#agent-status {
+  flex: none;
+  margin: var(--space-2xs) var(--space-pad) 0;
+  padding: var(--space-lg) var(--space-lg) var(--space-pad);
+  border-radius: var(--radius-inset);
+  background: var(--chrome-agent-subtle);
+}
+
+#agent-status[data-look="idle"] {
+  background: var(--chrome-field);
+}
+
+#agent-status p {
+  margin: 0;
+}
+
+#agent-status-now {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: var(--ui-base);
+  color: var(--chrome-text);
+}
+
+#agent-status-text b {
+  font-weight: 600;
+}
+
+#agent-status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-agent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--chrome-agent) 18%, transparent);
+}
+
+#agent-status[data-look="idle"] #agent-status-dot {
+  background: var(--chrome-text-tertiary);
+  box-shadow: none;
+}
+
+#agent-status-detail {
+  margin: 3px 0 0 17px;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
+}
+
+#agent-follow-row,
+#agent-follow-paused-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-pad);
+  padding-top: var(--space-md);
+  border-top: 1px solid color-mix(in srgb, var(--chrome-agent) 16%, transparent);
+  font-size: var(--ui-sm);
+  font-weight: 500;
+  color: var(--chrome-text);
+}
+
+#agent-status[data-look="idle"] #agent-follow-row {
+  border-top-color: var(--chrome-border);
+}
+
+.agent-follow-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  cursor: pointer;
+}
+
+.agent-follow-label .icon {
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-secondary);
+}
+
+#agent-follow-paused-row .agent-follow-label {
+  cursor: default;
+}
+
+#agent-follow-paused-row .agent-follow-label .icon {
+  color: var(--chrome-agent);
+}
+
+/* The Follow switch: a native checkbox (role "switch", the `switch` attribute where the browser has it) drawn the same everywhere. */
+#follow-switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 18px;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-border-strong);
+  cursor: pointer;
+}
+
+#follow-switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-raised);
+}
+
+#follow-switch:checked {
+  background: var(--chrome-agent);
+}
+
+#follow-switch:checked::before {
+  left: 14px;
+}
+
+#follow-switch:focus-visible,
+#follow-resume:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 2px;
+}
+
+#follow-resume {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  height: 26px;
+  padding: 0 var(--space-md);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-agent);
+  color: var(--chrome-primary-text);
+  font: inherit;
+  font-size: var(--ui-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#follow-resume .icon {
+  font-size: var(--size-icon-xs);
+}
+
+/* "Activity / Newest first". */
+.agent-section-head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: 14px var(--space-lg) var(--space-xs) var(--space-md);
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
+}
+
+.agent-section-head > :first-child {
+  font-weight: 600;
+}
+
+.agent-section-head > :last-child {
+  font-weight: 500;
+  color: var(--chrome-text-tertiary);
+}
+
+#agent-feed {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0 var(--space-md);
+  overflow-y: auto;
+  list-style: none;
+}
+
+#agent-bar[data-connection="offline"] #agent-feed,
+#agent-bar[data-connection="offline"] #agent-feed-empty {
+  opacity: 0.6;
+}
+
+.agent-activity {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+}
+
+button.agent-activity {
+  cursor: pointer;
+}
+
+button.agent-activity:hover {
+  background: var(--chrome-hover);
+}
+
+button.agent-activity:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
+.agent-activity-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: var(--chrome-field);
+  color: var(--chrome-text-secondary);
+  font-size: var(--size-icon-xs);
+  line-height: 1;
+}
+
+.agent-activity[data-variant="write"] .agent-activity-icon {
+  background: var(--chrome-agent-subtle);
+  color: var(--chrome-agent);
+}
+
+.agent-activity[data-variant="agent-comment"] .agent-activity-icon {
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+}
+
+.agent-activity[data-variant="error"] .agent-activity-icon {
+  background: color-mix(in srgb, var(--chrome-error) 14%, transparent);
+  color: var(--chrome-error);
+}
+
+.agent-activity[data-variant="deleted"] .agent-activity-icon {
+  color: var(--chrome-text-tertiary);
+}
+
+.agent-activity-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-activity-text {
+  display: block;
+  font-size: var(--ui-sm);
+  line-height: 1.35;
+  color: var(--chrome-text);
+  overflow-wrap: anywhere;
+}
+
+.agent-activity-text b {
+  font-weight: 600;
+}
+
+.agent-activity[data-variant="deleted"] .agent-activity-text {
+  color: var(--chrome-text-secondary);
+}
+
+.agent-activity-time {
+  display: block;
+  margin-top: var(--space-2xs);
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.agent-activity[data-variant="error"] .agent-activity-time {
+  color: var(--chrome-error);
+}
+
+#agent-feed-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-lg);
+  text-align: center;
+}
+
+#agent-feed-empty > .icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-field);
+  color: var(--chrome-text-tertiary);
+  font-size: var(--size-icon-sm);
+}
+
+#agent-feed-empty p {
+  margin: 0;
+}
+
+.agent-feed-empty-title {
+  font-size: var(--ui-sm);
+  font-weight: 600;
+}
+
+.agent-feed-empty-text {
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
+}
+
+/* The note field: a textarea, its scope and the send button. */
+#agent-note {
+  flex: none;
+  margin: var(--space-md) var(--space-pad) var(--space-pad);
+  padding: var(--space-pad) var(--space-pad) var(--space-md) var(--space-lg);
+  border-radius: var(--radius-inset);
+  background: var(--chrome-raised);
+  box-shadow: 0 0 0 1px var(--chrome-border);
+}
+
+#agent-note:focus-within {
+  box-shadow: 0 0 0 2px var(--chrome-focus-ring);
+}
+
+#agent-note-field {
+  display: block;
+  width: 100%;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  resize: none;
+  background: none;
+  outline: none;
+  font: inherit;
+  font-size: var(--ui-sm);
+  color: var(--chrome-text);
+}
+
+#agent-note-field[aria-disabled="true"] {
+  cursor: default;
+}
+
+#agent-note-field::placeholder {
+  color: var(--chrome-text-tertiary);
+}
+
+#agent-note-error {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--ui-xs);
+  color: var(--chrome-error);
+}
+
+#agent-note-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+#agent-note-scope {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
+}
+
+#agent-note-scope .icon {
+  flex: none;
+  font-size: var(--size-icon-xs);
+}
+
+#agent-note-scope-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#agent-note-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--size-control);
+  height: var(--size-control);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-primary);
+  color: var(--chrome-primary-text);
+  cursor: pointer;
+}
+
+#agent-note-send .icon {
+  font-size: var(--size-icon-sm);
+}
+
+#agent-note-send[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#agent-note-send:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 2px;
 }
 
 .tool-panel-context {

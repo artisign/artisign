@@ -175,15 +175,15 @@ describe("Live chip", () => {
     await boot();
     const source = sources.at(-1);
     source.onopen();
-    expect($("#connection-status-label").textContent).toBe("Live");
-    expect($("#connection-status").dataset.tooltip).toBe("Live reload: connected");
+    expect($("#connection-label").textContent).toBe("Live");
+    expect($("#connection").dataset.tooltip).toBe("Live reload: connected");
     source.onerror();
-    expect($("#connection-status-label").textContent).toBe("Offline");
-    expect($("#connection-status").classList.contains("disconnected")).toBe(true);
-    expect($("#connection-status").dataset.tooltip).toBe("Live reload disconnected, retrying");
+    expect($("#connection-label").textContent).toBe("Offline");
+    expect($("#connection").dataset.state).toBe("offline");
+    expect($("#connection").dataset.tooltip).toBe("Live reload disconnected, retrying");
     source.onopen();
-    expect($("#connection-status-label").textContent).toBe("Live");
-    expect($("#connection-status").classList.contains("disconnected")).toBe(false);
+    expect($("#connection-label").textContent).toBe("Live");
+    expect($("#connection").dataset.state).toBe("live");
   });
 });
 

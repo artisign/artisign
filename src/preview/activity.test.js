@@ -4,13 +4,14 @@ import {
   pushActivityEntry,
   activityNavigationTarget,
   highlightDurationMs,
-  activityEntryVariant,
+  activityVariant,
+  activityIsActionable,
+  describeActivity,
   activityTargetExists,
   activityIsNavigable,
   canFollowNavigate,
   resolveFollowNavigation,
   followAwaitsTarget,
-  formatActivityTarget,
   formatActivityTime,
   nextFollowState,
   followToggleClickAction,
@@ -65,15 +66,43 @@ describe("highlightDurationMs", () => {
   });
 });
 
-describe("activityEntryVariant", () => {
+describe("activityVariant", () => {
   it("is error for a failed call regardless of kind", () => {
-    expect(activityEntryVariant({ ok: false, kind: "read" })).toBe("error");
-    expect(activityEntryVariant({ ok: false, kind: "write" })).toBe("error");
+    expect(activityVariant({ ok: false, kind: "read" })).toBe("error");
+    expect(activityVariant({ ok: false, kind: "write" })).toBe("error");
   });
 
   it("is write for a successful write, default for a successful read", () => {
-    expect(activityEntryVariant({ ok: true, kind: "write" })).toBe("write");
-    expect(activityEntryVariant({ ok: true, kind: "read" })).toBe("default");
+    expect(activityVariant({ ok: true, kind: "write" })).toBe("write");
+    expect(activityVariant({ ok: true, kind: "read" })).toBe("default");
+  });
+
+  it("is deleted when the target is gone, except for the delete itself (its target is gone by definition)", () => {
+    expect(activityVariant({ ok: true, kind: "read", tool: "get_screen" }, true)).toBe("deleted");
+    expect(activityVariant({ ok: true, kind: "write", tool: "delete_entity" }, true)).toBe("write");
+  });
+
+  it("is agent-comment for the agent's comment tools", () => {
+    expect(activityVariant({ ok: true, kind: "write", tool: "create_comment" })).toBe("agent-comment");
+    expect(activityVariant({ ok: true, kind: "write", tool: "reply_comment" })).toBe("agent-comment");
+  });
+});
+
+describe("activityIsActionable", () => {
+  const ok = { ok: true, tool: "get_screen", kind: "read", target: { kind: "screen", name: "home" } };
+
+  it("is true for a call that worked on a screen, mockup, component or pattern that exists", () => {
+    expect(activityIsActionable(ok, true)).toBe(true);
+    expect(activityIsActionable({ ...ok, target: { kind: "mockup", name: "m" } }, true)).toBe(true);
+    expect(activityIsActionable({ ...ok, target: { kind: "component", name: "btn" } }, true)).toBe(true);
+    expect(activityIsActionable({ ...ok, target: { kind: "pattern", name: "p" } }, true)).toBe(true);
+  });
+
+  it("is false for a failed call, a gone target, a delete and a broad read", () => {
+    expect(activityIsActionable({ ...ok, ok: false }, true)).toBe(false);
+    expect(activityIsActionable(ok, false)).toBe(false);
+    expect(activityIsActionable({ ...ok, tool: "delete_entity" }, true)).toBe(false);
+    expect(activityIsActionable({ ...ok, target: null }, true)).toBe(false);
   });
 });
 
@@ -126,67 +155,63 @@ describe("activityIsNavigable", () => {
   });
 });
 
-describe("formatActivityTarget", () => {
-  it("labels a broad read project-wide", () => {
-    expect(formatActivityTarget({ target: null, tool: "find_nodes", nodes: [] })).toBe("project-wide");
+describe("describeActivity", () => {
+  const say = (event, options) => {
+    const { before, name, after } = describeActivity({ ok: true, nodes: [], ...event }, options);
+    return `${before}${name ?? ""}${after}`;
+  };
+
+  it("says what a write did and what it is doing now", () => {
+    const event = { tool: "write_html", kind: "write", target: { kind: "screen", name: "home" } };
+    expect(say(event)).toBe("Wrote home");
+    expect(say(event, { progressive: true })).toBe("Writing home");
+    expect(describeActivity({ ...event, ok: true, nodes: [] }).name).toBe("home"); // the one bold part
   });
 
-  it("labels a screen target, appending the node id when exactly one is affected", () => {
-    const event = { target: { kind: "screen", name: "checkout-cart" }, tool: "patch_html", nodes: ["checkout-cart.line-4"] };
-    expect(formatActivityTarget(event)).toBe("screen · checkout-cart · line-4");
+  it("names the one affected node after a patch, but not after write_html (its node is the screen root)", () => {
+    expect(say({ tool: "patch_html", kind: "write", target: { kind: "screen", name: "home" }, nodes: ["home.btn-new"] })).toBe("Updated home, btn-new");
+    expect(say({ tool: "write_html", kind: "write", target: { kind: "screen", name: "home" }, nodes: ["home.root"] })).toBe("Wrote home");
+    expect(say({ tool: "patch_html", kind: "write", target: { kind: "screen", name: "home" }, nodes: ["home.a", "home.b"] })).toBe("Updated home");
   });
 
-  it("omits the node suffix for write_html — its node is the whole screen, not a specific element", () => {
-    const event = { target: { kind: "screen", name: "checkout-cart" }, tool: "write_html", nodes: ["checkout-cart.root"] };
-    expect(formatActivityTarget(event)).toBe("screen · checkout-cart");
+  it("reads, inspects, and says broad calls in a few words", () => {
+    expect(say({ tool: "get_screen", kind: "read", target: { kind: "screen", name: "home" } })).toBe("Read home");
+    expect(say({ tool: "inspect_node", kind: "read", target: { kind: "screen", name: "cart" }, nodes: ["cart.note"] })).toBe("Inspected cart, note");
+    expect(say({ tool: "get_project", kind: "read", target: null })).toBe("Read the project");
+    expect(say({ tool: "get_design_system", kind: "read", target: null })).toBe("Read the design system");
+    expect(describeActivity({ ok: true, tool: "get_project", kind: "read", target: null, nodes: [] }).name).toBeNull();
   });
 
-  it("omits the node suffix when more than one node is affected", () => {
-    const event = {
-      target: { kind: "screen", name: "checkout-cart" },
-      tool: "patch_html",
-      nodes: ["checkout-cart.line-1", "checkout-cart.line-2"],
-    };
-    expect(formatActivityTarget(event)).toBe("screen · checkout-cart");
+  it("names a mockup with its variant, a component and a pattern with their kind", () => {
+    expect(say({ tool: "write_mockup", kind: "write", target: { kind: "mockup", name: "orders", variant: "b" } })).toBe("Wrote mockup orders, variant b");
+    expect(say({ tool: "set_meta", kind: "write", target: { kind: "component", name: "tag-chip" } })).toBe("Updated component tag-chip");
+    expect(say({ tool: "set_meta", kind: "write", target: { kind: "pattern", name: "checkout-layout" } })).toBe("Updated pattern checkout-layout");
   });
 
-  it("labels a mockup target, with variant when present", () => {
-    expect(formatActivityTarget({ target: { kind: "mockup", name: "checkout-flow" }, tool: "write_mockup", nodes: [] })).toBe(
-      "mockup · checkout-flow",
-    );
-    expect(
-      formatActivityTarget({ target: { kind: "mockup", name: "checkout-flow", variant: "option-b" }, tool: "write_mockup", nodes: [] }),
-    ).toBe("mockup · checkout-flow / option-b");
+  it("says a failed call in plain words (the daemon sends no reason)", () => {
+    expect(say({ tool: "patch_html", kind: "write", ok: false, target: { kind: "screen", name: "settings" } })).toBe("Could not update settings");
+    expect(say({ tool: "get_screen", kind: "read", ok: false, target: { kind: "screen", name: "settings" } }, { progressive: true })).toBe("Could not read settings");
   });
 
-  it("labels a component target, with variant when present", () => {
-    expect(formatActivityTarget({ target: { kind: "component", name: "tag-chip", variant: "active" }, tool: "promote_to_system", nodes: [] })).toBe(
-      "component · tag-chip#active",
-    );
-  });
-
-  it("labels a pattern target", () => {
-    expect(formatActivityTarget({ target: { kind: "pattern", name: "checkout-layout" }, tool: "set_meta", nodes: [] })).toBe(
-      "pattern · checkout-layout",
-    );
+  it("says a gone target, but not for the delete that removed it", () => {
+    expect(say({ tool: "get_screen", kind: "read", target: { kind: "screen", name: "cart" } }, { gone: true })).toBe("Read cart, which no longer exists");
+    expect(say({ tool: "delete_entity", kind: "write", target: { kind: "screen", name: "cart" } }, { gone: true })).toBe("Deleted cart");
   });
 });
 
 describe("formatActivityTime", () => {
-  it("reads 'just now' for anything under a second old", () => {
-    expect(formatActivityTime(1000, 1000)).toBe("just now");
+  it("reads 'now' under a minute", () => {
+    expect(formatActivityTime(1000, 1000)).toBe("now");
+    expect(formatActivityTime(1000, 1000 + 59_000)).toBe("now");
   });
 
-  it("reads '<n>s ago' under a minute", () => {
-    expect(formatActivityTime(1000, 1000 + 4000)).toBe("4s ago");
+  it("reads '<n> min ago' from a minute to an hour", () => {
+    expect(formatActivityTime(0, 60_000)).toBe("1 min ago");
+    expect(formatActivityTime(0, 125_000)).toBe("2 min ago");
   });
 
-  it("reads '<n>m ago' at a minute or more", () => {
-    expect(formatActivityTime(0, 90_000)).toBe("2m ago");
-  });
-
-  it("reads '<n>h ago' at an hour or more", () => {
-    expect(formatActivityTime(0, 2 * 3600_000)).toBe("2h ago");
+  it("reads '<n> h ago' at an hour or more", () => {
+    expect(formatActivityTime(0, 2 * 3600_000)).toBe("2 h ago");
   });
 });
 
@@ -275,23 +300,13 @@ describe("nextFollowState", () => {
 });
 
 describe("followToggleClickAction", () => {
-  it("turns on from off, regardless of where the click landed", () => {
-    expect(followToggleClickAction(FOLLOW_OFF, false)).toBe("toggle-on");
-    expect(followToggleClickAction(FOLLOW_OFF, true)).toBe("toggle-on");
+  it("turns on from off", () => {
+    expect(followToggleClickAction(FOLLOW_OFF)).toBe("toggle-on");
   });
 
-  it("turns off from following", () => {
-    expect(followToggleClickAction({ enabled: true, paused: false }, false)).toBe("toggle-off");
-  });
-
-  it("resumes from paused only when the click hit the Resume affordance", () => {
-    const paused = { enabled: true, paused: true };
-    expect(followToggleClickAction(paused, true)).toBe("resume");
-  });
-
-  it("turns off from paused when the click missed the Resume affordance", () => {
-    const paused = { enabled: true, paused: true };
-    expect(followToggleClickAction(paused, false)).toBe("toggle-off");
+  it("turns off from following and from paused (a paused follow is resumed by its own button)", () => {
+    expect(followToggleClickAction({ enabled: true, paused: false })).toBe("toggle-off");
+    expect(followToggleClickAction({ enabled: true, paused: true })).toBe("toggle-off");
   });
 });
 

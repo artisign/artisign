@@ -1,9 +1,10 @@
 {
-  "notes": "**Status: approved by Christian on 2026-10-26.** CHR-925 / CHR-906. Dark state of `shell-settings-menu` — identical structure; only the root binds the `chrome-dark` token group and the theme segmented control selects Dark (`chrome-segmented` variant `dark`). Selected segment keeps a visible `chrome-border-strong` ring on `chrome-raised` (the plain fill alone does not separate from the field in dark). Switch knob stays white; on-track = dark `chrome-accent`.",
+  "notes": "**CHR-1257 phase 2b, Stitch chrome (2026-11-27, awaiting Christian's approval).** Dark state of `shell-settings-menu` over `chrome-c-shell-dark`. Same rows; the root binds `chrome-dark.*`, the theme control selects Dark and the \"Connect AI tools…\" row is shown in its hover state. The item flows go to the light `shell-mcp-setup-dialog` and `shell-whats-new` because those two have no dark twin.\n\n---\nEarlier notes (history):\n\n**Status: approved by Christian on 2026-10-26.** CHR-925 / CHR-906. Dark state of `shell-settings-menu` — identical structure; only the root binds the `chrome-dark` token group and the theme segmented control selects Dark (`chrome-segmented` variant `dark`). Selected segment keeps a visible `chrome-border-strong` ring on `chrome-raised` (the plain fill alone does not separate from the field in dark). Switch knob stays white; on-track = dark `chrome-accent`.",
   "tags": [
     "CHR-925",
     "CHR-906",
-    "chr-1004"
+    "chr-1004",
+    "chr-1257"
   ],
   "variant_of": "shell-settings-menu",
   "variant_kind": "state"

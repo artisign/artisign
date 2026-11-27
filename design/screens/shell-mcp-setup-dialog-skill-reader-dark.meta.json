@@ -1,9 +1,10 @@
 {
-  "notes": "Dark theme of `shell-mcp-setup-dialog-skill-reader`. Same layout and content; the root binds `chrome-dark.*`. Back (arrow and button) returns to `shell-mcp-setup-dialog-skill-dark`. Spec: tag note `chr-1047`.",
+  "notes": "**CHR-1257 phase 2b, Stitch chrome (2026-11-27, awaiting Christian's approval).** Dark twin of `shell-mcp-setup-dialog-skill-reader` over `chrome-c-shell-dark`; the root binds `chrome-dark.*`. The arrow and Back return to `shell-mcp-setup-dialog-skill-dark`; X and scrim go to `shell-settings-menu-dark`.\n\n---\nEarlier notes (history):\n\nDark theme of `shell-mcp-setup-dialog-skill-reader`. Same layout and content; the root binds `chrome-dark.*`. Back (arrow and button) returns to `shell-mcp-setup-dialog-skill-dark`. Spec: tag note `chr-1047`.",
   "tags": [
     "chr-1047",
     "settings",
-    "dialog"
+    "dialog",
+    "chr-1257"
   ],
   "variant_of": "shell-mcp-setup-dialog-skill-reader",
   "variant_kind": "state"

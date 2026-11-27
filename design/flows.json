@@ -36,156 +36,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "shell-settings-menu.item-mcp",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-settings-menu.item-whats-new",
-    "event": "tap",
-    "to": "shell-whats-new",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-whats-new.wn-close",
-    "event": "tap",
-    "to": "shell-settings-menu",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-reader.reader-back",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog-skill",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-reader.reader-done",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog-skill",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-reader-dark.reader-back",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog-skill-dark",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-reader-dark.reader-done",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog-skill-dark",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog.tab-skill",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog-skill",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog.dlg-done",
-    "event": "tap",
-    "to": "shell-settings-menu",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-status-unavailable.tab-mcp",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-status-unavailable.dlg-done",
-    "event": "tap",
-    "to": "shell-settings-menu",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-status-unavailable-dark.tab-mcp",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-status-unavailable-dark.dlg-done",
-    "event": "tap",
-    "to": "shell-settings-menu-dark",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill.tab-mcp",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill.skill-read",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog-skill-reader",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill.dlg-done",
-    "event": "tap",
-    "to": "shell-settings-menu",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-dark.tab-mcp",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-dark.skill-read",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog-skill-reader-dark",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-dark.dlg-done",
-    "event": "tap",
-    "to": "shell-settings-menu-dark",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-all-installed.tab-mcp",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-all-installed.skill-read",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog-skill-reader",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-all-installed.dlg-done",
-    "event": "tap",
-    "to": "shell-settings-menu",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-all-installed-dark.tab-mcp",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-all-installed-dark.skill-read",
-    "event": "tap",
-    "to": "shell-mcp-setup-dialog-skill-reader-dark",
-    "to_kind": "screen"
-  },
-  {
-    "from": "shell-mcp-setup-dialog-skill-all-installed-dark.dlg-done",
-    "event": "tap",
-    "to": "shell-settings-menu-dark",
-    "to_kind": "screen"
-  },
-  {
     "from": "usecases-list.sub-personas",
     "event": "tap",
     "to": "usecases-personas",
@@ -1488,48 +1338,6 @@
     "to_kind": "screen"
   },
   {
-    "from": "app-shell.project-picker",
-    "event": "tap",
-    "to": "open-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.tab-board",
-    "event": "tap",
-    "to": "board-view",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.tab-ds",
-    "event": "tap",
-    "to": "design-system-view",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.tab-usecases",
-    "event": "tap",
-    "to": "usecases-list",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.left-header",
-    "event": "tap",
-    "to": "sidebars-collapsed",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.toolbar-side-inspect",
-    "event": "tap",
-    "to": "inspector-selected",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.comments-header",
-    "event": "tap",
-    "to": "comments-panel",
-    "to_kind": "screen"
-  },
-  {
     "from": "inspector-selected.toolbar-side-inspect",
     "event": "tap",
     "to": "app-shell",
@@ -2079,6 +1887,384 @@
     "from": "board-view.toolbar-side-collapse-all",
     "event": "tap",
     "to": "board-view-clusters-collapsed",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-settings-menu.item-mcp",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-settings-menu.item-whats-new",
+    "event": "tap",
+    "to": "shell-whats-new",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-settings-menu-dark.item-mcp",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-settings-menu-dark.item-whats-new",
+    "event": "tap",
+    "to": "shell-whats-new",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-dark.scrim",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-dark.dialog-close",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-dark.tab-mcp",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-dark.skill-read",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog-skill-reader-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-dark.dlg-done",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill.scrim",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill.dialog-close",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill.tab-mcp",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill.skill-read",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog-skill-reader",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill.dlg-done",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog.scrim",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog.dialog-close",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog.tab-skill",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog-skill",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog.dlg-done",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-all-installed.scrim",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-all-installed.dialog-close",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-all-installed.tab-mcp",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-all-installed.skill-read",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog-skill-reader",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-all-installed.dlg-done",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-all-installed-dark.scrim",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-all-installed-dark.dialog-close",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-all-installed-dark.tab-mcp",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-all-installed-dark.skill-read",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog-skill-reader-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-all-installed-dark.dlg-done",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-status-unavailable.scrim",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-status-unavailable.dialog-close",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-status-unavailable.tab-mcp",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-status-unavailable.dlg-done",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-status-unavailable-dark.scrim",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-status-unavailable-dark.dialog-close",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-status-unavailable-dark.tab-mcp",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-status-unavailable-dark.dlg-done",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-reader.scrim",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-reader.reader-back",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog-skill",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-reader.dialog-close",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-reader.reader-done",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog-skill",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-reader-dark.scrim",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-reader-dark.reader-back",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog-skill-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-reader-dark.dialog-close",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-mcp-setup-dialog-skill-reader-dark.reader-done",
+    "event": "tap",
+    "to": "shell-mcp-setup-dialog-skill-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-whats-new.scrim",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-whats-new.dialog-close",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "shell-whats-new.wn-close",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-dialog.scrim",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-dialog.dialog-close",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-dialog.dialog-cancel",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-dialog.dialog-confirm",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-dialog-dark.scrim",
+    "event": "tap",
+    "to": "chrome-c-shell-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-dialog-dark.dialog-close",
+    "event": "tap",
+    "to": "chrome-c-shell-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-dialog-dark.dialog-cancel",
+    "event": "tap",
+    "to": "chrome-c-shell-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "chrome-c-dialog-dark.dialog-confirm",
+    "event": "tap",
+    "to": "chrome-c-shell-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.project-picker",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-board",
+    "event": "tap",
+    "to": "board-view",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-ds",
+    "event": "tap",
+    "to": "design-system-view",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-usecases",
+    "event": "tap",
+    "to": "usecases-list",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.settings-button",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.left-header",
+    "event": "tap",
+    "to": "sidebars-collapsed",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.toolbar-side-inspect",
+    "event": "tap",
+    "to": "inspector-selected",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.comments-header",
+    "event": "tap",
+    "to": "comments-panel",
     "to_kind": "screen"
   }
 ]

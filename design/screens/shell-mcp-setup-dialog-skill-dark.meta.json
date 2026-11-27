@@ -1,9 +1,10 @@
 {
-  "notes": "Dark theme of `shell-mcp-setup-dialog-skill`. Same layout, copy and statuses; the root binds `chrome-dark.*`. Read SKILL.md goes to `shell-mcp-setup-dialog-skill-reader-dark`, Done to `shell-settings-menu-dark`. The MCP server tab flows to the light `shell-mcp-setup-dialog` because that screen has no dark variant (the theme follows the app setting in the build). Spec: tag note `chr-1047`.",
+  "notes": "**CHR-1257 phase 2b, Stitch chrome (2026-11-27, awaiting Christian's approval).** Dark twin of `shell-mcp-setup-dialog-skill` over `chrome-c-shell-dark`; the root binds `chrome-dark.*`. Same flows as before: Read SKILL.md to `shell-mcp-setup-dialog-skill-reader-dark`, Done, X and scrim to `shell-settings-menu-dark`, MCP server tab to the light `shell-mcp-setup-dialog`.\n\n---\nEarlier notes (history):\n\nDark theme of `shell-mcp-setup-dialog-skill`. Same layout, copy and statuses; the root binds `chrome-dark.*`. Read SKILL.md goes to `shell-mcp-setup-dialog-skill-reader-dark`, Done to `shell-settings-menu-dark`. The MCP server tab flows to the light `shell-mcp-setup-dialog` because that screen has no dark variant (the theme follows the app setting in the build). Spec: tag note `chr-1047`.",
   "tags": [
     "chr-1047",
     "settings",
-    "dialog"
+    "dialog",
+    "chr-1257"
   ],
   "variant_of": "shell-mcp-setup-dialog-skill",
   "variant_kind": "state"

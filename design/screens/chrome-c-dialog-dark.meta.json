@@ -1,10 +1,11 @@
 {
-  "notes": "CHR-905 direction C: dark counterpart of chrome-c-dialog.",
+  "notes": "**CHR-1257 phase 2b, Stitch chrome (2026-11-27, awaiting Christian's approval).** Dark twin of `chrome-c-dialog` over `chrome-c-shell-dark`; the root binds `chrome-dark.*`. Close, Cancel, scrim and confirm flow back to `chrome-c-shell-dark`.\n\n---\nEarlier notes (history):\n\nCHR-905 direction C: dark counterpart of chrome-c-dialog.",
   "tags": [
     "CHR-905",
     "CHR-909",
     "chr-1004",
-    "chr-1068"
+    "chr-1068",
+    "chr-1257"
   ],
   "variant_of": "chrome-c-dialog",
   "variant_kind": "state"

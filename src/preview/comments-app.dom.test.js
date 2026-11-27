@@ -90,24 +90,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("right panel collapse button", () => {
-  it("names the active tab in label and tooltip, also after collapse and expand", async () => {
-    memoryStorage.set("artisign.inspector.collapsed", "false");
-    await boot("one");
-    const btn = $("#inspector-collapse");
-    const names = () => [btn.getAttribute("aria-label"), btn.dataset.tooltip];
-    expect(names()).toEqual(["Collapse Elements panel", "Collapse Elements panel"]);
-    $("#panel-tab-activity").click();
-    expect(names()).toEqual(["Collapse Activity panel", "Collapse Activity panel"]);
-    btn.click();
-    expect(names()).toEqual(["Expand Activity panel", "Expand Activity panel"]);
-    btn.click();
-    expect(names()).toEqual(["Collapse Activity panel", "Collapse Activity panel"]);
-    $("#panel-tab-elements").click();
-    expect(names()).toEqual(["Collapse Elements panel", "Collapse Elements panel"]);
-  });
-});
-
 const TS = "2026-11-26T10:00:00.000Z";
 function seedThreads() {
   threadData = {
@@ -148,25 +130,26 @@ describe("canvas comments", () => {
       ["2", "agent", "detached", "Comment 2 on gone, detached"],
     ]);
     expect(pins().every((p) => p.tagName === "BUTTON")).toBe(true);
-    expect($("#comments-row-label").textContent).toBe("2 open comments");
-    expect($("#comments-row-hint").textContent).toBe("1 detached · shown on canvas");
+    expect($("#comment-count-badge").textContent).toBe("2");
+    expect($("#comment-count-badge").hidden).toBe(false);
+    expect($("#comment-mode-toggle").getAttribute("aria-label")).toBe("Comment mode, 2 open comments");
   });
 
-  it("the sidebar row reads No open comments without threads", async () => {
+  it("the Comment tool carries no count without threads", async () => {
     await boot("one");
     loadFrame();
-    expect($("#comments-row-label").textContent).toBe("No open comments");
-    expect($("#comments-row-hint").hidden).toBe(true);
+    expect($("#comment-count-badge").hidden).toBe(true);
+    expect($("#comment-mode-toggle").getAttribute("aria-label")).toBe("Comment mode");
     expect(pins()).toEqual([]);
   });
 
-  it("the sidebar row turns comment mode on and focuses the first pin", async () => {
+  it("the Comment tool turns comment mode on and shows the banner; the Context panel's comments row is gone (CHR-1267)", async () => {
     seedThreads();
     await boot("one");
     loadFrame();
-    $("#comments-row").click();
+    expect($("#comments-row")).toBeNull();
+    $("#comment-mode-toggle").click();
     expect($("#comment-mode-toggle").getAttribute("aria-pressed")).toBe("true");
-    expect(document.activeElement).toBe(pins()[0]);
     expect($("#comment-banner").hidden).toBe(false);
   });
 
@@ -304,16 +287,10 @@ describe("canvas comments", () => {
   });
 });
 
-describe("Notes panel", () => {
-  it("shows the tag chips for a tagged screen with no notes, without an empty text band", async () => {
+describe("Context panel (CHR-1267)", () => {
+  it("is gone: the Notes panel and its tag specs wait for the right-column slice", async () => {
     await boot("two");
-    expect($("#notes-panel").hidden).toBe(false);
-    expect([...document.querySelectorAll("#notes-panel-chips .chrome-chip")].map((c) => c.textContent)).toEqual(["alpha", "beta"]);
-    expect($("#notes-panel-text").hidden).toBe(true);
-  });
-
-  it("stays hidden for a screen with neither notes nor tags", async () => {
-    await boot("one");
-    expect($("#notes-panel").hidden).toBe(true);
+    expect($("#notes-panel")).toBeNull();
+    expect($("#sidebar-context")).toBeNull();
   });
 });

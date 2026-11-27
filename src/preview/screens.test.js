@@ -6,8 +6,7 @@ import {
   ancestorNames,
   subtreeNames,
   highlightParts,
-  flattenTree,
-} from "./screens.js";
+  flattenTree, viewportIconName, DESKTOP_MIN_WIDTH } from "./screens.js";
 
 // renderScreenList itself isn't tested here — this file stays on the fast
 // node default; its DOM smoke test lives in screens.dom.test.js. Filtering —
@@ -113,10 +112,15 @@ describe("buildScreenTree", () => {
 
 describe("displayName", () => {
   const tree = buildScreenTree([...cart, v("unrelated-name", "cart", "overlay")]);
-  it("shows the suffix behind an ellipsis when the name starts with the parent's", () => {
-    expect(displayName(tree.nodes.get("cart-two-items"))).toBe("…-two-items");
+  it("shows the plain suffix, without the parent's name or its separator, when the name starts with the parent's", () => {
+    expect(displayName(tree.nodes.get("cart-two-items"))).toBe("two-items");
     expect(displayName(tree.nodes.get("confirm-error"))).toBe("confirm-error");
-    expect(displayName(tree.nodes.get("cart-sheet-clear-confirm"))).toBe("…-confirm");
+    expect(displayName(tree.nodes.get("cart-sheet-clear-confirm"))).toBe("confirm");
+  });
+  it("keeps the full name when nothing but separators would be left", () => {
+    const t = buildScreenTree([v("home"), v("home-", "home", "state"), v("home_x", "home", "state")]);
+    expect(displayName(t.nodes.get("home-"))).toBe("home-");
+    expect(displayName(t.nodes.get("home_x"))).toBe("x");
   });
   it("shows the full name when it lacks the parent prefix, and for roots", () => {
     expect(displayName(tree.nodes.get("unrelated-name"))).toBe("unrelated-name");
@@ -224,5 +228,15 @@ describe("flattenTree", () => {
 
   it("with a filter: unrelated roots disappear", () => {
     expect(names(flattenTree(tree, { filter: "dash" }).rows)).toEqual(["dashboard:match"]);
+  });
+});
+
+describe("viewportIconName (CHR-1267)", () => {
+  it("is a monitor from the desktop width up and a phone below it, also for an unknown size", () => {
+    expect(viewportIconName({ width: 1280 })).toBe("desktop_windows");
+    expect(viewportIconName({ width: DESKTOP_MIN_WIDTH })).toBe("desktop_windows");
+    expect(viewportIconName({ width: 768 })).toBe("desktop_windows");
+    expect(viewportIconName({ width: 390 })).toBe("smartphone");
+    expect(viewportIconName(undefined)).toBe("smartphone");
   });
 });

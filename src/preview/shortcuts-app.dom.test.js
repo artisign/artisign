@@ -54,12 +54,16 @@ function stubDaemon() {
 // jsdom has no HTMLDialogElement.show()/close(); the comment popover is a non-modal <dialog>.
 HTMLDialogElement.prototype.show ??= function () { this.setAttribute("open", ""); };
 HTMLDialogElement.prototype.close ??= function () { this.removeAttribute("open"); };
+Element.prototype.scrollIntoView ??= () => {}; // jsdom has none; the inspector model scrolls its (detached) row
 
 const flush = async () => {
   for (let i = 0; i < 30; i++) await new Promise((r) => setTimeout(r, 0));
 };
 const $ = (sel) => document.querySelector(sel);
 const pressed = (id) => document.getElementById(id).getAttribute("aria-pressed");
+const zoomOpen = () => $("#zoom-menu").hasAttribute("data-open"); // jsdom has no Popover API, so the fallback toggles data-open
+/** Inspect mode's selection shows as the outline over the canvas (the Elements list is gone, CHR-1267). */
+const inspectFocused = () => !$("#inspect-overlay").hidden;
 
 /** Dispatches a keydown on `target` and returns whether it was left un-prevented. */
 function key(k, init = {}, target = document.body) {
@@ -100,10 +104,11 @@ describe("hints", () => {
   it("fills the tooltip key slots and the menu hints from the mapping (non-mac strings)", async () => {
     await boot();
     expect($("#flow-mode-toggle").dataset.shortcut).toBe("F");
-    expect($("#sidebar-context-collapse").dataset.shortcut).toBe("\\");
+    expect($("#sidebar-screens-collapse").dataset.shortcut).toBe("[");
     expect($("#follow-toggle-toggle").dataset.shortcut).toBe("W");
-    expect($('.zoom-button[data-zoom="fit"] .chrome-menu-hint').textContent).toBe("Shift+1");
-    expect($('.zoom-step-button[data-zoom-step="out"] .chrome-menu-hint').textContent).toBe("−");
+    expect($('#zoom-menu .zoom-button[data-zoom="fit"] .zoom-preset-hint').textContent).toBe("Shift+1");
+    expect($("#zoom-out").dataset.shortcut).toBe("−");
+    expect($("#zoom-in").dataset.shortcut).toBe("+");
     expect($("#menu-action-open .chrome-menu-hint").textContent).toBe("O");
     expect($("#menu-label-open .chrome-menu-hint").textContent).toBe("P");
   });
@@ -116,10 +121,8 @@ describe("modes", () => {
     expect(pressed("flow-mode-toggle")).toBe("true");
     key("c");
     expect([pressed("flow-mode-toggle"), pressed("comment-mode-toggle")]).toEqual(["false", "true"]);
-    expect($("#sidebar-context").dataset.collapsed).toBe("true"); // CHR-1248: comment mode works on the canvas, Context stays as it was
     key("i");
     expect([pressed("comment-mode-toggle"), pressed("inspect-mode-toggle")]).toEqual(["false", "true"]);
-    expect($("#inspector").dataset.collapsed).toBe("false"); // inspect opens Elements
     key("Escape");
     expect(pressed("inspect-mode-toggle")).toBe("false");
     key("f");
@@ -198,16 +201,17 @@ describe("views, panels, filter, theme", () => {
     expect($('[data-view="screens"]').getAttribute("aria-pressed")).toBe("true");
   });
 
-  it("[ \\ ] toggle the three panels (and persist like the buttons)", async () => {
+  it("[ folds the left card (and persists like the button)", async () => {
     await boot();
     key("[");
     expect($("#sidebar-screens").dataset.collapsed).toBe("true");
     await flush();
     expect(settings.prefs["artisign.sidebar-screens.collapsed"]).toBe("true");
+    key("[");
+    expect($("#sidebar-screens").dataset.collapsed).toBe("false");
+    key("]"); // the Elements panel is gone: nothing to toggle
     key("\\");
-    expect($("#sidebar-context").dataset.collapsed).toBe("false");
-    key("]");
-    expect($("#inspector").dataset.collapsed).toBe("false");
+    expect($("#sidebar-screens").dataset.collapsed).toBe("false");
   });
 
   it("/ focuses the screen filter (opening a collapsed Screens panel) without typing the slash", async () => {
@@ -237,21 +241,27 @@ describe("views, panels, filter, theme", () => {
 });
 
 describe("zoom", () => {
-  it("Screens: Shift+digits pick the presets, + / - step along them", async () => {
+  const fitPressed = () => $("#zoom-fit").getAttribute("aria-pressed");
+  it("Screens: Shift+digits pick the presets, + / - step along the ladder", async () => {
     await boot();
-    expect($("#zoom-label").textContent).toBe("Fit");
+    expect(fitPressed()).toBe("true");
     shift("%", "Digit5");
     expect($("#zoom-label").textContent).toBe("50%");
+    expect(fitPressed()).toBe("false");
     key("+", { shiftKey: true });
+    expect($("#zoom-label").textContent).toBe("75%");
+    key("=");
     expect($("#zoom-label").textContent).toBe("100%");
+    key("=");
+    key("=");
     key("=");
     expect($("#zoom-label").textContent).toBe("200%");
     key("+", { shiftKey: true }); // already the largest
     expect($("#zoom-label").textContent).toBe("200%");
     key("-");
-    expect($("#zoom-label").textContent).toBe("100%");
+    expect($("#zoom-label").textContent).toBe("150%");
     shift("!", "Digit1");
-    expect($("#zoom-label").textContent).toBe("Fit");
+    expect(fitPressed()).toBe("true");
     shift(")", "Digit0");
     expect($("#zoom-label").textContent).toBe("100%");
     shift("@", "Digit2");
@@ -263,7 +273,8 @@ describe("zoom", () => {
     key("2");
     shift("%", "Digit5");
     key("1");
-    expect($("#zoom-label").textContent).toBe("Fit");
+    expect($("#zoom-fit").getAttribute("aria-pressed")).toBe("true");
+    expect($("#zoom-label").textContent).toBe("100%");
   });
 
   it("Board: E / G toggle edges and clusters, +/- drive the slider, Shift+1 is Fit all", async () => {
@@ -376,7 +387,7 @@ describe("Escape consumed by an overlay does not also leave the mode", () => {
     key("i");
     $("#zoom-trigger").click();
     key("Escape");
-    expect($("#zoom-menu").hidden).toBe(true);
+    expect(zoomOpen()).toBe(false);
     expect(pressed("inspect-mode-toggle")).toBe("true");
   });
 });
@@ -414,9 +425,9 @@ describe("keys pressed inside the screen frame", () => {
     await flush(); // entries
     key("i");
     doc.getElementById("child").click();
-    expect($(".inspector-entry-focused")).not.toBeNull();
+    expect(inspectFocused()).toBe(true);
     frameKey(doc, "Escape");
-    expect($(".inspector-entry-focused")).toBeNull();
+    expect(inspectFocused()).toBe(false);
     expect(pressed("inspect-mode-toggle")).toBe("true");
     frameKey(doc, "Escape");
     expect(pressed("inspect-mode-toggle")).toBe("false");
@@ -430,11 +441,11 @@ describe("Escape in a text field", () => {
     await flush();
     key("i");
     doc.getElementById("child").click();
-    expect($(".inspector-entry-focused")).not.toBeNull();
+    expect(inspectFocused()).toBe(true);
     const filter = $("#screen-filter-input");
     filter.focus();
     key("Escape", {}, filter);
-    expect($(".inspector-entry-focused")).toBeNull();
+    expect(inspectFocused()).toBe(false);
     expect(pressed("inspect-mode-toggle")).toBe("true");
   });
 
@@ -455,18 +466,18 @@ describe("zoom steps", () => {
   it("step from the effective Fit scale and never zoom the wrong way", async () => {
     await boot();
     const holder = $("#screen-holder");
-    holder.style.setProperty("--zoom", "0.35");
+    holder.style.setProperty("--zoom", "0.04");
     key("-");
-    expect($("#zoom-label").textContent).toBe("Fit"); // already below 50%: out does nothing
+    expect($("#zoom-fit").getAttribute("aria-pressed")).toBe("true"); // already below the smallest step: out does nothing
     key("+", { shiftKey: true });
-    expect($("#zoom-label").textContent).toBe("50%");
+    expect($("#zoom-label").textContent).toBe("5%");
     shift("!", "Digit1");
     holder.style.setProperty("--zoom", "0.8");
     key("-");
-    expect($("#zoom-label").textContent).toBe("50%");
+    expect($("#zoom-label").textContent).toBe("75%");
     shift("!", "Digit1");
     holder.style.setProperty("--zoom", "0.8");
-    $('.zoom-step-button[data-zoom-step="in"]').click(); // the menu item takes the same path
+    $("#zoom-in").click(); // the pill button takes the same path
     expect($("#zoom-label").textContent).toBe("100%");
   });
 
@@ -496,10 +507,10 @@ describe("zoom preset keys and the zoom menu", () => {
   it("close an open zoom menu like the button click (focus to the trigger), but leave focus alone when it was closed", async () => {
     await boot();
     $("#zoom-trigger").click();
-    expect($("#zoom-menu").hidden).toBe(false);
+    expect(zoomOpen()).toBe(true);
     shift("@", "Digit2");
     expect($("#zoom-label").textContent).toBe("200%");
-    expect($("#zoom-menu").hidden).toBe(true);
+    expect(zoomOpen()).toBe(false);
     expect(document.activeElement).toBe($("#zoom-trigger"));
     const flow = $("#flow-mode-toggle");
     flow.focus();
@@ -519,9 +530,9 @@ describe("IME in a text field", () => {
     filter.focus();
     key("Escape", { isComposing: true }, filter);
     key("Escape", { keyCode: 229 }, filter);
-    expect($(".inspector-entry-focused")).not.toBeNull();
+    expect(inspectFocused()).toBe(true);
     key("Escape", {}, filter);
-    expect($(".inspector-entry-focused")).toBeNull();
+    expect(inspectFocused()).toBe(false);
   });
 });
 
@@ -535,9 +546,32 @@ describe("a top-document overlay and the screen frame", () => {
     doc.getElementById("child").click();
     expect($("#project-menu").hidden).toBe(true);
     $("#zoom-trigger").click();
-    expect($("#zoom-menu").hidden).toBe(false);
+    expect(zoomOpen()).toBe(true);
     doc.getElementById("child").dispatchEvent(new doc.defaultView.Event("pointerdown", { bubbles: true }));
-    expect($("#zoom-menu").hidden).toBe(true);
+    expect(zoomOpen()).toBe(false);
+  });
+
+  it("a press inside the frame closes the zoom popover on the native path too", async () => {
+    const menu = $("#zoom-menu");
+    let open = false;
+    menu.showPopover = () => {
+      open = true;
+      menu.dispatchEvent(new Event("toggle"));
+    };
+    menu.hidePopover = () => {
+      open = false;
+      menu.dispatchEvent(new Event("toggle"));
+    };
+    const matches = menu.matches.bind(menu);
+    menu.matches = (selector) => (selector === ":popover-open" ? open : matches(selector));
+    await boot();
+    const doc = frameDoc();
+    $("#zoom-trigger").dispatchEvent(new Event("click", { bubbles: true })); // the browser's invoker opens it
+    menu.showPopover();
+    expect(open).toBe(true);
+    doc.getElementById("child").dispatchEvent(new doc.defaultView.Event("pointerdown", { bubbles: true }));
+    expect(open).toBe(false);
+    expect($("#zoom-trigger").getAttribute("aria-expanded")).toBe("false");
   });
 
   it("Escape from the frame closes the open overlay and nothing else", async () => {
@@ -550,7 +584,7 @@ describe("a top-document overlay and the screen frame", () => {
     expect(pressed("flow-mode-toggle")).toBe("true");
     $("#zoom-trigger").click();
     frameKey(doc, "Escape");
-    expect($("#zoom-menu").hidden).toBe(true);
+    expect(zoomOpen()).toBe(false);
     expect(pressed("flow-mode-toggle")).toBe("true");
     frameKey(doc, "Escape"); // nothing open: leaves the mode
     expect(pressed("flow-mode-toggle")).toBe("false");

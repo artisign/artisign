@@ -90,7 +90,7 @@ describe("tabs", () => {
   it("opens on the MCP server tab and has tablist / tab / tabpanel semantics", async () => {
     await open();
     expect($(".mcp-tabs").getAttribute("role")).toBe("tablist");
-    expect($$("[role=tab]").map((t) => [t.textContent, t.getAttribute("aria-selected")])).toEqual([["MCP server", "true"], ["Agent skill", "false"]]);
+    expect($$("#mcp-dialog [role=tab]").map((t) => [t.textContent, t.getAttribute("aria-selected")])).toEqual([["MCP server", "true"], ["Agent skill", "false"]]);
     expect($("#mcp-panel-mcp").hidden).toBe(false);
     expect($("#mcp-panel-skill").hidden).toBe(true);
     expect($("#mcp-tab-skill").getAttribute("aria-controls")).toBe("mcp-panel-skill");

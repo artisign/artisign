@@ -13,6 +13,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - **Comments on mockup variants:** comment threads can anchor to a mockup variant (an authored element id, or the whole variant). `list_comments` filters by `mockup` and `variant`, `create_comment` takes `mockup` + `variant`, and `reply_comment` can re-anchor a mockup thread to another mockup node. A thread survives edits to the variant and shows as `detached` when its element or variant file is gone. `get_project` counts open mockup threads, and `get_mockup` reports them per variant.
 
+### Improvements
+
+- **New preview shell:** the browser preview moves to a floating layout on a dotted workspace. The top bar is three floating groups (brand and project picker, the view tabs, status and settings). The Screens and Mockups lists share one left card with counts, a find field, a tag toggle and a collapsible variant tree; the card can be dragged (the place is remembered per browser) and folded. The open screen is shown alone, centred, with a frame label, and the zoom is a pill with a continuous 5%–200% slider behind the % value. The Context and Elements panels, the variant bar's tree map and the "Variant map" setting are gone; light and dark follow the design system.
+
 ## [2.3.0] - 2026-11-21
 
 Use cases, a new way to describe what your app does before and while you design it, plus Windows support.

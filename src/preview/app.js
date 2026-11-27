@@ -12,8 +12,8 @@ import {
   fetchMockupComments,
   fetchScreenComments,
   fetchFlows,
-  fetchTags,
   fetchScreenNodes,
+  fetchScreenViewports,
   fetchCompare,
   postComment,
   fetchProjects,
@@ -33,13 +33,14 @@ import { createShortcutsDialog } from "./shortcuts-dialog.js";
 import { createSettingsMenu } from "./settings-menu.js";
 import { createMcpDialog } from "./mcp-dialog.js";
 import { createUpdateNotice, UPDATE_DISMISSED_KEY } from "./update-notice.js";
-import { setRovingTabindex, wireMenu } from "./menu-keys.js";
-import { renderScreenList, filterScreens, buildScreenTree, ancestorNames } from "./screens.js";
+import { createZoomPill } from "./zoom-pill.js";
+import { makeCardDraggable } from "./float-card.js";
+import { renderScreenList, filterScreens, buildScreenTree, flattenTree, ancestorNames, displayName, viewportIconName } from "./screens.js";
+import { icon } from "./icons.js";
 import { createVariantUI } from "./variants.js";
 import { createCompareView } from "./compare.js";
 import { modeToggleStates } from "./compare-data.js";
 import { renderMockupList, filterMockups } from "./mockups.js";
-import { renderScreenChips, renderTagNotes } from "./notes-panel.js";
 import { renderMockupView, renderColumnChips } from "./mockup-view.js";
 import { applyMockupZoom } from "./mockup-zoom.js";
 import { applyFlowMode } from "./flows.js";
@@ -48,14 +49,12 @@ import { createCommentCanvas, countRow, threadKind } from "./comment-canvas.js";
 import { createScreenHost, createMockupHost } from "./comment-hosts.js";
 import {
   pushActivityEntry,
-  activityTargetExists,
   activityIsNavigable,
   followAwaitsTarget,
   resolveFollowNavigation,
   highlightDurationMs,
   highlightNodes,
   highlightScreen,
-  renderActivityFeed,
   renderFollowToggle,
   nextFollowState,
   followToggleClickAction,
@@ -63,14 +62,12 @@ import {
   WRITE_RERENDER_GRACE_MS,
 } from "./activity.js";
 import { renderDesignSystem } from "./design-system.js";
-import { setMarkdown } from "./markdown.js";
 import { connectEvents } from "./sse.js";
 import { applyCanvas } from "./canvas.js";
 import { updateWarningBadge } from "./warnings.js";
 import { createBoardView } from "./board-view.js";
 import { createBoardComments } from "./board-comments.js";
 import { createUseCasesView } from "./usecases.js";
-import { renderScreenUseCases } from "./usecases-screen-link.js";
 import {
   MIN_BOARD_ZOOM,
   MAX_BOARD_ZOOM,
@@ -113,33 +110,24 @@ const localPrefs = (() => {
 const prefsStorage = await loadDaemonStorage(localPrefs);
 
 const screenListEl = document.getElementById("screen-list");
-const mockupSectionEl = document.getElementById("mockup-section");
 const mockupListEl = document.getElementById("mockup-list");
 const mockupViewEl = document.getElementById("mockup-view");
 const screenFilterInput = document.getElementById("screen-filter-input");
 const screenFilterHint = document.getElementById("screen-filter-hint");
 const screenTagsToggle = document.getElementById("screen-tags-toggle");
-const notesPanelEl = document.getElementById("notes-panel");
-const notesPanelHeader = document.getElementById("notes-panel-header");
-const notesPanelScreen = document.getElementById("notes-panel-screen");
-const notesPanelText = document.getElementById("notes-panel-text");
-const notesPanelChipsEl = document.getElementById("notes-panel-chips");
-const notesPanelTagsEl = document.getElementById("notes-panel-tags");
+const screenFilterClear = document.getElementById("screen-filter-clear");
+const navTabScreens = document.getElementById("nav-tab-screens");
+const navTabMockups = document.getElementById("nav-tab-mockups");
+const navScrollEl = document.getElementById("nav-scroll");
+const navCountScreens = document.getElementById("nav-count-screens");
+const navCountMockups = document.getElementById("nav-count-mockups");
 const screenFrame = document.getElementById("screen-frame");
 const canvasEl = document.getElementById("canvas");
-// CHR-732 — variant breadcrumb / tree map / inspector cards. onSelect is the sidebar's own human-navigation path (pauses follow).
+// CHR-732 — the variant breadcrumb above the frame. onSelect is the nav tree's own human-navigation path (pauses follow).
 let variantLayoutShown = false;
-let variantMapVisible = true; // restored from the pref once prefsStorage exists (below)
 const variantUI = createVariantUI({
   barEl: document.getElementById("variant-bar"),
-  mapEl: document.getElementById("variant-map"),
-  inspectorEl: document.getElementById("variant-inspector"),
   onSelect: (name) => selectScreenHuman(name),
-  // CHR-912 — the tree map can be hidden; per-browser, shown by default (today's behaviour).
-  map: {
-    visible: () => variantMapVisible,
-    onToggle: setVariantMap,
-  },
   // CHR-738 — the Single | Compare toggle and the popover checkboxes; `compare` (below) is only read once the UI renders.
   compare: {
     state: () => compare.state(),
@@ -147,17 +135,10 @@ const variantUI = createVariantUI({
     onPick: (name) => compare.toggle(name),
   },
 });
-/** The variant-map toggle, shared by the bar's own button and the settings menu (CHR-926). The bar must be re-rendered afterwards (the bar's caller does; the menu calls refreshVariantUI). */
-function setVariantMap(visible) {
-  variantMapVisible = visible;
-  writeBoolPref(prefsStorage, "artisign.variantMap", visible);
-  // The map takes canvas width, so the fit zoom is recomputed.
-  queueMicrotask(refitActivePane);
-}
 
 function refreshVariantUI() {
   const shown = variantUI.update(screens, screenFlows, currentScreen);
-  // The bar and map take canvas space, so the fit zoom has to be recomputed when they appear or go.
+  // The breadcrumb takes a band above the frame, so the fit zoom has to be recomputed when it appears or goes.
   if (shown !== variantLayoutShown) {
     variantLayoutShown = shown;
     updateCanvas();
@@ -168,8 +149,7 @@ const mainEl = document.getElementById("main");
 const mockupCommentLayerEl = document.getElementById("mockup-comment-layer");
 const compareViewEl = document.getElementById("compare-view");
 const comparePanelEl = document.getElementById("compare-panel");
-const comparePanelTitleEl = document.getElementById("compare-panel-title");
-const panelTabsEl = document.getElementById("panel-tabs");
+const compareCardEl = document.getElementById("compare-card");
 const screenHolderEl = document.getElementById("screen-holder");
 const frameCaptionEl = document.getElementById("frame-caption");
 const statusBarOverlayEl = document.getElementById("status-bar-overlay");
@@ -180,7 +160,6 @@ const screensViewEl = document.getElementById("screens-view");
 const designSystemViewEl = document.getElementById("design-system-view");
 const boardViewEl = document.getElementById("board-view");
 const usecasesViewEl = document.getElementById("usecases-view");
-const screenUseCasesEl = document.getElementById("screen-usecases");
 const boardSurfaceEl = document.getElementById("board-surface");
 const boardCanvasEl = document.getElementById("board-canvas");
 const boardCanvasInnerEl = document.getElementById("board-canvas-inner");
@@ -210,41 +189,32 @@ const followToggleToggleEl = document.getElementById("follow-toggle-toggle");
 const followToggleResumeEl = document.getElementById("follow-toggle-resume");
 const followToggleLabelEl = document.getElementById("follow-toggle-label");
 const activityScreenHighlightEl = document.getElementById("activity-screen-highlight");
-const panelTabElementsEl = document.getElementById("panel-tab-elements");
-const panelTabActivityEl = document.getElementById("panel-tab-activity");
-const panelBodyElementsEl = document.getElementById("panel-body-elements");
-const panelBodyActivityEl = document.getElementById("panel-body-activity");
-const activityFeedListEl = document.getElementById("activity-feed-list");
-const activityFeedEmptyEl = document.getElementById("activity-feed-empty");
 const flowModeToggle = document.getElementById("flow-mode-toggle");
 const commentModeToggle = document.getElementById("comment-mode-toggle");
 const canvasControlsEl = document.getElementById("canvas-controls");
 const zoomButtons = document.querySelectorAll(".zoom-button");
 const zoomTrigger = document.getElementById("zoom-trigger");
 const zoomMenu = document.getElementById("zoom-menu");
-const zoomControlsEl = document.getElementById("zoom-controls");
 const zoomLabel = document.getElementById("zoom-label");
+const zoomRange = document.getElementById("zoom-range");
+const commentCountBadge = document.getElementById("comment-count-badge");
 const statusBarToggle = document.getElementById("status-bar-toggle");
 const warningBadge = document.getElementById("warning-badge");
 const connectionStatus = document.getElementById("connection-status");
 const viewTabs = document.querySelectorAll(".view-tab");
-const commentsRowBtn = document.getElementById("comments-row");
-const commentsRowLabel = document.getElementById("comments-row-label");
-const commentsRowHint = document.getElementById("comments-row-hint");
 const commentLayerEl = document.getElementById("comment-layer");
 const commentToolbarEl = document.getElementById("comment-toolbar");
 const commentBannerEl = document.getElementById("comment-banner");
 const bodyEl = document.getElementById("body");
 const sidebarScreensEl = document.getElementById("sidebar-screens");
 const sidebarScreensCollapseBtn = document.getElementById("sidebar-screens-collapse");
-const sidebarContextEl = document.getElementById("sidebar-context");
-const sidebarContextCollapseBtn = document.getElementById("sidebar-context-collapse");
+const sidebarScreensGripEl = document.getElementById("sidebar-screens-grip");
+const appEl = document.getElementById("app");
 const inspectModeToggle = document.getElementById("inspect-mode-toggle");
-const inspectorEl = document.getElementById("inspector");
-const inspectorCollapseBtn = document.getElementById("inspector-collapse");
-const inspectorListEl = document.getElementById("inspector-list");
-const inspectorEmptyEl = document.getElementById("inspector-empty");
-const inspectorErrorEl = document.getElementById("inspector-error");
+// CHR-1267 — the Elements panel is gone; the inspector's model stays as inspect mode's selection source (outline + label on the canvas) and renders into detached nodes until the inspector slice (CHR-1270) mounts a panel again.
+const inspectorListEl = document.createElement("ul");
+const inspectorEmptyEl = document.createElement("p");
+const inspectorErrorEl = document.createElement("p");
 const inspectOverlayEl = document.getElementById("inspect-overlay");
 const noProjectStateEl = document.getElementById("no-project-state");
 const projectPickerTrigger = document.getElementById("project-picker-trigger");
@@ -268,11 +238,8 @@ const initProjectDialogEl = document.getElementById("init-project-dialog");
 let screens = [];
 /** @type {{ from: string, event: string, to: string, to_kind: string }[]} every flow edge of the project — the variant UI (CHR-732) reads "also reached from" and flow counts off it; kept fresh by loadScreens and the "flows" SSE event. */
 let screenFlows = [];
-/** @type {{ tag: string, notes: string }[]} — every project tag with its own notes (CHR-596). */
-let tagNotes = [];
-// Which tag specs the reader has opened. Survives a re-render of the panel,
-// which happens on every SSE screen event and sidebar filter keystroke.
-const expandedTagNotes = new Set();
+/** @type {Map<string, { width: number, height: number }>} each screen's frame size — the nav tree's desktop / mobile icon (CHR-1267); an empty map falls back to the mobile icon. */
+let screenViewports = new Map();
 let currentScreen = null;
 /** @type {{ name: string, title?: string, description?: string, tags: string[], variants: { id: string, title: string, description?: string }[] }[]} */
 let mockups = [];
@@ -289,7 +256,6 @@ let currentMockup = null;
 let screenFilter = "";
 /** @type {string[]} pinned screen names, same daemon-held/SSE-driven lifecycle as screenFilter. */
 let pinnedScreens = [];
-let notesExpanded = true;
 let currentView = "screens";
 /** @type {"none" | "flow" | "comment" | "inspect"} */
 let activeMode = "none";
@@ -344,6 +310,9 @@ let heldFollowTimer = null;
 // (re-)render; a write's cue stays armed until `expires` so the `change`
 // re-render that follows it re-applies the cue instead of wiping it.
 let pendingDesignSystemCue = null; // { target, kind, expires } | null
+/** @type {ReturnType<typeof createZoomPill> | null} created with the zoom section below; the first updateCanvas() runs before it. */
+let zoomPill = null;
+
 let boardBuilt = false; // built lazily on first activation, then kept in sync via SSE — see loadBoard()
 let activeProjectRoot = null; // the project root currently displayed; null while the empty state shows
 let eventSource; // current /events connection — closed and reopened with a fresh ?project= on every switch
@@ -361,8 +330,6 @@ let iframeRenderedScreen = null;
 let pendingRenderScreen = null;
 let pendingRenderOk = true; // whether the render pending in pendingRenderScreen succeeded
 let iframeRenderOk = true; // ...and the one the iframe currently shows
-
-variantMapVisible = readBoolPref(prefsStorage, "artisign.variantMap", true);
 
 // CHR-738 — side-by-side variant compare. Mode, selection and zoom are per-browser prefs (compare.js -> prefs.js).
 const compare = createCompareView(
@@ -393,7 +360,6 @@ function enterCompare() {
   if (!currentScreen) return;
   if (activeMode !== "none") setMode(activeMode);
   pauseFollow(); // a navigation that leaves the family would end the comparison
-  expandInspectorPanel(); // the compare panel replaces Elements in the inspector (CHR-888)
   compare.enter(currentScreen);
 }
 
@@ -527,14 +493,13 @@ const useCases = createUseCasesView({
   getProject: () => activeProjectRoot,
   getProjectName: () => projectPickerName.textContent ?? "",
   getScreens: () => screens,
-  onDataChanged: () => updateScreenUseCases(), // the reverse entry follows `usecases` events
   fetchRender,
   fetchScreenNodes,
   openScreen: async (screen, node) => {
     pauseFollow();
     setView("screens");
     if (screen !== currentScreen || currentMockup !== null) await selectScreen(screen);
-    if (node) handleInspectSelect(node, node); // an element-mapped frame opens the screen with that element selected (Elements panel + canvas outline)
+    if (node) handleInspectSelect(node, node); // an element-mapped frame opens the screen with that element selected (canvas outline)
   },
 });
 
@@ -847,7 +812,7 @@ function resetProjectState() {
   mockupThreads = [];
   screens = [];
   screenFlows = [];
-  tagNotes = []; // else one project's tag notes leak into the panel of the next
+  screenViewports = new Map();
   currentScreen = null;
   // screenFilter/pinnedScreens are deliberately NOT reset here (CHR-624) —
   // they're daemon-held, per-project state now, not local-only; loadBoardState()
@@ -867,8 +832,6 @@ function resetProjectState() {
   screenFrame.srcdoc = "";
   board.setScreens([], [], activeProjectRoot);
   useCases.reset();
-  screenUseCasesRequest++; // an answer still on its way belongs to the project we just left
-  screenUseCasesEl.hidden = true;
   iframeRenderedScreen = null;
   pendingRenderScreen = null;
   inspectorRequestId++; // discards any in-flight fetch from the project we just left — see loadInspectorEntries
@@ -884,7 +847,6 @@ function resetProjectState() {
   // followState), so only `paused` resets here — nothing is pending a
   // resume for in the project we're leaving.
   activityFeed = [];
-  renderActivityFeedPanel();
   clearActivityHighlights();
   mockupCueCleanup();
   mockupCueCleanup = () => {};
@@ -921,11 +883,6 @@ async function switchToProject(root) {
 /** localStorage key for the last opened screen — scoped per project since the daemon serves several at once. */
 function lastScreenKey(projectRoot) {
   return `artisign.last-screen:${projectRoot}`;
-}
-
-async function loadTags() {
-  tagNotes = await fetchTags(activeProjectRoot);
-  updateNotesPanel();
 }
 
 /**
@@ -994,8 +951,7 @@ function reportBoardStateFailure(writePromise) {
  * can start while this fetch is still in flight; without the check, a slow
  * response for the project we've since left would land in the NEW project's
  * UI. Also never lets a failure propagate to its caller's `Promise.all`
- * (review fix 4) — bootScreens awaits this alongside loadScreens/loadMockups/
- * loadTags, and a rejection there would abort the rest of boot (including
+ * (review fix 4) — bootScreens awaits this alongside loadScreens/loadMockups, and a rejection there would abort the rest of boot (including
  * restoring the persisted screen selection); on failure this instead resets
  * to empty so a fetch error can't leave the PREVIOUS project's filter/pins
  * on screen (resetProjectState deliberately no longer clears them itself).
@@ -1016,7 +972,7 @@ async function loadBoardState() {
 }
 
 async function bootScreens() {
-  await Promise.all([loadScreens(), loadMockups(), loadTags(), loadBoardState()]);
+  await Promise.all([loadScreens(), loadMockups(), loadBoardState()]);
   const persisted = parseLastSelection(readStringPref(prefsStorage, lastScreenKey(activeProjectRoot), null));
   if (persisted?.kind === "mockup" && mockups.some((m) => m.name === persisted.name)) {
     await selectMockup(persisted.name);
@@ -1034,7 +990,6 @@ function restoreCompare() {
 /** Re-fetches everything the current view depends on — used after an SSE reconnect, where the gap while disconnected is invisible to us. */
 async function resyncCurrentProject() {
   loadScreensSelectingFirst(); // the first screen may have arrived while disconnected
-  loadTags();
   loadBoardState(); // CHR-624 — the daemon's board state is empty after a restart; a reconnect must resync it same as everything else
   compare.reloadAll();
   const mockupsOk = await loadMockups();
@@ -1168,11 +1123,6 @@ async function handleChangeEvent(event) {
     screenFlows = nextFlows;
     refreshVariantUI();
     if (boardBuilt) board.setFlows(nextFlows);
-  } else if (event.kind === "tag_meta") {
-    // Re-tagging a screen needs nothing extra here — a "screen" event above
-    // already refreshes the panel with the (unchanged) tag list; this branch
-    // only fires when a tag's own notes change.
-    await loadTags();
   }
 }
 
@@ -1274,27 +1224,7 @@ function jumpToLatestActivity() {
   if (latest) navigateToActivity(latest);
 }
 
-panelTabElementsEl.addEventListener("click", () => setRightPanelTab("elements"));
-panelTabActivityEl.addEventListener("click", () => setRightPanelTab("activity"));
-
-/** Switches the right panel between the Elements list and the new Activity feed ($panel-tabs) — a plain client-side split, not persisted (the feed itself resets on reload anyway). */
-function setRightPanelTab(tab) {
-  panelTabElementsEl.setAttribute("aria-pressed", String(tab === "elements"));
-  panelTabActivityEl.setAttribute("aria-pressed", String(tab === "activity"));
-  panelBodyElementsEl.hidden = tab !== "elements";
-  panelBodyActivityEl.hidden = tab !== "activity";
-  syncInspectorPanelName();
-}
-
-/** The right panel's collapse button names whatever the panel currently shows (Compare, Activity or Elements); label and tooltip come from the one place that builds them. */
-function syncInspectorPanelName() {
-  const comparing = !comparePanelEl.hidden;
-  const activity = panelTabActivityEl.getAttribute("aria-pressed") === "true";
-  inspectorCollapseBtn.dataset.panel = comparing ? "Compare" : activity ? "Activity" : "Elements";
-  applyPanelLabel(inspectorEl, inspectorCollapseBtn);
-}
-
-/** Label, tooltip and a11y name of a panel's collapse button from `data-panel` and the collapsed state. */
+/** Label, tooltip and a11y name of a card's collapse button from `data-panel` and the collapsed state. */
 function applyPanelLabel(panelEl, collapseBtn) {
   const label = `${panelEl.dataset.collapsed === "true" ? "Expand" : "Collapse"} ${collapseBtn.dataset.panel} panel`;
   collapseBtn.setAttribute("aria-label", label);
@@ -1306,20 +1236,6 @@ function currentActivityLists() {
   return { screenNames: screens.map((s) => s.name), mockupNames: mockups.map((m) => m.name) };
 }
 
-/** Re-renders the activity feed from the current `activityFeed` + the live screens/mockups lists (a target's existence can change independently of the feed itself — see activityTargetExists). */
-function renderActivityFeedPanel() {
-  renderActivityFeed(activityFeedListEl, activityFeedEmptyEl, activityFeed, {
-    exists: (event) => activityTargetExists(event, currentActivityLists()),
-    onSelect: handleActivityFeedSelect,
-  });
-}
-
-/** A feed row's click is human navigation like any other (ADR-005 pause rule 1) — a click landing here means the human wants to look at that entry's target, so it pauses follow the same way a sidebar click or a tab switch does, then navigates there. The 2026-09-18 exemption that let a feed click skip pauseFollow is reversed: it pulled the view right back to the agent's current target on the next live call, which is wrong the moment the human actually clicked something. */
-function handleActivityFeedSelect(event) {
-  pauseFollow();
-  navigateToActivity(event);
-}
-
 /**
  * One per MCP tool call (src/mcp/activity.ts), regardless of follow's own
  * state — the feed fills even while follow is off/paused; only navigation
@@ -1328,7 +1244,6 @@ function handleActivityFeedSelect(event) {
  */
 function handleActivityEvent(event) {
   activityFeed = pushActivityEntry(activityFeed, event);
-  renderActivityFeedPanel();
   // A failed call never navigates or highlights — by design, not an
   // oversight (ADR-005: "never navigate or highlight — there is nothing
   // confirmed to point at").
@@ -1402,7 +1317,7 @@ function throttledActivityNavigate(event) {
 /**
  * Navigates to (and schedules a highlight for) an activity event's target —
  * shared by live follow (handleActivityEvent, gated on actually following)
- * and a feed click (handleActivityFeedSelect, unconditional). Uses
+ * and the Agent bar's feed click (a later slice, unconditional). Uses
  * activityIsNavigable, not the bare activityNavigationTarget (review fix
  * 2) — a write whose own target has already vanished by the time this
  * fires (`delete_entity`, most notably) must not jump to an error render.
@@ -1688,47 +1603,80 @@ function setSidebarTags(on) {
 }
 screenTagsToggle.addEventListener("click", () => setSidebarTags(!showSidebarTags));
 
-/** Re-renders the screen list and the mockup list (both filtered by the same sidebar search), plus everything in the sidebar derived from them/the current selection, plus the board toolbar's status text/Clear pins (CHR-624 — cheap and pure, so it's simplest to always keep in sync here rather than gate it on the Board tab actually showing). */
+// Which list the left card shows — a mockup selection switches it to Mockups, a screen selection back to Screens (selectScreen / selectMockup); the tabs set it by hand.
+/** @type {"screens" | "mockups"} */
+let navTab = "screens";
+
+/** Switches the card's Screens | Mockups tab and re-renders; `focus` moves keyboard focus onto the chosen tab. */
+function setNavTab(tab, focus = false) {
+  navTab = tab;
+  refreshSidebar();
+  if (focus) (tab === "screens" ? navTabScreens : navTabMockups).focus();
+}
+
+navTabScreens.addEventListener("click", () => setNavTab("screens"));
+navTabMockups.addEventListener("click", () => setNavTab("mockups"));
+// Roving tabs: arrows and Home/End move between the two tabs.
+document.getElementById("nav-tabs").addEventListener("keydown", (evt) => {
+  const next = { ArrowLeft: "screens", ArrowRight: "mockups", Home: "screens", End: "mockups" }[evt.key];
+  if (!next) return;
+  evt.preventDefault();
+  setNavTab(next, true);
+});
+
+/** The card's find-field hint under the field: what the filter matched, empty while there is no filter. */
+function filterHintText(filteredMockupCount) {
+  if (screenFilter.trim() === "") return "";
+  if (navTab === "mockups") return `${filteredMockupCount} of ${mockups.length} mockup${mockups.length === 1 ? "" : "s"}`;
+  const { matchCount, contextCount } = flattenTree(buildScreenTree(screens), { filter: screenFilter });
+  return `${matchCount} match${matchCount === 1 ? "" : "es"}${contextCount > 0 ? `, ${contextCount} for context` : ""}, of ${screens.length} screen${screens.length === 1 ? "" : "s"}`;
+}
+
+/** Re-renders the card (tabs with counts, the screen tree or the mockup tree — both filtered by the same find field), plus everything derived from them/the current selection: the breadcrumb, and the board toolbar's status text/Clear pins (CHR-624 — cheap and pure, so it's simplest to always keep in sync here rather than gate it on the Board tab actually showing). */
 function refreshSidebar() {
+  const showScreens = navTab === "screens";
+  navTabScreens.setAttribute("aria-selected", String(showScreens));
+  navTabMockups.setAttribute("aria-selected", String(!showScreens));
+  navTabScreens.tabIndex = showScreens ? 0 : -1;
+  navTabMockups.tabIndex = showScreens ? -1 : 0;
+  navScrollEl.setAttribute("aria-labelledby", showScreens ? "nav-tab-screens" : "nav-tab-mockups");
+  navCountScreens.textContent = String(screens.length);
+  navCountMockups.textContent = String(mockups.length);
+  screenListEl.hidden = !showScreens;
+  mockupListEl.hidden = showScreens;
   renderScreenList(screenListEl, screens, currentScreen, selectScreenHuman, screenFilter, {
     pinned: new Set(pinnedScreens),
     onTogglePin: toggleScreenPin,
     expanded: currentExpandedScreens(),
     onToggleExpand: toggleScreenExpanded,
     showTags: showSidebarTags,
+    viewports: screenViewports,
     compare: compare.isOn() ? { ...compare.state(), onToggle: compare.toggle } : undefined,
   });
   const filteredMockups = filterMockups(mockups, screenFilter);
-  renderMockupList(mockupListEl, filteredMockups, { activeName: currentMockup, onSelect: selectMockupHuman });
-  mockupSectionEl.hidden = filteredMockups.length === 0;
-  const filteredScreenCount = filterScreens(screens, screenFilter).length;
-  screenFilterHint.textContent = `${filteredScreenCount} screen${filteredScreenCount === 1 ? "" : "s"} · ${filteredMockups.length} mockup${filteredMockups.length === 1 ? "" : "s"} · matches name and tags`;
+  renderMockupList(mockupListEl, filteredMockups, {
+    activeName: currentMockup,
+    onSelect: selectMockupHuman,
+    showTags: showSidebarTags,
+    expanded: currentExpandedScreens(),
+    onToggleExpand: toggleScreenExpanded,
+  });
+  appendNavEmpty(showScreens ? screenListEl : mockupListEl, showScreens ? screens.length : mockups.length, showScreens ? filterScreens(screens, screenFilter).length : filteredMockups.length);
+  screenFilterHint.textContent = filterHintText(filteredMockups.length);
+  screenFilterClear.hidden = screenFilter === "";
   refreshVariantUI();
-  updateNotesPanel();
   renderBoardStatus();
-  renderActivityFeedPanel(); // CHR-631 — a screen/mockup's deletion can flip a feed row to the inert "deleted" look; recompute alongside everything else refreshSidebar already keeps in sync
 }
 
-function updateNotesPanel() {
-  const screen = screens.find((s) => s.name === currentScreen);
-  const notes = screen?.notes ?? "";
-  const screenTags = screen?.tags ?? [];
-  const screenTagsLower = new Set(screenTags.map((t) => t.toLowerCase()));
-  const matchingTagNotes = tagNotes.filter((t) => screenTagsLower.has(t.tag.toLowerCase()));
-  // A screen with no notes of its own but a tagged spec still gets a panel —
-  // the tag section is the whole point, not an addendum to the screen's own
-  // notes.
-  notesPanelEl.hidden = notes.length === 0 && matchingTagNotes.length === 0 && screenTags.length === 0;
-  if (notesPanelEl.hidden) return;
-  notesPanelScreen.textContent = screen.name;
-  // notesPanelText only ever holds the screen's own notes — setMarkdown
-  // replaces its children wholesale, so the tag sections render into their
-  // own sibling element (notesPanelTagsEl), never inside this one.
-  setMarkdown(notesPanelText, notes);
-  notesPanelText.hidden = notes.length === 0;
-  renderScreenChips(notesPanelChipsEl, screenTags);
-  notesPanelHeader.setAttribute("aria-expanded", String(notesExpanded));
-  renderTagNotes(notesPanelTagsEl, screenTags, tagNotes, expandedTagNotes);
+/** The line a list shows instead of rows: nothing exists yet, or the filter matches nothing. */
+function appendNavEmpty(listEl, total, matching) {
+  if (matching > 0) return;
+  const item = document.createElement("li");
+  item.className = "nav-empty";
+  item.setAttribute("role", "none");
+  const noun = listEl === screenListEl ? "screens" : "mockups";
+  item.textContent = total === 0 ? `No ${noun} yet. They show up here as soon as the agent writes one.` : `No ${noun} match “${screenFilter.trim()}”.`;
+  listEl.appendChild(item);
 }
 
 // CHR-624/ADR-005: the sidebar (and, via refreshSidebar's renderBoardStatus,
@@ -1750,16 +1698,45 @@ screenFilterInput.addEventListener("input", () => {
   }, BOARD_FILTER_WRITE_DEBOUNCE_MS);
 });
 
-notesPanelHeader.addEventListener("click", () => {
-  notesExpanded = !notesExpanded;
-  notesPanelHeader.setAttribute("aria-expanded", String(notesExpanded));
+screenFilterClear.addEventListener("click", () => {
+  screenFilterInput.value = "";
+  screenFilterInput.dispatchEvent(new Event("input", { bubbles: true }));
+  screenFilterInput.focus();
 });
+
+// The nav tree's desktop / mobile icons (CHR-1267) come from get_project, which reads every screen: one read at a time, a change that lands meanwhile asks for one more afterwards.
+let viewportsInFlight = false;
+let viewportsAgain = false;
+
+async function refreshViewports() {
+  if (viewportsInFlight) {
+    viewportsAgain = true;
+    return;
+  }
+  viewportsInFlight = true;
+  const project = activeProjectRoot;
+  try {
+    const sizes = await fetchScreenViewports(project);
+    if (project === activeProjectRoot) {
+      screenViewports = sizes;
+      refreshSidebar();
+    }
+  } finally {
+    viewportsInFlight = false;
+  }
+  if (viewportsAgain) {
+    viewportsAgain = false;
+    void refreshViewports();
+  }
+}
 
 async function loadScreens() {
   // A failed flows read only leaves the variant UI without "also reached from".
-  [screens, screenFlows] = await Promise.all([fetchScreens(activeProjectRoot), fetchFlows(activeProjectRoot).catch(() => [])]);
+  const project = activeProjectRoot;
+  [screens, screenFlows] = await Promise.all([fetchScreens(project), fetchFlows(project).catch(() => [])]);
   compare.reconcile(); // a deleted member leaves the selection, a deleted reference ends compare
   refreshSidebar();
+  void refreshViewports(); // the tree's desktop / mobile icons follow a moment later, never holding the list back
   const empty = screens.length === 0;
   emptyGuideEl.hidden = !empty;
   screenHolderEl.hidden = empty; // no white frame while the guide shows on the bare canvas
@@ -1805,39 +1782,12 @@ async function selectScreen(screen) {
   clearTimeout(activityHighlightGraceTimer);
   currentScreen = screen;
   currentMockup = null; // screens and mockups are never selected at the same time
+  navTab = "screens";
   if (activeProjectRoot) writeStringPref(prefsStorage, lastScreenKey(activeProjectRoot), screen);
   revealScreenInSidebar(screen);
   refreshSidebar();
   applyMainVisibility();
   await Promise.all([loadCurrentScreen(), loadComments(), loadInspectorEntries()]);
-  updateScreenUseCases();
-}
-
-let screenUseCasesRequest = 0;
-
-/** Reverse entry (Use Cases): the use cases whose steps map to the screen shown. One read per screen, independent of the Use Cases tab; hidden when nothing maps to it or the project has no usecases/ folder. */
-async function updateScreenUseCases() {
-  const request = ++screenUseCasesRequest;
-  screenUseCasesEl.hidden = true;
-  if (!currentScreen || currentMockup !== null) return; // no screen shown (a mockup, another project): nothing to list
-  const screen = currentScreen;
-  const { total, items } = await useCases.forScreen(screen);
-  if (request !== screenUseCasesRequest || screen !== currentScreen) return;
-  renderScreenUseCases(screenUseCasesEl, {
-    total,
-    items,
-    screen,
-    onOpen: (id) => {
-      pauseFollow();
-      setView("usecases");
-      useCases.showCase(id);
-    },
-    onShowAll: () => {
-      pauseFollow();
-      setView("usecases");
-      useCases.showScreen(screen);
-    },
-  });
 }
 
 /**
@@ -1856,6 +1806,7 @@ async function selectMockup(name) {
   clearTimeout(activityHighlightGraceTimer);
   currentScreen = null;
   currentMockup = name;
+  navTab = "mockups";
   commentCanvas.setHost(mockupHost);
   commentCanvas.setData({ scope: `mockup:${name}`, comments: [], threads: [] });
   mockupThreads = [];
@@ -1872,7 +1823,6 @@ async function selectMockup(name) {
   inspectorRequestId++;
   refreshSidebar();
   applyMainVisibility();
-  updateScreenUseCases(); // a mockup has no use cases of its own: hides the reverse entry
   await Promise.all([loadCurrentMockup(), loadComments()]); // loadComments() clears the panel to the previous screen's threads otherwise
 }
 
@@ -1904,7 +1854,7 @@ async function loadComments() {
       : { comments: [], threads: [] };
   if (requestId !== commentsRequestId) return; // a newer request has since started — drop this stale result
   commentCanvas.setData({ scope: screen ? `screen:${screen}` : mockup ? `mockup:${mockup}` : null, comments: result.comments, threads: result.threads });
-  renderCommentsRow(result.threads);
+  renderCommentCount(result.threads);
   if (mockup) {
     mockupThreads = result.threads;
     renderMockupChips();
@@ -1933,13 +1883,13 @@ function renderMockupChips() {
   commentCanvas.layout(); // a chip row can change the header's height
 }
 
-/** CHR-1253 — the Context sidebar's one-line summary of the screen's threads. */
-function renderCommentsRow(threads) {
-  const row = countRow(threads);
-  commentsRowLabel.textContent = row.label;
-  commentsRowHint.hidden = row.open === 0;
-  commentsRowHint.textContent = row.detached > 0 ? `${row.detached} detached · shown on canvas` : "shown on canvas";
-  commentsRowBtn.dataset.empty = String(row.open === 0);
+/** CHR-1267 — the open-thread count on the Comment tool (the Context panel's "N open comments" row is gone). */
+function renderCommentCount(threads) {
+  const { open } = countRow(threads);
+  commentCountBadge.hidden = open === 0;
+  commentCountBadge.textContent = String(open);
+  const label = open === 0 ? "Comment mode" : `Comment mode, ${open} open comment${open === 1 ? "" : "s"}`;
+  commentModeToggle.setAttribute("aria-label", label);
 }
 
 /** Rebuilds the Elements panel's list from the current screen's nodes (see fetchScreenNodes/buildEntries). */
@@ -2066,15 +2016,41 @@ function handleInspectSelect(modelId, clickedDomId) {
 }
 
 const FRAME_CAPTION_BAND = 28;
+const VARIANT_BAR_BAND = 52; // the breadcrumb pill takes the label's place and a little more room (CHR-1267)
+
+/** The label above the frame (design `frame-label`): the viewport icon, the screen's name and — for a variant — its path under the main screen, then the frame size. */
+function renderFrameLabel(width, height) {
+  const name = iframeRenderedScreen;
+  const node = buildScreenTree(screens).nodes.get(name);
+  const chain = [];
+  for (let n = node; n; n = n.parent) chain.unshift(n);
+  const root = chain[0]?.name ?? name;
+  const detail = chain.slice(1).map((n) => displayName(n)).join(", ");
+  const nameEl = document.createElement("span");
+  nameEl.className = "frame-label-name";
+  nameEl.textContent = root;
+  const detailEl = document.createElement("span");
+  detailEl.className = "frame-label-detail";
+  detailEl.textContent = `${detail ? `${detail} · ` : ""}${width} × ${height}`;
+  frameCaptionEl.replaceChildren(icon(viewportIconName(screenViewports.get(name) ?? { width }), "frame-label-icon"), nameEl, detailEl);
+}
 
 function updateCanvas() {
-  // CHR-912 — "<screen> · <w> × <h>" above the frame, in a reserved band; not while the how-to-start guide replaces the frame.
+  // "<screen> <variant> · <w> × <h>" above the frame, in a reserved band; not while the how-to-start guide replaces the frame, and the variant breadcrumb takes its place on a variant family.
   // Name and size come from the same rendered document: while a newly selected screen is still loading, the frame (and so its size) is the previous one, and a failed render shows an error note, not a screen.
-  const showCaption = iframeRenderedScreen !== null && iframeRenderOk && !screenHolderEl.hidden;
-  const { width, height } = applyCanvas({ canvasEl, holderEl: screenHolderEl, iframeEl: screenFrame, zoom, topInset: showCaption ? FRAME_CAPTION_BAND : 0 });
+  const rendered = iframeRenderedScreen !== null && iframeRenderOk && !screenHolderEl.hidden;
+  const showBar = variantLayoutShown && !screenHolderEl.hidden;
+  const showCaption = rendered && !showBar;
+  const { width, height } = applyCanvas({ canvasEl, holderEl: screenHolderEl, iframeEl: screenFrame, zoom, topInset: showBar ? VARIANT_BAR_BAND : showCaption ? FRAME_CAPTION_BAND : 0 });
   frameCaptionEl.hidden = !showCaption;
-  if (showCaption) frameCaptionEl.textContent = `${iframeRenderedScreen} · ${width} × ${height}`;
+  if (showCaption) renderFrameLabel(width, height);
+  // The label and the breadcrumb sit above the frame's top-left corner.
+  const frameLeft = screenHolderEl.style.left || "0px";
+  frameCaptionEl.style.left = frameLeft;
+  frameCaptionEl.style.top = `${Math.max(0, parseFloat(screenHolderEl.style.top || "0") - FRAME_CAPTION_BAND + 4)}px`;
+  screensStageEl.style.setProperty("--frame-left", frameLeft);
   commentCanvas.layout(); // pins follow zoom, resize and every re-render
+  syncZoomUI();
 }
 
 /** Whether the zoom buttons currently control the mockup row instead of the screen canvas — see applyMainVisibility. */
@@ -2091,6 +2067,7 @@ function updateMockupZoom() {
   const columnsEl = mockupViewEl.querySelector(".mockup-columns");
   if (columnsEl) applyMockupZoom({ paneEl: mockupViewEl, columnsEl, zoom: mockupZoom });
   if (currentMockup !== null) commentCanvas.layout(); // pins follow the zoomed and re-fitted columns
+  syncZoomUI();
 }
 
 /** Re-fits whichever of the screen canvas / mockup row is actually showing — shared by every trigger whose available space can change without a view/selection switch of its own (pane resize, side-panel collapse). */
@@ -2101,53 +2078,37 @@ function refitActivePane() {
 }
 
 /**
- * Wires a collapsible side panel: applies the persisted collapse state up
- * front, then toggles + persists + re-fits the canvas on every click. The
- * DOM (`panelEl.dataset.collapsed`) is the single source of truth — no
- * parallel module-level boolean to keep in sync. `defaultCollapsed` applies
- * only while nothing is stored (CHR-888: Context and Elements start collapsed).
- * Returns `expand`, for a mode whose output lives in this panel — it opens
- * the panel the same way a click on the chevron would.
+ * Wires the left card's fold control: applies the persisted state up front, then toggles + persists + re-fits the canvas on every click. The DOM (`panelEl.dataset.collapsed`) is the single source of truth — no parallel module-level boolean to keep in sync. The card's folded state also frees the canvas's left reserve (`#app[data-card-folded]`, style.css), so the fit zoom is recomputed.
  */
-function setupSidePanel(panelEl, collapseBtn, prefKey, defaultCollapsed = false) {
+function setupCardFold(panelEl, collapseBtn, prefKey) {
   const iconEl = collapseBtn.querySelector(".side-panel-collapse-icon");
-  const openIcon = iconEl.textContent; // left_panel_close / right_panel_close; the rail shows a chevron pointing back at the content
-  const railIcon = panelEl.classList.contains("side-panel-right") ? "chevron_left" : "chevron_right";
   function apply(collapsed) {
     panelEl.dataset.collapsed = String(collapsed);
+    appEl.dataset.cardFolded = String(collapsed);
     collapseBtn.setAttribute("aria-expanded", String(!collapsed));
     applyPanelLabel(panelEl, collapseBtn);
-    iconEl.textContent = collapsed ? railIcon : openIcon;
+    iconEl.textContent = collapsed ? "expand_more" : "expand_less";
   }
-  apply(readBoolPref(prefsStorage, prefKey, defaultCollapsed));
-  function set(collapsed) {
+  apply(readBoolPref(prefsStorage, prefKey, false));
+  collapseBtn.addEventListener("click", () => {
+    const collapsed = panelEl.dataset.collapsed !== "true";
     apply(collapsed);
     writeBoolPref(prefsStorage, prefKey, collapsed);
-    // The Screens/Context panels stay visible over the mockup view too
-    // (only the Elements/inspector panel doesn't) — collapsing either
-    // changes #mockup-view's available width just as much as the canvas's,
-    // so this must re-fit whichever is active.
     refitActivePane();
-  }
-  collapseBtn.addEventListener("click", () => set(panelEl.dataset.collapsed !== "true"));
-  return function expand() {
-    if (panelEl.dataset.collapsed === "true") set(false);
-  };
+  });
 }
 
-setupSidePanel(sidebarScreensEl, sidebarScreensCollapseBtn, "artisign.sidebar-screens.collapsed");
-setupSidePanel(sidebarContextEl, sidebarContextCollapseBtn, "artisign.sidebar-context.collapsed", true);
-const expandInspectorPanel = setupSidePanel(inspectorEl, inspectorCollapseBtn, "artisign.inspector.collapsed", true);
+setupCardFold(sidebarScreensEl, sidebarScreensCollapseBtn, "artisign.sidebar-screens.collapsed");
+// The grip moves the card; where it was left is remembered per viewer.
+makeCardDraggable({ cardEl: sidebarScreensEl, gripEl: sidebarScreensGripEl, storage: prefsStorage, key: "artisign.sidebar-screens.position", label: "Screens card", liveEl: document.getElementById("sidebar-screens-live") });
 
 zoom = parseZoomPref(readStringPref(prefsStorage, "artisign.zoom", null), zoom);
 mockupZoom = parseZoomPref(readStringPref(prefsStorage, "artisign.mockupZoom", null), mockupZoom);
-syncZoomButtons(zoom);
 
 // CHR-631 — follow's `enabled` bit is the one per-browser preference here
 // (off by default); `paused` never persists — see the module-level doc.
 followState = { enabled: readBoolPref(prefsStorage, "artisign.followEnabled", false), paused: false };
 renderFollowUI();
-renderActivityFeedPanel(); // shows the empty state before boot() ever loads a project
 updateCanvas();
 
 screenFrame.addEventListener("load", () => {
@@ -2201,53 +2162,37 @@ window.addEventListener("resize", () => {
   if (isMockupZoomActive() ? mockupZoom === "fit" : zoom === "fit") refitActivePane();
 });
 
-function syncZoomButtons(value) {
-  let currentLabel = value === "fit" ? "Fit" : `${Math.round(value * 100)}%`;
-  for (const button of zoomButtons) {
-    const current = button.dataset.zoom === (value === "fit" ? "fit" : String(value));
-    button.setAttribute("aria-checked", String(current));
-    button.classList.toggle("is-current", current);
-    button.querySelector(".chrome-menu-check").textContent = current ? "check" : "";
-    // The label is the button's own text, not the check icon's ligature or the shortcut hint.
-    if (current) currentLabel = [...button.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent).join("").trim();
-  }
-  zoomLabel.textContent = currentLabel;
+/** The scale the zoom controls' target is drawn at right now, with "fit" resolved to its number. */
+function effectiveZoomScale() {
+  const current = isMockupZoomActive() ? mockupZoom : zoom;
+  if (current !== "fit") return current;
+  const drawn = isMockupZoomActive() ? mockupViewEl.querySelector(".mockup-columns") : screenHolderEl;
+  return parseFloat(drawn?.style.getPropertyValue("--zoom") ?? "") || 1;
 }
 
-const zoomMenuRows = () => /** @type {HTMLElement[]} */ ([...zoomMenu.querySelectorAll("button")]);
-
-/** An ARIA menu like the project menu (CHR-920): opening focuses the current level, arrows move, Escape (below) and Tab out close it. */
-function setZoomMenuOpen(open) {
-  zoomMenu.hidden = !open;
-  zoomTrigger.setAttribute("aria-expanded", String(open));
-  if (!open) return;
-  const rows = zoomMenuRows();
-  const start = rows.find((row) => row.classList.contains("is-current")) ?? rows[0];
-  setRovingTabindex(rows, start);
-  start?.focus();
+/** The pill's % value, the slider and the presets follow the zoom the controls currently target (the screen canvas or the mockup row). */
+function syncZoomUI() {
+  zoomPill?.sync({ zoom: isMockupZoomActive() ? mockupZoom : zoom, scale: effectiveZoomScale() });
 }
-wireMenu(zoomMenu, zoomMenuRows, {
-  onTabOut: () => {
-    if (!zoomMenu.hidden) setZoomMenuOpen(false);
-  },
+
+// The zoom pill (CHR-1267): − / % / + / Fit; the % opens the slider popover.
+zoomPill = createZoomPill({
+  pillEl: canvasControlsEl,
+  triggerEl: zoomTrigger,
+  menuEl: zoomMenu,
+  labelEl: zoomLabel,
+  rangeEl: zoomRange,
+  presetEls: [...zoomButtons],
+  onZoom: (value) => setZoom(value),
 });
 
-zoomTrigger.addEventListener("click", () => setZoomMenuOpen(zoomMenu.hidden));
-// Capture on pointerdown, not a bubbling click: the project menu's trigger and the compare "add" chip stop propagation, so a click handler would never hear that another menu was opened.
-document.addEventListener(
-  "pointerdown",
-  (evt) => {
-    if (!zoomMenu.hidden && !zoomControlsEl.contains(evt.target)) setZoomMenuOpen(false);
-  },
-  true,
-);
-// Capture + stopImmediatePropagation: this Escape only closes the menu, so inspect mode's Escape (clears its focus) must not also fire.
+// Capture + stopImmediatePropagation: this Escape only closes the popover, so inspect mode's Escape (clears its focus) must not also fire.
 document.addEventListener(
   "keydown",
   (evt) => {
-    if (evt.key === "Escape" && !zoomMenu.hidden) {
+    if (evt.key === "Escape" && zoomPill?.isOpen()) {
       evt.stopImmediatePropagation();
-      setZoomMenuOpen(false);
+      zoomPill.close();
       zoomTrigger.focus();
     }
   },
@@ -2256,7 +2201,6 @@ document.addEventListener(
 
 /** Sets the zoom level for whichever the buttons currently target — the mockup row or the screen canvas (see isMockupZoomActive) — each remembered under its own pref key. */
 function setZoom(next) {
-  syncZoomButtons(next);
   if (isMockupZoomActive()) {
     mockupZoom = next;
     writeStringPref(prefsStorage, "artisign.mockupZoom", String(next));
@@ -2272,27 +2216,15 @@ for (const button of zoomButtons) {
   button.addEventListener("click", () => {
     const value = button.dataset.zoom;
     setZoom(value === "fit" ? "fit" : Number(value));
-    setZoomMenuOpen(false);
-    zoomTrigger.focus();
   });
 }
 
-/** The zoom levels the preset buttons offer, ascending ("fit" is not a level). The +/- steps walk this ladder. */
-function zoomLadder() {
-  return [...zoomButtons].map((b) => b.dataset.zoom).filter((v) => v !== "fit").map(Number).sort((x, y) => x - y);
-}
-
-/** The scale the zoom controls' target is drawn at right now, with "fit" resolved to its number. */
-function effectiveZoomScale() {
-  const current = isMockupZoomActive() ? mockupZoom : zoom;
-  if (current !== "fit") return current;
-  const drawn = isMockupZoomActive() ? mockupViewEl.querySelector(".mockup-columns") : screenHolderEl;
-  return parseFloat(drawn?.style.getPropertyValue("--zoom") ?? "") || 1;
-}
+/** The levels the − / + buttons and the +/- keys walk, ascending ("fit" is not a level). The slider reaches every value between 5 % and 200 %; the steps skip through them in useful strides. */
+const ZOOM_STEPS = [0.05, 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
 /** One step along the ladder from the effective scale (also from Fit); out of Fit never zooms in, nor in out. */
 function stepZoom(direction) {
-  const target = nextZoomLevel(effectiveZoomScale(), direction, zoomLadder());
+  const target = nextZoomLevel(effectiveZoomScale(), direction, ZOOM_STEPS);
   if (target !== undefined) setZoom(target);
 }
 
@@ -2316,8 +2248,6 @@ function setMode(next) {
   if (activeMode === "inspect" && resulting !== "inspect") clearInspectFocus();
   // ADR-005 pause rule 1 — an open comment or inspect mode pauses follow.
   if (resulting === "comment" || resulting === "inspect") pauseFollow();
-  // CHR-888 — both panels start collapsed; a mode whose output lands in one opens it. Comment mode's output is on the canvas (CHR-1248).
-  if (resulting === "inspect") expandInspectorPanel();
   activeMode = resulting;
   flowModeToggle.setAttribute("aria-pressed", String(activeMode === "flow"));
   commentModeToggle.setAttribute("aria-pressed", String(activeMode === "comment"));
@@ -2332,12 +2262,6 @@ flowModeToggle.addEventListener("click", () => {
   setMode("flow");
 });
 commentModeToggle.addEventListener("click", () => setMode("comment"));
-// CHR-1253 — the sidebar row: comment mode on, then the first pin focused.
-commentsRowBtn.addEventListener("click", () => {
-  if (!currentScreen && currentMockup === null) return;
-  if (activeMode !== "comment") setMode("comment");
-  commentCanvas.focusFirstPin();
-});
 inspectModeToggle.addEventListener("click", () => setMode("inspect"));
 
 /**
@@ -2450,23 +2374,23 @@ function applyMainVisibility() {
   designSystemViewEl.hidden = currentView !== "design-system";
   boardViewEl.hidden = currentView !== "board";
   usecasesViewEl.hidden = currentView !== "usecases";
-  // The Use Cases tab brings its own list panel: the Screens and Context sidebars make way for it.
+  // The Use Cases tab brings its own list panel: the Screens card makes way for it.
   sidebarScreensEl.hidden = currentView === "usecases";
-  sidebarContextEl.hidden = currentView === "usecases";
+  // The shell lays the canvas and the full-height views out per view and per compare state (style.css).
+  appEl.dataset.shellView = currentView;
+  appEl.dataset.comparing = String(comparing);
   // The zoom group stays visible over the mockup view too — it
   // scales the whole comparison row instead of the screen canvas. Only the
   // Status bar toggle, which has no mockup-view counterpart, hides with it.
   canvasControlsEl.hidden = currentView !== "screens" || comparing; // compare has its own zoom in its chip row
   statusBarToggle.hidden = currentView !== "screens" || showMockup || comparing;
   warningBadge.hidden = currentView !== "screens" || showMockup || warningCount === 0;
-  // The Elements panel only makes sense next to the single-screen canvas.
-  inspectorEl.hidden = currentView !== "screens" || showMockup;
+  // The interim tools (modes, status bar) only make sense next to the single-screen canvas and the board.
   // Comment/inspect mode have no board counterpart (see board-view.js), and
   // none of the three apply to the mockup view.
   const toggles = modeToggleStates({ view: currentView, showMockup, comparing });
   flowModeToggle.disabled = toggles.flow.disabled;
   commentModeToggle.disabled = toggles.comment.disabled;
-  commentsRowBtn.disabled = toggles.comment.disabled || (!currentScreen && !showMockup);
   // The comment layer and its toolbar belong to the single-screen canvas and the mockup columns.
   commentCanvas.setToolbarHidden(currentView !== "screens" || comparing || (showMockup ? false : !currentScreen));
   inspectModeToggle.disabled = toggles.inspect.disabled;
@@ -2474,16 +2398,11 @@ function applyMainVisibility() {
   flowModeToggle.dataset.tooltip = toggles.flow.title || "Flow mode";
   commentModeToggle.dataset.tooltip = toggles.comment.title || "Comment mode";
   inspectModeToggle.dataset.tooltip = toggles.inspect.title || "Inspect mode";
-  if (comparing || currentView !== "screens") setZoomMenuOpen(false);
-  // The compare panel replaces the Elements/Activity panel while comparing.
-  const activityTab = panelTabActivityEl.getAttribute("aria-pressed") === "true";
-  panelTabsEl.hidden = comparing;
-  comparePanelTitleEl.hidden = !comparing;
+  if (comparing || currentView !== "screens") zoomPill?.close();
+  // The Differences panel lives in its own card while comparing.
+  compareCardEl.hidden = !comparing;
   comparePanelEl.hidden = !comparing;
-  syncInspectorPanelName();
-  panelBodyElementsEl.hidden = comparing || activityTab;
-  panelBodyActivityEl.hidden = comparing || !activityTab;
-  syncZoomButtons(showMockup ? mockupZoom : zoom);
+  syncZoomUI();
   if (showMockup) updateMockupZoom();
   if (comparing) {
     compare.show(); // renders held back while another tab was showing
@@ -2514,7 +2433,6 @@ function setView(view) {
   if (view === "design-system") loadDesignSystem();
   if (view === "usecases") useCases.show();
   else useCases.hide();
-  if (view === "screens") updateScreenUseCases(); // the reverse entry may have use cases to show now
   if (view !== "board") boardComments.close(); // a preview must not outlive the board (its Esc handling is the board's)
   if (view === "board" && !boardBuilt) loadBoard();
   // CHR-623 review finding 5: an already-built board was `hidden` (clientWidth
@@ -2609,13 +2527,6 @@ const settingsMenu = createSettingsMenu({
     },
     clusters: { get: () => boardClustersOn, set: setBoardClusters },
     edges: { get: () => boardEdgesVisible, set: setBoardEdges },
-    "variant-map": {
-      get: () => variantMapVisible,
-      set: (on) => {
-        setVariantMap(on);
-        refreshVariantUI();
-      },
-    },
     "sidebar-tags": { get: () => showSidebarTags, set: setSidebarTags },
   },
   onOpenMcp: () => mcpDialog.show(),
@@ -2659,7 +2570,7 @@ function pressControl(el) {
 function openOverlay() {
   if (!dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen() || whatsNewDialog.isOpen() || document.querySelector("dialog.uc-dialog[open]")) return "other";
   if (!projectMenuEl.hidden) return "project-menu";
-  if (!zoomMenu.hidden) return "zoom-menu";
+  if (zoomPill?.isOpen()) return "zoom-menu";
   return document.querySelector(".chrome-menu:not([hidden])") ? "other" : null;
 }
 
@@ -2680,9 +2591,9 @@ function runShortcut(id) {
   if (def?.zoom !== undefined) {
     // The zoom controls themselves must be showing; the level goes straight to the setter (the preset button's click would also move focus to the trigger).
     if (canvasControlsEl.hidden) return false;
-    const menuWasOpen = !zoomMenu.hidden;
+    const menuWasOpen = zoomPill.isOpen();
     setZoom(def.zoom);
-    setZoomMenuOpen(false);
+    zoomPill.close();
     if (menuWasOpen) zoomTrigger.focus(); // as the preset button's click does; a key with the menu closed leaves focus alone
     return true;
   }
@@ -2748,6 +2659,7 @@ document.addEventListener("keydown", onShortcutKeydown);
 function closeOverlaysOnFramePress(evt) {
   const overlay = openOverlay();
   if (!overlay || !dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen() || whatsNewDialog.isOpen()) return;
+  if (overlay === "zoom-menu") zoomPill.close(); // a native popover's light dismiss never sees a press inside the frame's document
   document.body.dispatchEvent(new (evt.type === "click" ? MouseEvent : Event)(evt.type, { bubbles: true }));
 }
 

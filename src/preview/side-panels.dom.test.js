@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 //
-// CHR-888 — first-run collapse defaults of the three side panels in app.js:
-// Screens expanded, Context and Elements collapsed; a stored pref always wins.
+// CHR-888 / CHR-1267 — the left floating card in app.js: expanded by default, its fold state and position are per-viewer prefs. (The Context and Elements panels it replaced are gone.)
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
 import { fakeSettings } from "./fake-settings.test-helper.js";
@@ -63,53 +62,54 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe("side panel defaults", () => {
-  it("fresh install: Screens expanded, Context and Elements collapsed", async () => {
+describe("left card (CHR-1267)", () => {
+  it("fresh install: the card is expanded, and the Context and Elements panels no longer exist", async () => {
     await boot();
-    expect([state("sidebar-screens"), state("sidebar-context"), state("inspector")]).toEqual(["false", "true", "true"]);
-    expect([expanded("sidebar-screens-collapse"), expanded("sidebar-context-collapse"), expanded("inspector-collapse")]).toEqual(["true", "false", "false"]);
+    expect(state("sidebar-screens")).toBe("false");
+    expect(expanded("sidebar-screens-collapse")).toBe("true");
+    expect(document.getElementById("app").dataset.cardFolded).toBe("false");
+    expect(document.getElementById("sidebar-context")).toBeNull();
+    expect(document.getElementById("inspector")).toBeNull();
   });
 
-  it("the collapse button swaps its icon, label and tooltip with the panel state", async () => {
+  it("the fold control swaps its icon, label and tooltip with the state, persists, and tells the shell", async () => {
     await boot();
-    const btn = document.getElementById("inspector-collapse");
+    const btn = document.getElementById("sidebar-screens-collapse");
     const iconOf = () => btn.querySelector(".side-panel-collapse-icon").textContent;
-    expect([iconOf(), btn.getAttribute("aria-label"), btn.dataset.tooltip]).toEqual(["chevron_left", "Expand Elements panel", "Expand Elements panel"]);
+    expect([iconOf(), btn.getAttribute("aria-label"), btn.dataset.tooltip]).toEqual(["expand_less", "Collapse Screens panel", "Collapse Screens panel"]);
     btn.click();
-    expect([iconOf(), btn.getAttribute("aria-label"), btn.dataset.tooltip]).toEqual(["right_panel_close", "Collapse Elements panel", "Collapse Elements panel"]);
-    const screens = document.getElementById("sidebar-screens-collapse");
-    expect(screens.querySelector(".side-panel-collapse-icon").textContent).toBe("left_panel_close");
-    screens.click();
-    expect(screens.querySelector(".side-panel-collapse-icon").textContent).toBe("chevron_right");
+    expect([iconOf(), btn.getAttribute("aria-label"), btn.dataset.tooltip, state("sidebar-screens")]).toEqual(["expand_more", "Expand Screens panel", "Expand Screens panel", "true"]);
+    expect(document.getElementById("app").dataset.cardFolded).toBe("true");
+    await flush();
+    expect(settings.prefs["artisign.sidebar-screens.collapsed"]).toBe("true");
+    btn.click();
+    expect(state("sidebar-screens")).toBe("false");
   });
 
-  it("stored prefs win over the defaults", async () => {
-    memoryStorage.set("artisign.sidebar-context.collapsed", "false");
-    memoryStorage.set("artisign.inspector.collapsed", "false");
+  it("a stored fold state wins", async () => {
     memoryStorage.set("artisign.sidebar-screens.collapsed", "true");
     await boot();
-    expect([state("sidebar-screens"), state("sidebar-context"), state("inspector")]).toEqual(["true", "false", "false"]);
+    expect(state("sidebar-screens")).toBe("true");
+    expect(document.getElementById("app").dataset.cardFolded).toBe("true");
   });
 
-  it("expanding a default-collapsed panel persists", async () => {
+  it("restores the position the grip left it at, for this viewer", async () => {
+    memoryStorage.set("artisign.sidebar-screens.position", "120,90");
     await boot();
-    document.getElementById("inspector-collapse").click();
-    expect(state("inspector")).toBe("false");
-    await flush();
-    expect(settings.prefs["artisign.inspector.collapsed"]).toBe("false");
+    const card = document.getElementById("sidebar-screens");
+    expect([card.style.left, card.style.top]).toEqual(["120px", "90px"]);
   });
 
-  it("comment mode leaves Context as it is (CHR-1248), inspect mode opens Elements", async () => {
+  it("comment mode and inspect mode work without a panel to open", async () => {
     await boot();
     const comment = document.getElementById("comment-mode-toggle");
     const inspect = document.getElementById("inspect-mode-toggle");
     comment.disabled = false;
     inspect.disabled = false;
     comment.click();
-    expect([state("sidebar-context"), state("inspector")]).toEqual(["true", "true"]);
+    expect(comment.getAttribute("aria-pressed")).toBe("true");
     inspect.click();
-    expect(state("inspector")).toBe("false");
-    await flush();
-    expect(settings.prefs["artisign.inspector.collapsed"]).toBe("false");
+    expect(inspect.getAttribute("aria-pressed")).toBe("true");
+    expect(comment.getAttribute("aria-pressed")).toBe("false");
   });
 });

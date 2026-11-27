@@ -35,6 +35,18 @@
   --chrome-edge: #9aa0c0;
   --chrome-connector: #c4c4c4;
   --chrome-shadow-float: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 10px 28px rgba(40, 30, 20, 0.14);
+  /* CHR-1267 — the Stitch chrome: dotted workspace, translucent floating surfaces, hint blue, agent violet. */
+  --chrome-workspace: #f3f3f1;
+  --chrome-workspace-dot: #d3d1cc;
+  --chrome-float: rgba(255, 255, 255, 0.92);
+  --chrome-shadow-card: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 8px 30px rgba(40, 30, 20, 0.10);
+  --chrome-shadow-frame: 0 1px 2px rgba(0, 0, 0, 0.06), 0 16px 40px rgba(40, 30, 20, 0.12);
+  --chrome-shadow-raised: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(40, 30, 20, 0.12);
+  --chrome-hint: #2563eb;
+  --chrome-hint-text: #ffffff;
+  --chrome-agent: #6a4bd6;
+  --chrome-agent-subtle: #f2eeff;
+  --chrome-cluster: rgba(255, 255, 255, 0.55);
 
   /* Themeless scales. */
   --space-2xs: 2px;
@@ -51,6 +63,10 @@
   --radius-menu: 8px;
   --radius-md: 10px;
   --radius-pill: 999px;
+  --radius-card: 20px;
+  --radius-item: 12px;
+  --radius-frame: 16px;
+  --radius-inset: 14px;
   --size-control: 28px;
   --size-control-sm: 24px;
   --size-control-compact: 26px;
@@ -65,6 +81,14 @@
   --size-icon-sm: 16px;
   --size-icon-xs: 14px;
   --size-indicator: 7px;
+  --size-tool: 40px;
+  --size-toolbar: 52px;
+  --size-float-control: 34px;
+  --size-field-lg: 32px;
+  --size-tag: 17px;
+  --size-nav-card: 256px;
+  --size-agent-bar: 248px;
+  --size-dot-grid: 22px;
   --ui-base: 13px;
   --ui-sm: 12px;
   --ui-xs: 11.5px;
@@ -123,6 +147,17 @@
   --chrome-edge: #6b7090;
   --chrome-connector: #4a4743;
   --chrome-shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.55);
+  --chrome-workspace: #1a1917;
+  --chrome-workspace-dot: #35322e;
+  --chrome-float: rgba(32, 31, 29, 0.94);
+  --chrome-shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 32px rgba(0, 0, 0, 0.5);
+  --chrome-shadow-frame: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 16px 40px rgba(0, 0, 0, 0.5);
+  --chrome-shadow-raised: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --chrome-hint: #2563eb;
+  --chrome-hint-text: #ffffff;
+  --chrome-agent: #a78bfa;
+  --chrome-agent-subtle: #2a2342;
+  --chrome-cluster: rgba(43, 41, 39, 0.55);
 }
 
 /* Chrome icon font (CHR-910) — the bundled Material Symbols Rounded file, served by the daemon at a fixed URL so icons work with no project open and offline. Static font: no FILL/GRAD axes, so an on-state icon is tinted, not filled. */
@@ -672,49 +707,6 @@ body {
   background: var(--chrome-canvas);
 }
 
-#app {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-#topbar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  padding: 0 var(--space-lg);
-  height: var(--size-bar-main);
-  border-bottom: 1px solid var(--chrome-border);
-  background: var(--chrome-bar);
-}
-
-/* No project open: only the title, the picker, the theme toggle and the Live chip remain. */
-#topbar.is-empty .project-only {
-  display: none;
-}
-
-.topbar-spacer {
-  flex: 1;
-  min-width: 0;
-}
-
-#app-title {
-  font-weight: 600;
-  font-size: var(--ui-base);
-  margin-right: var(--space-xs);
-}
-
-#view-tabs {
-  display: flex;
-  align-self: stretch;
-  gap: var(--space-xs);
-}
-
-#view-tabs[hidden] {
-  display: none;
-}
-
 /* CHR-628/CHR-629/CHR-631 — the follow toggle: a pill with two SIBLING <button>s (toggle, "Resume") inside a non-interactive <span> (review fix 4 — no interactive descendants inside a button, and a keyboard activation's target is the button itself). The pill look lives on the outer span; the buttons are UA-reset to read as plain content. */
 .follow-toggle-toggle {
   display: inline-flex;
@@ -797,32 +789,6 @@ body {
   color: var(--chrome-text-secondary);
 }
 
-#canvas-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-#canvas-controls[hidden] {
-  display: none;
-}
-
-#zoom-controls {
-  position: relative;
-}
-
-#zoom-menu {
-  position: absolute;
-  top: calc(100% + var(--space-xs));
-  right: 0;
-  width: 160px;
-  z-index: 20;
-}
-
-#zoom-menu[hidden] {
-  display: none;
-}
-
 #warning-badge {
   height: var(--size-control-compact);
   padding: 0 var(--space-md);
@@ -837,332 +803,6 @@ body {
 
 #warning-badge[hidden] {
   display: none;
-}
-
-#body {
-  flex: 1;
-  display: flex;
-  min-height: 0;
-}
-
-#body[hidden] {
-  display: none;
-}
-
-.side-panel {
-  flex: none;
-  width: 280px;
-  border-right: 1px solid var(--chrome-border);
-  background: var(--chrome-sidebar);
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-/* Collapsed = a 36px icon rail; the canvas reclaims the freed width. */
-.side-panel[data-collapsed="true"] {
-  width: 36px;
-}
-
-/* One header for all three panels (CHR-913): title (or the right panel's tabs) and a 24px collapse icon button. */
-.side-panel-header {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  height: var(--size-panel-header);
-  padding: 0 var(--space-md) 0 var(--space-lg);
-  border-bottom: 1px solid var(--chrome-border);
-  color: var(--chrome-text);
-  font-size: var(--ui-base);
-  font-weight: 500;
-}
-
-/* The rail stacks a panel icon over the expand button. */
-.side-panel[data-collapsed="true"] .side-panel-header {
-  flex-direction: column;
-  height: auto;
-  padding: var(--space-md) 0;
-  gap: var(--space-xs);
-}
-
-.side-panel-title {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.side-panel[data-collapsed="true"] .side-panel-title {
-  display: none;
-}
-
-/* CHR-628/CHR-629/CHR-631 — $panel-tabs: the Elements/Activity split in the right-hand panel, underline tabs (the topbar's .chrome-tab) that take the title's place and sit over the header's bottom border. */
-.panel-tabs {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: stretch;
-  align-self: stretch;
-  gap: var(--space-2xs);
-  margin-bottom: -1px;
-}
-
-.side-panel[data-collapsed="true"] .panel-tabs {
-  display: none;
-}
-
-#panel-body-activity[hidden] {
-  display: none;
-}
-
-.side-panel-rail-icon {
-  display: none;
-  font-size: var(--size-icon-sm);
-  color: var(--chrome-text-tertiary);
-}
-
-.side-panel[data-collapsed="true"] .side-panel-rail-icon {
-  display: block;
-}
-
-.side-panel-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.side-panel[data-collapsed="true"] .side-panel-body {
-  display: none;
-}
-
-/* Right-hand panel: mirrored border; its rail sits on the RIGHT of the content row (app.js swaps the collapse icon for the matching chevron). */
-.side-panel-right {
-  border-right: none;
-  border-left: 1px solid var(--chrome-border);
-  width: 300px;
-}
-
-/* Only shown next to the single-screen canvas (Screens view) — the base
-   .side-panel rule sets display:flex, which would otherwise beat the
-   [hidden] attribute's UA-stylesheet display:none. */
-#inspector[hidden] {
-  display: none;
-}
-
-/* Screens sidebar (CHR-914): search field, Tags toggle, match counter, then the tree. 264px wide while expanded; scoped to data-collapsed="false" because an id selector would otherwise beat the 36px rail rule. */
-#sidebar-screens[data-collapsed="false"] {
-  width: 264px;
-}
-
-#screen-filter {
-  padding: var(--space-pad) var(--space-pad) 0;
-}
-
-#screen-filter-row {
-  display: flex;
-  gap: var(--space-sm);
-}
-
-#screen-filter-input-wrap {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  height: var(--size-control);
-  padding: 0 var(--space-md);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  background: var(--chrome-field);
-}
-
-#screen-filter-input-wrap:focus-within {
-  border-color: var(--chrome-accent);
-  box-shadow: 0 0 0 2px var(--chrome-focus-ring);
-}
-
-#screen-filter-icon {
-  font-size: var(--size-icon-sm);
-  color: var(--chrome-text-tertiary);
-}
-
-#screen-filter-input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  font: inherit;
-  font-size: var(--ui-base);
-  color: var(--chrome-text);
-}
-
-#screen-filter-input::placeholder {
-  color: var(--chrome-text-tertiary);
-}
-
-/* Tags toggle: ghost button with a tag icon; pressed = the active fill (.chrome-btn--ghost). */
-#screen-tags-toggle .icon {
-  font-size: var(--size-icon-sm);
-}
-
-#screen-filter-hint {
-  padding: var(--space-sm) var(--space-xs) var(--space-lg);
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-}
-
-#screen-list {
-  list-style: none;
-  margin: 0;
-  padding: 0 var(--space-pad) var(--space-pad);
-}
-
-#screen-list li {
-  margin-bottom: var(--space-2xs);
-  /* Positioning context for .screen-item-pin (CHR-624) — a SIBLING of
-     .screen-item, not a child (see screens.js's renderScreenList), so the
-     positioned ancestor has to be one level up. */
-  position: relative;
-}
-
-.screen-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: transparent;
-  /* Right padding wider than the other three sides (CHR-624) — clears
-     .screen-item-pin, which overlaps this corner. */
-  padding: 5px 34px 6px var(--space-md);
-  border-radius: var(--radius-sm);
-  font: inherit;
-  font-size: var(--ui-base);
-  color: var(--chrome-text);
-  cursor: pointer;
-}
-
-.screen-item:hover {
-  background: var(--chrome-hover);
-}
-
-.screen-item[aria-current="true"],
-li[data-depth="0"] > .screen-item.in-tree[aria-current="true"] {
-  background: var(--chrome-active);
-  color: var(--chrome-text);
-  font-weight: 600;
-}
-
-.screen-item:focus-visible,
-.mockup-item:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: -2px;
-}
-
-/* CHR-731 — variant tree. A row's --depth (set inline by renderScreenList, only when the project has variants) indents 14px per level behind a 1px depth guide. */
-#screen-list li[data-depth] {
-  margin-left: calc(var(--depth) * 14px);
-}
-
-#screen-list li[data-depth]:not([data-depth="0"]) {
-  border-left: 1px solid var(--chrome-border);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-
-/* Room for the chevron at the row's left edge. */
-.screen-item.in-tree {
-  padding-left: 26px;
-}
-
-li[data-depth="0"] > .screen-item.in-tree {
-  font-weight: 500;
-}
-
-li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
-  font-size: var(--ui-sm);
-}
-
-.screen-item-name {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  min-height: var(--size-icon);
-  min-width: 0;
-}
-
-.screen-item-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.screen-item-total {
-  margin-left: auto;
-  flex: none;
-  font-size: var(--ui-2xs);
-  font-weight: 400;
-  color: var(--chrome-text-tertiary);
-}
-
-.screen-item-toggle {
-  position: absolute;
-  top: 5px;
-  left: var(--space-xs);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: var(--size-icon);
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--chrome-text-secondary);
-  cursor: pointer;
-}
-
-.screen-item-toggle:hover:not(:disabled) {
-  color: var(--chrome-text);
-}
-
-.screen-item-toggle:disabled {
-  cursor: default;
-}
-
-.screen-item-toggle:focus-visible,
-.screen-item-pin:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: 1px;
-}
-
-/* The kind icon (main / state / overlay / step): a Material Symbol in the secondary text colour, 16px. */
-.kind-icon {
-  flex: none;
-  color: var(--chrome-text-secondary);
-}
-
-/* A row that only gives context for a match: grey, chips dimmed. */
-#screen-list li.context .screen-item {
-  color: var(--chrome-text-tertiary);
-}
-
-#screen-list li.context .tag-row {
-  opacity: 0.55;
-}
-
-#screen-list li.screen-hidden-row {
-  padding: var(--space-xs) var(--space-md) var(--space-lg) 20px;
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-}
-
-.screen-item mark {
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-  border-radius: 2px;
 }
 
 /* Tag chip ($tag-chip): the 16px pill; match = accent, +N = dashed. */
@@ -1212,15 +852,7 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
   margin-top: 3px;
 }
 
-.screen-item.in-tree .tag-row {
-  padding-left: var(--space-xs);
-}
-
 /* On the selected row the chips lift onto the raised surface. */
-.screen-item[aria-current="true"] .tag-chip:not(.match):not(.tag-more),
-.mockup-item[aria-current="true"] .tag-chip {
-  background: var(--chrome-raised);
-}
 
 /* Shared `$pin-button` look (CHR-624) — the sidebar row's own pin button
    (.screen-item-pin) and the board tile's (.board-tile-pin) both carry this
@@ -1268,93 +900,6 @@ li[data-depth]:not([data-depth="0"]) > .screen-item.in-tree {
     opacity: 1;
     pointer-events: auto;
   }
-}
-
-/* Mockup sidebar section — always visually distinct from #screen-list, even
-   though both share the row shape. */
-#mockup-section[hidden] {
-  display: none;
-}
-
-.sidebar-section-title {
-  padding: var(--space-lg) var(--space-pad) var(--space-sm) var(--space-xl);
-  font-size: var(--ui-2xs);
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: var(--chrome-text-tertiary);
-  text-transform: uppercase;
-}
-
-#mockup-list {
-  list-style: none;
-  margin: 0;
-  padding: 0 var(--space-pad) var(--space-pad);
-}
-
-#mockup-list li {
-  margin-bottom: var(--space-2xs);
-}
-
-.mockup-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: transparent;
-  padding: 5px var(--space-md) 6px;
-  border-radius: var(--radius-sm);
-  font: inherit;
-  font-size: var(--ui-base);
-  color: var(--chrome-text);
-  cursor: pointer;
-}
-
-.mockup-item:hover {
-  background: var(--chrome-hover);
-}
-
-.mockup-item[aria-current="true"] {
-  background: var(--chrome-active);
-  color: var(--chrome-text);
-  font-weight: 500;
-}
-
-.mockup-item-name-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.mockup-item-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mockup-item-badge {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  height: var(--size-chip-h);
-  padding: 0 var(--space-sm);
-  border-radius: var(--radius-pill);
-  background: var(--chrome-field);
-  color: var(--chrome-text-secondary);
-  font-size: var(--ui-chip);
-  font-weight: 400;
-}
-
-.mockup-item[aria-current="true"] .mockup-item-badge {
-  background: var(--chrome-raised);
-}
-
-.mockup-item-sub {
-  margin-top: var(--space-xs);
-  font-size: var(--ui-2xs);
-  font-weight: 400;
-  color: var(--chrome-text-tertiary);
 }
 
 /* Shared block for every renderMarkdown() output — notes panel,
@@ -1505,51 +1050,6 @@ button.chrome-section-header:focus-visible {
   transform: rotate(-90deg);
 }
 
-#notes-panel[hidden] {
-  display: none;
-}
-
-#notes-panel-screen {
-  margin-left: auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--ui-2xs);
-  font-weight: 400;
-  color: var(--chrome-text-tertiary);
-}
-
-#notes-panel-header[aria-expanded="false"] + #notes-panel-body {
-  display: none;
-}
-
-#notes-panel-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  padding: var(--space-pad) var(--space-lg);
-}
-
-#notes-panel-text {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--chrome-text-secondary);
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-#notes-panel-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-}
-
-#notes-panel-chips:empty,
-#notes-panel-tags:empty {
-  display: none;
-}
-
 /* The tag spec sections: collapsed by default, quieter than the Notes header above them. */
 .tag-notes-section + .tag-notes-section {
   margin-top: var(--space-xs);
@@ -1597,89 +1097,6 @@ button.chrome-section-header:focus-visible {
   color: var(--chrome-text-secondary);
   line-height: 1.5;
   overflow-wrap: anywhere;
-}
-
-/* CHR-1253 — the Comments section is one row: threads live on the canvas. A divider above it only when Notes is shown. */
-#notes-panel:not([hidden]) + #comments-panel {
-  border-top: 1px solid var(--chrome-border);
-}
-
-.comments-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  width: 100%;
-  height: var(--size-row-section);
-  padding: 0 var(--space-lg);
-  border: none;
-  background: transparent;
-  color: var(--chrome-text);
-  font: inherit;
-  font-size: var(--ui-sm);
-  text-align: left;
-  cursor: pointer;
-}
-
-.comments-row .icon {
-  font-size: var(--size-icon-sm);
-  color: var(--chrome-text-secondary);
-}
-
-.comments-row:hover:not(:disabled) {
-  background: var(--chrome-hover);
-}
-
-.comments-row:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: -2px;
-}
-
-.comments-row:disabled {
-  cursor: default;
-  opacity: 0.55;
-}
-
-.comments-row[data-empty="true"] #comments-row-label {
-  color: var(--chrome-text-secondary);
-}
-
-#comments-row-hint {
-  margin-left: auto;
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-  white-space: nowrap;
-}
-
-#comments-row-hint[hidden] {
-  display: none;
-}
-
-#main {
-  flex: 1;
-  min-width: 0;
-  position: relative;
-}
-
-.main-view {
-  height: 100%;
-  overflow: auto;
-}
-
-#screens-view {
-  display: flex;
-  flex-direction: column;
-}
-
-/* CHR-732 — the breadcrumb bar sits above the canvas; the stage keeps the old canvas row (canvas + the variant tree map; the empty-project guide sits centred on #canvas, CHR-890). */
-#screens-stage {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  position: relative; /* anchors the comment banner and the floating canvas toolbar (CHR-1252) */
-}
-
-#screens-stage > #canvas {
-  min-width: 0;
 }
 
 #screens-view[hidden],
@@ -1872,37 +1289,6 @@ button.chrome-section-header:focus-visible {
   box-shadow: var(--frame-shadow);
   width: 360px;
   height: 200px;
-}
-
-/* Neutral pane the screen is clipped and centered in — its own size (not
-   the screen's) is what "fit" zoom measures against. */
-#canvas {
-  flex: 1;
-  position: relative;
-  overflow: auto;
-  background: var(--chrome-canvas);
-}
-
-/* Sized in JS (canvas.js) to the screen's declared, unscaled size; the
-   `transform: scale()` applied there does the zooming without affecting
-   this element's own layout box, which is why left/top are also computed
-   in JS instead of via flex centering. */
-#frame-caption {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-  pointer-events: none;
-}
-
-#frame-caption[hidden] {
-  display: none;
 }
 
 #screen-holder {
@@ -2133,20 +1519,6 @@ button.chrome-section-header:focus-visible {
 
 /* CHR-628/CHR-629/CHR-631 — activity feed ($activity-entry). */
 
-#activity-feed-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-#activity-feed-empty {
-  margin: 0;
-  padding: var(--space-2xl) var(--space-xl);
-  font-size: var(--ui-sm);
-  color: var(--chrome-text-tertiary);
-  text-align: center;
-}
-
 /* .activity-entry is now the <button> itself (review fix 4 — a real button gets keyboard focus/activation for free), so it needs the same UA-reset properties as .screen-item/.mockup-item's own list-row buttons on top of its existing look. */
 .activity-entry {
   display: flex;
@@ -2272,12 +1644,6 @@ button.chrome-section-header:focus-visible {
 }
 
 /* Elements inspector panel */
-
-#inspector-list {
-  list-style: none;
-  margin: 0;
-  padding: var(--space-xs) 0 0;
-}
 
 .inspector-entry {
   border-bottom: 1px solid var(--chrome-border);
@@ -2493,28 +1859,6 @@ button.chrome-section-header:focus-visible {
 .inspector-ds-warning-icon {
   flex: none;
   color: var(--chrome-danger);
-}
-
-#inspector-empty {
-  margin: 0;
-  padding: var(--space-xl);
-  font-size: var(--ui-sm);
-  color: var(--chrome-text-tertiary);
-}
-
-#inspector-empty[hidden] {
-  display: none;
-}
-
-#inspector-error {
-  margin: 0;
-  padding: var(--space-xl);
-  font-size: var(--ui-sm);
-  color: var(--chrome-error);
-}
-
-#inspector-error[hidden] {
-  display: none;
 }
 
 /* Design system view (CHR-915): each section is a raised card in a centred column, the way `design-system-view` draws it. */
@@ -3679,280 +3023,6 @@ button.chrome-section-header:focus-visible {
   opacity: 0.4;
 }
 
-/* CHR-732 — variant breadcrumb bar (approved `variants-screen-view` c-breadcrumb-tree). */
-#variant-bar {
-  flex: none;
-  min-height: var(--size-bar-sub);
-  min-width: 0;
-  display: flex;
-  /* Deep chains wrap onto a second line instead of widening the screen view. */
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-xs) var(--space-md);
-  padding: var(--space-xs) var(--space-lg);
-  background: var(--chrome-bar);
-  border-bottom: 1px solid var(--chrome-border);
-  font-size: var(--ui-base);
-  position: relative;
-}
-
-#variant-bar[hidden],
-#variant-map[hidden],
-#variant-inspector[hidden] {
-  display: none;
-}
-
-.crumb-group {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 0 1 auto;
-  min-width: 56px;
-  height: var(--size-control);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--chrome-text);
-}
-
-.crumb-group.open {
-  background: var(--chrome-hover);
-  border-color: var(--chrome-border-strong);
-}
-
-.crumb-group.on {
-  flex-shrink: 0;
-  background: var(--chrome-accent-subtle);
-  border-color: var(--chrome-accent);
-  color: var(--chrome-accent);
-  font-weight: 500;
-}
-
-#variant-bar .crumb,
-.crumb-toggle,
-.variant-back,
-.variant-pop-row,
-.variant-link,
-.map-node {
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-
-#variant-bar .crumb {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  min-width: 0;
-  height: 100%;
-  padding: 0 var(--space-xs) 0 var(--space-md);
-}
-
-.crumb-name {
-  min-width: 0;
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  direction: rtl;
-  text-align: left;
-}
-
-.crumb-toggle {
-  display: inline-flex;
-  align-items: center;
-  height: 100%;
-  padding: 0 var(--space-sm) 0 var(--space-2xs);
-  color: var(--chrome-text-tertiary);
-}
-
-.crumb-toggle .icon {
-  font-size: var(--size-icon-xs);
-}
-
-.kind-icon.icon,
-.crumb-home {
-  font-size: var(--size-icon-sm);
-}
-
-.variant-map-toggle {
-  flex: none;
-}
-
-#variant-bar .crumb-sep {
-  font-size: var(--size-icon-xs);
-  color: var(--chrome-text-tertiary);
-}
-
-.variant-bar-spacer {
-  flex: 1;
-}
-
-.variant-chip {
-  white-space: nowrap;
-}
-
-.variant-chip-overlay {
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-}
-
-.variant-chip-step {
-  background: var(--chrome-warning-subtle);
-  color: var(--chrome-warning);
-}
-
-.variant-back {
-  flex: none;
-}
-
-.variant-pop {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 20;
-  width: 262px;
-  font-size: var(--ui-base);
-  font-weight: 400;
-}
-
-.variant-pop-row {
-  gap: var(--space-sm);
-}
-
-.variant-pop-row.current {
-  font-weight: 500;
-}
-
-.variant-pop-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.variant-pop-itself {
-  margin-top: var(--space-xs);
-  border-top: 1px solid var(--chrome-border);
-  border-radius: 0 0 var(--radius-xs) var(--radius-xs);
-  color: var(--chrome-accent);
-}
-
-/* Variant tree map beside the screen. */
-#variant-map {
-  flex: none;
-  width: 260px;
-  padding: var(--space-2xl) var(--space-2xl) var(--space-2xl) 0;
-  overflow: auto;
-  background: var(--chrome-canvas);
-}
-
-.variant-card,
-.variant-map-card {
-  padding: var(--space-lg);
-  background: var(--chrome-raised);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-md);
-  font-size: var(--ui-sm);
-  line-height: 1.5;
-  color: var(--chrome-text);
-}
-
-.variant-card h3,
-.variant-map-card h3 {
-  margin: 0 0 var(--space-sm);
-  font-size: var(--ui-2xs);
-  font-weight: 500;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--chrome-text-tertiary);
-}
-
-.map-node {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: calc(100% - var(--indent, 0px));
-  margin-left: var(--indent, 0px);
-  padding: 4px 6px;
-  border-radius: 5px;
-  text-align: left;
-  font-size: 0.75rem;
-}
-
-.map-node:hover {
-  background: var(--chrome-hover);
-}
-
-.map-node.dim {
-  color: var(--chrome-text-tertiary);
-}
-
-.map-node.on {
-  background: var(--chrome-active);
-  color: var(--chrome-text);
-  font-weight: 500;
-}
-
-.map-node-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.map-node-note {
-  display: inline-flex;
-  align-items: center;
-  margin-left: auto;
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-}
-
-.map-node-note .icon {
-  font-size: var(--size-icon-xs);
-}
-
-/* Inspector cards (Elements tab, above the element list). */
-#variant-inspector {
-  padding: var(--space-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  border-bottom: 1px solid var(--chrome-border);
-}
-
-.variant-kv {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-lg);
-}
-
-.variant-kv b {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--chrome-text);
-  font-weight: 500;
-}
-
-.variant-link {
-  display: block;
-  width: 100%;
-  padding: 0;
-  text-align: left;
-  color: var(--chrome-accent);
-  font-size: var(--ui-sm);
-}
-
-.variant-home-note {
-  margin: var(--space-xs) 0 0;
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-}
-
 /* CHR-733 — board clusters (approved `variants-board` c-clusters / c-clusters-collapsed). */
 #board-collapse-all-btn[hidden] {
   display: none;
@@ -4156,8 +3226,6 @@ button.chrome-section-header:focus-visible {
 #screens-stage[hidden],
 #compare-hint[hidden],
 #compare-panel[hidden],
-#compare-panel-title[hidden],
-.panel-tabs[hidden],
 .compare-banner[hidden],
 .compare-column-error[hidden] {
   display: none;
@@ -5315,11 +4383,6 @@ body:has(#settings-menu:not([hidden])) #update-notice {
    built from the --chrome-* groups like every other shell view. The mapping view's overlays sit in the PARENT
    document next to the frame iframes (never inside them), so this stylesheet cannot leak into a screen.
    ========================================================================================================== */
-
-#sidebar-screens[hidden],
-#sidebar-context[hidden] {
-  display: none;
-}
 
 #usecases-view {
   display: flex;
@@ -11248,4 +10311,1239 @@ button.uc-target:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ==========================================================================================================
+   CHR-1267 — the Stitch chrome shell: a dotted workspace, three floating top groups, the left floating card,
+   the zoom pill. Everything floats over #main, which fills the window. The side tool bar, the right column
+   and the agent bar are later slices (CHR-1268…1272); #interim-tools and #compare-card hold what they will
+   replace. All values come from the chrome-light / chrome-dark groups and the radius / size tokens above.
+   ========================================================================================================== */
+
+html,
+body {
+  overflow: hidden;
+}
+
+body {
+  background-color: var(--chrome-workspace);
+  background-image: radial-gradient(circle, var(--chrome-workspace-dot) 1px, transparent 1.3px);
+  background-size: var(--size-dot-grid) var(--size-dot-grid);
+}
+
+#app {
+  position: relative;
+  height: 100%;
+  /* Where the canvas may draw: below the top groups, right of the card and the tool bar, above the zoom pill. */
+  --shell-top: 76px;
+  --shell-bottom: 80px;
+  --reserve-left: 356px;
+  --reserve-right: 16px;
+}
+
+/* A folded card frees the width; the interim tools slide under it (as the side tool bar will). */
+#app[data-card-folded="true"] {
+  --reserve-left: 88px;
+}
+
+/* The Design System view keeps its look, beside the card; Use Cases has its own list panel and no card. */
+#app[data-shell-view="design-system"] {
+  --reserve-left: 288px;
+}
+
+#app[data-shell-view="usecases"] {
+  --reserve-left: 0px;
+}
+
+/* Compare shows its Differences panel in a card on the right. */
+#app[data-comparing="true"] {
+  --reserve-right: 312px;
+}
+
+.float-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-float);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--chrome-shadow-card);
+}
+
+.float-pill[hidden],
+.float-card[hidden] {
+  display: none;
+}
+
+/* ---- Top bar: brand + project, view tabs, status + settings ---- */
+
+#topbar {
+  position: absolute;
+  z-index: 40;
+  top: var(--space-xl);
+  right: var(--space-xl);
+  left: var(--space-xl);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+#topbar > * {
+  pointer-events: auto;
+}
+
+#topbar.is-empty .project-only {
+  display: none;
+}
+
+#view-tabs {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+#app-title {
+  padding: 0 var(--space-pad) 0 var(--space-lg);
+  font-size: var(--ui-md, 14px);
+  font-weight: 600;
+}
+
+#topbar #project-picker-trigger {
+  height: var(--size-float-control);
+  padding: 0 var(--space-lg) 0 var(--space-md);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-field);
+  font-weight: 500;
+}
+
+#topbar #project-picker-trigger:hover {
+  background: var(--chrome-hover);
+}
+
+#topbar #project-picker-trigger.project-picker-empty {
+  border: 1px dashed var(--chrome-border-strong);
+}
+
+#topbar #project-picker-trigger[aria-expanded="true"] {
+  box-shadow: 0 0 0 2px var(--chrome-focus-ring);
+}
+
+.view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  height: var(--size-float-control);
+  padding: 0 var(--space-xl);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--chrome-text-secondary);
+  font: inherit;
+  font-size: var(--ui-base);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.view-tab:hover {
+  color: var(--chrome-text);
+}
+
+.view-tab[aria-pressed="true"] {
+  background: var(--chrome-primary);
+  color: var(--chrome-primary-text);
+}
+
+.view-tab:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+#topbar-end {
+  gap: var(--space-sm);
+  padding-left: var(--space-md);
+}
+
+#topbar-end .chrome-icon-btn,
+#interim-tools .chrome-icon-btn {
+  position: relative;
+  width: var(--size-float-control);
+  height: var(--size-float-control);
+  border-radius: var(--radius-pill);
+}
+
+#warning-badge {
+  height: var(--size-control-compact);
+}
+
+/* ---- Floating card (design `float-card`) ---- */
+
+.float-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-card);
+  background: var(--chrome-float);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--chrome-shadow-card);
+  overflow: hidden;
+}
+
+.float-card-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-pad) var(--space-md) var(--space-sm) var(--space-pad);
+}
+
+.float-card-title {
+  margin: 0;
+  font-size: var(--ui-base);
+  font-weight: 600;
+}
+
+.float-card-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.float-card-scroll {
+  overflow-y: auto;
+}
+
+.float-card[data-collapsed="true"] .float-card-body {
+  display: none;
+}
+
+.float-grip {
+  display: inline-flex;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--size-icon-sm);
+  height: var(--size-icon);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--chrome-text-tertiary);
+  cursor: grab;
+}
+
+.float-grip .icon {
+  font-size: var(--size-icon-sm);
+}
+
+.float-grip:hover {
+  color: var(--chrome-text-secondary);
+}
+
+.float-grip:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+.float-card.is-dragging {
+  box-shadow: var(--chrome-shadow-card), 0 0 0 2px var(--chrome-focus-ring);
+  user-select: none;
+}
+
+.float-card.is-dragging .float-grip {
+  cursor: grabbing;
+}
+
+/* ---- The left card ---- */
+
+#sidebar-screens {
+  position: absolute;
+  z-index: 20;
+  top: var(--shell-top);
+  bottom: 18px; /* the zoom pill's bottom line */
+  left: var(--space-xl);
+  width: var(--size-nav-card);
+}
+
+#sidebar-screens[data-collapsed="true"] {
+  bottom: auto;
+}
+
+#sidebar-screens[hidden] {
+  display: none;
+}
+
+/* Segmented control: Screens | Mockups, with counts. */
+.seg-tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  height: var(--size-field-lg);
+  padding: var(--space-2xs);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-field);
+}
+
+.seg-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--chrome-text-secondary);
+  font: inherit;
+  font-size: var(--ui-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.seg-tab[aria-selected="true"] {
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-raised);
+  color: var(--chrome-text);
+  font-weight: 600;
+}
+
+.seg-tab:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+.seg-count {
+  font-size: var(--ui-2xs);
+  font-weight: 500;
+  color: var(--chrome-text-tertiary);
+}
+
+#screen-filter {
+  flex: none;
+  padding: 0 var(--space-md);
+}
+
+#screen-filter-row {
+  display: flex;
+  gap: var(--space-md);
+}
+
+#screen-filter-input-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  height: var(--size-field-lg);
+  padding: 0 var(--space-sm) 0 var(--space-pad);
+  border-radius: var(--radius-md);
+  background: var(--chrome-field);
+  color: var(--chrome-text-tertiary);
+}
+
+#screen-filter-input-wrap:focus-within {
+  background: var(--chrome-raised);
+  box-shadow: inset 0 0 0 1px var(--chrome-accent), 0 0 0 2px var(--chrome-focus-ring);
+}
+
+#screen-filter-icon {
+  font-size: var(--size-icon-sm);
+}
+
+#screen-filter-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--ui-sm);
+  color: var(--chrome-text);
+}
+
+#screen-filter-input::placeholder {
+  color: var(--chrome-text-tertiary);
+}
+
+#screen-filter-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--chrome-text-tertiary);
+  cursor: pointer;
+}
+
+#screen-filter-clear[hidden] {
+  display: none;
+}
+
+#screen-filter-clear .icon {
+  font-size: var(--size-icon-xs);
+}
+
+#screen-filter-clear:hover {
+  background: var(--chrome-hover);
+}
+
+/* Tag toggle: pressed shows the tag chips on every row. */
+#screen-tags-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--size-field-lg);
+  height: var(--size-field-lg);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--chrome-field);
+  color: var(--chrome-text-secondary);
+  cursor: pointer;
+}
+
+#screen-tags-toggle[aria-pressed="true"] {
+  background: var(--chrome-accent-subtle);
+  box-shadow: inset 0 0 0 1px var(--chrome-focus-ring);
+  color: var(--chrome-accent);
+}
+
+#screen-tags-toggle .icon {
+  font-size: var(--size-icon-sm);
+}
+
+#screen-tags-toggle:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+#screen-filter-hint {
+  padding: var(--space-sm) var(--space-xs) 0;
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+#screen-filter-hint:empty {
+  display: none;
+}
+
+/* The tree scrolls inside the card; the bottom edge fades out. */
+#nav-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-md) var(--space-md) var(--space-3xl);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
+}
+
+#screen-list,
+#mockup-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#screen-list[hidden],
+#mockup-list[hidden] {
+  display: none;
+}
+
+.nav-empty {
+  padding: var(--space-md) var(--space-xs);
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-tertiary);
+}
+
+/* One row of the nav tree: the select button carries icon, name, tags and the variant count; the chevron, the pin and the compare checkbox are its siblings. Variants nest 16px per level behind a 1px guide. */
+.screen-item-row {
+  position: relative;
+}
+
+.screen-item-row[data-depth]:not([data-depth="0"]) {
+  margin-left: calc(var(--depth, 1) * 16px - 5px);
+  padding-left: var(--space-xs);
+  border-left: 1px solid var(--chrome-border);
+}
+
+.screen-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-sm) var(--space-pad) var(--space-sm) 26px;
+  border: none;
+  border-radius: var(--radius-item);
+  background: none;
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-base);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.screen-item-row[data-depth]:not([data-depth="0"]) > .screen-item {
+  padding-left: var(--space-pad);
+  border-radius: var(--radius-md);
+  color: var(--chrome-text-secondary);
+  font-size: var(--ui-sm);
+  font-weight: 400;
+}
+
+.screen-item:hover {
+  background: var(--chrome-hover);
+}
+
+.screen-item[aria-current="true"] {
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+  font-weight: 600;
+}
+
+.screen-item:focus-visible,
+.screen-item-toggle:focus-visible,
+.screen-item-pin:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
+.screen-item .kind-icon {
+  margin-top: 1px;
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.screen-item-row[data-depth]:not([data-depth="0"]) .kind-icon {
+  font-size: var(--size-icon-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.screen-item[aria-current="true"] .kind-icon {
+  color: var(--chrome-accent);
+}
+
+.screen-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.screen-item-name {
+  min-width: 0;
+  overflow: hidden;
+  line-height: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screen-item-row[data-depth]:not([data-depth="0"]) .screen-item-name {
+  line-height: 16px;
+}
+
+.screen-item .tag-row {
+  flex-wrap: nowrap;
+  margin-top: var(--space-xs);
+  overflow: hidden;
+  font-weight: 400;
+}
+
+.screen-item mark {
+  background: none;
+  color: var(--chrome-accent);
+  font-weight: 700;
+}
+
+.screen-item-total {
+  flex: none;
+  margin-left: var(--space-sm);
+  font-size: var(--ui-xs);
+  font-weight: 400;
+  line-height: 17px;
+  color: var(--chrome-text-tertiary);
+}
+
+.screen-item-row.context > .screen-item {
+  color: var(--chrome-text-tertiary);
+}
+
+.screen-item-row.context .tag-row {
+  opacity: 0.6;
+}
+
+.screen-hidden-row {
+  padding: var(--space-xs) var(--space-pad) var(--space-xs) 26px;
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.screen-item-toggle {
+  position: absolute;
+  z-index: 1;
+  top: var(--space-md);
+  left: var(--space-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-icon-sm);
+  height: var(--size-icon-sm);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--chrome-text-tertiary);
+  cursor: pointer;
+}
+
+.screen-item-row[data-depth]:not([data-depth="0"]) > .screen-item-toggle {
+  left: var(--space-sm);
+}
+
+.screen-item-toggle:hover:not(:disabled) {
+  color: var(--chrome-text);
+}
+
+.screen-item-toggle:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.screen-item-pin {
+  top: var(--space-sm);
+  right: 34px;
+}
+
+.screen-item-compare {
+  position: absolute;
+  top: var(--space-md);
+  right: 32px;
+  margin: 0;
+}
+
+/* ---- Frame label, breadcrumb and the canvas ---- */
+
+#main {
+  position: absolute;
+  inset: 0;
+}
+
+.main-view {
+  position: absolute;
+  top: var(--shell-top);
+  left: var(--reserve-left);
+  right: 0;
+  bottom: 0;
+  overflow: auto;
+}
+
+#screens-view,
+#mockup-view {
+  right: var(--reserve-right);
+  bottom: var(--shell-bottom);
+}
+
+#screens-view {
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
+
+#screens-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  position: relative; /* anchors the comment banner and the floating canvas toolbar (CHR-1252) */
+}
+
+#screens-stage > #canvas {
+  min-width: 0;
+}
+
+#mockup-comment-layer {
+  inset: var(--shell-top) var(--reserve-right) var(--shell-bottom) var(--reserve-left);
+}
+
+/* Pane the frame is clipped and centred in — its own size (not the frame's) is what "fit" zoom measures against. The workspace dots show through. */
+#canvas {
+  flex: 1;
+  position: relative;
+  overflow: auto;
+}
+
+/* Positioned in JS (app.js) above the frame's top-left corner. */
+#frame-caption {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: 18px;
+  font-size: var(--ui-sm);
+  font-weight: 600;
+  color: var(--chrome-text-secondary);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+#frame-caption[hidden] {
+  display: none;
+}
+
+.frame-label-icon {
+  font-size: var(--size-icon-xs);
+}
+
+.frame-label-detail {
+  font-weight: 500;
+  color: var(--chrome-text-tertiary);
+}
+
+#screen-holder {
+  border-radius: var(--radius-frame);
+  box-shadow: var(--chrome-shadow-frame);
+}
+
+/* The variant breadcrumb floats above the frame, left-aligned with it. */
+#variant-bar {
+  position: absolute;
+  z-index: 6;
+  top: var(--space-xs);
+  left: var(--frame-left, 0);
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-xs) var(--space-md) var(--space-xs) var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-float);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--chrome-shadow-card);
+  font-size: var(--ui-sm);
+}
+
+#variant-bar[hidden] {
+  display: none;
+}
+
+/* Comparing: the bar sits over the compare view's top-left, which makes room. */
+#app[data-comparing="true"] #variant-bar {
+  left: 0;
+}
+
+#app[data-comparing="true"] #compare-view {
+  margin-top: 52px;
+}
+
+.crumb-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 56px;
+  height: var(--size-control);
+  border-radius: var(--radius-pill);
+  color: var(--chrome-text-secondary);
+}
+
+.crumb-group.open {
+  box-shadow: 0 0 0 2px var(--chrome-focus-ring);
+}
+
+.crumb-group.on {
+  flex-shrink: 0;
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+  font-weight: 600;
+}
+
+#variant-bar .crumb,
+.crumb-toggle,
+.variant-back,
+.variant-pop-row {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+#variant-bar .crumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--space-xs) 0 var(--space-md);
+  font-weight: 500;
+}
+
+.crumb-group.on .crumb {
+  font-weight: 600;
+}
+
+.crumb-name {
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.crumb-toggle {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--space-sm) 0 var(--space-2xs);
+  border-radius: var(--radius-pill);
+  color: var(--chrome-text-tertiary);
+}
+
+.crumb-group.on .crumb-toggle {
+  color: inherit;
+}
+
+.crumb-toggle .icon {
+  font-size: var(--size-icon-xs);
+}
+
+.kind-icon.icon,
+.crumb-home {
+  font-size: var(--size-icon-sm);
+}
+
+#variant-bar .crumb-sep {
+  font-size: var(--size-icon-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.variant-bar-spacer {
+  flex: 1;
+  min-width: var(--space-sm);
+}
+
+.variant-chip {
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.variant-chip-overlay {
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+}
+
+.variant-chip-step {
+  background: var(--chrome-warning-subtle);
+  color: var(--chrome-warning);
+}
+
+.variant-back {
+  flex: none;
+}
+
+.variant-pop {
+  position: absolute;
+  top: calc(100% + var(--space-md));
+  left: 0;
+  z-index: 20;
+  width: 262px;
+  border-radius: var(--radius-item);
+  box-shadow: var(--chrome-shadow-card);
+  font-size: var(--ui-sm);
+  font-weight: 400;
+}
+
+.variant-pop-row {
+  gap: var(--space-sm);
+  border-radius: var(--radius-md);
+}
+
+.variant-pop-row.current {
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+  font-weight: 600;
+}
+
+.variant-pop-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variant-pop-itself {
+  margin-top: var(--space-xs);
+  color: var(--chrome-accent);
+}
+
+/* ---- Comment layer, banner and canvas toolbar over the new canvas ---- */
+
+#comment-toolbar {
+  bottom: var(--space-md);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-float);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--chrome-shadow-card);
+}
+
+/* ---- Interim tools (modes + status bar) until the side tool bar (CHR-1268) ---- */
+
+#interim-tools {
+  position: absolute;
+  z-index: 20;
+  top: var(--shell-top);
+  left: calc(var(--space-xl) + var(--size-nav-card) + var(--space-xl));
+  flex-direction: column;
+  padding: var(--space-md) var(--space-sm);
+  border-radius: calc(var(--size-toolbar) / 2);
+}
+
+#app[data-card-folded="true"] #interim-tools {
+  top: 138px;
+  left: var(--space-xl);
+}
+
+#app[data-shell-view="usecases"] #interim-tools,
+#app[data-shell-view="design-system"] #interim-tools {
+  display: none;
+}
+
+#interim-tools .chrome-icon-btn {
+  width: var(--size-tool);
+  height: var(--size-tool);
+}
+
+#interim-tools .chrome-icon-btn[aria-pressed="true"] {
+  background: var(--chrome-primary);
+  color: var(--chrome-primary-text);
+}
+
+.tool-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  place-items: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-accent);
+  color: var(--chrome-primary-text);
+  font-size: var(--ui-badge);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tool-badge[hidden] {
+  display: none;
+}
+
+/* ---- Compare card (Differences panel) ---- */
+
+#compare-card {
+  position: absolute;
+  z-index: 20;
+  top: var(--shell-top);
+  right: var(--space-xl);
+  bottom: 18px;
+  width: 280px;
+}
+
+/* ---- Zoom pill and its popover ---- */
+
+#zoom-pill-wrap {
+  position: absolute;
+  z-index: 20;
+  bottom: 18px;
+  left: var(--reserve-left);
+  right: var(--reserve-right);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+#zoom-pill-wrap > * {
+  pointer-events: auto;
+}
+
+#canvas-controls .chrome-icon-btn {
+  width: var(--size-float-control);
+  height: var(--size-float-control);
+  border-radius: var(--radius-pill);
+}
+
+#zoom-trigger {
+  width: 52px;
+  height: var(--size-float-control);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-base);
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+#zoom-trigger:hover,
+#zoom-trigger[aria-expanded="true"] {
+  background: var(--chrome-hover);
+}
+
+#zoom-trigger:focus-visible,
+#zoom-fit:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 1px;
+}
+
+.zoom-pill-divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 var(--space-xs);
+  background: var(--chrome-border);
+}
+
+#zoom-fit {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: var(--size-float-control);
+  padding: 0 var(--space-lg);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--chrome-text-secondary);
+  font: inherit;
+  font-size: var(--ui-base);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#zoom-fit:hover,
+#zoom-fit.is-current {
+  background: var(--chrome-hover);
+  color: var(--chrome-text);
+}
+
+#zoom-fit .icon {
+  font-size: var(--size-icon-sm);
+}
+
+/* The popover sits above the pill, centred on it — placed in CSS alone (the pill's place is fixed), so it needs no anchor positioning and works wherever the API does. A browser without the Popover API toggles `data-open` instead. */
+#zoom-menu {
+  position: fixed;
+  inset: auto;
+  bottom: 70px;
+  left: calc((var(--reserve-left) + 100vw - var(--reserve-right)) / 2 - 136px);
+  width: 272px;
+  margin: 0;
+  padding: var(--space-md) var(--space-lg) var(--space-sm);
+  border: none;
+  border-radius: var(--radius-item);
+  background: var(--chrome-raised);
+  color: var(--chrome-text);
+  box-shadow: var(--chrome-shadow-card);
+  overflow: visible;
+}
+
+#zoom-menu:not(:is(:popover-open, [data-open])) {
+  display: none;
+}
+
+.zoom-pop-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+  font-size: var(--ui-xs);
+}
+
+.zoom-pop-head b {
+  font-weight: 600;
+}
+
+.zoom-pop-head span {
+  color: var(--chrome-text-tertiary);
+}
+
+#zoom-range {
+  --fill: 50%;
+  display: block;
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+
+#zoom-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to right, var(--chrome-primary) var(--fill), var(--chrome-border-strong) var(--fill));
+}
+
+#zoom-range::-moz-range-track {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to right, var(--chrome-primary) var(--fill), var(--chrome-border-strong) var(--fill));
+}
+
+#zoom-range::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 2px solid var(--chrome-raised);
+  border-radius: 50%;
+  background: var(--chrome-primary);
+  box-shadow: var(--chrome-shadow-raised);
+  appearance: none;
+}
+
+#zoom-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--chrome-raised);
+  border-radius: 50%;
+  background: var(--chrome-primary);
+  box-shadow: var(--chrome-shadow-raised);
+}
+
+#zoom-range:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-pill);
+}
+
+.zoom-pop-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-2xs);
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.zoom-pop-sep {
+  height: 1px;
+  margin: var(--space-md) calc(-1 * var(--space-lg)) var(--space-xs);
+  background: var(--chrome-border);
+}
+
+.zoom-pop-presets {
+  display: flex;
+  flex-direction: column;
+  margin: 0 calc(-1 * var(--space-sm));
+}
+
+.zoom-preset {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  height: var(--size-row-menu);
+  padding: 0 var(--space-md);
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-sm);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.zoom-preset .icon {
+  width: var(--size-icon-sm);
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.zoom-preset:hover {
+  background: var(--chrome-hover);
+}
+
+.zoom-preset.is-current {
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+  font-weight: 600;
+}
+
+.zoom-preset.is-current .icon {
+  color: var(--chrome-accent);
+}
+
+.zoom-preset:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
+.zoom-preset-hint {
+  margin-left: auto;
+  font-size: var(--ui-2xs);
+  font-weight: 400;
+  color: var(--chrome-text-tertiary);
+}
+
+/* ---- Full-height views and project-less state under the floating bar ---- */
+
+#update-notice {
+  top: calc(var(--space-xl) + var(--size-float-control) + var(--space-2xl));
+  right: var(--space-xl);
+}
+
+#no-project-state {
+  position: absolute;
+  inset: 0;
+  padding-top: var(--shell-top);
+}
+
+#empty-card {
+  border: none;
+  border-radius: var(--radius-card);
+  background: var(--chrome-float);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--chrome-shadow-card);
+}
+
+#usecases-view {
+  top: 0;
+  padding-top: var(--shell-top);
+}
+
+/* The how-to-start guide is the get-started card (design `get-started-card`): a float surface with the prompt in a tray. */
+#empty-guide {
+  width: 440px;
+  padding: var(--space-3xl) var(--space-2xl);
+  border-radius: var(--radius-card);
+  background: var(--chrome-float);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--chrome-shadow-card);
+}
+
+#empty-guide-prompt-box {
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--chrome-field);
 }

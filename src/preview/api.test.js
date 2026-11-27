@@ -25,6 +25,7 @@ import {
   initProject,
   fetchFsDirs,
   fetchSetup,
+  fetchScreenViewports,
 } from "./api.js";
 
 const PROJECT = "/Users/example/my-project";
@@ -168,5 +169,39 @@ describe("fetchSetup (CHR-1048)", () => {
     const setup = await fetchSetup();
     expect(setup.skill).toBeNull();
     expect(setup.clients).toHaveLength(1);
+  });
+});
+
+describe("fetchScreenViewports (CHR-1267)", () => {
+  afterEach(() => {
+    delete globalThis.fetch;
+  });
+
+  it("reads every screen's frame size from get_project's tree view, scoped to the project", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      okJson({
+        screens: [
+          { screen: "home", viewport: { width: 1280, height: 800, declared: true } },
+          { screen: "checkout", viewport: { width: 390, height: 844, declared: false } },
+          { screen: "odd", viewport: { width: "wide" } },
+          { screen: "none" },
+        ],
+      }),
+    );
+    const sizes = await fetchScreenViewports(PROJECT);
+    expect(globalThis.fetch).toHaveBeenCalledWith(`/api/tools/get_project?project=${P}`, expect.objectContaining({ method: "POST", body: JSON.stringify({ view: "tree" }) }));
+    expect([...sizes]).toEqual([
+      ["home", { width: 1280, height: 800 }],
+      ["checkout", { width: 390, height: 844 }],
+    ]);
+  });
+
+  it("answers an empty map when the read fails, so the tree falls back to the phone icon", async () => {
+    globalThis.fetch = vi.fn(async () => ({ ok: false, json: async () => ({}) }));
+    expect((await fetchScreenViewports(PROJECT)).size).toBe(0);
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("down");
+    });
+    expect((await fetchScreenViewports(PROJECT)).size).toBe(0);
   });
 });

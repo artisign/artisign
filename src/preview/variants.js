@@ -1,10 +1,6 @@
-// CHR-732 — the screen view's variant context: a breadcrumb bar above the
-// canvas, a variant tree map beside it, and the inspector's "Variant" and
-// "Also reached from" cards. Everything is derived from /api/screens (the
-// stored `variant_of` chain — never the flow arrival path) and /api/flows.
-// The pure functions come first, the DOM wiring (createVariantUI) last.
+// CHR-732 — the screen view's variant context: a breadcrumb pill floating above the frame (CHR-1267: the variant tree map and its toggle are gone, the nav tree carries the variants). Everything is derived from /api/screens (the stored `variant_of` chain — never the flow arrival path) and /api/flows. The pure functions come first (flowCounts / alsoReachedFrom feed the inspector slice), the DOM wiring (createVariantUI) last.
 
-import { buildScreenTree, createKindIcon, displayName } from "./screens.js";
+import { buildScreenTree, createKindIcon } from "./screens.js";
 import { canCompare } from "./compare-data.js";
 import { icon } from "./icons.js";
 import { setRovingTabindex, wireMenu } from "./menu-keys.js";
@@ -90,25 +86,24 @@ function button(className, text, onClick) {
 
 /**
  * @param {{
- *   barEl: HTMLElement, mapEl: HTMLElement, inspectorEl: HTMLElement,
+ *   barEl: HTMLElement,
  *   onSelect: (screen: string) => void,
- *   map?: { visible: () => boolean, onToggle: (visible: boolean) => void },
  *   compare?: {
  *     state: () => { on: boolean, selected: string[], cap: number },
  *     onMode: (on: boolean) => void,
  *     onPick: (screen: string) => void,
  *   },
- * }} els CHR-912 — `map` is the per-browser show/hide of the variant map (default visible when absent). CHR-738 — `compare` adds the Single | Compare toggle to the bar and a
+ * }} els CHR-738 — `compare` adds the Single | Compare toggle to the bar and a
  *   checkbox per popover row while compare is on; without it the bar is as before.
  * @returns {{
  *   update: (screens: object[], flows: object[], currentScreen: string | null) => boolean,
  *   openPopover: (screen: string) => void,
  * }}
- *   `update` re-renders everything and returns whether the bar/map are showing,
+ *   `update` re-renders the bar and returns whether it is showing,
  *   so the caller can re-fit the canvas when that changes. `openPopover` opens
  *   the variants popover of one crumb (the compare chip row's "add" chip).
  */
-export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, map }) {
+export function createVariantUI({ barEl, onSelect, compare }) {
   let openCrumb = null;
   let last = { screens: [], flows: [], currentScreen: null };
   // Where keyboard focus goes after the next render instead of the element
@@ -141,19 +136,17 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
   /** A render replaces every control, so focus is remembered by role + screen and put back. */
   function focusKey() {
     const active = document.activeElement;
-    if (!active || ![barEl, mapEl, inspectorEl].some((c) => c.contains(active))) return null;
+    if (!active || !barEl.contains(active)) return null;
     return { cls: active.classList[0], screen: active.dataset.screen ?? active.closest("[data-screen]")?.dataset.screen };
   }
 
   function restoreFocus(key) {
     if (!key) return;
-    for (const container of [barEl, mapEl, inspectorEl]) {
-      for (const candidate of container.querySelectorAll(`.${key.cls}`)) {
-        const screen = candidate.dataset.screen ?? candidate.closest("[data-screen]")?.dataset.screen;
-        if (screen === key.screen) {
-          candidate.focus();
-          return;
-        }
+    for (const candidate of barEl.querySelectorAll(`.${key.cls}`)) {
+      const screen = candidate.dataset.screen ?? candidate.closest("[data-screen]")?.dataset.screen;
+      if (screen === key.screen) {
+        candidate.focus();
+        return;
       }
     }
   }
@@ -237,19 +230,6 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
 
   function renderBar(ctx, current) {
     barEl.innerHTML = "";
-    // Hidden while comparing: the map lives in the single-screen stage, which compare replaces.
-    if (map && !compare?.state().on) {
-      const shown = map.visible();
-      const mapToggle = button("variant-map-toggle chrome-icon-btn chrome-icon-btn--sm", "", () => {
-        map.onToggle(!shown);
-        rerender();
-      });
-      mapToggle.setAttribute("aria-pressed", String(shown));
-      mapToggle.setAttribute("aria-label", "Variant map");
-      mapToggle.dataset.tooltip = "Variant map";
-      mapToggle.appendChild(icon("account_tree"));
-      barEl.append(mapToggle, el("span", "chrome-divider-v"));
-    }
     ctx.chain.forEach((node, i) => {
       if (i > 0) barEl.appendChild(icon("chevron_right", "crumb-sep"));
       const group = el("span", "crumb-group");
@@ -289,7 +269,7 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
       barEl.appendChild(el("span", "variant-chip chrome-chip", `depth ${ctx.depth}`));
       if (ctx.kind) barEl.appendChild(el("span", `variant-chip variant-chip-${ctx.kind} chrome-chip`, ctx.kind));
       const back = button("variant-back chrome-btn chrome-btn--ghost chrome-btn--compact", `Back to ${ctx.root.name}`, () => go(ctx.root.name));
-      back.prepend(icon("arrow_upward"));
+      back.prepend(icon("arrow_back"));
       barEl.appendChild(back);
     } else {
       barEl.appendChild(el("span", "variant-chip chrome-chip", `${ctx.node.total} variant${ctx.node.total === 1 ? "" : "s"}`));
@@ -317,77 +297,6 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
     return group;
   }
 
-  function renderMap(ctx, current) {
-    mapEl.innerHTML = "";
-    const card = el("div", "variant-map-card");
-    card.appendChild(el("h3", "", `Variant tree · ${ctx.root.name}`));
-    const onPath = new Set(ctx.chain);
-    const visit = (node) => {
-      const row = button("map-node", "", () => go(node.name));
-      row.dataset.screen = node.name;
-      row.style.setProperty("--indent", `${node.depth * 12}px`);
-      row.classList.toggle("on", node.name === current);
-      row.classList.toggle("dim", !onPath.has(node));
-      row.setAttribute("aria-current", String(node.name === current));
-      row.title = node.name;
-      if (node === ctx.root) row.appendChild(icon("home", "crumb-home"));
-      else {
-        const kindIcon = createKindIcon(node.screen.variant_kind);
-        if (kindIcon) row.appendChild(kindIcon);
-      }
-      row.appendChild(el("span", "map-node-name", displayName(node)));
-      const expanded = onPath.has(node);
-      if (node === ctx.root) row.appendChild(el("span", "map-node-note", "base"));
-      else if (!expanded && node.children.length > 0) {
-        const note = el("span", "map-node-note");
-        note.append(icon("chevron_right"), String(node.total));
-        row.appendChild(note);
-      }
-      card.appendChild(row);
-      if (expanded) node.children.forEach(visit);
-    };
-    visit(ctx.root);
-    mapEl.appendChild(card);
-  }
-
-  function renderInspector(ctx, flows, current) {
-    inspectorEl.innerHTML = "";
-    if (!ctx.parent) return false;
-    const variant = el("div", "variant-card");
-    variant.appendChild(el("h3", "", "Variant"));
-    const counts = flowCounts(flows, current);
-    const rows = [
-      ["Path", ctx.chain.slice(0, -1).map((n) => n.name).join(" › ")],
-      ["Kind", ctx.kind ?? "—"],
-      ["Depth", String(ctx.depth)],
-      ["Siblings", String(ctx.siblings.length)],
-      ["Flows in / out", `${counts.in} / ${counts.out}`],
-    ];
-    for (const [label, value] of rows) {
-      const kv = el("div", "variant-kv");
-      kv.appendChild(el("span", "", label));
-      const b = el("b", "", value);
-      b.title = value;
-      kv.appendChild(b);
-      variant.appendChild(kv);
-    }
-    inspectorEl.appendChild(variant);
-
-    const sources = alsoReachedFrom(flows, current, ctx.parent.name);
-    if (sources.length > 0) {
-      const card = el("div", "variant-card also-reached");
-      card.appendChild(el("h3", "", `Also reached from · ${sources.length} flow source${sources.length === 1 ? "" : "s"}`));
-      for (const source of sources) {
-        const link = button("variant-link", source, () => go(source));
-        link.dataset.screen = source;
-        card.appendChild(link);
-      }
-      card.appendChild(el("p", "variant-home-note", `Home = ${ctx.parent.name} (only variant-of).`));
-      inspectorEl.appendChild(card);
-    }
-    return true;
-  }
-
   function update(screens, flows, currentScreen) {
     const key = focusNext ?? focusKey();
     focusNext = null;
@@ -405,19 +314,12 @@ export function createVariantUI({ barEl, mapEl, inspectorEl, onSelect, compare, 
     if (!ctx) {
       openCrumb = null;
       barEl.hidden = true;
-      mapEl.hidden = true;
-      inspectorEl.hidden = true;
       barEl.innerHTML = "";
-      mapEl.innerHTML = "";
-      inspectorEl.innerHTML = "";
       return false;
     }
     if (openCrumb && !ctx.chain.some((n) => n.name === openCrumb)) openCrumb = null;
     renderBar(ctx, currentScreen);
-    renderMap(ctx, currentScreen);
-    inspectorEl.hidden = !renderInspector(ctx, flows, currentScreen);
     barEl.hidden = false;
-    mapEl.hidden = map ? !map.visible() : false;
     return true;
   }
 

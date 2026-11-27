@@ -1308,7 +1308,8 @@ async function sendAgentNote(text, noteKey) {
   const screen = noteKey.startsWith("screen:") ? noteKey.slice("screen:".length) : null;
   if (screen === null) return { ok: false, message: "no screen is open" };
   const result = await postComment({ screen, node_id: null, text }, activeProjectRoot);
-  if (result.ok && screen === currentScreen) await loadComments(); // the SSE "comments" event would too, a moment later
+  // The note is on disk once the post answered: a failing refresh must not read as a failed send (a resend would start a second thread). The SSE "comments" event refreshes a moment later anyway.
+  if (result.ok && screen === currentScreen) await loadComments().catch(() => {});
   return result;
 }
 
@@ -2180,6 +2181,7 @@ const PANEL_TOOLS = { inspect: inspectModeToggle, notes: notesToolToggle, commen
 // CHR-1269 — the Agent bar. It folds above whichever tool panel takes the right column (the panel's onChange below).
 const agentBar = createAgentBar({
   barEl: document.getElementById("agent-bar"),
+  topbarEl: document.getElementById("topbar-agent"),
   storage: prefsStorage,
   onFollow: (on) => applyFollowToggleAction(on ? "toggle-on" : "toggle-off"),
   onResume: () => applyFollowToggleAction("resume"),
@@ -2897,6 +2899,11 @@ function controlFor(id) {
 /** Still available with no project open: the picker, its menu, the theme and the reference. */
 const NO_PROJECT_SHORTCUTS = new Set(["project-menu", "menu-open", "menu-new", "theme", "help"]);
 
+/** The Agent bar shows in the Screens and Board views; the other two carry Follow and the Live chip in the top bar. */
+function agentBarShown() {
+  return currentView === "screens" || currentView === "board";
+}
+
 /** @param {string} id a SHORTCUTS id (shortcuts.js) */
 function runShortcut(id) {
   const def = shortcutById(id);
@@ -2918,9 +2925,10 @@ function runShortcut(id) {
     case "follow":
       // A paused follow has no switch on screen (Resume stands in its place): the key still turns follow off.
       if (followState.paused) applyFollowToggleAction(followToggleClickAction(followState));
-      else if (!pressControl(controlFor(id))) return false;
+      else if (!pressControl(document.getElementById(agentBarShown() ? "follow-label" : "topbar-follow-label"))) return false;
       return true;
-    case "follow-resume": return followState.paused && pressControl(controlFor(id));
+    case "follow-resume": return followState.paused && pressControl(document.getElementById(agentBarShown() ? "follow-resume" : "topbar-follow-resume"));
+    case "panel-agent": return agentBarShown() && pressControl(document.getElementById("agent-bar-fold")); // no Agent bar in the Design System view and Use Cases: nothing to fold, nothing to store
     case "zoom-in":
     case "zoom-out":
       if (currentView === "board") return pressControl(id === "zoom-in" ? boardZoomPlusBtn : boardZoomMinusBtn);

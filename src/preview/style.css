@@ -11443,6 +11443,41 @@ body {
   display: none;
 }
 
+/* The Design System view and Use Cases have no Agent bar: the top bar carries the Live chip and the Follow control there, and only there. */
+#topbar-agent {
+  display: none;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 0 var(--space-md);
+}
+
+#app[data-shell-view="design-system"] #topbar-agent,
+#app[data-shell-view="usecases"] #topbar-agent {
+  display: inline-flex;
+}
+
+#topbar-agent [hidden] {
+  display: none;
+}
+
+#topbar-follow {
+  display: inline-flex;
+  align-items: center;
+}
+
+.topbar-follow-part {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: var(--ui-sm);
+  font-weight: 500;
+  color: var(--chrome-text);
+}
+
+#topbar-follow-paused .agent-follow-label .icon {
+  color: var(--chrome-agent);
+}
+
 /* The Live chip: green dot + "Live"; offline it becomes a red pill. */
 .live-chip {
   display: inline-flex;
@@ -11506,6 +11541,17 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The design's float-icon-btn "sm": 28px, a pill, a 16px icon (only this button; the other cards keep the 24px chrome-icon-btn--sm). */
+#agent-bar-fold {
+  width: var(--size-control);
+  height: var(--size-control);
+  border-radius: var(--radius-pill);
+}
+
+#agent-bar-fold .icon {
+  font-size: var(--size-icon-sm);
 }
 
 #agent-bar #agent-bar-fold[aria-disabled="true"] {
@@ -11602,7 +11648,7 @@ body {
 }
 
 /* The Follow switch: a native checkbox (role "switch", the `switch` attribute where the browser has it) drawn the same everywhere. */
-#follow-switch {
+.follow-switch {
   appearance: none;
   position: relative;
   flex: none;
@@ -11614,7 +11660,7 @@ body {
   cursor: pointer;
 }
 
-#follow-switch::before {
+.follow-switch::before {
   content: "";
   position: absolute;
   top: 2px;
@@ -11626,21 +11672,21 @@ body {
   box-shadow: var(--chrome-shadow-raised);
 }
 
-#follow-switch:checked {
+.follow-switch:checked {
   background: var(--chrome-agent);
 }
 
-#follow-switch:checked::before {
+.follow-switch:checked::before {
   left: 14px;
 }
 
-#follow-switch:focus-visible,
-#follow-resume:focus-visible {
+.follow-switch:focus-visible,
+.follow-resume:focus-visible {
   outline: 2px solid var(--chrome-focus-ring);
   outline-offset: 2px;
 }
 
-#follow-resume {
+.follow-resume {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
@@ -11656,7 +11702,7 @@ body {
   cursor: pointer;
 }
 
-#follow-resume .icon {
+.follow-resume .icon {
   font-size: var(--size-icon-xs);
 }
 
@@ -11688,6 +11734,11 @@ body {
   padding: 0 var(--space-md);
   overflow-y: auto;
   list-style: none;
+}
+
+/* The bottom 36px fade tells that rows run on below; agent-bar.js sets data-fade only while they do, never at the end of the list. */
+#agent-feed[data-fade="true"] {
+  mask-image: linear-gradient(#000 calc(100% - 36px), transparent);
 }
 
 #agent-bar[data-connection="offline"] #agent-feed,

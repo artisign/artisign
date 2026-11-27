@@ -12,6 +12,14 @@ export const IDLE_AFTER_MS = 60_000;
 const NO_CALL_YET = "No agent call in this session yet";
 
 /**
+ * Whether a scrolling list has more rows below what shows (the feed fades its bottom edge only then).
+ * @param {{ scrollTop: number, clientHeight: number, scrollHeight: number }} el
+ */
+export function feedHasMoreBelow({ scrollTop, clientHeight, scrollHeight }) {
+  return scrollHeight - clientHeight - scrollTop > 1;
+}
+
+/**
  * What the status box says (design `agent-status`): the latest feed entry as the agent's present, "Idle" when nothing happened for a while or the feed is empty, "Waiting for the connection" while the live connection is down.
  * @param {{ feed: object[], follow: { enabled: boolean, paused: boolean }, connected: boolean, now: number, exists: (event: object) => boolean }} state
  * @returns {{ look: "active" | "idle", text: import("./activity.js").ActivityText, detail: string }}
@@ -46,14 +54,15 @@ export function noteState({ view, showMockup, comparing, screen, screenLabel, mo
 /**
  * @param {{
  *   barEl: HTMLElement,
+ *   topbarEl: HTMLElement,
  *   storage: Storage,
  *   onFollow: (on: boolean) => void,
  *   onResume: () => void,
  *   onSelect: (event: object) => void,
  *   onSend: (text: string, noteKey: string) => Promise<{ ok: true } | { ok: false, message: string }>,
- * }} args `onSend` posts the note for the scope the field showed when it was sent (`noteKey`).
+ * }} args `onSend` posts the note for the scope the field showed when it was sent (`noteKey`). `topbarEl` holds the Live chip and Follow control the top bar shows in the views that have no Agent bar (Design System, Use Cases); the stylesheet picks which of the two sets shows.
  */
-export function createAgentBar({ barEl, storage, onFollow, onResume, onSelect, onSend }) {
+export function createAgentBar({ barEl, topbarEl, storage, onFollow, onResume, onSelect, onSend }) {
   const $ = (id) => /** @type {HTMLElement} */ (barEl.querySelector(`#${id}`));
   const foldEl = /** @type {HTMLButtonElement} */ ($("agent-bar-fold"));
   const foldIconEl = $("agent-bar-fold-icon");
@@ -70,6 +79,11 @@ export function createAgentBar({ barEl, storage, onFollow, onResume, onSelect, o
   const fieldEl = /** @type {HTMLTextAreaElement} */ ($("agent-note-field"));
   const errorEl = $("agent-note-error");
   const sendEl = /** @type {HTMLButtonElement} */ ($("agent-note-send"));
+  const tb = (id) => /** @type {HTMLElement} */ (topbarEl.querySelector(`#${id}`));
+  const topSwitchEl = /** @type {HTMLInputElement} */ (tb("topbar-follow-switch"));
+  const topChipEl = tb("topbar-connection");
+  const topFollowEl = tb("topbar-follow-on");
+  const topPausedEl = tb("topbar-follow-paused");
 
   const FOLD_KEY = "artisign.agent-bar.collapsed";
   let userFolded = readBoolPref(storage, FOLD_KEY, false);
@@ -102,7 +116,25 @@ export function createAgentBar({ barEl, storage, onFollow, onResume, onSelect, o
   applyFold();
 
   switchEl.addEventListener("change", () => onFollow(switchEl.checked));
+  topSwitchEl.addEventListener("change", () => onFollow(topSwitchEl.checked));
   $("follow-resume").addEventListener("click", () => onResume());
+  tb("topbar-follow-resume").addEventListener("click", () => onResume());
+
+  /** Live regions announce every replaced text node, even an identical one: write only what changed. */
+  function setText(el, text) {
+    if (el.textContent !== text) el.textContent = text;
+  }
+  function setData(el, key, value) {
+    if (el.dataset[key] !== value) el.dataset[key] = value;
+  }
+
+  // --- The feed's bottom fade: only while rows run on below it --------------
+
+  function syncFade() {
+    feedEl.dataset.fade = String(feedHasMoreBelow(feedEl));
+  }
+  feedEl.addEventListener("scroll", syncFade, { passive: true });
+  if (typeof ResizeObserver !== "undefined") new ResizeObserver(syncFade).observe(feedEl); // the card's height changes with the window and the fold
 
   // --- The note field -------------------------------------------------------
 
@@ -159,8 +191,16 @@ export function createAgentBar({ barEl, storage, onFollow, onResume, onSelect, o
     sending = true;
     syncSend();
     showError("");
-    const result = await onSend(text, key);
-    sending = false;
+    /** @type {{ ok: true } | { ok: false, message: string }} */
+    let result;
+    try {
+      result = await onSend(text, key);
+    } catch (err) {
+      // The daemon being unreachable rejects the request: the text stays, the field stays editable.
+      result = { ok: false, message: err instanceof Error ? err.message : String(err) };
+    } finally {
+      sending = false;
+    }
     if (result.ok) {
       // The field may show another scope by now (follow moved on): only the scope the note was written for forgets its text.
       if (note.key === key) fieldEl.value = "";
@@ -179,23 +219,37 @@ export function createAgentBar({ barEl, storage, onFollow, onResume, onSelect, o
      * @param {{ feed: object[], follow: { enabled: boolean, paused: boolean }, connected: boolean, now?: number, exists: (event: object) => boolean, note: ReturnType<typeof noteState> }} state
      */
     render({ feed, follow, connected, now = Date.now(), exists, note: nextNote }) {
-      barEl.dataset.connection = connected ? "live" : "offline";
-      connectionEl.dataset.state = connected ? "live" : "offline";
-      $("connection-label").textContent = connected ? "Live" : "Offline";
-      connectionEl.dataset.tooltip = connected ? "Live reload: connected" : "Live reload disconnected, retrying";
+      const chipState = connected ? "live" : "offline";
+      const chipLabel = connected ? "Live" : "Offline";
+      const chipTip = connected ? "Live reload: connected" : "Live reload disconnected, retrying";
+      barEl.dataset.connection = chipState;
+      for (const [chip, label] of [[connectionEl, $("connection-label")], [topChipEl, tb("topbar-connection-label")]]) {
+        setData(chip, "state", chipState);
+        setText(label, chipLabel);
+        setData(chip, "tooltip", chipTip);
+      }
 
       const status = agentStatus({ feed, follow, connected, now, exists });
-      statusEl.dataset.look = status.look;
-      foldedStatusEl.dataset.look = status.look;
-      fillActivityText($("agent-status-text"), status.text);
-      $("agent-status-detail").textContent = status.detail;
-      $("agent-bar-folded-text").textContent = `${status.text.before}${status.text.name ?? ""}${status.text.after}`;
+      setData(statusEl, "look", status.look);
+      setData(foldedStatusEl, "look", status.look);
+      const said = `${status.text.before}${status.text.name ?? ""}${status.text.after}`;
+      const statusTextEl = $("agent-status-text");
+      if (statusTextEl.dataset.said !== said) {
+        statusTextEl.dataset.said = said;
+        fillActivityText(statusTextEl, status.text);
+      }
+      setText($("agent-status-detail"), status.detail);
+      setText($("agent-bar-folded-text"), said);
       const paused = follow.enabled && follow.paused;
       followRowEl.hidden = paused;
       pausedRowEl.hidden = !paused;
       switchEl.checked = follow.enabled;
+      topFollowEl.hidden = paused;
+      topPausedEl.hidden = !paused;
+      topSwitchEl.checked = follow.enabled;
 
       renderActivityFeed(feedEl, $("agent-feed-empty"), feed, { exists, onSelect, now: () => now });
+      syncFade();
       renderNote(nextNote);
     },
     /** A tool panel took (or gave back) the column below: fold (or unfold) with it. @param {boolean} open */

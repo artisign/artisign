@@ -161,8 +161,8 @@ const UPDATED = ["Updated", "Updating", "update"];
 const VERBS = {
   inspect_node: ["Inspected", "Inspecting", "inspect"],
   delete_entity: ["Deleted", "Deleting", "delete"],
-  create_comment: ["Commented on", "Commenting on", "comment on"],
-  reply_comment: ["Commented on", "Commenting on", "comment on"],
+  create_comment: ["Commented", "Commenting", "comment"],
+  reply_comment: ["Replied to a comment", "Replying to a comment", "reply to a comment"],
   write_html: WROTE,
   write_mockup: WROTE,
   import_html: WROTE,
@@ -175,8 +175,6 @@ const BROAD_SUBJECTS = {
   get_design_system: "the design system",
   set_tokens: "the design system tokens",
   list_comments: "the comments",
-  create_comment: "the comments",
-  reply_comment: "the comments",
   get_guide: "the guide",
   list_use_cases: "the use cases",
   get_use_case: "the use cases",
@@ -204,23 +202,24 @@ export function describeActivity(event, { gone = false, progressive = false } = 
   let pre = "";
   let name = null;
   let post = "";
-  if (!target) pre = BROAD_SUBJECTS[event.tool] ?? "the project";
+  // The agent's comment calls carry no target (src/mcp/activity.ts): the verb stands alone, with no invented object.
+  if (!target) pre = BROAD_SUBJECTS[event.tool] ?? (event.tool === "create_comment" || event.tool === "reply_comment" ? "" : "the project");
   else if (target.kind === "mockup") {
-    pre = "mockup ";
+    pre = "mockup";
     name = target.name;
     post = target.variant ? `, variant ${target.variant}` : "";
   } else if (target.kind === "component" || target.kind === "pattern") {
-    pre = `${target.kind} `;
+    pre = target.kind;
     name = target.name;
   } else {
     name = target.name;
     const node = nodeLabel(event);
     post = node ? `, ${node}` : "";
   }
-  if (!event.ok) return { before: `Could not ${base} ${pre}`, name, after: post };
-  const lead = progressive ? ing : past;
+  const words = (verb) => [verb, pre].filter(Boolean).join(" ") + (name !== null ? " " : "");
+  if (!event.ok) return { before: words(`Could not ${base}`), name, after: post };
   const suffix = gone && event.tool !== "delete_entity" ? `${post}, which no longer exists` : post;
-  return { before: `${lead} ${pre}`, name, after: suffix };
+  return { before: words(progressive ? ing : past), name, after: suffix };
 }
 
 /** The visual variant of a feed row (design `agent-activity`): independent of anything but the event and whether its target is gone. */

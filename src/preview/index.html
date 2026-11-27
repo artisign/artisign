@@ -52,6 +52,14 @@
           <button type="button" class="view-tab" data-view="usecases" aria-pressed="false">Use Cases<span class="chrome-badge"><span class="visually-hidden">, </span>Beta</span></button>
         </nav>
         <div id="topbar-end" class="float-pill">
+          <!-- CHR-1269: the Design System view and Use Cases have no Agent bar; their top bar carries the Live chip and the Follow control instead (shown by style.css only there). Same state as the Agent bar's, drawn by agent-bar.js. -->
+          <span id="topbar-agent" class="project-only">
+            <span id="topbar-follow" class="float-follow">
+              <span id="topbar-follow-on" class="topbar-follow-part"><label id="topbar-follow-label" class="agent-follow-label" for="topbar-follow-switch" data-tooltip="Follow the agent" data-shortcut-id="follow">Follow</label><input type="checkbox" id="topbar-follow-switch" class="follow-switch" role="switch" switch /></span>
+              <span id="topbar-follow-paused" class="topbar-follow-part" hidden><span class="agent-follow-label"><span class="icon" aria-hidden="true">pause_circle</span>Follow paused</span><button type="button" id="topbar-follow-resume" class="follow-resume" data-tooltip="Resume following" data-shortcut-id="follow-resume"><span class="icon" aria-hidden="true">play_arrow</span>Resume</button></span>
+            </span>
+            <span id="topbar-connection" class="live-chip" role="status" data-state="live" data-tooltip="Live reload: connected"><span class="live-chip-dot" aria-hidden="true"></span><span id="topbar-connection-label">Live</span></span>
+          </span>
           <button type="button" id="warning-badge" class="chrome-chip chrome-chip--warning" title="Render diagnostics — click to step through" hidden></button>
           <!-- CHR-926: app settings (theme, the per-browser toggles), MCP setup and About. An ARIA menu like the zoom menu (CHR-920); wired by settings-menu.js. -->
           <div id="settings-controls">
@@ -339,20 +347,21 @@
             <!-- Shown only while the bar is folded: the status dot and the live status (design `agent-bar-folded`). -->
             <span id="agent-bar-folded-status" class="agent-folded-status" data-look="active" hidden><span class="agent-folded-dot" aria-hidden="true"></span><span id="agent-bar-folded-text"></span></span>
             <span id="connection" class="live-chip" role="status" data-state="live" data-tooltip="Live reload: connected"><span class="live-chip-dot" aria-hidden="true"></span><span id="connection-label">Live</span></span>
-            <button type="button" id="agent-bar-fold" class="chrome-icon-btn chrome-icon-btn--sm" aria-expanded="true" aria-label="Fold Agent bar" data-tooltip="Fold Agent bar" data-shortcut-id="panel-agent"><span id="agent-bar-fold-icon" class="icon" aria-hidden="true">keyboard_arrow_up</span></button>
+            <button type="button" id="agent-bar-fold" class="chrome-icon-btn" aria-expanded="true" aria-label="Fold Agent bar" data-tooltip="Fold Agent bar" data-shortcut-id="panel-agent"><span id="agent-bar-fold-icon" class="icon" aria-hidden="true">keyboard_arrow_up</span></button>
           </div>
           <span id="agent-bar-live" class="visually-hidden" role="status" aria-live="polite"></span>
           <div id="agent-bar-body" class="float-card-body">
-            <div id="agent-status" role="status" data-look="active">
-              <p id="agent-status-now"><span id="agent-status-dot" aria-hidden="true"></span><span id="agent-status-text"></span></p>
-              <p id="agent-status-detail"></p>
+            <div id="agent-status" data-look="active">
+              <!-- Only the two text lines are the live region: the switch and Resume below are controls, not a status message. -->
+              <p id="agent-status-now" role="status"><span id="agent-status-dot" aria-hidden="true"></span><span id="agent-status-text"></span></p>
+              <p id="agent-status-detail" role="status"></p>
               <div id="agent-follow-row">
                 <label id="follow-label" class="agent-follow-label" for="follow-switch" data-tooltip="Follow the agent" data-shortcut-id="follow"><span class="icon" aria-hidden="true">visibility</span>Follow the agent</label>
-                <input type="checkbox" id="follow-switch" role="switch" switch />
+                <input type="checkbox" id="follow-switch" class="follow-switch" role="switch" switch />
               </div>
               <div id="agent-follow-paused-row" hidden>
                 <span class="agent-follow-label"><span class="icon" aria-hidden="true">pause_circle</span>Follow paused</span>
-                <button type="button" id="follow-resume" data-tooltip="Resume following" data-shortcut-id="follow-resume"><span class="icon" aria-hidden="true">play_arrow</span>Resume</button>
+                <button type="button" id="follow-resume" class="follow-resume" data-tooltip="Resume following" data-shortcut-id="follow-resume"><span class="icon" aria-hidden="true">play_arrow</span>Resume</button>
               </div>
             </div>
             <div class="agent-section-head"><span>Activity</span><span>Newest first</span></div>

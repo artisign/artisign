@@ -330,6 +330,93 @@ describe("the note field", () => {
   });
 });
 
+describe("the Design System view and Use Cases (no Agent bar there)", () => {
+  const topFollow = () => (!$("#topbar-follow-paused").hidden ? "paused" : $("#topbar-follow-switch").checked ? "following" : "off");
+
+  it("follow on, a component write switches to the Design System view: the top bar shows the follow state and the Live chip, and Offline when the stream drops", async () => {
+    localStorage.setItem("artisign.followEnabled", "true");
+    await boot();
+    activity("write_html", "write", { kind: "component", name: "btn" });
+    await flush();
+    expect($("#app").dataset.shellView).toBe("design-system");
+    expect(topFollow()).toBe("following");
+    expect($("#topbar-connection-label").textContent).toBe("Live");
+    sources.at(-1).onerror();
+    expect($("#topbar-connection-label").textContent).toBe("Offline");
+    expect($("#topbar-connection").dataset.tooltip).toBe("Live reload disconnected, retrying");
+    sources.at(-1).onopen();
+    expect($("#topbar-connection-label").textContent).toBe("Live");
+  });
+
+  it("a human move there pauses follow: Resume in the top bar, and W and R act on the top bar's controls", async () => {
+    localStorage.setItem("artisign.followEnabled", "true");
+    await boot();
+    tab("design-system").click();
+    await flush();
+    expect(topFollow()).toBe("paused");
+    key("r");
+    expect(topFollow()).toBe("following");
+    key("w");
+    expect(topFollow()).toBe("off");
+    key("w");
+    expect(topFollow()).toBe("following");
+    $("#topbar-follow-switch").click();
+    expect(topFollow()).toBe("off");
+  });
+
+  it("] folds nothing there and stores nothing: back in Screens the bar is as it was", async () => {
+    await boot();
+    for (const view of ["design-system", "usecases"]) {
+      tab(view).click();
+      await flush();
+      key("]");
+      expect(collapsed()).toBe(false);
+    }
+    tab("screens").click();
+    await flush();
+    expect(collapsed()).toBe(false);
+    key("]"); // and in Screens it still works
+    expect(collapsed()).toBe(true);
+  });
+});
+
+describe("the note field and the network", () => {
+  it("a post that rejects (daemon gone) shows the error, keeps the text, and a second send works", async () => {
+    await boot();
+    const realFetch = globalThis.fetch;
+    let down = true;
+    vi.stubGlobal("fetch", async (url, init) => {
+      if (down && String(url).startsWith("/api/comments") && init?.method === "POST") throw new TypeError("Failed to fetch");
+      return realFetch(url, init);
+    });
+    typeNote("hello");
+    $("#agent-note").requestSubmit();
+    await flush();
+    expect($("#agent-note-error").textContent).toBe("Could not send the note: Failed to fetch");
+    expect($("#agent-note-field").value).toBe("hello");
+    down = false;
+    $("#agent-note").requestSubmit();
+    await flush();
+    expect(posts).toEqual([{ screen: "a", node_id: null, text: "hello" }]);
+    expect($("#agent-note-field").value).toBe("");
+  });
+
+  it("a refresh that fails after a successful post is not a failed send (no resend, no second thread)", async () => {
+    await boot();
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (url, init) => {
+      if (String(url).startsWith("/api/comments") && init?.method !== "POST") throw new TypeError("Failed to fetch");
+      return realFetch(url, init);
+    });
+    typeNote("once");
+    $("#agent-note").requestSubmit();
+    await flush();
+    expect(posts).toHaveLength(1);
+    expect($("#agent-note-error").hidden).toBe(true);
+    expect($("#agent-note-field").value).toBe("");
+  });
+});
+
 describe("where it shows", () => {
   it("the Design System view and Use Cases have no right column: the shell says so for the stylesheet", async () => {
     await boot();

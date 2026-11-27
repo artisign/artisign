@@ -3,7 +3,7 @@
 // CHR-1269 — the Agent bar card on its own (the real index.html markup, no daemon): folding by the user and by a panel, the Follow switch, the feed, and the note field's behaviour.
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import html from "./index.html?raw";
-import { createAgentBar } from "./agent-bar.js";
+import { createAgentBar, feedHasMoreBelow } from "./agent-bar.js";
 
 const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
 
@@ -28,6 +28,7 @@ function mount(over = {}) {
   calls = { follow: [], resume: 0, select: [], send: [] };
   bar = createAgentBar({
     barEl: $("#agent-bar"),
+    topbarEl: $("#topbar-agent"),
     storage,
     onFollow: (on) => calls.follow.push(on),
     onResume: () => calls.resume++,
@@ -242,7 +243,7 @@ describe("the note field", () => {
   it("a note sent for one screen does not clear what is typed on another by the time the answer comes", async () => {
     let finish;
     document.body.innerHTML = bodyHtml;
-    bar = createAgentBar({ barEl: $("#agent-bar"), storage, onFollow() {}, onResume() {}, onSelect() {}, onSend: () => new Promise((r) => (finish = r)) });
+    bar = createAgentBar({ barEl: $("#agent-bar"), topbarEl: $("#topbar-agent"), storage, onFollow() {}, onResume() {}, onSelect() {}, onSend: () => new Promise((r) => (finish = r)) });
     bar.render(state);
     typeNote("for home");
     $("#agent-note-send").click();
@@ -253,6 +254,38 @@ describe("the note field", () => {
     expect($("#agent-note-field").value).toBe("for cart");
     bar.render(state);
     expect($("#agent-note-field").value).toBe(""); // home's text was sent and is gone
+  });
+
+  it("a send that rejects (the daemon is unreachable) shows the error, keeps the text, leaves the field editable, and a second send works", async () => {
+    let attempt = 0;
+    document.body.innerHTML = bodyHtml;
+    const sent = [];
+    bar = createAgentBar({
+      barEl: $("#agent-bar"),
+      topbarEl: $("#topbar-agent"),
+      storage,
+      onFollow() {},
+      onResume() {},
+      onSelect() {},
+      onSend: async (text) => {
+        sent.push(text);
+        if (++attempt === 1) throw new TypeError("Failed to fetch");
+        return { ok: true };
+      },
+    });
+    bar.render(state);
+    typeNote("hello");
+    $("#agent-note-send").click();
+    await flush();
+    expect($("#agent-note-error").textContent).toBe("Could not send the note: Failed to fetch");
+    expect($("#agent-note-field").value).toBe("hello");
+    expect($("#agent-note-field").readOnly).toBe(false);
+    expect($("#agent-note-send").getAttribute("aria-disabled")).toBe("false");
+    $("#agent-note-send").click();
+    await flush();
+    expect(sent).toEqual(["hello", "hello"]);
+    expect($("#agent-note-field").value).toBe("");
+    expect($("#agent-note-error").hidden).toBe(true);
   });
 
   it("reset() drops every draft (a new project)", () => {
@@ -281,5 +314,83 @@ describe("the card", () => {
     expect($("#agent-bar").style.left).toBe("784px");
     expect(storage.map.get("artisign.agent-bar.position")).toBe("800,78");
     spy.mockRestore();
+  });
+});
+
+describe("live regions", () => {
+  it("only the two status lines and the Live chip are live regions, not the box holding the switch and Resume", () => {
+    expect($("#agent-status").hasAttribute("role")).toBe(false);
+    expect($("#agent-status-now").getAttribute("role")).toBe("status");
+    expect($("#agent-status-detail").getAttribute("role")).toBe("status");
+    expect($("#agent-status-now").contains($("#follow-switch"))).toBe(false);
+    expect($("#connection").getAttribute("role")).toBe("status");
+  });
+
+  it("a re-render with identical state does not touch them (a screen reader would repeat every replaced text node)", () => {
+    render({ feed: feedOf({}), follow: { enabled: true, paused: false } });
+    const regions = ["#connection", "#agent-status-now", "#agent-status-detail", "#agent-bar-folded-status", "#topbar-connection"].map((sel) => $(sel));
+    const observer = new MutationObserver(() => {});
+    for (const el of regions) observer.observe(el, { childList: true, subtree: true, characterData: true, attributes: true });
+    render({});
+    render({ now: NOW + 1000 }); // the 15 s timer: same words
+    expect(observer.takeRecords()).toEqual([]);
+    render({ connected: false }); // a real change still lands
+    expect(observer.takeRecords().length).toBeGreaterThan(0);
+    observer.disconnect();
+  });
+});
+
+describe("the top bar's own Live chip and Follow control (Design System view, Use Cases)", () => {
+  it("mirror the Agent bar's state: Live and Offline with the tooltip, the switch, the paused row with Resume", () => {
+    expect($("#topbar-connection-label").textContent).toBe("Live");
+    render({ connected: false });
+    expect($("#topbar-connection-label").textContent).toBe("Offline");
+    expect($("#topbar-connection").dataset.state).toBe("offline");
+    expect($("#topbar-connection").dataset.tooltip).toBe("Live reload disconnected, retrying");
+    render({ connected: true, follow: { enabled: true, paused: false } });
+    expect($("#topbar-follow-switch").checked).toBe(true);
+    expect($("#topbar-follow-paused").hidden).toBe(true);
+    render({ follow: { enabled: true, paused: true } });
+    expect($("#topbar-follow-on").hidden).toBe(true);
+    expect($("#topbar-follow-paused").hidden).toBe(false);
+  });
+
+  it("their controls report like the Agent bar's", () => {
+    $("#topbar-follow-switch").click();
+    expect(calls.follow).toEqual([true]);
+    render({ follow: { enabled: true, paused: true } });
+    $("#topbar-follow-resume").click();
+    expect(calls.resume).toBe(1);
+  });
+});
+
+describe("the feed's bottom fade", () => {
+  it("is the pure rule: only while rows run on below", () => {
+    expect(feedHasMoreBelow({ scrollTop: 0, clientHeight: 300, scrollHeight: 300 })).toBe(false); // not overflowing
+    expect(feedHasMoreBelow({ scrollTop: 0, clientHeight: 300, scrollHeight: 500 })).toBe(true);
+    expect(feedHasMoreBelow({ scrollTop: 100, clientHeight: 300, scrollHeight: 500 })).toBe(true);
+    expect(feedHasMoreBelow({ scrollTop: 200, clientHeight: 300, scrollHeight: 500 })).toBe(false); // at the end
+    expect(feedHasMoreBelow({ scrollTop: 199.6, clientHeight: 300, scrollHeight: 500 })).toBe(false); // sub-pixel rounding
+  });
+
+  it("data-fade follows the list: on when it overflows, off at the end and when it does not overflow", () => {
+    const feed = $("#agent-feed");
+    const geometry = (scrollTop, scrollHeight) => {
+      Object.defineProperty(feed, "scrollTop", { configurable: true, value: scrollTop, writable: true });
+      Object.defineProperty(feed, "clientHeight", { configurable: true, value: 300 });
+      Object.defineProperty(feed, "scrollHeight", { configurable: true, value: scrollHeight });
+    };
+    geometry(0, 300);
+    render({ feed: feedOf({}) });
+    expect(feed.dataset.fade).toBe("false");
+    geometry(0, 600);
+    render({ feed: feedOf({}, {}) });
+    expect(feed.dataset.fade).toBe("true");
+    geometry(300, 600);
+    feed.dispatchEvent(new Event("scroll"));
+    expect(feed.dataset.fade).toBe("false");
+    geometry(100, 600);
+    feed.dispatchEvent(new Event("scroll"));
+    expect(feed.dataset.fade).toBe("true");
   });
 });

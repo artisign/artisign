@@ -188,6 +188,15 @@ describe("describeActivity", () => {
     expect(say({ tool: "set_meta", kind: "write", target: { kind: "pattern", name: "checkout-layout" } })).toBe("Updated pattern checkout-layout");
   });
 
+  it("says the agent's comment calls with the design's verbs and no invented object (their events carry no target)", () => {
+    expect(say({ tool: "create_comment", kind: "write", target: null })).toBe("Commented");
+    expect(say({ tool: "create_comment", kind: "write", target: null }, { progressive: true })).toBe("Commenting");
+    expect(say({ tool: "create_comment", kind: "write", ok: false, target: null })).toBe("Could not comment");
+    expect(say({ tool: "reply_comment", kind: "write", target: null })).toBe("Replied to a comment");
+    expect(say({ tool: "reply_comment", kind: "write", target: null }, { progressive: true })).toBe("Replying to a comment");
+    expect(say({ tool: "reply_comment", kind: "write", ok: false, target: null })).toBe("Could not reply to a comment");
+  });
+
   it("says a failed call in plain words (the daemon sends no reason)", () => {
     expect(say({ tool: "patch_html", kind: "write", ok: false, target: { kind: "screen", name: "settings" } })).toBe("Could not update settings");
     expect(say({ tool: "get_screen", kind: "read", ok: false, target: { kind: "screen", name: "settings" } }, { progressive: true })).toBe("Could not read settings");

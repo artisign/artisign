@@ -51,7 +51,7 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
   // --- fold ---------------------------------------------------------------------
   function applyFold(collapsed) {
     barEl.dataset.collapsed = String(collapsed);
-    toolsEl.hidden = collapsed;
+    // Hidden by CSS (data-collapsed), not by the `hidden` attribute: the tools' keys must keep working while the bar is folded.
     foldEl.setAttribute("aria-expanded", String(!collapsed));
     const label = collapsed ? "Unfold tool bar" : "Fold tool bar";
     foldEl.setAttribute("aria-label", label);

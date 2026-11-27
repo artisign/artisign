@@ -36,12 +36,13 @@ describe("resolveShortcut", () => {
     expect(press("F")).toBe("flow"); // Caps Lock
     expect(press("c")).toBe("comment");
     expect(press("i")).toBe("inspect");
-    expect(press("s")).toBe("status-bar");
+    expect(press("s")).toBeNull(); // the status bar is gone
     expect(press("w")).toBe("follow");
     expect(press("r")).toBe("follow-resume");
     expect(press("1")).toBe("view-screens");
-    expect(press("2")).toBe("view-design-system");
-    expect(press("3")).toBe("view-board");
+    expect(press("2")).toBe("view-board");
+    expect(press("3")).toBe("view-design-system");
+    expect(press("4")).toBe("view-usecases");
     expect(press("[")).toBe("panel-screens");
     expect(press("\\")).toBe("tool-bar-fold"); // the tool bar's fold (CHR-1268)
     expect(press("]")).toBeNull(); // the Agent bar's fold waits for CHR-1269

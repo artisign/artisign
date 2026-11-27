@@ -1306,28 +1306,6 @@ button.chrome-section-header:focus-visible {
   background: var(--frame-surface);
 }
 
-/* Device chrome — lives over the iframe in the parent document, scales
-   together with #screen-holder since it's a sibling inside the same
-   transformed box. Never part of the iframe's srcdoc. */
-#status-bar-overlay {
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--space-xl);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--frame-on);
-  background: var(--frame-scrim);
-  pointer-events: none;
-}
-
-#status-bar-overlay[hidden] {
-  display: none;
-}
-
 /* CHR-890 — the how-to-start guide sits on the bare canvas while the project has no screens: native size, centred, outside the zoomed #screen-holder (which is hidden then). */
 #empty-guide {
   position: absolute;
@@ -3779,8 +3757,7 @@ li.has-compare > .screen-item {
   outline-offset: 1px;
 }
 
-.settings-toggle-row,
-.more-toggle-row {
+.settings-toggle-row {
   justify-content: space-between;
 }
 
@@ -3804,13 +3781,11 @@ li.has-compare > .screen-item {
   background: #fff;
 }
 
-.settings-toggle-row[aria-checked="true"] .settings-switch,
-.more-toggle-row[aria-checked="true"] .settings-switch {
+.settings-toggle-row[aria-checked="true"] .settings-switch {
   background: var(--chrome-accent);
 }
 
-.settings-toggle-row[aria-checked="true"] .settings-switch::after,
-.more-toggle-row[aria-checked="true"] .settings-switch::after {
+.settings-toggle-row[aria-checked="true"] .settings-switch::after {
   left: 14px;
 }
 
@@ -11527,7 +11502,7 @@ body {
   gap: var(--space-2xs);
 }
 
-#tool-bar-tools[hidden] {
+#tool-bar[data-collapsed="true"] #tool-bar-tools {
   display: none;
 }
 
@@ -11655,17 +11630,6 @@ body {
   background: color-mix(in srgb, var(--chrome-hint-text) 22%, transparent);
   font: inherit;
   font-size: var(--ui-2xs);
-}
-
-/* The More menu opens to the right of its tool, like the hints. */
-#more-menu {
-  inset: auto;
-  margin: 0;
-  margin-inline-start: var(--space-md);
-  position-area: inline-end span-block-end;
-  position-try-fallbacks: flip-inline;
-  min-width: 200px;
-  border: none;
 }
 
 /* ---- The right column's panel ---- */

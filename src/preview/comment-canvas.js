@@ -42,14 +42,13 @@ export function numberThreads(threads) {
 
 /**
  * The threads that get a pin: open ones, plus resolved ones when "Show
- * resolved" is on; none at all while "Hide pins" is on.
+ * resolved" is on.
  * @template {{ status: "open" | "resolved" }} T
  * @param {T[]} threads
- * @param {{ showResolved: boolean, hidePins: boolean }} opts
+ * @param {{ showResolved: boolean }} opts
  * @returns {T[]}
  */
-export function pinnedThreads(threads, { showResolved, hidePins }) {
-  if (hidePins) return [];
+export function pinnedThreads(threads, { showResolved }) {
   return threads.filter((t) => t.status === "open" || showResolved);
 }
 
@@ -232,12 +231,13 @@ function divEl(className) {
  *   host: CommentHost,
  *   bannerEl: HTMLElement,
  *   actions: CanvasActions,
+ *   fallbackFocus?: (threadId: string | null) => HTMLElement | null,
  *   prefs?: { showResolved: boolean },
  *   onPrefsChange?: (prefs: { showResolved: boolean }) => void,
  *   onActiveChange?: () => void,
  * }} opts
  */
-export function createCommentCanvas({ host: initialHost, bannerEl, actions, prefs, onPrefsChange, onActiveChange }) {
+export function createCommentCanvas({ host: initialHost, bannerEl, actions, prefs, onPrefsChange, onActiveChange, fallbackFocus }) {
   let host = initialHost;
   /** @type {string | null} what the data belongs to ("screen:<name>" / "mockup:<name>"); a change closes the popover */
   let scope = null;
@@ -482,7 +482,7 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
     pinsEl.replaceChildren();
     const numbers = numberThreads(threads);
     const perElement = new Map();
-    const pinned = pinnedThreads(threads, { showResolved, hidePins: false });
+    const pinned = pinnedThreads(threads, { showResolved });
     // DOM order follows the frames (a mockup's columns A, B, C), then the log.
     const ordered = host.frames().flatMap((frame) => pinned.filter((t) => homeFrame(t)?.key === frame.key));
     for (const t of ordered) {
@@ -920,8 +920,8 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
     render();
     onActiveChange?.();
     if (!returnFocus) return;
-    // Back to the thread's pin; after a resolve or delete that pin is gone, so the first pin (or the Comment tool) takes focus instead.
-    const target = (was && was !== "new" ? pinFor(was) : null) ?? /** @type {HTMLElement | null} */ (pinsEl.querySelector(".comment-pin"));
+    // Back to the thread's pin; after a resolve or delete that pin is gone, so the first pin takes focus, else what the owner names (the Comments row or tool it was opened from, the Comment tool).
+    const target = (was && was !== "new" ? pinFor(was) : null) ?? /** @type {HTMLElement | null} */ (pinsEl.querySelector(".comment-pin")) ?? fallbackFocus?.(was && was !== "new" ? was : null) ?? null;
     target?.focus();
   }
 

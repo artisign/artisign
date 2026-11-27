@@ -92,7 +92,6 @@ describe("topbar markup", () => {
       ["comments-tool-toggle", "Comments", "chat_bubble", "M"],
       ["flow-mode-toggle", "Flow", "route", "F"],
       ["design-system-tool", "Design system", "palette", "D"],
-      ["more-tool-toggle", "More actions", "more_horiz", undefined],
     ]) {
       const btn = document.getElementById(id);
       expect(btn.getAttribute("aria-label"), id).toBe(label);
@@ -100,10 +99,8 @@ describe("topbar markup", () => {
       expect(btn.dataset.shortcut, id).toBe(key); // filled from the shortcut mapping (CHR-916)
       expect(btn.title, id).toBe(key ? `${label} (${key})` : label); // the baseline tooltip where interest invokers are missing
     }
-    // Status bar lives in the More menu now.
-    const status = document.getElementById("status-bar-toggle");
-    expect(status.closest("#more-menu")).not.toBeNull();
-    expect(status.dataset.shortcut).toBe("S");
+    expect(document.getElementById("status-bar-toggle")).toBeNull(); // no status bar, no More menu (CHR-1268)
+    expect(document.getElementById("more-tool-toggle")).toBeNull();
   });
 });
 

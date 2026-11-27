@@ -166,7 +166,6 @@ const notesPanelEmptyEl = document.getElementById("notes-panel-empty");
 const screenUseCasesEl = document.getElementById("screen-usecases");
 const screenHolderEl = document.getElementById("screen-holder");
 const frameCaptionEl = document.getElementById("frame-caption");
-const statusBarOverlayEl = document.getElementById("status-bar-overlay");
 const emptyGuideEl = document.getElementById("empty-guide");
 const emptyGuidePromptEl = document.getElementById("empty-guide-prompt");
 const emptyGuideCopyBtn = document.getElementById("empty-guide-copy");
@@ -208,8 +207,6 @@ const commentModeToggle = document.getElementById("comment-mode-toggle");
 const notesToolToggle = document.getElementById("notes-tool-toggle");
 const commentsToolToggle = document.getElementById("comments-tool-toggle");
 const designSystemTool = document.getElementById("design-system-tool");
-const moreToolToggle = document.getElementById("more-tool-toggle");
-const moreMenuEl = document.getElementById("more-menu");
 const toolPanelEl = document.getElementById("tool-panel");
 const canvasControlsEl = document.getElementById("canvas-controls");
 const zoomButtons = document.querySelectorAll(".zoom-button");
@@ -218,7 +215,6 @@ const zoomMenu = document.getElementById("zoom-menu");
 const zoomLabel = document.getElementById("zoom-label");
 const zoomRange = document.getElementById("zoom-range");
 const commentCountBadge = document.getElementById("comment-count-badge");
-const statusBarToggle = document.getElementById("status-bar-toggle");
 const warningBadge = document.getElementById("warning-badge");
 const connectionStatus = document.getElementById("connection-status");
 const viewTabs = document.querySelectorAll(".view-tab");
@@ -283,7 +279,7 @@ let currentView = "screens";
 let openCommentCount = 0;
 let latestComments = { comments: [], threads: [] };
 /** @type {"open" | "resolved"} the Comments panel's tab; Resolved also puts a check pin on every resolved thread. */
-let commentsTab = readBoolPref(prefsStorage, "artisign.comments.showResolved", false) ? "resolved" : "open";
+let commentsTab = "open";
 /** @type {{ tag: string, notes: string }[]} every project tag with its own notes (CHR-596) — the Notes panel shows the ones the open screen carries. */
 let tagNotes = [];
 const expandedTagNotes = new Set(); // the tag notes the reader has opened, kept across re-renders
@@ -2099,12 +2095,15 @@ const commentCanvas = createCommentCanvas({
     renderMockupChips();
     markActiveCommentRow();
   },
-  // Show resolved is the Comments panel's Resolved tab (CHR-1268): the pins follow the tab.
-  prefs: { showResolved: readBoolPref(prefsStorage, "artisign.comments.showResolved", false) },
-  onPrefsChange: ({ showResolved }) => {
-    writeBoolPref(prefsStorage, "artisign.comments.showResolved", showResolved);
-    if (currentMockup !== null) renderMockupChips(); // Show resolved adds or drops the resolved chip
-    renderCommentsList();
+  // Resolved pins show while the Comments panel's Resolved tab is open (CHR-1268), never otherwise: nothing is persisted.
+  onPrefsChange: () => {
+    if (currentMockup !== null) renderMockupChips(); // the resolved chip comes and goes with the tab
+  },
+  // A resolve or delete takes its pin with it: focus goes to the row the thread was opened from, else the Comments tool while its panel is open, else the Comment tool.
+  fallbackFocus: (threadId) => {
+    const row = threadId ? document.querySelector(`#comments-list .comment-row[data-thread="${CSS.escape(threadId)}"]`) : null;
+    if (row) return row;
+    return toolPanels.opened() === "comments" ? commentsToolToggle : commentModeToggle;
   },
   actions: {
     setMode: (on) => {
@@ -2168,6 +2167,7 @@ const toolPanels = createToolPanels({
     syncPanelContext();
     if (shown === "notes") updateNotesPanel();
     if (shown === "comments") renderCommentsList();
+    syncResolvedPins();
     syncToolStates();
     refitActivePane(); // the column takes width from the canvas
   },
@@ -2180,11 +2180,6 @@ function isPopoverOpen(el) {
   } catch {
     return false;
   }
-}
-
-/** @param {HTMLElement} el */
-function closePopover(el) {
-  if (isPopoverOpen(el)) el.hidePopover();
 }
 
 /** "home, default": the screen a panel is about, the way the frame label names it. */
@@ -2224,9 +2219,7 @@ function syncToolStates() {
   });
   toolBar.setState(flowModeToggle, { ...states.flow, pressed: activeMode === "flow" });
   toolBar.setState(designSystemTool, { ...states.designSystem });
-  toolBar.setState(moreToolToggle, { ...states.more });
   for (const id of ["notes", "comments"]) if (states[id].disabled && toolPanels.opened() === id) toolPanels.close(false);
-  if (states.more.disabled) closePopover(moreMenuEl);
 }
 
 for (const [id, button] of [["notes", notesToolToggle], ["comments", commentsToolToggle]]) {
@@ -2242,28 +2235,26 @@ designSystemTool.addEventListener("click", () => {
   setView("design-system");
 });
 
-// Comments panel: Open | Resolved. Resolved also shows the check pins on the canvas.
-for (const [tab, id] of [["open", "comments-tab-open"], ["resolved", "comments-tab-resolved"]]) {
-  document.getElementById(id).addEventListener("click", () => {
-    commentsTab = tab;
-    commentCanvas.setShowResolved(tab === "resolved");
-    renderCommentsList();
-  });
+// Comments panel: Open | Resolved (a tablist: arrows and Home/End move between the tabs, like the left card's). Resolved also shows the check pins — only while this panel is open.
+const commentTabEls = { open: document.getElementById("comments-tab-open"), resolved: document.getElementById("comments-tab-resolved") };
+function setCommentsTab(tab, focus = false) {
+  commentsTab = tab;
+  syncResolvedPins();
+  renderCommentsList();
+  if (focus) commentTabEls[tab].focus();
 }
-commentCanvas.setShowResolved(commentsTab === "resolved");
+function syncResolvedPins() {
+  commentCanvas.setShowResolved(toolPanels.shown() === "comments" && commentsTab === "resolved");
+}
+for (const tab of ["open", "resolved"]) commentTabEls[tab].addEventListener("click", () => setCommentsTab(tab));
+document.getElementById("comments-tabs").addEventListener("keydown", (evt) => {
+  const next = { ArrowLeft: "open", ArrowRight: "resolved", Home: "open", End: "resolved" }[evt.key];
+  if (!next) return;
+  evt.preventDefault();
+  setCommentsTab(next, true);
+});
 syncToolStates(); // the initial state: nothing is open yet
 
-// The More menu: a native popover; Status bar is its one item for now.
-statusBarToggle.addEventListener("click", () => {
-  const isOn = statusBarToggle.getAttribute("aria-checked") === "true";
-  statusBarToggle.setAttribute("aria-checked", String(!isOn));
-  statusBarOverlayEl.hidden = isOn;
-  closePopover(moreMenuEl);
-});
-moreMenuEl.addEventListener("toggle", () => {
-  moreToolToggle.setAttribute("aria-expanded", String(isPopoverOpen(moreMenuEl)));
-  if (isPopoverOpen(moreMenuEl)) statusBarToggle.focus();
-});
 
 // The iframe document is replaced wholesale on every srcdoc assignment, so
 // flow/comment-mode listeners and outlines have to be reapplied after each
@@ -2656,10 +2647,8 @@ function applyMainVisibility() {
   appEl.dataset.shellView = currentView;
   appEl.dataset.comparing = String(comparing);
   // The zoom group stays visible over the mockup view too — it
-  // scales the whole comparison row instead of the screen canvas. Only the
-  // Status bar toggle, which has no mockup-view counterpart, hides with it.
+  // scales the whole comparison row instead of the screen canvas.
   canvasControlsEl.hidden = currentView !== "screens" || comparing; // compare has its own zoom in its chip row
-  statusBarToggle.hidden = currentView !== "screens" || showMockup || comparing;
   warningBadge.hidden = currentView !== "screens" || showMockup || warningCount === 0;
   // The side tool bar: which tools apply here (comment/inspect have no board counterpart, none of the modes a mockup's, Compare its own set).
   toolPanels.setComparing(comparing); // Compare's Differences show in the right column until a tool panel takes its place
@@ -2694,8 +2683,8 @@ function setView(view) {
   // clicking its own toggle.
   if ((view === "board" || view === "design-system") && activeMode === "comment") setMode("comment");
   if (view === "board" && activeMode === "inspect") setMode("inspect");
-  // None of the three modes has a Use Cases counterpart either.
-  if (view === "usecases" && activeMode !== "none") setMode(activeMode);
+  // None of the three modes has a Use Cases or Design System counterpart either (their tools are greyed out there): leaving them also closes inspect's panel.
+  if ((view === "usecases" || view === "design-system") && activeMode !== "none") setMode(activeMode);
   if (view === "design-system") loadDesignSystem();
   if (view === "usecases") useCases.show();
   else useCases.hide();
@@ -2837,8 +2826,9 @@ function openOverlay() {
   if (!dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen() || whatsNewDialog.isOpen() || document.querySelector("dialog.uc-dialog[open]")) return "other";
   if (!projectMenuEl.hidden) return "project-menu";
   if (zoomPill?.isOpen()) return "zoom-menu";
-  if (isPopoverOpen(moreMenuEl)) return "other";
-  return document.querySelector(".chrome-menu:not([hidden]):not([popover])") ? "other" : null; // a native popover menu (More) is open or not by :popover-open, checked above
+  // A native popover menu (the Use Cases filter and sort menus) is open or not by :popover-open, never by `hidden`.
+  const menus = [...document.querySelectorAll(".chrome-menu")];
+  return menus.some((menu) => (menu.hasAttribute("popover") ? isPopoverOpen(menu) : !menu.hidden)) ? "other" : null;
 }
 
 /** The control a shortcut id belongs to: the element carrying `data-shortcut-id`, or the button a menu hint sits in. */
@@ -2927,7 +2917,6 @@ function closeOverlaysOnFramePress(evt) {
   const overlay = openOverlay();
   if (!overlay || !dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen() || whatsNewDialog.isOpen()) return;
   if (overlay === "zoom-menu") zoomPill.close(); // a native popover's light dismiss never sees a press inside the frame's document
-  closePopover(moreMenuEl); // ...nor does the More menu's
   document.body.dispatchEvent(new (evt.type === "click" ? MouseEvent : Event)(evt.type, { bubbles: true }));
 }
 

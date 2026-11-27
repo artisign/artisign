@@ -35,11 +35,11 @@ export const SHORTCUTS = [
   { id: "comments", group: "Tools", label: "Comments", key: "m", display: "M" },
   { id: "flow", group: "Tools", label: "Flow", key: "f", display: "F" },
   { id: "design-system", group: "Tools", label: "Design system", key: "d", display: "D" },
-  { id: "status-bar", group: "Tools", label: "Status bar", key: "s", display: "S" },
 
   { id: "view-screens", group: "Views", label: "Screens", key: "1", display: "1", target: "screens" },
-  { id: "view-design-system", group: "Views", label: "Design System", key: "2", display: "2", target: "design-system" },
-  { id: "view-board", group: "Views", label: "Board", key: "3", display: "3", target: "board" },
+  { id: "view-board", group: "Views", label: "Board", key: "2", display: "2", target: "board" },
+  { id: "view-design-system", group: "Views", label: "Design System", key: "3", display: "3", target: "design-system" },
+  { id: "view-usecases", group: "Views", label: "Use Cases", key: "4", display: "4", target: "usecases" },
 
   { id: "zoom-fit", group: "Zoom", label: "Fit", code: "Digit1", shift: true, display: "1", zoom: "fit", view: "screens" },
   { id: "zoom-50", group: "Zoom", label: "50%", code: "Digit5", shift: true, display: "5", zoom: 0.5, view: "screens" },

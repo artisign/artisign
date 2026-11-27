@@ -161,12 +161,6 @@
             </button>
             <button type="button" id="flow-mode-toggle" class="tool-btn" aria-pressed="false" aria-label="Flow" data-tool-hint="Flow" data-shortcut-id="flow"><span class="icon" aria-hidden="true">route</span></button>
             <button type="button" id="design-system-tool" class="tool-btn" aria-label="Design system" data-tool-hint="Design system" data-shortcut-id="design-system"><span class="icon" aria-hidden="true">palette</span></button>
-            <span class="tool-sep" role="separator" aria-orientation="horizontal"></span>
-            <button type="button" id="more-tool-toggle" class="tool-btn" aria-label="More actions" aria-haspopup="menu" aria-expanded="false" aria-controls="more-menu" popovertarget="more-menu" data-tool-hint="More actions"><span class="icon" aria-hidden="true">more_horiz</span></button>
-          </div>
-          <!-- The overflow menu: a native popover="auto" (light dismiss, Esc), opened by the More tool's popovertarget. -->
-          <div id="more-menu" popover="auto" class="chrome-menu" role="menu" aria-label="More actions">
-            <button type="button" id="status-bar-toggle" class="chrome-menu-item more-toggle-row" role="menuitemcheckbox" aria-checked="false" data-shortcut-id="status-bar"><span>Status bar</span><span class="settings-switch" aria-hidden="true"></span></button>
           </div>
         </div>
         <main id="main">
@@ -213,17 +207,8 @@
                 -->
                 <iframe id="screen-frame" title="Screen preview" sandbox="allow-same-origin"></iframe>
                 <!--
-                  Device chrome overlay lives in the PARENT document, layered
-                  over the iframe — never inside its srcdoc. It must never
-                  appear in stored screen HTML or a get_screen response.
-                -->
-                <div id="status-bar-overlay" hidden>
-                  <span id="status-bar-time">9:41</span>
-                  <span id="status-bar-glyphs">●●● 🛜 🔋</span>
-                </div>
-                <!--
                   Inspect mode's selection outline — same layering rationale
-                  as #status-bar-overlay: positioned in the PARENT document,
+                  positioned in the PARENT document,
                   in the iframe's own (unscaled) coordinate space, since
                   #screen-holder carries the zoom transform both share.
                 -->

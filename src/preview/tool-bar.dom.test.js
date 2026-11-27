@@ -33,17 +33,18 @@ describe("hintText", () => {
 describe("fold", () => {
   it("toggles the tools, the label and aria-expanded, and remembers the choice per viewer", () => {
     const { bar, storage, $ } = build({ interest: false });
-    expect([$("tools").hidden, $("fold").getAttribute("aria-expanded"), $("fold").getAttribute("aria-label")]).toEqual([false, "true", "Fold tool bar"]);
+    expect([$("bar").dataset.collapsed, $("fold").getAttribute("aria-expanded"), $("fold").getAttribute("aria-label")]).toEqual(["false", "true", "Fold tool bar"]);
     $("fold").click();
-    expect([$("tools").hidden, $("bar").dataset.collapsed, $("fold").getAttribute("aria-expanded"), $("fold").getAttribute("aria-label")]).toEqual([true, "true", "false", "Unfold tool bar"]);
+    expect([$("bar").dataset.collapsed, $("fold").getAttribute("aria-expanded"), $("fold").getAttribute("aria-label")]).toEqual(["true", "false", "Unfold tool bar"]);
+    expect($("tools").hidden).toBe(false); // folded by CSS: the tools stay reachable for their keys (pressControl refuses [hidden])
     expect($("fold").querySelector(".icon").textContent).toBe("keyboard_arrow_down");
     expect(storage.map.get("artisign.tool-bar.collapsed")).toBe("true");
     expect(bar.isFolded()).toBe(true);
     // a fresh bar starts folded
     const again = build({ interest: false, storage });
-    expect(again.$("tools").hidden).toBe(true);
+    expect(again.$("bar").dataset.collapsed).toBe("true");
     again.bar.toggleFold();
-    expect(again.$("tools").hidden).toBe(false);
+    expect(again.$("bar").dataset.collapsed).toBe("false");
   });
 });
 

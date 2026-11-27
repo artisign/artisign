@@ -257,14 +257,14 @@ describe("canvas comments", () => {
     const bar = $("#tool-bar");
     expect([bar.getAttribute("role"), bar.getAttribute("aria-orientation"), bar.getAttribute("focusgroup")]).toEqual(["toolbar", "vertical", "toolbar wrap block"]);
     const tools = [...document.querySelectorAll("#tool-bar-tools .tool-btn")];
-    expect(tools.map((b) => b.id)).toEqual(["comment-mode-toggle", "inspect-mode-toggle", "notes-tool-toggle", "comments-tool-toggle", "flow-mode-toggle", "design-system-tool", "more-tool-toggle"]);
-    expect(tools.map((b) => b.tabIndex)).toEqual([0, -1, -1, -1, -1, -1, -1]);
+    expect(tools.map((b) => b.id)).toEqual(["comment-mode-toggle", "inspect-mode-toggle", "notes-tool-toggle", "comments-tool-toggle", "flow-mode-toggle", "design-system-tool"]);
+    expect(tools.map((b) => b.tabIndex)).toEqual([0, -1, -1, -1, -1, -1]);
     tools[0].focus();
     tools[0].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true }));
-    expect(document.activeElement).toBe(tools[6]); // wraps
-    tools[6].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(tools[5]); // wraps
+    tools[5].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
     expect(document.activeElement).toBe(tools[0]);
-    expect(tools.map((b) => b.tabIndex)).toEqual([0, -1, -1, -1, -1, -1, -1]);
+    expect(tools.map((b) => b.tabIndex)).toEqual([0, -1, -1, -1, -1, -1]);
   });
 
   it("the Comments tool opens the thread list: detached first, then the log order; a row opens that thread's popover", async () => {
@@ -323,6 +323,100 @@ describe("canvas comments", () => {
     expect(pins()[2].getAttribute("aria-label")).toBe("Comment 3 on card-goal, resolved");
     $("#comments-tab-open").click();
     expect(pins().map((p) => p.dataset.state)).toEqual(["open", "detached"]);
+  });
+
+  it("resolved pins show only while the Comments panel's Resolved tab is open: not after closing the panel, not after a reload", async () => {
+    seedThreads();
+    await boot("one");
+    loadFrame();
+    $("#comments-tool-toggle").click();
+    $("#comments-tab-resolved").click();
+    expect(pins().map((p) => p.dataset.state)).toContain("resolved");
+    $("#tool-panel-close").click();
+    expect(pins().map((p) => p.dataset.state)).toEqual(["open", "detached"]);
+    $("#comments-tool-toggle").click(); // the tab is still Resolved
+    expect(pins().map((p) => p.dataset.state)).toContain("resolved");
+    $("#notes-tool-toggle").click(); // another panel replaces it
+    expect(pins().map((p) => p.dataset.state)).not.toContain("resolved");
+  });
+
+  it("the Open | Resolved tabs are a tablist: arrows and Home/End move between them", async () => {
+    seedThreads();
+    await boot("one");
+    loadFrame();
+    $("#comments-tool-toggle").click();
+    const key = (k) => $("#comments-tabs").dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+    key("ArrowRight");
+    expect([$("#comments-tab-resolved").getAttribute("aria-selected"), $("#comments-tab-resolved").tabIndex, document.activeElement.id]).toEqual(["true", 0, "comments-tab-resolved"]);
+    key("ArrowLeft");
+    expect([$("#comments-tab-open").getAttribute("aria-selected"), document.activeElement.id]).toEqual(["true", "comments-tab-open"]);
+    key("End");
+    expect($("#comments-tab-resolved").getAttribute("aria-selected")).toBe("true");
+    key("Home");
+    expect($("#comments-tab-open").getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("resolving the last pin with the Comments panel open puts focus back on the Comments tool", async () => {
+    seedThreads();
+    threadData.threads = threadData.threads.filter((t) => t.id === "c1");
+    threadData.comments = threadData.comments.filter((c) => c.id === "c1" || c.parent_id === "c1");
+    await boot("one");
+    loadFrame();
+    $("#comments-tool-toggle").click();
+    $("#comments-list .comment-row").click(); // opened from its row
+    threadData.threads[0].status = "resolved";
+    $('.comment-popover-header [aria-label="Resolve"]').click();
+    await flush();
+    expect(document.activeElement.id).toBe("comments-tool-toggle"); // the row went with the thread
+  });
+
+  it("resolving the last pin puts focus back on the Comment tool when no panel is open", async () => {
+    seedThreads();
+    threadData.threads = threadData.threads.filter((t) => t.id === "c1");
+    threadData.comments = threadData.comments.filter((c) => c.id === "c1" || c.parent_id === "c1");
+    await boot("one");
+    loadFrame();
+    pins()[0].click();
+    threadData.threads[0].status = "resolved"; // what the daemon answers after the resolve
+    $('.comment-popover-header [aria-label="Resolve"]').click();
+    await flush();
+    expect(pins()).toEqual([]);
+    expect(document.activeElement.id).toBe("comment-mode-toggle");
+  });
+
+  it("leaving for the Design System view also ends inspect and flow mode (their tools are greyed out there)", async () => {
+    await boot("one");
+    loadFrame();
+    $("#inspect-mode-toggle").click();
+    $("#design-system-tool").click();
+    await flush();
+    expect($("#inspect-mode-toggle").getAttribute("aria-pressed")).toBe("false");
+    expect($("#tool-panel").hidden).toBe(true);
+    $('[data-view="screens"]').click();
+    await flush();
+    $("#flow-mode-toggle").click();
+    $("#design-system-tool").click();
+    await flush();
+    expect($("#flow-mode-toggle").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("the tool keys keep working while the tool bar is folded", async () => {
+    await boot("one");
+    loadFrame();
+    $("#tool-bar-fold").click();
+    expect($("#tool-bar").dataset.collapsed).toBe("true");
+    const press = (k) => document.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+    press("c");
+    expect($("#comment-mode-toggle").getAttribute("aria-pressed")).toBe("true");
+    press("n");
+    expect($("#tool-panel-title").textContent).toBe("Notes");
+    press("m");
+    expect($("#tool-panel-title").textContent).toBe("Comments");
+    press("f");
+    expect($("#flow-mode-toggle").getAttribute("aria-pressed")).toBe("true");
+    press("d");
+    await flush();
+    expect($('[data-view="design-system"]').getAttribute("aria-pressed")).toBe("true");
   });
 
   it("closing the panel returns focus to its tool; Esc closes it after a mode; one panel at a time", async () => {

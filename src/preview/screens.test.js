@@ -112,10 +112,15 @@ describe("buildScreenTree", () => {
 
 describe("displayName", () => {
   const tree = buildScreenTree([...cart, v("unrelated-name", "cart", "overlay")]);
-  it("shows the suffix behind an ellipsis when the name starts with the parent's", () => {
-    expect(displayName(tree.nodes.get("cart-two-items"))).toBe("…-two-items");
+  it("shows the plain suffix, without the parent's name or its separator, when the name starts with the parent's", () => {
+    expect(displayName(tree.nodes.get("cart-two-items"))).toBe("two-items");
     expect(displayName(tree.nodes.get("confirm-error"))).toBe("confirm-error");
-    expect(displayName(tree.nodes.get("cart-sheet-clear-confirm"))).toBe("…-confirm");
+    expect(displayName(tree.nodes.get("cart-sheet-clear-confirm"))).toBe("confirm");
+  });
+  it("keeps the full name when nothing but separators would be left", () => {
+    const t = buildScreenTree([v("home"), v("home-", "home", "state"), v("home_x", "home", "state")]);
+    expect(displayName(t.nodes.get("home-"))).toBe("home-");
+    expect(displayName(t.nodes.get("home_x"))).toBe("x");
   });
   it("shows the full name when it lacks the parent prefix, and for roots", () => {
     expect(displayName(tree.nodes.get("unrelated-name"))).toBe("unrelated-name");

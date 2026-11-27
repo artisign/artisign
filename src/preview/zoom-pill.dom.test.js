@@ -28,6 +28,14 @@ function build({ native }) {
     const matches = menuEl.matches.bind(menuEl);
     menuEl.matches = (selector) => (selector === ":popover-open" ? state.open : matches(selector));
   }
+  if (native) {
+    // The declared invoker: the browser toggles the popover on a click of the trigger (stand-in for that behaviour).
+    document.getElementById("trigger").addEventListener("click", () => {
+      if (!document.getElementById("trigger").hasAttribute("popovertarget")) return;
+      if (state.open) menuEl.hidePopover();
+      else menuEl.showPopover();
+    });
+  }
   const zooms = [];
   const pill = createZoomPill({
     pillEl: document.getElementById("pill"),
@@ -58,7 +66,7 @@ describe.each([
     ctx = build({ native });
   });
 
-  it("the % value toggles it and aria-expanded follows", () => {
+  it("the % value toggles it and aria-expanded follows (a second click closes, it never reopens)", () => {
     ctx.trigger.click();
     expect(ctx.pill.isOpen()).toBe(true);
     expect(ctx.trigger.getAttribute("aria-expanded")).toBe("true");
@@ -66,6 +74,8 @@ describe.each([
     ctx.trigger.click();
     expect(ctx.pill.isOpen()).toBe(false);
     expect(ctx.trigger.getAttribute("aria-expanded")).toBe("false");
+    ctx.trigger.click();
+    expect(ctx.pill.isOpen()).toBe(true);
   });
 
   it("close() closes it and is a no-op when closed", () => {
@@ -118,6 +128,12 @@ describe("fallback box", () => {
 });
 
 describe("native popover", () => {
+  it("the trigger is the declared invoker, so the script never toggles it by hand", () => {
+    const ctx = build({ native: true });
+    expect(ctx.trigger.getAttribute("popovertarget")).toBe("menu");
+    expect(build({ native: false }).trigger.hasAttribute("popovertarget")).toBe(false);
+  });
+
   it("light dismiss and Escape close it without close(): the `toggle` event keeps aria-expanded right", () => {
     const ctx = build({ native: true });
     ctx.trigger.click();

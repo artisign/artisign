@@ -2659,6 +2659,7 @@ document.addEventListener("keydown", onShortcutKeydown);
 function closeOverlaysOnFramePress(evt) {
   const overlay = openOverlay();
   if (!overlay || !dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen() || whatsNewDialog.isOpen()) return;
+  if (overlay === "zoom-menu") zoomPill.close(); // a native popover's light dismiss never sees a press inside the frame's document
   document.body.dispatchEvent(new (evt.type === "click" ? MouseEvent : Event)(evt.type, { bubbles: true }));
 }
 

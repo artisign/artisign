@@ -551,6 +551,29 @@ describe("a top-document overlay and the screen frame", () => {
     expect(zoomOpen()).toBe(false);
   });
 
+  it("a press inside the frame closes the zoom popover on the native path too", async () => {
+    const menu = $("#zoom-menu");
+    let open = false;
+    menu.showPopover = () => {
+      open = true;
+      menu.dispatchEvent(new Event("toggle"));
+    };
+    menu.hidePopover = () => {
+      open = false;
+      menu.dispatchEvent(new Event("toggle"));
+    };
+    const matches = menu.matches.bind(menu);
+    menu.matches = (selector) => (selector === ":popover-open" ? open : matches(selector));
+    await boot();
+    const doc = frameDoc();
+    $("#zoom-trigger").dispatchEvent(new Event("click", { bubbles: true })); // the browser's invoker opens it
+    menu.showPopover();
+    expect(open).toBe(true);
+    doc.getElementById("child").dispatchEvent(new doc.defaultView.Event("pointerdown", { bubbles: true }));
+    expect(open).toBe(false);
+    expect($("#zoom-trigger").getAttribute("aria-expanded")).toBe("false");
+  });
+
   it("Escape from the frame closes the open overlay and nothing else", async () => {
     await boot();
     const doc = frameDoc();

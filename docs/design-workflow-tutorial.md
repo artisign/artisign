@@ -338,9 +338,7 @@ browser and comments on specific nodes.
 
 If the human turns on **Follow mode** (the topbar toggle, off by default),
 every tool call you make drives their view live: the preview switches to
-whatever screen/mockup you touch and briefly outlines the affected nodes,
-and every call also lands in the right panel's Activity feed regardless of
-whether they're following. Nothing to do differently on your side — it's
+whatever screen/mockup you touch and briefly outlines the affected nodes. Nothing to do differently on your side — it's
 a read of the same MCP traffic you're already producing, not another
 channel to write to.
 

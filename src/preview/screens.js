@@ -76,15 +76,17 @@ export function buildScreenTree(screens) {
 
 /**
  * The name shown for a row. Below the root, a name that starts with its
- * parent's name shows only the suffix behind an ellipsis; anything else
- * shows in full. Display only — the screen's real name is never changed.
+ * parent's name shows only what follows it (the parent's name and the
+ * separator are dropped, no ellipsis); anything else shows in full. Display
+ * only — the screen's real name is never changed (the row's title keeps it).
  * @param {TreeNode} node
  * @returns {string}
  */
 export function displayName(node) {
   const parent = node.parent;
   if (parent && node.name.length > parent.name.length && node.name.startsWith(parent.name)) {
-    return `…${node.name.slice(parent.name.length)}`;
+    const rest = node.name.slice(parent.name.length).replace(/^[\s\-_./:]+/, "");
+    if (rest !== "") return rest;
   }
   return node.name;
 }

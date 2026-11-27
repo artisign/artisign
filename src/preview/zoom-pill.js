@@ -29,10 +29,10 @@ export function createZoomPill({ pillEl, triggerEl, menuEl, labelEl, rangeEl, pr
 
   const isOpen = () => (native ? menuEl.matches(":popover-open") : menuEl.hasAttribute("data-open"));
   const reflect = () => triggerEl.setAttribute("aria-expanded", String(isOpen()));
+  // Native: the trigger is the popover's declared invoker (`popovertarget`), so the browser toggles it and light dismiss leaves the invoker alone — a second click closes instead of reopening. Only the fallback toggles by hand.
   function open() {
     if (isOpen()) return;
-    if (native) menuEl.showPopover();
-    else menuEl.setAttribute("data-open", "");
+    menuEl.setAttribute("data-open", "");
     reflect();
     rangeEl.focus();
   }
@@ -43,12 +43,17 @@ export function createZoomPill({ pillEl, triggerEl, menuEl, labelEl, rangeEl, pr
     reflect();
   }
 
-  triggerEl.addEventListener("click", () => {
-    if (isOpen()) close();
-    else open();
+  if (native) triggerEl.setAttribute("popovertarget", menuEl.id);
+  else
+    triggerEl.addEventListener("click", () => {
+      if (isOpen()) close();
+      else open();
+    });
+  // Native: the browser opens, closes and light-dismisses; this keeps aria-expanded right and puts the focus on the slider.
+  menuEl.addEventListener("toggle", () => {
+    reflect();
+    if (native && isOpen()) rangeEl.focus();
   });
-  // Native light dismiss and Escape close the popover without going through close().
-  menuEl.addEventListener("toggle", reflect);
   if (!native) {
     document.addEventListener(
       "pointerdown",

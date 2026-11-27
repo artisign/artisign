@@ -201,7 +201,7 @@ describe("renderScreenList — variant tree", () => {
     expect(row("cart-sheet-confirm-error").querySelector(".kind-icon").dataset.viewport).toBe("mobile"); // a state variant shows its viewport
     expect(row("cart-sheet-confirm-error").querySelector(".screen-item").getAttribute("aria-level")).toBe("4");
     expect(row("cart-sheet-confirm").querySelector(".screen-item-text").textContent).toBe(
-      "…-confirm",
+      "confirm",
     );
     expect(row("cart-sheet-confirm").querySelector(".screen-item").title).toBe(
       "cart-sheet-confirm\ncart › cart-sheet › cart-sheet-confirm",

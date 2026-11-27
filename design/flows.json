@@ -1,47 +1,5 @@
 [
   {
-    "from": "board-view.si-open",
-    "event": "tap",
-    "to": "open-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "board-view.si-init",
-    "event": "tap",
-    "to": "init-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "board-view.si-empty",
-    "event": "tap",
-    "to": "no-project-empty-state",
-    "to_kind": "screen"
-  },
-  {
-    "from": "board-view.bc-init",
-    "event": "tap",
-    "to": "init-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "board-view.bc-empty",
-    "event": "tap",
-    "to": "no-project-empty-state",
-    "to_kind": "screen"
-  },
-  {
-    "from": "board-view.bc-open",
-    "event": "tap",
-    "to": "open-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "board-view.bc-1",
-    "event": "tap",
-    "to": "app-shell",
-    "to_kind": "screen"
-  },
-  {
     "from": "no-project-empty-state.empty-btn-open",
     "event": "tap",
     "to": "open-project-dialog",
@@ -291,66 +249,6 @@
     "from": "board-view-clusters-collapsed.frame-cart-head",
     "event": "tap",
     "to": "board-view-clusters-expanded",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.project-picker",
-    "event": "tap",
-    "to": "open-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.tab-ds",
-    "event": "tap",
-    "to": "design-system-view",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.tab-board",
-    "event": "tap",
-    "to": "board-view",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.tab-usecases",
-    "event": "tap",
-    "to": "usecases-list",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.left-header",
-    "event": "tap",
-    "to": "sidebars-collapsed",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.su-row-1",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.su-row-2",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.su-row-3",
-    "event": "tap",
-    "to": "usecases-detail",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.comments-header",
-    "event": "tap",
-    "to": "comments-panel",
-    "to_kind": "screen"
-  },
-  {
-    "from": "app-shell.el-checkout",
-    "event": "tap",
-    "to": "inspector-selected",
     "to_kind": "screen"
   },
   {
@@ -1689,6 +1587,138 @@
     "from": "usecases-mapping.fr-dialog",
     "event": "tap",
     "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.project-picker",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-board",
+    "event": "tap",
+    "to": "board-view",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-ds",
+    "event": "tap",
+    "to": "design-system-view",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.tab-usecases",
+    "event": "tap",
+    "to": "usecases-list",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.left-header",
+    "event": "tap",
+    "to": "sidebars-collapsed",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.toolbar-side-inspect",
+    "event": "tap",
+    "to": "inspector-selected",
+    "to_kind": "screen"
+  },
+  {
+    "from": "app-shell.comments-header",
+    "event": "tap",
+    "to": "comments-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.bc-home",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.bc-settings",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.bc-cart",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.bc-checkout",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.bc-order-placed",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.project-picker",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.tab-screens",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.tab-ds",
+    "event": "tap",
+    "to": "design-system-view",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.tab-usecases",
+    "event": "tap",
+    "to": "usecases-list",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.si-checkout",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.si-order-placed",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.si-cart",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.si-home",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.si-settings",
+    "event": "tap",
+    "to": "app-shell",
+    "to_kind": "screen"
+  },
+  {
+    "from": "board-view.toolbar-side-collapse-all",
+    "event": "tap",
+    "to": "board-view-clusters-collapsed",
     "to_kind": "screen"
   }
 ]

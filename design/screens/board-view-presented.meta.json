@@ -1,11 +1,12 @@
 {
-  "notes": "CHR-618/CHR-621 ticket state 6: the browser switches to the Board tab when an agent presents screens (standing decision, not modelled as an Artisign flow since it is a tool-driven UI transition, not a user click). Shows a dismissible pill banner (\\\"Agent switched you here to show 3 screens\\\") positioned inside the canvas, clearly below the toolbar's bottom border (not overlapping it — first version straddled the border and read as misplaced chrome rather than an intentional overlay). All three tiles carry the unpinned `default` `$pin-button` — none is pinned here, demonstrating the affordance's resting state, not just its pinned state. No new component for the banner: this is a one-off, not a repeated pattern yet, so it is built directly from `$color.accent`/`$spacing`/`$radius.pill` tokens rather than promoted — promote it if a second occurrence appears.",
+  "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** The agent presented screens (`set_board_state`), so the browser switched to the Board. A floating status pill above the zoom pill says \"The agent switched you to the Board to show 5 screens\" with a violet agent dot and a Dismiss button (flows to `board-view`). The board state the agent set is visible in the nav card (\"5 shown by the agent\", filter and pins) and in the Agent bar feed (\"Put 5 screens on the Board for you\"). The tab switch itself is not a flow (tool-driven, not a click). The pill is a one-off and stays inline.\n\n---\nEarlier notes (history):\n\nCHR-618/CHR-621 ticket state 6: the browser switches to the Board tab when an agent presents screens (standing decision, not modelled as an Artisign flow since it is a tool-driven UI transition, not a user click). Shows a dismissible pill banner (\\\"Agent switched you here to show 3 screens\\\") positioned inside the canvas, clearly below the toolbar's bottom border (not overlapping it — first version straddled the border and read as misplaced chrome rather than an intentional overlay). All three tiles carry the unpinned `default` `$pin-button` — none is pinned here, demonstrating the affordance's resting state, not just its pinned state. No new component for the banner: this is a one-off, not a repeated pattern yet, so it is built directly from `$color.accent`/`$spacing`/`$radius.pill` tokens rather than promoted — promote it if a second occurrence appears.",
   "tags": [
     "chr-621",
     "chr-618",
     "chr-739",
     "CHR-905",
-    "CHR-909"
+    "CHR-909",
+    "chr-1257"
   ],
   "variant_of": "board-view",
   "variant_kind": "state"

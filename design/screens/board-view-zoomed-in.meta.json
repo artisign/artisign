@@ -1,11 +1,12 @@
 {
-  "notes": "CHR-618/CHR-621 ticket state 7 (zoomed in half): `$board-toolbar` `zoomedin` variant — 200% active, edges on. One tile (`app-shell`) fills most of the canvas at 640px wide, unpinned and the sole filter match (\\\"1 shown — 1 match · 0 pinned\\\"). No edges are drawn because there is only one tile on screen — nothing to connect — even though the toolbar's edge toggle itself stays on, since edge visibility and tile count are independent (a single-tile view with edges enabled just has none to render, which is a legitimate state, not one this screen fakes with a special edges-off variant).",
+  "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Board at 200 % with the zoom slider open (decision `chr621-continuous-zoom-slider`: the slider now lives in a popover off the pill). Clicking the % value opens `zoom-pill` `slider-open`: native `<input type=range min=5 max=200>` with `aria-valuetext`, scale 5/100/200 %, presets Fit, 50, 100, 200 with keys. At 200 % a 390×844 mobile screen is 780×1688, so `checkout` fills the stage width and runs off the bottom; the writing ring stays on its frame. Only the label row stays at chrome size.\n\n---\nEarlier notes (history):\n\nCHR-618/CHR-621 ticket state 7 (zoomed in half): `$board-toolbar` `zoomedin` variant — 200% active, edges on. One tile (`app-shell`) fills most of the canvas at 640px wide, unpinned and the sole filter match (\\\"1 shown — 1 match · 0 pinned\\\"). No edges are drawn because there is only one tile on screen — nothing to connect — even though the toolbar's edge toggle itself stays on, since edge visibility and tile count are independent (a single-tile view with edges enabled just has none to render, which is a legitimate state, not one this screen fakes with a special edges-off variant).",
   "tags": [
     "chr-621",
     "chr-618",
     "chr-739",
     "CHR-905",
-    "CHR-909"
+    "CHR-909",
+    "chr-1257"
   ],
   "variant_of": "board-view",
   "variant_kind": "state"

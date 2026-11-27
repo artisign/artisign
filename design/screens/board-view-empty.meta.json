@@ -1,11 +1,12 @@
 {
-  "notes": "CHR-618/CHR-621 ticket state 5: filter matches nothing (\\\"xyzzy\\\") and nothing is pinned, so the union is empty. Toolbar `status` reads \\\"0 shown — 0 matches · 0 pinned\\\" and has no `actions` fill (no pins to clear, unlike `board-view`'s canonical state). Canvas centers a plain empty-state message rather than an empty board grid, telling the human the two ways out: clear the filter, or pin something from the sidebar.",
+  "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Filter \"xyzzy\" matches nothing and nothing is pinned. **Redesigned as equivalent:** the old toolbar status line is gone; the nav card shows \"Nothing on the board\" under the filter and \"No screen or tag matches “xyzzy”.\" instead of the list. The canvas centres a floating card that names both ways out, with a **Clear filter** button (flows to `board-view`). \"Collapse all\" is disabled; the Agent bar note scope reads 0 screens.\n\n---\nEarlier notes (history):\n\nCHR-618/CHR-621 ticket state 5: filter matches nothing (\\\"xyzzy\\\") and nothing is pinned, so the union is empty. Toolbar `status` reads \\\"0 shown — 0 matches · 0 pinned\\\" and has no `actions` fill (no pins to clear, unlike `board-view`'s canonical state). Canvas centers a plain empty-state message rather than an empty board grid, telling the human the two ways out: clear the filter, or pin something from the sidebar.",
   "tags": [
     "chr-621",
     "chr-618",
     "chr-739",
     "CHR-905",
-    "CHR-909"
+    "CHR-909",
+    "chr-1257"
   ],
   "variant_of": "board-view",
   "variant_kind": "state"

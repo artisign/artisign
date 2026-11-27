@@ -1,11 +1,12 @@
 {
-  "notes": "CHR-628/CHR-629: Activity feed empty state — no agent tool calls yet this session. Uses the plain `default` topbar (follow off, the default state) to show the feed fills/exists independent of the follow toggle's own state, per the ticket's \"fills even when follow is off\" requirement.",
+  "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** The Activity feed before any agent call in this session. `agent-status` `idle` (grey dot, \"Idle\", Follow switch off) and an empty note in the feed that says the feed fills with Follow on or off. The note field stays available.\n\n---\nEarlier notes (history):\n\nCHR-628/CHR-629: Activity feed empty state — no agent tool calls yet this session. Uses the plain `default` topbar (follow off, the default state) to show the feed fills/exists independent of the follow toggle's own state, per the ticket's \"fills even when follow is off\" requirement.",
   "tags": [
     "chr-628",
     "chr-629",
     "chr-739",
     "CHR-905",
-    "CHR-909"
+    "CHR-909",
+    "chr-1257"
   ],
   "variant_of": "follow-active-feed",
   "variant_kind": "state"

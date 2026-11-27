@@ -1,5 +1,5 @@
 {
-  "notes": "",
+  "notes": "**CHR-1257 phase 2b, Stitch chrome (2026-11-27, awaiting Christian's approval).** Dark twin of `no-project-empty-state`; the root binds `chrome-dark.*` (dark dotted workspace, dark float card). Same chrome decision: only the logo + \"No project\" picker and the settings button stay. Settings flows to `shell-settings-menu-dark`; Open project… and New project… flow to the light dialogs, which have no dark twin.\n\n---\nEarlier notes (history):\n\n(none)",
   "tags": [
     "CHR-905",
     "empty-state",
@@ -7,7 +7,8 @@
     "chr-739",
     "chr-831",
     "CHR-909",
-    "chr-1004"
+    "chr-1004",
+    "chr-1257"
   ],
   "variant_of": "no-project-empty-state",
   "variant_kind": "state"

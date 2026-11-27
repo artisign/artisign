@@ -1,10 +1,11 @@
 {
-  "notes": "CHR-831 error state: invalid name (path separators, empty, \".\" or \"..\"). Message: \"Folder names can’t contain / or \\ and can’t be empty, “.” or “..”.\" Same row, same behavior as the exists state.",
+  "notes": "**CHR-1257 phase 2b, Stitch chrome (2026-11-27, awaiting Christian's approval).** Same `new-folder-row` `error` as the exists state, with the typed name \"clients/2026\" and the invalid-name message. Meaning unchanged.\n\n---\nEarlier notes (history):\n\nCHR-831 error state: invalid name (path separators, empty, \".\" or \"..\"). Message: \"Folder names can’t contain / or \\ and can’t be empty, “.” or “..”.\" Same row, same behavior as the exists state.",
   "tags": [
     "dialog",
     "chr-831",
     "CHR-905",
-    "CHR-909"
+    "CHR-909",
+    "chr-1257"
   ],
   "variant_of": "init-project-dialog-new-folder",
   "variant_kind": "state"

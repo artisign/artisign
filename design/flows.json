@@ -1,41 +1,5 @@
 [
   {
-    "from": "no-project-empty-state.empty-btn-open",
-    "event": "tap",
-    "to": "open-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "no-project-empty-state.empty-btn-init",
-    "event": "tap",
-    "to": "init-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "no-project-empty-state-dark.empty-btn-open",
-    "event": "tap",
-    "to": "open-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "no-project-empty-state-dark.empty-btn-init",
-    "event": "tap",
-    "to": "init-project-dialog",
-    "to_kind": "screen"
-  },
-  {
-    "from": "init-project-dialog.init-dialog-newfolder",
-    "event": "tap",
-    "to": "init-project-dialog-new-folder",
-    "to_kind": "screen"
-  },
-  {
-    "from": "open-project-dialog.open-dialog-newfolder",
-    "event": "tap",
-    "to": "open-project-dialog-new-folder",
-    "to_kind": "screen"
-  },
-  {
     "from": "usecases-list.sub-personas",
     "event": "tap",
     "to": "usecases-personas",
@@ -2265,6 +2229,294 @@
     "from": "app-shell.comments-header",
     "event": "tap",
     "to": "comments-panel",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state.project-picker",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state.settings-button",
+    "event": "tap",
+    "to": "shell-settings-menu",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state.empty-btn-open",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state.empty-btn-init",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state-dark.project-picker",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state-dark.settings-button",
+    "event": "tap",
+    "to": "shell-settings-menu-dark",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state-dark.empty-btn-open",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "no-project-empty-state-dark.empty-btn-init",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog.dialog-scrim",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog.open-dialog-close",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog.open-dialog-newfolder",
+    "event": "tap",
+    "to": "open-project-dialog-new-folder",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog.open-dialog-cancel",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog-new-folder.dialog-scrim",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog-new-folder.open-dialog-close",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog-new-folder.open-dialog-newfolder",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog-new-folder.open-dialog-cancel",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog-new-folder-exists.dialog-scrim",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog-new-folder-exists.open-dialog-close",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog-new-folder-exists.open-dialog-newfolder",
+    "event": "tap",
+    "to": "open-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog-new-folder-exists.open-dialog-cancel",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog-new-folder-created.dialog-scrim",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog-new-folder-created.open-dialog-close",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog-new-folder-created.open-dialog-newfolder",
+    "event": "tap",
+    "to": "open-project-dialog-new-folder",
+    "to_kind": "screen"
+  },
+  {
+    "from": "open-project-dialog-new-folder-created.open-dialog-cancel",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog.dialog-scrim",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog.init-dialog-close",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog.init-dialog-newfolder",
+    "event": "tap",
+    "to": "init-project-dialog-new-folder",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog.init-dialog-cancel",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder.dialog-scrim",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder.init-dialog-close",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder.init-dialog-newfolder",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder.init-dialog-cancel",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-exists.dialog-scrim",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-exists.init-dialog-close",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-exists.init-dialog-newfolder",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-exists.init-dialog-cancel",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-invalid.dialog-scrim",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-invalid.init-dialog-close",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-invalid.init-dialog-newfolder",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-invalid.init-dialog-cancel",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-permission.dialog-scrim",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-permission.init-dialog-close",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-permission.init-dialog-newfolder",
+    "event": "tap",
+    "to": "init-project-dialog",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-permission.init-dialog-cancel",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-created.dialog-scrim",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-created.init-dialog-close",
+    "event": "tap",
+    "to": "no-project-empty-state",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-created.init-dialog-newfolder",
+    "event": "tap",
+    "to": "init-project-dialog-new-folder",
+    "to_kind": "screen"
+  },
+  {
+    "from": "init-project-dialog-new-folder-created.init-dialog-cancel",
+    "event": "tap",
+    "to": "no-project-empty-state",
     "to_kind": "screen"
   }
 ]

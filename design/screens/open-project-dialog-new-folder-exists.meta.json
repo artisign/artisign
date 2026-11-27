@@ -1,10 +1,11 @@
 {
-  "notes": "CHR-831 error state in the Open project dialog. Identical row and messages to the New project dialog; only \"exists\" is drawn here. \"invalid\" and \"permission\" use the same `$new-folder-row` `error` variant with the strings in the init-project-dialog-new-folder-* screens.",
+  "notes": "**CHR-1257 phase 2b, Stitch chrome (2026-11-27, awaiting Christian's approval).** `new-folder-row` `error`: red ring on the input (`aria-invalid`, `aria-describedby` = the message), Create dimmed (`aria-disabled`), message line with an `error` icon. Message unchanged.\n\n---\nEarlier notes (history):\n\nCHR-831 error state in the Open project dialog. Identical row and messages to the New project dialog; only \"exists\" is drawn here. \"invalid\" and \"permission\" use the same `$new-folder-row` `error` variant with the strings in the init-project-dialog-new-folder-* screens.",
   "tags": [
     "dialog",
     "chr-831",
     "CHR-905",
-    "CHR-909"
+    "CHR-909",
+    "chr-1257"
   ],
   "variant_of": "open-project-dialog-new-folder",
   "variant_kind": "state"

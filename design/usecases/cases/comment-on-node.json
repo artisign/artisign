@@ -65,9 +65,6 @@
       "data": [
         {
           "object": "comment",
-          "before": {
-            "status": "none"
-          },
           "after": {
             "status": "open"
           }

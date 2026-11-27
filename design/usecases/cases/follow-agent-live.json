@@ -30,7 +30,7 @@
   "inputs": [
     {
       "object": "settings",
-      "source": "Topbar Follow pill",
+      "source": "Agent bar, Follow the agent switch",
       "example": {
         "follow": false
       }
@@ -49,7 +49,7 @@
     {
       "id": "turn-on",
       "actor": "designer-dana",
-      "action": "Turns on Follow in the topbar",
+      "action": "Turns on Follow the agent in the Agent bar",
       "target": {
         "screen": "follow-active-feed"
       },
@@ -84,7 +84,7 @@
     {
       "id": "resume",
       "actor": "designer-dana",
-      "action": "Resumes explicitly",
+      "action": "Resumes with Resume in the Agent bar",
       "target": {
         "screen": "follow-active-feed"
       }

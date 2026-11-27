@@ -1,0 +1,91 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>5 Review changes timeline</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden}
+body{font-family:Inter,system-ui,sans-serif;font-size:13px;-webkit-font-smoothing:antialiased;position:relative}
+.ic{flex:none;display:block}
+.mono{font-family:'Geist Mono','JetBrains Mono',ui-monospace,monospace}
+.row{display:flex;align-items:center}
+.ex{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;font-size:10.5px;font-weight:600;letter-spacing:.02em;background:#fff3d6;color:#8a5a00}
+
+body{background:#eef0f3;color:#1c1f24}
+.top{position:absolute;left:12px;right:12px;top:12px;height:48px;border-radius:16px;background:#fff;display:flex;align-items:center;gap:10px;padding:0 8px 0 16px;box-shadow:0 0 0 1px rgba(0,0,0,.05)}
+.btn{display:flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:10px;color:#5a606b;font-weight:500}
+.btn.on{background:#eef0f3;color:#1c1f24;font-weight:600}
+.card{position:absolute;background:#fff;border-radius:18px;box-shadow:0 0 0 1px rgba(0,0,0,.05),0 8px 24px rgba(20,30,50,.06)}
+.ch{display:flex;gap:10px;padding:12px 14px;border-radius:14px;margin:0 8px}
+.ch.on{background:#f3effe}
+.dot{width:10px;height:10px;border-radius:50%;margin-top:4px;flex:none}
+.t{font-weight:600}
+.s{color:#7b8290;font-size:12px;margin-top:3px;line-height:1.4}
+.tick{position:absolute;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px #7c3aed}
+</style></head><body>
+<div class="top" id="topbar">
+  <b id="topbar-brand" style="font-size:14px;letter-spacing:-.01em">artisign</b>
+  <div class="btn" id="project-switcher"><svg class="ic " id="project-switcher-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>Example project<svg class="ic " id="project-switcher-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></div>
+  <div id="topbar-divider" style="width:1px;height:20px;background:#e5e8ed"></div>
+  <div class="btn on" id="views-tab-screens">Screens</div><div class="btn" id="views-tab-board">Board</div><div class="btn" id="views-tab-design-system">Design System</div><div class="btn" id="views-tab-use-cases">Use Cases</div>
+  <span id="topbar-spacer" style="flex:1"></span>
+  <div class="row" id="mode-switch" style="background:#eef0f3;border-radius:12px;padding:3px;gap:2px"><div class="btn" id="mode-switch-browse" style="height:28px"><svg class="ic " id="mode-switch-browse-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/></svg>Browse</div><div class="btn on" id="mode-switch-review" style="height:28px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08)"><svg class="ic " id="mode-switch-review-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>Review changes</div></div>
+  <span class="row" id="agent-live" style="gap:6px;color:#16a34a;font-weight:600;font-size:12px;margin-left:8px"><span id="agent-live-dot" style="width:7px;height:7px;border-radius:50%;background:#16a34a"></span>Live</span>
+  <div class="btn" id="settings-button"><svg class="ic " id="settings-button-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></div>
+</div>
+<!-- screen -->
+<div class="row" id="frame-label" style="position:absolute;left:44px;top:80px;gap:8px;font-size:12.5px;color:#5a606b"><svg class="ic " id="frame-label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4"/></svg><b id="frame-label-name" style="color:#1c1f24">home</b><span class="ex" id="frame-label-example">Example</span><span id="frame-label-write">· after write 3</span></div>
+<div id="frame" style="position:absolute;left:44px;top:106px;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.05),0 20px 50px rgba(20,30,50,.12)"><div id="frame-viewport" style="width:985.6000000000001px;height:627.2px;overflow:hidden;border-radius:14px"><div id="frame-home" style="width:880px;height:560px;transform:scale(1.12);transform-origin:0 0;background:#ffffff;color:#1d1c1a;display:flex;flex-direction:column;font-size:12.5px">
+      <div class="row" id="frame-home-nav" style="height:52px;padding:0 30px;gap:22px;border-bottom:1px solid #eceae6">
+        <div id="frame-home-nav-logo" style="width:22px;height:22px;border-radius:7px;background:#0f8a7e"></div>
+        <div id="frame-home-nav-orders" style="font-weight:600">Orders</div><div id="frame-home-nav-products" style="color:#8d8a84">Products</div><div id="frame-home-nav-customers" style="color:#8d8a84">Customers</div>
+        <div id="frame-home-nav-spacer" style="flex:1"></div><div id="frame-home-nav-search" style="width:200px;height:30px;border-radius:9px;background:#f7f6f3"></div><div id="frame-home-nav-avatar" style="width:30px;height:30px;border-radius:50%;background:#e6e3de"></div></div>
+      <div id="frame-home-header" style="padding:26px 30px 0;display:flex;justify-content:space-between;align-items:flex-end">
+          <div id="frame-home-header-titles"><div id="frame-home-header-eyebrow" style="font-size:12px;color:#8d8a84;font-weight:500">Example shop</div><div id="frame-home-header-title" style="font-size:24px;font-weight:700;letter-spacing:-.02em;color:#1d1c1a">Orders</div></div>
+          <div class="row" id="frame-home-header-actions" style="gap:8px"><div id="frame-home-export" style="padding:8px 14px;border-radius:10px;border:1px solid #eceae6;font-weight:500">Export</div><div id="frame-home-new-order" style="padding:8px 14px;border-radius:10px;background:#0f8a7e;color:#fff;font-weight:600">New order</div></div></div>
+          <div id="frame-home-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:20px 30px;outline:2px solid #7c3aed;outline-offset:-10px;border-radius:24px;">
+            <div id="frame-home-stat-open" style="background:#f7f6f3;border-radius:14px;padding:14px 16px"><div id="frame-home-stat-open-label" style="font-size:11.5px;color:#8d8a84">Open</div><div id="frame-home-stat-open-value" style="height:14px;width:54px;margin-top:10px;border-radius:5px;background:#d6d2cb"></div></div><div id="frame-home-stat-packing" style="background:#f7f6f3;border-radius:14px;padding:14px 16px"><div id="frame-home-stat-packing-label" style="font-size:11.5px;color:#8d8a84">Packing</div><div id="frame-home-stat-packing-value" style="height:14px;width:40px;margin-top:10px;border-radius:5px;background:#d6d2cb"></div></div><div id="frame-home-stat-shipped" style="background:#f7f6f3;border-radius:14px;padding:14px 16px"><div id="frame-home-stat-shipped-label" style="font-size:11.5px;color:#8d8a84">Shipped</div><div id="frame-home-stat-shipped-value" style="height:14px;width:66px;margin-top:10px;border-radius:5px;background:#d6d2cb"></div></div>
+          </div>
+          <div id="frame-home-orders" style="padding:0 30px"><div id="frame-home-orders-row-1" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-1-customer" style="gap:10px"><div id="frame-home-orders-row-1-avatar" style="width:28px;height:28px;border-radius:8px;background:#ffe1c7"></div><div id="frame-home-orders-row-1-name" style="height:8px;width:120px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-1-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-1-status"><span id="frame-home-orders-row-1-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#dcf0ed;color:#0b6b62;font-size:11px;font-weight:600">Shipped</span></div>
+      <div id="frame-home-orders-row-1-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-2" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-2-customer" style="gap:10px"><div id="frame-home-orders-row-2-avatar" style="width:28px;height:28px;border-radius:8px;background:#dfe4ff"></div><div id="frame-home-orders-row-2-name" style="height:8px;width:96px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-2-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-2-status"><span id="frame-home-orders-row-2-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#fdf1e0;color:#a35a00;font-size:11px;font-weight:600">Packing</span></div>
+      <div id="frame-home-orders-row-2-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-3" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-3-customer" style="gap:10px"><div id="frame-home-orders-row-3-avatar" style="width:28px;height:28px;border-radius:8px;background:#e9dcff"></div><div id="frame-home-orders-row-3-name" style="height:8px;width:134px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-3-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-3-status"><span id="frame-home-orders-row-3-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#dcf0ed;color:#0b6b62;font-size:11px;font-weight:600">Shipped</span></div>
+      <div id="frame-home-orders-row-3-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-4" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-4-customer" style="gap:10px"><div id="frame-home-orders-row-4-avatar" style="width:28px;height:28px;border-radius:8px;background:#d9f2e3"></div><div id="frame-home-orders-row-4-name" style="height:8px;width:88px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-4-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-4-status"><span id="frame-home-orders-row-4-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#eceae6;color:#5b5853;font-size:11px;font-weight:600">Open</span></div>
+      <div id="frame-home-orders-row-4-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-5" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-5-customer" style="gap:10px"><div id="frame-home-orders-row-5-avatar" style="width:28px;height:28px;border-radius:8px;background:#ffd9de"></div><div id="frame-home-orders-row-5-name" style="height:8px;width:110px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-5-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-5-status"><span id="frame-home-orders-row-5-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#fdf1e0;color:#a35a00;font-size:11px;font-weight:600">Packing</span></div>
+      <div id="frame-home-orders-row-5-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div></div></div></div></div>
+<div id="change-marker" style="position:absolute;left:68px;top:246px;padding:3px 10px;border-radius:999px;background:#7c3aed;color:#fff;font-size:11.5px;font-weight:600">Changed in write 3</div>
+<!-- changes list -->
+<div class="card" id="changes-panel" style="right:12px;top:72px;width:356px;bottom:12px;padding-top:6px">
+  <div class="row" id="changes-panel-header" style="padding:12px 18px 10px;gap:8px"><b id="changes-panel-title" style="font-size:15px">Changes</b><span id="changes-panel-spacer" style="flex:1"></span><span class="ex" id="changes-panel-example">Example</span></div>
+  <div class="s" id="changes-panel-intro" style="padding:0 18px 12px;margin:0">What the agent did on this screen, newest first.</div>
+  <div class="ch on" id="change-write-3"><span class="dot" id="change-write-3-dot" style="background:#7c3aed"></span><div id="change-write-3-body" style="flex:1"><div class="t" id="change-write-3-title">Write 3</div><div class="s" id="change-write-3-summary">Cards row: labels moved above the values</div></div><svg class="ic " id="change-write-3-chevron" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></div><div class="ch " id="change-write-2"><span class="dot" id="change-write-2-dot" style="background:#7c3aed"></span><div id="change-write-2-body" style="flex:1"><div class="t" id="change-write-2-title">Write 2</div><div class="s" id="change-write-2-summary">Table: status pills added</div></div></div><div class="ch " id="change-read"><span class="dot" id="change-read-dot" style="background:#0d9488"></span><div id="change-read-body" style="flex:1"><div class="t" id="change-read-title">Read</div><div class="s" id="change-read-summary">Agent read the design system tokens</div></div></div><div class="ch " id="change-write-1"><span class="dot" id="change-write-1-dot" style="background:#7c3aed"></span><div id="change-write-1-body" style="flex:1"><div class="t" id="change-write-1-title">Write 1</div><div class="s" id="change-write-1-summary">home created</div></div></div>
+  <div id="change-detail" style="position:absolute;left:12px;right:12px;bottom:12px;border-radius:14px;background:#f6f7f9;padding:12px 14px">
+    <div class="t" id="change-detail-title" style="font-size:12.5px">Write 3</div>
+    <div class="row" id="change-detail-actions" style="gap:8px;margin-top:10px">
+      <div class="btn" id="change-detail-before-after" style="background:#fff;box-shadow:0 0 0 1px #e1e4ea;flex:1;justify-content:center"><svg class="ic " id="change-detail-before-after-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 2v20"/></svg>Before and after</div>
+      <div class="btn" id="change-detail-comment" style="background:#1c1f24;color:#fff;flex:1;justify-content:center"><svg class="ic " id="change-detail-comment-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>Comment</div>
+    </div>
+  </div>
+</div>
+<!-- timeline -->
+<div class="card row" id="timeline" style="left:44px;width:986px;bottom:16px;height:56px;padding:0 14px;gap:14px">
+  <div id="timeline-play" style="width:34px;height:34px;border-radius:50%;background:#1c1f24;color:#fff;display:flex;align-items:center;justify-content:center"><svg class="ic " id="timeline-play-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5v14l11-7L7 5Z"/></svg></div>
+  <div id="timeline-track" style="position:relative;flex:1;height:30px">
+    <div id="timeline-track-rail" style="position:absolute;left:0;right:0;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:#e5e8ed"></div>
+    <div id="timeline-track-progress" style="position:absolute;left:0;width:88%;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:#c4b5fd"></div>
+    <div class="tick" id="timeline-tick-write-1" style="left:6%"></div><div class="tick" id="timeline-tick-read" style="left:30%;box-shadow:0 0 0 2px #0d9488"></div><div class="tick" id="timeline-tick-write-2" style="left:52%"></div>
+    <div class="tick" id="timeline-tick-write-3" style="left:88%;width:16px;height:16px;margin:-8px 0 0 -8px;background:#7c3aed;box-shadow:0 0 0 4px #ede9fe"></div>
+  </div>
+  <span id="timeline-position" style="color:#5a606b;font-weight:500">Write 3 of 3</span>
+</div>
+</body></html>

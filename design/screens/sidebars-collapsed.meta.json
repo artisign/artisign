@@ -1,6 +1,7 @@
 {
-  "notes": "All three side panels in their 36px rail state. The rail keeps the panel's bottom border and shows the panel icon above a flipped chevron; the body is hidden, not unmounted.",
+  "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** All three floating cards folded, the frame gets the room (110 %).\n\n- **Redesigned as equivalent:** the 36px side rails are gone. Folding a card keeps only its head: nav card = `float-card` `folded` (tabs plus unfold), tool bar = `tool-bar` `folded` (one button), Agent bar = `agent-bar-folded` with the live status.\n- Every unfold control flows back to `app-shell`. Keys [ \\ ] fold and unfold the three cards (see `chrome-c-shell-shortcuts`).\n\n---\nEarlier notes (history):\n\nAll three side panels in their 36px rail state. The rail keeps the panel's bottom border and shows the panel icon above a flipped chevron; the body is hidden, not unmounted.",
   "tags": [
+    "chr-1257",
     "shell",
     "empty-state",
     "chr-739",

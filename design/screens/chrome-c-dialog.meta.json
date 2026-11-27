@@ -1,6 +1,7 @@
 {
-  "notes": "CHR-905 direction C, light: New project dialog over the dimmed shell (`--chrome-scrim`). radius.md 10px, padding spacing.3xl 20px, `chrome-btn` secondary-compact chips / ghost / secondary / primary, `chrome-list-row`, `chrome-field` focus. Dark counterpart: chrome-c-dialog-dark.",
+  "notes": "**CHR-1257 phase 2b, Stitch chrome (2026-11-27, awaiting Christian's approval).** Redesigned as the equivalent: the New project dialog opened inside a project (project menu, New project…) over `app-shell`, with the name field focused. Same folder picker as `init-project-dialog` (which is the no-project case).\n\n- Native `<dialog>` in the `float-dialog` shell, 560px, top 96px; h1 \"New project\", sub \"Choose where the new project folder is created.\", close.\n- Places: three `quick-chip`s (`aria-pressed`, Workspace current). Path: `nav` \"Folder path\" with an `ol` of crumbs (decorative chevrons `aria-hidden`, current folder `aria-current`), `new-folder-btn` at the right.\n- Folders: `chrome-field` tray, `role=listbox`, `chrome-list-row` options (portfolio `selected`, notes-app badged Project).\n- `text-field` `focus` \"Project name\" = my-new-project, hint \"Will create: ~/Workspace/portfolio/my-new-project\" (`aria-describedby`).\n- Footer: `btn` Cancel, `btn` `confirm` \"Create & open\". Close, Cancel, scrim and confirm flow back to `app-shell`.\n\n---\nEarlier notes (history):\n\nCHR-905 direction C, light: New project dialog over the dimmed shell (`--chrome-scrim`). radius.md 10px, padding spacing.3xl 20px, `chrome-btn` secondary-compact chips / ghost / secondary / primary, `chrome-list-row`, `chrome-field` focus. Dark counterpart: chrome-c-dialog-dark.",
   "tags": [
+    "chr-1257",
     "CHR-905",
     "CHR-909",
     "chr-1004",

@@ -1,0 +1,10 @@
+{
+  "notes": "**CHR-1257 — Flow tool on (flow mode) in the Stitch chrome.** Same behaviour as the shipped app (`src/preview/flows.js` `applyFlowMode`, toggle `#flow-mode-toggle` in `app.js`); only the look is new.\n\n- **Tool:** `toolbar-side-flow` is `tool-btn` `pressed` (`aria-pressed=\"true\"`, key F). Pressing it again turns flow mode off (→ app-shell). Flow, Comment and Inspect are mutually exclusive: turning one on turns the others off. Turning Flow on in Compare leaves Compare first (only Single navigates).\n- **Hints:** every element of the open screen that carries `data-flow-target` gets a `flow-hint` outline: 2px solid `--chrome-info` (#2a3edb light, the same blue as today), `outline-offset: 1px`, `cursor: pointer`. In the app the outline goes on the element itself (style added on load and on toggle, original style restored when flow mode turns off); the design draws it as positioned `flow-hint` instances over the stand-in. Shown: Products tab, New order, the five order rows.\n- **Hover (new cue):** the hovered linked element gets a 10% `--chrome-info` tint and a target chip under its right edge (`flow-hint` `hover`, route icon + target screen id; for a node target `screen.node` show the screen part). Shown on New order → `checkout`.\n- **Click:** a tap on a linked element (trigger `tap`, the default) opens the target screen; for a node target it opens that node's screen. Non-tap triggers (hover, longpress, swipe) are hinted but do not navigate. Flow mode stays on after the jump. The jump is human navigation, so it pauses Follow the agent (ADR-005 pause rule 1). The Agent bar stays open: Flow is a canvas mode, not a right-column panel.\n- **Stand-in flows:** in the user's example project, Products → product-list, New order → checkout, a row → order-detail. In this design project all hints flow to `app-shell` as the stand-in for \"Screens view with the target screen open\" (there is no separate screen per target).\n- Design system tool → design-system-view; Notes, Comments, Inspect keep their panel flows.",
+  "tags": [
+    "chr-1257",
+    "shell",
+    "screens"
+  ],
+  "variant_of": "app-shell",
+  "variant_kind": "state"
+}

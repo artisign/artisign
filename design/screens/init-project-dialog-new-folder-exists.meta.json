@@ -1,6 +1,7 @@
 {
-  "notes": "CHR-831 error state: name already exists. `$new-folder-row` variant `error` (red input border, Create at 0.4 opacity, message below). Message: \"A folder named “scratch” already exists here.\" The row stays open and focused; editing the name clears the message.",
+  "notes": "**CHR-1257 phase 2b, Stitch chrome (2026-11-27, awaiting Christian's approval).** `new-folder-row` `error` with \"scratch\": red ring (`aria-invalid`, `aria-describedby` = the message), Create dimmed (`aria-disabled`), message with an `error` icon. Message and behaviour unchanged.\n\n---\nEarlier notes (history):\n\nCHR-831 error state: name already exists. `$new-folder-row` variant `error` (red input border, Create at 0.4 opacity, message below). Message: \"A folder named “scratch” already exists here.\" The row stays open and focused; editing the name clears the message.",
   "tags": [
+    "chr-1257",
     "dialog",
     "chr-831",
     "CHR-905",

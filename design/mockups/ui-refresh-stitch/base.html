@@ -1,0 +1,132 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Stitch refined — Screens tab</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1440px;height:900px;overflow:hidden}
+body{font-family:Inter,system-ui,sans-serif;font-size:13px;-webkit-font-smoothing:antialiased;position:relative;background:#f3f3f1;color:#1f1f1d}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.ic{flex:none;display:block}
+.row{display:flex;align-items:center}
+.ex{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:999px;font-size:10.5px;font-weight:600;letter-spacing:.02em;background:#fff3d6;color:#8a5a00}
+.canvas{position:absolute;inset:0;background-image:radial-gradient(#d3d1cc 1.1px,transparent 1.2px);background-size:22px 22px}
+.float{position:absolute;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-radius:20px;box-shadow:0 0 0 1px rgba(0,0,0,.05),0 8px 30px rgba(40,30,20,.10)}
+.pill{border-radius:999px}
+.btn{display:flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:999px;color:#4a4844;font-weight:500}
+.btn.on{background:#1f1f1d;color:#fff}
+.ib{width:34px;height:34px;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#55524d}
+.hd{display:flex;align-items:center;gap:6px;padding:10px 8px 6px 10px}
+.grip{color:#b3afa8}
+.seg{display:flex;flex:1;height:32px;padding:3px;border-radius:999px;background:#efeeea}
+.seg button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:999px;font-weight:500;color:#6b6862;font-size:12.5px}
+.seg button[aria-selected="true"]{background:#fff;color:#1f1f1d;font-weight:600;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 1px 3px rgba(40,30,20,.12)}
+.seg .n{font-size:11px;color:#9a968f;font-weight:500}
+.find{display:flex;align-items:center;gap:8px;height:32px;margin:2px 8px 6px;padding:0 10px;border-radius:10px;background:#f5f4f1;color:#9a968f;font-size:12.5px}
+.item{display:flex;align-items:center;gap:9px;height:34px;padding:0 10px;border-radius:12px;color:#3b3935}
+.item.sel{background:#e3f2ef;color:#0b6b62;font-weight:600}
+.cnt{margin-left:auto;font-size:11.5px;color:#9a968f;font-weight:400}
+.item.sel .cnt{color:#3f8f86}
+.lbl{position:absolute;font-size:12px;font-weight:600;color:#5b5853;display:flex;gap:6px;align-items:center}
+.lbl .v{font-weight:500;color:#9a968f}
+.fr{position:absolute;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.06),0 16px 40px rgba(40,30,20,.12)}
+.tools{position:absolute;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px;width:64px}
+.tool{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:52px;min-height:52px;border-radius:14px;color:#4a4844}
+.tool span{font-size:11px;font-weight:500;line-height:1}
+.tool[aria-pressed="true"]{background:#1f1f1d;color:#fff}
+.tool .badge{position:absolute;top:5px;right:7px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e3f2ef;color:#0b6b62;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.sep{width:28px;height:0;border-top:1px solid #e3e0db;margin:4px 0}
+</style></head><body>
+<div class="canvas" id="canvas"></div>
+
+<!-- the one open screen -->
+<div class="lbl" id="frame-label" style="left:380px;top:128px"><svg class="ic" id="frame-label-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4"/></svg> home <span class="v" id="frame-label-variant">default</span> <span class="ex" id="frame-label-example">Example</span></div>
+<div class="fr" id="frame" style="left:380px;top:154px"><div id="frame-viewport" style="width:968px;height:616px;overflow:hidden;border-radius:16px"><div id="frame-home" style="width:880px;height:560px;transform:scale(1.1);transform-origin:0 0;background:#ffffff;color:#1d1c1a;display:flex;flex-direction:column;font-size:12.5px">
+      <div class="row" id="frame-home-nav" style="height:52px;padding:0 30px;gap:22px;border-bottom:1px solid #eceae6">
+        <div id="frame-home-nav-logo" style="width:22px;height:22px;border-radius:7px;background:#0f8a7e"></div>
+        <div id="frame-home-nav-orders" style="font-weight:600">Orders</div><div id="frame-home-nav-products" style="color:#8d8a84">Products</div><div id="frame-home-nav-customers" style="color:#8d8a84">Customers</div>
+        <div id="frame-home-nav-spacer" style="flex:1"></div><div id="frame-home-nav-search" style="width:200px;height:30px;border-radius:9px;background:#f7f6f3"></div><div id="frame-home-nav-avatar" style="width:30px;height:30px;border-radius:50%;background:#e6e3de"></div></div>
+      <div id="frame-home-header" style="padding:26px 30px 0;display:flex;justify-content:space-between;align-items:flex-end">
+          <div id="frame-home-header-titles"><div id="frame-home-header-eyebrow" style="font-size:12px;color:#8d8a84;font-weight:500">Example shop</div><div id="frame-home-header-title" style="font-size:24px;font-weight:700;letter-spacing:-.02em;color:#1d1c1a">Orders</div></div>
+          <div class="row" id="frame-home-header-actions" style="gap:8px"><div id="frame-home-export" style="padding:8px 14px;border-radius:10px;border:1px solid #eceae6;font-weight:500">Export</div><div id="frame-home-new-order" style="padding:8px 14px;border-radius:10px;background:#0f8a7e;color:#fff;font-weight:600">New order</div></div></div>
+          <div id="frame-home-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:20px 30px;">
+            <div id="frame-home-stat-open" style="background:#f7f6f3;border-radius:14px;padding:14px 16px"><div id="frame-home-stat-open-label" style="font-size:11.5px;color:#8d8a84">Open</div><div id="frame-home-stat-open-value" style="height:14px;width:54px;margin-top:10px;border-radius:5px;background:#d6d2cb"></div></div><div id="frame-home-stat-packing" style="background:#f7f6f3;border-radius:14px;padding:14px 16px"><div id="frame-home-stat-packing-label" style="font-size:11.5px;color:#8d8a84">Packing</div><div id="frame-home-stat-packing-value" style="height:14px;width:40px;margin-top:10px;border-radius:5px;background:#d6d2cb"></div></div><div id="frame-home-stat-shipped" style="background:#f7f6f3;border-radius:14px;padding:14px 16px"><div id="frame-home-stat-shipped-label" style="font-size:11.5px;color:#8d8a84">Shipped</div><div id="frame-home-stat-shipped-value" style="height:14px;width:66px;margin-top:10px;border-radius:5px;background:#d6d2cb"></div></div>
+          </div>
+          <div id="frame-home-orders" style="padding:0 30px"><div id="frame-home-orders-row-1" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-1-customer" style="gap:10px"><div id="frame-home-orders-row-1-avatar" style="width:28px;height:28px;border-radius:8px;background:#ffe1c7"></div><div id="frame-home-orders-row-1-name" style="height:8px;width:120px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-1-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-1-status"><span id="frame-home-orders-row-1-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#dcf0ed;color:#0b6b62;font-size:11px;font-weight:600">Shipped</span></div>
+      <div id="frame-home-orders-row-1-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-2" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-2-customer" style="gap:10px"><div id="frame-home-orders-row-2-avatar" style="width:28px;height:28px;border-radius:8px;background:#dfe4ff"></div><div id="frame-home-orders-row-2-name" style="height:8px;width:96px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-2-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-2-status"><span id="frame-home-orders-row-2-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#fdf1e0;color:#a35a00;font-size:11px;font-weight:600">Packing</span></div>
+      <div id="frame-home-orders-row-2-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-3" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-3-customer" style="gap:10px"><div id="frame-home-orders-row-3-avatar" style="width:28px;height:28px;border-radius:8px;background:#e9dcff"></div><div id="frame-home-orders-row-3-name" style="height:8px;width:134px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-3-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-3-status"><span id="frame-home-orders-row-3-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#dcf0ed;color:#0b6b62;font-size:11px;font-weight:600">Shipped</span></div>
+      <div id="frame-home-orders-row-3-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-4" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-4-customer" style="gap:10px"><div id="frame-home-orders-row-4-avatar" style="width:28px;height:28px;border-radius:8px;background:#d9f2e3"></div><div id="frame-home-orders-row-4-name" style="height:8px;width:88px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-4-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-4-status"><span id="frame-home-orders-row-4-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#eceae6;color:#5b5853;font-size:11px;font-weight:600">Open</span></div>
+      <div id="frame-home-orders-row-4-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div><div id="frame-home-orders-row-5" style="display:grid;grid-template-columns:1.4fr 1fr .8fr .7fr;gap:14px;align-items:center;padding:11px 0;border-top:1px solid #eceae6">
+      <div class="row" id="frame-home-orders-row-5-customer" style="gap:10px"><div id="frame-home-orders-row-5-avatar" style="width:28px;height:28px;border-radius:8px;background:#ffd9de"></div><div id="frame-home-orders-row-5-name" style="height:8px;width:110px;border-radius:4px;background:#dcd9d3"></div></div>
+      <div id="frame-home-orders-row-5-date" style="height:8px;width:70px;border-radius:4px;background:#e6e3de"></div>
+      <div id="frame-home-orders-row-5-status"><span id="frame-home-orders-row-5-status-badge" style="display:inline-block;padding:3px 9px;border-radius:999px;background:#fdf1e0;color:#a35a00;font-size:11px;font-weight:600">Packing</span></div>
+      <div id="frame-home-orders-row-5-total" style="height:8px;width:44px;border-radius:4px;background:#e6e3de;justify-self:end"></div></div></div></div></div></div>
+
+<!-- top left: brand + project -->
+<div class="float pill row" id="topbar-left" style="left:16px;top:16px;padding:4px 6px 4px 16px;gap:10px">
+  <b id="topbar-brand" style="font-size:14px;letter-spacing:-.01em">artisign</b>
+  <div class="btn" id="project-switcher" style="background:#f1f0ed"><svg class="ic" id="project-switcher-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>Example project<svg class="ic" id="project-switcher-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></div>
+</div>
+<!-- top center: views -->
+<div class="float pill row" id="views" style="left:50%;transform:translateX(-50%);top:16px;padding:4px;gap:2px">
+  <div class="btn on" id="views-tab-screens">Screens</div><div class="btn" id="views-tab-board">Board</div><div class="btn" id="views-tab-design-system">Design System</div><div class="btn" id="views-tab-use-cases">Use Cases</div>
+</div>
+<!-- top right -->
+<div class="float pill row" id="topbar-right" style="right:16px;top:16px;padding:4px 4px 4px 14px;gap:6px">
+  <span class="row" id="agent-live" style="gap:6px;color:#16a34a;font-weight:600;font-size:12px"><span id="agent-live-dot" style="width:7px;height:7px;border-radius:50%;background:#16a34a"></span>Live</span>
+  <div class="btn" id="follow-agent"><svg class="ic" id="follow-agent-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Follow agent</div><div class="ib" id="settings-button"><svg class="ic" id="settings-button-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></div>
+</div>
+
+<!-- left: one card, Screens | Mockups -->
+<div class="float" id="nav-card" style="left:16px;top:78px;width:256px">
+  <div class="hd" id="nav-card-header">
+    <span class="grip" id="nav-card-grip" title="Drag card"><svg class="ic" id="nav-card-grip-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></svg></span>
+    <div class="seg" id="nav-card-tabs" role="tablist" aria-label="Project content">
+      <button type="button" role="tab" id="tab-screens" aria-selected="true">Screens <span class="n" id="tab-screens-count">4</span></button>
+      <button type="button" role="tab" id="tab-mockups" aria-selected="false">Mockups <span class="n" id="tab-mockups-count">2</span></button>
+    </div>
+    <button type="button" class="ib" id="nav-card-fold" style="width:28px;height:28px" aria-label="Fold card" title="Fold card"><svg class="ic" id="nav-card-fold-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></button>
+  </div>
+  <div role="tabpanel" id="nav-card-panel" aria-labelledby="tab-screens">
+    <div class="find" id="screens-find"><svg class="ic" id="screens-find-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Find a screen</div>
+    <div id="screens-list" style="padding:0 8px 10px">
+    <div class="item sel" id="screens-row-home"><svg class="ic" id="screens-row-home-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4"/></svg><span id="screens-row-home-name">home</span><span class="cnt" id="screens-row-home-count">4 variants</span></div>
+    <div class="item" id="screens-row-checkout"><svg class="ic" id="screens-row-checkout-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg><span id="screens-row-checkout-name">checkout</span><span class="cnt" id="screens-row-checkout-count">2 variants</span></div>
+    <div class="item" id="screens-row-order-placed"><svg class="ic" id="screens-row-order-placed-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg><span id="screens-row-order-placed-name">order-placed</span><span class="cnt" id="screens-row-order-placed-count"></span></div>
+    <div class="item" id="screens-row-settings"><svg class="ic" id="screens-row-settings-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4"/></svg><span id="screens-row-settings-name">settings</span><span class="cnt" id="screens-row-settings-count">3 variants</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- left side: vertical tool bar for the open screen -->
+<div class="float tools" id="tool-bar" role="toolbar" aria-orientation="vertical" aria-label="Screen tools" aria-controls="frame" style="left:288px;top:154px">
+  <button type="button" class="tool" id="toolbar-side-comment" aria-pressed="false" title="Comment (C)"><svg class="ic" id="toolbar-side-comment-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg><span id="toolbar-side-comment-label">Comment</span></button>
+  <button type="button" class="tool" id="toolbar-side-variants" aria-label="Variants, 4" title="Variants (V)"><svg class="ic" id="toolbar-side-variants-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="11" height="14" rx="2.5"/><path d="M17 7h1.5A2.5 2.5 0 0 1 21 9.5v8a2.5 2.5 0 0 1-2.5 2.5H10"/></svg><span id="toolbar-side-variants-label">Variants</span><b class="badge" id="toolbar-side-variants-badge" aria-hidden="true">4</b></button>
+  <button type="button" class="tool" id="toolbar-side-inspect" aria-pressed="false" title="Inspect (I)"><svg class="ic" id="toolbar-side-inspect-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6M4 4v6M20 4h-6M20 4v6M4 20h6M4 20v-6"/><path d="m13 13 7 3-3 1-1 3-3-7Z"/></svg><span id="toolbar-side-inspect-label">Inspect</span></button>
+  <button type="button" class="tool" id="toolbar-side-preview" title="Preview (P)"><svg class="ic" id="toolbar-side-preview-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5v14l11-7L7 5Z"/></svg><span id="toolbar-side-preview-label">Preview</span></button>
+  <span class="sep" id="toolbar-side-separator" role="separator"></span>
+  <button type="button" class="tool" id="toolbar-side-more" style="min-height:40px" aria-label="More actions" aria-haspopup="menu" aria-expanded="false" title="More actions"><svg class="ic" id="toolbar-side-more-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></button>
+</div>
+
+<!-- right: context icon rail -->
+<div class="float" id="context-rail" style="right:16px;top:78px;padding:6px;display:flex;flex-direction:column;gap:4px">
+  <div class="ib" id="context-rail-notes" title="Notes"><svg class="ic" id="context-rail-notes-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div>
+  <div class="ib" id="context-rail-comments" style="position:relative" title="Comments"><svg class="ic" id="context-rail-comments-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg><span id="context-rail-comments-badge" style="position:absolute;right:3px;top:3px;min-width:15px;height:15px;border-radius:8px;background:#0f8a7e;color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center">1</span></div>
+  <div class="ib" id="context-rail-flow" title="Flow"><svg class="ic" id="context-rail-flow-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 14h6v6h-6zM7 10v4a3 3 0 0 0 3 3h4"/></svg></div>
+  <div class="ib" id="context-rail-design-system" title="Design system"><svg class="ic" id="context-rail-design-system-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="8" cy="10" r="1.2"/><circle cx="12" cy="7.5" r="1.2"/><circle cx="16" cy="10" r="1.2"/><path d="M12 21a2.5 2.5 0 0 1 0-5h2a3 3 0 0 0 3-3"/></svg></div>
+</div>
+
+<!-- bottom: zoom -->
+<div class="float pill row" id="zoom-pill" style="left:50%;transform:translateX(-50%);bottom:18px;padding:4px;gap:2px">
+  <div class="ib" id="zoom-pill-out"><svg class="ic" id="zoom-pill-out-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></div><span id="zoom-pill-value" style="width:46px;text-align:center;font-weight:600">110%</span><div class="ib" id="zoom-pill-in"><svg class="ic" id="zoom-pill-in-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></div>
+  <div id="zoom-pill-divider" style="width:1px;height:20px;background:#e3e0db;margin:0 4px"></div><div class="btn" id="zoom-pill-fit"><svg class="ic" id="zoom-pill-fit-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Fit</div>
+</div>
+</body></html>

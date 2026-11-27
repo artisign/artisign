@@ -1,6 +1,7 @@
 {
-  "notes": "CHR-1164 state sheet for the Use Cases view tab with its \"Beta\" badge: default, hover and pressed, each in light (top) and dark (bottom). Only the view tabs are drawn; the bars stand in for the 44px topbar (`size.bar-main`). Instances: `chrome-tab` `beta` / `beta-hover` / `beta-active`, each carrying a `chrome-badge`. The dark half rebinds the `--chrome-*` members to `chrome-dark.*` on its section, exactly as a dark screen root does. In context: `app-shell` (default state, light) and `usecases-list` (pressed, via `shell-topbar` `use-cases`). Spec: tag note `chr-1164`.",
+  "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** State sheet of the Use Cases tab with its Beta badge in the view bar: default, hover, selected; light left, dark right. Each tab sits in a `float-pill` as in the view bar. Instances: `float-btn` (default), `float-btn` `hover` (new variant, `--chrome-hover` fill), `float-btn` `on` (`aria-pressed=\"true\"`), each with a `chrome-badge`. The dark half rebinds `--chrome-*` to `chrome-dark.*` on its section.\n\n---\nEarlier notes (history):\n\nCHR-1164 state sheet for the Use Cases view tab with its \"Beta\" badge: default, hover and pressed, each in light (top) and dark (bottom). Only the view tabs are drawn; the bars stand in for the 44px topbar (`size.bar-main`). Instances: `chrome-tab` `beta` / `beta-hover` / `beta-active`, each carrying a `chrome-badge`. The dark half rebinds the `--chrome-*` members to `chrome-dark.*` on its section, exactly as a dark screen root does. In context: `app-shell` (default state, light) and `usecases-list` (pressed, via `shell-topbar` `use-cases`). Spec: tag note `chr-1164`.",
   "tags": [
+    "chr-1257",
     "shell",
     "chr-1164"
   ],

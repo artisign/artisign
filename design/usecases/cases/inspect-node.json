@@ -19,7 +19,7 @@
     "via": "browser preview"
   },
   "goal": "See refs, computed values and size of one element.",
-  "outcome": "The Elements panel shows the selected node's details.",
+  "outcome": "The Inspect panel shows the selected node's details.",
   "inputs": [
     {
       "object": "screen",

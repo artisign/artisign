@@ -1,6 +1,7 @@
 {
-  "notes": "",
+  "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Dark theme of `board-view`: the same Board state (filter \"checkout\", home and settings pinned, checkout being written), the root binds `--chrome-*` from `chrome-dark.*` including `cluster`. Canvas is the `stand-in-board` instance; the user-screen frames stay white. Row clicks in the nav card flow to `app-shell`; the per-cluster flows live on `board-view`.",
   "tags": [
+    "chr-1257",
     "CHR-905",
     "view",
     "chr-621",

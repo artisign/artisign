@@ -45,10 +45,10 @@
     {
       "id": "add",
       "actor": "designer-dana",
-      "action": "Turns on comment mode with the comment icon in the top bar or the C key",
+      "action": "Turns on comment mode with the Comment tool in the tool bar or the C key",
       "target": {
         "screen": "app-shell",
-        "node": "mode-comment"
+        "node": "toolbar-side-comment"
       }
     },
     {
@@ -66,9 +66,6 @@
       "data": [
         {
           "object": "comment",
-          "before": {
-            "status": "none"
-          },
           "after": {
             "status": "open"
           }

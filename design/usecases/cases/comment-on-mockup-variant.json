@@ -70,10 +70,10 @@
     {
       "id": "comment-mode",
       "actor": "designer-dana",
-      "action": "Turns on comment mode, which covers all columns",
+      "action": "Turns on comment mode with the Comment tool or the C key; it covers all columns",
       "target": {
         "screen": "mockup-comments-thread",
-        "node": "mode-comment"
+        "node": "toolbar-side-comment"
       }
     },
     {

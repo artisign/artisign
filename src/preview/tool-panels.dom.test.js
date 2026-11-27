@@ -14,13 +14,14 @@ beforeEach(() => {
   document.body.innerHTML = `<aside id="panel" hidden><button id="grip"></button><h2 id="title"></h2><span id="ctx"></span><button id="close"></button><span id="live"></span>
     <section id="inspect" hidden></section><section id="notes" hidden></section><section id="comments" hidden></section><section id="compare" hidden></section></aside>`;
   const $ = (id) => document.getElementById(id);
-  const calls = { change: [], close: [] };
+  const calls = { change: [], close: [], leave: [] };
   const panels = createToolPanels({
     panelEl: $("panel"), titleEl: $("title"), contextEl: $("ctx"), closeEl: $("close"), gripEl: $("grip"), liveEl: $("live"),
     sections: { inspect: $("inspect"), notes: $("notes"), comments: $("comments"), compare: $("compare") },
     storage: memoryStorage(),
     onChange: (shown, opened) => calls.change.push([shown, opened]),
     onClose: (id, returnFocus) => calls.close.push([id, returnFocus]),
+    onLeaveCompare: () => calls.leave.push(true),
   });
   ctx = { $, panels, calls };
 });
@@ -66,16 +67,20 @@ describe("one panel at a time", () => {
 });
 
 describe("Compare's Differences", () => {
-  it("show by themselves while comparing, without a cross", () => {
+  it("show by themselves while comparing; their cross leaves Compare (it is not a tool panel)", () => {
     ctx.panels.setComparing(true);
-    expect([ctx.$("panel").hidden, ctx.$("title").textContent, visible(), ctx.$("close").hidden]).toEqual([false, "Differences", ["compare"], true]);
-    expect(ctx.panels.opened()).toBeNull(); // not a tool panel
+    expect([ctx.$("panel").hidden, ctx.$("title").textContent, visible(), ctx.$("close").hidden]).toEqual([false, "Differences", ["compare"], false]);
+    expect(ctx.$("close").getAttribute("aria-label")).toBe("Close Differences and leave Compare");
+    expect(ctx.panels.opened()).toBeNull();
+    ctx.$("close").click();
+    expect(ctx.calls.leave).toEqual([true]);
+    expect(ctx.calls.close).toEqual([]);
   });
 
   it("give way to a tool panel and come back when it closes", () => {
     ctx.panels.setComparing(true);
     ctx.panels.open("notes");
-    expect([ctx.$("title").textContent, visible(), ctx.$("close").hidden]).toEqual(["Notes", ["notes"], false]);
+    expect([ctx.$("title").textContent, visible(), ctx.$("close").getAttribute("aria-label")]).toEqual(["Notes", ["notes"], "Close panel"]);
     ctx.panels.close(true);
     expect([ctx.$("title").textContent, visible()]).toEqual(["Differences", ["compare"]]);
     ctx.panels.setComparing(false);

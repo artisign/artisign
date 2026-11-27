@@ -361,12 +361,13 @@
           <span id="tool-panel-live" class="visually-hidden" role="status" aria-live="polite"></span>
           <div class="float-card-body">
             <section id="inspect-panel" class="tool-panel-body" hidden>
+              <div id="inspector-summary" class="inspect-summary" hidden></div>
               <section id="variant-inspector" hidden></section>
               <div class="tool-section-head"><span>Layers</span><span id="inspector-count" class="tool-section-meta"></span></div>
-              <div id="inspect-panel-note" class="inspect-panel-note">Click an element on the screen to inspect it.</div>
-              <ul id="inspector-list"></ul>
-              <p id="inspector-empty" hidden>No elements.</p>
+              <ul id="inspector-list" role="tree" aria-label="Layers"></ul>
+              <p id="inspector-empty" hidden>No elements. Click an element on the screen to inspect it.</p>
               <p id="inspector-error" hidden></p>
+              <div id="inspector-details" hidden></div>
             </section>
             <section id="notes-panel" class="tool-panel-body" hidden>
               <div id="notes-panel-text" class="md"></div>

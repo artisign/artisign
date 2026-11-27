@@ -36,7 +36,7 @@ describe("renderVariantInspector", () => {
     const cards = [...container.querySelectorAll(".inspect-card")];
     expect(cards).toHaveLength(2);
     expect(cards[0].querySelector(".inspect-card-head").textContent).toBe("Variantstate");
-    expect([...cards[0].querySelectorAll(".inspect-kv")].map((r) => r.textContent)).toEqual(["Pathhome", "Depth1", "Siblingserror, loading", "Flows3 in, 1 out"]);
+    expect([...cards[0].querySelectorAll(".prop-row")].map((r) => r.textContent)).toEqual(["Pathhome", "Depth1", "Siblingserror, loading", "Flows3 in, 1 out"]);
     expect(cards[1].querySelector(".inspect-card-head").textContent).toBe("Also reached from2 flow sources");
     const links = [...cards[1].querySelectorAll(".inspect-kv-link")];
     expect(links.map((l) => l.textContent)).toEqual(["history", "account"]);

@@ -1,6 +1,6 @@
 // CHR-1268 — the right column's one floating panel (design `float-card` in the right column): Inspect, Notes, Comments or — while comparing — Compare's Differences. One at a time; opening one replaces the other. Until the Agent bar (CHR-1269) lands the panel takes the whole column. The grip drags it (position remembered per viewer), the cross closes it.
 //
-// Compare's Differences is the panel of a mode, not of a tool: while comparing and no tool panel is open it shows by itself (and has no cross — Compare's own Single | Compare switch leaves it); a tool panel opened meanwhile takes its place, and closing that brings the Differences back.
+// Compare's Differences is the panel of a mode, not of a tool: while comparing and no tool panel is open it shows by itself, and its cross leaves Compare (design: "Close leaves Compare"); a tool panel opened meanwhile takes its place, and closing that brings the Differences back.
 
 import { makeCardDraggable } from "./float-card.js";
 
@@ -26,9 +26,10 @@ const PANELS = /** @type {const} */ ({
  *   storage: Storage,
  *   onChange: (shown: PanelId | null, opened: Exclude<PanelId, "compare"> | null) => void,
  *   onClose: (id: Exclude<PanelId, "compare">, returnFocus: boolean) => void,
+ *   onLeaveCompare: () => void,
  * }} args `onChange` runs after every change of what shows (`opened` is the tool panel the user asked for, null for none or for Compare's own); `onClose` runs when the user closes a tool panel (cross or Escape) — before `onChange` — so the owner can leave the tool's mode.
  */
-export function createToolPanels({ panelEl, titleEl, contextEl, closeEl, gripEl, liveEl, sections, storage, onChange, onClose }) {
+export function createToolPanels({ panelEl, titleEl, contextEl, closeEl, gripEl, liveEl, sections, storage, onChange, onClose, onLeaveCompare }) {
   /** @type {Exclude<PanelId, "compare"> | null} the tool panel the user opened */
   let opened = null;
   let comparing = false;
@@ -51,8 +52,8 @@ export function createToolPanels({ panelEl, titleEl, contextEl, closeEl, gripEl,
       titleEl.textContent = PANELS[next].title;
       contextEl.textContent = "";
     }
-    // Compare's Differences has no cross: leaving Compare is its own switch.
-    closeEl.hidden = next === "compare";
+    closeEl.setAttribute("aria-label", next === "compare" ? "Close Differences and leave Compare" : "Close panel");
+    closeEl.dataset.tooltip = next === "compare" ? "Leave Compare" : "Close panel";
     onChange(shown, opened);
   }
 
@@ -65,7 +66,10 @@ export function createToolPanels({ panelEl, titleEl, contextEl, closeEl, gripEl,
     return true;
   }
 
-  closeEl.addEventListener("click", () => close(true));
+  closeEl.addEventListener("click", () => {
+    if (opened === null && shown === "compare") onLeaveCompare();
+    else close(true);
+  });
 
   return {
     /** @param {Exclude<PanelId, "compare">} id */

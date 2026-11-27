@@ -230,6 +230,8 @@ const inspectModeToggle = document.getElementById("inspect-mode-toggle");
 const inspectorListEl = document.getElementById("inspector-list");
 const inspectorEmptyEl = document.getElementById("inspector-empty");
 const inspectorCountEl = document.getElementById("inspector-count");
+const inspectorSummaryEl = document.getElementById("inspector-summary");
+const inspectorDetailsEl = document.getElementById("inspector-details");
 const variantInspectorEl = document.getElementById("variant-inspector");
 const inspectorErrorEl = document.getElementById("inspector-error");
 const inspectOverlayEl = document.getElementById("inspect-overlay");
@@ -733,8 +735,8 @@ function getRenderedDocForScreen(screen) {
 }
 
 const inspectorPanel = createInspectorPanel(
-  { listEl: inspectorListEl, emptyEl: inspectorEmptyEl, errorEl: inspectorErrorEl },
-  { getRenderedDoc: getRenderedDocForScreen },
+  { listEl: inspectorListEl, emptyEl: inspectorEmptyEl, errorEl: inspectorErrorEl, summaryEl: inspectorSummaryEl, detailsEl: inspectorDetailsEl },
+  { getRenderedDoc: getRenderedDocForScreen, onSelect: (id) => handleInspectSelect(id, id) }, // a row selects like a click on the canvas: the outline follows
 );
 
 const projectUI = createProjectUI(
@@ -2162,6 +2164,7 @@ const toolPanels = createToolPanels({
     if (id === "inspect" && activeMode === "inspect") setMode("inspect");
     if (returnFocus) PANEL_TOOLS[id].focus();
   },
+  onLeaveCompare: () => leaveCompare(),
   onChange: (shown) => {
     appEl.dataset.panelOpen = String(shown !== null);
     syncPanelContext();
@@ -2321,6 +2324,10 @@ function updateCanvas() {
   frameCaptionEl.style.left = frameLeft;
   frameCaptionEl.style.top = `${Math.max(0, parseFloat(screenHolderEl.style.top || "0") - FRAME_CAPTION_BAND + 4)}px`;
   screensStageEl.style.setProperty("--frame-left", frameLeft);
+  // The tool bar's default top lines up with the frame's top (design); a dragged bar keeps its own place.
+  const frameTop = rendered && !screenHolderEl.hidden ? canvasEl.getBoundingClientRect().top - appEl.getBoundingClientRect().top + parseFloat(screenHolderEl.style.top || "0") : null;
+  if (frameTop !== null && frameTop > 0) appEl.style.setProperty("--toolbar-top", `${Math.round(frameTop)}px`);
+  else appEl.style.removeProperty("--toolbar-top");
   commentCanvas.layout(); // pins follow zoom, resize and every re-render
   syncZoomUI();
 }
@@ -2646,6 +2653,7 @@ function applyMainVisibility() {
   // The shell lays the canvas and the full-height views out per view and per compare state (style.css).
   appEl.dataset.shellView = currentView;
   appEl.dataset.comparing = String(comparing);
+  if (currentView !== "screens" || showMockup || comparing) appEl.style.removeProperty("--toolbar-top"); // only the single frame has a top to align with
   // The zoom group stays visible over the mockup view too — it
   // scales the whole comparison row instead of the screen canvas.
   canvasControlsEl.hidden = currentView !== "screens" || comparing; // compare has its own zoom in its chip row

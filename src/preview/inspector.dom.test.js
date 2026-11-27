@@ -7,33 +7,46 @@
 // verification. Here getRenderedDoc always returns null, exercising the
 // "waiting" fallback path instead of asserting on layout jsdom can't produce.
 import { readFileSync } from "node:fs";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
 import { createInspectorPanel, updateInspectOverlay } from "./inspector.js";
 
-function makePanel(getRenderedDoc = () => null) {
-  const listEl = document.createElement("ul");
-  const emptyEl = document.createElement("p");
-  const errorEl = document.createElement("p");
-  const panel = createInspectorPanel({ listEl, emptyEl, errorEl }, { getRenderedDoc });
-  return { panel, listEl, emptyEl, errorEl };
+beforeAll(() => {
+  Element.prototype.scrollIntoView ??= () => {}; // jsdom has none; a selection scrolls its row into view
+});
+
+function makePanel(getRenderedDoc = () => null, onSelect) {
+  const els = Object.fromEntries(["listEl:ul", "emptyEl:p", "errorEl:p", "summaryEl:div", "detailsEl:div"].map((s) => {
+    const [key, tag] = s.split(":");
+    return [key, document.createElement(tag)];
+  }));
+  const panel = createInspectorPanel(els, { getRenderedDoc, onSelect });
+  return { panel, ...els };
 }
 
 const entries = [
-  { id: "root", tag: "section", componentRef: null, variant: null, tokenRefs: [] },
-  { id: "btn-1", tag: "button", componentRef: "btn-primary", variant: "hover", tokenRefs: [] },
+  { id: "root", tag: "section", parentId: null, componentRef: null, variant: null, tokenRefs: [] },
+  { id: "btn-1", tag: "button", parentId: "root", componentRef: "btn-primary", variant: "hover", tokenRefs: [{ property: "background", ref: "color.primary" }] },
+  { id: "label", tag: "span", parentId: "btn-1", componentRef: null, variant: null, tokenRefs: [] },
 ];
+const ids = (listEl) => [...listEl.querySelectorAll("[role=treeitem]")].map((li) => li.dataset.entry);
 
-describe("createInspectorPanel", () => {
-  it("renders one row per entry with tag/id label and a component badge", () => {
+describe("createInspectorPanel — the Layers tree", () => {
+  it("renders node-rows (treeitems with chevron, tag and id), the roots open one level, deeper levels behind their chevron", () => {
     const { panel, listEl, emptyEl } = makePanel();
     panel.setEntries(entries, "home");
-
-    const rows = listEl.querySelectorAll(".inspector-entry");
-    expect(rows).toHaveLength(2);
-    expect(rows[0].querySelector(".inspector-entry-label").textContent).toBe("<section> · root");
-    expect(rows[0].querySelector(".inspector-entry-badge")).toBeNull();
+    expect(ids(listEl)).toEqual(["root", "btn-1"]); // label sits under the closed btn-1
+    const rows = listEl.querySelectorAll("[role=treeitem]");
+    expect(rows[0].getAttribute("aria-expanded")).toBe("true");
+    expect(rows[1].getAttribute("aria-expanded")).toBe("false");
+    expect(rows[1].getAttribute("aria-level")).toBe("2");
+    expect(rows[1].querySelector(".node-row-tag").textContent).toBe("button");
+    expect(rows[1].querySelector(".node-row-id").textContent).toBe("btn-1");
     expect(rows[1].querySelector(".inspector-entry-badge").textContent).toBe("$btn-primary");
     expect(emptyEl.hidden).toBe(true);
+    rows[1].querySelector(".node-row-chev").click();
+    expect(ids(listEl)).toEqual(["root", "btn-1", "label"]);
+    listEl.querySelector('[data-entry="root"] .node-row-chev').click();
+    expect(ids(listEl)).toEqual(["root"]);
   });
 
   it("shows the empty state for zero entries", () => {
@@ -42,46 +55,82 @@ describe("createInspectorPanel", () => {
     expect(emptyEl.hidden).toBe(false);
   });
 
-  it("expands a row on head click and falls back to the waiting note when no rendered doc is available", () => {
-    const { panel, listEl } = makePanel(() => null);
+  it("selecting opens the ancestors, tints the row (aria-selected) and fills the summary: the id and 'tag in ancestors'", () => {
+    const { panel, listEl, summaryEl } = makePanel();
     panel.setEntries(entries, "home");
-
-    const head = listEl.querySelector(".inspector-entry-head");
-    expect(head.getAttribute("aria-expanded")).toBe("false");
-    head.click();
-    expect(head.getAttribute("aria-expanded")).toBe("true");
-
-    const body = listEl.querySelector(".inspector-entry-body");
-    expect(body.hidden).toBe(false);
-    expect(body.querySelector(".inspector-entry-note").textContent).toMatch(/waiting/i);
+    panel.focusEntry("label");
+    expect(ids(listEl)).toEqual(["root", "btn-1", "label"]);
+    const selected = listEl.querySelector('[aria-selected="true"]');
+    expect(selected.dataset.entry).toBe("label");
+    expect(summaryEl.hidden).toBe(false);
+    expect(summaryEl.querySelector(".inspect-summary-id").textContent).toBe("label");
+    expect(summaryEl.querySelector(".inspect-summary-sub").textContent).toBe("span in btn-1, root");
+    panel.clearFocus();
+    expect(summaryEl.hidden).toBe(true);
+    expect(listEl.querySelector('[aria-selected="true"]')).toBeNull();
   });
 
-  it("carries expand state over a same-screen re-render, but resets it on a screen switch", () => {
-    const { panel, listEl } = makePanel(() => null);
+  it("a click on a row selects it through onSelect (the canvas outline follows), or by itself without one", () => {
+    const picked = [];
+    const { panel, listEl } = makePanel(() => null, (id) => picked.push(id));
     panel.setEntries(entries, "home");
-    listEl.querySelector(".inspector-entry-head").click();
-    expect(listEl.querySelector(".inspector-entry-head").getAttribute("aria-expanded")).toBe("true");
+    listEl.querySelector('[data-entry="btn-1"]').click();
+    expect(picked).toEqual(["btn-1"]);
+    const bare = makePanel();
+    bare.panel.setEntries(entries, "home");
+    bare.listEl.querySelector('[data-entry="btn-1"]').click();
+    expect(bare.panel.getFocusedDomId()).toBe("btn-1");
+  });
 
-    // Same screen (e.g. a design-system edit re-render) -> expand survives.
+  it("without a rendered document the sections wait; a part of an instance names its instance", () => {
+    const { panel, detailsEl, summaryEl } = makePanel(() => null);
     panel.setEntries(entries, "home");
-    expect(listEl.querySelector(".inspector-entry-head").getAttribute("aria-expanded")).toBe("true");
-    expect(listEl.querySelector(".inspector-entry-body").hidden).toBe(false);
+    panel.focusEntry("btn-1", "btn-1--label");
+    expect(detailsEl.querySelector(".inspector-entry-note").textContent).toMatch(/waiting/i);
+    expect(summaryEl.querySelector(".inspect-summary-id").textContent).toBe("btn-1--label");
+    expect(summaryEl.querySelector(".inspect-summary-sub").textContent).toBe("part of btn-1");
+  });
 
-    // A different screen -> ids aren't stable across screens, so it resets.
+  it("carries the selection and the opened levels over a same-screen re-render, but resets both on a screen switch", () => {
+    const { panel, listEl } = makePanel();
+    panel.setEntries(entries, "home");
+    panel.focusEntry("label");
+    panel.setEntries(entries, "home");
+    expect(panel.getFocusedDomId()).toBe("label");
+    expect(ids(listEl)).toEqual(["root", "btn-1", "label"]);
     panel.setEntries(entries, "other");
-    expect(listEl.querySelector(".inspector-entry-head").getAttribute("aria-expanded")).toBe("false");
-    expect(listEl.querySelector(".inspector-entry-body").hidden).toBe(true);
+    expect(panel.getFocusedDomId()).toBeNull();
+    expect(ids(listEl)).toEqual(["root", "btn-1"]);
   });
 
   it("setError clears the list and shows the error message", () => {
     const { panel, listEl, errorEl, emptyEl } = makePanel();
     panel.setEntries(entries, "home");
     panel.setError("boom");
-
-    expect(listEl.querySelectorAll(".inspector-entry")).toHaveLength(0);
+    expect(listEl.querySelectorAll("[role=treeitem]")).toHaveLength(0);
     expect(errorEl.hidden).toBe(false);
     expect(errorEl.textContent).toBe("boom");
     expect(emptyEl.hidden).toBe(true);
+  });
+});
+
+describe("createInspectorPanel — Box, Design system, Type", () => {
+  it("lists the box, the refs with their resolved values and the font of the selection", () => {
+    const doc = document.implementation.createHTMLDocument("x");
+    doc.body.innerHTML = '<div id="root"><button id="btn-1"></button></div>';
+    doc.getElementById("root").getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 400 });
+    doc.getElementById("btn-1").getBoundingClientRect = () => ({ left: 7, top: 9, width: 93, height: 34 });
+    // jsdom computes no layout or cascade: the computed style is answered by hand.
+    const spy = vi.spyOn(window, "getComputedStyle").mockReturnValue({ fontSize: "11.5px", fontWeight: "600", getPropertyValue: (p) => (p === "background-color" ? "rgb(15, 138, 126)" : "") });
+    try {
+      const { panel, detailsEl } = makePanel(() => doc);
+      panel.setEntries(entries, "home");
+      panel.focusEntry("btn-1");
+      expect([...detailsEl.querySelectorAll(".tool-section-head")].map((h) => h.textContent)).toEqual(["Boxpx", "Design system2 refs", "Type"]);
+      expect([...detailsEl.querySelectorAll(".prop-row")].map((r) => r.textContent)).toEqual(["Size93 × 34", "Positionx 7, y 9", "Component$btn-primaryhover", "Fill$color.primary#0f8a7e", "Font11.5px, 600"]);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
@@ -91,7 +140,7 @@ describe("inspect outline label (CHR-780)", () => {
   });
   const withInstance = [
     ...entries,
-    { id: "card-1", tag: "div", componentRef: "product-card", variant: null, tokenRefs: [] },
+    { id: "card-1", tag: "div", parentId: "root", componentRef: "product-card", variant: null, tokenRefs: [] },
   ];
 
   it("labels a component instance with its ref, and with ref · variant when it has one", () => {

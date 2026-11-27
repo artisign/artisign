@@ -120,7 +120,7 @@ describe("compare mode in the screen view", () => {
     expect($("#compare-panel").hidden).toBe(false);
     expect($("#tool-panel").hidden).toBe(false);
     expect($("#tool-panel-title").textContent).toBe("Differences");
-    expect($("#compare-panel .compare-summary h3").textContent).toBe("vs. reference family");
+    expect($("#compare-panel .compare-summary-line").textContent).toMatch(/differ from the base|Comparing/);
   });
 
   it("Single goes back to the screen that was open before compare", async () => {

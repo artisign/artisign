@@ -1660,221 +1660,182 @@ button.chrome-section-header:focus-visible {
   background: color-mix(in srgb, var(--chrome-activity-write) 8%, transparent) !important;
 }
 
-/* Elements inspector panel */
+/* Inspect panel (design `inspector-selected`): the Layers tree of node-rows, Box / Design system / Type as prop-rows. */
 
-.inspector-entry {
-  border-bottom: 1px solid var(--chrome-border);
-}
-
-/* Element row: 30px, chevron + "<tag> · id" in the code face. An open row takes the active fill; the entry focused by inspect mode also tints its chevron. */
-.inspector-entry-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  width: 100%;
-  height: var(--size-row-menu);
-  padding: 0 var(--space-pad);
-  border: none;
-  background: none;
-  color: var(--chrome-text-secondary);
-  cursor: pointer;
-  text-align: left;
-}
-
-.inspector-entry-head:hover {
-  background: var(--chrome-hover);
-}
-
-.inspector-entry-head[aria-expanded="true"] {
-  background: var(--chrome-active);
-  color: var(--chrome-text);
-}
-
-.inspector-entry-head:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: -2px;
-}
-
-.inspector-entry-chevron {
+.inspector-entry-note {
+  margin: 0;
+  padding: var(--space-md) var(--space-xs);
+  font-size: var(--ui-xs);
   color: var(--chrome-text-tertiary);
 }
 
-.inspector-entry-focused .inspector-entry-chevron {
-  color: var(--chrome-accent);
+/* `node-row`: 26px, chevron + tag + id in the code face; the selected row takes the hint tint. */
+.node-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: 26px;
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-md);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.inspector-entry-label {
-  flex: 1;
+.node-row:hover {
+  background: var(--chrome-hover);
+}
+
+.node-row.is-selected {
+  background: color-mix(in srgb, var(--chrome-hint) 14%, transparent);
+  color: var(--chrome-text);
+  font-weight: 600;
+}
+
+.node-row-chev {
+  display: inline-flex;
+  flex: none;
+  width: var(--size-icon-xs);
+  height: var(--size-icon-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.node-row-chev .icon {
+  font-size: var(--size-icon-xs);
+}
+
+.node-row.is-selected .node-row-chev,
+.node-row.is-selected .node-row-tag {
+  color: var(--chrome-hint);
+}
+
+.node-row-tag {
+  color: var(--chrome-text-tertiary);
+}
+
+.node-row-id {
   min-width: 0;
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: var(--ui-xs);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.inspector-entry-head[aria-expanded="true"] .inspector-entry-label {
-  font-weight: 500;
-}
-
-/* The component ref on the row: the design system's token-hit chip. */
+/* The component ref on a row: the design system's token-hit chip. */
 .inspector-entry-badge {
   flex: none;
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
-  height: 18px;
-  padding: 0 7px;
+  height: 16px;
+  padding: 0 var(--space-md);
   border-radius: var(--radius-pill);
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
-  font-family: ui-monospace, Menlo, monospace;
   font-size: var(--ui-chip);
   font-weight: 400;
 }
 
-/* The detail card under an open row: Position / Colors / Typography / Spacing, then the design-system refs. */
-.inspector-entry-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  margin: var(--space-sm) var(--space-md) var(--space-md);
-  padding: var(--space-md) var(--space-pad) var(--space-pad);
-  border-radius: var(--radius-sm);
-  background: var(--chrome-field);
+/* The selected element: its id in the code face, then "tag in ancestors". */
+.inspect-summary {
+  margin: 0 0 var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-item);
+  background: color-mix(in srgb, var(--chrome-hint) 12%, transparent);
 }
 
-.inspector-entry-body[hidden] {
+.inspect-summary[hidden] {
   display: none;
 }
 
-.inspector-entry-groups {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.inspector-entry-note {
-  margin: 0;
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-}
-
-.inspector-entry-note strong {
+.inspect-summary-id {
   font-family: ui-monospace, Menlo, monospace;
-  font-weight: 500;
-  color: var(--chrome-accent);
+  font-size: var(--ui-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
-.inspector-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2xs);
-}
-
-.inspector-group-label {
-  font-size: var(--ui-chip);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--chrome-text-tertiary);
-}
-
-.inspector-group-value {
-  font-family: ui-monospace, Menlo, monospace;
+.inspect-summary-sub {
+  margin-top: var(--space-2xs);
   font-size: var(--ui-xs);
-  color: var(--chrome-text);
-}
-
-.inspector-colors-value {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: var(--ui-xs);
-  color: var(--chrome-text);
-}
-
-/* The swatch fill is the element's own computed colour (set inline), never a chrome token — it reads the same in both themes. */
-.inspector-color-chip {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  border: 1px solid var(--chrome-border-strong);
-}
-
-.inspector-ds-refs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-}
-
-.inspector-ds-chip {
-  display: inline-flex;
-  align-items: center;
-  height: 18px;
-  padding: 0 7px;
-  border-radius: var(--radius-pill);
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: var(--ui-chip);
-}
-
-.inspector-ds-chip-variant {
-  background: var(--chrome-raised);
   color: var(--chrome-text-secondary);
-  border: 1px solid var(--chrome-border);
 }
 
-.inspector-ds-row {
+#inspector-details[hidden] {
+  display: none;
+}
+
+/* `prop-row`: label 60px, value in the code face; the token variant stacks the ref chip over its resolved value. */
+.prop-row {
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  font-size: var(--ui-2xs);
+  min-height: 26px;
+  padding: 0 var(--space-md);
+  font-size: var(--ui-xs);
 }
 
-.inspector-ds-prop {
+.prop-label {
   flex: none;
-  width: 70px;
-  color: var(--chrome-text-tertiary);
+  width: 60px;
+  color: var(--chrome-text-secondary);
+}
+
+.prop-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: ui-monospace, Menlo, monospace;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.inspector-ds-path {
+.prop-row-token {
+  align-items: flex-start;
+  padding-top: var(--space-xs);
+  padding-bottom: var(--space-xs);
+}
+
+.prop-row-token .prop-label {
+  padding-top: 2px;
+}
+
+.prop-main {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2xs);
   min-width: 0;
+}
+
+.prop-ref {
+  max-width: 100%;
+  height: 18px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-xs);
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
   font-family: ui-monospace, Menlo, monospace;
-  color: var(--chrome-text);
+  font-size: var(--ui-2xs);
+  line-height: 18px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.inspector-ds-value {
+.prop-value-sub {
   flex: none;
-  border-radius: var(--radius-xs);
-  padding: 1px var(--space-sm);
-  background: var(--chrome-raised);
-  border: 1px solid var(--chrome-border);
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
 }
 
-.inspector-ds-row-warning {
-  background: color-mix(in srgb, var(--chrome-danger) 10%, transparent);
-  border-radius: var(--radius-xs);
-  padding: var(--space-xs) var(--space-sm);
-}
-
-.inspector-ds-row-warning .inspector-ds-path,
-.inspector-ds-row-warning .inspector-ds-value {
+.prop-row-warning .prop-ref {
+  background: color-mix(in srgb, var(--chrome-danger) 12%, transparent);
   color: var(--chrome-danger);
-  border: none;
-  background: none;
-  padding: 0;
 }
 
-.inspector-ds-warning-icon {
-  flex: none;
+.prop-row-warning .prop-value-sub {
   color: var(--chrome-danger);
 }
 
@@ -3512,64 +3473,43 @@ button.chrome-section-header:focus-visible {
   color: var(--chrome-error);
 }
 
-.compare-summary {
-  margin: 0 var(--space-md);
-  padding: var(--space-lg);
-  background: var(--chrome-raised);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-md);
-}
-
-.compare-summary h3 {
-  margin: 0 0 var(--space-sm);
-  font-size: var(--ui-2xs);
-  font-weight: 500;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--chrome-text-tertiary);
-}
-
-.compare-summary-row {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-md);
-  padding: 4px 0;
+.compare-summary-line,
+.compare-summary-note {
+  margin: 0;
+  padding: 0 var(--space-lg) var(--space-md);
+  font-size: var(--ui-xs);
   color: var(--chrome-text-secondary);
 }
 
-.compare-summary-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.compare-summary-note {
+  color: var(--chrome-warning);
 }
 
-.compare-summary-row b {
-  flex: none;
-  font-weight: 500;
-  color: var(--chrome-text);
-}
-
+/* `diff-row` (design): a 22px tinted icon square, the node id in the code face, the change on a second line. */
 .compare-diff-list {
-  margin-top: var(--space-md);
-  border-top: 1px solid var(--chrome-border);
+  margin-top: var(--space-xs);
+  padding: 0 var(--space-md);
 }
 
-/* One element-row per changed node: kind icon, node id in the code face, member on the right. */
 .compare-diff-row {
   display: flex;
-  align-items: center;
-  gap: var(--space-sm);
+  align-items: flex-start;
+  gap: var(--space-md);
   width: 100%;
-  min-height: var(--size-row-menu);
-  padding: var(--space-xs) var(--space-pad);
+  padding: var(--space-sm) var(--space-md);
   border: none;
-  border-bottom: 1px solid var(--chrome-border);
-  background: transparent;
+  border-radius: var(--radius-md);
+  background: none;
   font: inherit;
+  font-size: var(--ui-sm);
   text-align: left;
-  color: var(--chrome-text-secondary);
+  color: var(--chrome-text);
   cursor: pointer;
+}
+
+.compare-diff-row:hover,
+.compare-diff-row.selected {
+  background: var(--chrome-hover);
 }
 
 .compare-diff-row:focus-visible {
@@ -3577,33 +3517,46 @@ button.chrome-section-header:focus-visible {
   outline-offset: -2px;
 }
 
-.compare-diff-row:hover,
-.compare-diff-row.selected {
-  background: var(--chrome-active);
+.compare-diff-sign {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: var(--chrome-warning-subtle);
+  color: var(--chrome-warning);
+  font-size: var(--size-icon-xs);
 }
 
-.compare-diff-sign {
-  color: var(--chrome-warning);
+.compare-diff-row[data-kind="added"] .compare-diff-sign {
+  background: color-mix(in srgb, var(--chrome-ok) 14%, transparent);
+  color: var(--chrome-ok);
+}
+
+.compare-diff-row[data-kind="removed"] .compare-diff-sign {
+  background: color-mix(in srgb, var(--chrome-error) 14%, transparent);
+  color: var(--chrome-error);
+}
+
+.diff-row-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .compare-diff-id {
-  min-width: 0;
+  display: block;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: ui-monospace, Menlo, monospace;
   font-size: var(--ui-xs);
-}
-
-.compare-diff-member {
-  margin-left: auto;
-  flex: none;
-  max-width: 40%;
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-style: normal;
-  color: var(--chrome-text-tertiary);
+}
+
+.diff-row-change {
+  display: block;
+  margin-top: var(--space-2xs);
+  color: var(--chrome-text-secondary);
 }
 
 /* Compare checkboxes: sidebar rows (next to the pin) and breadcrumb popover rows. */
@@ -11447,7 +11400,7 @@ body {
 #tool-bar {
   position: absolute;
   z-index: 20;
-  top: var(--shell-top);
+  top: var(--toolbar-top, var(--shell-top)); /* aligned with the open frame's top (app.js sets --toolbar-top); the card's top elsewhere */
   left: calc(var(--space-xl) + var(--size-nav-card) + var(--space-xl));
   display: flex;
   flex-direction: column;
@@ -11654,10 +11607,6 @@ body {
   color: var(--chrome-text-tertiary);
 }
 
-#tool-panel-close[hidden] {
-  display: none;
-}
-
 .tool-panel-body {
   flex: 1 1 auto;
   min-height: 0;
@@ -11849,12 +11798,6 @@ body {
 }
 
 /* Inspect */
-.inspect-panel-note {
-  padding: var(--space-md) var(--space-xs);
-  font-size: var(--ui-xs);
-  color: var(--chrome-text-tertiary);
-}
-
 #inspector-list {
   margin: 0;
   padding: 0;
@@ -11969,11 +11912,13 @@ body {
   display: none;
 }
 
+/* `info-card` (design): a ringed raised card with a head (title left, meta right) and prop-rows. */
 .inspect-card {
-  margin: 0 0 var(--space-md);
-  padding: var(--space-md) var(--space-lg) var(--space-sm);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-item);
+  margin: var(--space-2xs) var(--space-pad) var(--space-md);
+  padding: var(--space-sm) 0;
+  border-radius: var(--radius-inset);
+  background: var(--chrome-raised);
+  box-shadow: 0 0 0 1px var(--chrome-border);
   font-size: var(--ui-xs);
 }
 
@@ -11982,7 +11927,7 @@ body {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-md);
-  padding-bottom: var(--space-xs);
+  padding: var(--space-xs) var(--space-lg);
 }
 
 .inspect-card-head b {
@@ -11992,26 +11937,6 @@ body {
 
 .inspect-card-meta {
   color: var(--chrome-text-tertiary);
-}
-
-.inspect-kv {
-  display: grid;
-  grid-template-columns: 62px minmax(0, 1fr);
-  align-items: baseline;
-  gap: var(--space-md);
-  padding: var(--space-xs) 0;
-}
-
-.inspect-kv-label {
-  color: var(--chrome-text-secondary);
-}
-
-.inspect-kv-value {
-  min-width: 0;
-  overflow: hidden;
-  font-family: ui-monospace, Menlo, monospace;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .inspect-kv-link {

@@ -10,7 +10,7 @@
 //    client-side re-parsing of the augmented source: which class is a
 //    component ref vs. a token-style class is a server-side (registry)
 //    decision, not something a client-side grammar guess can get right.
-//  - computed values (position/colors/typography/spacing) and unresolved
+//  - computed values (box, font) and unresolved
 //    markers come from the *rendered* iframe document, read live, lazily,
 //    only when an entry is expanded — same "no second render engine"
 //    rationale as canvas.js/warnings.js: nothing here re-resolves a ref,
@@ -25,7 +25,7 @@
 
 import { icon } from "./icons.js";
 import { formatTokenRef, isRefUnresolved } from "./token-ref-format.js";
-import { relativeRect, resolveModelId, parseUnresolvedPaths, rgbToHex, formatPosition, formatTypography, formatSpacing } from "./inspector-data.js";
+import { relativeRect, resolveModelId, parseUnresolvedPaths, rgbToHex } from "./inspector-data.js";
 
 const UNRESOLVED_MARKER_ATTR = "data-unresolved-token";
 
@@ -46,7 +46,7 @@ function formatResolvedValue(raw) {
  * @param {Document} renderedDoc
  * @param {string} domId — the element to actually read (the clicked one for
  *   a component-instance-descendant click, otherwise the entry's own id)
- * @returns {{ rect: object, bg: string, text: string, typography: string, spacing: string, unresolvedPaths: string[], resolve: (property: string) => string } | null}
+ * @returns {{ rect: { x: number, y: number, w: number, h: number }, fontSize: string, fontWeight: string, unresolvedPaths: string[], resolve: (property: string) => string } | null}
  */
 function readComputedDetails(renderedDoc, domId) {
   const el = renderedDoc.getElementById(domId);
@@ -56,269 +56,219 @@ function readComputedDetails(renderedDoc, domId) {
   const unresolvedPaths = parseUnresolvedPaths(el.getAttribute(UNRESOLVED_MARKER_ATTR));
   return {
     rect: relativeRect(el.getBoundingClientRect(), root.getBoundingClientRect()),
-    bg: rgbToHex(cs.backgroundColor),
-    text: rgbToHex(cs.color),
-    typography: formatTypography({ fontFamily: cs.fontFamily, fontSize: cs.fontSize, fontWeight: cs.fontWeight, lineHeight: cs.lineHeight }),
-    spacing: formatSpacing({ padding: cs.padding, margin: cs.margin, radius: cs.borderRadius }),
+    fontSize: cs.fontSize,
+    fontWeight: cs.fontWeight,
     unresolvedPaths,
     resolve: (property) => formatResolvedValue(cs.getPropertyValue(resolvedPropertyName(property))),
   };
 }
 
-function group(labelText, valueEl) {
-  const wrap = document.createElement("div");
-  wrap.className = "inspector-group";
-  const label = document.createElement("span");
-  label.className = "inspector-group-label";
-  label.textContent = labelText;
-  wrap.appendChild(label);
-  wrap.appendChild(valueEl);
-  return wrap;
-}
+/** Labels for the properties a token ref usually sits on (design `prop-row`, token variant). */
+const PROPERTY_LABELS = { background: "Fill", "background-color": "Fill", color: "Text", "border-radius": "Radius", padding: "Padding", margin: "Margin", gap: "Gap", "font-size": "Size", "font-weight": "Weight" };
 
-function textValue(text) {
-  const span = document.createElement("span");
-  span.className = "inspector-group-value";
-  span.textContent = text;
-  return span;
-}
-
-function colorSwatchRow(details) {
-  const row = document.createElement("span");
-  row.className = "inspector-colors-value";
-  const bgChip = document.createElement("span");
-  bgChip.className = "inspector-color-chip";
-  bgChip.style.background = details.bg === "transparent" ? "#fff" : details.bg;
-  row.append(bgChip, document.createTextNode(`bg ${details.bg}`));
-  const textChip = document.createElement("span");
-  textChip.className = "inspector-color-chip";
-  textChip.style.background = details.text === "transparent" ? "#fff" : details.text;
-  row.append(textChip, document.createTextNode(`text ${details.text}`));
-  return row;
-}
-
-function dsChip(text, variantStyle) {
-  const chip = document.createElement("span");
-  chip.className = variantStyle ? "inspector-ds-chip inspector-ds-chip-variant" : "inspector-ds-chip";
-  chip.textContent = text;
-  return chip;
-}
-
-function dsRow({ property, display, unresolved, resolvedValue }) {
-  const row = document.createElement("div");
-  row.className = unresolved ? "inspector-ds-row inspector-ds-row-warning" : "inspector-ds-row";
-
-  if (unresolved) {
-    row.appendChild(icon("warning", "inspector-ds-warning-icon icon-xs"));
-  }
-
-  const prop = document.createElement("span");
-  prop.className = "inspector-ds-prop";
-  prop.textContent = property;
-  row.appendChild(prop);
-
-  const path = document.createElement("span");
-  path.className = "inspector-ds-path";
-  path.textContent = display;
-  row.appendChild(path);
-
-  const value = document.createElement("span");
-  value.className = "inspector-ds-value";
-  value.textContent = unresolved ? "unresolved" : resolvedValue;
-  row.appendChild(value);
-
-  return row;
+/** @param {string} tag @param {string} [className] @param {string} [text] */
+function el(tag, className = "", text = "") {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
 }
 
 /** A small muted status line for states that don't have a body to show yet (waiting/missing). */
 function statusNote(text) {
-  const note = document.createElement("p");
-  note.className = "inspector-entry-note";
-  note.textContent = text;
-  return note;
+  return el("p", "inspector-entry-note", text);
 }
 
-/** @param {{ id: string, tag: string, componentRef: string | null, variant: string | null, tokenRefs: { property: string, ref: unknown }[] }} entry */
-function buildEntryBody(entry, details) {
-  const body = document.createElement("div");
-  body.className = "inspector-entry-groups";
-  body.appendChild(group("Position", textValue(formatPosition(details.rect))));
-  body.appendChild(group("Colors", colorSwatchRow(details)));
-  body.appendChild(group("Typography", textValue(details.typography)));
-  body.appendChild(group("Spacing & radius", textValue(details.spacing)));
+/** A section head: bold title left, quiet meta right (design `section-head`). */
+function sectionHead(title, meta = "") {
+  const head = el("div", "tool-section-head");
+  head.append(el("span", "", title), el("span", "tool-section-meta", meta));
+  return head;
+}
 
-  if (entry.componentRef || entry.tokenRefs.length > 0) {
-    const dsGroup = document.createElement("div");
-    dsGroup.className = "inspector-group";
-    const label = document.createElement("span");
-    label.className = "inspector-group-label";
-    label.textContent = "Design system";
-    dsGroup.appendChild(label);
+/** Design `prop-row`: a label and a mono value. */
+function propRow(label, value) {
+  const row = el("div", "prop-row");
+  row.append(el("span", "prop-label", label), el("span", "prop-value", value));
+  return row;
+}
 
-    if (entry.componentRef) {
-      const refsRow = document.createElement("div");
-      refsRow.className = "inspector-ds-refs";
-      refsRow.appendChild(dsChip(`$${entry.componentRef}`, false));
-      if (entry.variant) refsRow.appendChild(dsChip(entry.variant, true));
-      dsGroup.appendChild(refsRow);
-    }
-
-    for (const tokenRef of entry.tokenRefs) {
-      const unresolved = isRefUnresolved(tokenRef.ref, details.unresolvedPaths);
-      dsGroup.appendChild(
-        dsRow({
-          property: tokenRef.property,
-          display: formatTokenRef(tokenRef.ref),
-          unresolved,
-          resolvedValue: unresolved ? "" : details.resolve(tokenRef.property),
-        }),
-      );
-    }
-    body.appendChild(dsGroup);
-  }
-
-  return body;
+/** Design `prop-row` token variant: the ref as a chip, its resolved value under it. */
+function tokenRow({ label, ref, value, unresolved }) {
+  const row = el("div", unresolved ? "prop-row prop-row-token prop-row-warning" : "prop-row prop-row-token");
+  const main = el("span", "prop-main");
+  main.append(el("span", "prop-ref", ref), el("span", "prop-value prop-value-sub", unresolved ? "unresolved" : value));
+  row.append(el("span", "prop-label", label), main);
+  return row;
 }
 
 /**
- * Owns the Elements panel's list DOM: builds one row per entry, expands
- * rows on their own header click, and lets `focusEntry` (inspect mode)
- * drive expand + highlight + scroll-into-view externally.
+ * The sections below the layers for one element: Box, Design system, Type (design `inspector-selected`).
+ * @param {{ id: string, tag: string, componentRef: string | null, variant: string | null, tokenRefs: { property: string, ref: unknown }[] }} entry
+ * @param {NonNullable<ReturnType<typeof readComputedDetails>>} details
+ */
+function buildDetails(entry, details) {
+  const frag = document.createDocumentFragment();
+  frag.append(sectionHead("Box", "px"), propRow("Size", `${details.rect.w} × ${details.rect.h}`), propRow("Position", `x ${details.rect.x}, y ${details.rect.y}`));
+  const refCount = (entry.componentRef ? 1 : 0) + entry.tokenRefs.length;
+  if (refCount > 0) {
+    frag.append(sectionHead("Design system", `${refCount} ref${refCount === 1 ? "" : "s"}`));
+    if (entry.componentRef) frag.append(tokenRow({ label: "Component", ref: `$${entry.componentRef}`, value: entry.variant ?? "default", unresolved: false }));
+    for (const tokenRef of entry.tokenRefs) {
+      const unresolved = isRefUnresolved(tokenRef.ref, details.unresolvedPaths);
+      frag.append(tokenRow({ label: PROPERTY_LABELS[tokenRef.property] ?? tokenRef.property, ref: formatTokenRef(tokenRef.ref), value: unresolved ? "" : details.resolve(tokenRef.property), unresolved }));
+    }
+  }
+  frag.append(sectionHead("Type"), propRow("Font", `${details.fontSize}, ${details.fontWeight}`));
+  return frag;
+}
+
+/**
+ * Owns the Inspect panel's DOM (design `inspector-selected`): the selected element's summary, the Layers tree (`node-row`s, chevrons, the selected row tinted) and, below it, Box / Design system / Type for the selection. Inspect mode drives the selection from the canvas through `focusEntry`; a click on a row selects the same way (`onSelect`).
  *
- * @param {{ listEl: HTMLElement, emptyEl: HTMLElement, errorEl: HTMLElement }} elements
- * @param {{ getRenderedDoc: (screen: string) => Document | null }} deps —
- *   reads the *current* iframe document lazily, at expand/refresh time,
+ * @param {{ listEl: HTMLElement, emptyEl: HTMLElement, errorEl: HTMLElement, summaryEl: HTMLElement, detailsEl: HTMLElement }} elements
+ * @param {{ getRenderedDoc: (screen: string) => Document | null, onSelect?: (id: string) => void }} deps —
+ *   reads the *current* iframe document lazily, at selection/refresh time,
  *   scoped to a screen name so a stale/mismatched iframe (still showing a
  *   different screen, or not loaded yet) is never read as if it were live.
  */
-export function createInspectorPanel({ listEl, emptyEl, errorEl }, { getRenderedDoc }) {
-  /** @type {{ id: string, tag: string, componentRef: string | null, variant: string | null, tokenRefs: object[] }[]} */
+export function createInspectorPanel({ listEl, emptyEl, errorEl, summaryEl, detailsEl }, { getRenderedDoc, onSelect }) {
+  /** @type {{ id: string, tag: string, parentId: string | null, componentRef: string | null, variant: string | null, tokenRefs: { property: string, ref: unknown }[] }[]} */
   let entries = [];
   let entriesScreen = null;
   let modelIds = new Set();
-  const rows = new Map(); // id -> { rowEl, headEl, chevronEl, bodyEl, expanded, lastClickedDomId }
+  /** @type {Map<string, string | null>} entry id -> parent entry id (null at a root or when the parent is not an entry) */
+  let parentOf = new Map();
+  /** @type {Map<string, string[]>} */
+  let childrenOf = new Map();
+  const expanded = new Set(); // tree nodes the reader (or a selection) opened
   let focusedId = null;
+  let lastClickedDomId = null;
 
-  function renderBody(id, clickedDomId) {
-    const row = rows.get(id);
-    const entry = entries.find((e) => e.id === id);
-    if (!row || !entry) return;
-    row.lastClickedDomId = clickedDomId;
-    row.bodyEl.innerHTML = "";
+  summaryEl.hidden = true;
+  detailsEl.hidden = true;
 
-    const isPart = clickedDomId !== id;
-    if (isPart) {
-      const note = document.createElement("p");
-      note.className = "inspector-entry-note";
-      note.append("Part of component instance ");
-      const strong = document.createElement("strong");
-      strong.textContent = entry.id;
-      note.appendChild(strong);
-      row.bodyEl.appendChild(note);
+  function depthOf(id) {
+    let depth = 0;
+    for (let p = parentOf.get(id); p; p = parentOf.get(p)) depth += 1;
+    return depth;
+  }
+
+  function ancestors(id) {
+    const chain = [];
+    for (let p = parentOf.get(id); p; p = parentOf.get(p)) chain.push(p);
+    return chain;
+  }
+
+  /** Rows that show: every root, and the children of an expanded visible node. */
+  function visibleIds() {
+    const out = [];
+    const walk = (id) => {
+      out.push(id);
+      if (expanded.has(id)) for (const child of childrenOf.get(id) ?? []) walk(child);
+    };
+    for (const e of entries) if (!parentOf.get(e.id)) walk(e.id);
+    return out;
+  }
+
+  function renderTree() {
+    const byId = new Map(entries.map((e) => [e.id, e]));
+    listEl.replaceChildren(
+      ...visibleIds().map((id) => {
+        const entry = /** @type {NonNullable<ReturnType<typeof byId.get>>} */ (byId.get(id));
+        const kids = childrenOf.get(id) ?? [];
+        const li = el("li", id === focusedId ? "inspector-entry inspector-entry-focused node-row is-selected" : "inspector-entry node-row");
+        li.setAttribute("role", "treeitem");
+        li.setAttribute("aria-level", String(depthOf(id) + 1));
+        li.setAttribute("aria-selected", String(id === focusedId));
+        if (kids.length > 0) li.setAttribute("aria-expanded", String(expanded.has(id)));
+        li.dataset.entry = id;
+        li.style.paddingLeft = `calc(var(--space-md) + ${depthOf(id)} * 12px)`;
+        const chev = el("span", "node-row-chev");
+        if (kids.length > 0) {
+          chev.append(icon(expanded.has(id) ? "expand_more" : "chevron_right", "icon-xs"));
+          chev.addEventListener("click", (evt) => {
+            evt.stopPropagation();
+            toggle(id);
+          });
+        }
+        li.append(chev, el("span", "node-row-tag", entry.tag), el("span", "node-row-id", entry.id));
+        if (entry.componentRef) {
+          const badge = el("span", "inspector-entry-badge", `$${entry.componentRef}`);
+          li.append(badge);
+        }
+        li.addEventListener("click", () => {
+          if (onSelect) onSelect(id);
+          else focusEntry(id);
+        });
+        return li;
+      }),
+    );
+    emptyEl.hidden = entries.length > 0;
+  }
+
+  function toggle(id) {
+    if (expanded.has(id)) expanded.delete(id);
+    else expanded.add(id);
+    renderTree();
+  }
+
+  function renderSelection() {
+    const entry = focusedId ? entries.find((e) => e.id === focusedId) : null;
+    if (!entry) {
+      summaryEl.hidden = true;
+      detailsEl.hidden = true;
+      return;
     }
-
+    const where = ancestors(entry.id).slice(0, 2);
+    const isPart = lastClickedDomId !== null && lastClickedDomId !== entry.id;
+    summaryEl.replaceChildren(el("div", "inspect-summary-id", isPart ? lastClickedDomId : entry.id), el("div", "inspect-summary-sub", isPart ? `part of ${entry.id}` : `${entry.tag}${where.length > 0 ? ` in ${where.join(", ")}` : ""}`));
+    summaryEl.hidden = false;
     const doc = getRenderedDoc(entriesScreen);
+    detailsEl.replaceChildren();
+    detailsEl.hidden = false;
     if (!doc) {
-      row.bodyEl.appendChild(statusNote("Waiting for the screen to finish rendering…"));
+      detailsEl.append(statusNote("Waiting for the screen to finish rendering…"));
       return;
     }
-    const details = readComputedDetails(doc, clickedDomId ?? id);
+    const domId = lastClickedDomId ?? entry.id;
+    const details = readComputedDetails(doc, domId);
     if (!details) {
-      row.bodyEl.appendChild(statusNote("Element not found in the rendered screen."));
+      detailsEl.append(statusNote("Element not found in the rendered screen."));
       return;
     }
-    row.bodyEl.appendChild(buildEntryBody(entry, details));
-  }
-
-  function setExpanded(id, expanded, clickedDomId) {
-    const row = rows.get(id);
-    if (!row) return;
-    row.expanded = expanded;
-    row.headEl.setAttribute("aria-expanded", String(expanded));
-    row.chevronEl.textContent = expanded ? "expand_more" : "chevron_right";
-    if (expanded) {
-      renderBody(id, clickedDomId ?? id);
-      row.bodyEl.hidden = false;
-    } else {
-      row.bodyEl.hidden = true;
-    }
-  }
-
-  function buildRow(entry) {
-    const li = document.createElement("li");
-    li.className = "inspector-entry";
-
-    const head = document.createElement("button");
-    head.type = "button";
-    head.className = "inspector-entry-head";
-    head.setAttribute("aria-expanded", "false");
-
-    const chevron = icon("chevron_right", "inspector-entry-chevron icon-xs");
-    head.appendChild(chevron);
-
-    const label = document.createElement("span");
-    label.className = "inspector-entry-label";
-    label.textContent = `<${entry.tag}> · ${entry.id}`;
-    head.appendChild(label);
-
-    if (entry.componentRef) {
-      const badge = document.createElement("span");
-      badge.className = "inspector-entry-badge";
-      badge.textContent = `$${entry.componentRef}`;
-      head.appendChild(badge);
-    }
-
-    li.appendChild(head);
-
-    const body = document.createElement("div");
-    body.className = "inspector-entry-body";
-    body.hidden = true;
-    li.appendChild(body);
-
-    const row = { rowEl: li, headEl: head, chevronEl: chevron, bodyEl: body, expanded: false, lastClickedDomId: null };
-    head.addEventListener("click", () => setExpanded(entry.id, !row.expanded));
-    return row;
+    detailsEl.append(buildDetails(entry, details));
   }
 
   /**
-   * Rebuilds the list. When `screen` is the SAME screen the panel already
-   * showed (a re-render — SSE change, not a screen switch), expand/focus
-   * state is carried over onto the matching new rows so a design-system
-   * edit doesn't visually collapse whatever the user had open; on an
-   * actual screen switch (`screen` differs) nothing carries over — ids
-   * are only stable within one screen, not across them.
+   * Rebuilds the tree. When `screen` is the SAME screen the panel already
+   * showed (a re-render — SSE change, not a screen switch), expansion and
+   * the selection are carried over so a design-system edit doesn't collapse
+   * what the reader had open; on an actual screen switch nothing carries
+   * over — ids are only stable within one screen.
    * @param {typeof entries} nextEntries
    * @param {string | null} screen
    */
   function setEntries(nextEntries, screen) {
     const sameScreen = screen !== null && screen === entriesScreen;
-    const previouslyExpanded = sameScreen ? [...rows].filter(([, r]) => r.expanded).map(([id]) => id) : [];
-    const previousClickedByRow = sameScreen ? new Map([...rows].map(([id, r]) => [id, r.lastClickedDomId])) : new Map();
     const previousFocused = sameScreen ? focusedId : null;
-
+    const previousClicked = sameScreen ? lastClickedDomId : null;
+    if (!sameScreen) expanded.clear();
     entries = nextEntries;
     entriesScreen = screen;
     modelIds = new Set(entries.map((e) => e.id));
-    rows.clear();
-    listEl.innerHTML = "";
-    focusedId = null;
+    parentOf = new Map(entries.map((e) => [e.id, e.parentId && modelIds.has(e.parentId) ? e.parentId : null]));
+    childrenOf = new Map();
+    for (const e of entries) {
+      const parent = parentOf.get(e.id);
+      if (parent) childrenOf.set(parent, [...(childrenOf.get(parent) ?? []), e.id]);
+    }
+    if (!sameScreen) for (const e of entries) if (!parentOf.get(e.id)) expanded.add(e.id); // the roots open one level
     errorEl.hidden = true;
-    emptyEl.hidden = entries.length > 0;
-
-    for (const entry of entries) {
-      const row = buildRow(entry);
-      rows.set(entry.id, row);
-      listEl.appendChild(row.rowEl);
-    }
-
-    for (const id of previouslyExpanded) {
-      if (!rows.has(id)) continue;
-      setExpanded(id, true, previousClickedByRow.get(id) ?? id);
-    }
-    if (previousFocused && rows.has(previousFocused)) {
-      focusedId = previousFocused;
-      rows.get(previousFocused).rowEl.classList.add("inspector-entry-focused");
-    }
+    focusedId = previousFocused && modelIds.has(previousFocused) ? previousFocused : null;
+    lastClickedDomId = focusedId ? previousClicked : null;
+    renderTree();
+    renderSelection();
   }
 
   /** A fetch failure: shows the server's message instead of the empty/list state. */
@@ -326,56 +276,57 @@ export function createInspectorPanel({ listEl, emptyEl, errorEl }, { getRendered
     entries = [];
     entriesScreen = null;
     modelIds = new Set();
-    rows.clear();
-    listEl.innerHTML = "";
+    parentOf = new Map();
+    childrenOf = new Map();
+    expanded.clear();
     focusedId = null;
+    lastClickedDomId = null;
+    listEl.replaceChildren();
     emptyEl.hidden = true;
+    renderSelection();
     errorEl.textContent = message;
     errorEl.hidden = false;
   }
 
-  /** Re-renders every currently expanded row's body against the current (possibly just-reloaded) document — see readComputedDetails. */
+  /** Re-reads the selection's computed values against the current (possibly just-reloaded) document — see readComputedDetails. */
   function refreshExpanded() {
-    for (const [id, row] of rows) {
-      if (row.expanded) renderBody(id, row.lastClickedDomId ?? id);
-    }
+    if (focusedId) renderSelection();
   }
 
   /**
-   * Focuses + expands the entry for a canvas click (inspect mode). For a
-   * component-instance descendant, `clickedDomId` is the actual element
-   * clicked (its computed values are shown) while `id` (the containing
-   * instance) is what gets focused/expanded in the list.
+   * Selects an entry (a canvas click in inspect mode, or a row click): opens its ancestors, tints its row, shows its summary and values. For a component-instance descendant, `clickedDomId` is the actual element clicked (its computed values are shown) while `id` (the containing instance) is what the tree selects.
    * @param {string} id
    * @param {string} [clickedDomId]
    */
   function focusEntry(id, clickedDomId) {
-    if (!rows.has(id)) return;
-    if (focusedId && rows.has(focusedId)) rows.get(focusedId).rowEl.classList.remove("inspector-entry-focused");
+    if (!modelIds.has(id)) return;
     focusedId = id;
-    const row = rows.get(id);
-    row.rowEl.classList.add("inspector-entry-focused");
-    setExpanded(id, true, clickedDomId);
-    row.rowEl.scrollIntoView({ block: "nearest" });
+    lastClickedDomId = clickedDomId ?? id;
+    for (const ancestor of ancestors(id)) expanded.add(ancestor);
+    renderTree();
+    renderSelection();
+    listEl.querySelector(".inspector-entry-focused")?.scrollIntoView({ block: "nearest" });
   }
 
   function clearFocus() {
-    if (focusedId && rows.has(focusedId)) rows.get(focusedId).rowEl.classList.remove("inspector-entry-focused");
     focusedId = null;
+    lastClickedDomId = null;
+    renderTree();
+    renderSelection();
   }
 
   /** The dom id last shown for the currently focused entry (for overlay positioning), or null when nothing's focused. */
   function getFocusedDomId() {
-    if (!focusedId || !rows.has(focusedId)) return null;
-    return rows.get(focusedId).lastClickedDomId ?? focusedId;
+    if (!focusedId || !modelIds.has(focusedId)) return null;
+    return lastClickedDomId ?? focusedId;
   }
 
   /** CHR-780 — the focused entry's "$ref · variant" label for the canvas outline, from the same entry the row badge reads; null for a plain element or when the outline sits on a descendant of the instance rather than the instance itself. */
   function getFocusedLabel() {
-    if (!focusedId || !rows.has(focusedId)) return null;
+    if (!focusedId) return null;
     const entry = entries.find((e) => e.id === focusedId);
     if (!entry?.componentRef) return null;
-    const outlinedId = rows.get(focusedId).lastClickedDomId ?? focusedId;
+    const outlinedId = lastClickedDomId ?? focusedId;
     if (outlinedId !== focusedId) return null;
     return entry.variant ? `$${entry.componentRef} · ${entry.variant}` : `$${entry.componentRef}`;
   }

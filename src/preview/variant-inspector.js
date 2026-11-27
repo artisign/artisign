@@ -34,10 +34,10 @@ export function renderVariantInspector(container, ctx, flows, current, go) {
     ["Flows", `${counts.in} in, ${counts.out} out`],
   ];
   for (const [label, value] of rows) {
-    const row = el("div", "inspect-kv");
-    const v = el("span", "inspect-kv-value", value);
+    const row = el("div", "prop-row");
+    const v = el("span", "prop-value", value);
     v.title = value;
-    row.append(el("span", "inspect-kv-label", label), v);
+    row.append(el("span", "prop-label", label), v);
     variant.append(row);
   }
   container.append(variant);
@@ -49,13 +49,13 @@ export function renderVariantInspector(container, ctx, flows, current, go) {
     cardHead.append(el("b", "", "Also reached from"), el("span", "inspect-card-meta", `${sources.length} flow source${sources.length === 1 ? "" : "s"}`));
     card.append(cardHead);
     for (const source of sources) {
-      const row = el("div", "inspect-kv");
-      const link = el("button", "inspect-kv-value inspect-kv-link", source);
+      const row = el("div", "prop-row");
+      const link = el("button", "prop-value inspect-kv-link", source);
       link.type = "button";
       link.title = `Open ${source}`;
       link.dataset.screen = source;
       link.addEventListener("click", () => go(source));
-      row.append(el("span", "inspect-kv-label", "Flow"), link);
+      row.append(el("span", "prop-label", "Flow"), link);
       card.append(row);
     }
     container.append(card);

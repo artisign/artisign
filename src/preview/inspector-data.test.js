@@ -4,10 +4,6 @@ import {
   resolveModelId,
   parseUnresolvedPaths,
   rgbToHex,
-  shortFontFamily,
-  formatPosition,
-  formatTypography,
-  formatSpacing,
   buildEntries,
 } from "./inspector-data.js";
 
@@ -94,49 +90,10 @@ describe("rgbToHex", () => {
   });
 });
 
-describe("shortFontFamily", () => {
-  it("takes the first family in a stack", () => {
-    expect(shortFontFamily("system-ui, -apple-system, sans-serif")).toBe("system-ui");
-  });
-
-  it("strips surrounding quotes", () => {
-    expect(shortFontFamily('"Segoe UI", sans-serif')).toBe("Segoe UI");
-  });
-
-  it("returns an empty string for empty input", () => {
-    expect(shortFontFamily("")).toBe("");
-  });
-});
-
-describe("formatPosition", () => {
-  it("formats the four values in order", () => {
-    expect(formatPosition({ x: 24, y: 212, w: 412, h: 44 })).toBe("X 24 · Y 212 · W 412 · H 44");
-  });
-});
-
-describe("formatTypography", () => {
-  it("joins family/size/weight, omitting a 'normal' line-height", () => {
-    expect(formatTypography({ fontFamily: "system-ui, sans-serif", fontSize: "0.9rem", fontWeight: "600", lineHeight: "normal" })).toBe(
-      "system-ui · 0.9rem · 600",
-    );
-  });
-
-  it("appends a non-normal line-height", () => {
-    expect(formatTypography({ fontFamily: "system-ui", fontSize: "0.9rem", fontWeight: "600", lineHeight: "1.2" })).toBe(
-      "system-ui · 0.9rem · 600 · lh 1.2",
-    );
-  });
-});
-
-describe("formatSpacing", () => {
-  it("formats padding/margin/radius in order", () => {
-    expect(formatSpacing({ padding: "12px 16px", margin: "0px", radius: "6px" })).toBe("pad 12px 16px · margin 0px · radius 6px");
-  });
-});
-
 describe("buildEntries", () => {
   it("gives a node with no refs key empty refs", () => {
-    expect(buildEntries([{ id: "n1", tag: "div" }])).toEqual([{ id: "n1", tag: "div", componentRef: null, variant: null, tokenRefs: [] }]);
+    expect(buildEntries([{ id: "n1", tag: "div" }])).toEqual([{ id: "n1", tag: "div", parentId: null, componentRef: null, variant: null, tokenRefs: [] }]);
+    expect(buildEntries([{ id: "n2", tag: "span", parent_id: "n1" }])[0].parentId).toBe("n1"); // the tree's parent link
   });
 
   it("reads component_ref and variant straight through", () => {

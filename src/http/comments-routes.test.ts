@@ -7,6 +7,7 @@ import { initProject } from "../init/init-project.js";
 import { setupArtisignHome, type ArtisignHomeFixture } from "../tools/test-fixtures.js";
 import { startDaemon, type DaemonHandle } from "../daemon/start.js";
 import { FsStore } from "../store/index.js";
+import { writeMockup } from "../tools/mockups.js";
 
 async function waitForSseEvent(response: Response, predicate: (evt: Record<string, unknown>) => boolean, timeoutMs: number): Promise<Record<string, unknown>> {
   const reader = response.body!.getReader();
@@ -118,6 +119,35 @@ describe("/api/comments", () => {
       expect(reply.screen).toBe("home");
       expect(reply.node_id).toBe("home.n2");
       expect(reply.resolved).toBe(true);
+    });
+
+    it("resolves a thread without words (the popover's Resolve), but never posts an empty plain reply", async () => {
+      const { json: root } = await post("/api/comments", { screen: "home", node_id: "n2", text: "make this bigger" });
+      expect((await post("/api/comments", { parent_id: root.id, text: "" })).status).toBe(400);
+      expect((await post("/api/comments", { screen: "home", node_id: "n2", text: "", resolved: true })).status).toBe(400);
+      expect((await post("/api/comments", { parent_id: root.id, text: "", resolved: true })).status).toBe(201);
+
+      const { json } = await get("/api/comments?screen=home");
+      expect(json.threads).toEqual([{ id: root.id, node_id: "home.n2", author: "human", status: "resolved", detached: false, reply_count: 0 }]);
+      expect((json.comments as unknown[]).length).toBe(1); // the wordless resolve line is no message
+    });
+
+    it("applies thread actions: reanchor to a DOM id, reopen, delete (CHR-1248)", async () => {
+      const { json: root } = await post("/api/comments", { screen: "home", node_id: "n2", text: "make this bigger" });
+      expect((await post("/api/comments", { action: "reanchor", comment_id: root.id, screen: "home", node_id: "nope" })).status).toBe(404);
+      expect((await post("/api/comments", { action: "reanchor", comment_id: root.id, screen: "home", node_id: "n1" })).status).toBe(200);
+      let { json } = await get("/api/comments?screen=home");
+      expect(json.threads).toMatchObject([{ id: root.id, node_id: "home.n1", status: "open" }]);
+
+      await post("/api/comments", { parent_id: root.id, text: "", resolved: true });
+      expect((await post("/api/comments", { action: "reopen", comment_id: root.id })).status).toBe(200);
+      ({ json } = await get("/api/comments?screen=home"));
+      expect(json.threads).toMatchObject([{ status: "open" }]);
+
+      expect((await post("/api/comments", { action: "delete", comment_id: root.id })).status).toBe(200);
+      ({ json } = await get("/api/comments?screen=home"));
+      expect([json.comments, json.threads]).toEqual([[], []]);
+      expect((await post("/api/comments", { action: "explode", comment_id: root.id })).status).toBe(400);
     });
 
     it("rejects a reply to an unknown parent_id", async () => {
@@ -277,5 +307,117 @@ describe("/api/comments", () => {
     const afterReply = await post("/api/tools/list_comments", { node: "home.n2", status: "any", include_replies: true });
     const bodies = (afterReply.json.comments as Array<{ body: string }>).map((c) => c.body);
     expect(bodies).toEqual(["make this bigger", "on it"]);
+  });
+  // CHR-1262 / ADR-012 — mockup threads and the three GET selectors.
+  describe("mockup threads", () => {
+    beforeEach(async () => {
+      await writeMockup(store, { mockup: "cart-options", variant: "a", mode: "create", html: `<section id="cart"><li id="item-1">Tea</li></section>` });
+      await writeMockup(store, { mockup: "cart-options", variant: "b", mode: "create", html: `<div>plain</div>` });
+    });
+
+    it("creates a root on an authored id and on the whole variant", async () => {
+      const node = await post("/api/comments", { mockup: "cart-options", variant: "a", node_id: "item-1", text: "heavy" });
+      expect(node.status).toBe(201);
+      expect(node.json).toMatchObject({ mockup: "cart-options", variant: "a", node_id: "mockup:cart-options#a.item-1", author: "human" });
+      expect(node.json).not.toHaveProperty("screen");
+      const whole = await post("/api/comments", { mockup: "cart-options", variant: "b", node_id: null, text: "plain" });
+      expect(whole.status).toBe(201);
+      expect(whole.json.node_id).toBeNull();
+    });
+
+    it("refuses a generated id, an unknown variant, both targets and a missing variant", async () => {
+      expect((await post("/api/comments", { mockup: "cart-options", variant: "a", node_id: "n2", text: "x" })).status).toBe(404);
+      expect((await post("/api/comments", { mockup: "cart-options", variant: "z", text: "x" })).status).toBe(404);
+      expect((await post("/api/comments", { mockup: "cart-options", variant: "a", screen: "home", text: "x" })).status).toBe(400);
+      expect((await post("/api/comments", { mockup: "cart-options", text: "x" })).status).toBe(400);
+      expect((await post("/api/comments", { mockup: "../x", variant: "a", text: "x" })).status).toBe(400);
+    });
+
+    it("replies, resolves and reopens a mockup thread, inheriting its target", async () => {
+      const { json: root } = await post("/api/comments", { mockup: "cart-options", variant: "a", node_id: "item-1", text: "heavy" });
+      const reply = await post("/api/comments", { parent_id: root.id, text: "still" });
+      expect(reply.json).toMatchObject({ mockup: "cart-options", variant: "a", node_id: "mockup:cart-options#a.item-1" });
+      await post("/api/comments", { parent_id: root.id, resolved: true });
+      const resolved = await get("/api/comments?mockup=cart-options");
+      expect((resolved.json.threads as Array<{ status: string }>)[0]!.status).toBe("resolved");
+      expect((await post("/api/comments", { action: "reopen", comment_id: root.id })).status).toBe(200);
+      expect(((await get("/api/comments?mockup=cart-options")).json.threads as Array<{ status: string }>)[0]!.status).toBe("open");
+    });
+
+    it("re-anchors within the mockup and refuses a screen anchor or a generated id", async () => {
+      const { json: root } = await post("/api/comments", { mockup: "cart-options", variant: "a", node_id: "item-1", text: "heavy" });
+      const moved = await post("/api/comments", { action: "reanchor", comment_id: root.id, mockup: "cart-options", variant: "a", node_id: "cart" });
+      expect(moved.status).toBe(200);
+      const threads = (await get("/api/comments?mockup=cart-options")).json.threads as Array<{ node_id: string }>;
+      expect(threads[0]!.node_id).toBe("mockup:cart-options#a.cart");
+
+      expect((await post("/api/comments", { action: "reanchor", comment_id: root.id, screen: "home", node_id: "n2" })).status).toBe(400);
+      expect((await post("/api/comments", { action: "reanchor", comment_id: root.id, mockup: "cart-options", variant: "a", node_id: "n9" })).status).toBe(404);
+      expect((await post("/api/comments", { action: "reanchor", comment_id: root.id, mockup: "cart-options", node_id: "cart" })).status).toBe(400);
+    });
+
+    it("refuses to move a screen thread onto a mockup", async () => {
+      const { json: root } = await post("/api/comments", { screen: "home", node_id: "n2", text: "x" });
+      const res = await post("/api/comments", { action: "reanchor", comment_id: root.id, mockup: "cart-options", variant: "a", node_id: "cart" });
+      expect(res.status).toBe(400);
+      expect(res.json.code).toBe("validation_failed");
+    });
+
+    it("GET takes exactly one of screen, scope=screens and mockup", async () => {
+      for (const q of ["", "?screen=home&mockup=cart-options", "?scope=screens&screen=home", "?scope=screens&mockup=cart-options", "?scope=everything"]) {
+        const res = await get(`/api/comments${q}`);
+        expect(res.status, q).toBe(400);
+        expect(res.json.code).toBe("validation_failed");
+      }
+    });
+
+    it("GET scope=screens returns every screen thread with its screen, and no mockup thread", async () => {
+      await post("/api/comments", { screen: "home", node_id: "n2", text: "on home" });
+      await post("/api/comments", { screen: "pick", text: "on pick" });
+      await post("/api/comments", { mockup: "cart-options", variant: "a", node_id: "item-1", text: "on a mockup" });
+      const { status, json } = await get("/api/comments?scope=screens");
+      expect(status).toBe(200);
+      expect((json.comments as Array<{ text: string }>).map((c) => c.text)).toEqual(["on home", "on pick"]);
+      expect(json.threads).toEqual([
+        expect.objectContaining({ screen: "home", node_id: "home.n2", status: "open", detached: false }),
+        expect.objectContaining({ screen: "pick", node_id: null }),
+      ]);
+    });
+
+    it("GET screen= stays as it was: no screen key on the entries, no mockup threads", async () => {
+      await post("/api/comments", { screen: "home", node_id: "n2", text: "on home" });
+      await post("/api/comments", { mockup: "cart-options", variant: "a", text: "on a mockup" });
+      const { json } = await get("/api/comments?screen=home");
+      expect(json.threads).toEqual([{ id: expect.any(String), node_id: "home.n2", author: "human", status: "open", detached: false, reply_count: 0 }]);
+    });
+
+    it("GET mockup= returns the threads of every variant, with variant on the entries and detached computed", async () => {
+      await post("/api/comments", { mockup: "cart-options", variant: "a", node_id: "item-1", text: "row" });
+      await post("/api/comments", { mockup: "cart-options", variant: "b", text: "plain" });
+      await post("/api/comments", { screen: "home", text: "screen" });
+      await writeMockup(store, { mockup: "cart-options", variant: "a", mode: "replace", html: `<section id="cart"></section>` });
+
+      const { status, json } = await get("/api/comments?mockup=cart-options");
+      expect(status).toBe(200);
+      expect(json.threads).toEqual([
+        expect.objectContaining({ variant: "a", node_id: "mockup:cart-options#a.item-1", detached: true }),
+        expect.objectContaining({ variant: "b", node_id: null, detached: false }),
+      ]);
+      expect(json.comments).toEqual([
+        expect.objectContaining({ mockup: "cart-options", variant: "a", resolved: false }),
+        expect.objectContaining({ mockup: "cart-options", variant: "b" }),
+      ]);
+    });
+
+    it("GET mockup= answers an unknown mockup with an empty list", async () => {
+      expect((await get("/api/comments?mockup=nope")).json).toEqual({ comments: [], threads: [] });
+    });
+
+    it("counts a line with neither screen nor mockup as skipped, on every selector", async () => {
+      await store.appendComment(JSON.stringify({ id: "cmt_x", parent_id: null, node_id: null, author: "human", text: "?", resolved: false, ts: "2026-01-01T00:00:00.000Z" }));
+      for (const q of ["screen=home", "scope=screens", "mockup=cart-options"]) {
+        expect((await get(`/api/comments?${q}`)).json.skipped_malformed_lines, q).toBe(1);
+      }
+    });
   });
 });

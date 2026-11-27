@@ -203,7 +203,7 @@ function deriveTargetAndNodes(tool: string, input: Record<string, unknown>, resu
     // broad reads: feed-only per ADR-005, never a navigation target — also
     // `list_comments` when filtered to one screen or node.
     // set_tokens — rewrites across many screens/components/patterns at once.
-    // init_project, reply_comment — no target shape this event models fits.
+    // init_project, reply_comment, create_comment — no target shape this event models fits.
     // set_board_state (CHR-624) — the Board's filter/pins aren't a single
     // screen/mockup/component/pattern; `toolKind` tells its read form apart.
     default:

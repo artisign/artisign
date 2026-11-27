@@ -29,10 +29,10 @@ describe("renderMockupView", () => {
 
     const columns = container.querySelectorAll(".mockup-column");
     expect(columns).toHaveLength(2);
-    expect(columns[0].querySelector(".mockup-column-index").textContent).toBe("Variant 1");
+    expect(columns[0].querySelector(".mockup-column-index").textContent).toBe("A");
     expect(columns[0].querySelector(".mockup-column-title").textContent).toBe("Variant A");
     expect(columns[0].querySelector(".mockup-column-description").textContent).toBe("Single page");
-    expect(columns[1].querySelector(".mockup-column-index").textContent).toBe("Variant 2");
+    expect(columns[1].querySelector(".mockup-column-index").textContent).toBe("B");
     expect(columns[1].querySelector(".mockup-column-title").textContent).toBe("Variant B");
     // No description on variant B -> no description element at all.
     expect(columns[1].querySelector(".mockup-column-description")).toBeNull();

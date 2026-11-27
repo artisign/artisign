@@ -1,0 +1,11 @@
+{
+  "notes": "**Mockup comments: comment mode, new thread in variant C** (CHR-1260 / CHR-1261). **One comment mode for all columns**, entered with the top-bar chat icon (pressed, `aria-pressed=\"true\"`), `C`, or the toolbar's Comment button.\n\n- `comment-mode-banner`: \"Comment mode — click an element in any variant to start a thread · Esc to exit\". On this view it sits at the bottom of the stage, above the toolbar, so it never covers a column header. On a single screen it stays at the top.\n- Existing pins dim to 0.45 opacity and do not react to clicks.\n- Hover over any element in any frame shows `comment-hover-outline` (dashed blue) with the label \"<variant letter> · <node-id>\". Here that is \"B · b-btn-checkout\".\n- A click selects the element (`comment-hover-outline` variant `target`) and opens `comment-popover` variant `new`. Its title is \"New thread\" + the `variant-badge`, and its body is a `comment-input` with an @ mention for agents. It flips to the side with room (here left of C's item-3, over column B).\n- Comment posts and leaves comment mode on the new thread (→ `mockup-comments-thread`). Cancel or Esc discards it; a second Esc leaves comment mode.\n\n**A11y:** in comment mode every element in the frames is reachable with Tab in DOM order, column by column. Enter on an element starts a thread. The banner is `role=\"status\"`, so mode changes are announced. Focus goes into the input on open and returns to the element on cancel.",
+  "tags": [
+    "chr-1260",
+    "chr-1261",
+    "mockups",
+    "comments"
+  ],
+  "variant_of": "chrome-c-mockup-columns",
+  "variant_kind": "state"
+}

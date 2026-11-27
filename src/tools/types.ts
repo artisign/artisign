@@ -148,6 +148,8 @@ export type ToolHandlerContext = {
   listProjects?: () => Promise<{ name: string; root: string; open: boolean }[]>;
   viewState?: ViewState;
   source?: "agent" | "human";
+  /** The connected MCP client's name — the default agent identity on comments (CHR-1254). */
+  clientName?: string;
 };
 
 /** Thrown by a single-resource tool (get_*) when the target doesn't exist or input is invalid. */
@@ -173,14 +175,20 @@ export type PublicFlow = {
 export type CommentStatus = "open" | "resolved";
 export type CommentAuthor = "human" | "agent";
 
-export type PublicComment = {
+/** A comment names a screen, or (CHR-1262, ADR-012) one variant of a mockup. */
+export type PublicCommentTarget = { screen: string } | { mockup: string; variant: string };
+
+export type PublicComment = PublicCommentTarget & {
   id: string;
   parent_id: string | null;
-  screen: string;
   node: string | null;
   author: CommentAuthor;
+  /** The agent's name on agent-authored comments (CHR-1249). */
+  agent?: string;
   body: string;
   status: CommentStatus;
+  /** On a root only: its anchor node no longer exists (CHR-1249). */
+  detached?: boolean;
   reply_count: number;
   created_at: string;
 };

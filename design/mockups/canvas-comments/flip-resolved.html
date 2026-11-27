@@ -1,0 +1,127 @@
+<style>
+*{box-sizing:border-box}
+.app{width:1440px;height:900px;background:#181716;color:#ecebe8;font:13px/1.4 system-ui,-apple-system,'Segoe UI',sans-serif;display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit}
+.top{height:44px;flex:none;display:flex;align-items:center;gap:16px;padding:0 10px 0 14px;border-bottom:1px solid #2f2d2a;background:#201f1d}
+.logo{font-weight:700;font-size:15px}
+.proj{padding:4px 10px;border:1px solid #44413d;border-radius:6px;background:none;font-weight:600}
+.tab{color:#a09d97;padding:12px 2px;border:0;background:none;font-size:14px}
+.tab.on{color:#ecebe8;box-shadow:inset 0 -2px 0 #ecebe8}
+.sp{flex:1}
+.ib{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:0;background:none;color:#a09d97;padding:0}
+.ib.on{background:#383532;color:#ecebe8}
+.pill{padding:3px 9px;border-radius:6px;background:#2a2826;border:0}
+.dot{width:7px;height:7px;border-radius:4px;background:#34d399;display:inline-block}
+.main{flex:1;display:flex;min-height:0}
+.side{width:240px;flex:none;border-right:1px solid #2f2d2a;padding:12px 10px;display:flex;flex-direction:column;gap:4px}
+.h{font-weight:600;font-size:14px;padding:2px 4px 6px}
+.field{height:28px;border-radius:6px;background:#2a2826;color:#6e6b66;display:flex;align-items:center;padding:0 10px;margin-bottom:6px}
+.row{padding:6px 8px;border-radius:6px;display:flex;justify-content:space-between}
+.row.on{background:#383532}
+.mut{color:#a09d97}.ter{color:#6e6b66}
+.ctx{width:272px;flex:none;border-right:1px solid #2f2d2a;display:flex;flex-direction:column}
+.ctx p{margin:0 0 10px;color:#a09d97;line-height:1.55}
+.ctx b{color:#ecebe8}
+.chip{font-size:11px;padding:1px 6px;border-radius:4px;background:#2a2826;color:#a09d97}
+.count{border-top:1px solid #2f2d2a;padding:0 12px;height:40px;display:flex;align-items:center;gap:8px;background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left;white-space:nowrap}
+.nb{min-width:18px;height:18px;border-radius:9px;background:#2563eb;color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
+.cv{flex:1;position:relative;background:#242220;overflow:hidden}
+.cbar{height:36px;display:flex;align-items:center;gap:8px;padding:0 10px;border-bottom:1px solid #2f2d2a;background:#201f1d}
+.scr{padding:3px 10px;border:1px solid #2f7f72;border-radius:6px;color:#3fc4b4;background:#1c3532}
+.seg{display:flex;background:#2a2826;border-radius:6px;padding:2px}
+.seg span{padding:2px 10px;border-radius:5px;color:#a09d97}.seg .on{background:#383532;color:#ecebe8}
+.cap{position:absolute;left:0;right:0;top:56px;text-align:center;color:#6e6b66;font-size:12px}
+.pv{position:absolute;left:190px;top:84px;width:700px;height:500px;background:#fafaf8;color:#2a2a2a;font-size:10px;box-shadow:0 10px 40px rgba(0,0,0,.5);display:flex;flex-direction:column}
+.pvt{height:28px;display:flex;align-items:center;gap:12px;padding:0 12px;border-bottom:1px solid #e6e4df;font-size:9px;color:#666}
+.pvb{flex:1;display:flex}
+.pvl{width:180px;border-right:1px solid #e6e4df;background:#f3f2ee;padding:10px;display:flex;flex-direction:column;gap:4px;font-size:9px;color:#555}
+.pvl .s{height:20px;border-radius:4px;background:#fff;border:1px solid #e3e1dc;display:flex;align-items:center;padding:0 6px;color:#888}
+.pvl .i{padding:5px 6px;border-radius:4px;margin-left:12px;color:#333}.pvl .i.on{background:#e7e5df}
+.pvd{flex:1;padding:16px 20px;position:relative}
+.btn{position:relative;height:22px;padding:0 9px;border:1px solid #dcdad5;border-radius:5px;background:#fff;font-size:9px;font-weight:500;color:#333;display:inline-flex;align-items:center}
+.tg{font-size:8px;padding:1px 6px;border-radius:8px;background:#efeee9;color:#666}
+.cards{margin-top:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.card{position:relative;border:1px solid #e3e1dc;border-radius:6px;background:#fff;padding:8px;line-height:1.45;color:#444;font-size:9px;min-height:78px}
+.ch{font-size:8px;color:#888;margin-bottom:4px}
+.step{position:relative;display:flex;gap:8px;margin-top:10px}
+.av{width:18px;height:18px;border-radius:9px;background:#e0b04a;flex:none}
+.node{font-family:ui-monospace,Menlo,monospace;font-size:8px;background:#e9f4f2;color:#2f6f64;padding:1px 5px;border-radius:3px}
+.pin{position:absolute;width:24px;height:24px;border-radius:12px 12px 12px 3px;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);z-index:6;padding:0}
+.ph{background:#2563eb}.pa{background:#7c3aed}
+.pr{background:#d1cec8;color:#6b6863;border-color:#fff}
+.act{box-shadow:0 0 0 4px rgba(37,99,235,.4),0 2px 6px rgba(0,0,0,.35)}
+.outl{outline:2px solid #2563eb;outline-offset:2px}
+.pop{position:absolute;width:300px;background:#2b2927;color:#ecebe8;border-radius:10px;box-shadow:0 0 0 1px rgba(255,255,255,.12),0 12px 32px rgba(0,0,0,.55);font-size:12px;z-index:20;line-height:1.45;text-align:left;font-weight:400}
+.pophd{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 12px;border-bottom:1px solid #383532;height:40px}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:11px}
+.msg{padding:10px 12px 4px;display:flex;flex-direction:column;gap:4px}
+.who{display:flex;align-items:center;gap:6px}
+.avc{width:22px;height:22px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex:none}
+.bd{font-size:10px;padding:0 5px;border-radius:3px;line-height:16px}
+.bh{background:#22305a;color:#a8b8ff}.ba{background:#2f2452;color:#c4b2ff}
+.txt{padding-left:28px}
+.reply{padding:10px 12px 12px;display:flex;gap:6px}
+.inp{flex:1;height:32px;border-radius:6px;border:1px solid #44413d;background:#2a2826;color:#6e6b66;padding:7px 10px;font-size:12px}
+.send{width:32px;height:32px;border-radius:6px;border:0;background:#2563eb;color:#fff;display:inline-flex;align-items:center;justify-content:center}
+.notch{position:absolute;right:-6px;top:22px;width:12px;height:12px;background:#2b2927;transform:rotate(45deg);box-shadow:1px -1px 0 rgba(255,255,255,.12)}
+.rpop{position:absolute;width:240px;background:#2b2927;color:#ecebe8;border-radius:10px;box-shadow:0 0 0 1px rgba(255,255,255,.12),0 12px 32px rgba(0,0,0,.55);font-size:12px;z-index:15;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.okb{font-size:10px;padding:0 6px;border-radius:3px;line-height:16px;background:#1c3532;color:#3fc4b4}
+.sbtn{height:26px;padding:0 10px;border-radius:6px;border:1px solid #44413d;background:none;font-size:12px;align-self:flex-start}
+.tb{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);display:flex;align-items:center;gap:4px;padding:4px;background:#2b2927;border-radius:10px;box-shadow:0 0 0 1px rgba(255,255,255,.12),0 12px 32px rgba(0,0,0,.55)}
+.tb .ib{width:32px;height:32px}
+.tbt{border:0;background:none;color:#a09d97;padding:6px 10px;border-radius:6px;min-height:32px;display:inline-flex;align-items:center;gap:6px}
+.tbt.on{background:#383532;color:#ecebe8}
+.vs{width:1px;height:20px;background:#44413d;margin:0 4px}
+</style>
+<div class="app">
+<div class="top">
+<span class="logo">artisign</span><button class="proj">artisign-ui ▾</button>
+<div style="display:flex;gap:20px"><button class="tab on">Screens</button><button class="tab">Design System</button><button class="tab">Board</button><button class="tab">Use Cases</button></div>
+<span class="sp"></span>
+<button class="ib" aria-label="Comment mode (C)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></button>
+<button class="pill">50% ▾</button><span style="display:flex;align-items:center;gap:6px" class="mut"><span class="dot"></span>Live</span>
+</div>
+<div class="main">
+<div class="side"><div class="h">Screens</div><div class="field">Search screens, mockups</div>
+<div class="row"><span>app-shell</span><span class="ter">39</span></div><div class="row"><span>board-view</span><span class="ter">8</span></div><div class="row"><span>design-system-view</span><span class="ter">1</span></div><div class="row"><span>no-project-empty-state</span><span class="ter">11</span></div><div class="row on"><span>usecases-list</span><span class="ter">34</span></div><div class="row"><span>usecases-detail</span><span class="ter">6</span></div></div>
+<div class="ctx"><div class="h" style="padding:12px 12px 8px">Context</div>
+<div style="flex:1;padding:0 12px"><p><b>Built for thousands.</b> Groups load collapsed except the path to the selected case.</p><p><b>States.</b> Loading row, page error with Retry, nothing-selected placeholder.</p><div style="display:flex;gap:4px"><span class="chip">chr-1062</span><span class="chip">chr-1097</span></div></div>
+<button class="count"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a09d97" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg><span class="nb">3</span><span style="flex:1">open comments</span><span class="ter" style="font-size:12px">+ 2 resolved shown</span></button>
+</div>
+<div class="cv">
+<div class="cbar"><button class="scr">usecases-list ▾</button><span class="sp"></span><span class="chip">34 variants</span><div class="seg"><span class="on">Single</span><span>Compare</span></div></div>
+<div class="cap">usecases-list · 1440 × 900</div>
+<div class="pv">
+<div class="pvt"><b style="color:#222">artisign</b><span>Screens</span><span>Board</span><b style="color:#222">Use Cases</b></div>
+<div class="pvb">
+<div class="pvl"><div class="s">Search title, trigger, steps…</div><div style="margin:4px 0">212 of 1,284 use cases</div><div>▸ agents</div><div>▾ mapping</div><div class="i on">Map a step to a screen element</div><div class="i">Repair a stale mapping</div><div class="i">Give a node an authored id</div><div>▸ screens</div><div>▸ onboarding</div></div>
+<div class="pvd">
+<div style="font-size:8px;color:#888;margin-bottom:6px">mapping › elements</div>
+<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:14px;font-weight:600;color:#1f1f1f">Map a step to a screen element</div><div style="display:flex;gap:6px"><span class="btn outl" style="z-index:30">Show on screens<span class="pin ph act" style="top:-13px;right:-13px">1</span>
+<div class="pop" style="right:calc(100% + 20px);top:-20px"><span class="notch"></span>
+<div class="pophd"><b>#1</b><span class="mono mut">btn-show-on-screens</span><span class="sp"></span>
+<button class="ib" aria-label="Resolve"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12l5 5L20 7"/></svg></button>
+<button class="ib" aria-label="More"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button></div>
+<div class="msg"><div class="who"><span class="avc" style="background:#2563eb">C</span><b>Christian</b><span class="bd bh">Human</span><span class="ter" style="font-size:11px">5h</span></div><div class="txt">Label is unclear next to Edit. “Show on screens” or “Locate”?</div></div>
+<div class="reply"><div class="inp">Reply, @ to mention an agent</div><button class="send" aria-label="Send"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l16-8-6 16-2-7-8-1z"/></svg></button></div>
+</div></span><span class="btn">Edit</span></div></div>
+<div style="margin-top:8px;display:flex;gap:6px"><span class="tg" style="background:#e3f3ea;color:#256b47">● Ready</span><span class="tg">mapping</span><span class="tg">design</span></div>
+<div style="margin-top:14px;display:flex;gap:8px;align-items:center"><span class="av" style="width:24px;height:24px;border-radius:12px"></span><div><b>Dana</b><div style="font-size:8px;color:#888">Designer · Human · Medium</div></div></div>
+<div class="cards">
+<div class="card"><div class="ch">Trigger</div>A step says “Click Show on screens” but nothing tells a developer which element that is.<span class="pin pr" style="top:-13px;right:-13px" aria-label="Thread 4, resolved"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span></div>
+<div class="card"><div class="ch">Goal</div>Point the step at the exact node on the right screen, using a node with an authored id.<span class="pin ph" style="top:-13px;right:-13px">2</span></div>
+<div class="card"><div class="ch">Outcome</div>The step carries screen and node; detail shows the target chip.</div>
+</div>
+<div style="margin-top:16px;font-weight:600;font-size:11px">Flow <span style="font-weight:400;font-size:8px;color:#888">3 steps · 3 screens</span></div>
+<div class="step"><span class="av"></span><div><div style="font-size:8px;color:#888">Step 1 · Dana</div><div>Opens the use case and clicks Edit</div><span class="node">usecases-detail › btn-edit</span></div></div>
+<div class="step"><span class="av"></span><div style="position:relative;padding-right:18px"><div style="font-size:8px;color:#888">Step 2 · Dana</div><div>Chooses the screen of the step</div><span class="node">usecases-edit-dialog › n184</span><div style="color:#b45309;font-size:8px;margin-top:2px">n184 is generated and may change on rewrite.</div><span class="pin pa" style="top:-6px;right:-14px">3</span></div></div>
+<div class="step"><span class="av"></span><div style="position:relative;padding-right:18px"><div style="font-size:8px;color:#888">Step 3 · Dana</div><div>Chooses the element on that screen</div><span class="node">usecases-edit-dialog › sel-node</span><span class="pin pr" style="top:-6px;right:-14px" aria-label="Thread 5, resolved"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></span>
+<div class="rpop" style="left:calc(100% + 24px);top:-12px"><div class="who"><b>#5</b><span class="mono mut">sel-node</span><span class="okb">Resolved</span></div><span class="mut" style="font-size:12px">Resolved by ux-agent · yesterday · 3 messages</span><button class="sbtn">Reopen</button></div>
+</div></div>
+</div></div></div>
+<div class="tb">
+<button class="ib on" aria-label="Select (V)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 8-6 2-2 6z"/></svg></button>
+<button class="ib" aria-label="Comment (C)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></button>
+<span class="vs"></span><button class="tbt on" aria-pressed="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5L20 7"/></svg>Show resolved</button><button class="tbt">Hide pins</button>
+</div>
+</div></div></div>

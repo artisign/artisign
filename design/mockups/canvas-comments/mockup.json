@@ -1,0 +1,24 @@
+{
+  "variants": [
+    {
+      "id": "thread-open",
+      "title": "1 · Thread open (pin + popover)",
+      "description": "CHR-1250/1251: numbered pins (Human blue, Agent purple), active pin with a ring, element outline, popover to the right of the element. The Context sidebar keeps only the count row (CHR-1253)."
+    },
+    {
+      "id": "comment-mode-new",
+      "title": "2 · Comment mode + new thread",
+      "description": "CHR-1252: the mode starts from the top-bar icon or C, with a hint bar that names Esc. Hover shows an outline and a node id label; a click opens an empty popover at the node, with an @-mention list for agents. Existing pins are dimmed."
+    },
+    {
+      "id": "detached",
+      "title": "3 · Detached thread + more menu",
+      "description": "CHR-1249/1250: node n184 no longer exists after the re-render. The thread is not deleted: its pin moves, dashed and amber, to a \"Detached\" tray left of the screen. The popover explains the state and offers re-anchor; the more menu is open."
+    },
+    {
+      "id": "flip-resolved",
+      "title": "4 · Popover flip + show resolved",
+      "description": "CHR-1251/1252: the element sits at the right edge, so the popover opens to the left. \"Show resolved\" is on: resolved threads appear as grey pins with a check mark. One thread is resolved and can be reopened (Reopen)."
+    }
+  ]
+}

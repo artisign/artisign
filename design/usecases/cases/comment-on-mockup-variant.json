@@ -1,0 +1,111 @@
+{
+  "id": "comment-on-mockup-variant",
+  "title": "Comment on an element of a mockup variant",
+  "group": "mockups",
+  "tags": [
+    "chr-1260",
+    "chr-1261"
+  ],
+  "status": "draft",
+  "personas": [
+    "designer-dana"
+  ],
+  "constellations": [
+    "design-team-large-project"
+  ],
+  "trigger": {
+    "text": "Dana compares the variants of a mockup and sees a problem in one of them.",
+    "actor": "designer-dana",
+    "via": "browser preview"
+  },
+  "goal": "The note is anchored to the exact element of the right variant, so the agent knows which option it is about.",
+  "outcome": "An open thread on one variant's element, shown in that variant's column.",
+  "state": [
+    {
+      "subject": "system",
+      "property": "mockup_variants",
+      "value": 3
+    },
+    {
+      "subject": "system",
+      "property": "mockup_open_comments",
+      "value": 4
+    }
+  ],
+  "inputs": [
+    {
+      "object": "mockup",
+      "source": "Selected mockup",
+      "example": {
+        "mockup": "cart-summary-options",
+        "variants": [
+          "a-sticky",
+          "b-sheet",
+          "c-inline"
+        ]
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "object": "comment",
+      "target": "comments.jsonl",
+      "example": {
+        "node": "mockup:cart-summary-options#c-inline.item-3",
+        "body": "Quantity next to a line total reads like a unit price.",
+        "status": "open"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "id": "open-mockup",
+      "actor": "designer-dana",
+      "action": "Selects the mockup; the canvas shows one column per variant, each with its pins and counts",
+      "target": {
+        "screen": "mockup-comments-thread",
+        "node": "stage"
+      }
+    },
+    {
+      "id": "comment-mode",
+      "actor": "designer-dana",
+      "action": "Turns on comment mode, which covers all columns",
+      "target": {
+        "screen": "mockup-comments-thread",
+        "node": "mode-comment"
+      }
+    },
+    {
+      "id": "pick-element",
+      "actor": "designer-dana",
+      "action": "Clicks the element in variant C's column; the outline names the variant and node",
+      "target": {
+        "screen": "mockup-comments-mode",
+        "node": "target-outline"
+      }
+    },
+    {
+      "id": "write",
+      "actor": "designer-dana",
+      "action": "Writes the comment in the new-thread popover",
+      "target": {
+        "screen": "mockup-comments-mode",
+        "node": "new-input"
+      }
+    },
+    {
+      "id": "save",
+      "actor": "system",
+      "action": "Appends the thread anchored to variant C's element and shows its pin and count in that column",
+      "data": [
+        {
+          "object": "comment",
+          "after": {
+            "status": "open"
+          }
+        }
+      ]
+    }
+  ]
+}

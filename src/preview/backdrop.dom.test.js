@@ -3,7 +3,7 @@
 // CHR-940: the inert backdrop layer contributes no selectable, commentable or flow targets. The fixture has the shape the renderer emits (render.ts): the layer is anonymous — no `id`, no `data-flow-*` — but keeps the other screen's `data-unresolved-*` markers. Being `inert` + `pointer-events:none`, a click on the backdrop area lands on the overlay root, which is what these tests click.
 import { describe, it, expect, vi } from "vitest";
 import { applyFlowMode } from "./flows.js";
-import { applyCommentMode } from "./comments.js";
+import { commentTarget } from "./comment-canvas.js";
 import { applyInspectMode } from "./inspector.js";
 import { findDiagnostics } from "./warnings.js";
 
@@ -38,17 +38,12 @@ describe("backdrop layer", () => {
     cleanup();
   });
 
-  it("comment mode: the layer has nothing to anchor to or mark, own nodes and the root do", () => {
+  it("comment mode: the layer has nothing to anchor to, own nodes and the root do", () => {
     const doc = makeDoc();
-    const onSelect = vi.fn();
-    const cleanup = applyCommentMode(doc, true, new Set(["own-btn"]), onSelect);
-    expect(doc.getElementById("own-btn").getAttribute("style")).toContain("outline");
-    expect(doc.querySelector("[data-backdrop-layer]").querySelector("[style*=outline]")).toBeNull();
-    click(doc.getElementById("own-btn"));
-    expect(onSelect).toHaveBeenLastCalledWith("own-btn");
-    click(doc.getElementById("sheet-root"));
-    expect(onSelect).toHaveBeenLastCalledWith(null);
-    cleanup();
+    expect(commentTarget(doc, doc.getElementById("own-btn"))?.id).toBe("own-btn");
+    expect(commentTarget(doc, doc.getElementById("sheet-root"))?.id).toBeNull();
+    // A node inside the inert layer resolves to the overlay root, never to the other screen's content.
+    expect(commentTarget(doc, doc.querySelector(".bd-btn"))?.id).toBeNull();
   });
 
   it("inspect mode: own nodes stay selectable, the backdrop area behaves like the empty root", () => {

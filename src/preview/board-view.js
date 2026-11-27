@@ -6,7 +6,9 @@
 // don't carry comment listeners at all, so toggling comment mode has no
 // effect while the board is showing (app.js falls back to "none" when
 // switching views away from a mode the new view doesn't support, except it
-// keeps flow mode since the board does support that).
+// keeps flow mode since the board does support that). The comment pins on the
+// board (CHR-1264, board-comments.js) are a read-only overlay in the parent
+// document that measures tiles through commentGeometry().
 
 import { fetchRender } from "./api.js";
 import { applyFlowMode } from "./flows.js";
@@ -79,6 +81,9 @@ const ZOOM_GESTURE_QUIET_MS = 150;
  *   last zoom applied" bookkeeping, since a grid-shape change can leave a
  *   previously-exact `lastFitAllZoom` no longer matching what Fit all would
  *   compute now.
+ *   `onLayout` (CHR-1264) fires after every change of tile geometry or zoom
+ *   (relayout and setZoom) — the read-only comment overlay re-measures its
+ *   markers from it; it never writes into a tile.
  *   `onTogglePin` (CHR-624) fires when a tile's pin button is clicked —
  *   app.js owns the actual pin/unpin write (setBoardState) and the
  *   resulting SSE broadcast is what actually changes what's pinned; this
@@ -99,6 +104,7 @@ export function createBoardView({
   emptyStateBodyEl,
   onZoomChange,
   onRelayout,
+  onLayout,
   onTogglePin,
   onToggleCluster,
 }) {
@@ -301,6 +307,7 @@ export function createBoardView({
     applyZoomDependentTileChrome();
     drawEdges();
     onRelayout?.();
+    onLayout?.();
   }
 
   /**
@@ -394,6 +401,7 @@ export function createBoardView({
       applyZoomSizing();
       applyZoomDependentTileChrome();
     }
+    onLayout?.();
     onZoomChange?.(zoom, source);
   }
 
@@ -409,6 +417,43 @@ export function createBoardView({
       computeFitAllZoom(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, { ...gridOptions(), columns: currentColumns }),
       { source: "fitall" },
     );
+  }
+
+  /**
+   * Zooms to one tile and centres it — a group comment pin's click (CHR-1264).
+   * Zooms in: to at least 100 % and 1.5x the current zoom, more when the tile needs it to fill the surface (the 200 % cap applies); never out.
+   * @param {string} screen
+   */
+  function zoomToTile(screen) {
+    const tile = findTile(layout.tiles, screen);
+    if (!tile) return;
+    const room = 2 * BASE_PADDING;
+    const fit = Math.min(surfaceEl.clientWidth / (tile.width + room), surfaceEl.clientHeight / (tile.height + room)) * 100;
+    setZoom(Math.max(100, zoom * 1.5, fit));
+    const scale = zoom / 100;
+    const { left, top } = computeCenterScroll(
+      { x: tile.x * scale, y: tile.y * scale, width: tile.width * scale, height: tile.height * scale },
+      surfaceEl.clientWidth,
+      surfaceEl.clientHeight,
+      layout.contentWidth * scale,
+      layout.contentHeight * scale,
+    );
+    surfaceEl.scrollLeft = left;
+    surfaceEl.scrollTop = top;
+  }
+
+  /**
+   * What the read-only comment overlay measures against (CHR-1264): the zoom,
+   * every tile's base-layout box, and each tile's rendered document — read
+   * like flow edges read their elements, never written to.
+   * @returns {{ zoom: number, tiles: { screen: string, x: number, y: number, width: number, height: number, naturalWidth: number }[], docOf: (screen: string) => Document | null }}
+   */
+  function commentGeometry() {
+    return {
+      zoom,
+      tiles: layout.tiles.map((t) => ({ screen: t.screen, x: t.x, y: t.y, width: t.width, height: t.height, naturalWidth: t.naturalWidth })),
+      docOf: (screen) => iframesByScreen.get(screen)?.contentDocument ?? null,
+    };
   }
 
   function setEdgesVisible(visible) {
@@ -853,6 +898,8 @@ export function createBoardView({
     setFlowMode,
     setZoom,
     fitAll,
+    zoomToTile,
+    commentGeometry,
     setEdgesVisible,
     // CHR-623 review finding 7: switching TO an already-built board tab
     // must relayout immediately, not through scheduleRelayout's coalescing

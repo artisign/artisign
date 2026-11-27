@@ -90,7 +90,7 @@ export function modeToggleStates({ view, showMockup, comparing }) {
   const unavailable = "Not available while comparing variants";
   return {
     flow: { disabled: showMockup || view === "usecases", title: comparing ? "Leaves Compare and follows flows in Single" : "" },
-    comment: { disabled: view === "board" || view === "usecases" || showMockup || comparing, title: comparing ? unavailable : "" },
+    comment: { disabled: view === "board" || view === "design-system" || view === "usecases" || comparing, title: comparing ? unavailable : "" },
     inspect: { disabled: view === "board" || view === "usecases" || showMockup || comparing, title: comparing ? unavailable : null },
   };
 }

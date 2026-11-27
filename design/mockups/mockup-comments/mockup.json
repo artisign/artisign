@@ -1,0 +1,25 @@
+{
+  "variants": [
+    {
+      "id": "b1-pins-in-columns",
+      "title": "B1 · Pins in every column, thread open",
+      "description": "The canvas comment model applied to the column compare view as it is. Every column renders its variant's pins over the frame (same comment-pin, Human blue, Agent violet); detached pins stack dashed amber at the frame's top-left, resolved pins show grey with a check while Show resolved is on. Thread numbers run across the whole mockup (#1–#5) so \"#3\" is unique in a discussion. The popover opens next to the pin and may cover the neighbouring column (placement right, left, below, above as on the canvas); its header names the variant and the node (C · total-row). Column headers (chrome, counter-scaled) carry the variant's count chips; the Context panel keeps the count row for the whole mockup. The floating comment toolbar is the same as on a screen. Trade-off: no new concept, all variants comparable at a glance, but with many threads and narrow columns pins crowd the frames and an open popover hides part of the next variant."
+    },
+    {
+      "id": "b1-comment-mode",
+      "title": "B1 · Comment mode across all columns, new thread",
+      "description": "Comment mode in B1. C or the Comment button in the floating toolbar turns it on for every column at once; the blue hint bar names Esc. Hover outlines an element in any variant and labels it with variant letter and node id (C · item-3); column headers are chrome and never selectable. A click opens the new-thread popover at that element; here it flips to the left because the column is at the right edge, covering part of column B. Existing pins dim while the mode is on. The thread anchors to variant C's element, so it never shows in A or B even if they contain an element with the same id. Trade-off: one mode for the whole mockup, identical to the canvas, but a popover can cover the variant you want to compare against."
+    },
+    {
+      "id": "b2-focus-column",
+      "title": "B2 · Comment on one focused column at a time",
+      "description": "Comments belong to one variant at a time. Each column header gets a Comment button with the variant's count; clicking it (or C while the pointer is over a column) focuses that column: the others dim to 45%, hide their pins and keep only their count chips, which switch focus with one click. Comment mode, pins and popovers then work only in the focused column, and a popover may lie over a dimmed neighbour without hiding anything you are reviewing. Shown here: B focused, Show resolved on, resolved thread #6 open with the Resolved badge and Reopen. Esc leaves the focus and restores all columns. Trade-off: no clutter and no covered variants, an explicit \"which option am I talking about\", but one extra click and pins of two variants are never visible side by side."
+    }
+  ],
+  "tags": [
+    "chr-1260",
+    "chr-1261"
+  ],
+  "title": "Mockup comments: directions",
+  "description": "CHR-1261 phase 1. Commenting on elements of mockup variants in the column compare view. B1 pins in every column with one comment mode for all columns (two states: thread open, comment mode + new thread). B2 one focused column at a time (resolved thread shown). Detached, resolved, none and open appear across the variants. Use cases: comment-on-mockup-variant, discuss-mockup-thread, agent-answers-mockup-comments."
+}

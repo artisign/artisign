@@ -4,7 +4,8 @@
   "group": "review",
   "tags": [
     "chr-1120",
-    "chr-1160"
+    "chr-1160",
+    "CHR-1258"
   ],
   "status": "ready",
   "personas": [
@@ -19,7 +20,7 @@
     "via": "browser preview"
   },
   "goal": "The note is anchored to the exact element for the agent.",
-  "outcome": "An open comment on the node, listed in the Comments panel.",
+  "outcome": "An open comment on the node, shown as a pin on the canvas.",
   "inputs": [
     {
       "object": "screen",
@@ -44,18 +45,18 @@
     {
       "id": "add",
       "actor": "designer-dana",
-      "action": "Chooses Add comment in the Comments panel",
+      "action": "Turns on comment mode with the comment icon in the top bar or the C key",
       "target": {
         "screen": "app-shell",
-        "node": "comments-header"
+        "node": "mode-comment"
       }
     },
     {
       "id": "pick-node",
       "actor": "designer-dana",
-      "action": "Clicks the element in the frame to anchor the comment",
+      "action": "Clicks the element in the frame and writes the comment in the popover",
       "target": {
-        "screen": "comments-panel"
+        "screen": "comments-mode-new"
       }
     },
     {

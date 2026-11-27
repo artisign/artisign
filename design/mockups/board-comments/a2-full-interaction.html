@@ -1,0 +1,140 @@
+<style>
+*{box-sizing:border-box}
+.app{width:1440px;height:900px;background:#e8e6e2;font:13px/1.4 system-ui,-apple-system,'Segoe UI',sans-serif;color:#1d1c1a;display:flex;flex-direction:column;overflow:hidden;position:relative}
+button{font:inherit;color:inherit;cursor:pointer}
+.top{height:44px;flex:none;background:#fbfaf9;border-bottom:1px solid #e3e0db;display:flex;align-items:center;gap:14px;padding:0 12px}
+.logo{font-weight:700;font-size:14px}
+.proj{height:28px;padding:0 10px;border:0;border-radius:6px;background:none}
+.vr{width:1px;height:18px;background:#e3e0db}
+.tab{color:#6b6863;height:44px;display:inline-flex;align-items:center;border:0;background:none;padding:0 2px;font-size:13px}
+.tab.on{color:#1d1c1a;box-shadow:inset 0 -2px 0 #1d1c1a}
+.sp{flex:1}
+.ib{width:28px;height:28px;border:0;border-radius:6px;background:none;color:#6b6863;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.ib.on{background:#dcf0ed;color:#0f8a7e}
+.live{display:inline-flex;align-items:center;gap:6px;color:#6b6863;font-size:12px}
+.live i{width:7px;height:7px;border-radius:4px;background:#16a34a}
+.tbar{height:40px;flex:none;background:#fbfaf9;border-bottom:1px solid #e3e0db;display:flex;align-items:center;gap:8px;padding:0 16px}
+.tb{height:28px;padding:0 10px;border:1px solid #d1cec8;border-radius:6px;background:#fff;display:inline-flex;align-items:center;gap:6px;font-size:12.5px}
+.sl{width:140px;height:4px;border-radius:2px;background:#e2dfda;position:relative}
+.sl b{position:absolute;left:0;top:0;height:4px;border-radius:2px;background:#0f8a7e}
+.sl i{position:absolute;top:-4px;width:12px;height:12px;border-radius:6px;background:#0f8a7e;border:2px solid #fff;box-shadow:0 0 0 1px #0f8a7e}
+.stat{font-size:12px;color:#9a968f}
+.body{flex:1;display:flex;min-height:0}
+.side{width:264px;flex:none;background:#f4f3f0;border-right:1px solid #e3e0db}
+.sh{height:40px;display:flex;align-items:center;padding:0 12px;font-weight:600;border-bottom:1px solid #e3e0db}
+.field{margin:12px 8px 6px;height:28px;border-radius:6px;background:#efede9;color:#9a968f;display:flex;align-items:center;padding:0 10px;font-size:12px}
+.meta{font-size:11px;color:#9a968f;padding:0 10px 10px;border-bottom:1px solid #e3e0db}
+.row{display:flex;align-items:center;gap:8px;height:34px;margin:2px 8px;padding:0 8px;border-radius:6px}
+.row .n{flex:1}.row .c{font-size:11px;color:#9a968f}
+.pb{width:22px;height:22px;border-radius:6px;border:1px solid #d1cec8;background:#fff;color:#9a968f;display:inline-flex;align-items:center;justify-content:center;padding:0;flex:none}
+.pb.pn{background:#0f8a7e;border-color:#0f8a7e;color:#fff}
+.cv{flex:1;position:relative;overflow:hidden}
+.tile{position:absolute;width:250px;background:#fff;border:1px solid #d1cec8;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05),0 6px 16px rgba(40,30,20,.06)}
+.tile>.pb{position:absolute;top:-9px;right:-9px}
+.thumb{height:232px;background:#fafaf8;border-bottom:1px solid #e3e0db;border-radius:8px 8px 0 0;position:relative}
+.ph{position:absolute;left:72px;top:10px;width:104px;height:212px;background:#fff;border:1px solid #e3e0db;border-radius:8px;padding:10px 8px;display:flex;flex-direction:column;gap:6px}
+.ph i{display:block}
+.ph .h{height:8px;width:55%;background:#d9d6d0;border-radius:2px;margin-bottom:6px}
+.ph .r{height:26px;background:#f3f1ed;border:1px solid #ebe8e3;border-radius:4px}
+.ph .bt{margin-top:auto;height:18px;background:#2a3edb;border-radius:4px}
+.ph .hl{outline:2px solid #2563eb;outline-offset:1px}
+.ph .hv{outline:1.5px dashed #2563eb;outline-offset:1px;background:#eef2ff}
+.nm{height:34px;display:flex;align-items:center;gap:6px;padding:0 10px;font-size:12px}
+.cc{margin-left:auto;display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:600;background:#e6edfd;color:#1d4ed8;border:0}
+.cc+.cc{margin-left:0}
+.cc.dt{background:#fdf1e0;color:#92400e}
+.cc.rs{background:#efede9;color:#6b6863}
+.pin{position:absolute;width:24px;height:24px;border-radius:12px 12px 12px 4px;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.28);padding:0;z-index:3}
+.hu{background:#2563eb}.ag{background:#7c3aed}.rsp{background:#a8a49d}
+.dtp{background:#fff;color:#b45309;border:2px dashed #f59e0b}
+.act{box-shadow:0 0 0 4px rgba(37,99,235,.35),0 1px 4px rgba(0,0,0,.28)}
+.grp{position:absolute;height:24px;min-width:30px;padding:0 7px;border-radius:12px;background:#1d1c1a;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.28);z-index:3}
+.pop{position:absolute;width:320px;background:#fff;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,.07),0 10px 28px rgba(40,30,20,.14);font-size:12.5px;z-index:10}
+.phd{height:40px;display:flex;align-items:center;gap:6px;padding:0 6px 0 12px;border-bottom:1px solid #e3e0db}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:#efede9;color:#6b6863;padding:1px 6px;border-radius:4px}
+.msg{padding:10px 12px 8px;border-bottom:1px solid #efede9}
+.who{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.av{width:20px;height:20px;border-radius:10px;color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.bd{font-size:10px;padding:0 5px;border-radius:3px;line-height:16px}
+.bh{background:#dfe4ff;color:#2a3edb}.ba{background:#ede5ff;color:#6d28d9}
+.tm{margin-left:auto;font-size:11px;color:#9a968f}
+.tx{padding-left:26px}
+.rep{display:flex;gap:6px;padding:10px 12px 6px}
+.inp{flex:1;min-height:32px;border-radius:6px;border:1px solid #d1cec8;background:#efede9;color:#9a968f;display:flex;align-items:center;padding:6px 10px;font-size:12px}
+.inp.on{background:#fff;border-color:#2563eb;color:#1d1c1a;align-items:flex-start;min-height:56px}
+.send{width:32px;height:32px;border-radius:6px;border:0;background:#2563eb;color:#fff;display:inline-flex;align-items:center;justify-content:center}
+.hint{font-size:11px;color:#9a968f;padding:0 12px 10px}
+.ctb{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);display:flex;align-items:center;gap:4px;padding:4px;background:#fff;border-radius:10px;box-shadow:0 0 0 1px rgba(0,0,0,.07),0 10px 28px rgba(40,30,20,.14);z-index:8}
+.ctb .ib{width:32px;height:32px}
+.ctb .pr{background:#e2dfda;color:#1d1c1a}
+.tt{border:0;background:none;color:#6b6863;padding:0 10px;height:32px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;font-size:12.5px}
+.tt.on{color:#1d1c1a}
+.vs{width:1px;height:20px;background:#e3e0db;margin:0 4px}
+.ann{position:absolute;border:1px dashed #b8b3ab;border-radius:10px;background:rgba(251,250,249,.55)}
+.ann>.at{position:absolute;left:12px;top:-10px;background:#e8e6e2;padding:0 6px;font-size:11.5px;color:#6b6863}
+.hb{position:absolute;display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:999px;background:#2563eb;color:#fff;font-size:12px;white-space:nowrap}
+.kb{font-size:10.5px;padding:0 5px;border-radius:3px;background:rgba(255,255,255,.22)}
+.nl{position:absolute;font-family:ui-monospace,Menlo,monospace;font-size:10px;background:#2563eb;color:#fff;padding:1px 5px;border-radius:3px;z-index:4}
+.btn{height:28px;padding:0 12px;border-radius:6px;border:1px solid #d1cec8;background:#fff;font-size:12px}
+.btn.pri{background:#1d1c1a;border-color:#1d1c1a;color:#fbfaf9}
+</style>
+<div class="app">
+<div class="top"><span class="logo">artisign</span><button class="proj">artisign-ui</button><span class="vr"></span>
+<button class="tab">Screens</button><button class="tab">Design System</button><button class="tab on">Board</button><button class="tab">Use Cases</button><span class="vr"></span><span class="live">Follow</span>
+<span class="sp"></span>
+<button class="ib" aria-label="Comment mode (C)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></button>
+<button class="ib" aria-label="Theme"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 4v16"/></svg></button><span class="live"><i></i>Live</span></div>
+<div class="tbar"><button class="tb">Fit all</button><button class="tb">100%</button><span class="vr"></span><button class="tb" style="width:28px;padding:0;justify-content:center">−</button><span class="sl"><b style="width:84px"></b><i style="left:78px"></i></span><button class="tb" style="width:28px;padding:0;justify-content:center">+</button><span style="font-size:12.5px">170%</span><button class="tb">Edges: Off</button>
+<span class="sp"></span><span class="stat">6 shown · 17 open comments · 1 detached · 2 resolved</span></div>
+<div class="body">
+<div class="side"><div class="sh">Screens</div><div class="field">Search screens, mockups and tags</div><div class="meta">6 screens · 6 on board</div>
+<div class="row"><span class="n">cart-l2</span><span class="c">10</span><span class="pb pn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">dashboard</span><span class="c">9</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">menu-today</span><span class="c">37</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">order-l3</span><span class="c">8</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">drink-l3</span><span class="c">3</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+<div class="row"><span class="n">cafes-l2</span><span class="c">1</span><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span></div>
+</div>
+<div class="cv">
+<div class="tile" style="left:32px;top:32px"><span class="pb pn"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r hl"></i><i class="r"></i><i class="bt"></i></div>
+<button class="pin ag" style="left:155px;top:29px">3</button><button class="pin hu act" style="left:155px;top:61px" aria-expanded="true">2</button><button class="pin hu" style="left:155px;top:181px">1</button></div>
+<div class="nm">cart-l2<span class="cc">3</span></div></div>
+<div class="pop" style="left:225px;top:85px" role="dialog" aria-label="Comment 2 on item-2-name">
+<div class="phd"><b>#2</b><span class="mono">item-2-name</span><span class="sp"></span>
+<button class="ib" aria-label="Resolve"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12l5 5L20 7"/></svg></button>
+<button class="ib" aria-label="More"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
+<button class="ib" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<div class="msg"><div class="who"><span class="av" style="background:#2563eb">YO</span><b>You</b><span class="bd bh">Human</span><span class="tm">2h</span></div><div class="tx">Long names wrap to two lines and push the quantity down. Can we clamp the name to one line?</div></div>
+<div class="msg"><div class="who"><span class="av" style="background:#7c3aed">UX</span><b>ux-agent</b><span class="bd ba">Agent</span><span class="tm">1h</span></div><div class="tx">Done as a proposal: one line with an ellipsis, the full name in the item sheet.</div></div>
+<div class="rep"><div class="inp">Reply, @ to mention an agent</div><button class="send" aria-label="Send"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12l16-8-6 16-2-7-8-1z"/></svg></button></div>
+<div class="hint">Enter to send · Shift+Enter for a new line · Esc to close</div></div>
+<div class="tile" style="left:312px;top:32px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div></div><div class="nm">dashboard</div></div>
+<div class="tile" style="left:592px;top:32px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div>
+<button class="pin hu" style="left:155px;top:29px">1</button><button class="grp" style="left:146px;top:76px" aria-label="10 comments overlap here, zoom in to separate them">10</button><button class="pin ag" style="left:155px;top:181px">12</button></div>
+<div class="nm">menu-today<span class="cc">12</span></div></div>
+<div class="tile" style="left:872px;top:32px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div>
+<button class="pin dtp" style="left:58px;top:2px" aria-label="Comment 2, detached">2</button><button class="pin hu" style="left:155px;top:93px">1</button></div>
+<div class="nm">order-l3<span class="cc">1</span><span class="cc dt">1 detached</span></div></div>
+<div class="tile" style="left:32px;top:330px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div>
+<button class="pin rsp" style="left:155px;top:29px" aria-label="Comment 1, resolved"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button><button class="pin rsp" style="left:155px;top:181px" aria-label="Comment 2, resolved"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg></button></div>
+<div class="nm">drink-l3<span class="cc rs">2 resolved</span></div></div>
+<div class="tile" style="left:312px;top:330px"><span class="pb"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg></span>
+<div class="thumb"><div class="ph"><i class="h"></i><i class="r"></i><i class="r"></i><i class="bt"></i></div></div><div class="nm">cafes-l2</div></div>
+<div class="ann" style="left:600px;top:340px;width:540px;height:380px"><span class="at">Comment mode on the Board (C), at 100% zoom or more</span>
+<span class="hb" style="left:24px;top:24px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Comment mode — click an element in a tile to start a thread<span class="kb">Esc</span>to exit</span>
+<div class="tile" style="left:24px;top:72px;width:200px"><div class="thumb" style="height:200px"><div class="ph" style="left:48px;top:8px;height:184px"><i class="h"></i><i class="r"></i><i class="r"></i><i class="r hv"></i><i class="bt"></i></div><span class="nl" style="left:58px;top:94px">item-3-name</span></div><div class="nm">cafes-l2</div></div>
+<div class="pop" style="left:240px;top:72px;width:276px;position:absolute"><div class="phd"><b>New thread</b><span class="mono">item-3-name</span><span class="sp"></span><button class="ib" aria-label="Discard"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<div style="padding:10px 12px"><div class="inp on">The distance is missing next to the name</div></div>
+<div style="display:flex;align-items:center;gap:6px;padding:0 12px 12px"><span style="font-size:11px;color:#9a968f;flex:1">Enter to send</span><button class="btn">Cancel</button><button class="btn pri">Comment</button></div></div>
+<div style="position:absolute;left:24px;right:24px;bottom:16px;font-size:11.5px;color:#6b6863;line-height:1.5">Below 100% the Comment button is disabled: “Zoom to 100% to comment”. Pins then merge into one count dot per tile; a click on a dot zooms to the tile and opens its first thread.</div>
+</div>
+<div class="ctb" role="toolbar" aria-label="Comment tools">
+<button class="ib pr" aria-label="Select (V)" aria-pressed="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3l14 8-6 2-2 6z"/></svg></button>
+<button class="ib" aria-label="Comment (C)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></button>
+<span class="vs"></span><button class="tt on" aria-pressed="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5L20 7"/></svg>Show resolved</button><button class="tt">Hide pins</button></div>
+</div></div></div>

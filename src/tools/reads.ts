@@ -25,7 +25,7 @@ import { backdropHint, rootBackdrop } from "./backdrop.js";
 import { renderScreenDocument, describeViewport } from "./render-context.js";
 import { parseNodeRef, formatNodeRef } from "./node-ref.js";
 import { readAllFlows, readScreenFlows, toPublicFlowRecord } from "./flows.js";
-import { readCommentRecords, readCommentRecordsWithStats, groupThreads, threadStatus, toPublicComment, type CommentRecord } from "./comments.js";
+import { readCommentRecords, readCommentRecordsWithStats, groupThreads, threadStatus, toPublicComment, detachedRootIds, isMockupTarget, type CommentRecord } from "./comments.js";
 import { selectFields } from "./fields.js";
 import { variantLinks, variantFields } from "./variants.js";
 import { isValidTagName } from "./name-validation.js";
@@ -152,8 +152,11 @@ export async function getProject(store: Store, input: GetProjectInput): Promise<
   const openThreads = groupThreads(commentRecords).filter((t) => threadStatus(t) === "open");
   const openCommentCount = openThreads.length;
   const openCommentCountByScreen = new Map<string, number>();
+  const openCommentCountByMockup = new Map<string, number>();
   for (const thread of openThreads) {
-    openCommentCountByScreen.set(thread.root.screen, (openCommentCountByScreen.get(thread.root.screen) ?? 0) + 1);
+    const root = thread.root;
+    if (isMockupTarget(root)) openCommentCountByMockup.set(root.mockup, (openCommentCountByMockup.get(root.mockup) ?? 0) + 1);
+    else openCommentCountByScreen.set(root.screen, (openCommentCountByScreen.get(root.screen) ?? 0) + 1);
   }
 
   // Only a project that has use cases carries the count, so one without a usecases/ folder answers byte-identically.
@@ -239,7 +242,9 @@ export async function getProject(store: Store, input: GetProjectInput): Promise<
   let mockups = await Promise.all(
     mockupNames.map(async (name) => {
       const meta = await readMockupMetaOrDefault(store, name);
-      return { mockup: name, variant_count: meta.variants.length, tags: meta.tags ?? [] };
+      // Only a mockup with open threads carries the count, so a project without mockup comments answers byte-identically (ADR-012).
+      const open = openCommentCountByMockup.get(name) ?? 0;
+      return { mockup: name, variant_count: meta.variants.length, tags: meta.tags ?? [], ...(open > 0 ? { open_comment_count: open } : {}) };
     }),
   );
   if (input.tags && input.tags.length > 0) {
@@ -310,7 +315,7 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
     }),
   ]);
   const openCommentCount = groupThreads(commentRecords).filter(
-    (t) => t.root.screen === input.screen && threadStatus(t) === "open",
+    (t) => !isMockupTarget(t.root) && t.root.screen === input.screen && threadStatus(t) === "open",
   ).length;
 
   const summary: Record<string, unknown> = {
@@ -378,7 +383,7 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
     if (reachedFrom.size > 0) full.reached_from = [...reachedFrom].sort();
   }
   if (input.fields?.includes("comments")) {
-    full.comments = commentsForScreen(commentRecords, input.screen, true);
+    full.comments = commentsForScreen(commentRecords, input.screen, true, doc.nodes);
   }
   if (input.fields?.includes("rendered_html")) {
     // Only rendered on explicit request — a resolved DOM is far heavier
@@ -395,11 +400,13 @@ export async function getScreen(store: Store, input: GetScreenInput): Promise<Re
   return selectFields(full, SCREEN_ALWAYS, SCREEN_FIELDS, fields);
 }
 
-function commentsForScreen(records: CommentRecord[], screen: string, includeReplies: boolean): PublicComment[] {
-  const threads = groupThreads(records).filter((t) => t.root.screen === screen);
+function commentsForScreen(records: CommentRecord[], screen: string, includeReplies: boolean, nodes: Record<string, unknown>): PublicComment[] {
+  const threads = groupThreads(records).filter((t) => !isMockupTarget(t.root) && t.root.screen === screen);
   const out: PublicComment[] = [];
   for (const thread of threads) {
-    out.push(toPublicComment(thread.root, thread.replies.length));
+    const nodeId = thread.root.node_id?.slice(screen.length + 1);
+    const detached = nodeId !== undefined && nodes[nodeId] === undefined;
+    out.push(toPublicComment(thread.root, thread.replies.length, { status: thread.status, detached }));
     if (includeReplies) {
       for (const reply of thread.replies) out.push(toPublicComment(reply, 0));
     }
@@ -521,7 +528,7 @@ export async function getNode(store: Store, input: GetNodeInput): Promise<Record
       const commentRecords = await readCommentRecords(store);
       const threads = groupThreads(commentRecords).filter((t) => t.root.node_id === input.node);
       full.comments = threads.flatMap((t) => [
-        toPublicComment(t.root, t.replies.length),
+        toPublicComment(t.root, t.replies.length, { status: t.status, detached: false }),
         ...t.replies.map((r) => toPublicComment(r, 0)),
       ]);
     }
@@ -787,8 +794,10 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
   const registry = await loadRegistry(store);
   const [commentRecords, flowRecords] = await Promise.all([readCommentRecords(store), readAllFlows(store)]);
   const commentedNodes = new Map<string, boolean>();
-  for (const record of commentRecords) {
-    if (record.node_id) commentedNodes.set(record.node_id, true);
+  // Current anchors only (CHR-1249): a re-anchored thread marks its new node, a deleted one none.
+  for (const thread of groupThreads(commentRecords)) {
+    if (isMockupTarget(thread.root)) continue; // mockups stay outside find_nodes (ADR-012)
+    if (thread.root.node_id) commentedNodes.set(thread.root.node_id, true);
   }
   const flowFroms = new Set(flowRecords.map((f) => f.from));
 
@@ -898,14 +907,25 @@ export async function findNodes(store: Store, input: FindNodesInput): Promise<Re
 
 export type ListCommentsInput = {
   screen?: string;
+  mockup?: string;
+  variant?: string;
   node?: string;
-  status?: "open" | "resolved" | "any";
+  status?: "open" | "resolved" | "detached" | "any";
   include_replies?: boolean;
   cursor?: string;
   limit?: number;
 };
 
+/**
+ * Threads with their CURRENT anchor (CHR-1254): every root carries `screen`
+ * (or, for a mockup thread, `mockup` and `variant`, ADR-012) and `node` (the
+ * same node ref get_node/find_nodes/patch_html use),
+ * `detached: true` when that node no longer exists, and `agent` on agent
+ * comments. `status: "detached"` lists the open threads that lost their node.
+ */
 export async function listComments(store: Store, input: ListCommentsInput): Promise<Record<string, unknown>> {
+  if (input.screen !== undefined && input.mockup !== undefined) throw new ToolError("validation_failed", "pass either screen or mockup, not both");
+  if (input.variant !== undefined && input.mockup === undefined) throw new ToolError("validation_failed", "variant needs mockup");
   const status = input.status ?? "open";
   const includeReplies = input.include_replies ?? false;
   const limit = input.limit ?? 50;
@@ -916,15 +936,20 @@ export async function listComments(store: Store, input: ListCommentsInput): Prom
   if (input.node) {
     threads = threads.filter((t) => t.root.node_id === input.node);
   } else if (input.screen) {
-    threads = threads.filter((t) => t.root.screen === input.screen);
+    threads = threads.filter((t) => !isMockupTarget(t.root) && t.root.screen === input.screen);
+  } else if (input.mockup) {
+    threads = threads.filter((t) => isMockupTarget(t.root) && t.root.mockup === input.mockup && (input.variant === undefined || t.root.variant === input.variant));
   }
-  if (status !== "any") {
+  const detached = await detachedRootIds(store, threads);
+  if (status === "detached") {
+    threads = threads.filter((t) => threadStatus(t) === "open" && detached.has(t.root.id));
+  } else if (status !== "any") {
     threads = threads.filter((t) => threadStatus(t) === status);
   }
 
   const flattened: PublicComment[] = [];
   for (const thread of threads) {
-    flattened.push(toPublicComment(thread.root, thread.replies.length));
+    flattened.push(toPublicComment(thread.root, thread.replies.length, { status: thread.status, detached: detached.has(thread.root.id) }));
     if (includeReplies) {
       for (const reply of thread.replies) flattened.push(toPublicComment(reply, 0));
     }

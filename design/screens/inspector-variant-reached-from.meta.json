@@ -1,5 +1,5 @@
 {
-  "notes": "Inspector Elements tab for a variant that is reachable from several screens. Approved model \"one parent, other entries are plain edges\" (mockup `variants-multi-parent` / `one-parent-edges`), implemented in CHR-732.\n\n- A variant has exactly one home (`variant_of`); every other screen that opens it is an ordinary flow edge.\n- Two cards at the top of the Elements tab: `Also reached from · N flow sources` (each source is a link) and the `Variant` card (Path, Kind, Depth, Siblings, Flows in / out). Both are `$variant-card` instances; the rows are plain text in the `body` slot.\n- The card list replaces the mockup's stand-alone card beside the phone; the sidebar lists the variant once under its home.\n- Link targets are intentionally not wired as flows: the sources named here are illustrative and not screens of this project.",
+  "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Inspect panel on the variant `home` › `empty`, root node selected.\n\n- Same model as before (one parent, other entries are plain edges), now as two `info-card`s at the top of the Inspect panel: `Variant` (Path with a link to the root, Depth, Siblings, Flows) and `Also reached from` (two links). `info-card` replaces the uppercase `variant-card` in the new chrome.\n- `variant-path-root` flows to `app-shell` (replaces the old `bar` flow, whose node no longer exists). The two \"Also reached from\" links stay unwired on purpose (illustrative sources).\n- Canvas shows `stand-in-orders` `empty`, tree in `stand-in-screen-tree` `empty-selected`, `inspect-outline` around the root. Close flows to `screen-view-variant-breadcrumb`.\n\n---\nEarlier notes (history):\n\nInspector Elements tab for a variant that is reachable from several screens. Approved model \"one parent, other entries are plain edges\" (mockup `variants-multi-parent` / `one-parent-edges`), implemented in CHR-732.\n\n- A variant has exactly one home (`variant_of`); every other screen that opens it is an ordinary flow edge.\n- Two cards at the top of the Elements tab: `Also reached from · N flow sources` (each source is a link) and the `Variant` card (Path, Kind, Depth, Siblings, Flows in / out). Both are `$variant-card` instances; the rows are plain text in the `body` slot.\n- The card list replaces the mockup's stand-alone card beside the phone; the sidebar lists the variant once under its home.\n- Link targets are intentionally not wired as flows: the sources named here are illustrative and not screens of this project.",
   "tags": [
     "chr-727",
     "chr-736",
@@ -8,7 +8,8 @@
     "chr-739",
     "CHR-905",
     "CHR-909",
-    "chr-1068"
+    "chr-1068",
+    "chr-1257"
   ],
   "variant_of": "inspector-selected",
   "variant_kind": "state"

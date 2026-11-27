@@ -1,10 +1,11 @@
 {
-  "notes": "The Context panel carrying a review thread. A reply is indented by one spacing step and sits on the subtle surface, so a human comment and an agent's answer are distinguishable at a glance.",
+  "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** The Comments tool open on `home` default.\n\n- Tool bar: `comments-header` pressed; pressing it again (flow) returns to `app-shell`.\n- Right column: the Agent bar folds to `agent-bar-folded` (live status stays visible) and the Comments panel opens below it as a `float-card`. Close (`comments-close`) flows back to `app-shell`. This is the panel convention for every tool panel (Comments, Inspect, Compare), see decision `chr1257-tool-panels-fold-agent-bar`.\n- Panel: Open / Resolved `seg-tabs`; the selected thread (pin 1) is expanded with `comment-entry` (human) and `comment-entry` `agent` (indented reply on the agent tint), a ref chip to the commented node, a native `<input>` reply field and Resolve. Other threads collapse to `comment-summary`.\n- Canvas: `comment-pin` markers on the frame, pin 1 `selected` with the commented node outlined.\n- Intended drift: 34px equals `size.float-control` by coincidence (reply field height).\n\n---\nEarlier notes (history):\n\nThe Context panel carrying a review thread. A reply is indented by one spacing step and sits on the subtle surface, so a human comment and an agent's answer are distinguishable at a glance.",
   "tags": [
     "review",
     "chr-739",
     "CHR-905",
-    "CHR-909"
+    "CHR-909",
+    "chr-1257"
   ],
   "variant_of": "app-shell",
   "variant_kind": "state"

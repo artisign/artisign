@@ -1,12 +1,13 @@
 {
-  "notes": "",
+  "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Dark theme of `shell-empty-project`: identical markup (shared `get-started-card`), the root binds `--chrome-*` from `chrome-dark.*`. The fold button `screens-collapse` keeps its flow to `sidebars-collapsed`.",
   "tags": [
     "CHR-905",
     "shell",
     "empty-state",
     "chr-889",
     "CHR-909",
-    "chr-1004"
+    "chr-1004",
+    "chr-1257"
   ],
   "variant_of": "shell-empty-project",
   "variant_kind": "state"

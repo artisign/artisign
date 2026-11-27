@@ -1,5 +1,5 @@
 {
-  "notes": "",
+  "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Dark theme of `screen-view-variant-breadcrumb`: identical markup, the root binds `--chrome-*` from `chrome-dark.*`. The user-screen frame stays light (never themed). Flows from the light twin point to `chrome-c-shell-dark` here, so the dark path stays dark.",
   "tags": [
     "CHR-905",
     "chr-727",
@@ -8,7 +8,8 @@
     "view",
     "chr-739",
     "CHR-909",
-    "chr-1068"
+    "chr-1068",
+    "chr-1257"
   ],
   "variant_of": "screen-view-variant-breadcrumb",
   "variant_kind": "state"

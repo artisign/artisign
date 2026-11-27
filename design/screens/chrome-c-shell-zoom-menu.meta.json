@@ -1,10 +1,11 @@
 {
-  "notes": "CHR-905 direction C: zoom dropdown open (trigger in `open` state) with the browser-safe shortcut hints (Shift+1 Fit, Shift+5 50%, Shift+0 100%, Shift+2 200%, + / - step). Full table: decision chr905-shortcuts.",
+  "notes": "**CHR-1257 phase 2a, Stitch chrome (2026-11-27, awaiting Christian's approval).** Overlay on `app-shell`: the zoom slider open. **Redesigned as equivalent** of the old zoom dropdown.\n\n- Christian's decision (2026-11-27): the slim zoom pill stays; clicking the % value opens a popover with a continuous slider from 5 to 200 %. Drawn as `zoom-pill` `slider-open`.\n- Popover: native `<input type=\"range\" min=\"5\" max=\"200\" step=\"1\">` with `aria-valuetext` (here 90%), scale marks 5 / 100 / 200 %, then the presets Fit (Shift 1), 50% (Shift 5), 100% (Shift 0), 200% (Shift 2) as `float-menu-item`s. The value button carries `aria-expanded=\"true\"` and a field tint while open. − / + still step.\n- The popover is `popover=\"auto\"`: Esc or a click outside closes it. Decision `chr621-continuous-zoom-slider` (updated).\n\n---\nEarlier notes (history):\n\nCHR-905 direction C: zoom dropdown open (trigger in `open` state) with the browser-safe shortcut hints (Shift+1 Fit, Shift+5 50%, Shift+0 100%, Shift+2 200%, + / - step). Full table: decision chr905-shortcuts.",
   "tags": [
     "CHR-905",
     "CHR-909",
     "chr-1004",
-    "chr-1068"
+    "chr-1068",
+    "chr-1257"
   ],
   "variant_of": "app-shell",
   "variant_kind": "overlay"

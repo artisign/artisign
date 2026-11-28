@@ -474,7 +474,7 @@ describe("Connect AI tools dialog", () => {
     copy.click();
     await flush();
     expect(copy.querySelector(".icon").textContent).toBe("error");
-    expect(copy.title).toMatch(/copy failed/i);
+    expect(copy.dataset.tooltip).toMatch(/copy failed/i);
     expect(window.getSelection().toString()).toBe("artisign setup");
   });
 

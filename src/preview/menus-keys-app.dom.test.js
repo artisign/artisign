@@ -84,7 +84,7 @@ describe("project menu", () => {
     trigger.focus();
     trigger.click();
     expect($("#project-menu").hidden).toBe(false);
-    expect(rows().map((r) => r.title || r.id)).toEqual(["/p", "/q", "/r/gamma", "menu-action-open", "menu-action-init"]);
+    expect(rows().map((r) => r.dataset.tooltip || r.id)).toEqual(["/p", "/q", "/r/gamma", "menu-action-open", "menu-action-init"]);
     expect(document.activeElement).toBe(rows()[0]);
     const current = $("#project-menu [aria-current]");
     expect(current).toBe(rows()[0]); // the current project is a row like the others

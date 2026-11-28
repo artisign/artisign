@@ -97,7 +97,7 @@ describe("topbar markup", () => {
       expect(btn.getAttribute("aria-label"), id).toBe(label);
       expect(btn.querySelector(".icon").textContent, id).toBe(icon);
       expect(btn.dataset.shortcut, id).toBe(key); // filled from the shortcut mapping (CHR-916)
-      expect(btn.title, id).toBe(id === "resolved-toggle" ? `${label} (0) (${key})` : key ? `${label} (${key})` : label); // the baseline tooltip where interest invokers are missing; Show resolved names the count (CHR-1292)
+      expect(btn.dataset.tooltip, id).toBe(id === "resolved-toggle" ? `${label} (0)` : label); // the shared tooltip text; the key is in data-shortcut, Show resolved names the count (CHR-1292)
     }
     expect(document.getElementById("status-bar-toggle")).toBeNull(); // no status bar, no More menu (CHR-1268)
     expect(document.getElementById("more-tool-toggle")).toBeNull();

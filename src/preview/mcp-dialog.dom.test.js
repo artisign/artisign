@@ -210,7 +210,7 @@ describe("Agent skill tab", () => {
     const described = document.getElementById(chip.getAttribute("aria-describedby"));
     expect(described.textContent).toBe("EACCES: permission denied, open '~/.claude/skills/artisign/SKILL.md'");
     expect(described.classList.contains("mcp-visually-hidden")).toBe(true);
-    expect(chip.title).toBe(described.textContent);
+    expect(chip.dataset.tooltip).toBe(described.textContent);
     // counts as not installed
     expect($("#mcp-summary").textContent).toBe("1 of 4 tools have the current skill");
   });

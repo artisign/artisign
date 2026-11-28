@@ -37,7 +37,7 @@ describe("floating surfaces and empty states in index.html", () => {
     for (const dialog of doc.querySelectorAll(".project-dialog")) {
       const close = dialog.querySelector(".dialog-close");
       expect(close.getAttribute("aria-label")).toBe("Close");
-      expect(close.title).toBe("Close"); // a native title: the shared tooltip sits under the top layer a modal dialog is in
+      expect(close.dataset.tooltip).toBe("Close"); // the shared tooltip is a manual popover: it also shows above a modal dialog
       expect(close.classList.contains("float-icon-btn")).toBe(true);
       expect(close.querySelector(".icon").textContent).toBe("close");
       expect(dialog.querySelector(".btn-new-folder").textContent.trim()).toBe("create_new_folderNew folder");

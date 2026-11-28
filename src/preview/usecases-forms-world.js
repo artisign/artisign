@@ -302,7 +302,7 @@ export async function openConstellationDialog(options) {
         const fromSel = selectInput({ options: endOptions(pool, row.from), value: row.from, ariaLabel: `Relationship ${j + 1} from`, onChange: (value) => { row.from = value; touch(); drawMembers(); } });
         const typeSel = selectInput({ options: typeOptions(), value: row.type, ariaLabel: `Relationship ${j + 1} type`, onChange: (value) => { row.type = value; touch(); } });
         const toSel = selectInput({ options: endOptions(pool, row.to), value: row.to, ariaLabel: `Relationship ${j + 1} to`, className: "uc-rel-to", onChange: (value) => { row.to = value; touch(); drawMembers(); } });
-        for (const sel of [fromSel, typeSel, toSel]) sel.addEventListener("change", () => (sel.title = sel.selectedOptions[0]?.textContent ?? ""));
+        for (const sel of [fromSel, typeSel, toSel]) sel.addEventListener("change", () => (sel.dataset.tooltip = sel.selectedOptions[0]?.textContent ?? ""));
         const note = textInput({ value: row.note, placeholder: "Note", ariaLabel: `Relationship ${j + 1} note`, onInput: (value) => { row.note = value; touch(); } });
         const rowEl = h(
           "div",
@@ -311,7 +311,7 @@ export async function openConstellationDialog(options) {
           rowHint,
           warn,
         );
-        for (const sel of [fromSel, typeSel, toSel]) sel.title = sel.selectedOptions[0]?.textContent ?? "";
+        for (const sel of [fromSel, typeSel, toSel]) sel.dataset.tooltip = sel.selectedOptions[0]?.textContent ?? "";
         fromSel.dataset.warnPath = `relationship.${j}.warn`;
         rowEl.dataset.row = String(j);
         touchScope(rowEl, row, () => refresh());

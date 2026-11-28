@@ -184,7 +184,7 @@ export function createVariantUI({ barEl, onSelect, compare }) {
       row.classList.add("current", "is-current");
       row.appendChild(el("span", "variant-pop-current chrome-menu-hint", "current"));
     }
-    row.title = name;
+    row.dataset.tooltip = name;
     return row;
   }
 
@@ -238,7 +238,7 @@ export function createVariantUI({ barEl, onSelect, compare }) {
       group.classList.toggle("open", openCrumb === node.name);
       const crumb = button("crumb", "", () => go(node.name));
       crumb.setAttribute("aria-current", String(node.name === current));
-      crumb.title = node.name;
+      crumb.dataset.tooltip = node.name;
       if (i === 0) crumb.appendChild(icon("home", "crumb-home"));
       else {
         const kindIcon = createKindIcon(node.screen.variant_kind);

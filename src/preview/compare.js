@@ -153,7 +153,7 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
   function renderLabels() {
     for (const [name, column] of columns) {
       column.labelEl.replaceChildren(el("span", "compare-label-name", name));
-      column.labelEl.title = name;
+      column.labelEl.dataset.tooltip = name;
       const member = memberData(name);
       column.bannerEl.hidden = true;
       let note = "";
@@ -233,18 +233,18 @@ export function createCompareView({ barEl, hintEl, canvasEl, columnsEl, panelEl 
     barEl.appendChild(el("b", "compare-title", "Compare"));
     const ref = el("span", "compare-chip compare-chip-reference chrome-chip chrome-chip--hit");
     ref.dataset.screen = reference;
-    ref.title = reference;
+    ref.dataset.tooltip = reference;
     ref.append(icon("lock", "compare-chip-lock"), icon("home"), el("span", "compare-chip-name", reference), el("span", "compare-chip-note", "· reference"));
     barEl.appendChild(ref);
     for (const name of selected) {
       const chip = el("span", "compare-chip chrome-chip");
       chip.dataset.screen = name;
-      chip.title = name;
+      chip.dataset.tooltip = name;
       chip.appendChild(el("span", "compare-chip-name", name));
       const member = memberData(name);
       if (member?.status === "low_overlap") {
         const share = el("span", "compare-chip-overlap", `${overlapPercent(member)}%`);
-        share.title = "Share of node ids in common with the reference";
+        share.dataset.tooltip = "Share of node ids in common with the reference";
         chip.appendChild(share);
       }
       const remove = button("compare-chip-remove", "", () => toggle(name));

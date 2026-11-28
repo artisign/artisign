@@ -730,7 +730,7 @@ export function createBoardView({
           const micro = document.createElement("span");
           micro.className = `board-cluster-thumb kind-${thumb.kind ?? "state"} ${isDesktop(thumb.screen) ? "desktop" : "mobile"}`;
           micro.classList.toggle("deeper", thumb.deeper);
-          micro.title = thumb.screen;
+          micro.dataset.tooltip = thumb.screen;
           strip.appendChild(micro);
         }
         if (frame.moreThumbs > 0) {
@@ -752,7 +752,7 @@ export function createBoardView({
       el.style.width = `${more.width}px`;
       el.style.height = `${more.height}px`;
       el.textContent = `+${more.names.length} more`;
-      el.title = more.names.join("\n");
+      el.dataset.tooltip = more.names.join("\n");
       framesEl.appendChild(el);
     }
   }

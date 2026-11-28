@@ -134,7 +134,7 @@ describe("board clusters — DOM", () => {
     await board.setScreens(many.map((s) => s.name), [], "p", { screens: many, expanded: ["m"], clusters: true });
     const more = tiles.querySelector(".board-more-tile");
     expect(more.textContent).toBe("+2 more");
-    expect(more.title).toBe("m-8\nm-9");
+    expect(more.dataset.tooltip).toBe("m-8\nm-9");
     expect(tileNames(tiles)).toHaveLength(9);
   });
 

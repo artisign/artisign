@@ -235,7 +235,7 @@ function appendTagRow(parent, tags, needle) {
     chip.className = "tag-chip";
     if (tagMatches(tag)) chip.classList.add("match");
     chip.textContent = tag;
-    chip.title = tag;
+    chip.dataset.tooltip = tag;
     tagRow.appendChild(chip);
   }
   if (rest > 0) {
@@ -243,7 +243,7 @@ function appendTagRow(parent, tags, needle) {
     more.className = "tag-chip tag-more";
     if (ordered.slice(MAX_VISIBLE_TAGS).some(tagMatches)) more.classList.add("match");
     more.textContent = `+${rest}`;
-    more.title = ordered.join(", ");
+    more.dataset.tooltip = ordered.join(", ");
     tagRow.appendChild(more);
   }
   parent.appendChild(tagRow);
@@ -387,7 +387,7 @@ function appendScreenRows(listEl, rows, ctx) {
     if (node.children.length > 0) button.setAttribute("aria-expanded", String(row.expanded));
 
     const shown = displayName(node);
-    if (shown !== node.name) button.title = `${node.name}\n${[...ancestorNames(tree, node.name), node.name].join(" › ")}`;
+    if (shown !== node.name) button.dataset.tooltip = `${node.name}\n${[...ancestorNames(tree, node.name), node.name].join(" › ")}`;
 
     button.appendChild(rowIcon(screen, node.parent !== null, viewports.get(screen.name)));
 
@@ -415,7 +415,7 @@ function appendScreenRows(listEl, rows, ctx) {
       const total = document.createElement("span");
       total.className = "screen-item-total";
       total.textContent = String(node.total);
-      total.title = `${node.total} variant${node.total === 1 ? "" : "s"}`;
+      total.dataset.tooltip = `${node.total} variant${node.total === 1 ? "" : "s"}`;
       button.appendChild(total);
     }
 
@@ -450,7 +450,7 @@ function appendScreenRows(listEl, rows, ctx) {
       box.checked = ticked;
       box.disabled = isReference || (!ticked && compare.selected.length >= compare.cap);
       box.setAttribute("aria-label", isReference ? `${screen.name} is the compare reference` : `Compare ${screen.name}`);
-      if (isReference) box.title = "The main screen is the locked reference";
+      if (isReference) box.dataset.tooltip = "The main screen is the locked reference";
       box.addEventListener("change", () => compare.onToggle(screen.name));
       li.classList.add("has-compare");
       li.appendChild(box);

@@ -77,7 +77,7 @@ export function renderMockupList(listEl, mockups, { activeName, activeVariant = 
         const chip = document.createElement("span");
         chip.className = "tag-chip";
         chip.textContent = tag;
-        chip.title = tag;
+        chip.dataset.tooltip = tag;
         tagRow.appendChild(chip);
       }
       main.appendChild(tagRow);
@@ -86,7 +86,7 @@ export function renderMockupList(listEl, mockups, { activeName, activeVariant = 
     const total = document.createElement("span");
     total.className = "screen-item-total";
     total.textContent = String(mockup.variants.length);
-    total.title = `${mockup.variants.length} variant${mockup.variants.length === 1 ? "" : "s"}`;
+    total.dataset.tooltip = `${mockup.variants.length} variant${mockup.variants.length === 1 ? "" : "s"}`;
     button.appendChild(total);
     button.addEventListener("click", () => onSelect(mockup.name));
     li.appendChild(button);

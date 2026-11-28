@@ -324,6 +324,6 @@ describe("variant view", () => {
     const groups = $$(".uc-matrix .uc-matrix-scope").map((g) => [g.dataset.scope, g.getAttribute("colspan")]);
     expect(groups).toEqual([["constellations", "3"], ["personas", "2"]]);
     expect($$(".uc-matrix .uc-matrix-dim").map(text)).toEqual(["Household", "Channel"]);
-    expect($$(".uc-matrix th.is-gap").map((th) => th.title)).toEqual(["Blended family: not covered", "Letter: not covered"]);
+    expect($$(".uc-matrix th.is-gap").map((th) => th.dataset.tooltip)).toEqual(["Blended family: not covered", "Letter: not covered"]);
   });
 });

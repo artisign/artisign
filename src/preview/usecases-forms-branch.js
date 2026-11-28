@@ -216,7 +216,7 @@ export async function openBranchDialog(options) {
     const count = lastBuild.errors.length;
     // Untouched rows report nothing until left (untilTouched), but Apply stays blocked meanwhile.
     applyButton.disabled = count > 0;
-    applyButton.title = count > 0 ? lastBuild.errors[0] : "";
+    applyButton.dataset.tooltip = count > 0 ? lastBuild.errors[0] : "";
     // A branch nobody typed into yet says nothing in the footer (Apply is disabled and says why in its title); an edited one names its errors.
     dialog.setMessage(count > 0 && (dialog.isDirty() || !isNew) ? `${count} ${count === 1 ? "error" : "errors"}. ${lastBuild.errors[0]}` : "", "error");
   }

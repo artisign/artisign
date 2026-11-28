@@ -234,6 +234,13 @@
 
 /* Shared tooltip (tooltip.js). Fixed so it escapes every overflow:hidden panel; positioned by script. */
 #chrome-tooltip {
+  /* A manual popover (top layer, above modal dialogs): reset the UA popover box. */
+  inset: auto;
+  margin: 0;
+  border: 0;
+  overflow: visible;
+  max-width: min(360px, calc(100vw - 16px));
+  white-space: pre-line;
   position: fixed;
   z-index: 1000;
   display: inline-flex;
@@ -244,8 +251,21 @@
   background: var(--chrome-tooltip);
   color: var(--chrome-tooltip-text);
   font-size: 11.5px;
-  white-space: nowrap;
   pointer-events: none;
+  animation: chrome-tooltip-in 120ms ease-out;
+}
+
+@keyframes chrome-tooltip-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* No fade for reduced motion; the timings stay. */
+@media (prefers-reduced-motion: reduce) {
+  #chrome-tooltip {
+    animation: none;
+  }
 }
 
 #chrome-tooltip[hidden],
@@ -10119,67 +10139,6 @@ body.is-panel-resizing {
   color: var(--chrome-tooltip-text);
   font-size: var(--ui-sm);
   pointer-events: none;
-}
-
-/* Hint tooltips: blue, after ~2 s of hover, to the right of the tool. The popover is only drawn while open (display is set for :popover-open alone, so the UA's closed state stays). */
-#tool-bar [interestfor] {
-  --interest-delay-start: 2s;
-  interest-delay-start: var(--interest-delay-start);
-  --interest-delay-end: 0.1s;
-  interest-delay-end: var(--interest-delay-end);
-}
-
-/* Moving from one tool to the next while a hint shows: the next one needs no new wait. */
-#tool-bar:has([interestfor]:is(:interest-source, .interest-source)) [interestfor] {
-  --interest-delay-start: 0s;
-}
-
-.tool-hint {
-  inset: auto;
-  margin: 0;
-  margin-inline-start: var(--space-md);
-  position-area: inline-end;
-  position-try-fallbacks: flip-inline;
-  width: auto;
-  border: 1px solid transparent;
-  background: var(--chrome-hint);
-  color: var(--chrome-hint-text);
-  overflow: visible;
-}
-
-/* Docked horizontally, the hint opens above the tool (CHR-1287). */
-.tool-hint[data-placement="top"] {
-  margin-inline-start: 0;
-  margin-block-end: var(--space-md);
-  position-area: block-start;
-  position-try-fallbacks: flip-block;
-}
-
-.tool-hint:popover-open {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-md);
-  height: var(--size-control);
-  padding: 0 var(--space-md) 0 var(--space-lg);
-  border-radius: var(--radius-pill);
-  font-size: var(--ui-sm);
-  font-weight: 500;
-  line-height: 1;
-  white-space: nowrap;
-  box-shadow: var(--chrome-shadow-float);
-}
-
-.tool-hint-key {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--chrome-hint-text) 22%, transparent);
-  font: inherit;
-  font-size: var(--ui-2xs);
 }
 
 /* ---- The right column's panel ---- */

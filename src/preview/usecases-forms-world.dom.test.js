@@ -215,7 +215,7 @@ describe("constellation dialog", () => {
     const to = $$(".uc-rel-to");
     expect(to).toHaveLength(3);
     expect(to[2].selectedOptions[0].textContent).toBe("Household liability policy");
-    expect(to[2].title).toBe("Household liability policy");
+    expect(to[2].dataset.tooltip).toBe("Household liability policy");
     expect(to[2].getAttribute("aria-label")).toBe("Relationship 3 to");
   });
 

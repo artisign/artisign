@@ -36,7 +36,7 @@ export function renderVariantInspector(container, ctx, flows, current, go) {
   for (const [label, value] of rows) {
     const row = el("div", "prop-row");
     const v = el("span", "prop-value", value);
-    v.title = value;
+    v.dataset.tooltip = value;
     row.append(el("span", "prop-label", label), v);
     variant.append(row);
   }
@@ -52,7 +52,7 @@ export function renderVariantInspector(container, ctx, flows, current, go) {
       const row = el("div", "prop-row");
       const link = el("button", "prop-value inspect-kv-link", source);
       link.type = "button";
-      link.title = `Open ${source}`;
+      link.dataset.tooltip = `Open ${source}`;
       link.dataset.screen = source;
       link.addEventListener("click", () => go(source));
       row.append(el("span", "prop-label", "Flow"), link);

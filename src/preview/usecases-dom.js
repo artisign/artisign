@@ -3,7 +3,7 @@
 
 /**
  * @param {string} tag
- * @param {Record<string, any> | null} [props] `class`, `dataset`, `style` (object of CSS custom properties / properties), `onClick`-style handlers, `text`; `true` sets a boolean attribute, `false`/`null`/`undefined` skips
+ * @param {Record<string, any> | null} [props] `class`, `dataset`, `title` (becomes `data-tooltip`), `style` (object of CSS custom properties / properties), `onClick`-style handlers, `text`; `true` sets a boolean attribute, `false`/`null`/`undefined` skips
  * @param {...any} children strings, nodes, arrays (flattened) or nothing
  * @returns {HTMLElement}
  */
@@ -15,6 +15,7 @@ export function h(tag, props, ...children) {
     else if (key === "dataset") Object.assign(el.dataset, value);
     else if (key === "style") for (const [name, v] of Object.entries(value)) el.style.setProperty(name, String(v));
     else if (key === "text") el.textContent = value;
+    else if (key === "title" && tag !== "iframe") el.setAttribute("data-tooltip", String(value)); // the shared tooltip (CHR-1285), never the native one
     else if (key.startsWith("on") && typeof value === "function") el.addEventListener(key.slice(2).toLowerCase(), value);
     else el.setAttribute(key, value === true ? "" : String(value));
   }

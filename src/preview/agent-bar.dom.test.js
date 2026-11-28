@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// CHR-1269 — the Agent bar card on its own (the real index.html markup, no daemon): folding by the user and by a panel, the Follow switch, the feed, and the note field's behaviour.
+// CHR-1269 — the Agent bar card on its own (the real index.html markup, no daemon): folding by the user and by a panel, the Follow switch, the feed.
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import html from "./index.html?raw";
 import { createAgentBar, feedHasMoreBelow } from "./agent-bar.js";
@@ -13,7 +13,6 @@ function memoryStorage() {
 }
 
 const NOW = 5_000_000;
-const screenNote = { enabled: true, key: "screen:home", icon: "desktop_windows", scope: "On home", reason: "" };
 const feedOf = (...events) => events.map((e, i) => ({ tool: "write_html", kind: "write", ok: true, target: { kind: "screen", name: "home" }, nodes: [], at: NOW - i * 1000, ...e }));
 
 let storage;
@@ -22,10 +21,10 @@ let bar;
 let state;
 const $ = (sel) => document.querySelector(sel);
 
-function mount(over = {}) {
+function mount() {
   document.body.innerHTML = bodyHtml;
   storage = storage ?? memoryStorage();
-  calls = { follow: [], resume: 0, select: [], send: [] };
+  calls = { follow: [], resume: 0, select: [] };
   bar = createAgentBar({
     barEl: $("#agent-bar"),
     topbarEl: $("#topbar-agent"),
@@ -33,26 +32,11 @@ function mount(over = {}) {
     onFollow: (on) => calls.follow.push(on),
     onResume: () => calls.resume++,
     onSelect: (event) => calls.select.push(event),
-    onSend: async (text, key) => {
-      calls.send.push([text, key]);
-      return over.sendResult ?? { ok: true };
-    },
   });
-  state = { feed: [], follow: { enabled: false, paused: false }, connected: true, now: NOW, exists: () => true, note: screenNote };
+  state = { feed: [], follow: { enabled: false, paused: false }, connected: true, now: NOW, exists: () => true };
   bar.render(state);
 }
 const render = (patch = {}) => bar.render((state = { ...state, ...patch }));
-const typeNote = (text) => {
-  const field = $("#agent-note-field");
-  field.value = text;
-  field.dispatchEvent(new Event("input", { bubbles: true }));
-};
-const enter = (init = {}) => {
-  const evt = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true, ...init });
-  $("#agent-note-field").dispatchEvent(evt);
-  return evt;
-};
-const flush = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(() => {
   storage = memoryStorage();
@@ -163,145 +147,9 @@ describe("folding", () => {
   });
 
   it("focus inside the body that folds away moves to the chevron, not to the page", () => {
-    $("#agent-note-field").focus();
+    $("#follow-switch").focus();
     bar.setPanelOpen(true);
     expect(document.activeElement).toBe($("#agent-bar-fold"));
-  });
-});
-
-describe("the note field", () => {
-  it("is labelled, scoped, and sends on the button with the scope it showed", async () => {
-    expect($("#agent-note-field").getAttribute("placeholder")).toBe("Leave a note for the agent");
-    expect($("#agent-note-scope-text").textContent).toBe("On home");
-    typeNote("  Make the button smaller  ");
-    $("#agent-note-send").click();
-    await flush();
-    expect(calls.send).toEqual([["Make the button smaller", "screen:home"]]);
-    expect($("#agent-note-field").value).toBe("");
-  });
-
-  it("Enter sends, Shift+Enter does not, and an Enter that confirms an IME conversion does not", async () => {
-    typeNote("one");
-    expect(enter({ shiftKey: true }).defaultPrevented).toBe(false); // a new line
-    enter({ isComposing: true });
-    enter({ keyCode: 229 });
-    await flush();
-    expect(calls.send).toEqual([]);
-    expect(enter().defaultPrevented).toBe(true);
-    await flush();
-    expect(calls.send).toEqual([["one", "screen:home"]]);
-  });
-
-  it("sends nothing when empty, and send is aria-disabled until there is text", async () => {
-    expect($("#agent-note-send").getAttribute("aria-disabled")).toBe("true");
-    $("#agent-note-send").click();
-    enter();
-    await flush();
-    expect(calls.send).toEqual([]);
-    typeNote("hi");
-    expect($("#agent-note-send").getAttribute("aria-disabled")).toBe("false");
-  });
-
-  it("a failed send keeps the text and says what went wrong", async () => {
-    mount({ sendResult: { ok: false, message: "screen not found" } });
-    typeNote("hello");
-    $("#agent-note-send").click();
-    await flush();
-    expect($("#agent-note-field").value).toBe("hello");
-    expect($("#agent-note-error").hidden).toBe(false);
-    expect($("#agent-note-error").textContent).toBe("Could not send the note: screen not found");
-    typeNote("hello again");
-    expect($("#agent-note-error").hidden).toBe(true);
-  });
-
-  it("is off with a reason where no single screen can take it: read-only, aria-disabled, still focusable, nothing sent", async () => {
-    render({ note: { enabled: false, key: "board", icon: "grid_view", scope: "On the Board, 5 screens", reason: "Not available on the Board" } });
-    const field = $("#agent-note-field");
-    expect([field.readOnly, field.getAttribute("aria-disabled"), field.disabled, field.placeholder]).toEqual([true, "true", false, "Not available on the Board"]);
-    expect($("#agent-note-reason").textContent).toBe("Not available on the Board");
-    expect($("#agent-note-scope-text").textContent).toBe("On the Board, 5 screens");
-    field.focus();
-    expect(document.activeElement).toBe(field);
-    enter();
-    $("#agent-note-send").click();
-    await flush();
-    expect(calls.send).toEqual([]);
-  });
-
-  it("each scope keeps its own unsent text: a note typed for one screen never lands on the next one", async () => {
-    typeNote("for home");
-    render({ note: { ...screenNote, key: "screen:cart", scope: "On cart" } }); // follow moved the open screen
-    expect($("#agent-note-field").value).toBe("");
-    typeNote("for cart");
-    render({ note: screenNote });
-    expect($("#agent-note-field").value).toBe("for home");
-    $("#agent-note-send").click();
-    await flush();
-    expect(calls.send).toEqual([["for home", "screen:home"]]);
-  });
-
-  it("a note sent for one screen does not clear what is typed on another by the time the answer comes", async () => {
-    let finish;
-    document.body.innerHTML = bodyHtml;
-    bar = createAgentBar({ barEl: $("#agent-bar"), topbarEl: $("#topbar-agent"), storage, onFollow() {}, onResume() {}, onSelect() {}, onSend: () => new Promise((r) => (finish = r)) });
-    bar.render(state);
-    typeNote("for home");
-    $("#agent-note-send").click();
-    bar.render({ ...state, note: { ...screenNote, key: "screen:cart", scope: "On cart" } });
-    typeNote("for cart");
-    finish({ ok: true });
-    await flush();
-    expect($("#agent-note-field").value).toBe("for cart");
-    bar.render(state);
-    expect($("#agent-note-field").value).toBe(""); // home's text was sent and is gone
-  });
-
-  it("a send that rejects (the daemon is unreachable) shows the error, keeps the text, leaves the field editable, and a second send works", async () => {
-    let attempt = 0;
-    document.body.innerHTML = bodyHtml;
-    const sent = [];
-    bar = createAgentBar({
-      barEl: $("#agent-bar"),
-      topbarEl: $("#topbar-agent"),
-      storage,
-      onFollow() {},
-      onResume() {},
-      onSelect() {},
-      onSend: async (text) => {
-        sent.push(text);
-        if (++attempt === 1) throw new TypeError("Failed to fetch");
-        return { ok: true };
-      },
-    });
-    bar.render(state);
-    typeNote("hello");
-    $("#agent-note-send").click();
-    await flush();
-    expect($("#agent-note-error").textContent).toBe("Could not send the note: Failed to fetch");
-    expect($("#agent-note-field").value).toBe("hello");
-    expect($("#agent-note-field").readOnly).toBe(false);
-    expect($("#agent-note-send").getAttribute("aria-disabled")).toBe("false");
-    $("#agent-note-send").click();
-    await flush();
-    expect(sent).toEqual(["hello", "hello"]);
-    expect($("#agent-note-field").value).toBe("");
-    expect($("#agent-note-error").hidden).toBe(true);
-  });
-
-  it("reset() drops every draft (a new project)", () => {
-    typeNote("draft");
-    render({ note: { ...screenNote, key: "screen:cart", scope: "On cart" } });
-    bar.reset();
-    render({ note: screenNote });
-    expect($("#agent-note-field").value).toBe("");
-  });
-
-  it("announces a sent note politely", async () => {
-    typeNote("x");
-    $("#agent-note-send").click();
-    await flush();
-    expect($("#agent-bar-live").textContent).toBe("Note sent");
-    expect($("#agent-bar-live").getAttribute("aria-live")).toBe("polite");
   });
 });
 

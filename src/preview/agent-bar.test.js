@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agentStatus, noteState, writingScreen, IDLE_AFTER_MS } from "./agent-bar.js";
+import { agentStatus, writingScreen, IDLE_AFTER_MS } from "./agent-bar.js";
 
 const NOW = 1_000_000;
 const write = { tool: "write_html", kind: "write", ok: true, target: { kind: "screen", name: "home" }, nodes: [], at: NOW - 1000 };
@@ -38,38 +38,6 @@ describe("agentStatus", () => {
   it("says a failed call and a gone target as they are", () => {
     expect(status({ feed: [{ ...write, ok: false }] }).said).toBe("Could not write home");
     expect(status({ exists: () => false, feed: [{ ...write, tool: "get_screen", kind: "read" }] }).said).toBe("Reading home, which no longer exists");
-  });
-});
-
-describe("noteState", () => {
-  const where = { view: "screens", showMockup: false, comparing: false, screen: "home", screenLabel: "home, default", mockup: null, boardCount: 5 };
-
-  it("is on for the open screen, scoped by the screen's name", () => {
-    expect(noteState(where)).toEqual({ enabled: true, key: "screen:home", icon: "desktop_windows", scope: "On home, default", reason: "" });
-  });
-
-  it("is off on the Board with the design's scope line, and says why", () => {
-    expect(noteState({ ...where, view: "board" })).toMatchObject({ enabled: false, icon: "grid_view", scope: "On the Board, 5 screens", reason: "Not available on the Board" });
-    expect(noteState({ ...where, view: "board", boardCount: 1 }).scope).toBe("On the Board, 1 screen");
-  });
-
-  it("is on for the selected variant of an open mockup, scoped by mockup and variant", () => {
-    expect(noteState({ ...where, showMockup: true, mockup: "orders-layout", mockupVariant: { id: "b", label: "Order cards" } })).toEqual({
-      enabled: true,
-      key: "mockup:orders-layout#b",
-      icon: "view_column",
-      scope: "On orders-layout, Order cards",
-      reason: "",
-    });
-  });
-
-  it("is off for a mockup without variants, and while comparing, with a reason", () => {
-    expect(noteState({ ...where, showMockup: true, mockup: "orders-layout" })).toMatchObject({ enabled: false, icon: "view_column", scope: "On orders-layout", reason: "This mockup has no variants" });
-    expect(noteState({ ...where, comparing: true })).toMatchObject({ enabled: false, reason: "Not available while comparing variants" });
-  });
-
-  it("is off with no screen open", () => {
-    expect(noteState({ ...where, screen: null, screenLabel: "" })).toMatchObject({ enabled: false, key: "none", reason: "No screen is open" });
   });
 });
 

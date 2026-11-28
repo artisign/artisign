@@ -121,9 +121,8 @@ describe("compare mode in the screen view", () => {
     expect($("#tool-panel").hidden).toBe(false);
     expect($("#tool-panel-title").textContent).toBe("Differences");
     expect($("#compare-panel .compare-summary-line").textContent).toMatch(/differ from the base|Comparing/);
-    // CHR-1269: the Agent bar folds above it, and its note field cannot pick one screen of several
+    // CHR-1269: the Agent bar folds above it
     expect($("#agent-bar").dataset.collapsed).toBe("true");
-    expect($("#agent-note-field").placeholder).toBe("Not available while comparing variants");
   });
 
   it("Single goes back to the screen that was open before compare", async () => {
@@ -140,7 +139,6 @@ describe("compare mode in the screen view", () => {
     expect(rowButton("a1").getAttribute("aria-current")).toBe("true");
     expect($("#tool-panel").hidden).toBe(true);
     expect($("#agent-bar").dataset.collapsed).toBe("false"); // CHR-1269: and the Agent bar is back
-    expect($("#agent-note-field").getAttribute("aria-disabled")).toBe("false");
   });
 
   it("navigating to a screen outside the family ends compare", async () => {

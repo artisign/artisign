@@ -45,8 +45,8 @@ function boardToolStates({ tileCount, openCount, clustersOn, anyExpanded }) {
     inspect: empty ? no("Inspect, nothing on the board", nothing) : OK,
     notes: unavailable("Notes"),
     comments: empty
-      ? no("Comments on tiles, nothing on the board", nothing)
-      : { ...OK, name: openCount === 0 ? "Comments on tiles" : `Comments on tiles, ${openCount} open` },
+      ? no("Comments, nothing on the board", nothing)
+      : { ...OK, name: openCount === 0 ? "Comments" : `Comments, ${openCount} open` },
     // The toggle is a switch on its own: on or off whatever the data (CHR-1292). Its tooltip (state and count) is app.js's.
     showResolved: { ...OK, name: "Show resolved comments" },
     flow: { ...OK, name: "Flow arrows" },

@@ -128,7 +128,7 @@ describe("the Board's tool bar", () => {
     expect(label("comment-mode-toggle")).toBe("Comment");
     expect(label("inspect-mode-toggle")).toBe("Inspect");
     expect(label("notes-tool-toggle")).toBe("Notes, not available on the Board");
-    expect(label("comments-tool-toggle")).toBe("Comments on tiles, 1 open");
+    expect(label("comments-tool-toggle")).toBe("Comments, 1 open");
     expect(label("resolved-toggle")).toBe("Show resolved comments");
     expect(label("flow-mode-toggle")).toBe("Flow arrows");
     expect(document.getElementById("design-system-tool")).toBeNull(); // CHR-1284
@@ -155,7 +155,7 @@ describe("the Board's tool bar", () => {
   it("with nothing on the board, comments and collapse all say so; Show resolved stays a working switch (CHR-1292)", async () => {
     boardState = { filter: "xyzzy", pinned: [], expanded: [] };
     await openBoard();
-    expect(label("comments-tool-toggle")).toBe("Comments on tiles, nothing on the board");
+    expect(label("comments-tool-toggle")).toBe("Comments, nothing on the board");
     expect(label("resolved-toggle")).toBe("Show resolved comments");
     expect($("#resolved-toggle").hasAttribute("aria-disabled")).toBe(false);
     expect(label("board-collapse-all-btn")).toBe("Collapse all clusters, nothing on the board");

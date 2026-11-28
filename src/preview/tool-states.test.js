@@ -44,12 +44,12 @@ describe("toolStates", () => {
 
     it("comments, show resolved, flow arrows, clusters and collapse all apply, named as the design names them", () => {
       const states = board();
-      expect(states.comments).toEqual({ disabled: false, reason: "", name: "Comments on tiles, 6 open" });
+      expect(states.comments).toEqual({ disabled: false, reason: "", name: "Comments, 6 open" });
       expect(states.showResolved.name).toBe("Show resolved comments");
       expect(states.flow.name).toBe("Flow arrows");
       expect(states.clusters.name).toBe("Clusters");
       expect(states.collapseAll.name).toBe("Collapse all clusters");
-      expect(board({ openCount: 0 }).comments.name).toBe("Comments on tiles");
+      expect(board({ openCount: 0 }).comments.name).toBe("Comments");
     });
 
     it("Show resolved is a switch on its own (CHR-1292): never greyed by the data, with the comments off or nothing on the board", () => {
@@ -60,7 +60,7 @@ describe("toolStates", () => {
     it("nothing on the board: comments and collapse all are greyed and say so", () => {
       const states = board({ tileCount: 0 });
       expect(disabled(states)).toEqual(["comment", "inspect", "notes", "comments", "collapseAll"]);
-      expect(states.comments.name).toBe("Comments on tiles, nothing on the board");
+      expect(states.comments.name).toBe("Comments, nothing on the board");
       expect(states.comments.hint).toBe("Nothing on the board");
       expect(states.collapseAll.name).toBe("Collapse all clusters, nothing on the board");
       expect(states.flow.disabled).toBe(false);

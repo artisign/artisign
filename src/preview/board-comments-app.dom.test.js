@@ -128,7 +128,7 @@ describe("Board comments in the app", () => {
     expect(boardRequests()).toHaveLength(1);
     expect(boardPins().map((p) => p.getAttribute("aria-label"))).toEqual(["Comment 1 on btn-a, open", "Comment 1 on btn-a, open"]);
     expect([...document.querySelectorAll("#board-comment-layer .comment-count-chip")].map((c) => c.getAttribute("aria-label"))).toEqual(["1 open comment", "1 open comment"]);
-    expect($("#comments-tool-toggle").getAttribute("aria-label")).toBe("Comments on tiles, 2 open");
+    expect($("#comments-tool-toggle").getAttribute("aria-label")).toBe("Comments, 2 open");
   });
 
   it("has no comment listener or marker inside a tile document", async () => {
@@ -194,7 +194,7 @@ describe("Board comments in the app", () => {
     $("#comments-pins-toggle").click();
     expect(badge.hidden).toBe(false);
     expect(badge.textContent).toBe("2");
-    expect($("#comments-tool-toggle").getAttribute("aria-label")).toBe("Comments on tiles, 2 open");
+    expect($("#comments-tool-toggle").getAttribute("aria-label")).toBe("Comments, 2 open");
     $("#comments-pins-toggle").click();
     expect(badge.hidden).toBe(true);
   });

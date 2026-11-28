@@ -12851,20 +12851,32 @@ body:has(#settings-menu:is(:popover-open, [data-open])) .update-toast {
 }
 
 /* ---------------------------------------------------------------------------
-   CHR-1295, CHR-1296 — Comment and Inspect on the Board. The pick layer takes the
+   CHR-1295, CHR-1296 — Comment and Inspect on the Board. Each tile's pick overlay takes the
    pointer while a tool is active; the outlines and the comment popover sit in two
    layers over the board view, placed from the tiles' on-screen rects.
    --------------------------------------------------------------------------- */
-#board-pick-layer {
+.board-tile-pick {
   position: absolute;
   inset: 0;
-  z-index: 4;
   pointer-events: none;
 }
 
-#board-pick-layer[data-active="true"] {
+#board-canvas[data-pick="true"] .board-tile-pick {
   pointer-events: auto;
   cursor: crosshair;
+}
+
+#comments-pins-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+}
+
+#comments-pins-row[hidden] {
+  display: none;
 }
 
 #board-inspect-layer,

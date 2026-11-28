@@ -198,13 +198,16 @@ describe("the Board's tool bar", () => {
     expect($("#flow-mode-toggle").getAttribute("aria-pressed")).toBe("false"); // the mode did not survive the visit
   });
 
-  it("the Comments panel of the Screens view does not stay open on the Board", async () => {
+  it("the Comments panel stays open across the view switch and lists the Board's threads there (CHR-1295)", async () => {
     await boot();
     $("#comments-tool-toggle").click();
     expect($("#tool-panel").hidden).toBe(false);
     $('.view-tab[data-view="board"]').click();
     await flush();
-    expect($("#tool-panel").hidden).toBe(true);
+    expect($("#tool-panel").hidden).toBe(false);
+    expect($("#comments-pins-row").hidden).toBe(false);
+    $('.view-tab[data-view="screens"]').click();
+    expect($("#comments-pins-row").hidden).toBe(true);
   });
 
   it("Clusters toggles the shared preference, Collapse all clears the expanded state through the board API", async () => {

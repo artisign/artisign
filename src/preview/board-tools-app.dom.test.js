@@ -24,12 +24,14 @@ const storageStub = {
 let boardData;
 let posts;
 let nodeRequests;
+let boardWrites;
 let sources;
 
 function stubDaemon() {
   boardData = { comments: [], threads: [] };
   posts = [];
   nodeRequests = [];
+  boardWrites = [];
   sources = [];
   vi.stubGlobal("localStorage", storageStub);
   Object.defineProperty(window, "localStorage", { configurable: true, value: storageStub });
@@ -47,6 +49,10 @@ function stubDaemon() {
     if (path === "/api/comments") {
       const screen = new URLSearchParams(query).get("screen");
       return json(screen ? { comments: boardData.comments.filter((c) => c.screen === screen), threads: boardData.threads.filter((t) => t.screen === screen) } : boardData);
+    }
+    if (path === "/api/tools/set_board_state") {
+      boardWrites.push(JSON.parse(init.body));
+      return json({});
     }
     if (path === "/api/projects") return json({ active: "/p", open: [{ root: "/p", name: "p" }], recent: [] });
     if (path === "/api/screens") return json({ screens: SCREENS });
@@ -111,8 +117,12 @@ const seed = () => {
   };
 };
 
-/** A pointer move or click at a client point, on the layer that owns the pointer. */
-const onLayer = (type, x, y) => $("#board-pick-layer").dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y, bubbles: true, cancelable: true }));
+/** A pointer move or click at a client point: on the pick overlay of the tile drawn there, else on the surface (empty board space). */
+const onLayer = (type, x, y) => {
+  const tile = Object.entries(TILE_AT).find(([, left]) => x >= left && x < left + 200 && y >= 50 && y < 450)?.[0];
+  const target = tile ? document.querySelector(`.board-tile[data-screen="${tile}"] .board-tile-pick`) : $("#board-surface");
+  target.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y, bubbles: true, cancelable: true }));
+};
 /** The client point of a document point in tile `screen`. */
 const clientOf = (screen, x, y) => [TILE_AT[screen] + x * 0.5, 50 + y * 0.5];
 
@@ -150,16 +160,16 @@ describe("Comment on the Board (CHR-1295)", () => {
   it("is an enabled tool: C turns the mode on with its banner, the pointer layer takes the pointer, Esc leaves", async () => {
     await openBoard();
     expect($("#comment-mode-toggle").hasAttribute("aria-disabled")).toBe(false);
-    expect($("#board-pick-layer").dataset.active).toBe("false");
+    expect($("#board-canvas").dataset.pick).toBe("false");
     key("c");
     expect($("#comment-mode-toggle").getAttribute("aria-pressed")).toBe("true");
     expect($("#board-comment-banner").hidden).toBe(false);
     expect($("#board-comment-banner").textContent).toContain("Comment mode: click an element to start a thread");
-    expect($("#board-pick-layer").dataset.active).toBe("true");
+    expect($("#board-canvas").dataset.pick).toBe("true");
     esc();
     expect($("#comment-mode-toggle").getAttribute("aria-pressed")).toBe("false");
     expect($("#board-comment-banner").hidden).toBe(true);
-    expect($("#board-pick-layer").dataset.active).toBe("false");
+    expect($("#board-canvas").dataset.pick).toBe("false");
   });
 
   it("hovering an element outlines it with its name; a click opens the composer, and Enter posts the thread on that screen and element", async () => {
@@ -231,12 +241,95 @@ describe("Comment on the Board (CHR-1295)", () => {
     await openBoard();
     key("c");
     $('.view-tab[data-view="screens"]').click();
-    expect($("#board-pick-layer").dataset.active).toBe("false");
+    expect($("#board-canvas").dataset.pick).toBe("false");
     expect($("#comment-banner").hidden).toBe(false); // the mode is still on, now on the Screens canvas
     $('.view-tab[data-view="board"]').click();
-    expect($("#board-pick-layer").dataset.active).toBe("true");
+    expect($("#board-canvas").dataset.pick).toBe("true");
     expect($("#comment-banner").hidden).toBe(true);
   });
+});
+
+describe("the tools beside the Board's own controls", () => {
+  it("keep a tile's controls clickable: the pick overlay sits inside the tile's frame, below its label and pin mark", async () => {
+    await openBoard();
+    key("c");
+    const tile = document.querySelector('.board-tile[data-screen="one"]');
+    expect(tile.querySelector(".board-tile-frame > .board-tile-pick")).not.toBeNull();
+    expect(tile.querySelector(".board-tile-pick").contains(tile.querySelector(".board-tile-pin"))).toBe(false);
+    expect(tile.querySelector(".board-tile-frame").contains(tile.querySelector(".board-tile-label"))).toBe(false);
+    // The pin mark still works and starts no thread.
+    const pin = tile.querySelector(".board-tile-pin");
+    pin.hidden = false;
+    pin.click();
+    await flush();
+    expect(boardWrites).toHaveLength(1);
+    expect(popover().hasAttribute("open")).toBe(false);
+    // The same in inspect mode: a click on the control selects nothing.
+    key("i");
+    pin.click();
+    await flush();
+    expect(nodeRequests).toEqual([]);
+  });
+});
+
+describe("the views' comment canvases", () => {
+  it("entering the Board closes the Screens popover, so the first Esc there closes the Board's own", async () => {
+    seed();
+    await openBoard();
+    $('.view-tab[data-view="screens"]').click();
+    await flush();
+    key("c");
+    // Open a thread in the Screens canvas (the pin of screen "one" is on the open screen).
+    const screensPin = document.querySelector("#comment-layer .comment-pin");
+    if (screensPin) screensPin.click();
+    $('.view-tab[data-view="board"]').click();
+    await flush();
+    expect(document.querySelector("#comment-layer .comment-popover").hasAttribute("open")).toBe(false);
+    press($("#board-comment-layer .comment-pin"));
+    expect(popover().hasAttribute("open")).toBe(true);
+    esc();
+    expect(popover().hasAttribute("open")).toBe(false);
+    expect($("#comment-mode-toggle").getAttribute("aria-pressed")).toBe("true"); // the mode stays until the next Esc
+  });
+
+  it("with comment mode on, below 30 % the hover outline stays away", async () => {
+    memoryStorage.set("artisign.boardZoom", "20");
+    await openBoard();
+    key("c");
+    const [x, y] = clientOf("two", 150, 120);
+    onLayer("pointermove", x, y);
+    expect($("#board-comment-canvas-layer .comment-hover-outline").hidden).toBe(true);
+  });
+});
+
+describe("pan input with a tool active (CHR-1290)", () => {
+  const press1 = (target, type, x, y, init = {}) => target.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y, bubbles: true, cancelable: true, ...init }));
+  const drag = (button, from, to) => {
+    const overlay = document.querySelector('.board-tile[data-screen="one"] .board-tile-pick');
+    press1(overlay, "pointerdown", from[0], from[1], { button, buttons: 1 << (button === 1 ? 2 : 0) });
+    press1(document, "pointermove", from[0], from[1], { buttons: 1 });
+    press1(document, "pointermove", to[0], to[1], { buttons: 1 });
+    press1(document, "pointerup", to[0], to[1]);
+  };
+  const scrollOf = () => [$("#board-surface").scrollLeft, $("#board-surface").scrollTop];
+
+  for (const [name, mode] of [["Comment", "c"], ["Inspect", "i"]]) {
+    it(`${name}: a left drag does not pan the Board, a middle drag and Space + drag do`, async () => {
+      await openBoard();
+      $("#board-surface").scrollLeft = 200;
+      $("#board-surface").scrollTop = 200;
+      key(mode);
+      drag(0, [150, 100], [110, 60]);
+      expect(scrollOf()).toEqual([200, 200]);
+      drag(1, [150, 100], [110, 60]);
+      expect(scrollOf()).toEqual([240, 240]);
+      $("#board-surface").dispatchEvent(new Event("pointerenter"));
+      document.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", key: " ", bubbles: true, cancelable: true }));
+      drag(0, [150, 100], [130, 80]);
+      document.dispatchEvent(new KeyboardEvent("keyup", { code: "Space", key: " ", bubbles: true }));
+      expect(scrollOf()).toEqual([260, 260]);
+    });
+  }
 });
 
 describe("Inspect on the Board (CHR-1296)", () => {
@@ -246,7 +339,7 @@ describe("Inspect on the Board (CHR-1296)", () => {
     key("i");
     expect($("#inspect-mode-toggle").getAttribute("aria-pressed")).toBe("true");
     expect($("#inspect-panel").hidden).toBe(false);
-    expect($("#board-pick-layer").dataset.active).toBe("true");
+    expect($("#board-canvas").dataset.pick).toBe("true");
   });
 
   it("hovering outlines the element with its name; a click lists that tile's screen in the panel and selects the element", async () => {
@@ -297,7 +390,7 @@ describe("Inspect on the Board (CHR-1296)", () => {
     expect($("#inspect-mode-toggle").getAttribute("aria-pressed")).toBe("true");
     esc();
     expect($("#inspect-mode-toggle").getAttribute("aria-pressed")).toBe("false");
-    expect($("#board-pick-layer").dataset.active).toBe("false");
+    expect($("#board-canvas").dataset.pick).toBe("false");
   });
 
   it("below 30 % it says to zoom in and selects nothing", async () => {

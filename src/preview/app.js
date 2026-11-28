@@ -202,7 +202,8 @@ const toolGroupSepEl = document.getElementById("tool-group-sep");
 const resolvedToggleBtn = document.getElementById("resolved-toggle");
 const toolToastEl = document.getElementById("tool-toast");
 const boardCommentLayerEl = document.getElementById("board-comment-layer");
-const boardPickLayerEl = document.getElementById("board-pick-layer");
+const commentsPinsRowEl = document.getElementById("comments-pins-row");
+const commentsPinsToggleEl = document.getElementById("comments-pins-toggle");
 const boardInspectLayerEl = document.getElementById("board-inspect-layer");
 const boardInspectHoverEl = document.getElementById("board-inspect-hover");
 const boardInspectSelectionEl = document.getElementById("board-inspect-selection");
@@ -498,6 +499,8 @@ let boardCommentsOn = readBoolPref(prefsStorage, BOARD_COMMENTS_KEY, true);
 // CHR-1292 — the Show resolved switch is one state for the Screens view and the Board, kept in the view state and the prefs, never derived from the comments (the key keeps its old name so a stored choice survives).
 let showResolvedOn = readBoolPref(prefsStorage, BOARD_RESOLVED_KEY, false);
 let boardCommentsRequestId = 0;
+/** What the last GET /api/comments?scope=screens answered: the Comments panel lists it on the Board. */
+let latestBoardComments = { comments: [], threads: [] };
 const boardComments = createBoardComments({
   layerEl: boardCommentLayerEl,
   surfaceEl: boardSurfaceEl,
@@ -537,7 +540,10 @@ const boardCanvas = createCommentCanvas({
   bannerEl: boardCommentBannerEl,
   keyOf: (t) => t.screen ?? null,
   canWrite: () => boardZoom >= TOOL_MIN_ZOOM,
-  onActiveChange: () => boardComments.setActiveThread(boardCanvas.activeThread()),
+  onActiveChange: () => {
+    boardComments.setActiveThread(boardCanvas.activeThread());
+    markActiveCommentRow();
+  },
   // A resolve or delete takes its pin with it: the focus goes back to a marker of the thread, else the Comment tool.
   fallbackFocus: (threadId) => (threadId ? boardComments.markerOf(threadId) : null) ?? commentModeToggle,
   actions: {
@@ -567,11 +573,13 @@ function inspectTarget(doc, el) {
 }
 
 const boardPicker = createBoardPicker({
-  layerEl: boardPickLayerEl,
+  containerEl: boardCanvasEl,
+  targetSelector: ".board-tile-pick",
   frames: () => board.tileFrames(),
   onHover: (hit, el) => {
     if (activeMode === "comment") {
-      boardCanvas.hover(hit?.screen ?? null, hit && el ? commentTarget(hit.doc, el) : null);
+      // Below the zoom limit writing is off: no outline invites a click.
+      boardCanvas.hover(hit?.screen ?? null, hit && el && boardZoom >= TOOL_MIN_ZOOM ? commentTarget(hit.doc, el) : null);
     } else if (activeMode === "inspect") {
       const target = hit && boardZoom >= TOOL_MIN_ZOOM ? inspectTarget(hit.doc, el) : null;
       boardInspectHover = target ? { screen: hit.screen, id: target.id } : null;
@@ -643,9 +651,9 @@ function syncBoardTools() {
   boardPicker.refresh();
 }
 
-// The pick layer covers the tiles' canvas; the rest of the visible surface is empty board space too, and Inspect clears its selection there.
+// Empty board space (the surface, the canvas and the tiles' own box, never a tile or its controls): Inspect clears its selection there.
 boardSurfaceEl.addEventListener("click", (evt) => {
-  if (evt.target === boardSurfaceEl && activeMode === "inspect") clearInspectFocus();
+  if ((evt.target === boardSurfaceEl || evt.target === boardCanvasEl || evt.target === boardTilesEl) && activeMode === "inspect") clearInspectFocus();
 });
 
 boardSurfaceEl.addEventListener(
@@ -663,13 +671,14 @@ function toggleBoardComments() {
   boardCommentsOn = !boardCommentsOn;
   writeBoolPref(prefsStorage, BOARD_COMMENTS_KEY, boardCommentsOn);
   boardComments.setEnabled(boardCommentsOn);
+  if (!boardCommentsOn) boardCanvas.dismiss(); // a popover without its pins would hang in the air
+  commentsPinsToggleEl.checked = boardCommentsOn;
   renderBoardStatus(); // the Comments tool's state follows
 }
 resolvedToggleBtn.addEventListener("click", () => {
   showResolvedOn = !showResolvedOn;
   writeBoolPref(prefsStorage, BOARD_RESOLVED_KEY, showResolvedOn);
-  boardComments.setShowResolved(showResolvedOn);
-  syncResolvedPins(); // the Screens view's pins
+  syncResolvedPins(); // the Screens view's pins and the Board's
   syncToolStates();
   if (showResolvedOn) showResolvedHint();
 });
@@ -705,6 +714,8 @@ async function loadBoardComments() {
   if (requestId !== boardCommentsRequestId || project !== activeProjectRoot) return; // a newer request or a project switch moved on
   boardComments.setData({ comments: result.comments, threads: result.threads });
   boardCanvas.setData({ scope: "board", comments: result.comments, threads: result.threads });
+  latestBoardComments = { comments: result.comments, threads: result.threads };
+  if (currentView === "board" && toolPanels.shown() === "comments") renderCommentsList();
   renderBoardStatus();
 }
 
@@ -1053,6 +1064,7 @@ function resetProjectState() {
   boardCommentsRequestId++; // an answer still on its way belongs to the project we just left
   boardComments.setData({ comments: [], threads: [] });
   boardCanvas.setData({ scope: null, comments: [], threads: [] });
+  latestBoardComments = { comments: [], threads: [] };
   boardInspectScreen = null;
   boardInspectHover = null;
   activeMode = "none";
@@ -2283,7 +2295,7 @@ function renderCommentCount(threads) {
 
 /** Marks the open thread's row in place — rebuilding the list on every open or close would remove the very row a press is on before its click lands. */
 function markActiveCommentRow() {
-  const active = commentCanvas.activeThread();
+  const active = (currentView === "board" ? boardCanvas : commentCanvas).activeThread();
   for (const row of document.querySelectorAll("#comments-list .comment-row")) {
     const on = row.dataset.thread === active;
     row.classList.toggle("is-active", on);
@@ -2291,8 +2303,23 @@ function markActiveCommentRow() {
   }
 }
 
+/** A row of the Comments panel on the Board: the thread's tile comes into view (at a zoom where writing works) and its popover opens; a screen with no tile here opens in the Screens view. @param {string} id */
+function openBoardThread(id) {
+  const screen = boardComments.screenOf(id);
+  if (screen === null) return;
+  if (!board.revealTile(screen, TOOL_MIN_ZOOM)) {
+    void openScreenThread(screen, id);
+    return;
+  }
+  boardCanvas.openThread(id);
+  boardComments.layout();
+}
+
 /** The Comments panel's list: the shown scope's threads, the tab's half of them; a row opens its pin's popover. */
 function renderCommentsList() {
+  const onBoard = currentView === "board";
+  commentsPinsRowEl.hidden = !onBoard;
+  commentsPinsToggleEl.checked = boardCommentsOn;
   renderCommentsPanel(
     {
       tabOpenEl: document.getElementById("comments-tab-open"),
@@ -2304,12 +2331,13 @@ function renderCommentsList() {
       footEl: document.getElementById("comments-foot"),
     },
     {
-      threads: latestComments.threads,
-      comments: latestComments.comments,
+      threads: onBoard ? latestBoardComments.threads : latestComments.threads,
+      comments: onBoard ? latestBoardComments.comments : latestComments.comments,
       tab: commentsTab,
-      activeId: commentCanvas.activeThread(),
-      variantLabel: currentMockup === null ? undefined : (variant) => mockupColumns.find((c) => c.variantId === variant)?.letter ?? variant,
-      onOpen: (id) => commentCanvas.openThread(id),
+      activeId: (onBoard ? boardCanvas : commentCanvas).activeThread(),
+      variantLabel: currentMockup === null || onBoard ? undefined : (variant) => mockupColumns.find((c) => c.variantId === variant)?.letter ?? variant,
+      perScreen: onBoard,
+      onOpen: onBoard ? openBoardThread : (id) => commentCanvas.openThread(id),
     },
   );
 }
@@ -2548,7 +2576,7 @@ function syncToolStates() {
   const boardCommentCount = boardNow ? boardComments.summary(boardNow.visibleNames).open : 0;
   toolBar.setState(commentsToolToggle, {
     ...states.comments,
-    pressed: onBoard ? boardCommentsOn && !states.comments.disabled : toolPanels.opened() === "comments",
+    pressed: toolPanels.opened() === "comments",
     name: states.comments.name ?? (openCommentCount === 0 ? "Comments" : `Comments, ${openCommentCount} open`),
   });
   // The badge counts open threads; on the Board it shows while the pins are off (design: the pressed tool has none).
@@ -2567,8 +2595,7 @@ function syncToolStates() {
     toolBar.setState(boardCollapseAllBtn, { ...states.collapseAll });
   }
   toolBar.syncRoving();
-  // The Comments panel is the Screens view's; on the Board the same tool only switches the tile pins.
-  for (const id of ["notes", "comments"]) if ((states[id].disabled || (onBoard && id === "comments")) && toolPanels.opened() === id) toolPanels.close(false);
+  for (const id of ["notes", "comments"]) if (states[id].disabled && toolPanels.opened() === id) toolPanels.close(false);
   renderAgentBar();
 }
 
@@ -2576,9 +2603,7 @@ for (const [id, button] of [["notes", notesToolToggle], ["comments", commentsToo
   button.addEventListener("click", () => {
     // ADR-005 pause rule 1 — opening a panel is the human working on the screen; the same as opening a mode.
     pauseFollow();
-    // On the Board the Comments tool switches the pins on the tiles (read-only there); there is no panel.
-    if (id === "comments" && currentView === "board") toggleBoardComments();
-    else toolPanels.toggle(id);
+    toolPanels.toggle(id);
   });
 }
 
@@ -2592,7 +2617,9 @@ function setCommentsTab(tab, focus = false) {
 }
 function syncResolvedPins() {
   // The Resolved tab shows the pins while it is open; the tool bar's switch shows them whatever tab is up (CHR-1292).
-  commentCanvas.setShowResolved(showResolvedOn || (toolPanels.shown() === "comments" && commentsTab === "resolved"));
+  const on = showResolvedOn || (toolPanels.shown() === "comments" && commentsTab === "resolved");
+  commentCanvas.setShowResolved(on);
+  boardComments.setShowResolved(on);
 }
 for (const tab of ["open", "resolved"]) commentTabEls[tab].addEventListener("click", () => setCommentsTab(tab));
 document.getElementById("comments-tabs").addEventListener("keydown", (evt) => {
@@ -2601,6 +2628,7 @@ document.getElementById("comments-tabs").addEventListener("keydown", (evt) => {
   evt.preventDefault();
   setCommentsTab(next, true);
 });
+commentsPinsToggleEl.addEventListener("change", () => toggleBoardComments());
 syncResolvedPins(); // a stored Show resolved choice reaches the Screens view
 syncToolStates(); // the initial state: nothing is open yet
 
@@ -3255,6 +3283,7 @@ function setView(view) {
     syncPanelContext();
   }
   syncCommentModes();
+  if (toolPanels.shown() === "comments") renderCommentsList();
   // The Flow tool is the flow arrows on the Board: the flow mode does not come along.
   if (view === "board" && activeMode === "flow") setMode("flow");
   // None of the three modes has a Use Cases or Design System counterpart either (their tools are greyed out there): leaving them also closes inspect's panel.
@@ -3263,6 +3292,7 @@ function setView(view) {
   if (view === "usecases") useCases.show();
   else useCases.hide();
   if (view === "screens") updateScreenUseCases(); // the reverse entry may have use cases to show now
+  if (view === "board") commentCanvas.dismiss(); // the Screens popover must not stay open (and take Esc) behind the Board
   if (view !== "board") {
     // A list or popover must not outlive the board (its Esc handling is the board's).
     boardComments.close();
@@ -3469,7 +3499,7 @@ function runShortcut(id) {
       return true;
     case "leave":
       // The comment layer's Escape first cancels a re-anchor pick or closes the popover; the next one leaves comment mode.
-      if (commentCanvas.handleEscape() || boardCanvas.handleEscape()) return true;
+      if ((currentView === "board" ? boardCanvas : commentCanvas).handleEscape()) return true;
       // Inspect mode's Escape first clears the focused element, the next one leaves the mode.
       if (activeMode === "inspect" && inspectorPanel.getFocusedDomId()) clearInspectFocus();
       else if (activeMode !== "none") setMode(activeMode);

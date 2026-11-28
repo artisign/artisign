@@ -260,6 +260,22 @@ export function createBoardView({
     surfaceEl.scrollTo({ left, top, behavior: "smooth" });
   }
 
+  /**
+   * Brings a tile into view for a thread opened from the Comments panel: at least `minZoom`, the tile centred (instantly, so a popover can be placed right after). False when the screen has no tile here.
+   * @param {string} screen
+   * @param {number} minZoom
+   */
+  function revealTile(screen, minZoom) {
+    const tile = resolveEdgeEnd(layout, screen)?.rect;
+    if (!tile) return false;
+    if (zoom < minZoom) setZoom(minZoom);
+    const scale = zoom / 100;
+    const { left, top } = scrollToCenter({ x: tile.x * scale, y: tile.y * scale, width: tile.width * scale, height: tile.height * scale });
+    surfaceEl.scrollLeft = left;
+    surfaceEl.scrollTop = top;
+    return true;
+  }
+
   function setHighlight(source) {
     highlightedSource = source;
     drawEdges();
@@ -867,6 +883,10 @@ export function createBoardView({
       scheduleRelayout();
     });
     frame.appendChild(iframe);
+    // CHR-1295, CHR-1296: the pointer overlay of the Comment and Inspect tools (board-pick.js), inert until a tool is active.
+    const pick = document.createElement("div");
+    pick.className = "board-tile-pick";
+    frame.appendChild(pick);
     tile.appendChild(frame);
 
     const writing = document.createElement("span");
@@ -1063,6 +1083,7 @@ export function createBoardView({
     zoomToTile,
     commentGeometry,
     tileFrames,
+    revealTile,
     /** @param {boolean} on */
     setPickTool(on) {
       pickToolOn = on;

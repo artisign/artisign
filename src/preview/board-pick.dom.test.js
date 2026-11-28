@@ -1,70 +1,83 @@
 // @vitest-environment jsdom
 //
-// CHR-1295, CHR-1296 — the Board's pointer layer: moves and clicks become hits in the tile under the pointer.
+// CHR-1295, CHR-1296 — the Board's pointer overlays: moves and clicks on a tile's overlay become hits in the tile under the pointer; anything else is not the tool's.
 import { describe, it, expect, beforeEach } from "vitest";
 import { createBoardPicker } from "./board-pick.js";
 
-let layer;
+let canvas;
+let overlay;
+let control;
 let events;
 let el;
 let picker;
 
 const doc = () => ({ elementFromPoint: (x, y) => ({ at: [x, y], ...el }) });
 const frames = () => [{ screen: "one", rect: () => ({ left: 100, top: 50, width: 200, height: 400 }), layoutWidth: () => 400, doc }];
-const ptr = (type, x, y) => layer.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y, bubbles: true, cancelable: true }));
+const ptr = (target, type, x, y) => target.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y, bubbles: true, cancelable: true }));
 
 beforeEach(() => {
-  document.body.innerHTML = '<div id="layer" data-active="false"></div>';
-  layer = document.getElementById("layer");
+  document.body.innerHTML = '<div id="canvas"><div class="tile"><div class="pick"></div><button class="control">pin</button></div></div>';
+  canvas = document.getElementById("canvas");
+  overlay = canvas.querySelector(".pick");
+  control = canvas.querySelector(".control");
   events = [];
   el = { id: "btn" };
   picker = createBoardPicker({
-    layerEl: layer,
+    containerEl: canvas,
+    targetSelector: ".pick",
     frames,
     onHover: (hit, element) => events.push(["hover", hit?.screen ?? null, element?.at ?? null]),
     onPick: (hit, element) => events.push(["pick", hit?.screen ?? null, element?.at ?? null]),
   });
 });
 
-describe("the pointer layer", () => {
-  it("takes the pointer only while a tool is active", () => {
-    expect(layer.dataset.active).toBe("false");
+describe("the pointer overlays", () => {
+  it("are switched by the canvas's data-pick, so the tools own the pointer only while active", () => {
     picker.setActive(true);
-    expect(layer.dataset.active).toBe("true");
+    expect(canvas.dataset.pick).toBe("true");
     picker.setActive(false);
-    expect(layer.dataset.active).toBe("false");
+    expect(canvas.dataset.pick).toBe("false");
   });
 
-  it("reports the element under the pointer in the tile's own pixels", () => {
-    ptr("pointermove", 150, 100);
-    expect(events).toEqual([["hover", "one", [100, 100]]]);
-  });
-
-  it("reports a click the same way, and a click on empty board space as no tile", () => {
-    ptr("click", 150, 100);
-    ptr("click", 20, 20);
+  it("report the element under the pointer in the tile's own pixels, on a move and on a click", () => {
+    ptr(overlay, "pointermove", 150, 100);
+    ptr(overlay, "click", 150, 100);
     expect(events).toEqual([
+      ["hover", "one", [100, 100]],
       ["pick", "one", [100, 100]],
-      ["pick", null, null],
     ]);
   });
 
-  it("reports leaving the board as no tile", () => {
-    ptr("pointermove", 150, 100);
-    layer.dispatchEvent(new MouseEvent("pointerleave"));
+  it("ignore a click on a tile's own control (it keeps its own behaviour) and report the pointer leaving the overlay as no tile", () => {
+    ptr(overlay, "pointermove", 150, 100);
+    events.length = 0;
+    ptr(control, "click", 150, 100);
+    expect(events).toEqual([]);
+    ptr(control, "pointermove", 150, 100);
+    expect(events).toEqual([["hover", null, null]]);
+  });
+
+  it("report a click that lands on no tile as a pick on nothing", () => {
+    ptr(overlay, "click", 20, 20);
+    expect(events).toEqual([["pick", null, null]]);
+  });
+
+  it("report leaving the board as no tile", () => {
+    ptr(overlay, "pointermove", 150, 100);
+    canvas.dispatchEvent(new MouseEvent("pointerleave"));
     expect(events.at(-1)).toEqual(["hover", null, null]);
   });
 
-  it("asks again about the last pointer position after a scroll moved the tiles under it", () => {
+  it("ask again about the last pointer position after a scroll moved the tiles under it", () => {
     picker.setActive(true);
-    ptr("pointermove", 150, 100);
+    ptr(overlay, "pointermove", 150, 100);
     events.length = 0;
     el = { id: "other" };
     picker.refresh();
     expect(events).toEqual([["hover", "one", [100, 100]]]);
   });
 
-  it("does not ask while no tool is active, or before the pointer was ever over the board", () => {
+  it("do not ask while no tool is active, or before the pointer was ever over a tile", () => {
     picker.refresh();
     picker.setActive(true);
     picker.refresh();

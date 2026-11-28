@@ -139,39 +139,74 @@ describe("Board comments in the app", () => {
     }
   });
 
-  it("the Comments tool switches the pins off and on; Show resolved adds resolved pins and keeps its state", async () => {
+  it("the Comments tool opens the panel; the pins have their own switch in it; Show resolved adds resolved pins and keeps its state", async () => {
     seed();
     await openBoard();
     const comments = $("#comments-tool-toggle");
     const resolved = $("#resolved-toggle");
+    expect(comments.getAttribute("aria-pressed")).toBe("false");
+    comments.click();
     expect(comments.getAttribute("aria-pressed")).toBe("true");
+    expect($("#tool-panel").hidden).toBe(false);
+    const pins = $("#comments-pins-toggle");
+    expect(pins.checked).toBe(true);
     expect(resolved.hidden).toBe(false);
     expect(resolved.getAttribute("aria-label")).toBe("Show resolved comments");
     resolved.click();
     expect(resolved.getAttribute("aria-pressed")).toBe("true");
     expect(boardPins().some((p) => p.dataset.state === "resolved")).toBe(true);
-    comments.click();
-    expect(comments.getAttribute("aria-pressed")).toBe("false");
+    pins.click();
+    expect(pins.checked).toBe(false);
     expect($("#board-comment-layer").hidden).toBe(true);
     // CHR-1292: a switch on its own — it stays usable with the pins off and keeps its state.
     expect(resolved.hasAttribute("aria-disabled")).toBe(false);
     expect(resolved.getAttribute("aria-pressed")).toBe("true");
-    comments.click();
+    pins.click();
     expect($("#board-comment-layer").hidden).toBe(false);
-    expect(resolved.hasAttribute("aria-disabled")).toBe(false);
   });
 
-  it("the open count is a badge on the Comments tool while the pins are off, and the tool is named for it either way", async () => {
+  it("the panel lists the Board's threads with their screens, numbered as their pins; a row brings the tile into view and opens the thread", async () => {
+    seed();
+    await openBoard();
+    $("#comments-tool-toggle").click();
+    const rows = () => [...document.querySelectorAll("#comments-list .comment-row")];
+    expect(rows().map((r) => r.querySelector(".comment-row-variant").textContent)).toEqual(["one", "two"]);
+    expect(rows().map((r) => r.querySelector(".comment-row-num").textContent)).toEqual(["1", "1"]); // numbered per screen, like the pins
+    expect($("#comments-count-open").textContent).toBe("2");
+    expect($("#comments-count-resolved").textContent).toBe("1");
+    rows()[1].click();
+    const popover = $("#board-comment-canvas-layer .comment-popover");
+    expect(popover.hasAttribute("open")).toBe(true);
+    expect(popover.textContent).toContain("Check spacing");
+    expect(rows()[1].classList.contains("is-active")).toBe(true);
+    // The Resolved tab lists the resolved ones and shows their pins, with the panel open.
+    $("#comments-tab-resolved").click();
+    expect(rows().map((r) => r.querySelector(".comment-row-variant").textContent)).toEqual(["two"]);
+    expect(boardPins().some((p) => p.dataset.state === "resolved")).toBe(true);
+  });
+
+  it("the open count is a badge on the Comments tool while the pins are off", async () => {
     seed();
     await openBoard();
     const badge = $("#comment-count-badge");
-    expect(badge.hidden).toBe(true); // pressed: the pins say it
+    expect(badge.hidden).toBe(true); // the pins say it
     $("#comments-tool-toggle").click();
+    $("#comments-pins-toggle").click();
     expect(badge.hidden).toBe(false);
     expect(badge.textContent).toBe("2");
     expect($("#comments-tool-toggle").getAttribute("aria-label")).toBe("Comments on tiles, 2 open");
-    $("#comments-tool-toggle").click();
+    $("#comments-pins-toggle").click();
     expect(badge.hidden).toBe(true);
+  });
+
+  it("turning the pins off closes an open thread popover", async () => {
+    seed();
+    await openBoard();
+    $("#comments-tool-toggle").click();
+    press(boardPins()[0]);
+    expect($("#board-comment-canvas-layer .comment-popover").hasAttribute("open")).toBe(true);
+    $("#comments-pins-toggle").click();
+    expect($("#board-comment-canvas-layer .comment-popover").hasAttribute("open")).toBe(false);
   });
 
   it("Show resolved is on or off whatever the data: pressed state, tooltip with state and count, a hint at 0 (CHR-1292)", async () => {
@@ -207,8 +242,9 @@ describe("Board comments in the app", () => {
     key("M", { shiftKey: true });
     expect($("#resolved-toggle").getAttribute("aria-pressed")).toBe("true");
     key("m");
-    expect($("#comments-tool-toggle").getAttribute("aria-pressed")).toBe("false");
+    expect($("#comments-tool-toggle").getAttribute("aria-pressed")).toBe("true");
     key("m");
+    expect($("#comments-tool-toggle").getAttribute("aria-pressed")).toBe("false");
     $('.view-tab[data-view="screens"]').click();
     expect($("#resolved-toggle").hidden).toBe(false);
     expect($("#resolved-toggle").getAttribute("aria-pressed")).toBe("true"); // the state stays across views

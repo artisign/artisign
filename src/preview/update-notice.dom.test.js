@@ -8,7 +8,7 @@ import { resolve } from "node:path";
 import { cwd } from "node:process";
 import { fakeSettings } from "./fake-settings.test-helper.js";
 import { localDay } from "./update-notice.js";
-import { makeNativePopover } from "./dialog-stub.test-helper.js";
+import { makeNativePopover, installDialogStubs } from "./dialog-stub.test-helper.js";
 
 const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
 
@@ -417,6 +417,34 @@ describe("About status in the settings menu", () => {
     about = { version: "2.1.1", updateCheck: "on", latest: "2.4.0", updateAvailable: true };
     await openMenu();
     expect($("#settings-update-text").textContent).toBe("Version 2.4.0 available");
+  });
+});
+
+describe("with a modal dialog open", () => {
+  const dialog = () => $("#whats-new-dialog");
+
+  it("does not show over the dialog, and shows once the dialog has closed", async () => {
+    installDialogStubs();
+    about = { version: "2.1.1", updateCheck: "on", latest: "2.2.0", updateAvailable: false };
+    await boot();
+    dialog().showModal();
+    about = { version: "2.1.1", updateCheck: "on", latest: "2.2.0", updateAvailable: true };
+    $("#settings-trigger").click(); // a re-read finds the update while the dialog is up
+    await flush();
+    expect(shown()).toBe(false);
+    expect($("#update-live").textContent).toBe("artisign 2.2.0 is available"); // announced, though not drawn yet
+    dialog().close();
+    expect(shown()).toBe(true);
+  });
+
+  it("a dismissed or withdrawn notice does not appear when the dialog closes", async () => {
+    installDialogStubs();
+    await boot();
+    expect(shown()).toBe(true);
+    $("#update-toast-close").click();
+    dialog().showModal();
+    dialog().close();
+    expect(shown()).toBe(false);
   });
 });
 

@@ -12679,11 +12679,11 @@ body:has(#settings-menu:is(:popover-open, [data-open])) .update-toast {
   cursor: pointer;
 }
 
-.empty-recent-row:hover:not(:disabled) {
+.empty-recent-row:hover:not([aria-disabled="true"]) {
   background: var(--chrome-hover);
 }
 
-.empty-recent-row:disabled {
+.empty-recent-row[aria-disabled="true"] {
   cursor: progress;
   opacity: 0.6;
 }

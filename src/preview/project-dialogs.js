@@ -33,7 +33,7 @@ function failureMessage(err) {
  * Wires one dialog (open or init) to the shared `/api/fs/dirs` browsing logic.
  *
  * @param {HTMLElement} dialogEl
- * @param {{ mode: "open" | "init", onConfirm: (target: { dir: string, name?: string }) => Promise<{ ok: true } | { ok: false, message: string }>, onCancel: () => void }} options
+ * @param {{ mode: "open" | "init", onConfirm: (target: { dir: string, name?: string }, isCurrent: () => boolean) => Promise<{ ok: true } | { ok: false, message: string }>, onCancel: () => void }} options
  */
 function createBrowser(dialogEl, { mode, onConfirm, onCancel }) {
   const quickChips = /** @type {HTMLElement[]} */ ([...dialogEl.querySelectorAll(".quick-chip")]);
@@ -56,6 +56,7 @@ function createBrowser(dialogEl, { mode, onConfirm, onCancel }) {
   let newFolderRowEl = null; // the inline create row while it is open
   let busy = false; // an open / init request is in flight
   let loadSeq = 0; // a later load (or a close) supersedes an earlier one still in flight
+  let session = 0; // one per opening of the dialog: a confirm that outlives its session must leave the next one alone
 
   /** @param {string} path */
   function displayPath(path) {
@@ -420,15 +421,18 @@ function createBrowser(dialogEl, { mode, onConfirm, onCancel }) {
     busy = true;
     errorEl.hidden = true;
     updateHint();
+    const mine = session;
+    const isCurrent = () => mine === session;
     /** @type {{ ok: true } | { ok: false, message: string }} */
     let result;
     try {
-      result = await onConfirm(/** @type {{ dir: string, name?: string }} */ (target));
+      result = await onConfirm(/** @type {{ dir: string, name?: string }} */ (target), isCurrent);
     } catch (err) {
       result = { ok: false, message: failureMessage(err) };
     } finally {
-      busy = false; // never stuck: the button comes back whether the request answered, failed or threw
+      if (isCurrent()) busy = false; // never stuck: the button comes back whether the request answered, failed or threw
     }
+    if (!isCurrent()) return; // the dialog was closed (and maybe reopened) meanwhile: nothing of this answer belongs in it
     updateHint();
     if (!result.ok) {
       errorEl.textContent = result.message;
@@ -445,6 +449,7 @@ function createBrowser(dialogEl, { mode, onConfirm, onCancel }) {
   /** Back to nothing: no stale folders, name, hint or message stay behind a closed dialog, and a request still in flight cannot paint into it. */
   function clear() {
     loadSeq++;
+    session++;
     busy = false;
     currentPath = null;
     selectedProjectPath = null;
@@ -478,9 +483,9 @@ export function createProjectDialogs({ openDialogEl, initDialogEl, fallbackFocus
 
   const openBrowser = createBrowser(openDialogEl, {
     mode: "open",
-    onConfirm: async ({ dir }) => {
+    onConfirm: async ({ dir }, isCurrent) => {
       const result = await onOpen(dir);
-      if (result.ok) openModal.hide();
+      if (result.ok && isCurrent()) openModal.hide();
       return result;
     },
     onCancel: () => openModal.hide(),
@@ -488,9 +493,9 @@ export function createProjectDialogs({ openDialogEl, initDialogEl, fallbackFocus
 
   const initBrowser = createBrowser(initDialogEl, {
     mode: "init",
-    onConfirm: async ({ dir, name }) => {
+    onConfirm: async ({ dir, name }, isCurrent) => {
       const result = await onInit(dir, name ?? "");
-      if (result.ok) initModal.hide();
+      if (result.ok && isCurrent()) initModal.hide();
       return result;
     },
     onCancel: () => initModal.hide(),

@@ -29,8 +29,14 @@ export function createUpdateNotice({ toastEl, titleEl, commandEl, closeEl, liveE
 
   const isShown = () => (native ? toastEl.matches(":popover-open") : toastEl.hasAttribute("data-open"));
 
+  /** The toast is wanted (an update that was not dismissed), whether or not it can show right now. */
+  let wanted = false;
+  /** A modal dialog owns the page: a toast shown over its scrim would sit in the top layer above it, and inert. */
+  const dialogOpen = () => document.querySelector("dialog.float-dialog[open], dialog.uc-dialog[open]") !== null;
+
   /** @param {boolean} show */
   function setShown(show) {
+    if (show && dialogOpen()) show = false; // it shows once that dialog has closed
     if (show === isShown()) return;
     if (native) {
       if (show) toastEl.showPopover();
@@ -46,8 +52,12 @@ export function createUpdateNotice({ toastEl, titleEl, commandEl, closeEl, liveE
     const title = show ? `artisign ${about.latest} is available` : "";
     if (show && titleEl.textContent !== title) titleEl.textContent = title;
     if (liveEl.textContent !== title) liveEl.textContent = title;
+    wanted = show;
     setShown(show);
   }
+
+  // `close` does not bubble: capture it on the document to learn that a dialog has closed.
+  document.addEventListener("close", () => setShown(wanted), true);
 
   closeEl.addEventListener("click", () => {
     if (current?.latest) writeStringPref(storage, UPDATE_DISMISSED_KEY, `${localDay()}|${current.latest}`);

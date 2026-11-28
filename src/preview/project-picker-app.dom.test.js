@@ -292,13 +292,71 @@ describe("menu and empty-state rows are buttons without glyph icons (CHR-911)", 
     const row = () => $("#empty-recent-list .empty-recent-row");
     row().click();
     await flush();
-    expect(row().disabled).toBe(true); // a second press cannot start a second open
+    expect(row().getAttribute("aria-disabled")).toBe("true"); // a second press cannot start a second open
+    row().focus();
+    expect(document.activeElement).toBe(row()); // still focusable: the press does not drop the focus
     release();
     await flush();
     expect($("#empty-error").hidden).toBe(false);
     expect($("#empty-error").textContent).toBe("No artisign project at /work/gone.");
     expect($("#empty-error").getAttribute("role")).toBe("alert");
-    expect(row().disabled).toBe(false); // never stuck
+    expect(row().hasAttribute("aria-disabled")).toBe(false); // never stuck
+  });
+
+  it("the pressed recent row keeps the focus while it opens and after a failure", async () => {
+    projects = { active: null, open: [], recent: ["/work/gone"] };
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (url, init) => (String(url) === "/api/projects/open" ? { ok: false, status: 404, statusText: "x", json: async () => ({ message: "gone" }) } : realFetch(url, init)));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await boot();
+    const row = $("#empty-recent-list .empty-recent-row");
+    row.focus();
+    row.click();
+    expect(document.activeElement).toBe(row);
+    await flush(); // the failure re-reads the projects and rebuilds the rows
+    expect($("#empty-error").textContent).toBe("gone");
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it("a failure while applying an opened project is reported as what it is, not as a lost connection", async () => {
+    projects = { active: null, open: [], recent: ["/work/acme"] };
+    const realFetch = globalThis.fetch;
+    let applied = false;
+    vi.stubGlobal("fetch", async (url, init) => {
+      const path = String(url).split("?")[0];
+      if (path === "/api/projects/open") {
+        applied = true;
+        projects = { active: "/work/acme", open: [{ root: "/work/acme", name: "acme" }], recent: [] };
+        return { ok: true, status: 200, json: async () => projects };
+      }
+      if (applied && path === "/api/screens") throw new Error("screens exploded");
+      return realFetch(url, init);
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await boot();
+    $("#empty-recent-list .empty-recent-row").click();
+    await flush();
+    expect($("#empty-error").textContent).not.toBe("Could not reach artisign. Try again.");
+  });
+
+  it("the message of an earlier visit to the no-project card does not come back with it", async () => {
+    projects = { active: null, open: [], recent: ["/work/gone"] };
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (url, init) => (String(url) === "/api/projects/open" ? { ok: false, status: 404, statusText: "x", json: async () => ({ message: "gone" }) } : realFetch(url, init)));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await boot();
+    $("#empty-recent-list .empty-recent-row").click();
+    await flush();
+    expect($("#empty-error").hidden).toBe(false);
+    projects = { active: "/p", open: [{ root: "/p", name: "alpha" }], recent: [] };
+    emit(liveSource(), { type: "project-opened", root: "/p" });
+    await flush();
+    projects = { active: null, open: [], recent: ["/work/gone"] };
+    emit(liveSource(), { type: "project-closed", root: "/p" });
+    await flush();
+    expect($("#no-project-state").hidden).toBe(false);
+    expect($("#empty-error").hidden).toBe(true);
+    expect($("#empty-error").textContent).toBe("");
   });
 
   it("a request that breaks says so too, and the row comes back", async () => {
@@ -313,7 +371,7 @@ describe("menu and empty-state rows are buttons without glyph icons (CHR-911)", 
     $("#empty-recent-list .empty-recent-row").click();
     await flush();
     expect($("#empty-error").textContent).toBe("Could not reach artisign. Try again.");
-    expect($("#empty-recent-list .empty-recent-row").disabled).toBe(false);
+    expect($("#empty-recent-list .empty-recent-row").hasAttribute("aria-disabled")).toBe(false);
   });
 
   it("tells recents that share a base name apart by their shortened path, with the full path as title", async () => {

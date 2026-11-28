@@ -302,6 +302,23 @@ describe("the preview", () => {
     expect(preview().hidden).toBe(true);
   });
 
+  it("leaves Esc to an open modal dialog: the preview stays until the dialog is gone", () => {
+    const board = setup();
+    board.setData(data());
+    press(pins()[0]);
+    const dialog = document.body.appendChild(document.createElement("dialog"));
+    dialog.className = "float-dialog";
+    dialog.setAttribute("open", "");
+    const evt = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    document.body.dispatchEvent(evt);
+    expect(evt.defaultPrevented).toBe(false); // the browser can still close the dialog with it
+    expect(preview().hidden).toBe(false);
+    dialog.removeAttribute("open");
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect(preview().hidden).toBe(true);
+    dialog.remove();
+  });
+
   it("a count chip opens its first thread of that kind", () => {
     const board = setup();
     board.setData(data());

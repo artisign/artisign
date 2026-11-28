@@ -177,10 +177,16 @@ export function createProjectUI(elements, callbacks) {
     }
 
     // The card's primary action takes the focus when the card appears (design: autofocus on "Open project…"), unless focus is somewhere useful already. The `autofocus` attribute alone does not: the card is hidden when the page loads.
+    if (justEmptied) {
+      emptyErrorEl.hidden = true; // a message of an earlier visit to the card does not come back with it
+      emptyErrorEl.textContent = "";
+    }
     if (justEmptied && (document.activeElement === null || document.activeElement === document.body)) emptyBtnOpenEl.focus();
 
     // Recent projects: one link row per path (folder icon, the path, a chevron). The section is left out while there are none.
     emptyRecentEl.hidden = state.recent.length === 0;
+    // A rebuild must not drop focus that was on a row: it goes to the row of the same path, else to "Open project…".
+    const restoreFocus = captureFocus(emptyRecentListEl, "data-key", () => emptyBtnOpenEl);
     emptyRecentListEl.replaceChildren();
     for (const path of state.recent) {
       const item = document.createElement("li");
@@ -188,6 +194,7 @@ export function createProjectUI(elements, callbacks) {
       row.type = "button";
       row.className = "empty-recent-row";
       row.title = path;
+      row.dataset.key = path;
       const folder = document.createElement("span");
       folder.className = "empty-recent-icon icon";
       folder.setAttribute("aria-hidden", "true");
@@ -209,23 +216,28 @@ export function createProjectUI(elements, callbacks) {
       chevron.textContent = "chevron_right";
       row.append(folder, name, chevron);
       // A press opens the project; the row stays off while that runs and a failure is said in the card (never a dead click).
+      // `aria-disabled`, not `disabled`: a disabled row would drop the focus the press gave it.
       row.addEventListener("click", async () => {
-        if (row.disabled) return;
-        row.disabled = true;
+        if (row.getAttribute("aria-disabled") === "true") return;
+        row.setAttribute("aria-disabled", "true");
         emptyErrorEl.hidden = true;
+        let message = null;
         try {
-          const message = await onOpenRecent(path);
-          if (message) {
-            emptyErrorEl.textContent = message;
-            emptyErrorEl.hidden = false;
-          }
+          message = (await onOpenRecent(path)) ?? null;
+        } catch (err) {
+          message = err instanceof Error && err.message ? err.message : "Could not open the project. Try again.";
         } finally {
-          row.disabled = false;
+          row.removeAttribute("aria-disabled");
+        }
+        if (message) {
+          emptyErrorEl.textContent = message;
+          emptyErrorEl.hidden = false;
         }
       });
       item.append(row);
       emptyRecentListEl.append(item);
     }
+    restoreFocus();
   }
 
   /** @param {ProjectsState} next */

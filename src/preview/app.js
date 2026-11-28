@@ -728,19 +728,21 @@ const projectUI = createProjectUI(
     },
     // Answers the message to show when it fails (the no-project card says it; the project menu has no place for one).
     onOpenRecent: async (dir) => {
+      // Only the request itself is "could not reach artisign"; a failure while applying its result is reported as what it is (it propagates to the card).
+      let result;
       try {
-        const result = await openProject(dir);
-        if (result.ok) {
-          await applyProjectsResult(result.projects);
-          return null;
-        }
-        console.error(result.message);
-        await syncProjects(); // the recent path may no longer exist — drop it from the list
-        return result.message;
+        result = await openProject(dir);
       } catch (err) {
         console.error(err);
         return "Could not reach artisign. Try again.";
       }
+      if (result.ok) {
+        await applyProjectsResult(result.projects);
+        return null;
+      }
+      console.error(result.message);
+      await syncProjects(); // the recent path may no longer exist — drop it from the list
+      return result.message;
     },
     onOpenDialog: () => projectDialogs.showOpenDialog(),
     onInitDialog: () => projectDialogs.showInitDialog(),

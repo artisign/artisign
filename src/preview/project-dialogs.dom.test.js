@@ -520,6 +520,48 @@ describe("confirming an open / init: async, visible errors, never stuck", () => 
   });
 });
 
+describe("a confirm that outlives its dialog session", () => {
+  beforeEach(() => {
+    globalThis.fetch = vi.fn(async (url) => {
+      const path = new URL(url, "http://127.0.0.1").searchParams.get("path") ?? HOME;
+      return { ok: true, json: async () => ({ path, parent: null, home: HOME, entries: [{ name: "notes-app", path: `${path}/notes-app`, isArtisignProject: true }] }) };
+    });
+  });
+
+  async function pending(outcome) {
+    let release;
+    const gate = new Promise((r) => (release = r));
+    create({ onOpen: async () => (await gate, outcome()) });
+    dialogs.showOpenDialog();
+    await settle();
+    openEl.querySelector(".dir-row").click();
+    openEl.querySelector(".btn-confirm").click();
+    return release;
+  }
+
+  it("a success that arrives after close and reopen does not close the new session", async () => {
+    const release = await pending(() => ({ ok: true }));
+    dialogs.hide();
+    dialogs.showOpenDialog();
+    await settle();
+    release();
+    await settle();
+    expect(openEl.open).toBe(true);
+  });
+
+  it("an error that arrives after close and reopen paints nothing and leaves the new session's button alone", async () => {
+    const release = await pending(() => ({ ok: false, message: "old failure" }));
+    dialogs.hide();
+    dialogs.showOpenDialog();
+    await settle();
+    openEl.querySelector(".dir-row").click(); // the new session picks its own project
+    release();
+    await settle();
+    expect(openEl.querySelector(".dialog-error").hidden).toBe(true);
+    expect(openEl.querySelector(".btn-confirm").disabled).toBe(false);
+  });
+});
+
 describe("closing: state resets, nothing stale stays", () => {
   beforeEach(() => {
     globalThis.fetch = vi.fn(async (url) => {

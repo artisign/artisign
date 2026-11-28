@@ -9591,6 +9591,7 @@ body {
   right: 0;
   display: flex;
   justify-content: center;
+  box-sizing: border-box; /* the padding tool-bar.js sets makes room for a docked tool bar (CHR-1287) */
   pointer-events: none;
 }
 
@@ -9872,6 +9873,60 @@ body {
   user-select: none;
 }
 
+/* CHR-1287: the horizontal layout, docked at the bottom beside the zoom pill (tool-bar.js places it with inline left/top). Handle and fold at the left end, the separator turns upright. */
+#tool-bar[data-orientation="horizontal"] {
+  z-index: 21; /* the columns never cover a docked bar */
+  flex-direction: row;
+  width: max-content;
+  padding: var(--space-xs) var(--space-sm);
+}
+
+#tool-bar[data-orientation="horizontal"][data-collapsed="true"] {
+  padding-bottom: var(--space-xs);
+}
+
+#tool-bar[data-orientation="horizontal"] #tool-bar-head {
+  width: auto;
+  height: var(--size-tool);
+  gap: var(--space-2xs);
+  padding-left: 0;
+}
+
+#tool-bar[data-orientation="horizontal"] #tool-bar-grip .icon {
+  transform: none;
+}
+
+#tool-bar[data-orientation="horizontal"] #tool-bar-fold .icon {
+  transform: rotate(-90deg);
+}
+
+#tool-bar[data-orientation="horizontal"] #tool-bar-tools {
+  flex-direction: row;
+}
+
+#tool-bar[data-orientation="horizontal"] .tool-sep {
+  width: 0;
+  height: 28px;
+  margin: 0 var(--space-xs);
+  border-top: none;
+  border-left: 1px solid var(--chrome-border);
+}
+
+/* The dock preview: an outline where the bar will sit while the pointer is in the bottom snap zone. */
+.tool-dock-preview {
+  position: absolute;
+  z-index: 19;
+  box-sizing: border-box;
+  border: 2px dashed var(--chrome-focus-ring);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--chrome-focus-ring) 10%, transparent);
+  pointer-events: none;
+}
+
+.tool-dock-preview[hidden] {
+  display: none;
+}
+
 #tool-bar-head {
   display: flex;
   align-items: center;
@@ -10016,6 +10071,14 @@ body {
   background: var(--chrome-hint);
   color: var(--chrome-hint-text);
   overflow: visible;
+}
+
+/* Docked horizontally, the hint opens above the tool (CHR-1287). */
+.tool-hint[data-placement="top"] {
+  margin-inline-start: 0;
+  margin-block-end: var(--space-md);
+  position-area: block-start;
+  position-try-fallbacks: flip-block;
 }
 
 .tool-hint:popover-open {

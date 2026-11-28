@@ -2235,6 +2235,7 @@ const toolBar = createToolBar({
   liveEl: document.getElementById("tool-bar-live"),
   storage: prefsStorage,
   mac: macPlatform,
+  dock: { pillEl: document.getElementById("canvas-controls"), wrapEl: document.getElementById("zoom-pill-wrap") },
 });
 
 /** The tool button that opens each panel. */
@@ -2463,13 +2464,18 @@ const CARD_GAP = 16;
 /** What the floating cards cover of the window right now (canvas-insets.js). A folded Screens card covers only its head, which sits where the tool bar slides to, so it counts only while open. */
 function measureCanvasInsets() {
   const cards = [];
+  let dockedTop = null; // CHR-1287: a bar docked at the bottom takes from the bottom inset, not from a side
   for (const el of [sidebarScreensEl.dataset.collapsed === "true" ? null : sidebarScreensEl, document.getElementById("tool-bar"), document.getElementById("agent-bar"), toolPanelEl]) {
     if (!el || el.hidden) continue;
     const rect = el.getBoundingClientRect();
-    if (rect.width > 0) cards.push({ left: rect.left, right: rect.right });
+    if (rect.width <= 0) continue;
+    if (el.id === "tool-bar" && toolBar.orientation() === "horizontal") dockedTop = rect.top;
+    else cards.push({ left: rect.left, right: rect.right });
   }
   const style = getComputedStyle(appEl);
-  return computeCanvasInsets(appEl.clientWidth, cards, { top: parseFloat(style.getPropertyValue("--shell-top")) || 0, bottom: parseFloat(style.getPropertyValue("--shell-bottom")) || 0, gap: CARD_GAP });
+  const insets = computeCanvasInsets(appEl.clientWidth, cards, { top: parseFloat(style.getPropertyValue("--shell-top")) || 0, bottom: parseFloat(style.getPropertyValue("--shell-bottom")) || 0, gap: CARD_GAP });
+  if (dockedTop !== null) insets.bottom = Math.max(insets.bottom, appEl.getBoundingClientRect().bottom - dockedTop + CARD_GAP);
+  return insets;
 }
 
 // CHR-1299 — the insets the Screens canvas fits and centres in. A snapshot, taken when a fit is asked for (first fit, a view or project switch, a window resize, the Fit control) and kept otherwise: folding or opening a card never moves the frame.

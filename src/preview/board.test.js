@@ -12,7 +12,6 @@ import {
   clampZoom,
   computeFitAllZoom,
   computeBoardColumns,
-  zoomSliderOffset,
   labelDisplayMode,
   computeZoomAroundCursor,
   computeWheelZoomFactor,
@@ -24,8 +23,9 @@ import {
   DEFAULT_COLUMNS,
   BOARD_ZOOM_STEP,
   computeBoardVisibility,
-  formatBoardStatusText,
-  LOW_ZOOM_AFFORDANCE_THRESHOLD,
+  formatBoardStatus,
+  countBoardItems,
+  OVERVIEW_ZOOM_BELOW,
 } from "./board.js";
 
 describe("screenIdFromRef", () => {
@@ -388,35 +388,22 @@ describe("computeBoardColumns", () => {
   });
 });
 
-describe("zoomSliderOffset", () => {
-  it("sits at the track's start for the minimum zoom", () => {
-    expect(zoomSliderOffset(MIN_BOARD_ZOOM)).toBe(0);
-  });
-
-  it("sits at the track's end for the maximum zoom", () => {
-    expect(zoomSliderOffset(MAX_BOARD_ZOOM)).toBe(140);
-  });
-
-  it("maps 100% to the documented ~49% position along a 140px track", () => {
-    // (100 - 5) / (200 - 5) * 140 = 68.20...
-    expect(zoomSliderOffset(100)).toBeCloseTo(68.21, 1);
-  });
-
-  it("clamps an out-of-range zoom before mapping it", () => {
-    expect(zoomSliderOffset(9999)).toBe(140);
-    expect(zoomSliderOffset(-50)).toBe(0);
-  });
-});
-
 describe("labelDisplayMode", () => {
-  it("hides the label below 60%", () => {
-    expect(labelDisplayMode(59)).toBe("hidden");
+  it("hides the label on an overview, below 15%", () => {
+    expect(labelDisplayMode(14)).toBe("hidden");
     expect(labelDisplayMode(MIN_BOARD_ZOOM)).toBe("hidden");
   });
 
-  it("truncates the label between 60% and 100%", () => {
-    expect(labelDisplayMode(60)).toBe("truncated");
+  it("truncates the label between 15% and 100%: it keeps its size at every zoom and takes the tile's width", () => {
+    expect(labelDisplayMode(15)).toBe("truncated");
+    expect(labelDisplayMode(24)).toBe("truncated");
     expect(labelDisplayMode(99)).toBe("truncated");
+  });
+
+  it("a variant tile of an expanded cluster has no caption below 24%", () => {
+    expect(labelDisplayMode(23, { member: true })).toBe("hidden");
+    expect(labelDisplayMode(24, { member: true })).toBe("truncated");
+    expect(labelDisplayMode(23)).toBe("truncated"); // the main tile and plain tiles keep theirs
   });
 
   it("shows the full label at 100% and above", () => {
@@ -643,20 +630,47 @@ describe("computeBoardVisibility", () => {
   });
 });
 
-describe("formatBoardStatusText", () => {
-  it("matches the approved design's exact phrasing", () => {
-    expect(formatBoardStatusText({ shownCount: 4, matchCount: 3, pinnedCount: 2 })).toBe("4 shown — 3 matches · 2 pinned");
+describe("formatBoardStatus", () => {
+  it("says what is on the board, as the design words it", () => {
+    expect(formatBoardStatus(5, { filtered: true, presented: false })).toBe("5 on the board");
+    expect(formatBoardStatus(186, { filtered: false, presented: false })).toBe("All 186 on the board");
   });
 
-  it("formats a zero-everything empty state", () => {
-    expect(formatBoardStatusText({ shownCount: 0, matchCount: 0, pinnedCount: 0 })).toBe("0 shown — 0 matches · 0 pinned");
+  it("says the agent put it there while its notice is up", () => {
+    expect(formatBoardStatus(5, { filtered: true, presented: true })).toBe("5 shown by the agent");
+  });
+
+  it("says when there is nothing, whatever else is true", () => {
+    expect(formatBoardStatus(0, { filtered: true, presented: true })).toBe("Nothing on the board");
   });
 });
 
-describe("LOW_ZOOM_AFFORDANCE_THRESHOLD", () => {
-  it("is the same threshold labelDisplayMode uses to hide the label", () => {
-    expect(labelDisplayMode(LOW_ZOOM_AFFORDANCE_THRESHOLD)).not.toBe("hidden");
-    expect(labelDisplayMode(LOW_ZOOM_AFFORDANCE_THRESHOLD - 1)).toBe("hidden");
+describe("countBoardItems", () => {
+  const screens = [
+    { name: "home", tags: [] },
+    { name: "home-empty", tags: [], variant_of: "home", variant_kind: "state" },
+    { name: "home-error", tags: [], variant_of: "home", variant_kind: "state" },
+    { name: "cart", tags: [] },
+    { name: "login", tags: [] },
+  ];
+  it("counts a cluster once, with all its variants on the board (design: 5 clusters are 5)", () => {
+    expect(countBoardItems(screens, ["home", "home-empty", "home-error", "cart"], true)).toBe(2);
+  });
+  it("counts a cluster of which only a variant is shown", () => {
+    expect(countBoardItems(screens, ["home-error", "login"], true)).toBe(2);
+  });
+  it("counts every shown screen with clusters off, where each is a tile", () => {
+    expect(countBoardItems(screens, ["home", "home-empty", "home-error", "cart"], false)).toBe(4);
+  });
+  it("is 0 for an empty board", () => {
+    expect(countBoardItems(screens, [], true)).toBe(0);
+  });
+});
+
+describe("OVERVIEW_ZOOM_BELOW", () => {
+  it("is the threshold labelDisplayMode uses to hide the label (and the comment pins use to become dots)", () => {
+    expect(labelDisplayMode(OVERVIEW_ZOOM_BELOW)).not.toBe("hidden");
+    expect(labelDisplayMode(OVERVIEW_ZOOM_BELOW - 1)).toBe("hidden");
   });
 });
 
@@ -668,7 +682,10 @@ import {
   computeLayout,
   resolveEdgeEnd,
   resolveFlowEdge,
-  clusterTileScale,
+  BASE_GAP,
+  BASE_GAP_Y,
+  CAPTION_ROOM,
+  MAX_ROW_WIDTH,
   tileAboveExtent,
   MAX_TILES_PER_DEPTH,
 } from "./board.js";
@@ -804,40 +821,82 @@ describe("computeClusterLayout", () => {
     expect(layout.tiles.map((t) => t.screen)).toEqual(["dashboard", "cart", "plain"]);
   });
 
-  it("an expanded cluster lays depth 0..2 out left to right inside its frame, with connectors", () => {
+  it("a collapsed cluster draws a thumbnail for every variant of the family, also those that are not on the board", () => {
+    const model = buildBoardModel(clusterScreens, ["cart", "plain"], []); // only the main screen is shown
+    const layout = computeClusterLayout(model.items, sizes, { columns: 3 });
+    const frame = layout.frames.find((f) => f.root === "cart");
+    expect(frame.thumbs.map((t) => t.screen)).toEqual(["cart-clear", "cart-clear-confirm", "cart-clear-all", "cart-clear-no-save", "cart-two-items"]);
+  });
+
+  it("no label reaches the card or tile above it at any zoom from the overview zoom up (plain tiles and collapsed clusters)", () => {
+    const model = buildBoardModel(clusterScreens, allNames, []);
+    const layout = computeClusterLayout(model.items, sizes, { columns: 1, gapX: BASE_GAP, gapY: BASE_GAP_Y, padding: 10 });
+    // One column, so every item lies under the one before. A label is 18px high, 8px above its tile, on screen: 26 / zoom board px.
+    const boxes = model.items.map((item) => {
+      const name = item.type === "tile" ? item.screen : item.root;
+      const tile = layout.tiles.find((t) => t.screen === name);
+      const frame = layout.frames.find((f) => f.root === name);
+      return { name, tileTop: tile.y, cardTop: frame ? frame.y : tile.y - 40, cardBottom: frame ? frame.y + frame.height : tile.y + tile.height + 16 };
+    });
+    for (let zoom = OVERVIEW_ZOOM_BELOW; zoom <= 200; zoom += 5) {
+      const label = 26 / (zoom / 100);
+      for (let i = 1; i < boxes.length; i++) {
+        expect(boxes[i].tileTop - label, `${boxes[i].name} at ${zoom} %`).toBeGreaterThanOrEqual(boxes[i - 1].cardBottom);
+      }
+    }
+  });
+
+  it("the grid's row gap holds a label (26px on screen) down to the overview zoom, with the card's own padding", () => {
+    expect(26 / (OVERVIEW_ZOOM_BELOW / 100) + 16).toBeLessThanOrEqual(BASE_GAP_Y);
+  });
+
+  it("an expanded cluster is one row: the main screen and its variants side by side at native size, deeper levels as rows below, captions' room under each row", () => {
     const { layout } = layoutOf(["cart"]);
     const frame = layout.frames.find((f) => f.root === "cart");
     const at = (name) => layout.tiles.find((t) => t.screen === name);
+    // depth 0 and 1 share a row
+    expect(at("cart").y).toBe(at("cart-clear").y);
+    expect(at("cart-clear").y).toBe(at("cart-two-items").y);
     expect(at("cart").x).toBeLessThan(at("cart-clear").x);
-    expect(at("cart-clear").x).toBeLessThan(at("cart-clear-confirm").x);
-    expect(at("cart-clear-confirm").x).toBe(at("cart-clear-all").x);
-    for (const name of ["cart", "cart-clear", "cart-clear-no-save", "cart-two-items"]) {
+    expect(at("cart-clear").x).toBeLessThan(at("cart-two-items").x);
+    expect(at("cart").width).toBe(100); // native size
+    // depth 2 is the next row, with the first row's captions between
+    const rowBottom = at("cart").y + at("cart").height;
+    expect(at("cart-clear-confirm").y).toBeGreaterThanOrEqual(rowBottom + CAPTION_ROOM);
+    expect(at("cart-clear-confirm").y).toBe(at("cart-clear-all").y);
+    expect(at("cart-clear-confirm").x).toBe(at("cart").x); // rows start at the card's left padding
+    for (const name of ["cart", "cart-clear", "cart-two-items", "cart-clear-no-save"]) {
       const t = at(name);
       expect(t.x).toBeGreaterThanOrEqual(frame.x);
       expect(t.x + t.width).toBeLessThanOrEqual(frame.x + frame.width);
-      expect(t.y + t.height).toBeLessThanOrEqual(frame.y + frame.height);
+      expect(t.y + t.height + CAPTION_ROOM).toBeLessThanOrEqual(frame.y + frame.height); // the caption room is inside the card
     }
-    expect(at("cart").width).toBeLessThan(100); // shrunk cluster tiles
-    expect(layout.connectors).toEqual([
-      { from: "cart", to: "cart-clear" },
-      { from: "cart-clear", to: "cart-clear-confirm" },
-      { from: "cart-clear", to: "cart-clear-all" },
-      { from: "cart-clear", to: "cart-clear-no-save" },
-      { from: "cart", to: "cart-two-items" },
-    ]);
+    expect(at("cart").y).toBeGreaterThanOrEqual(frame.y + frame.headerHeight + tileAboveExtent()); // the label of the main screen is above
     expect(layout.mores).toEqual([]);
+    expect(layout.connectors).toBeUndefined();
   });
 
-  it("puts a '+N more' tile under a capped level", () => {
+  it("puts a '+N more' tile at the end of a capped row", () => {
     const many = [v("m"), ...Array.from({ length: 11 }, (_, i) => v(`m-${i}`, "m", "overlay"))];
     const model = buildBoardModel(many, many.map((s) => s.name), ["m"]);
     const layout = computeClusterLayout(model.items, {}, {});
     expect(layout.mores).toHaveLength(1);
     expect(layout.mores[0].names).toEqual(["m-8", "m-9", "m-10"]);
-    const lastTile = layout.tiles.filter((t) => t.screen.startsWith("m-")).sort((a, b) => b.y - a.y)[0];
-    expect(layout.mores[0].y).toBeGreaterThanOrEqual(lastTile.y + lastTile.height);
+    const lastTile = layout.tiles.filter((t) => t.screen.startsWith("m-")).sort((a, b) => b.x - a.x)[0];
+    expect(layout.mores[0].x).toBeGreaterThanOrEqual(lastTile.x + lastTile.width);
+    expect(layout.mores[0].y).toBe(lastTile.y);
     const frame = layout.frames[0];
-    expect(layout.mores[0].y + layout.mores[0].height).toBeLessThanOrEqual(frame.y + frame.height);
+    expect(layout.mores[0].x + layout.mores[0].width).toBeLessThanOrEqual(frame.x + frame.width);
+  });
+
+  it("draws a row smaller when it would run past the maximum row width", () => {
+    const many = [v("m"), ...Array.from({ length: 8 }, (_, i) => v(`m-${i}`, "m", "overlay"))];
+    const wide = Object.fromEntries(many.map((s) => [s.name, { width: 1100, height: 640 }]));
+    const layout = computeClusterLayout(buildBoardModel(many, many.map((s) => s.name), ["m"]).items, wide, {});
+    const frame = layout.frames[0];
+    expect(layout.tiles[0].width).toBeLessThan(1100);
+    expect(layout.tiles[0].width).toBeGreaterThan(0.2 * 1100 - 1);
+    expect(frame.width).toBeLessThanOrEqual(MAX_ROW_WIDTH + 2 * 24 + 1);
   });
 
   it("dimmed context ancestors do not count toward the per-level cap", () => {
@@ -864,23 +923,6 @@ describe("computeClusterLayout", () => {
     const level2 = model.clusters[0].levels.find((l) => l.depth === 2);
     expect(level2.tiles).toHaveLength(8);
     expect(level2.hidden.map((m) => m.screen)).toEqual(["m-ctx-8"]);
-  });
-
-  it("draws one connector from a parent to the '+N more' tile its folded children went into", () => {
-    const many = [v("m"), ...Array.from({ length: 11 }, (_, i) => v(`m-${i}`, "m", "overlay"))];
-    const model = buildBoardModel(many, many.map((s) => s.name), ["m"]);
-    const layout = computeClusterLayout(model.items, {}, {});
-    expect(layout.connectors.filter((c) => c.more)).toEqual([{ from: "m", to: layout.mores[0].id, more: true }]);
-    expect(layout.connectors).toHaveLength(8 + 1);
-  });
-
-  it("shrinks tiles of a very full level so the cluster stays a sane height", () => {
-    const many = [v("m"), ...Array.from({ length: 11 }, (_, i) => v(`m-${i}`, "m", "overlay"))];
-    const cluster = buildBoardModel(many, many.map((s) => s.name), ["m"]).clusters[0];
-    const scale = clusterTileScale(cluster, {});
-    expect(scale).toBeLessThan(0.6);
-    expect(scale).toBeGreaterThanOrEqual(0.2);
-    expect(clusterTileScale(buildBoardModel(clusterScreens, allNames, ["cart"]).clusters.find((c) => c.root === "cart"), sizes)).toBe(0.6);
   });
 
   it("all-plain items lay out exactly like the flat grid", () => {
@@ -972,46 +1014,35 @@ describe("Fit all with clusters", () => {
   });
 });
 
-// A tile's name label (and, for a pinned-outside-filter tile, its badge) is drawn ABOVE the tile, outside its box. The frame layout has to leave that room, or the label / badge lands on the frame header (or on the tile above).
-describe("label and badge room in cluster frames", () => {
+// A tile's name label is drawn ABOVE the tile, outside its box. The frame layout has to leave that room, or the label lands on the frame header (or on the tile above).
+describe("label room in cluster frames", () => {
   const options = { columns: 3, gapX: 10, gapY: 10, padding: 10 };
-  const layoutOf = (expanded, badged) => {
-    const model = buildBoardModel(clusterScreens, allNames, expanded);
-    return computeClusterLayout(model.items, sizes, { ...options, badged: new Set(badged) });
-  };
-  /** The y the tile's label / badge starts at. */
-  const top = (tile, badged) => tile.y - tileAboveExtent(badged.has(tile.screen));
+  const layoutOf = (expanded) => computeClusterLayout(buildBoardModel(clusterScreens, allNames, expanded).items, sizes, options);
+  /** The y the tile's label starts at. */
+  const top = (tile) => tile.y - tileAboveExtent();
 
-  it("reserves the extent in the collapsed frame: a pinned-outside-filter root's badge stays below the header", () => {
-    const badged = new Set(["cart"]);
-    const layout = layoutOf([], badged);
-    const frame = layout.frames.find((f) => f.root === "cart");
-    const main = layout.tiles.find((t) => t.screen === "cart");
-    expect(top(main, badged)).toBeGreaterThanOrEqual(frame.y + frame.headerHeight);
-    expect(main.y + main.height).toBeLessThanOrEqual(frame.y + frame.height);
-    // The unbadged cluster only reserves the label.
-    const other = layout.tiles.find((t) => t.screen === "dashboard");
-    const otherFrame = layout.frames.find((f) => f.root === "dashboard");
-    expect(top(other, badged)).toBeGreaterThanOrEqual(otherFrame.y + otherFrame.headerHeight);
+  it("reserves the extent in the collapsed frame: the label stays below the header", () => {
+    const layout = layoutOf([]);
+    for (const root of ["cart", "dashboard"]) {
+      const frame = layout.frames.find((f) => f.root === root);
+      const main = layout.tiles.find((t) => t.screen === root);
+      expect(top(main)).toBeGreaterThanOrEqual(frame.y + frame.headerHeight);
+      expect(main.y + main.height).toBeLessThanOrEqual(frame.y + frame.height);
+    }
   });
 
   it("an expanded frame clears the header for the first tile of every column and the tile above for the rest", () => {
-    const badged = new Set(["cart", "cart-clear", "cart-clear-confirm", "cart-clear-all", "cart-clear-no-save", "cart-two-items"]);
-    const layout = layoutOf(["cart"], badged);
+    const layout = layoutOf(["cart"]);
     const frame = layout.frames.find((f) => f.root === "cart");
     const inFrame = layout.tiles.filter((t) => frame.members.includes(t.screen));
     expect(inFrame.length).toBe(6);
     for (const tile of inFrame) {
-      expect(top(tile, badged), `${tile.screen} vs header`).toBeGreaterThanOrEqual(frame.y + frame.headerHeight);
+      expect(top(tile), `${tile.screen} vs header`).toBeGreaterThanOrEqual(frame.y + frame.headerHeight);
       for (const above of inFrame) {
         const sameColumn = above.x < tile.x + tile.width && tile.x < above.x + above.width;
-        if (above !== tile && sameColumn && above.y < tile.y) expect(top(tile, badged), `${tile.screen} vs ${above.screen}`).toBeGreaterThanOrEqual(above.y + above.height);
+        if (above !== tile && sameColumn && above.y < tile.y) expect(top(tile), `${tile.screen} vs ${above.screen}`).toBeGreaterThanOrEqual(above.y + above.height);
       }
       expect(tile.y + tile.height).toBeLessThanOrEqual(frame.y + frame.height);
     }
-  });
-
-  it("without a badged tile the extent is just the label's", () => {
-    expect(tileAboveExtent(false)).toBeLessThan(tileAboveExtent(true));
   });
 });

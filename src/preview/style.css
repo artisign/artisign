@@ -33,7 +33,6 @@
   --chrome-activity-read: #0d9488;
   --chrome-activity-write: #7c3aed;
   --chrome-edge: #9aa0c0;
-  --chrome-connector: #c4c4c4;
   --chrome-shadow-float: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 10px 28px rgba(40, 30, 20, 0.14);
   /* CHR-1267 — the Stitch chrome: dotted workspace, translucent floating surfaces, hint blue, agent violet. */
   --chrome-workspace: #f3f3f1;
@@ -145,7 +144,6 @@
   --chrome-activity-read: #2dd4bf;
   --chrome-activity-write: #a78bfa;
   --chrome-edge: #6b7090;
-  --chrome-connector: #4a4743;
   --chrome-shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.55);
   --chrome-workspace: #1a1917;
   --chrome-workspace-dot: #35322e;
@@ -760,43 +758,42 @@ body {
 
 /* On the selected row the chips lift onto the raised surface. */
 
-/* Shared `$pin-button` look (CHR-624) — the sidebar row's own pin button
-   (.screen-item-pin) and the board tile's (.board-tile-pin) both carry this
-   base class, then add their own positioning on top (a sidebar row and a
-   board tile size/place it differently, but the button itself — the 22px
-   box, the icon, the pinned/unpinned color swap — is identical). */
-.pin-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-sm);
-  background: var(--chrome-raised);
-  border: 1px solid var(--chrome-border-strong);
-  color: var(--chrome-text-tertiary);
-  cursor: pointer;
-  padding: 0;
-}
-
-.pin-button.pinned {
-  background: var(--chrome-accent);
-  border-color: var(--chrome-accent);
-  color: var(--chrome-primary-text);
-}
-
-/* A sidebar row's pin shows on hover/focus and always once pinned, so the unpinned rows stay quiet (opacity only: no layout shift). While hidden it takes no clicks; keyboard focus still reaches it and reveals it. Without hover (touch) it is always shown. */
+/* The pin toggle of a list row (design `pin-toggle`): a 26px ring, accent-filled while the screen is pinned. In the Screens view it shows on hover and focus and always once pinned, so the unpinned rows stay quiet (opacity only: no layout shift; hidden it takes no clicks, keyboard focus still reaches it and reveals it); on the Board's list (`.always`) it is always there. Without hover (touch) it is always shown. */
 .screen-item-pin {
   position: absolute;
   top: 4px;
   right: var(--space-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--chrome-border-strong);
+  color: var(--chrome-text-tertiary);
+  cursor: pointer;
   opacity: 0;
   pointer-events: none;
 }
 
+.screen-item-pin.pinned {
+  background: var(--chrome-accent);
+  box-shadow: none;
+  color: var(--chrome-primary-text);
+}
+
+.screen-item-pin .icon {
+  font-size: var(--size-icon-xs);
+  line-height: 1;
+}
+
 #screen-list li:hover > .screen-item-pin,
 #screen-list li:focus-within > .screen-item-pin,
-.screen-item-pin.pinned {
+.screen-item-pin.pinned,
+.screen-item-pin.always {
   opacity: 1;
   pointer-events: auto;
 }
@@ -1851,219 +1848,51 @@ button.chrome-section-header:focus-visible {
   max-width: 780px;
 }
 
-/* Board view */
+/* Board view (CHR-1271): the canvas between the tool bar and the Agent bar, on the open dotted workspace. Its controls live in the shell (zoom pill, tool bar, left card). */
 
 #board-view {
-  background: var(--chrome-canvas);
-  display: flex;
-  flex-direction: column;
-  /* .main-view sets overflow: auto/height: 100% for the single-pane views
-     (screens/mockup/design-system) — the board has its own toolbar sibling
-     above the scrollable surface, so it must not scroll as a whole. */
+  /* The workspace dots of #app show through. */
+  background: none;
+  right: var(--reserve-right);
+  bottom: var(--shell-bottom);
   overflow: hidden;
 }
 
-/* Board-tab-only bar (CHR-623), same chrome tokens as #topbar. CHR-915: 12px labels, 6px radius, the zoom slider as drawn in `$zoom-slider`. */
-#board-toolbar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-lg);
-  padding: var(--space-sm) var(--space-xl);
-  height: 40px;
-  border-bottom: 1px solid var(--chrome-border);
-  background: var(--chrome-bar);
+#board-view[hidden] {
+  display: none;
 }
 
-.board-quickjump,
-.toggle-button {
-  border: 1px solid var(--chrome-border-strong);
-  border-radius: var(--radius-sm);
-  padding: var(--space-sm) var(--space-pad);
-  font: inherit;
-  font-size: var(--ui-sm);
-  color: var(--chrome-text-secondary);
-  background: var(--chrome-raised);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.board-quickjump:hover,
-.toggle-button:hover {
-  background: var(--chrome-hover);
-}
-
-.board-quickjump:focus-visible,
-.toggle-button:focus-visible,
-.board-zoom-step:focus-visible,
-#board-zoom-range:focus-visible,
-#board-presented-dismiss:focus-visible,
-.board-cluster-header:focus-visible {
+#board-view button:focus-visible {
   outline: 2px solid var(--chrome-focus-ring);
   outline-offset: 1px;
 }
 
-/* Active only when the slider's current value exactly matches this shortcut's target — see board.js's updateBoardToolbar in board-view.js. */
-.board-quickjump[aria-pressed="true"] {
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-  font-weight: 500;
-  border-color: var(--chrome-accent);
-}
-
-/* The Edges / Clusters toggles: "On" is the resting state, so it takes the quiet tinted look of the design rather than a filled accent. */
-.toggle-button[aria-pressed="true"] {
-  background: var(--chrome-accent-subtle);
-  border-color: var(--chrome-border-strong);
-  color: var(--chrome-accent);
-  font-weight: 500;
-}
-
-.toggle-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-#board-toolbar-divider {
-  width: 1px;
-  height: 20px;
-  background: var(--chrome-border);
-}
-
-#board-zoom-slider {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.board-zoom-step {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 1px solid var(--chrome-border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--chrome-raised);
-  color: var(--chrome-text);
-  cursor: pointer;
-}
-
-.board-zoom-step .icon {
-  font-size: var(--size-icon-sm);
-}
-
-/* aria-disabled, not the disabled attribute (CHR-623 review finding 8) — a hard-disabled button can't hold keyboard focus; see app.js's updateBoardToolbar for the full reasoning. */
-.board-zoom-step[aria-disabled="true"] {
-  background: var(--chrome-field);
-  color: var(--chrome-text-tertiary);
-  cursor: not-allowed;
-}
-
-/* A native <input type="range"> styled to the $zoom-slider design (a thin filled track + a round thumb) rather than a hand-built track/thumb pair — keyboard control and accessible semantics come for free this way. The filled portion is a background gradient recomputed in JS on every value change (app.js's updateBoardToolbar), since a plain <input type=range> has no CSS-only way to color only the "filled" side of the track. */
-#board-zoom-range {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 140px;
-  height: 4px;
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-}
-
-#board-zoom-range::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: var(--radius-pill);
-}
-
-#board-zoom-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
-  margin-top: -4px;
-  border-radius: 50%;
-  background: var(--chrome-accent);
-  border: 2px solid var(--chrome-raised);
-  box-shadow: var(--chrome-shadow-float);
-  cursor: pointer;
-}
-
-#board-zoom-range::-moz-range-track {
-  height: 4px;
-  border-radius: var(--radius-pill);
-  background: var(--chrome-border);
-}
-
-#board-zoom-range::-moz-range-progress {
-  height: 4px;
-  border-radius: var(--radius-pill);
-  background: var(--chrome-accent);
-}
-
-#board-zoom-range::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--chrome-accent);
-  border: 2px solid var(--chrome-raised);
-  box-shadow: var(--chrome-shadow-float);
-  cursor: pointer;
-}
-
-#board-zoom-readout {
-  font-size: var(--ui-sm);
-  color: var(--chrome-text);
-  min-width: 36px;
-}
-
-#board-toolbar-spacer {
-  flex: 1;
-}
-
-#board-toolbar-status {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-}
-
-#board-toolbar-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-}
-
-/* The scroll container — #board-canvas is sized in JS (board-view.js) to
-   the tile content's SCALED (zoomed) pixel size, so native scrolling
-   (including smooth-scroll centering on flow navigation and zoom-around-
-   cursor) just works without any extra pan/zoom logic. */
+/* The scrollable canvas: #board-canvas inside is sized to the zoomed content, so native scrolling and zoom-around-cursor work against the real post-zoom size. */
 #board-surface {
-  position: relative;
-  flex: 1;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   overflow: auto;
 }
 
-/* CHR-625 — pill banner over #board-surface, independent of #board-canvas's
-   zoom transform/scroll position, same rationale as #board-empty-state
-   below. z-index above #board-tiles (1) so it stays readable over a tile
-   scrolled underneath it. */
+/* CHR-625 — the pill above the zoom pill: the agent switched the human to the Board. Independent of #board-canvas's zoom transform and scroll position. A live region: it is unhidden before its text is written. */
 #board-presented-banner {
   position: absolute;
-  top: var(--space-lg);
+  bottom: var(--space-md);
   left: 50%;
   transform: translateX(-50%);
   z-index: 2;
   display: flex;
   align-items: center;
   gap: var(--space-md);
-  background: var(--chrome-accent-subtle);
-  border: 1px solid var(--chrome-accent);
+  max-width: calc(100% - 2 * var(--space-xl));
+  padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-lg);
   border-radius: var(--radius-pill);
-  padding: var(--space-sm) var(--space-lg);
-  box-shadow: var(--chrome-shadow-float);
+  background: var(--chrome-float);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--chrome-shadow-card);
+  color: var(--chrome-text);
+  font-size: var(--ui-sm);
+  white-space: nowrap;
 }
 
 #board-presented-banner[hidden] {
@@ -2071,44 +1900,58 @@ button.chrome-section-header:focus-visible {
 }
 
 #board-presented-icon {
-  font-size: var(--size-icon-sm);
-  color: var(--chrome-accent);
+  flex: none;
+  width: var(--size-indicator);
+  height: var(--size-indicator);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-agent);
 }
 
 #board-presented-text {
-  color: var(--chrome-accent);
-  font-size: var(--ui-sm);
-  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#board-presented-text b {
+  font-weight: 600;
 }
 
 #board-presented-dismiss {
   display: flex;
+  padding: var(--space-2xs);
   border: none;
+  border-radius: var(--radius-pill);
   background: none;
-  color: var(--chrome-accent);
-  padding: 0 0 0 var(--space-xs);
-  border-radius: var(--radius-xs);
+  color: var(--chrome-text-secondary);
   cursor: pointer;
+}
+
+#board-presented-dismiss:hover {
+  background: var(--chrome-hover);
 }
 
 #board-presented-dismiss .icon {
   font-size: var(--size-icon-sm);
 }
 
-/* CHR-624 — centered over #board-surface, independent of #board-canvas's
-   zoom transform/scroll position (a "no tiles" message has no zoom level of
-   its own). */
+/* CHR-624 — the card in the middle of the board when nothing is on it (design `board-view-empty`). Independent of the canvas's zoom and scroll. */
 #board-empty-state {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-md);
-  max-width: 360px;
-  margin: 0 auto;
+  gap: var(--space-sm);
+  width: min(360px, calc(100% - 2 * var(--space-xl)));
   padding: var(--space-2xl);
+  border-radius: var(--radius-card);
+  background: var(--chrome-float);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--chrome-shadow-card);
   text-align: center;
 }
 
@@ -2118,19 +1961,28 @@ button.chrome-section-header:focus-visible {
 
 #board-empty-icon {
   color: var(--chrome-text-tertiary);
-  font-size: 32px;
+  font-size: 28px;
 }
 
 #board-empty-title {
   font-size: var(--ui-title);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--chrome-text);
 }
 
 #board-empty-body {
-  font-size: var(--ui-base);
-  color: var(--chrome-text-tertiary);
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
   line-height: 1.5;
+  white-space: pre-line;
+}
+
+#board-empty-clear {
+  margin-top: var(--space-md);
+}
+
+#board-empty-clear[hidden] {
+  display: none;
 }
 
 /* Sizing wrapper only — no transform of its own, so its layout box (which
@@ -2163,15 +2015,18 @@ button.chrome-section-header:focus-visible {
   pointer-events: none;
 }
 
+/* The flow arrows: dashed hairlines with a small head (design `board-view`). A highlighted source's edges are solid accent. */
 .board-edge {
   fill: none;
   stroke: var(--chrome-edge);
-  stroke-width: 2px;
+  stroke-width: calc(1.5px / var(--bz, 1)); /* a hairline at every zoom */
+  stroke-dasharray: calc(6px / var(--bz, 1)) calc(5px / var(--bz, 1));
 }
 
 .board-edge.highlighted {
   stroke: var(--chrome-accent);
-  stroke-width: 3.5px;
+  stroke-width: calc(3px / var(--bz, 1));
+  stroke-dasharray: none;
 }
 
 .board-edge-arrow {
@@ -2182,89 +2037,182 @@ button.chrome-section-header:focus-visible {
   fill: var(--chrome-accent);
 }
 
+/* A screen on the board: its frame, white, with the frame shadow. The card around it (and the label above it) belong to the tile; inside a cluster the cluster's frame is the card. */
 .board-tile {
   position: absolute;
-  background: var(--chrome-raised);
-  border-radius: 8px;
-  box-shadow: var(--frame-tile-shadow);
+  background: var(--frame-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--chrome-shadow-frame);
 }
 
-/* CHR-624 — a tile on the board SOLELY because it's pinned, not because it
-   also matches the shared filter (the `$board-tile` `outside-filter`
-   variant). Dashed, not solid, so it reads as distinct from every
-   filter-matching tile's own (undashed) box-shadow-only default look at a
-   glance. `outline`, not `border` (review fix 7) — .board-tile's own
-   width/height are set inline by board-view.js to an exact pixel size, and
-   a `border` is part of the box (even under this file's global
-   `box-sizing: border-box`, it still insets the padding box those
-   dimensions are relative to); .board-tile-frame is positioned `top: 0;
-   left: 0` against that padding box, so a `border` here shifted it 2px
-   down/right and let it overhang. `outline` never participates in the box
-   model — `outline-offset: -2px` keeps the same visual position a `border`
-   would have had. */
-.board-tile.outside-filter {
-  outline: 2px dashed var(--chrome-accent);
-  outline-offset: -2px;
+/* The agent writes this screen: the violet ring of the Agent bar and the "Writing" chip. */
+.board-tile.writing {
+  box-shadow: 0 0 0 calc(2px / var(--bz, 1)) var(--chrome-agent), var(--chrome-shadow-frame);
 }
 
-/* `margin-bottom` clears .board-tile-label's own row entirely, not just a
-   small gap (review fix 7): both used to sit on the same `bottom: 100%`
-   line, right-aligned here vs. left-aligned + nowrap there, so a long
-   screen name grew straight into this badge's text; and at the old,
-   smaller margin the badge's own bottom edge came within 2px of
-   .board-tile-pin's top (`top: -8px`), overlapping it. --space-2xl clears
-   the label's ~20px total footprint (its own margin-bottom + line box)
-   with a few px to spare, which also puts this well clear of the pin. */
-.board-tile-badge {
+/* The main screen of an expanded cluster is its `current` member (design `cluster-member` current): ringed in accent. */
+.board-tile.current {
+  box-shadow: 0 0 0 calc(2px / var(--bz, 1)) var(--chrome-accent), var(--chrome-shadow-frame);
+}
+
+.board-tile.current.writing {
+  box-shadow: 0 0 0 calc(2px / var(--bz, 1)) var(--chrome-agent), var(--chrome-shadow-frame);
+}
+
+/* The card of a tile outside a cluster (design `board-cluster`): label zone above, padding around. Behind the frame, never in the way of a press. */
+.board-tile:not(.in-cluster)::before {
+  content: "";
   position: absolute;
-  bottom: 100%;
-  right: 0;
-  margin-bottom: var(--space-2xl);
-  font-size: var(--ui-chip);
-  line-height: var(--size-chip-h);
-  padding: 0 var(--space-sm);
-  border-radius: var(--radius-pill);
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-  white-space: nowrap;
+  inset: -40px -16px -16px;
+  z-index: -1;
+  border-radius: var(--radius-card);
+  background: var(--chrome-cluster);
+  box-shadow: 0 0 0 calc(1px / var(--bz, 1)) var(--chrome-border);
+  pointer-events: none;
 }
 
-/* Overlaps the tile's own top-right corner, unclipped — same reasoning as
-   .board-tile-label's overflow-visible placement above the tile: .board-tile
-   itself doesn't clip (only .board-tile-frame, for the iframe's rounded
-   corners, does), so a child positioned partly outside the tile's own box
-   still renders in full. Hidden below LOW_ZOOM_AFFORDANCE_THRESHOLD when
-   NOT pinned — see board-view.js's applyZoomDependentTileChrome; a pinned
-   tile's button always stays visible, at any zoom. */
-.board-tile-pin {
-  position: absolute;
-  top: -8px;
-  right: -8px;
+/* CHR-624 — on the board SOLELY because it is pinned, not because it matches the shared filter: the card (or the cluster's frame) gets the dashed accent outline (design `board-cluster` outside). */
+.board-tile.outside-filter:not(.in-cluster)::before {
+  box-shadow: none;
+  outline: calc(1.5px / var(--bz, 1)) dashed color-mix(in srgb, var(--chrome-accent) 55%, transparent);
 }
 
+/* The label (design `frame-label`): one size at every zoom — the tile's own box scales, the label divides the zoom back out. Its width is the tile's width on screen (at least 88px). */
 .board-tile-label {
   position: absolute;
   bottom: 100%;
   left: 0;
-  margin-bottom: var(--space-sm);
-  font-size: var(--ui-xs);
-  font-weight: 500;
-  color: var(--chrome-text);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: max(calc(100% * var(--bz, 1)), 88px);
+  height: 18px;
+  margin-bottom: calc(8px / var(--bz, 1));
+  font-size: var(--ui-sm);
+  font-weight: 600;
+  color: var(--chrome-text-secondary);
   white-space: nowrap;
+  transform-origin: left bottom;
+  transform: scale(calc(1 / var(--bz, 1)));
+  /* Only the pin mark takes presses: the label lies over the cluster header, whose toggle must stay reachable. */
+  pointer-events: none;
 }
 
-/* Zoom-dependent label rendering (CHR-623, board.js's labelDisplayMode):
-   hidden below 60% board zoom (illegible at that scale), truncated to the
-   tile's own width from 60% up to 100%, full (this block's plain
-   white-space: nowrap above) at 100% and above. `max-width` is set inline
-   per tile (board-view.js) since it depends on that tile's own width. */
-.board-tile-label[data-mode="hidden"] {
+.board-tile-label[data-mode="hidden"],
+.board-tile-caption[data-mode="hidden"] {
   display: none;
 }
 
-.board-tile-label[data-mode="truncated"] {
+/* The caption of a variant in an expanded cluster (design `cluster-member`): below its frame, a small name; its pin mark and chips come after it. The main screen's caption is plain text, "default", in accent. */
+.board-tile.member .board-tile-label,
+.board-tile-caption {
+  top: 100%;
+  bottom: auto;
+  height: 16px;
+  margin: calc(8px / var(--bz, 1)) 0 0;
+  font-size: var(--ui-2xs);
+  font-weight: 500;
+  transform-origin: left top;
+}
+
+.board-tile-caption {
+  position: absolute;
+  left: 0;
+  width: max(calc(100% * var(--bz, 1)), 60px);
+  overflow: hidden;
+  color: var(--chrome-accent);
+  font-weight: 600;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: scale(calc(1 / var(--bz, 1)));
+  pointer-events: none;
+}
+
+/* The room the label keeps for the comment chips, which board-comments.js draws over it. */
+.board-tile-chips-slot {
+  flex: none;
+}
+
+/* At 100 % and above the full name shows, whatever the tile's width. */
+.board-tile-label[data-mode="full"] {
+  width: max-content;
+  min-width: calc(100% * var(--bz, 1));
+}
+
+.board-tile-viewport {
+  flex: none;
+  font-size: var(--size-icon-xs);
+}
+
+/* The name keeps its size (the count gives way first); only a name longer than the label itself is cut. */
+.board-tile-name {
+  flex: 0 0 auto;
+  max-width: calc(100% - 20px);
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The count gives way first when the label is tight. */
+.board-tile-count {
+  flex: 0 100 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--ui-2xs);
+  font-weight: 500;
+  color: var(--chrome-text-tertiary);
+}
+
+/* The pin mark of a pinned screen, right-aligned in the label; pressing it unpins. */
+.board-tile-pin {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+  pointer-events: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--chrome-accent);
+  cursor: pointer;
+}
+
+.board-tile-pin[hidden] {
+  display: none;
+}
+
+.board-tile-pin .icon {
+  font-size: var(--size-icon-xs);
+}
+
+/* The chip on the screen the agent writes (design `board-cluster` writing), top-right, one size at every zoom. */
+.board-tile-writing {
+  position: absolute;
+  top: calc(5px / var(--bz, 1));
+  right: calc(5px / var(--bz, 1));
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  height: 16px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-agent);
+  color: var(--chrome-primary-text);
+  font-size: var(--ui-badge);
+  font-weight: 600;
+  line-height: 1;
+  transform-origin: top right;
+  transform: scale(calc(1 / var(--bz, 1)));
+}
+
+.board-tile-writing[hidden] {
+  display: none;
+}
+
+.board-tile-writing .icon {
+  font-size: 11px;
 }
 
 .board-tile-frame {
@@ -2273,7 +2221,7 @@ button.chrome-section-header:focus-visible {
   left: 0;
   transform-origin: top left;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .board-tile-iframe {
@@ -2795,10 +2743,7 @@ button.chrome-section-header:focus-visible {
   opacity: 0.4;
 }
 
-/* CHR-733 — board clusters (approved `variants-board` c-clusters / c-clusters-collapsed). */
-#board-collapse-all-btn[hidden] {
-  display: none;
-}
+/* CHR-733 — board clusters (design `board-cluster`, `board-cluster-expanded`, `cluster-toggle`, `cluster-thumb`). */
 
 /* Under the tiles (earlier in DOM order); only the header buttons take clicks. */
 .board-frames {
@@ -2810,126 +2755,124 @@ button.chrome-section-header:focus-visible {
 .board-cluster-frame {
   position: absolute;
   box-sizing: border-box;
-  border: 1.5px solid var(--chrome-edge);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--chrome-raised) 45%, transparent);
+  border-radius: var(--radius-card);
+  background: var(--chrome-cluster);
+  box-shadow: 0 0 0 calc(1px / var(--bz, 1)) var(--chrome-border);
+}
+
+.board-cluster-frame.outside-filter {
+  box-shadow: none;
+  outline: calc(1.5px / var(--bz, 1)) dashed color-mix(in srgb, var(--chrome-accent) 55%, transparent);
 }
 
 .board-cluster-frame.expanded {
-  border-color: var(--chrome-accent);
-  background: var(--chrome-accent-subtle);
+  box-shadow: 0 0 0 calc(1.5px / var(--bz, 1)) var(--chrome-accent);
+  outline: none;
 }
 
+/* The header zone above the main frame: a press anywhere on it expands or collapses; what it shows is the toggle. */
 .board-cluster-header {
   pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
+  position: relative;
+  display: block;
   width: 100%;
-  overflow: hidden;
-  padding: 0 var(--space-lg);
+  padding: 0;
   border: none;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
   background: transparent;
   font: inherit;
-  font-size: var(--ui-xs);
-  color: var(--chrome-text);
-  white-space: nowrap;
   cursor: pointer;
-  text-align: left;
 }
 
-.board-cluster-header b {
-  flex: 0 1 auto;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-md);
-  font-weight: 500;
-}
-
-.board-cluster-chevron {
-  font-size: var(--size-icon-sm);
-}
-
-/* In a narrow frame the meta shrinks first (flex-shrink 10), then the name ellipsizes; the "collapse" action never shrinks. */
-.board-cluster-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.board-cluster-header > span:not(.board-cluster-action) {
-  flex: 0 10 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-}
-
-/* "collapse" on an open cluster, pushed to the right edge. */
-.board-cluster-action {
+/* The toggle (design `cluster-toggle`) keeps one size at every zoom. Collapsed it waits beside the card until the header is hovered or focused; expanded it sits in the header, always shown. */
+.board-cluster-toggle {
+  position: absolute;
+  /* On the label's row: its bottom edge is 8px (on screen) above the main frame, which starts 64 board px (header + label room) below the card's top. */
+  top: calc(64px - 28px / var(--bz, 1));
+  left: calc(100% + 8px / var(--bz, 1));
   display: inline-flex;
   align-items: center;
   gap: var(--space-2xs);
-  flex: none;
-  margin-left: auto;
+  height: 20px;
+  padding: 0 var(--space-sm) 0 var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-float);
+  box-shadow: var(--chrome-shadow-raised);
+  color: var(--chrome-text);
   font-size: var(--ui-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  z-index: 2; /* above the tiles of the card next to it */
+  transform-origin: left top;
+  transform: scale(calc(1 / var(--bz, 1)));
+}
+
+.board-cluster-header:hover .board-cluster-toggle,
+.board-cluster-header:focus-visible .board-cluster-toggle {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .board-cluster-toggle {
+    opacity: 1;
+  }
+}
+
+.board-cluster-frame.expanded .board-cluster-toggle {
+  background: var(--chrome-accent-subtle);
+  box-shadow: none;
   color: var(--chrome-accent);
+  opacity: 1;
+}
+
+/* A card wide enough on screen holds the Collapse toggle in its header, right of the label. */
+.board-cluster-frame.expanded.roomy .board-cluster-toggle {
+  left: auto;
+  right: calc(12px / var(--bz, 1));
+  transform-origin: right top;
+}
+
+.board-cluster-toggle .icon {
+  font-size: var(--size-icon-xs);
 }
 
 .board-cluster-thumbs {
   position: absolute;
-  left: 12px;
-  right: 12px;
+  left: 16px;
+  right: 16px;
   display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 36px;
+  align-items: flex-start;
+  gap: var(--space-xs);
 }
 
-/* The $micro-thumb: 12 x 26, a sheet strip for overlays, dashed for a deeper level. */
+/* The thumbnail of a variant (design `cluster-thumb`): the shape of its viewport, the first one — the frame above — ringed in accent. */
 .board-cluster-thumb {
-  position: relative;
-  display: inline-block;
-  width: 12px;
-  height: 26px;
+  display: block;
+  flex: none;
   box-sizing: border-box;
-  border: 1px solid var(--chrome-border-strong);
   border-radius: 3px;
-  background: var(--frame-surface);
-  overflow: hidden;
+  background: var(--chrome-raised);
+  box-shadow: 0 0 0 1px var(--chrome-border-strong);
 }
 
-.board-cluster-thumb.kind-overlay::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 34%;
-  background: var(--chrome-accent);
+.board-cluster-thumb.desktop {
+  width: 30px;
+  height: 19px;
 }
 
-.board-cluster-thumb.kind-state,
-.board-cluster-thumb.kind-step {
-  background: var(--frame-surface-muted);
+.board-cluster-thumb.mobile {
+  width: 14px;
+  height: 30px;
 }
 
-/* Two text lines on a state thumb. */
-.board-cluster-thumb.kind-state::after {
-  content: "";
-  position: absolute;
-  left: 1px;
-  right: 1px;
-  top: 2px;
-  height: 1.5px;
-  background: currentColor;
-  box-shadow: 0 3px 0 currentColor;
+.board-cluster-thumb.on {
+  box-shadow: 0 0 0 1.5px var(--chrome-accent);
 }
 
 .board-cluster-thumb.deeper {
-  border-style: dashed;
+  box-shadow: 0 0 0 1px var(--chrome-border-strong);
+  opacity: 0.6;
 }
 
 .board-cluster-thumbs-more {
@@ -2953,12 +2896,6 @@ button.chrome-section-header:focus-visible {
 
 .board-tile.context {
   opacity: 0.55;
-}
-
-.board-connector {
-  fill: none;
-  stroke: var(--chrome-connector);
-  stroke-width: 2px;
 }
 
 .board-edge-label rect {
@@ -9809,21 +9746,20 @@ button.uc-target:hover {
   outline-offset: 2px;
 }
 
-/* The tile's name-bar chips: right-aligned in the label row above the tile, left of its pin button, scaled with the tile like the label. The solid backdrop keeps a long name legible underneath. */
+/* The tile's count chips (design `board-cluster`): in the label row above the tile, right after the label's text; board-comments.js sets left, top and height from where the label ends. Native size at every zoom, like the label. */
+.board-comment-chips[hidden] {
+  display: none;
+}
+
 .board-comment-chips {
   position: absolute;
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  padding-left: var(--space-sm);
-  margin-top: calc(-4px * var(--board-scale, 1));
-  transform: translate(-100%, -100%) scale(var(--board-scale, 1));
-  transform-origin: 100% 100%;
-  background: var(--chrome-canvas);
   pointer-events: auto;
 }
 
-/* Below 60 % zoom: one count dot inside the tile's top-left corner. */
+/* Below 15 % zoom: one count dot inside the tile's top-left corner. */
 .board-comment-dot {
   position: absolute;
   display: grid;
@@ -10426,13 +10362,43 @@ body {
   outline-offset: 1px;
 }
 
-#screen-filter-hint {
+/* The line under the find field: what the filter matched; on the Board what is on the board, with Clear pins. */
+#screen-filter-status {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
   padding: var(--space-sm) var(--space-xs) 0;
-  font-size: var(--ui-2xs);
+  font-size: var(--ui-xs);
   color: var(--chrome-text-tertiary);
 }
 
-#screen-filter-hint:empty {
+#screen-filter-status:has(#screen-filter-hint:empty):has(#board-clear-pins-btn[hidden]) {
+  display: none;
+}
+
+#board-clear-pins-btn {
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--chrome-accent);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+#board-clear-pins-btn:hover {
+  text-decoration: underline;
+}
+
+#board-clear-pins-btn:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+#board-clear-pins-btn[hidden] {
   display: none;
 }
 
@@ -10619,8 +10585,32 @@ body {
 }
 
 .screen-item-pin {
-  top: var(--space-sm);
-  right: 34px;
+  top: var(--space-xs);
+  right: 0;
+}
+
+/* The Board's list: the pin sits at the row's right end, after the variant count, so the count gets room. */
+.screen-item-row:has(.screen-item-pin.always) > .screen-item {
+  padding-right: 34px;
+}
+
+.screen-section {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-pad) var(--space-lg) var(--space-xs) var(--space-md);
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
+}
+
+.screen-section-title {
+  font-weight: 600;
+}
+
+.screen-section-count {
+  font-weight: 500;
+  color: var(--chrome-text-tertiary);
 }
 
 .screen-item-compare {

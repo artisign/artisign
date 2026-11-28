@@ -33,7 +33,7 @@ export const SHORTCUTS = [
   { id: "inspect", group: "Tools", label: "Inspect", key: "i", display: "I" },
   { id: "notes", group: "Tools", label: "Notes", key: "n", display: "N" },
   { id: "comments", group: "Tools", label: "Comments", key: "m", display: "M" },
-  { id: "flow", group: "Tools", label: "Flow", key: "f", display: "F" },
+  { id: "flow", group: "Tools", label: "Flow", key: "f", display: "F", view: "screens" }, // on the Board the Flow tool shows the flow arrows: E
   { id: "design-system", group: "Tools", label: "Design system", key: "d", display: "D" },
 
   { id: "view-screens", group: "Views", label: "Screens", key: "1", display: "1", target: "screens" },
@@ -41,19 +41,18 @@ export const SHORTCUTS = [
   { id: "view-design-system", group: "Views", label: "Design System", key: "3", display: "3", target: "design-system" },
   { id: "view-usecases", group: "Views", label: "Use Cases", key: "4", display: "4", target: "usecases" },
 
-  { id: "zoom-fit", group: "Zoom", label: "Fit", code: "Digit1", shift: true, display: "1", zoom: "fit", view: "screens" },
-  { id: "zoom-50", group: "Zoom", label: "50%", code: "Digit5", shift: true, display: "5", zoom: 0.5, view: "screens" },
-  { id: "zoom-100", group: "Zoom", label: "100%", code: "Digit0", shift: true, display: "0", zoom: 1, view: "screens" },
-  { id: "zoom-200", group: "Zoom", label: "200%", code: "Digit2", shift: true, display: "2", zoom: 2, view: "screens" },
+  { id: "zoom-fit", group: "Zoom", label: "Fit", code: "Digit1", shift: true, display: "1", zoom: "fit" },
+  { id: "zoom-50", group: "Zoom", label: "50%", code: "Digit5", shift: true, display: "5", zoom: 0.5 },
+  { id: "zoom-100", group: "Zoom", label: "100%", code: "Digit0", shift: true, display: "0", zoom: 1 },
+  { id: "zoom-200", group: "Zoom", label: "200%", code: "Digit2", shift: true, display: "2", zoom: 2 },
   { id: "zoom-in", group: "Zoom", label: "Zoom in", key: "+", alt: ["="], char: true, display: "+", aria: "Plus" },
   { id: "zoom-out", group: "Zoom", label: "Zoom out", key: "-", alt: ["_"], char: true, display: "−", aria: "-" },
 
-  // Same keys as the Screens zoom presets; the active view picks which one applies.
-  { id: "board-fit-all", group: "Board", label: "Fit all", code: "Digit1", shift: true, display: "1", view: "board" },
-  { id: "board-100", group: "Board", label: "100%", code: "Digit0", shift: true, display: "0", view: "board" },
-  { id: "board-edges", group: "Board", label: "Edges", key: "e", display: "E", view: "board" },
+  // The Board's own tools (CHR-1271); the Flow tool is E here, Comments is M as everywhere, Show resolved Shift+M.
+  { id: "board-edges", group: "Board", label: "Flow arrows", key: "e", display: "E", view: "board" },
+  { id: "board-show-resolved", group: "Board", label: "Show resolved comments", key: "m", shift: true, display: "M", view: "board" },
   { id: "board-clusters", group: "Board", label: "Clusters", key: "g", display: "G", view: "board" },
-  { id: "board-collapse-all", group: "Board", label: "Collapse all", key: "g", shift: true, display: "G", view: "board" },
+  { id: "board-collapse-all", group: "Board", label: "Collapse all clusters", key: "g", shift: true, display: "G", view: "board" },
 
   { id: "follow", group: "Agent", label: "Follow the agent", key: "w", display: "W" },
   { id: "follow-resume", group: "Agent", label: "Resume following", key: "r", display: "R" },

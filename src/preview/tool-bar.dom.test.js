@@ -90,6 +90,42 @@ describe("hints where interest invokers work", () => {
     expect($("b").hasAttribute("aria-describedby")).toBe(false);
   });
 
+  it("a tool the design gives its own tooltip words shows those, while disabled", () => {
+    const { bar, $ } = build({ interest: true });
+    bar.setState($("b"), { disabled: true, reason: "Nothing on the board", name: "Inspect, nothing on the board", hint: "Nothing on the board" });
+    const hint = document.getElementById($("b").getAttribute("interestfor"));
+    expect($("b").getAttribute("aria-label")).toBe("Inspect, nothing on the board");
+    expect(hint.querySelector(".tool-hint-label").textContent).toBe("Nothing on the board");
+    expect($("b").getAttribute("aria-describedby")).toBe(hint.id); // it says more than the name
+    // Enabled again, the default words are back.
+    bar.setState($("b"), { name: "Inspect" });
+    expect(hint.querySelector(".tool-hint-label").textContent).toBe("Inspect");
+  });
+
+  it("a hint that repeats the whole accessible name adds nothing for assistive tech", () => {
+    const { bar, $ } = build({ interest: true });
+    const label = "Comment, read-only on the Board: comment in the Screens view";
+    bar.setState($("a"), { disabled: true, reason: label, name: label, hint: label });
+    expect($("a").hasAttribute("aria-describedby")).toBe(false);
+    $("a").click();
+    expect($("live").textContent).toBe(label); // announced once, not "name: name"
+  });
+
+  it("the key chip follows the shortcut the tool answers to now (Flow is F in Screens, E on the Board)", () => {
+    const { bar, $ } = build({ interest: true });
+    const hint = document.getElementById($("a").getAttribute("interestfor"));
+    expect(hint.querySelector("kbd").textContent).toBe("C");
+    bar.setState($("a"), { shortcut: "board-edges" });
+    expect($("a").dataset.shortcutId).toBe("board-edges");
+    expect(hint.querySelector("kbd").textContent).toBe("E");
+    expect([$("a").getAttribute("aria-keyshortcuts"), $("a").dataset.shortcut]).toEqual(["E", "E"]); // for assistive tech too
+    bar.setState($("a"), { shortcut: "comment" });
+    expect([$("a").getAttribute("aria-keyshortcuts"), $("a").dataset.shortcut]).toEqual(["C", "C"]);
+    bar.setState($("a"), { shortcut: "" });
+    expect($("a").hasAttribute("aria-keyshortcuts")).toBe(false);
+    expect(hint.querySelector("kbd")).toBeNull();
+  });
+
   it("a new accessible name (the count on Comments) reaches the hint", () => {
     const { bar, $ } = build({ interest: true });
     bar.setState($("a"), { name: "Comments, 3 open" });
@@ -105,6 +141,21 @@ describe("hints where they do not (the native title stays)", () => {
     expect($("a").hasAttribute("interestfor")).toBe(false);
     bar.setState($("a"), { disabled: true, reason: "No screen is open" });
     expect($("a").title).toBe("Comment: No screen is open (C)");
+  });
+});
+
+describe("the roving tab stop (where the browser has no focusgroup)", () => {
+  it("skips hidden tools and moves its tab stop off a tool that went away", () => {
+    const { bar, $ } = build({ interest: false });
+    $("b").hidden = true;
+    $("a").focus();
+    $("a").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe($("c")); // not the hidden b
+    $("a").tabIndex = 0;
+    $("c").tabIndex = -1;
+    $("a").hidden = true;
+    bar.syncRoving();
+    expect([$("a").tabIndex, $("b").tabIndex, $("c").tabIndex]).toEqual([-1, -1, 0]);
   });
 });
 

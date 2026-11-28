@@ -300,33 +300,39 @@ describe("zoom", () => {
     expect($("#zoom-label").textContent).toBe("100%");
   });
 
-  it("Board: E / G toggle edges and clusters, +/- drive the slider, Shift+1 is Fit all", async () => {
+  it("Board: E is the Flow tool (flow arrows), G toggles clusters, Shift+G collapses all, +/- and the presets drive the Board's zoom, Shift+1 is Fit all", async () => {
     await boot();
     key("2");
     await flush();
-    expect(pressed("board-edges-toggle")).toBe("true");
+    expect(pressed("flow-mode-toggle")).toBe("true"); // the arrows are on
     key("e");
-    expect(pressed("board-edges-toggle")).toBe("false");
+    expect(pressed("flow-mode-toggle")).toBe("false");
+    key("e");
+    expect(pressed("flow-mode-toggle")).toBe("true");
+    key("f"); // F is the Flow tool of the Screens view: nothing here
+    expect(pressed("flow-mode-toggle")).toBe("true");
     expect(pressed("board-clusters-toggle")).toBe("true");
     key("g");
     expect(pressed("board-clusters-toggle")).toBe("false");
-    const before = Number($("#board-zoom-range").value);
+    key("g");
+    const before = Number($("#zoom-range").value);
     key("-");
-    expect(Number($("#board-zoom-range").value)).toBeLessThan(before);
-    const fitAll = vi.fn();
-    const hundred = vi.fn();
-    $("#board-fitall-btn").addEventListener("click", fitAll);
-    $("#board-100-btn").addEventListener("click", hundred);
-    shift("!", "Digit1");
-    expect(fitAll).toHaveBeenCalledTimes(1);
+    expect(Number($("#zoom-range").value)).toBeLessThan(before);
+    shift("@", "Digit2");
+    expect($("#zoom-label").textContent).toBe("200%");
+    shift("%", "Digit5");
+    expect($("#zoom-label").textContent).toBe("50%");
     shift(")", "Digit0");
-    expect(hundred).toHaveBeenCalledTimes(1);
+    expect($("#zoom-label").textContent).toBe("100%");
+    shift("!", "Digit1"); // Fit all computes its own value; the pill's Fit button reads it
+    expect($("#zoom-fit-label").textContent).toBe("Fit all");
     // Board keys do nothing in Screens.
     key("1");
-    shift("!", "Digit1"); // in Screens that is the zoom preset, not Fit all
-    expect(fitAll).toHaveBeenCalledTimes(1);
+    expect($("#zoom-fit-label").textContent).toBe("Fit");
     key("e");
-    expect(pressed("board-edges-toggle")).toBe("false");
+    expect(pressed("flow-mode-toggle")).toBe("false"); // E is not the Flow tool here, and nothing else took it
+    key("f");
+    expect(pressed("flow-mode-toggle")).toBe("true"); // F is
   });
 });
 
@@ -358,7 +364,9 @@ describe("reference dialog", () => {
     const rows = [...document.querySelectorAll("#shortcuts-dialog .shortcuts-row")].map((r) => [r.firstChild.textContent, r.lastChild.textContent]);
     for (const row of [["Comment", "C"], ["Inspect", "I"], ["Notes", "N"], ["Comments", "M"], ["Flow", "F"], ["Design system", "D"], ["Tool bar", "\\"]]) expect(rows).toContainEqual(row);
     expect(rows).toContainEqual(["Fit", "Shift+1"]);
-    expect(rows).toContainEqual(["Collapse all", "Shift+G"]);
+    expect(rows).toContainEqual(["Collapse all clusters", "Shift+G"]);
+    expect(rows).toContainEqual(["Flow arrows", "E"]);
+    expect(rows).toContainEqual(["Show resolved comments", "Shift+M"]);
     expect(rows).toContainEqual(["Close, leave a tool", "Esc"]);
     key("f");
     expect(pressed("flow-mode-toggle")).toBe("false");

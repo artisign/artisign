@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agentStatus, noteState, IDLE_AFTER_MS } from "./agent-bar.js";
+import { agentStatus, noteState, writingScreen, IDLE_AFTER_MS } from "./agent-bar.js";
 
 const NOW = 1_000_000;
 const write = { tool: "write_html", kind: "write", ok: true, target: { kind: "screen", name: "home" }, nodes: [], at: NOW - 1000 };
@@ -70,5 +70,23 @@ describe("noteState", () => {
 
   it("is off with no screen open", () => {
     expect(noteState({ ...where, screen: null, screenLabel: "" })).toMatchObject({ enabled: false, key: "none", reason: "No screen is open" });
+  });
+});
+
+describe("writingScreen", () => {
+  const state = (over = {}) => ({ feed: [write], connected: true, now: NOW, ...over });
+  it("is the screen of the newest feed entry when it is a recent screen write that worked", () => {
+    expect(writingScreen(state())).toBe("home");
+  });
+  it("is nobody once the agent went idle, while the connection is down, or for a read", () => {
+    expect(writingScreen(state({ now: NOW + IDLE_AFTER_MS + 5000 }))).toBeNull();
+    expect(writingScreen(state({ connected: false }))).toBeNull();
+    expect(writingScreen(state({ feed: [{ ...write, kind: "read", tool: "get_screen" }] }))).toBeNull();
+    expect(writingScreen(state({ feed: [] }))).toBeNull();
+  });
+  it("is nobody for a failed write, a delete, or a write that is not on a screen", () => {
+    expect(writingScreen(state({ feed: [{ ...write, ok: false }] }))).toBeNull();
+    expect(writingScreen(state({ feed: [{ ...write, tool: "delete_entity" }] }))).toBeNull();
+    expect(writingScreen(state({ feed: [{ ...write, target: { kind: "mockup", name: "m" } }] }))).toBeNull();
   });
 });

@@ -42,13 +42,13 @@ import { renderCommentsPanel } from "./comments-panel.js";
 import { renderScreenChips, renderTagNotes } from "./notes-panel.js";
 import { renderScreenUseCases } from "./usecases-screen-link.js";
 import { setMarkdown } from "./markdown.js";
-import { renderScreenList, filterScreens, buildScreenTree, flattenTree, ancestorNames, displayName, viewportIconName } from "./screens.js";
+import { renderScreenList, renderBoardScreenList, filterScreens, buildScreenTree, flattenTree, ancestorNames, displayName, viewportIconName } from "./screens.js";
 import { icon } from "./icons.js";
 import { createVariantUI, variantContext } from "./variants.js";
 import { renderVariantInspector } from "./variant-inspector.js";
 import { createCompareView } from "./compare.js";
 import { toolStates } from "./tool-states.js";
-import { createAgentBar, noteState, IDLE_AFTER_MS } from "./agent-bar.js";
+import { writingScreen, createAgentBar, noteState, IDLE_AFTER_MS } from "./agent-bar.js";
 import { renderMockupList, filterMockups, mockupExpandKey } from "./mockups.js";
 import { renderMockupView, renderColumnChips, markSelectedColumn } from "./mockup-view.js";
 import { applyMockupZoom } from "./mockup-zoom.js";
@@ -82,12 +82,12 @@ import {
   MAX_BOARD_ZOOM,
   DEFAULT_BOARD_ZOOM,
   clampZoom,
-  zoomSliderOffset,
   stepZoomDown,
   stepZoomUp,
   computeBoardVisibility,
   clusterToggleWrite,
-  formatBoardStatusText,
+  formatBoardStatus,
+  countBoardItems,
 } from "./board.js";
 import { createProjectUI } from "./projects.js";
 import { createProjectDialogs } from "./project-dialogs.js";
@@ -181,18 +181,11 @@ const boardTilesEl = document.getElementById("board-tiles");
 const boardEdgesEl = document.getElementById("board-edges");
 const boardEmptyStateEl = document.getElementById("board-empty-state");
 const boardEmptyBodyEl = document.getElementById("board-empty-body");
-const boardFitallBtn = document.getElementById("board-fitall-btn");
-const board100Btn = document.getElementById("board-100-btn");
-const boardZoomMinusBtn = document.getElementById("board-zoom-minus");
-const boardZoomPlusBtn = document.getElementById("board-zoom-plus");
-const boardZoomRangeInput = document.getElementById("board-zoom-range");
-const boardZoomReadoutEl = document.getElementById("board-zoom-readout");
-const boardEdgesToggleBtn = document.getElementById("board-edges-toggle");
-const boardToolbarStatusEl = document.getElementById("board-toolbar-status");
+const boardEmptyClearBtn = document.getElementById("board-empty-clear");
 const boardClearPinsBtn = document.getElementById("board-clear-pins-btn");
 const boardClustersToggleBtn = document.getElementById("board-clusters-toggle");
 const boardCollapseAllBtn = document.getElementById("board-collapse-all-btn");
-const boardCommentsToggleBtn = document.getElementById("board-comments-toggle");
+const boardToolsSepEl = document.getElementById("board-tools-sep");
 const boardResolvedToggleBtn = document.getElementById("board-resolved-toggle");
 const boardCommentLayerEl = document.getElementById("board-comment-layer");
 const boardPresentedBannerEl = document.getElementById("board-presented-banner");
@@ -211,6 +204,8 @@ const zoomTrigger = document.getElementById("zoom-trigger");
 const zoomMenu = document.getElementById("zoom-menu");
 const zoomLabel = document.getElementById("zoom-label");
 const zoomRange = document.getElementById("zoom-range");
+const zoomFitLabel = document.getElementById("zoom-fit-label");
+const zoomPopHint = document.getElementById("zoom-pop-hint");
 const commentCountBadge = document.getElementById("comment-count-badge");
 const warningBadge = document.getElementById("warning-badge");
 const viewTabs = document.querySelectorAll(".view-tab");
@@ -410,7 +405,7 @@ let expandedClusters = [];
 // The zoom "Fit all" last computed, if any — the only way to know whether
 // its quick-jump button should read active, since (unlike "100%") its
 // target isn't a fixed constant. Set from board.setZoom's onZoomChange
-// callback (source === "fitall"), read by updateBoardToolbar.
+// callback (source === "fitall"), read by syncZoomUI (the pill's Fit button).
 let lastFitAllZoom = null;
 // Debounces the board zoom preference write (CHR-623 review finding 3) — a
 // slider drag fires onZoomChange, and so a localStorage write, on every
@@ -439,7 +434,7 @@ const board = createBoardView({
     if (source === "fitall") lastFitAllZoom = value;
     boardZoom = value;
     scheduleBoardZoomPrefWrite(value);
-    updateBoardToolbar();
+    syncZoomUI();
   },
   // CHR-623 review finding 2: a relayout can change the grid shape under a
   // `lastFitAllZoom` that was exact for the PREVIOUS shape — invalidate it
@@ -447,10 +442,11 @@ const board = createBoardView({
   // compute anymore.
   onRelayout: () => {
     lastFitAllZoom = null;
-    updateBoardToolbar();
+    syncZoomUI();
   },
   onTogglePin: (screen) => toggleScreenPin(screen),
   onLayout: () => boardComments.layout(),
+  onTileKeydown: (evt) => onShortcutKeydown(evt),
 });
 board.mount();
 
@@ -470,23 +466,16 @@ const boardComments = createBoardComments({
   onOpenInScreens: (screen, threadId) => void openScreenThread(screen, threadId),
 });
 
-function renderBoardCommentToggles() {
-  boardCommentsToggleBtn.setAttribute("aria-pressed", String(boardCommentsOn));
-  boardCommentsToggleBtn.textContent = boardCommentsOn ? "Comments: On" : "Comments: Off";
-  boardResolvedToggleBtn.setAttribute("aria-pressed", String(boardShowResolved));
-}
-renderBoardCommentToggles();
-boardCommentsToggleBtn.addEventListener("click", () => {
+/** The Comments tool on the Board: the pins and count chips on the tiles on/off. */
+function toggleBoardComments() {
   boardCommentsOn = !boardCommentsOn;
   writeBoolPref(prefsStorage, BOARD_COMMENTS_KEY, boardCommentsOn);
-  renderBoardCommentToggles();
   boardComments.setEnabled(boardCommentsOn);
-  renderBoardStatus(); // the status line's comment count follows the toggle
-});
+  renderBoardStatus(); // the Comments tool's state follows
+}
 boardResolvedToggleBtn.addEventListener("click", () => {
   boardShowResolved = !boardShowResolved;
   writeBoolPref(prefsStorage, BOARD_RESOLVED_KEY, boardShowResolved);
-  renderBoardCommentToggles();
   boardComments.setShowResolved(boardShowResolved);
   renderBoardStatus();
 });
@@ -555,6 +544,9 @@ function toggleScreenPin(screen, screensToPin = [screen]) {
 boardClearPinsBtn.addEventListener("click", () => {
   if (activeProjectRoot) reportBoardStateFailure(setBoardState(activeProjectRoot, { pins: { op: "clear" } }));
 });
+boardEmptyClearBtn.addEventListener("click", () => {
+  screenFilterClear.click(); // the same path as the find field's own clear button
+});
 
 // CHR-625/ADR-005 review fix — whether the "agent switched you here" banner
 // is currently up. The banner's own `hidden` attribute is derived DOM state;
@@ -586,73 +578,49 @@ function showAgentPresentedBanner() {
   // must trigger the announcement.
   boardPresentedBannerEl.hidden = false;
   updateAgentPresentedBannerText();
+  renderBoardStatus(); // the card's line says the agent put the screens there
 }
 
 function hideAgentPresentedBanner() {
   agentPresentationActive = false;
   boardPresentedBannerEl.hidden = true;
+  renderBoardStatus(); // the card's line stops saying the agent put the screens there
 }
 
 boardPresentedDismissBtn.addEventListener("click", () => hideAgentPresentedBanner());
 
-/** No-op while the banner isn't showing — called from renderBoardStatus (see agentPresentationActive's own doc comment for why this needs to re-derive rather than hold a captured count). */
+/** What the Board counts: clusters and plain screens, not every variant (see countBoardItems). */
+function boardItemCount(visibility = computeBoardVisibility(screens, screenFilter, pinnedScreens)) {
+  return countBoardItems(screens, visibility.visibleNames, boardClustersOn);
+}
+
+/** The banner's words (design `board-view-presented`): "The agent switched you to the Board to show **5 screens**". Never rewritten while they read the same, so the live region speaks only for a real change. */
 function updateAgentPresentedBannerText() {
   if (!agentPresentationActive) return;
-  const shownCount = computeBoardVisibility(screens, screenFilter, pinnedScreens).shownCount;
-  // CHR-625 review fix 3 — a filter matching nothing sits right above the
-  // board's own empty state ("matches nothing"); "to show 0 screens" reads
-  // like a machine repeating itself. The approved copy's count covers the
-  // case where there's something to point at; drop it for the zero case.
-  boardPresentedTextEl.textContent =
-    shownCount === 0 ? "Agent switched you here" : `Agent switched you here to show ${shownCount} screen${shownCount === 1 ? "" : "s"}`;
+  const shownCount = boardItemCount();
+  const text = shownCount === 0 ? "The agent switched you to the Board" : `The agent switched you to the Board to show ${shownCount} screen${shownCount === 1 ? "" : "s"}`;
+  if (boardPresentedTextEl.textContent === text) return;
+  const parts = [document.createTextNode("The agent switched you to the Board")];
+  if (shownCount > 0) {
+    const count = document.createElement("b");
+    count.textContent = `${shownCount} screen${shownCount === 1 ? "" : "s"}`;
+    parts.push(document.createTextNode(" to show "), count);
+  }
+  boardPresentedTextEl.replaceChildren(...parts);
 }
 
-/** Re-renders the board toolbar's status text + Clear pins visibility from the current screens/screenFilter/pinnedScreens — cheap and pure, so it's fine to call unconditionally on every board-state-relevant change, not just while the Board tab is actually showing. */
+/** Re-renders everything the Board derives from screens/filter/pins/comments — the card's status line and Clear pins, the empty state's button, the banner, the tools — cheap and pure, so it is called on every board-state-relevant change, not just while the Board shows. */
 function renderBoardStatus() {
   const visibility = computeBoardVisibility(screens, screenFilter, pinnedScreens);
-  const comments = boardComments.summary(visibility.visibleNames);
-  boardToolbarStatusEl.textContent =
-    formatBoardStatusText(visibility) +
-    (boardCommentsOn && comments.open > 0 ? ` · ${comments.open} open comment${comments.open === 1 ? "" : "s"}${comments.detached > 0 ? ` · ${comments.detached} detached` : ""}` : "");
-  boardToolbarStatusEl.dataset.tooltip = boardToolbarStatusEl.textContent; // the full line, for when a crowded toolbar cuts it short
-  // Gated on the raw pin list, not `visibility.pinnedCount` (review fix 5):
-  // the latter is the CLEANED count (a pin whose screen no longer exists is
-  // dropped from it), so a project whose pins are entirely ghosts — the
-  // JSDoc on `pinnedScreens` above already names the causes, a branch
-  // switch or a hand-deleted file the daemon never pruned — would hide the
-  // one button that can get rid of them.
-  boardClearPinsBtn.hidden = pinnedScreens.length === 0;
+  const boardCard = currentView === "board" && navTab === "screens";
+  if (boardCard) screenFilterHint.textContent = formatBoardStatus(boardItemCount(visibility), { filtered: screenFilter.trim() !== "", presented: agentPresentationActive });
+  // Gated on the raw pin list, not `visibility.pinnedCount`: the latter is the CLEANED count (a pin whose screen no longer exists is dropped from it), so a project whose pins are entirely ghosts — a branch switch or a hand-deleted file the daemon never pruned — would hide the one button that can get rid of them.
+  boardClearPinsBtn.hidden = !boardCard || pinnedScreens.length === 0;
+  boardEmptyClearBtn.hidden = screenFilter.trim() === "";
   updateAgentPresentedBannerText(); // CHR-625 — keeps the banner's own count from drifting away from this same visibility computation
+  syncToolStates();
 }
 
-/** Syncs every toolbar control (range input + its fill/aria-valuetext, readout, quick-jump active states, step-button aria-disabled states) from the current `boardZoom`. */
-function updateBoardToolbar() {
-  boardZoomRangeInput.value = String(boardZoom);
-  const rounded = Math.round(boardZoom);
-  boardZoomReadoutEl.textContent = `${rounded}%`;
-  // The raw value ("80") reads to a screen reader as the plain number
-  // eighty — aria-valuetext overrides that with the actual unit (CHR-623
-  // review finding 8).
-  boardZoomRangeInput.setAttribute("aria-valuetext", `${rounded}%`);
-  const fillPct = zoomSliderOffset(boardZoom, 100);
-  boardZoomRangeInput.style.background = `linear-gradient(to right, var(--chrome-accent) ${fillPct}%, var(--chrome-border) ${fillPct}%)`;
-  board100Btn.setAttribute("aria-pressed", String(boardZoom === 100));
-  boardFitallBtn.setAttribute("aria-pressed", String(lastFitAllZoom !== null && boardZoom === lastFitAllZoom));
-  // aria-disabled, not the `disabled` attribute (CHR-623 review finding 8):
-  // a hard-disabled button can't hold focus, so tabbing onto "−" right as
-  // it hits the floor bumps focus to <body>. Styled the same as :disabled
-  // used to look (style.css); a click while aria-disabled stays a harmless
-  // no-op — stepZoomDown/stepZoomUp already clamp at the floor/ceiling, so
-  // there's nothing to guard in the handlers below.
-  boardZoomMinusBtn.setAttribute("aria-disabled", String(boardZoom <= MIN_BOARD_ZOOM));
-  boardZoomPlusBtn.setAttribute("aria-disabled", String(boardZoom >= MAX_BOARD_ZOOM));
-}
-
-boardFitallBtn.addEventListener("click", () => board.fitAll());
-board100Btn.addEventListener("click", () => board.setZoom(100));
-boardZoomMinusBtn.addEventListener("click", () => board.setZoom(stepZoomDown(boardZoom)));
-boardZoomPlusBtn.addEventListener("click", () => board.setZoom(stepZoomUp(boardZoom)));
-boardZoomRangeInput.addEventListener("input", () => board.setZoom(Number(boardZoomRangeInput.value)));
 /** Header click on a cluster frame (CHR-733): expand adds the main screen, collapse removes every member listed in `expanded`. The re-render comes back through the `board_state` broadcast, like a pin. */
 function toggleCluster(cluster) {
   if (!activeProjectRoot) return;
@@ -663,24 +631,17 @@ boardCollapseAllBtn.addEventListener("click", () => {
   if (activeProjectRoot) reportBoardStateFailure(setBoardState(activeProjectRoot, { expanded: { op: "clear" } }));
 });
 
-function renderBoardClustersToggle() {
-  boardClustersToggleBtn.setAttribute("aria-pressed", String(boardClustersOn));
-  boardClustersToggleBtn.textContent = boardClustersOn ? "Clusters: On" : "Clusters: Off";
-  boardCollapseAllBtn.hidden = !boardClustersOn;
-}
-
-/** Board clusters on/off, shared by the toolbar button and the settings menu (CHR-926). */
+/** Board clusters on/off, shared by the Clusters tool and the settings menu (CHR-926). */
 function setBoardClusters(on) {
   boardClustersOn = on;
   writeBoolPref(prefsStorage, "artisign.boardClusters", boardClustersOn);
-  renderBoardClustersToggle();
   if (boardBuilt) board.setClusterState({ clusters: boardClustersOn });
+  syncToolStates();
 }
 
 boardClustersToggleBtn.addEventListener("click", () => setBoardClusters(!boardClustersOn));
 
 boardClustersOn = readBoolPref(prefsStorage, "artisign.boardClusters", boardClustersOn);
-renderBoardClustersToggle();
 
 // CHR-910 / CHR-926 — chrome theme (System / Light / Dark), chosen in the settings menu and cycled by T. The pre-paint inline script in index.html already set data-theme; this re-applies it with the full module and keeps it live.
 const osDarkQuery = prefersDarkQuery(window);
@@ -710,24 +671,18 @@ const macPlatform = isMacPlatform(navigator);
 applyShortcutHints(document, macPlatform); // the keys shown in tooltips and menus come from the same mapping the handler below binds
 initTooltips(document);
 
-/** Board edges on/off, shared by the toolbar button and the settings menu (CHR-926). */
+/** Board flow arrows on/off, shared by the Flow tool (on the Board) and the settings menu (CHR-926). */
 function setBoardEdges(on) {
   boardEdgesVisible = on;
   writeBoolPref(prefsStorage, "artisign.boardEdgesVisible", boardEdgesVisible);
   board.setEdgesVisible(boardEdgesVisible);
-  boardEdgesToggleBtn.setAttribute("aria-pressed", String(boardEdgesVisible));
-  boardEdgesToggleBtn.textContent = boardEdgesVisible ? "Edges: On" : "Edges: Off";
+  syncToolStates();
 }
-
-boardEdgesToggleBtn.addEventListener("click", () => setBoardEdges(!boardEdgesVisible));
 
 boardZoom = clampZoom(parseBoardZoomPref(readStringPref(prefsStorage, "artisign.boardZoom", null), boardZoom, MIN_BOARD_ZOOM, MAX_BOARD_ZOOM));
 boardEdgesVisible = readBoolPref(prefsStorage, "artisign.boardEdgesVisible", boardEdgesVisible);
 board.setZoom(boardZoom);
 board.setEdgesVisible(boardEdgesVisible);
-boardEdgesToggleBtn.setAttribute("aria-pressed", String(boardEdgesVisible));
-boardEdgesToggleBtn.textContent = boardEdgesVisible ? "Edges: On" : "Edges: Off";
-updateBoardToolbar();
 
 /** @param {string | null} screen */
 function getRenderedDocForScreen(screen) {
@@ -1283,6 +1238,7 @@ function currentActivityLists() {
 
 /** Re-draws the Agent bar — status, Follow, feed, note field — from the current follow state, feed, connection and open view. The feed's rows look at the live screens/mockups lists (a target's existence changes independently of the feed itself — see activityTargetExists). */
 function renderAgentBar() {
+  board.setWritingScreen(writingScreen({ feed: activityFeed, connected: eventsConnected, now: Date.now() })); // the Board rings the screen the status box says is being written
   const showMockup = currentView === "screens" && currentMockup !== null;
   const lists = currentActivityLists();
   agentBar.render({
@@ -1298,7 +1254,7 @@ function renderAgentBar() {
       screenLabel: currentScreen === null ? "" : screenContext(currentScreen),
       mockup: currentMockup,
       mockupVariant: mockupVariantForNote(),
-      boardCount: computeBoardVisibility(screens, screenFilter, pinnedScreens).shownCount,
+      boardCount: boardItemCount(),
     }),
   });
 }
@@ -1762,7 +1718,8 @@ function refreshSidebar() {
   navCountMockups.textContent = String(mockups.length);
   screenListEl.hidden = !showScreens;
   mockupListEl.hidden = showScreens;
-  renderScreenList(screenListEl, screens, currentScreen, selectScreenHuman, screenFilter, {
+  // The Board's card groups the same rows under Matches / Pinned (or Pinned / All screens) and always shows the pin toggles.
+  (currentView === "board" ? renderBoardScreenList : renderScreenList)(screenListEl, screens, currentScreen, selectScreenHuman, screenFilter, {
     pinned: new Set(pinnedScreens),
     onTogglePin: toggleScreenPin,
     expanded: currentExpandedScreens(),
@@ -1781,7 +1738,8 @@ function refreshSidebar() {
     expanded: currentExpandedScreens(),
     onToggleExpand: toggleScreenExpanded,
   });
-  appendNavEmpty(showScreens ? screenListEl : mockupListEl, showScreens ? screens.length : mockups.length, showScreens ? filterScreens(screens, screenFilter).length : filteredMockups.length);
+  // The Board's list says what a filter without a match means by itself (renderBoardScreenList).
+  if (!(showScreens && currentView === "board" && screens.length > 0)) appendNavEmpty(showScreens ? screenListEl : mockupListEl, showScreens ? screens.length : mockups.length, showScreens ? filterScreens(screens, screenFilter).length : filteredMockups.length);
   screenFilterHint.textContent = filterHintText(filteredMockups.length);
   screenFilterClear.hidden = screenFilter === "";
   refreshVariantUI();
@@ -1889,6 +1847,7 @@ async function refreshViewports() {
     const sizes = await fetchScreenViewports(project);
     if (project === activeProjectRoot) {
       screenViewports = sizes;
+      board.setViewports(screenViewports);
       refreshSidebar();
     }
   } finally {
@@ -2070,11 +2029,8 @@ function renderMockupChips() {
 
 /** CHR-1268 — the open-thread count: the badge on the Comments tool and its accessible name. */
 function renderCommentCount(threads) {
-  const { open } = countRow(threads);
-  commentCountBadge.hidden = open === 0;
-  commentCountBadge.textContent = String(open);
-  openCommentCount = open;
-  syncToolStates();
+  openCommentCount = countRow(threads).open;
+  syncToolStates(); // the badge and the tool's name follow
 }
 
 /** Marks the open thread's row in place — rebuilding the list on every open or close would remove the very row a press is on before its click lands. */
@@ -2305,23 +2261,52 @@ function syncPanelContext() {
   } else toolPanels.setContext("");
 }
 
+/** The tools' names outside the Board (the Board names its own, in the design's words). */
+const TOOL_NAMES = { comment: "Comment", inspect: "Inspect", notes: "Notes", flow: "Flow", designSystem: "Design system" };
+
 /** Every tool's pressed state, availability and name, from the current view and modes. A panel whose tool no longer applies closes. */
 function syncToolStates() {
+  const onBoard = currentView === "board";
   const showMockup = currentView === "screens" && currentMockup !== null;
   const comparing = compare.isOn() && currentView === "screens" && !showMockup;
-  const states = toolStates({ view: currentView, showMockup, comparing, hasScreen: currentScreen !== null });
-  document.getElementById("tool-bar").setAttribute("aria-label", showMockup ? "Mockup tools" : "Screen tools"); // design: the bar is named for what it works on
-  toolBar.setState(commentModeToggle, { ...states.comment, pressed: activeMode === "comment" });
-  toolBar.setState(inspectModeToggle, { ...states.inspect, pressed: activeMode === "inspect" });
-  toolBar.setState(notesToolToggle, { ...states.notes, pressed: toolPanels.opened() === "notes" });
+  const boardNow = onBoard ? computeBoardVisibility(screens, screenFilter, pinnedScreens) : null;
+  const states = toolStates({
+    view: currentView,
+    showMockup,
+    comparing,
+    hasScreen: currentScreen !== null,
+    board: boardNow
+      ? { commentsOn: boardCommentsOn, tileCount: boardNow.shownCount, openCount: boardComments.summary(boardNow.visibleNames).open, edgesOn: boardEdgesVisible, clustersOn: boardClustersOn, anyExpanded: expandedClusters.length > 0 }
+      : undefined,
+  });
+  document.getElementById("tool-bar").setAttribute("aria-label", onBoard ? "Board tools" : showMockup ? "Mockup tools" : "Screen tools"); // design: the bar is named for what it works on
+  // Shown only on the Board; the roving tab stop follows what shows.
+  for (const el of [boardResolvedToggleBtn, boardToolsSepEl, boardClustersToggleBtn, boardCollapseAllBtn]) el.hidden = !onBoard;
+  const named = (key, extra = {}) => ({ ...states[key], name: states[key].name ?? TOOL_NAMES[key], ...extra });
+  toolBar.setState(commentModeToggle, { ...named("comment"), pressed: activeMode === "comment" });
+  toolBar.setState(inspectModeToggle, { ...named("inspect"), pressed: activeMode === "inspect" });
+  toolBar.setState(notesToolToggle, { ...named("notes"), pressed: toolPanels.opened() === "notes" });
+  const boardCommentCount = boardNow ? boardComments.summary(boardNow.visibleNames).open : 0;
   toolBar.setState(commentsToolToggle, {
     ...states.comments,
-    pressed: toolPanels.opened() === "comments",
-    name: openCommentCount === 0 ? "Comments" : `Comments, ${openCommentCount} open`,
+    pressed: onBoard ? boardCommentsOn && !states.comments.disabled : toolPanels.opened() === "comments",
+    name: states.comments.name ?? (openCommentCount === 0 ? "Comments" : `Comments, ${openCommentCount} open`),
   });
-  toolBar.setState(flowModeToggle, { ...states.flow, pressed: activeMode === "flow" });
-  toolBar.setState(designSystemTool, { ...states.designSystem });
-  for (const id of ["notes", "comments"]) if (states[id].disabled && toolPanels.opened() === id) toolPanels.close(false);
+  // The badge counts open threads; on the Board it shows while the pins are off (design: the pressed tool has none).
+  const badgeCount = onBoard ? (boardCommentsOn ? 0 : boardCommentCount) : openCommentCount;
+  commentCountBadge.hidden = badgeCount === 0;
+  commentCountBadge.textContent = String(badgeCount);
+  // The Flow tool is the flow mode of a screen, and the flow arrows on the Board (E there, F elsewhere).
+  toolBar.setState(flowModeToggle, onBoard ? { ...named("flow"), pressed: boardEdgesVisible, shortcut: "board-edges" } : { ...named("flow"), pressed: activeMode === "flow", shortcut: "flow" });
+  toolBar.setState(designSystemTool, { ...named("designSystem") });
+  if (onBoard) {
+    toolBar.setState(boardResolvedToggleBtn, { ...states.showResolved, pressed: boardShowResolved });
+    toolBar.setState(boardClustersToggleBtn, { ...states.clusters, pressed: boardClustersOn });
+    toolBar.setState(boardCollapseAllBtn, { ...states.collapseAll });
+  }
+  toolBar.syncRoving();
+  // The Comments panel is the Screens view's; on the Board the same tool only switches the tile pins.
+  for (const id of ["notes", "comments"]) if ((states[id].disabled || (onBoard && id === "comments")) && toolPanels.opened() === id) toolPanels.close(false);
   renderAgentBar(); // the note field's scope follows the same view state
 }
 
@@ -2329,7 +2314,9 @@ for (const [id, button] of [["notes", notesToolToggle], ["comments", commentsToo
   button.addEventListener("click", () => {
     // ADR-005 pause rule 1 — opening a panel is the human working on the screen; the same as opening a mode.
     pauseFollow();
-    toolPanels.toggle(id);
+    // On the Board the Comments tool switches the pins on the tiles (read-only there); there is no panel.
+    if (id === "comments" && currentView === "board") toggleBoardComments();
+    else toolPanels.toggle(id);
   });
 }
 
@@ -2552,6 +2539,7 @@ window.addEventListener("resize", () => {
 
 /** The scale the zoom controls' target is drawn at right now, with "fit" resolved to its number. */
 function effectiveZoomScale() {
+  if (currentView === "board") return boardZoom / 100;
   const current = isMockupZoomActive() ? mockupZoom : zoom;
   if (current !== "fit") return current;
   const drawn = isMockupZoomActive() ? mockupViewEl.querySelector(".mockup-columns") : screenHolderEl;
@@ -2560,7 +2548,14 @@ function effectiveZoomScale() {
 
 /** The pill's % value, the slider and the presets follow the zoom the controls currently target (the screen canvas or the mockup row). */
 function syncZoomUI() {
-  zoomPill?.sync({ zoom: isMockupZoomActive() ? mockupZoom : zoom, scale: effectiveZoomScale() });
+  const onBoard = currentView === "board";
+  // On the Board "fit" is a one-off value: the pill reads Fit only while the zoom is exactly what Fit all computed.
+  const current = onBoard ? (lastFitAllZoom !== null && boardZoom === lastFitAllZoom ? "fit" : boardZoom / 100) : isMockupZoomActive() ? mockupZoom : zoom;
+  zoomPill?.sync({ zoom: current, scale: effectiveZoomScale() });
+  const fitLabel = onBoard ? "Fit all" : "Fit";
+  if (zoomFitLabel.textContent !== fitLabel) zoomFitLabel.textContent = fitLabel; // the pill's own button; the presets in the menu keep "Fit"
+  const hint = onBoard ? "Drag, or Ctrl + scroll" : "Drag the slider";
+  if (zoomPopHint.textContent !== hint) zoomPopHint.textContent = hint;
 }
 
 // The zoom pill (CHR-1267): − / % / + / Fit; the % opens the slider popover.
@@ -2572,6 +2567,11 @@ zoomPill = createZoomPill({
   rangeEl: zoomRange,
   presetEls: [...zoomButtons],
   onZoom: (value) => setZoom(value),
+});
+
+// A press inside a Board tile's document never reaches this one (no listener goes into a tile): the focus moving into the iframe is how it shows up here, and a native popover's light dismiss does not see it.
+window.addEventListener("blur", () => {
+  if (document.activeElement?.tagName === "IFRAME" && zoomPill?.isOpen()) zoomPill.close();
 });
 
 // Capture + stopImmediatePropagation: this Escape only closes the popover, so inspect mode's Escape (clears its focus) must not also fire.
@@ -2587,9 +2587,13 @@ document.addEventListener(
   true,
 );
 
-/** Sets the zoom level for whichever the buttons currently target — the mockup row or the screen canvas (see isMockupZoomActive) — each remembered under its own pref key. */
+/** Sets the zoom level for whichever the buttons currently target — the Board, the mockup row or the screen canvas (see isMockupZoomActive) — each remembered under its own pref key. */
 function setZoom(next) {
-  if (isMockupZoomActive()) {
+  if (currentView === "board") {
+    // The Board keeps its zoom in percent; Fit all is the board's own computation.
+    if (next === "fit") board.fitAll();
+    else board.setZoom(Math.round(next * 100));
+  } else if (isMockupZoomActive()) {
     mockupZoom = next;
     writeStringPref(prefsStorage, "artisign.mockupZoom", String(next));
     updateMockupZoom();
@@ -2612,6 +2616,7 @@ const ZOOM_STEPS = [0.05, 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
 /** One step along the ladder from the effective scale (also from Fit); out of Fit never zooms in, nor in out. */
 function stepZoom(direction) {
+  if (currentView === "board") return board.setZoom(direction > 0 ? stepZoomUp(boardZoom) : stepZoomDown(boardZoom));
   const target = nextZoomLevel(effectiveZoomScale(), direction, ZOOM_STEPS);
   if (target !== undefined) setZoom(target);
 }
@@ -2641,6 +2646,8 @@ function setMode(next) {
 }
 
 flowModeToggle.addEventListener("click", () => {
+  // On the Board the Flow tool is the flow arrows, not the flow mode.
+  if (currentView === "board") return setBoardEdges(!boardEdgesVisible);
   if (compare.isOn()) leaveCompare(); // flow mode navigates, and only Single navigates (CHR-738)
   setMode("flow");
 });
@@ -2733,6 +2740,7 @@ async function loadBoard() {
     screens,
     expanded: expandedClusters,
     clusters: boardClustersOn,
+    viewports: screenViewports,
   });
   boardBuilt = true;
   await commentsLoaded;
@@ -2770,7 +2778,7 @@ function applyMainVisibility() {
   else if (showMockup) syncMockupToolbarTop(); // the columns' frames
   // The zoom group stays visible over the mockup view too — it
   // scales the whole comparison row instead of the screen canvas.
-  canvasControlsEl.hidden = currentView !== "screens" || comparing; // compare has its own zoom in its chip row
+  canvasControlsEl.hidden = (currentView !== "screens" && currentView !== "board") || comparing; // compare has its own zoom in its chip row
   warningBadge.hidden = currentView !== "screens" || showMockup || warningCount === 0;
   // The side tool bar: which tools apply here (comment/inspect have no board counterpart, none of the modes a mockup's, Compare its own set).
   toolPanels.setComparing(comparing); // Compare's Differences show in the right column until a tool panel takes its place
@@ -2778,7 +2786,7 @@ function applyMainVisibility() {
   syncPanelContext();
   // The comment layer and its banner belong to the single-screen canvas and the mockup columns.
   commentCanvas.setLayerHidden(currentView !== "screens" || comparing || (showMockup ? false : !currentScreen));
-  if (comparing || currentView !== "screens") zoomPill?.close();
+  if (comparing || (currentView !== "screens" && currentView !== "board")) zoomPill?.close();
   syncZoomUI();
   if (showMockup) updateMockupZoom();
   if (comparing) {
@@ -2791,10 +2799,12 @@ function applyMainVisibility() {
 }
 
 function setView(view) {
+  if (view !== currentView) zoomPill?.close(); // the menu belongs to the zoom it was opened for
   currentView = view;
   writeStringPref(prefsStorage, "artisign.view", view);
   for (const tab of viewTabs) tab.setAttribute("aria-pressed", String(tab.dataset.view === view));
   const showMockup = applyMainVisibility();
+  refreshSidebar(); // the Board's card lists and counts the screens its own way
   // Flow mode has no mockup-view counterpart either, but (unlike comment/
   // inspect) it's still armable from the Board tab — entering the mockup
   // state with it already on would otherwise leave it stuck active behind
@@ -2805,6 +2815,8 @@ function setView(view) {
   // clicking its own toggle.
   if ((view === "board" || view === "design-system") && activeMode === "comment") setMode("comment");
   if (view === "board" && activeMode === "inspect") setMode("inspect");
+  // The Flow tool is the flow arrows on the Board: the flow mode does not come along.
+  if (view === "board" && activeMode === "flow") setMode("flow");
   // None of the three modes has a Use Cases or Design System counterpart either (their tools are greyed out there): leaving them also closes inspect's panel.
   if ((view === "usecases" || view === "design-system") && activeMode !== "none") setMode(activeMode);
   if (view === "design-system") loadDesignSystem();
@@ -2995,7 +3007,6 @@ function runShortcut(id) {
     case "panel-agent": return agentBarShown() && pressControl(document.getElementById("agent-bar-fold")); // no Agent bar in the Design System view and Use Cases: nothing to fold, nothing to store
     case "zoom-in":
     case "zoom-out":
-      if (currentView === "board") return pressControl(id === "zoom-in" ? boardZoomPlusBtn : boardZoomMinusBtn);
       if (canvasControlsEl.hidden) return false;
       stepZoom(id === "zoom-in" ? 1 : -1);
       return true;

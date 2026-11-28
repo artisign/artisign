@@ -124,7 +124,11 @@
                 </div>
                 <button type="button" id="screen-tags-toggle" aria-pressed="true" aria-label="Show tags" data-tooltip="Show tags"><span class="icon" aria-hidden="true">sell</span></button>
               </div>
-              <div id="screen-filter-hint"></div>
+              <!-- CHR-1271: on the Board this line is the board's status ("5 on the board") and Clear pins; elsewhere what the filter matched. -->
+              <div id="screen-filter-status">
+                <div id="screen-filter-hint"></div>
+                <button type="button" id="board-clear-pins-btn" hidden>Clear pins</button>
+              </div>
             </div>
             <div id="nav-scroll" role="tabpanel" aria-labelledby="nav-tab-screens">
               <ul id="screen-list" role="tree" aria-label="Screens"></ul>
@@ -148,8 +152,14 @@
               <span class="icon" aria-hidden="true">chat_bubble</span>
               <span id="comment-count-badge" class="tool-badge" hidden></span>
             </button>
+            <!-- CHR-1271: Show resolved belongs to the Board (the Screens view lists resolved threads in the Comments card). -->
+            <button type="button" id="board-resolved-toggle" class="tool-btn" aria-pressed="false" aria-label="Show resolved comments" data-tool-hint="Show resolved comments" data-shortcut-id="board-show-resolved" hidden><span class="icon" aria-hidden="true">task_alt</span></button>
             <button type="button" id="flow-mode-toggle" class="tool-btn" aria-pressed="false" aria-label="Flow" data-tool-hint="Flow" data-shortcut-id="flow"><span class="icon" aria-hidden="true">route</span></button>
             <button type="button" id="design-system-tool" class="tool-btn" aria-label="Design system" data-tool-hint="Design system" data-shortcut-id="design-system"><span class="icon" aria-hidden="true">palette</span></button>
+            <!-- CHR-1271: the Board's own tools, shown only there. -->
+            <span id="board-tools-sep" class="tool-sep" role="separator" aria-orientation="horizontal" hidden></span>
+            <button type="button" id="board-clusters-toggle" class="tool-btn" aria-pressed="true" aria-label="Clusters" data-tool-hint="Clusters" data-shortcut-id="board-clusters" hidden><span class="icon" aria-hidden="true">workspaces</span></button>
+            <button type="button" id="board-collapse-all-btn" class="tool-btn" aria-label="Collapse all clusters" data-tool-hint="Collapse all clusters" data-shortcut-id="board-collapse-all" hidden><span class="icon" aria-hidden="true">unfold_less</span></button>
           </div>
         </div>
         <main id="main">
@@ -246,77 +256,16 @@
           <div id="usecases-view" class="main-view" hidden></div>
           <div id="board-view" class="main-view" hidden>
             <!--
-              Board-tab-only bar: a continuous zoom slider (5%-200%) with
-              Fit-all/100% quick jumps and a flow-edge visibility toggle
-              (CHR-623), plus the shared filter's result readout and Clear
-              pins (CHR-624) — the filter INPUT itself lives only in the
-              sidebar (#screen-filter-input), never duplicated here; see the
-              chr-621 design-system tag notes' "Filter ∪ pins" section.
-            -->
-            <div id="board-toolbar">
-              <button type="button" id="board-fitall-btn" class="board-quickjump" data-shortcut-id="board-fit-all">Fit all</button>
-              <button type="button" id="board-100-btn" class="board-quickjump" data-shortcut-id="board-100">100%</button>
-              <span id="board-toolbar-divider" aria-hidden="true"></span>
-              <div id="board-zoom-slider">
-                <button type="button" id="board-zoom-minus" class="board-zoom-step" aria-label="Zoom out"><span class="icon" aria-hidden="true">remove</span></button>
-                <input type="range" id="board-zoom-range" min="5" max="200" step="1" value="80" aria-label="Board zoom" />
-                <button type="button" id="board-zoom-plus" class="board-zoom-step" aria-label="Zoom in"><span class="icon" aria-hidden="true">add</span></button>
-                <span id="board-zoom-readout">80%</span>
-              </div>
-              <button type="button" id="board-edges-toggle" class="toggle-button" aria-pressed="true" data-shortcut-id="board-edges">Edges: On</button>
-              <button type="button" id="board-clusters-toggle" class="toggle-button" aria-pressed="true" data-shortcut-id="board-clusters">Clusters: On</button>
-              <button type="button" id="board-collapse-all-btn" class="board-quickjump" data-shortcut-id="board-collapse-all">Collapse all</button>
-              <span id="board-toolbar-spacer"></span>
-              <span id="board-toolbar-status"></span>
-              <span id="board-toolbar-actions">
-                <button type="button" id="board-comments-toggle" class="toggle-button" aria-pressed="true">Comments: On</button>
-                <button type="button" id="board-resolved-toggle" class="toggle-button" aria-pressed="false">Show resolved</button>
-                <button type="button" id="board-clear-pins-btn" class="board-quickjump" hidden>Clear pins</button>
-              </span>
-            </div>
-            <!--
-              One scrollable surface holding every screen as a tile
-              (#board-tiles) plus an SVG overlay drawing flow edges between
-              them (#board-edges). #board-canvas is sized in JS to the tile
-              content's SCALED (zoomed) pixel size — its child #board-canvas-inner
-              carries the actual `transform: scale()` and stays at the
-              content's unscaled (100%-zoom) size, same wrapper/transform
-              split as mockup-zoom.js's applyMockupZoom, so native scrolling
-              (including smooth-scroll centering on flow navigation and
-              zoom-around-cursor) works against the real post-zoom size
-              without any extra pan/zoom logic. Comment mode has no effect
-              here — see board-view.js's module comment.
+              CHR-1271: the Board's controls live in the shell like everywhere else — zoom in the zoom pill (Fit all, the 5%-200% slider), the toggles in the tool bar, the filter result and Clear pins in the left card. The surface below is only the canvas.
             -->
             <div id="board-surface">
               <!--
-                CHR-625/ADR-005 — shown when an agent's set_board_state call
-                (source "agent") switches the human here; see
-                handleBoardStateEvent in app.js. Positioned like
-                #board-empty-state below: overlays #board-surface directly,
-                outside #board-canvas's zoom-transform coordinate space, so it
-                stays put regardless of scroll/zoom — see the
-                `board-view-presented` design screen. Stays visible until
-                dismissed (no auto-dismiss timer).
+                #board-canvas is sized in JS to the tile content's SCALED (zoomed) pixel size — its child #board-canvas-inner
+                is transformed (scale) around the content's unscaled (100%-zoom) size, same wrapper/transform split as
+                mockup-zoom.js's applyMockupZoom, so native scrolling (including smooth-scroll centering on flow navigation and
+                zoom-around-cursor) works against the real post-zoom size without any extra pan/zoom logic. Comment mode has no
+                effect here — see board-view.js's module comment.
               -->
-              <div id="board-presented-banner" role="status" hidden>
-                <span id="board-presented-icon" class="icon" aria-hidden="true">visibility</span>
-                <span id="board-presented-text"></span>
-                <button type="button" id="board-presented-dismiss" aria-label="Dismiss agent presentation notice"><span class="icon" aria-hidden="true">close</span></button>
-              </div>
-              <!--
-                CHR-624/ADR-005 — shown instead of the (empty) tile canvas
-                when filter matches ∪ pinned is empty: either the project has
-                no screens at all, or the filter matches nothing and nothing
-                is pinned. Overlays #board-surface directly (position:
-                absolute, outside #board-canvas's zoom-transform coordinate
-                space) rather than trying to center it inside the zoomed
-                canvas — see the `board-view-empty` design screen.
-              -->
-              <div id="board-empty-state" hidden>
-                <span id="board-empty-icon" class="icon" aria-hidden="true">view_list</span>
-                <div id="board-empty-title">No screens to show</div>
-                <div id="board-empty-body"></div>
-              </div>
               <div id="board-canvas">
                 <div id="board-canvas-inner">
                   <div id="board-tiles"></div>
@@ -325,6 +274,25 @@
                 <!-- CHR-1264: the read-only comment overlay (board-comments.js), in the parent document at the zoomed size, next to the transformed inner box. -->
                 <div id="board-comment-layer"></div>
               </div>
+            </div>
+            <!--
+              CHR-625/ADR-005 — shown when an agent's set_board_state call switched the human here: a pill above the zoom pill that stays until dismissed.
+              Overlays the board area directly (outside #board-canvas's zoom-transform coordinate space) so it stays put regardless of scroll/zoom.
+              A live region that is always present: it is unhidden BEFORE its text is written, so the announcement fires.
+            -->
+            <div id="board-presented-banner" role="status" hidden>
+              <span id="board-presented-icon" aria-hidden="true"></span>
+              <span id="board-presented-text"></span>
+              <button type="button" id="board-presented-dismiss" aria-label="Dismiss agent presentation notice"><span class="icon" aria-hidden="true">close</span></button>
+            </div>
+            <!--
+              CHR-624 — shown when the visible set is empty (the filter matches nothing and nothing is pinned), per the `board-view-empty` design screen.
+            -->
+            <div id="board-empty-state" hidden>
+              <span id="board-empty-icon" class="icon" aria-hidden="true">grid_view</span>
+              <div id="board-empty-title">Nothing on the board</div>
+              <div id="board-empty-body"></div>
+              <button type="button" id="board-empty-clear" class="chrome-btn">Clear filter</button>
             </div>
           </div>
           <!-- CHR-927: update notice. A polite live region that is always present (so the toast is announced when it appears); the toast over the canvas never moves the layout. -->
@@ -428,10 +396,10 @@
             <button type="button" id="zoom-trigger" aria-haspopup="dialog" aria-expanded="false" aria-controls="zoom-menu" aria-label="Zoom level, open the zoom slider"><span id="zoom-label">100%</span></button>
             <button type="button" id="zoom-in" class="chrome-icon-btn zoom-step-button" data-zoom-step="in" aria-label="Zoom in" data-tooltip="Zoom in" data-shortcut-id="zoom-in"><span class="icon" aria-hidden="true">add</span></button>
             <span class="zoom-pill-divider" aria-hidden="true"></span>
-            <button type="button" id="zoom-fit" class="zoom-button" data-zoom="fit" aria-pressed="false"><span class="icon" aria-hidden="true">fit_screen</span>Fit</button>
+            <button type="button" id="zoom-fit" class="zoom-button" data-zoom="fit" aria-pressed="false"><span class="icon" aria-hidden="true">fit_screen</span><span id="zoom-fit-label">Fit</span></button>
           </div>
           <div id="zoom-menu" popover="auto" role="dialog" aria-label="Zoom">
-            <div class="zoom-pop-head"><b>Zoom</b><span>Drag the slider</span></div>
+            <div class="zoom-pop-head"><b>Zoom</b><span id="zoom-pop-hint">Drag the slider</span></div>
             <input type="range" id="zoom-range" min="5" max="200" step="1" value="100" aria-label="Zoom" />
             <div class="zoom-pop-scale" aria-hidden="true"><span>5%</span><span>100%</span><span>200%</span></div>
             <div class="zoom-pop-sep" aria-hidden="true"></div>

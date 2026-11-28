@@ -1,6 +1,6 @@
 // CHR-1264 — read-only comment pins on the Board: the open threads of every
 // screen tile as pins at their nodes, a count chip per tile, a group pin where
-// pins overlap, a detached pin, and — below 60 % board zoom — one count dot per
+// pins overlap, a detached pin, and — below 15 % board zoom — one count dot per
 // tile. A click (never a hover) on a pin opens a read-only preview with "Open
 // in Screens"; a click on a dot opens the screen's read-only thread list.
 // Reply, resolve and re-anchor stay in the Screens view.
@@ -16,35 +16,22 @@
 
 import { icon } from "./icons.js";
 import { authorLabel, bareId, numberThreads, pinnedThreads, placePopover, relativeTime, renderCommentMessage, threadKind } from "./comment-canvas.js";
-import { LOW_ZOOM_AFFORDANCE_THRESHOLD } from "./board.js";
+import { OVERVIEW_ZOOM_BELOW } from "./board.js";
 
 const PIN_SIZE = 24;
 /** Pins on one element stack leftwards by this much; pins closer than it in both axes merge into a group. */
 const STACK_STEP = PIN_SIZE - 4;
 const DETACHED_STEP = 30;
-/** The teal pin button sits on a tile's top-right corner (22 px, top/right -8 px, scaled with the tile): markers keep clear of it. */
-const PIN_BUTTON_LEFT = 14;
-const PIN_BUTTON_TOP = 8;
-const PIN_BUTTON_BOTTOM = 14;
 const DOT_INSET = 6;
+/** Gap between a label's text and its count chips, and the label row's height when the label itself is not drawn, in px. */
+const CHIP_GAP = 8;
+const LABEL_ROW = 18;
+/** How far past its tile's right edge a label may reach, in board px: half the gap to the next tile (board.js BASE_GAP). */
+const NEIGHBOR_ROOM = 40;
 
 // ---------------------------------------------------------------------------
 // Pure helpers (unit-tested in board-comments.test.js)
 // ---------------------------------------------------------------------------
-
-/**
- * Moves a pin centre left when its box would touch the tile's pin button (the
- * tile's top-right corner), so a comment marker never sits on it.
- * @param {{ x: number, y: number }} point pin centre
- * @param {{ top: number, right: number }} tile the tile's top-right corner, in layer pixels
- * @param {number} [scale] the board zoom as a factor: the button scales with the tile, a pin does not
- * @returns {{ x: number, y: number }}
- */
-export function clearOfPinButton(point, tile, scale = 1) {
-  const nearCorner = point.y - PIN_SIZE / 2 < tile.top + PIN_BUTTON_BOTTOM * scale && point.y + PIN_SIZE / 2 > tile.top - PIN_BUTTON_TOP * scale;
-  if (!nearCorner) return point;
-  return { x: Math.min(point.x, tile.right - PIN_BUTTON_LEFT * scale - PIN_SIZE / 2 - 2), y: point.y };
-}
 
 /**
  * Merges pins that would overlap at the current zoom: a pin joins the first
@@ -122,6 +109,8 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
   let trigger = null;
   /** Its marker key: layout() rebuilds the markers, so the element is looked up again by it. @type {string | null} */
   let triggerKey = null;
+  /** The chip rows of the last layout(), placed once every marker is in the layer (measuring needs them there). @type {{ screen: string, row: HTMLElement, tileBox: { left: number, top: number } }[]} */
+  let chipRows = [];
   /** Marker key → the element drawn for it by the last layout(). @type {Map<string, HTMLElement>} */
   let markers = new Map();
   /** Thread id → the key of the marker that stands for it (its pin, else its group, dot or chip). @type {Map<string, string>} */
@@ -173,11 +162,12 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     const focusedKey = markersEl.contains(document.activeElement) ? /** @type {HTMLElement} */ (document.activeElement).dataset.key : undefined;
     const focusInPreview = previewEl.contains(document.activeElement);
     const g = geometry();
-    const low = g.zoom < LOW_ZOOM_AFFORDANCE_THRESHOLD;
+    const low = g.zoom < OVERVIEW_ZOOM_BELOW;
     // A thread preview belongs to a pin, a list to a dot: the other zoom mode has no such marker.
     if (active && (low ? active.type === "thread" : active.type === "list")) closePreview(false);
     markers = new Map();
     anchors = new Map();
+    chipRows = [];
     const nodes = [];
     for (const tile of g.tiles) {
       const all = threadsOf(tile.screen);
@@ -190,7 +180,7 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
         if (shown.length > 0) nodes.push(buildDot(tile.screen, shown, box));
         continue;
       }
-      nodes.push(...buildChips(tile.screen, all, box, scale));
+      nodes.push(...buildChips(tile.screen, all, box));
       /** @type {{ t: BoardThread, x: number, y: number }[]} */
       const placed = [];
       let detachedIndex = 0;
@@ -207,7 +197,7 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
         const index = perElement.get(id) ?? 0;
         perElement.set(id, index + 1);
         // An element on the tile's top edge would put its pin into the name row above (chips, label): the pin stays inside the tile.
-        placed.push({ t, ...clearOfPinButton({ x: eb.right - index * STACK_STEP, y: Math.max(eb.top, box.top + PIN_SIZE / 2) }, box, scale) });
+        placed.push({ t, x: eb.right - index * STACK_STEP, y: Math.max(eb.top, box.top + PIN_SIZE / 2) });
       }
       const open = placed.filter((p) => !p.t.detached);
       const groups = groupPins(open);
@@ -219,10 +209,40 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
       }
     }
     markersEl.replaceChildren(...nodes);
+    placeChips(g);
     trigger = triggerKey ? (markers.get(triggerKey) ?? null) : null;
     if (active) syncActive();
     if (focusedKey) markers.get(focusedKey)?.focus();
     else if (focusInPreview && active) previewEl.focus();
+  }
+
+  /**
+   * Puts each chip row in the room its tile's label keeps for it — name, count, chips, then the pin mark — so the chips never cover the pin mark: the row's width is measured and handed to the label, which makes the room, and the row goes where the room starts.
+   * @param {ReturnType<typeof geometry>} g
+   */
+  function placeChips(g) {
+    const layerBox = layerEl.getBoundingClientRect();
+    for (const { screen, row, tileBox } of chipRows) {
+      const width = row.getBoundingClientRect().width;
+      g.reserveChips?.(screen, width + CHIP_GAP);
+      const at = g.chipsAt?.(screen);
+      row.hidden = false;
+      if (at) {
+        const left = at.left - layerBox.left;
+        row.style.left = `${left}px`;
+        row.style.top = `${at.top - layerBox.top}px`;
+        row.style.height = `${at.height}px`;
+        // Chips that would run into the next tile's label (the gap between two tiles is only a few pixels on screen at a small zoom) stay out: the pins still say it, and the label keeps its own room.
+        if (left + width > tileBox.right + (NEIGHBOR_ROOM * g.zoom) / 100) {
+          row.hidden = true;
+          g.reserveChips?.(screen, 0);
+        }
+      } else {
+        row.style.left = `${tileBox.left}px`;
+        row.style.top = `${tileBox.top - LABEL_ROW}px`;
+        row.style.height = `${LABEL_ROW}px`;
+      }
+    }
   }
 
   function register(markerKey, el, threadIds) {
@@ -275,8 +295,8 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     return register(key.group(screen, index), group, members.map((m) => m.t.id));
   }
 
-  /** The name-bar count chips of one tile: open, detached, and (when Show resolved is off and nothing else is left) the hidden resolved count. Right-aligned in the label row above the tile, clear of its pin button. */
-  function buildChips(screen, all, tileBox, scale) {
+  /** The count chips of one tile: open, detached, and (when Show resolved is off and nothing else is left) the hidden resolved count. They sit in the label row above the tile, in the room the label keeps for them (placeChips; design `board-cluster`). */
+  function buildChips(screen, all, tileBox) {
     const counts = screenCounts(all);
     const specs = [
       ["open", counts.open, "chat_bubble", "open comment", ""],
@@ -286,10 +306,7 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     if (specs.length === 0) return [];
     const row = document.createElement("div");
     row.className = "board-comment-chips";
-    // Scaled with the tile like its name label (and clear of the pin button), so the two read as one row at any zoom.
-    row.style.left = `${tileBox.right - (PIN_BUTTON_LEFT + 4) * scale}px`;
-    row.style.top = `${tileBox.top}px`;
-    row.style.setProperty("--board-scale", String(scale));
+    chipRows.push({ screen, row, tileBox });
     for (const [kind, count, glyph, noun, suffix] of specs) {
       const chip = document.createElement("button");
       chip.type = "button";
@@ -311,7 +328,7 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     return [row];
   }
 
-  /** The one count dot of a tile below 60 % zoom, inside its top-left corner. */
+  /** The one count dot of a tile below 15 % zoom, inside its top-left corner. */
   function buildDot(screen, shown, tileBox) {
     const dot = document.createElement("button");
     dot.type = "button";

@@ -6,9 +6,6 @@ import { isShown, trapFocus } from "./menu-keys.js";
 /** Group order per column, as drawn. */
 const COLUMNS = [["Tools", "Agent", "Project"], ["Zoom", "Board", "General"], ["Views", "Fold cards"]];
 
-/** Same keys as the Screens zoom presets; the Board applies them as Fit all / 100%, so the reference lists each key once. */
-const SHARED_WITH_ZOOM = new Set(["board-fit-all", "board-100"]);
-
 /**
  * @param {{ scrimEl: HTMLElement, columnsEl: HTMLElement, closeEl: HTMLElement, mac: boolean, fallbackFocusEl?: HTMLElement }} els `fallbackFocusEl`: where focus goes on close when the opener is gone or hidden
  * @returns {{ show: () => void, hide: () => void, isOpen: () => boolean }}
@@ -28,7 +25,7 @@ export function createShortcutsDialog({ scrimEl, columnsEl, closeEl, mac, fallba
       title.className = "shortcuts-group-title";
       title.textContent = group;
       section.appendChild(title);
-      for (const def of SHORTCUTS.filter((d) => d.group === group && !SHARED_WITH_ZOOM.has(d.id))) {
+      for (const def of SHORTCUTS.filter((d) => d.group === group)) {
         const row = document.createElement("div");
         row.className = "shortcuts-row";
         const label = document.createElement("span");

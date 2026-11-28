@@ -5,14 +5,6 @@
 
 import { icon } from "./icons.js";
 
-// The `$pin-button` design-system component's inline map-pin glyph (CHR-624)
-// — a static SVG, not an emoji (poor contrast on the accent fill, and
-// inconsistent rendering across OSes, per the component's own usage note).
-// Exported so board-view.js's board-tile pin buttons render the identical
-// glyph without a second copy of this markup.
-export const PIN_ICON_SVG =
-  '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"></path></svg>';
-
 /**
  * Case-insensitive substring match over a screen's name and its tags.
  * @param {{ name: string, tags: string[] }[]} screens
@@ -277,19 +269,93 @@ function appendTagRow(parent, tags, needle) {
  *
  *   CHR-738 — while compare is on, `compare` puts a checkbox on every row of the reference's family: the reference's is ticked and locked, the others toggle their membership until `cap` members are ticked, then the unticked ones are disabled. Rows outside the family get none.
  */
-export function renderScreenList(
-  listEl,
-  screens,
-  activeScreen,
-  onSelect,
-  filter = "",
-  { pinned, onTogglePin, expanded = new Set(), onToggleExpand, showTags = true, viewports = new Map(), compare } = {},
-) {
+export function renderScreenList(listEl, screens, activeScreen, onSelect, filter = "", opts = {}) {
   listEl.innerHTML = "";
   const tree = buildScreenTree(screens);
-  const needle = filter.trim().toLowerCase();
-  const { rows } = flattenTree(tree, { expanded, filter });
+  const { rows } = flattenTree(tree, { expanded: opts.expanded ?? new Set(), filter });
+  appendScreenRows(listEl, rows, { tree, filter, activeScreen, onSelect, ...opts });
+}
 
+/**
+ * The Board's list (CHR-1271): the same rows, grouped under headings. With a filter: "Matches" (what the filter finds) and "Pinned" (pinned screens it does not find — they stay on the board). Without one: "Pinned" and "All screens". A group is a set of top-level screens with their variants; its count is that number of rows. A pin toggle on every row, always visible.
+ * @param {HTMLElement} listEl
+ * @param {{ name: string, tags: string[], variant_of?: string, variant_kind?: string }[]} screens
+ * @param {string | null} activeScreen
+ * @param {(screen: string) => void} onSelect
+ * @param {string} filter
+ * @param {Parameters<typeof renderScreenList>[5]} opts as renderScreenList; `onTogglePin` and `pinned` are what the toggles use
+ * @returns {{ title: string, count: number }[]} the groups drawn (heading and number of rows)
+ */
+export function renderBoardScreenList(listEl, screens, activeScreen, onSelect, filter, opts = {}) {
+  listEl.innerHTML = "";
+  const tree = buildScreenTree(screens);
+  const expanded = opts.expanded ?? new Set();
+  const pinned = opts.pinned ?? new Set();
+  const rowCount = (rows) => rows.filter((r) => r.type === "screen" && r.node.parent === null).length;
+  const needle = filter.trim();
+  const found = needle ? flattenTree(tree, { expanded, filter }) : { rows: [] };
+  const foundNames = new Set(found.rows.filter((r) => r.type === "screen").map((r) => r.node.name));
+  // A pinned screen the Matches rows do not show is listed under Pinned with its toggle: its tree is opened down to it, unless a fully pinned ancestor's row stands for it.
+  const hiddenPins = [...pinned].filter((name) => tree.nodes.has(name) && !foundNames.has(name));
+  const openForPins = new Set(expanded);
+  for (const name of hiddenPins) {
+    const ancestors = [];
+    for (let p = tree.nodes.get(name).parent; p; p = p.parent) ancestors.push(p);
+    if (ancestors.some((a) => subtreeNames(a).every((n) => pinned.has(n)))) continue;
+    for (const a of ancestors) openForPins.add(a.name);
+  }
+  const pinnedRoots = tree.roots.filter((root) => subtreeNames(root).some((n) => hiddenPins.includes(n)));
+  /** @type {{ title: string, rows: SidebarRow[], emptyText?: string }[]} */
+  const groups = [];
+  if (needle) {
+    groups.push({ title: "Matches", rows: found.rows, emptyText: `No screen or tag matches \u201c${needle}\u201d.` });
+    if (pinnedRoots.length > 0) groups.push({ title: "Pinned", rows: flattenTree({ roots: pinnedRoots }, { expanded: openForPins }).rows });
+  } else {
+    const rest = tree.roots.filter((root) => !pinnedRoots.includes(root));
+    if (pinnedRoots.length > 0) groups.push({ title: "Pinned", rows: flattenTree({ roots: pinnedRoots }, { expanded: openForPins }).rows });
+    groups.push({ title: "All screens", rows: flattenTree({ roots: rest }, { expanded }).rows });
+  }
+  const drawn = [];
+  for (const group of groups) {
+    const count = rowCount(group.rows);
+    if (count === 0 && !group.emptyText) continue; // an empty "All screens" (everything is pinned) has nothing to say
+    // With nothing at all to show (no match, no pin) the line stands alone, under the status.
+    if (count === 0 && groups.length === 1) {
+      const none = document.createElement("li");
+      none.className = "nav-empty";
+      none.setAttribute("role", "presentation");
+      none.textContent = group.emptyText ?? "";
+      listEl.appendChild(none);
+      drawn.push({ title: group.title, count });
+      continue;
+    }
+    const head = document.createElement("li");
+    head.className = "screen-section";
+    head.setAttribute("role", "presentation");
+    const title = document.createElement("span");
+    title.className = "screen-section-title";
+    title.textContent = group.title;
+    const meta = document.createElement("span");
+    meta.className = "screen-section-count";
+    meta.textContent = String(count);
+    head.append(title, meta);
+    listEl.appendChild(head);
+    if (count === 0) {
+      const none = document.createElement("li");
+      none.className = "nav-empty";
+      none.setAttribute("role", "presentation");
+      none.textContent = group.emptyText ?? "";
+      listEl.appendChild(none);
+    } else appendScreenRows(listEl, group.rows, { tree, filter: needle, activeScreen, onSelect, ...opts, alwaysPins: true });
+    drawn.push({ title: group.title, count });
+  }
+  return drawn;
+}
+
+/** @param {HTMLElement} listEl @param {SidebarRow[]} rows @param {object} ctx the options of renderScreenList plus `tree`, `activeScreen`, `onSelect`, `filter`; `alwaysPins` marks the Board's list */
+function appendScreenRows(listEl, rows, ctx) {
+  const { tree, activeScreen, onSelect, pinned, onTogglePin, showTags = true, viewports = new Map(), compare, onToggleExpand, alwaysPins = false } = ctx;
+  const needle = (ctx.filter ?? "").trim().toLowerCase();
   for (const row of rows) {
     const li = document.createElement("li");
     li.className = "screen-item-row";
@@ -397,11 +463,12 @@ export function renderScreenList(
       // A sibling of `button.screen-item`, not a child — two nested interactive elements would be invalid HTML (and unfocusable via keyboard for the inner one in most browsers).
       const pinButton = document.createElement("button");
       pinButton.type = "button";
-      pinButton.className = "screen-item-pin pin-button";
+      pinButton.className = "screen-item-pin pin-toggle";
       pinButton.classList.toggle("pinned", isPinned);
-      pinButton.setAttribute("aria-label", `${isPinned ? "Unpin" : "Pin"} ${label}`);
+      pinButton.classList.toggle("always", alwaysPins);
+      pinButton.setAttribute("aria-label", isPinned ? `Unpin ${label} from the board` : `Pin ${label} to the board`);
       pinButton.setAttribute("aria-pressed", String(isPinned));
-      pinButton.innerHTML = PIN_ICON_SVG;
+      pinButton.appendChild(icon("keep", "icon-xs"));
       pinButton.addEventListener("click", (evt) => {
         evt.stopPropagation();
         onTogglePin(screen.name, subtree);

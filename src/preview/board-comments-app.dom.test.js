@@ -128,7 +128,7 @@ describe("Board comments in the app", () => {
     expect(boardRequests()).toHaveLength(1);
     expect(boardPins().map((p) => p.getAttribute("aria-label"))).toEqual(["Comment 1 on btn-a, open", "Comment 1 on btn-a, open"]);
     expect([...document.querySelectorAll("#board-comment-layer .comment-count-chip")].map((c) => c.getAttribute("aria-label"))).toEqual(["1 open comment", "1 open comment"]);
-    expect($("#board-toolbar-status").textContent).toContain("2 open comments");
+    expect($("#comments-tool-toggle").getAttribute("aria-label")).toBe("Comments on tiles, 2 open");
   });
 
   it("has no comment listener or marker inside a tile document", async () => {
@@ -139,28 +139,53 @@ describe("Board comments in the app", () => {
     }
   });
 
-  it("toggles Comments off and on, and adds resolved pins with Show resolved", async () => {
+  it("the Comments tool switches the pins off and on; Show resolved adds resolved pins and waits for the comments", async () => {
     seed();
     await openBoard();
-    expect($("#board-comments-toggle").textContent).toBe("Comments: On");
-    $("#board-resolved-toggle").click();
-    expect($("#board-resolved-toggle").getAttribute("aria-pressed")).toBe("true");
+    const comments = $("#comments-tool-toggle");
+    const resolved = $("#board-resolved-toggle");
+    expect(comments.getAttribute("aria-pressed")).toBe("true");
+    expect(resolved.hidden).toBe(false);
+    expect(resolved.getAttribute("aria-label")).toBe("Show resolved comments");
+    resolved.click();
+    expect(resolved.getAttribute("aria-pressed")).toBe("true");
     expect(boardPins().some((p) => p.dataset.state === "resolved")).toBe(true);
-    $("#board-comments-toggle").click();
-    expect($("#board-comments-toggle").textContent).toBe("Comments: Off");
+    comments.click();
+    expect(comments.getAttribute("aria-pressed")).toBe("false");
     expect($("#board-comment-layer").hidden).toBe(true);
-    $("#board-comments-toggle").click();
+    expect(resolved.getAttribute("aria-disabled")).toBe("true");
+    expect(resolved.getAttribute("aria-label")).toBe("Show resolved comments, turn on comments first");
+    comments.click();
     expect($("#board-comment-layer").hidden).toBe(false);
+    expect(resolved.hasAttribute("aria-disabled")).toBe(false);
   });
 
-  it("Comments: Off takes the count out of the status line, On brings it back", async () => {
+  it("the open count is a badge on the Comments tool while the pins are off, and the tool is named for it either way", async () => {
     seed();
     await openBoard();
-    expect($("#board-toolbar-status").textContent).toContain("2 open comments");
-    $("#board-comments-toggle").click();
-    expect($("#board-toolbar-status").textContent).not.toContain("open comment");
-    $("#board-comments-toggle").click();
-    expect($("#board-toolbar-status").textContent).toContain("2 open comments");
+    const badge = $("#comment-count-badge");
+    expect(badge.hidden).toBe(true); // pressed: the pins say it
+    $("#comments-tool-toggle").click();
+    expect(badge.hidden).toBe(false);
+    expect(badge.textContent).toBe("2");
+    expect($("#comments-tool-toggle").getAttribute("aria-label")).toBe("Comments on tiles, 2 open");
+    $("#comments-tool-toggle").click();
+    expect(badge.hidden).toBe(true);
+  });
+
+  it("M and Shift+M reach the same tools from the keyboard, and Show resolved stays out of the Screens view", async () => {
+    seed();
+    await openBoard();
+    const key = (k, init = {}) => document.dispatchEvent(new KeyboardEvent("keydown", { key: k, code: `Key${k.toUpperCase()}`, bubbles: true, cancelable: true, ...init }));
+    key("M", { shiftKey: true });
+    expect($("#board-resolved-toggle").getAttribute("aria-pressed")).toBe("true");
+    key("m");
+    expect($("#comments-tool-toggle").getAttribute("aria-pressed")).toBe("false");
+    key("m");
+    $('.view-tab[data-view="screens"]').click();
+    expect($("#board-resolved-toggle").hidden).toBe(true);
+    key("M", { shiftKey: true });
+    expect($("#board-resolved-toggle").getAttribute("aria-pressed")).toBe("true"); // unchanged: no-op outside the Board
   });
 
   it("closes the preview when the board is left, so Esc in Screens is not swallowed", async () => {

@@ -5,7 +5,7 @@
 // directly in screens.test.js under the fast node environment; this file
 // exists solely because renderScreenList needs a real `document`.
 import { describe, it, expect, vi } from "vitest";
-import { renderScreenList } from "./screens.js";
+import { renderScreenList, renderBoardScreenList } from "./screens.js";
 
 describe("renderScreenList", () => {
   const screens = [
@@ -329,5 +329,111 @@ describe("renderScreenList compare checkboxes (CHR-738)", () => {
 
     const full = boxes(render({ reference: "cart", family: ["cart", "a", "a1", "b"], selected: ["a"], cap: 1, onToggle: () => {} }));
     expect([full.a.disabled, full.a1.disabled, full.b.disabled]).toEqual([false, true, true]);
+  });
+});
+
+describe("pin toggles (design `pin-toggle`)", () => {
+  const screens = [{ name: "home", tags: [] }, { name: "cart", tags: [] }];
+  it("name what pressing them does: pin to the board, unpin from the board", () => {
+    const listEl = document.createElement("ul");
+    renderScreenList(listEl, screens, null, () => {}, "", { pinned: new Set(["cart"]), onTogglePin: () => {} });
+    expect([...listEl.querySelectorAll(".screen-item-pin")].map((b) => b.getAttribute("aria-label"))).toEqual(["Pin home to the board", "Unpin cart from the board"]);
+    expect(listEl.querySelector(".screen-item-pin .icon").textContent).toBe("keep");
+    expect(listEl.querySelector(".screen-item-pin").classList.contains("always")).toBe(false); // hover-revealed in the Screens view
+  });
+});
+
+describe("renderBoardScreenList (the Board's card)", () => {
+  const screens = [
+    { name: "checkout", tags: ["checkout", "payments"] },
+    { name: "checkout-error", tags: [], variant_of: "checkout", variant_kind: "state" },
+    { name: "cart", tags: ["checkout"] },
+    { name: "home", tags: ["orders"] },
+    { name: "settings", tags: ["account"] },
+    { name: "sign-in", tags: ["auth"] },
+  ];
+  const draw = (filter, pinned) => {
+    const listEl = document.createElement("ul");
+    const drawn = renderBoardScreenList(listEl, screens, null, () => {}, filter, { pinned: new Set(pinned), onTogglePin: () => {} });
+    const layout = [...listEl.children].map((li) => (li.classList.contains("screen-section") ? `# ${li.querySelector(".screen-section-title").textContent} ${li.querySelector(".screen-section-count").textContent}` : li.querySelector(".screen-item-text")?.textContent ?? li.textContent));
+    return { listEl, drawn, layout };
+  };
+
+  it("with a filter: Matches (what it finds) and Pinned (pinned screens it does not find)", () => {
+    const { drawn, layout } = draw("checkout", ["home", "settings"]);
+    expect(drawn).toEqual([{ title: "Matches", count: 2 }, { title: "Pinned", count: 2 }]);
+    expect(layout).toEqual(["# Matches 2", "checkout", "error", "cart", "# Pinned 2", "home", "settings"]); // the variant that matches too is a row under its main screen
+  });
+
+  it("without a filter: Pinned, then All screens (the rest)", () => {
+    const { drawn, layout } = draw("", ["home"]);
+    expect(drawn).toEqual([{ title: "Pinned", count: 1 }, { title: "All screens", count: 4 }]);
+    expect(layout.slice(0, 3)).toEqual(["# Pinned 1", "home", "# All screens 4"]);
+  });
+
+  it("without a filter and nothing pinned: only All screens", () => {
+    expect(draw("", []).drawn).toEqual([{ title: "All screens", count: 5 }]);
+  });
+
+  it("a pinned screen that matches the filter stays under Matches, not twice", () => {
+    const { drawn } = draw("checkout", ["checkout"]);
+    expect(drawn).toEqual([{ title: "Matches", count: 2 }]);
+  });
+
+  it("a pin on a variant keeps its whole tree under Pinned", () => {
+    const { drawn, layout } = draw("home", ["checkout-error"]);
+    expect(drawn).toEqual([{ title: "Matches", count: 1 }, { title: "Pinned", count: 1 }]);
+    expect(layout).toContain("checkout");
+  });
+
+  it("a filter that finds nothing, with nothing pinned, is the one line", () => {
+    const { listEl, drawn } = draw("xyzzy", []);
+    expect(drawn).toEqual([{ title: "Matches", count: 0 }]);
+    expect(listEl.querySelector(".screen-section")).toBeNull();
+    expect(listEl.querySelector(".nav-empty").textContent).toBe("No screen or tag matches \u201cxyzzy\u201d.");
+  });
+
+  it("a filter that finds nothing but leaves pins keeps the Matches heading with its line, and the pins below", () => {
+    const { layout } = draw("xyzzy", ["home"]);
+    expect(layout).toEqual(["# Matches 0", "No screen or tag matches \u201cxyzzy\u201d.", "# Pinned 1", "home"]);
+  });
+
+  it("a pinned variant is listed with its toggle when the filter matches only its siblings (the board still shows it)", () => {
+    const family = [
+      { name: "cart", tags: [] },
+      { name: "cart-empty", tags: [], variant_of: "cart", variant_kind: "state" },
+      { name: "cart-updated", tags: [], variant_of: "cart", variant_kind: "state" },
+    ];
+    const listEl = document.createElement("ul");
+    const drawn = renderBoardScreenList(listEl, family, null, () => {}, "cart-empty", { pinned: new Set(["cart-updated"]), onTogglePin: () => {} });
+    expect(drawn).toEqual([{ title: "Matches", count: 1 }, { title: "Pinned", count: 1 }]);
+    const pinnedRow = listEl.querySelector('[data-screen="cart-updated"]');
+    expect(pinnedRow).not.toBeNull();
+    expect(pinnedRow.querySelector(".screen-item-pin").getAttribute("aria-label")).toBe("Unpin cart-updated from the board");
+    expect(pinnedRow.querySelector(".screen-item-pin").classList.contains("pinned")).toBe(true);
+    // Every screen that is pinned has a row with a toggle somewhere in the list.
+    expect([...listEl.querySelectorAll(".screen-item-pin.pinned")].map((b) => b.closest("li").dataset.screen)).toContain("cart-updated");
+  });
+
+  it("without a filter a pinned variant under a root that is not fully pinned is opened up to, while a fully pinned family stays one row", () => {
+    const family = [
+      { name: "cart", tags: [] },
+      { name: "cart-empty", tags: [], variant_of: "cart", variant_kind: "state" },
+      { name: "cart-updated", tags: [], variant_of: "cart", variant_kind: "state" },
+      { name: "home", tags: [] },
+      { name: "home-empty", tags: [], variant_of: "home", variant_kind: "state" },
+    ];
+    const listEl = document.createElement("ul");
+    renderBoardScreenList(listEl, family, null, () => {}, "", { pinned: new Set(["cart-updated", "home", "home-empty"]), onTogglePin: () => {} });
+    const rows = [...listEl.querySelectorAll("li[data-screen]")].map((li) => li.dataset.screen);
+    expect(rows).toContain("cart-updated");
+    expect(rows).not.toContain("home-empty"); // home's row stands for its fully pinned family
+  });
+
+  it("every row's pin toggle is always shown on the Board's list", () => {
+    const { listEl } = draw("", ["home"]);
+    const pins = [...listEl.querySelectorAll(".screen-item-pin")];
+    expect(pins.length).toBe(5);
+    expect(pins.every((b) => b.classList.contains("always"))).toBe(true);
   });
 });

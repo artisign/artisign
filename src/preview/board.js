@@ -17,6 +17,10 @@ export const DEFAULT_COLUMNS = 4;
 // instead of staying a fixed pixel amount (which used to swamp shrunk tiles
 // at low zoom).
 export const BASE_GAP = 80;
+/**
+ * The vertical gap between two rows of the board, in board px. A tile's label keeps one size on screen (18px high, 8px above the box, 26px in all), which is 26/zoom board px: this gap holds it, with the card's own padding, down to the overview zoom (15 %), so a label never lands on the tile or card above it.
+ */
+export const BASE_GAP_Y = 190;
 export const BASE_PADDING = 60;
 const FALLBACK_SIZE = { width: 390, height: 844 };
 
@@ -387,21 +391,6 @@ export function computeBoardColumns(screens, sizes, viewportWidth, viewportHeigh
   return bestColumns;
 }
 
-/**
- * Pixel offset of the zoom-slider thumb along its track — the linear
- * mapping from the `$zoom-slider` design-system component (5%–200% ->
- * 0–`trackWidth`px).
- * @param {number} zoomPercent
- * @param {number} [trackWidth]
- * @param {number} [min]
- * @param {number} [max]
- * @returns {number}
- */
-export function zoomSliderOffset(zoomPercent, trackWidth = 140, min = MIN_BOARD_ZOOM, max = MAX_BOARD_ZOOM) {
-  const clamped = clampZoom(zoomPercent, min, max);
-  return ((clamped - min) / (max - min)) * trackWidth;
-}
-
 // Solved so that one mouse wheel "notch" (100 raw px — Chrome/Safari/Edge's
 // deltaMode-0 convention for a physical wheel click) changes zoom by
 // exactly ×1.2 (zooming in) or ÷1.2 (zooming out): exp(-100 * k) = 1/1.2.
@@ -480,25 +469,24 @@ export function stepZoomUp(zoom, step = BOARD_ZOOM_STEP, max = MAX_BOARD_ZOOM) {
   return Math.min(max, next);
 }
 
-// The "low zoom" legibility threshold from the `chr-621` design-system tag
-// notes — shared by two unrelated-looking rules that are actually the same
-// rule: below this, a tile's name label is illegible at the canvas's own
-// scale (labelDisplayMode), AND the UNPINNED pin affordance is pure visual
-// noise that drowns the handful of pinned markers a human is scanning for
-// at an overview zoom (CHR-624 — see board-view.js's applyZoomDependentTileState).
-export const LOW_ZOOM_AFFORDANCE_THRESHOLD = 60;
+/**
+ * Below this board zoom the board is an overview (dozens of tiles at a few percent): no name labels are drawn and the comment pins collapse into one count dot per tile (board-comments.js). From here up a label is drawn at a constant size, whatever the zoom — the design's labels and pins read the same at 24 % and at 200 % — truncated to the tile's own width below 100 %; at 100 % and above the full name shows.
+ */
+export const OVERVIEW_ZOOM_BELOW = 15;
 
 /**
- * Below this board zoom, a tile's name label is illegible at the canvas's
- * own scale and isn't rendered at all; below 100% but at/above this, it's
- * rendered truncated (ellipsis) to the tile's own width; at 100% and above,
- * the full name always shows. See the `chr-621` design-system tag notes'
- * "Label degradation by zoom" section.
+ * A variant tile inside an expanded cluster keeps no caption below this zoom: its caption (one size at every zoom) would not fit the room (CAPTION_ROOM) the cluster's layout leaves below the row.
+ */
+export const MEMBER_LABEL_MIN_ZOOM = 24;
+
+/**
  * @param {number} zoomPercent
+ * @param {{ member?: boolean }} [tile] `member`: a variant tile of an expanded cluster (the cluster's own main tile and every plain tile are not)
  * @returns {"hidden" | "truncated" | "full"}
  */
-export function labelDisplayMode(zoomPercent) {
-  if (zoomPercent < LOW_ZOOM_AFFORDANCE_THRESHOLD) return "hidden";
+export function labelDisplayMode(zoomPercent, { member = false } = {}) {
+  if (zoomPercent < OVERVIEW_ZOOM_BELOW) return "hidden";
+  if (member && zoomPercent < MEMBER_LABEL_MIN_ZOOM) return "hidden";
   if (zoomPercent < 100) return "truncated";
   return "full";
 }
@@ -555,10 +543,8 @@ export function computeZoomAroundCursor({
 // a cluster goes through computeClusterLayout. `computeLayout` picks, so
 // Fit all / column search work on either without knowing which.
 
-/** Expanded clusters draw their tiles at this fraction of native size (the approved `c-clusters` design shrinks them ~60% so a subtree fits)... */
-export const CLUSTER_TILE_SCALE = 0.6;
-/** ...or smaller, when the fullest depth level of a cluster would otherwise stack taller than this many board px (a level with 8 tiles is ~4000px at 0.6). */
-export const MAX_LEVEL_HEIGHT = 1800;
+/** An expanded cluster draws its members at native size in rows; a row wider than this (board px) is drawn smaller so it stays within it. */
+export const MAX_ROW_WIDTH = 3600;
 const MIN_CLUSTER_TILE_SCALE = 0.2;
 /** Tiles per depth level of an expanded cluster before the rest fold into a "+N more" tile. */
 export const MAX_TILES_PER_DEPTH = 8;
@@ -566,24 +552,21 @@ const FRAME_PAD = 24;
 const FRAME_HEADER = 40;
 const FRAME_MIN_WIDTH = 220;
 const THUMB_ROW = 36;
-const DEPTH_GAP = 56;
 const TILE_GAP = 28;
+/** Board px below a row of members for the captions (26px on screen at 24 % zoom, down to which they are drawn). */
+export const CAPTION_ROOM = 110;
 const MORE_HEIGHT = 56;
 const MAX_THUMBS = 8;
-/** The badge on a tile that is on the board only because it is pinned (the design's `outside-filter` variant). */
-export const OUTSIDE_FILTER_BADGE = "pinned · outside filter";
 
-/** Room a tile's name label takes above its box (CSS `.board-tile-label`: ~17px line + 6px margin), and with the "pinned · outside filter" badge (`.board-tile-badge`: 16px high, 24px above the box) — plus a little air. */
+/** Room a tile's name label takes above its box in board px (the label is 18px high at its own size and sits 8px above the box; a little air on top). Cluster frames reserve this so the label never lands on the frame header or on the tile above. */
 const LABEL_ABOVE = 24;
-const BADGE_ABOVE = 42;
 
 /**
- * How far above its box a tile draws its label / badge, in board px. Cluster frames reserve this so neither lands on the frame header or on the tile above.
- * @param {boolean} badged whether the tile carries the outside-filter badge
+ * How far above its box a tile draws its label, in board px.
  * @returns {number}
  */
-export function tileAboveExtent(badged) {
-  return badged ? BADGE_ABOVE : LABEL_ABOVE;
+export function tileAboveExtent() {
+  return LABEL_ABOVE;
 }
 
 function allNodes(node) {
@@ -645,8 +628,11 @@ export function buildBoardModel(screens, visibleNames, expandedNames = [], { clu
     }));
     for (const m of members) if (m.context) contextNames.add(m.screen);
     const expanded = all.some((n) => expandedSet.has(n.name));
+    // Every variant of the family, shown or not: the collapsed card draws one thumbnail for each (design `board-cluster`).
+    const variants = all.filter((n) => n !== root).map((n) => ({ screen: n.name, parent: n.parent?.name ?? null, depth: n.depth, kind: n.screen.variant_kind ?? null }));
     const cluster = {
       type: "cluster",
+      variants,
       root: root.name,
       size: root.total,
       depth: 1 + Math.max(...all.map((n) => n.depth)),
@@ -705,11 +691,11 @@ function layoutTile(screen, x, y, sizes, scale) {
   return { screen, x, y, width: natural.width * scale, height: natural.height * scale, naturalWidth: natural.width, naturalHeight: natural.height };
 }
 
-function collapsedBlock(cluster, sizes, badged) {
+function collapsedBlock(cluster, sizes) {
   const main = screenSize(sizes, cluster.root);
-  const above = tileAboveExtent(badged.has(cluster.root));
+  const above = tileAboveExtent();
   const width = Math.max(FRAME_MIN_WIDTH, main.width + FRAME_PAD * 2);
-  const others = cluster.members.filter((m) => m.parent !== null);
+  const others = cluster.variants;
   const height = FRAME_HEADER + above + main.height + (others.length > 0 ? 12 + THUMB_ROW : 0) + FRAME_PAD;
   return {
     width,
@@ -734,37 +720,42 @@ function collapsedBlock(cluster, sizes, badged) {
   };
 }
 
-/** The tile scale of one expanded cluster: CLUSTER_TILE_SCALE, shrunk so its fullest level stays within MAX_LEVEL_HEIGHT. */
-export function clusterTileScale(cluster, sizes) {
-  let tallest = 0;
+/**
+ * The rows of an expanded cluster (design `board-cluster-expanded`): the main screen and its variants side by side in one row, every deeper level a row below it. A level over MAX_TILES_PER_DEPTH folds the rest into one "+N more" tile at the end of its row.
+ * @param {{ levels: { depth: number, tiles: object[], hidden: object[] }[] }} cluster
+ * @returns {{ tiles: object[], hidden: object[], depth: number }[]}
+ */
+function clusterRows(cluster) {
+  const rows = [];
   for (const level of cluster.levels) {
-    const total = level.tiles.reduce((sum, m) => sum + screenSize(sizes, m.screen).height, 0);
-    tallest = Math.max(tallest, total + (level.hidden.length > 0 ? MORE_HEIGHT : 0) + TILE_GAP * level.tiles.length);
+    // depth 0 (the main screen) shares its row with depth 1
+    if (level.depth === 1 && rows.length === 1 && rows[0].depth === 0) {
+      rows[0].tiles.push(...level.tiles);
+      rows[0].hidden = level.hidden;
+      rows[0].depth = 1;
+    } else rows.push({ tiles: [...level.tiles], hidden: level.hidden, depth: level.depth });
   }
-  if (tallest <= 0) return CLUSTER_TILE_SCALE;
-  return Math.max(MIN_CLUSTER_TILE_SCALE, Math.min(CLUSTER_TILE_SCALE, MAX_LEVEL_HEIGHT / tallest));
+  return rows;
 }
 
-function expandedBlock(cluster, sizes, badged) {
-  const scale = clusterTileScale(cluster, sizes);
-  const columns = cluster.levels.map((level) => {
-    const entries = level.tiles.map((m) => ({ member: m, size: screenSize(sizes, m.screen), above: tileAboveExtent(badged.has(m.screen)) }));
-    const tileWidth = Math.max(...entries.map((e) => e.size.width * scale));
-    const moreWidth = level.hidden.length > 0 ? 140 : 0;
-    const width = Math.max(tileWidth, moreWidth);
-    const heights = entries.map((e) => e.size.height * scale);
-    if (level.hidden.length > 0) heights.push(MORE_HEIGHT);
-    // Between two tiles: the plain gap, or the next tile's label / badge if that needs more. The "+N more" tile has no label.
-    const gaps = heights.map((_, i) => (i === 0 ? 0 : Math.max(TILE_GAP, entries[i]?.above ?? 0)));
-    const height = heights.reduce((sum, h) => sum + h, 0) + gaps.reduce((sum, g) => sum + g, 0);
-    return { level, entries, gaps, width, height };
+const MORE_WIDTH = 140;
+
+function expandedBlock(cluster, sizes) {
+  const rows = clusterRows(cluster);
+  const tilesWidth = (row) => row.tiles.reduce((sum, m) => sum + screenSize(sizes, m.screen).width, 0);
+  const gapsWidth = (row) => TILE_GAP * (row.tiles.length - 1) + (row.hidden.length > 0 ? TILE_GAP + MORE_WIDTH : 0);
+  // Native size, smaller only for a row that would run past MAX_ROW_WIDTH (the gaps and the "+N more" tile keep their size).
+  const scale = Math.min(1, ...rows.map((row) => Math.max(MIN_CLUSTER_TILE_SCALE, (MAX_ROW_WIDTH - gapsWidth(row)) / tilesWidth(row))));
+  const laid = rows.map((row) => {
+    const heights = row.tiles.map((m) => screenSize(sizes, m.screen).height * scale);
+    if (row.hidden.length > 0) heights.push(MORE_HEIGHT);
+    const width = tilesWidth(row) * scale + gapsWidth(row);
+    return { row, width, height: Math.max(...heights) };
   });
-  // The first tile of a column sits below the header: pad by the frame padding or the tallest label / badge there.
-  const topPad = Math.max(FRAME_PAD, ...columns.map((c) => c.entries[0]?.above ?? 0));
-  const innerWidth = columns.reduce((sum, c) => sum + c.width, 0) + DEPTH_GAP * Math.max(0, columns.length - 1);
-  const innerHeight = Math.max(...columns.map((c) => c.height));
+  const innerWidth = Math.max(...laid.map((r) => r.width));
   const width = Math.max(FRAME_MIN_WIDTH, innerWidth + FRAME_PAD * 2);
-  const height = FRAME_HEADER + topPad + innerHeight + FRAME_PAD;
+  // The first row sits below the header and the main screen's label; each row has its members' captions below it.
+  const height = FRAME_HEADER + tileAboveExtent() + laid.reduce((sum, r) => sum + r.height + CAPTION_ROOM, 0);
   return {
     width,
     height,
@@ -783,48 +774,27 @@ function expandedBlock(cluster, sizes, badged) {
         thumbs: [],
         moreThumbs: 0,
       });
-      let cx = x + FRAME_PAD + (width - FRAME_PAD * 2 - innerWidth) / 2;
-      const placed = new Map();
-      for (const col of columns) {
-        let cy = y + FRAME_HEADER + topPad + (innerHeight - col.height) / 2;
-        for (const [i, { member, size }] of col.entries.entries()) {
-          if (i > 0) cy += col.gaps[i];
-          const tile = layoutTile(member.screen, cx + (col.width - size.width * scale) / 2, cy, sizes, scale);
+      let cy = y + FRAME_HEADER + tileAboveExtent();
+      for (const { row, height: rowHeight } of laid) {
+        let cx = x + FRAME_PAD;
+        for (const member of row.tiles) {
+          const tile = layoutTile(member.screen, cx, cy, sizes, scale);
           out.tiles.push(tile);
-          placed.set(member.screen, tile);
-          cy += tile.height;
+          cx += tile.width + TILE_GAP;
         }
-        if (col.level.hidden.length > 0) cy += TILE_GAP;
-        if (col.level.hidden.length > 0) {
+        if (row.hidden.length > 0) {
           out.mores.push({
-            id: `${cluster.root}:${col.level.depth}`,
+            id: `${cluster.root}:${row.depth}`,
             root: cluster.root,
-            depth: col.level.depth,
-            names: col.level.hidden.map((m) => m.screen),
-            x: cx + (col.width - 140) / 2,
+            depth: row.depth,
+            names: row.hidden.map((m) => m.screen),
+            x: cx,
             y: cy,
-            width: 140,
+            width: MORE_WIDTH,
             height: MORE_HEIGHT,
           });
         }
-        cx += col.width + DEPTH_GAP;
-      }
-      const foldedParents = new Set();
-      for (const member of cluster.members) {
-        const child = placed.get(member.screen);
-        const parent = member.parent ? placed.get(member.parent) : null;
-        if (child && parent) out.connectors.push({ from: parent.screen, to: child.screen });
-      }
-      // Children folded into a "+N more" tile keep their parent's connector,
-      // drawn once per parent to that tile.
-      for (const col of columns) {
-        const more = out.mores.find((m) => m.id === `${cluster.root}:${col.level.depth}`);
-        for (const member of col.level.hidden) {
-          const key = `${member.parent}>${more.id}`;
-          if (!member.parent || !placed.has(member.parent) || foldedParents.has(key)) continue;
-          foldedParents.add(key);
-          out.connectors.push({ from: member.parent, to: more.id, more: true });
-        }
+        cy += rowHeight + CAPTION_ROOM;
       }
     },
   };
@@ -834,16 +804,16 @@ function expandedBlock(cluster, sizes, badged) {
  * Cluster-aware sibling of computeBoardLayout: plain tiles and cluster
  * frames are packed into rows of `columns` items exactly like the flat grid
  * (row height = tallest item). A collapsed cluster is a frame around its main
- * tile at native size plus a thumbnail strip; an expanded one lays its
- * subtree out left-to-right by depth at CLUSTER_TILE_SCALE with at most
- * MAX_TILES_PER_DEPTH tiles per level (the rest become one "+N more" tile).
+ * tile at native size plus a thumbnail strip with one thumbnail per variant; an expanded one
+ * lays the main screen and its variants out side by side in one row, deeper levels as rows below,
+ * with at most MAX_TILES_PER_DEPTH tiles per level (the rest become one "+N more" tile).
  *
  * @param {(string | { type: "tile", screen: string } | object)[]} items
  * @param {Record<string, { width: number, height: number }>} sizes
- * @param {{ columns?: number, gapX?: number, gapY?: number, padding?: number, badged?: Set<string> }} [options]
+ * @param {{ columns?: number, gapX?: number, gapY?: number, padding?: number }} [options]
  * @returns {{
  *   tiles: ReturnType<typeof computeBoardLayout>["tiles"],
- *   frames: object[], mores: object[], connectors: { from: string, to: string, more?: boolean }[],
+ *   frames: object[], mores: object[],
  *   contentWidth: number, contentHeight: number,
  * }}
  */
@@ -852,8 +822,7 @@ export function computeClusterLayout(items, sizes, options = {}) {
   const gapX = options.gapX ?? BASE_GAP;
   const gapY = options.gapY ?? BASE_GAP;
   const padding = options.padding ?? BASE_PADDING;
-  const badged = options.badged ?? new Set(); // tiles drawing the "pinned · outside filter" badge above their box
-  const out = { tiles: [], frames: [], mores: [], connectors: [], contentWidth: padding * 2, contentHeight: padding * 2 };
+  const out = { tiles: [], frames: [], mores: [], contentWidth: padding * 2, contentHeight: padding * 2 };
 
   const blocks = items.map((item) => {
     if (typeof item === "string" || item.type === "tile") {
@@ -861,7 +830,7 @@ export function computeClusterLayout(items, sizes, options = {}) {
       const natural = screenSize(sizes, screen);
       return { width: natural.width, height: natural.height, emit: (x, y, o) => o.tiles.push(layoutTile(screen, x, y, sizes, 1)) };
     }
-    return item.expanded ? expandedBlock(item, sizes, badged) : collapsedBlock(item, sizes, badged);
+    return item.expanded ? expandedBlock(item, sizes) : collapsedBlock(item, sizes);
   });
 
   let y = padding;
@@ -974,13 +943,26 @@ export function computeBoardVisibility(screens, filter, pinned) {
 }
 
 /**
- * The `$board-toolbar` `status` slot's text — "N shown — M matches ·
- * K pinned", exactly as the approved `board-view` design screen shows it.
- * Takes `computeBoardVisibility`'s own return shape so the two can never
- * drift apart.
- * @param {{ shownCount: number, matchCount: number, pinnedCount: number }} visibility
+ * What the Board counts (design `board-view*`: "5 on the board" for five clusters, two of them pinned with their variants): one per cluster or plain screen, not one per variant. With clusters off every shown screen is a tile of its own.
+ * @param {{ name: string, variant_of?: string }[]} screens every screen of the project
+ * @param {string[]} visibleNames computeBoardVisibility's `visibleNames`
+ * @param {boolean} clusters whether the Board draws clusters
+ * @returns {number}
+ */
+export function countBoardItems(screens, visibleNames, clusters) {
+  if (!clusters) return visibleNames.length;
+  const visible = new Set(visibleNames);
+  return buildScreenTree(screens).roots.filter((root) => allNodes(root).some((n) => visible.has(n.name))).length;
+}
+
+/**
+ * The line under the find field on the Board (design `board-view*`): what is on the board, with no filter "All N on the board", with one "N on the board", "N shown by the agent" while the agent's presentation is up, "Nothing on the board" when there is nothing.
+ * @param {number} count countBoardItems' answer
+ * @param {{ filtered: boolean, presented: boolean }} state `filtered`: the find field holds a filter; `presented`: the agent switched the human to the Board and the notice is still up
  * @returns {string}
  */
-export function formatBoardStatusText({ shownCount, matchCount, pinnedCount }) {
-  return `${shownCount} shown — ${matchCount} matches · ${pinnedCount} pinned`;
+export function formatBoardStatus(count, { filtered, presented }) {
+  if (count === 0) return "Nothing on the board";
+  if (presented) return `${count} shown by the agent`;
+  return filtered ? `${count} on the board` : `All ${count} on the board`;
 }

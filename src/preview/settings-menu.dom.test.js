@@ -265,26 +265,28 @@ describe("toggles", () => {
     expect(row("follow").getAttribute("aria-checked")).toBe("false");
   });
 
-  it("Board clusters and Board edges drive the toolbar buttons", async () => {
+  it("Board clusters and Board edges drive the Clusters and Flow tools of the Board", async () => {
     await boot();
+    $('.view-tab[data-view="board"]').click();
     await openMenu();
     row("clusters").click();
     expect($("#board-clusters-toggle").getAttribute("aria-pressed")).toBe("false");
-    expect($("#board-clusters-toggle").textContent).toBe("Clusters: Off");
     row("edges").click();
-    expect($("#board-edges-toggle").getAttribute("aria-pressed")).toBe("false");
-    expect($("#board-edges-toggle").textContent).toBe("Edges: Off");
+    expect($("#flow-mode-toggle").getAttribute("aria-pressed")).toBe("false");
     await flush();
     expect(settings.prefs["artisign.boardClusters"]).toBe("false");
     expect(settings.prefs["artisign.boardEdgesVisible"]).toBe("false");
     expect(menu().hidden).toBe(false);
   });
 
-  it("changes made with the toolbar buttons show in the menu", async () => {
+  it("changes made with the Board's tools show in the menu", async () => {
     await boot();
-    $("#board-edges-toggle").click();
+    $('.view-tab[data-view="board"]').click();
+    $("#flow-mode-toggle").click();
+    $("#board-clusters-toggle").click();
     await openMenu();
     expect(row("edges").getAttribute("aria-checked")).toBe("false");
+    expect(row("clusters").getAttribute("aria-checked")).toBe("false");
   });
 
   it("has no Variant map switch any more: the variant bar it switched is gone (CHR-1267)", async () => {

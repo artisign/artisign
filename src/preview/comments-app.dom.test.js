@@ -256,8 +256,12 @@ describe("canvas comments", () => {
     loadFrame();
     const bar = $("#tool-bar");
     expect([bar.getAttribute("role"), bar.getAttribute("aria-orientation"), bar.getAttribute("focusgroup")]).toEqual(["toolbar", "vertical", "toolbar wrap block"]);
-    const tools = [...document.querySelectorAll("#tool-bar-tools .tool-btn")];
+    const all = [...document.querySelectorAll("#tool-bar-tools .tool-btn")];
+    // The Board's own tools are in the bar but hidden here, so they are neither a tab stop nor an arrow-key stop.
+    expect(all.filter((b) => b.hidden).map((b) => b.id)).toEqual(["board-resolved-toggle", "board-clusters-toggle", "board-collapse-all-btn"]);
+    const tools = all.filter((b) => !b.hidden);
     expect(tools.map((b) => b.id)).toEqual(["comment-mode-toggle", "inspect-mode-toggle", "notes-tool-toggle", "comments-tool-toggle", "flow-mode-toggle", "design-system-tool"]);
+    expect(all.map((b) => b.tabIndex).filter((i) => i === 0)).toHaveLength(1);
     expect(tools.map((b) => b.tabIndex)).toEqual([0, -1, -1, -1, -1, -1]);
     tools[0].focus();
     tools[0].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true }));

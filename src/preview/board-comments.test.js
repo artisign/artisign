@@ -1,20 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clearOfPinButton, groupPins, screenCounts, dotText } from "./board-comments.js";
-
-describe("clearOfPinButton", () => {
-  const tile = { top: 100, right: 400 };
-  it("moves a pin on the tile's top-right corner left of the pin button", () => {
-    expect(clearOfPinButton({ x: 400, y: 100 }, tile)).toEqual({ x: 372, y: 100 });
-    expect(clearOfPinButton({ x: 390, y: 112 }, tile)).toEqual({ x: 372, y: 112 });
-  });
-  it("scales the button's clearance with the board zoom", () => {
-    expect(clearOfPinButton({ x: 400, y: 100 }, tile, 0.5).x).toBe(400 - 7 - 12 - 2);
-  });
-  it("leaves a pin alone that is far enough from the corner, in either axis", () => {
-    expect(clearOfPinButton({ x: 300, y: 100 }, tile)).toEqual({ x: 300, y: 100 });
-    expect(clearOfPinButton({ x: 400, y: 150 }, tile)).toEqual({ x: 400, y: 150 });
-  });
-});
+import { groupPins, screenCounts, dotText } from "./board-comments.js";
 
 describe("groupPins", () => {
   it("merges pins closer than a pin's stacking step in both axes", () => {

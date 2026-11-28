@@ -9130,6 +9130,17 @@ body {
   background: var(--chrome-hover);
 }
 
+/* CHR-1297: a group the Board just expanded, lit up for a moment once the card has scrolled to it. */
+.screen-item-row.tree-reveal > .screen-item {
+  animation: tree-reveal 1.2s ease-out;
+}
+
+@keyframes tree-reveal {
+  from {
+    background: var(--chrome-accent-subtle);
+  }
+}
+
 .screen-item[aria-current="true"] {
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);

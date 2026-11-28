@@ -411,7 +411,11 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     const a = anchor.getBoundingClientRect();
     const o = layerEl.getBoundingClientRect();
     const box = { left: a.left - o.left, top: a.top - o.top, right: a.right - o.left, bottom: a.bottom - o.top };
-    const view = { left: surfaceEl.scrollLeft, top: surfaceEl.scrollTop, right: surfaceEl.scrollLeft + surfaceEl.clientWidth, bottom: surfaceEl.scrollTop + surfaceEl.clientHeight };
+    // The layer starts at the surface's padding (the constant card area, CHR-1299): move the visible part from surface space into layer space.
+    const pad = getComputedStyle(surfaceEl);
+    const padLeft = parseFloat(pad.paddingLeft) || 0;
+    const padTop = parseFloat(pad.paddingTop) || 0;
+    const view = { left: surfaceEl.scrollLeft - padLeft, top: surfaceEl.scrollTop - padTop, right: surfaceEl.scrollLeft + surfaceEl.clientWidth - padLeft, bottom: surfaceEl.scrollTop + surfaceEl.clientHeight - padTop };
     const size = { width: previewEl.offsetWidth || 320, height: previewEl.offsetHeight || 200 };
     const spot = placePopover(box, size, view);
     previewEl.style.left = `${spot.left}px`;

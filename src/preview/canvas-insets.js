@@ -9,6 +9,19 @@ const MIN_FREE_WIDTH = 200;
  */
 
 /**
+ * The centre for a bar of `barWidth` over a target centre, kept inside `[freeLeft, freeRight]`; a bar wider than the free span is centred in it.
+ * @param {number} center
+ * @param {number} barWidth
+ * @param {number} freeLeft
+ * @param {number} freeRight
+ * @returns {number}
+ */
+export function clampBarCenter(center, barWidth, freeLeft, freeRight) {
+  const half = Math.min(barWidth, Math.max(0, freeRight - freeLeft)) / 2;
+  return Math.min(Math.max(center, freeLeft + half), freeRight - half);
+}
+
+/**
  * The space the cards take from each window edge. A card on the left half pushes the left inset to its right edge, one on the right half the right inset to its left edge; `gap` is the breathing room kept between a card and the content. `top` and `bottom` are the fixed bands of the top groups and the zoom pill.
  * @param {number} viewportWidth
  * @param {CardRect[]} cards

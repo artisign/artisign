@@ -1,6 +1,6 @@
 // CHR-1268 — the side tool bar (design `tool-bar`, `tool-btn`, `hint-tooltip`): a vertical, icon-only toolbar between the left card and the screen. This module owns what is not app logic: the fold control, the grip (position remembered), the hint tooltips, the roving focus and the disabled state. What a tool does is app.js's business.
 //
-// Hints: every tool's name (and shortcut) shows as a blue `popover="hint"` tooltip after the pointer rests on the tool for about two seconds (`interest-delay-start` in style.css), wired with `interestfor` — only where interest invokers and anchor positioning both work. Elsewhere the tool keeps a native `title` (modern-web-guidance `toolbar`: no polyfill). A tool that does not apply is `aria-disabled` (still focusable) and its hint says why.
+// Hints: every tool's name (and shortcut) shows as a blue `popover="hint"` tooltip after the pointer rests on the tool for about two seconds (`interest-delay-start` in style.css), wired with `interestfor` — only where interest invokers and anchor positioning both work. Elsewhere the tool keeps a native `title` (modern-web-guidance `toolbar`: no polyfill). A tool that cannot act right now is `aria-disabled` (still focusable) and its hint says why; a tool that has no function in the view is `hidden` (CHR-1283, tool-states.js `TOOLS`).
 
 import { makeCardDraggable } from "./float-card.js";
 import { readBoolPref, writeBoolPref } from "./prefs.js";
@@ -178,7 +178,7 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
     isFolded: () => barEl.dataset.collapsed === "true",
     /**
      * @param {HTMLButtonElement} button
-     * @param {{ disabled?: boolean, reason?: string, pressed?: boolean, name?: string, hint?: string, shortcut?: string }} state `reason` is why the tool does not apply right now (ignored unless disabled); `pressed` is the toggle state (omit for a tool that has none); `name` replaces the accessible name; `hint` replaces the tooltip text of a disabled tool (default: name and reason); `shortcut` is the id of the key the tool answers to now.
+     * @param {{ disabled?: boolean, reason?: string, pressed?: boolean, name?: string, hint?: string, shortcut?: string }} state `reason` is why the tool does not apply right now (ignored unless disabled); `pressed` is the toggle state (omit for a tool that has none); `name` replaces the accessible name; `hint` replaces the tooltip text (default: name and, for a disabled tool, its reason); `shortcut` is the id of the key the tool answers to now.
      */
     setState(button, { disabled = false, reason = "", pressed, name, hint, shortcut }) {
       if (name !== undefined) button.setAttribute("aria-label", name);
@@ -198,7 +198,7 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
       else button.removeAttribute("aria-disabled");
       if (disabled && reason) button.dataset.toolReason = reason;
       else delete button.dataset.toolReason;
-      if (hint !== undefined && disabled) button.dataset.toolHintText = hint;
+      if (hint !== undefined) button.dataset.toolHintText = hint;
       else delete button.dataset.toolHintText;
       if (pressed !== undefined) button.setAttribute("aria-pressed", String(pressed));
       syncHint(button);

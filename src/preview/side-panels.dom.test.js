@@ -110,6 +110,6 @@ describe("left card (CHR-1267)", () => {
       tool.click();
       expect(tool.getAttribute("aria-pressed"), id).toBe("false");
     }
-    expect(document.getElementById("design-system-tool").getAttribute("aria-disabled")).toBeNull();
+    expect(document.getElementById("design-system-tool")).toBeNull(); // CHR-1284
   });
 });

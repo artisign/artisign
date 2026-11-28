@@ -139,11 +139,11 @@ describe("Board comments in the app", () => {
     }
   });
 
-  it("the Comments tool switches the pins off and on; Show resolved adds resolved pins and waits for the comments", async () => {
+  it("the Comments tool switches the pins off and on; Show resolved adds resolved pins and keeps its state", async () => {
     seed();
     await openBoard();
     const comments = $("#comments-tool-toggle");
-    const resolved = $("#board-resolved-toggle");
+    const resolved = $("#resolved-toggle");
     expect(comments.getAttribute("aria-pressed")).toBe("true");
     expect(resolved.hidden).toBe(false);
     expect(resolved.getAttribute("aria-label")).toBe("Show resolved comments");
@@ -153,8 +153,9 @@ describe("Board comments in the app", () => {
     comments.click();
     expect(comments.getAttribute("aria-pressed")).toBe("false");
     expect($("#board-comment-layer").hidden).toBe(true);
-    expect(resolved.getAttribute("aria-disabled")).toBe("true");
-    expect(resolved.getAttribute("aria-label")).toBe("Show resolved comments, turn on comments first");
+    // CHR-1292: a switch on its own — it stays usable with the pins off and keeps its state.
+    expect(resolved.hasAttribute("aria-disabled")).toBe(false);
+    expect(resolved.getAttribute("aria-pressed")).toBe("true");
     comments.click();
     expect($("#board-comment-layer").hidden).toBe(false);
     expect(resolved.hasAttribute("aria-disabled")).toBe(false);
@@ -173,19 +174,46 @@ describe("Board comments in the app", () => {
     expect(badge.hidden).toBe(true);
   });
 
-  it("M and Shift+M reach the same tools from the keyboard, and Show resolved stays out of the Screens view", async () => {
+  it("Show resolved is on or off whatever the data: pressed state, tooltip with state and count, a hint at 0 (CHR-1292)", async () => {
+    seed();
+    boardData.comments = boardData.comments.filter((c) => c.id !== "c3");
+    boardData.threads = boardData.threads.filter((t) => t.id !== "c3");
+    await openBoard();
+    const resolved = $("#resolved-toggle");
+    expect(resolved.getAttribute("aria-pressed")).toBe("false");
+    expect(resolved.title).toBe("Show resolved comments (0) (Shift+M)"); // jsdom has no interest invokers: the title carries the tooltip text
+    resolved.click();
+    expect(resolved.getAttribute("aria-pressed")).toBe("true"); // active = showResolved, not "has resolved comments"
+    expect(resolved.title).toBe("Hide resolved comments (0) (Shift+M)");
+    expect($("#tool-toast").hidden).toBe(false);
+    expect($("#tool-toast").textContent).toBe("No resolved comments on the board");
+    resolved.click();
+    expect(resolved.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("Show resolved counts the resolved threads of the shown tiles in its tooltip", async () => {
+    seed();
+    await openBoard();
+    expect($("#resolved-toggle").title).toBe("Show resolved comments (1) (Shift+M)");
+    $("#resolved-toggle").click();
+    expect($("#resolved-toggle").title).toBe("Hide resolved comments (1) (Shift+M)");
+    expect($("#tool-toast").hidden).toBe(true); // something to show: no hint
+  });
+
+  it("M and Shift+M reach the same tools from the keyboard, and Show resolved is the same switch in the Screens view", async () => {
     seed();
     await openBoard();
     const key = (k, init = {}) => document.dispatchEvent(new KeyboardEvent("keydown", { key: k, code: `Key${k.toUpperCase()}`, bubbles: true, cancelable: true, ...init }));
     key("M", { shiftKey: true });
-    expect($("#board-resolved-toggle").getAttribute("aria-pressed")).toBe("true");
+    expect($("#resolved-toggle").getAttribute("aria-pressed")).toBe("true");
     key("m");
     expect($("#comments-tool-toggle").getAttribute("aria-pressed")).toBe("false");
     key("m");
     $('.view-tab[data-view="screens"]').click();
-    expect($("#board-resolved-toggle").hidden).toBe(true);
+    expect($("#resolved-toggle").hidden).toBe(false);
+    expect($("#resolved-toggle").getAttribute("aria-pressed")).toBe("true"); // the state stays across views
     key("M", { shiftKey: true });
-    expect($("#board-resolved-toggle").getAttribute("aria-pressed")).toBe("true"); // unchanged: no-op outside the Board
+    expect($("#resolved-toggle").getAttribute("aria-pressed")).toBe("false");
   });
 
   it("closes the preview when the board is left, so Esc in Screens is not swallowed", async () => {

@@ -9134,6 +9134,17 @@ body {
   background: var(--chrome-hover);
 }
 
+/* CHR-1297: a group the Board just expanded, lit up for a moment once the card has scrolled to it. */
+.screen-item-row.tree-reveal > .screen-item {
+  animation: tree-reveal 1.2s ease-out;
+}
+
+@keyframes tree-reveal {
+  from {
+    background: var(--chrome-accent-subtle);
+  }
+}
+
 .screen-item[aria-current="true"] {
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
@@ -9309,13 +9320,14 @@ body {
   display: flex;
   flex-direction: column;
   overflow: visible;
+  /* The area the open cards take, a constant of the layout: the breadcrumb is kept out of it (app.js reads it), the compare view sits in it. */
+  padding: var(--shell-top) var(--reserve-right) var(--shell-bottom) var(--canvas-pad-left);
 }
 
 #screens-stage {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  position: relative; /* anchors the comment banner and the floating canvas toolbar (CHR-1252) */
+  position: absolute;
+  inset: 0;
+  display: flex; /* anchors the comment banner and the floating canvas toolbar (CHR-1252) */
 }
 
 #screens-stage > #canvas {
@@ -9904,6 +9916,12 @@ body {
   cursor: pointer;
 }
 
+/* CHR-1283: a tool without a function in the view is hidden. The class sets `display`, which would beat the `hidden` attribute and leave the tool (and a gap) in the bar. */
+.tool-btn[hidden],
+.tool-sep[hidden] {
+  display: none;
+}
+
 .tool-btn .icon {
   font-size: var(--size-icon);
 }
@@ -9956,6 +9974,22 @@ body {
   height: 0;
   margin: var(--space-xs) 0;
   border-top: 1px solid var(--chrome-border);
+}
+
+/* CHR-1292: a short, non-blocking hint at the bottom of the canvas (e.g. "No resolved comments on this screen"). */
+#tool-toast {
+  position: fixed;
+  bottom: var(--space-2xl);
+  left: 50%;
+  z-index: 40;
+  transform: translateX(-50%);
+  max-width: min(480px, calc(100vw - 2 * var(--space-xl)));
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-item);
+  background: var(--chrome-tooltip);
+  color: var(--chrome-tooltip-text);
+  font-size: var(--ui-sm);
+  pointer-events: none;
 }
 
 /* Hint tooltips: blue, after ~2 s of hover, to the right of the tool. The popover is only drawn while open (display is set for :popover-open alone, so the UA's closed state stays). */
@@ -11606,6 +11640,11 @@ dialog.float-dialog::backdrop {
 
 .shortcut-row dt {
   margin: 0;
+}
+
+/* CHR-1283: the view a key is limited to ("Flow arrows · Board"). */
+.shortcut-scope {
+  color: var(--chrome-text-secondary);
 }
 
 .shortcut-keys {

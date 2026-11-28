@@ -147,24 +147,24 @@
           </div>
           <span id="tool-bar-live" class="visually-hidden" role="status" aria-live="polite"></span>
           <div id="tool-bar-tools">
+            <!-- CHR-1288: two groups, as tool-states.js (TOOLS) lists them. Top: the tools that act on the canvas; bottom: the tools that open a panel. CHR-1283: a tool without a function in the current view is hidden (the Board's Clusters and Collapse all). -->
             <button type="button" id="comment-mode-toggle" class="tool-btn" aria-pressed="false" aria-label="Comment" data-tool-hint="Comment" data-shortcut-id="comment"><span class="icon" aria-hidden="true">add_comment</span></button>
             <button type="button" id="inspect-mode-toggle" class="tool-btn" aria-pressed="false" aria-label="Inspect" data-tool-hint="Inspect" data-shortcut-id="inspect"><span class="icon" aria-hidden="true">frame_inspect</span></button>
-            <span class="tool-sep" role="separator" aria-orientation="horizontal"></span>
+            <button type="button" id="flow-mode-toggle" class="tool-btn" aria-pressed="false" aria-label="Flow" data-tool-hint="Flow" data-shortcut-id="flow"><span class="icon" aria-hidden="true">route</span></button>
+            <button type="button" id="board-clusters-toggle" class="tool-btn" aria-pressed="true" aria-label="Clusters" data-tool-hint="Clusters" data-shortcut-id="board-clusters" hidden><span class="icon" aria-hidden="true">workspaces</span></button>
+            <button type="button" id="board-collapse-all-btn" class="tool-btn" aria-label="Collapse all clusters" data-tool-hint="Collapse all clusters" data-shortcut-id="board-collapse-all" hidden><span class="icon" aria-hidden="true">unfold_less</span></button>
+            <span id="tool-group-sep" class="tool-sep" role="separator" aria-orientation="horizontal"></span>
             <button type="button" id="notes-tool-toggle" class="tool-btn" aria-pressed="false" aria-label="Notes" data-tool-hint="Notes" data-shortcut-id="notes"><span class="icon" aria-hidden="true">description</span></button>
             <button type="button" id="comments-tool-toggle" class="tool-btn" aria-pressed="false" aria-label="Comments" data-tool-hint="Comments" data-shortcut-id="comments">
               <span class="icon" aria-hidden="true">chat_bubble</span>
               <span id="comment-count-badge" class="tool-badge" hidden></span>
             </button>
-            <!-- CHR-1271: Show resolved belongs to the Board (the Screens view lists resolved threads in the Comments card). -->
-            <button type="button" id="board-resolved-toggle" class="tool-btn" aria-pressed="false" aria-label="Show resolved comments" data-tool-hint="Show resolved comments" data-shortcut-id="board-show-resolved" hidden><span class="icon" aria-hidden="true">task_alt</span></button>
-            <button type="button" id="flow-mode-toggle" class="tool-btn" aria-pressed="false" aria-label="Flow" data-tool-hint="Flow" data-shortcut-id="flow"><span class="icon" aria-hidden="true">route</span></button>
-            <button type="button" id="design-system-tool" class="tool-btn" aria-label="Design system" data-tool-hint="Design system" data-shortcut-id="design-system"><span class="icon" aria-hidden="true">palette</span></button>
-            <!-- CHR-1271: the Board's own tools, shown only there. -->
-            <span id="board-tools-sep" class="tool-sep" role="separator" aria-orientation="horizontal" hidden></span>
-            <button type="button" id="board-clusters-toggle" class="tool-btn" aria-pressed="true" aria-label="Clusters" data-tool-hint="Clusters" data-shortcut-id="board-clusters" hidden><span class="icon" aria-hidden="true">workspaces</span></button>
-            <button type="button" id="board-collapse-all-btn" class="tool-btn" aria-label="Collapse all clusters" data-tool-hint="Collapse all clusters" data-shortcut-id="board-collapse-all" hidden><span class="icon" aria-hidden="true">unfold_less</span></button>
+            <!-- CHR-1292: a switch on its own (Screens view and Board): on or off whatever the number of resolved comments. -->
+            <button type="button" id="resolved-toggle" class="tool-btn" aria-pressed="false" aria-label="Show resolved comments" data-tool-hint="Show resolved comments" data-shortcut-id="show-resolved"><span class="icon" aria-hidden="true">task_alt</span></button>
           </div>
         </div>
+        <!-- CHR-1292: a short, non-blocking hint beside the tool bar (e.g. "No resolved comments on this screen"). -->
+        <div id="tool-toast" role="status" aria-live="polite" hidden></div>
         <main id="main">
           <div id="screens-view" class="main-view">
             <!-- CHR-732: variant breadcrumb — filled and shown by variants.js only for a variant or a screen that has variants. -->

@@ -24,17 +24,20 @@
  * }} ShortcutDef
  */
 
-export const SHORTCUT_GROUPS = ["Tools", "Views", "Zoom", "Board", "Agent", "Fold cards", "Project", "General"];
+export const SHORTCUT_GROUPS = ["Canvas tools", "Panel tools", "Views", "Zoom", "Agent", "Fold cards", "Project", "General"];
 
 /** @type {ShortcutDef[]} */
 export const SHORTCUTS = [
-  // The side tool bar (CHR-1268), in its order.
-  { id: "comment", group: "Tools", label: "Comment", key: "c", display: "C" },
-  { id: "inspect", group: "Tools", label: "Inspect", key: "i", display: "I" },
-  { id: "notes", group: "Tools", label: "Notes", key: "n", display: "N" },
-  { id: "comments", group: "Tools", label: "Comments", key: "m", display: "M" },
-  { id: "flow", group: "Tools", label: "Flow", key: "f", display: "F", view: "screens" }, // on the Board the Flow tool shows the flow arrows: E
-  { id: "design-system", group: "Tools", label: "Design system", key: "d", display: "D" },
+  // The side tool bar (CHR-1268), in its order and its two groups (CHR-1288): the tools that act on the canvas, then the tools that open a panel. `view` marks a key that only the named view has (CHR-1283): the Flow tool is F in the Screens view and E on the Board; Clusters and Collapse all belong to the Board.
+  { id: "comment", group: "Canvas tools", label: "Comment", key: "c", display: "C" },
+  { id: "inspect", group: "Canvas tools", label: "Inspect", key: "i", display: "I" },
+  { id: "flow", group: "Canvas tools", label: "Flow", key: "f", display: "F", view: "screens" },
+  { id: "board-edges", group: "Canvas tools", label: "Flow arrows", key: "e", display: "E", view: "board" },
+  { id: "board-clusters", group: "Canvas tools", label: "Clusters", key: "g", display: "G", view: "board" },
+  { id: "board-collapse-all", group: "Canvas tools", label: "Collapse all", key: "g", shift: true, display: "G", view: "board" },
+  { id: "notes", group: "Panel tools", label: "Notes", key: "n", display: "N" },
+  { id: "comments", group: "Panel tools", label: "Comments", key: "m", display: "M" },
+  { id: "show-resolved", group: "Panel tools", label: "Show resolved comments", key: "m", shift: true, display: "M" }, // Screens and Board; the tool is hidden in the other views, so the key does nothing there
 
   { id: "view-screens", group: "Views", label: "Screens", key: "1", display: "1", target: "screens" },
   { id: "view-board", group: "Views", label: "Board", key: "2", display: "2", target: "board" },
@@ -47,12 +50,6 @@ export const SHORTCUTS = [
   { id: "zoom-200", group: "Zoom", label: "200%", code: "Digit2", shift: true, display: "2", zoom: 2 },
   { id: "zoom-in", group: "Zoom", label: "Zoom in", key: "+", alt: ["="], char: true, display: "+", aria: "Plus" },
   { id: "zoom-out", group: "Zoom", label: "Zoom out", key: "-", alt: ["_"], char: true, display: "−", aria: "-" },
-
-  // The Board's own tools (CHR-1271); the Flow tool is E here, Comments is M as everywhere, Show resolved Shift+M.
-  { id: "board-edges", group: "Board", label: "Flow arrows", key: "e", display: "E", view: "board" },
-  { id: "board-show-resolved", group: "Board", label: "Show resolved comments", key: "m", shift: true, display: "M", view: "board" },
-  { id: "board-clusters", group: "Board", label: "Clusters", key: "g", display: "G", view: "board" },
-  { id: "board-collapse-all", group: "Board", label: "Collapse all", key: "g", shift: true, display: "G", view: "board" },
 
   { id: "follow", group: "Agent", label: "Follow the agent", key: "w", display: "W" },
   { id: "follow-resume", group: "Agent", label: "Resume following", key: "r", display: "R" },

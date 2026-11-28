@@ -43,12 +43,12 @@ import { renderCommentsPanel } from "./comments-panel.js";
 import { renderScreenChips, renderTagNotes } from "./notes-panel.js";
 import { renderScreenUseCases } from "./usecases-screen-link.js";
 import { setMarkdown } from "./markdown.js";
-import { renderScreenList, renderBoardScreenList, filterScreens, buildScreenTree, flattenTree, ancestorNames, displayName, viewportIconName } from "./screens.js";
+import { renderScreenList, renderBoardScreenList, filterScreens, buildScreenTree, flattenTree, ancestorNames, subtreeNames, displayName, viewportIconName } from "./screens.js";
 import { icon } from "./icons.js";
 import { createVariantUI, variantContext } from "./variants.js";
 import { renderVariantInspector } from "./variant-inspector.js";
 import { createCompareView } from "./compare.js";
-import { toolStates } from "./tool-states.js";
+import { TOOLS, toolShown, toolStates } from "./tool-states.js";
 import { writingScreen, createAgentBar, IDLE_AFTER_MS } from "./agent-bar.js";
 import { renderMockupList, filterMockups, mockupExpandKey } from "./mockups.js";
 import { renderMockupView, renderColumnChips, markSelectedColumn } from "./mockup-view.js";
@@ -74,7 +74,7 @@ import {
 import { renderDesignSystem } from "./design-system.js";
 import { connectEvents } from "./sse.js";
 import { applyCanvas } from "./canvas.js";
-import { computeCanvasInsets } from "./canvas-insets.js";
+import { computeCanvasInsets, clampBarCenter } from "./canvas-insets.js";
 import { updateWarningBadge } from "./warnings.js";
 import { createBoardView } from "./board-view.js";
 import { createBoardComments } from "./board-comments.js";
@@ -188,8 +188,9 @@ const boardEmptyClearBtn = document.getElementById("board-empty-clear");
 const boardClearPinsBtn = document.getElementById("board-clear-pins-btn");
 const boardClustersToggleBtn = document.getElementById("board-clusters-toggle");
 const boardCollapseAllBtn = document.getElementById("board-collapse-all-btn");
-const boardToolsSepEl = document.getElementById("board-tools-sep");
-const boardResolvedToggleBtn = document.getElementById("board-resolved-toggle");
+const toolGroupSepEl = document.getElementById("tool-group-sep");
+const resolvedToggleBtn = document.getElementById("resolved-toggle");
+const toolToastEl = document.getElementById("tool-toast");
 const boardCommentLayerEl = document.getElementById("board-comment-layer");
 const boardPresentedBannerEl = document.getElementById("board-presented-banner");
 const boardPresentedTextEl = document.getElementById("board-presented-text");
@@ -199,7 +200,6 @@ const flowModeToggle = document.getElementById("flow-mode-toggle");
 const commentModeToggle = document.getElementById("comment-mode-toggle");
 const notesToolToggle = document.getElementById("notes-tool-toggle");
 const commentsToolToggle = document.getElementById("comments-tool-toggle");
-const designSystemTool = document.getElementById("design-system-tool");
 const toolPanelEl = document.getElementById("tool-panel");
 const canvasControlsEl = document.getElementById("canvas-controls");
 const zoomButtons = document.querySelectorAll(".zoom-button");
@@ -278,6 +278,7 @@ let pinnedScreens = [];
 let currentView = "screens";
 /** The open-thread count of the shown scope (the Comments tool's badge) and the shown scope's threads and messages (the Comments panel's list). */
 let openCommentCount = 0;
+let resolvedThreadCount = 0; // CHR-1292: the threads the Comments panel counts on its Resolved tab
 let latestComments = { comments: [], threads: [] };
 /** @type {"open" | "resolved"} the Comments panel's tab; Resolved also puts a check pin on every resolved thread. */
 let commentsTab = "open";
@@ -407,6 +408,8 @@ let boardEdgesVisible = true;
 // lifecycle as `pinnedScreens`), stored as given by the daemon.
 let boardClustersOn = true;
 let expandedClusters = [];
+// Whether `expandedClusters` holds a list the daemon sent for the current project (CHR-1297: the first one is only a baseline for the tree sync).
+let expandedClustersSeen = false;
 // The zoom "Fit all" last computed, if any — the only way to know whether
 // its quick-jump button should read active, since (unlike "100%") its
 // target isn't a fixed constant. Set from board.setZoom's onZoomChange
@@ -460,14 +463,15 @@ board.mount();
 const BOARD_COMMENTS_KEY = "artisign.board.comments";
 const BOARD_RESOLVED_KEY = "artisign.board.showResolved";
 let boardCommentsOn = readBoolPref(prefsStorage, BOARD_COMMENTS_KEY, true);
-let boardShowResolved = readBoolPref(prefsStorage, BOARD_RESOLVED_KEY, false);
+// CHR-1292 — the Show resolved switch is one state for the Screens view and the Board, kept in the view state and the prefs, never derived from the comments (the key keeps its old name so a stored choice survives).
+let showResolvedOn = readBoolPref(prefsStorage, BOARD_RESOLVED_KEY, false);
 let boardCommentsRequestId = 0;
 const boardComments = createBoardComments({
   layerEl: boardCommentLayerEl,
   surfaceEl: boardSurfaceEl,
   geometry: () => board.commentGeometry(),
   enabled: boardCommentsOn,
-  showResolved: boardShowResolved,
+  showResolved: showResolvedOn,
   onZoomToTile: (screen) => board.zoomToTile(screen),
   onOpenInScreens: (screen, threadId) => void openScreenThread(screen, threadId),
 });
@@ -479,12 +483,36 @@ function toggleBoardComments() {
   boardComments.setEnabled(boardCommentsOn);
   renderBoardStatus(); // the Comments tool's state follows
 }
-boardResolvedToggleBtn.addEventListener("click", () => {
-  boardShowResolved = !boardShowResolved;
-  writeBoolPref(prefsStorage, BOARD_RESOLVED_KEY, boardShowResolved);
-  boardComments.setShowResolved(boardShowResolved);
-  renderBoardStatus();
+resolvedToggleBtn.addEventListener("click", () => {
+  showResolvedOn = !showResolvedOn;
+  writeBoolPref(prefsStorage, BOARD_RESOLVED_KEY, showResolvedOn);
+  boardComments.setShowResolved(showResolvedOn);
+  syncResolvedPins(); // the Screens view's pins
+  syncToolStates();
+  if (showResolvedOn) showResolvedHint();
 });
+
+/** CHR-1292 — a short, non-blocking hint beside the tool bar; no modal. */
+let toolToastTimer;
+function showToolToast(text) {
+  toolToastEl.textContent = text;
+  toolToastEl.hidden = false;
+  clearTimeout(toolToastTimer);
+  toolToastTimer = setTimeout(() => (toolToastEl.hidden = true), 3500);
+}
+
+/** Switching Show resolved on says why nothing appears: no resolved comments, or the pins are off. */
+function showResolvedHint() {
+  const onBoard = currentView === "board";
+  if (resolvedCommentCount() === 0) showToolToast(onBoard ? "No resolved comments on the board" : currentMockup !== null ? "No resolved comments on this mockup" : "No resolved comments on this screen");
+  else if (onBoard && !boardCommentsOn) showToolToast("Comments are off on the Board: turn them on to see the resolved pins");
+}
+
+/** The resolved threads the switch is about: the shown tiles on the Board, the open screen (or mockup) elsewhere. The Comments panel's Resolved tab counts the same threads. */
+function resolvedCommentCount() {
+  if (currentView === "board") return boardComments.summary(computeBoardVisibility(screens, screenFilter, pinnedScreens).visibleNames).resolved;
+  return resolvedThreadCount;
+}
 
 /** One request for every screen's threads; the board's markers and status line follow. */
 async function loadBoardComments() {
@@ -831,6 +859,8 @@ function resetProjectState() {
   clearTimeout(boardFilterWriteTimer);
   hideAgentPresentedBanner(); // CHR-625 — a presentation is per-project; don't carry it over to the next
   boardBuilt = false;
+  expandedClustersSeen = false;
+  pendingTreeReveal = null;
   boardCommentsRequestId++; // an answer still on its way belongs to the project we just left
   boardComments.setData({ comments: [], threads: [] });
   activeMode = "none";
@@ -910,7 +940,10 @@ function lastScreenKey(projectRoot) {
 function applyBoardState(filter, pinned, forceInputSync = false, expanded = []) {
   const expandedOnly = boardBuilt && (filter ?? "") === screenFilter && arraysEqual(pinned ?? [], pinnedScreens);
   screenFilter = filter ?? "";
+  const previousExpanded = expandedClustersSeen ? expandedClusters : null; // the first list of a project is the baseline, not a change
   expandedClusters = expanded ?? [];
+  expandedClustersSeen = true;
+  if (previousExpanded) syncBoardExpandedToTree(previousExpanded, expandedClusters); // CHR-1297
   // Skip while the human is typing in this very input (review fix 1) — the
   // broadcast this fires from is an echo of ITS OWN write (or a whitespace-
   // only filter the daemon normalised to `null`, board-state.ts), so writing
@@ -1654,6 +1687,51 @@ function revealScreenInSidebar(screen) {
   saveExpandedScreens();
 }
 
+/** The group the card still has to scroll to and light up (CHR-1297): set by a Board expand, done once the Screens list is on screen. */
+let pendingTreeReveal = null;
+const TREE_FLASH_MS = 1200;
+
+/**
+ * CHR-1297 — one-way sync Board -> card tree. The Board's `expanded` names went from `before` to `after`: a group expanded there opens in the tree with its parents, a group collapsed there closes with everything below it (Shift+G collapses them all). The tree never writes back: toggling it is navigation and leaves the Board alone. The state is shared (`expandedScreens`), so it also holds while the card is folded or shows Mockups; only the scroll and the highlight wait for the Screens list to be visible.
+ */
+function syncBoardExpandedToTree(before, after) {
+  const was = new Set(before);
+  const now = new Set(after);
+  const added = after.filter((name) => !was.has(name));
+  const removed = before.filter((name) => !now.has(name));
+  if (added.length === 0 && removed.length === 0) return;
+  const tree = buildScreenTree(screens);
+  const expanded = currentExpandedScreens();
+  for (const name of removed) {
+    const node = tree.nodes.get(name);
+    if (node) for (const member of subtreeNames(node)) expanded.delete(member);
+    else expanded.delete(name);
+  }
+  let reveal = null;
+  for (const name of added) {
+    if (!tree.nodes.has(name)) continue;
+    for (const ancestor of ancestorNames(tree, name)) expanded.add(ancestor);
+    expanded.add(name);
+    reveal ??= name;
+  }
+  saveExpandedScreens();
+  if (reveal) pendingTreeReveal = reveal;
+}
+
+/** Scrolls the pending group into view inside the card (`nearest`: no move when it is already visible) and lights it up briefly. Waits while the Screens list is not on screen; call again when it is. */
+function revealPendingTreeGroup() {
+  if (!pendingTreeReveal) return;
+  const listShown = navTab === "screens" && !sidebarScreensEl.hidden && sidebarScreensEl.dataset.collapsed !== "true";
+  if (!listShown) return;
+  const name = pendingTreeReveal;
+  pendingTreeReveal = null;
+  const row = [...screenListEl.querySelectorAll("li.screen-item-row")].find((li) => li.dataset.screen === name);
+  if (!row) return; // a filter hides it
+  row.scrollIntoView({ block: "nearest" });
+  row.classList.add("tree-reveal");
+  setTimeout(() => row.classList.remove("tree-reveal"), TREE_FLASH_MS);
+}
+
 screenTagsToggle.setAttribute("aria-pressed", String(showSidebarTags));
 /** Tags in the sidebar on/off, shared by the Tags button and the settings menu (CHR-926). */
 function setSidebarTags(on) {
@@ -1734,6 +1812,7 @@ function refreshSidebar() {
   syncPanelContext();
   renderBoardStatus();
   renderAgentBar(); // a feed row's target may have appeared or gone, and the Board's screen count moves with the list
+  revealPendingTreeGroup();
 }
 
 /** Fills the Notes panel for the open screen: its notes as Markdown, its tag chips, the notes of the tags it carries (collapsible), the use cases that map to it. */
@@ -2007,6 +2086,7 @@ function renderMockupChips() {
 /** CHR-1268 — the open-thread count: the badge on the Comments tool and its accessible name. */
 function renderCommentCount(threads) {
   openCommentCount = countRow(threads).open;
+  resolvedThreadCount = threads.filter((t) => t.status === "resolved").length;
   syncToolStates(); // the badge and the tool's name follow
 }
 
@@ -2238,7 +2318,10 @@ function syncPanelContext() {
 }
 
 /** The tools' names outside the Board (the Board names its own, in the design's words). */
-const TOOL_NAMES = { comment: "Comment", inspect: "Inspect", notes: "Notes", flow: "Flow", designSystem: "Design system" };
+const TOOL_NAMES = { comment: "Comment", inspect: "Inspect", notes: "Notes", flow: "Flow" };
+
+/** The tool bar's buttons by tool key (tool-states.js, TOOLS). */
+const TOOL_BUTTONS = { comment: commentModeToggle, inspect: inspectModeToggle, flow: flowModeToggle, clusters: boardClustersToggleBtn, collapseAll: boardCollapseAllBtn, notes: notesToolToggle, comments: commentsToolToggle, showResolved: resolvedToggleBtn };
 
 /** Every tool's pressed state, availability and name, from the current view and modes. A panel whose tool no longer applies closes. */
 function syncToolStates() {
@@ -2256,8 +2339,9 @@ function syncToolStates() {
       : undefined,
   });
   document.getElementById("tool-bar").setAttribute("aria-label", onBoard ? "Board tools" : showMockup ? "Mockup tools" : "Screen tools"); // design: the bar is named for what it works on
-  // Shown only on the Board; the roving tab stop follows what shows.
-  for (const el of [boardResolvedToggleBtn, boardToolsSepEl, boardClustersToggleBtn, boardCollapseAllBtn]) el.hidden = !onBoard;
+  // CHR-1283: a tool without a function in this view is hidden, not greyed (tool-states.js, TOOLS); the bar shrinks with it and the roving tab stop follows what shows. The divider stays only between two groups that both have a tool.
+  for (const [key, el] of Object.entries(TOOL_BUTTONS)) el.hidden = !toolShown(key, currentView);
+  toolGroupSepEl.hidden = !["canvas", "panel"].every((group) => TOOLS.some((t) => t.group === group && toolShown(t.key, currentView)));
   const named = (key, extra = {}) => ({ ...states[key], name: states[key].name ?? TOOL_NAMES[key], ...extra });
   toolBar.setState(commentModeToggle, { ...named("comment"), pressed: activeMode === "comment" });
   toolBar.setState(inspectModeToggle, { ...named("inspect"), pressed: activeMode === "inspect" });
@@ -2274,9 +2358,12 @@ function syncToolStates() {
   commentCountBadge.textContent = String(badgeCount);
   // The Flow tool is the flow mode of a screen, and the flow arrows on the Board (E there, F elsewhere).
   toolBar.setState(flowModeToggle, onBoard ? { ...named("flow"), pressed: boardEdgesVisible, shortcut: "board-edges" } : { ...named("flow"), pressed: activeMode === "flow", shortcut: "flow" });
-  toolBar.setState(designSystemTool, { ...named("designSystem") });
+  // CHR-1292: the switch is `showResolvedOn`, whatever the data; the tooltip names the state and the count.
+  if (toolShown("showResolved", currentView)) {
+    const count = resolvedCommentCount();
+    toolBar.setState(resolvedToggleBtn, { ...states.showResolved, name: "Show resolved comments", pressed: showResolvedOn, ...(states.showResolved.disabled ? {} : { hint: `${showResolvedOn ? "Hide" : "Show"} resolved comments (${count})` }) });
+  }
   if (onBoard) {
-    toolBar.setState(boardResolvedToggleBtn, { ...states.showResolved, pressed: boardShowResolved });
     toolBar.setState(boardClustersToggleBtn, { ...states.clusters, pressed: boardClustersOn });
     toolBar.setState(boardCollapseAllBtn, { ...states.collapseAll });
   }
@@ -2296,11 +2383,6 @@ for (const [id, button] of [["notes", notesToolToggle], ["comments", commentsToo
   });
 }
 
-designSystemTool.addEventListener("click", () => {
-  pauseFollow();
-  setView("design-system");
-});
-
 // Comments panel: Open | Resolved (a tablist: arrows and Home/End move between the tabs, like the left card's). Resolved also shows the check pins — only while this panel is open.
 const commentTabEls = { open: document.getElementById("comments-tab-open"), resolved: document.getElementById("comments-tab-resolved") };
 function setCommentsTab(tab, focus = false) {
@@ -2310,7 +2392,8 @@ function setCommentsTab(tab, focus = false) {
   if (focus) commentTabEls[tab].focus();
 }
 function syncResolvedPins() {
-  commentCanvas.setShowResolved(toolPanels.shown() === "comments" && commentsTab === "resolved");
+  // The Resolved tab shows the pins while it is open; the tool bar's switch shows them whatever tab is up (CHR-1292).
+  commentCanvas.setShowResolved(showResolvedOn || (toolPanels.shown() === "comments" && commentsTab === "resolved"));
 }
 for (const tab of ["open", "resolved"]) commentTabEls[tab].addEventListener("click", () => setCommentsTab(tab));
 document.getElementById("comments-tabs").addEventListener("keydown", (evt) => {
@@ -2319,6 +2402,7 @@ document.getElementById("comments-tabs").addEventListener("keydown", (evt) => {
   evt.preventDefault();
   setCommentsTab(next, true);
 });
+syncResolvedPins(); // a stored Show resolved choice reaches the Screens view
 syncToolStates(); // the initial state: nothing is open yet
 
 
@@ -2391,19 +2475,18 @@ function measureCanvasInsets() {
 // CHR-1299 — the insets the Screens canvas fits and centres in. A snapshot, taken when a fit is asked for (first fit, a view or project switch, a window resize, the Fit control) and kept otherwise: folding or opening a card never moves the frame.
 let canvasInsets = null;
 
-/** The variant breadcrumb is centred over the displayed screen (the compare area while comparing) and kept clear of the cards (CHR-1280). It clamps against the same insets snapshot the frame was placed with, never a live read of the cards, so folding a card neither moves the bar nor lets a later re-render move it. */
+/** The variant breadcrumb is centred over the displayed screen (the compare area while comparing) and kept inside the constant area the open cards leave free (CHR-1280); folding a card never moves it. */
 function syncVariantBar() {
   if (variantBarEl.hidden) return;
   const viewRect = screensViewEl.getBoundingClientRect();
-  canvasInsets ??= measureCanvasInsets();
-  const insets = canvasInsets;
-  const freeLeft = insets.left;
-  const freeWidth = Math.max(0, viewRect.width - insets.left - insets.right);
+  // The constant open-card area (#screens-view's padding), not the snapshot or a live card: the bar is never under an open card and never moves on fold or unfold.
+  const style = getComputedStyle(screensViewEl);
+  const freeLeft = parseFloat(style.paddingLeft) || 0;
+  const freeWidth = Math.max(0, viewRect.width - freeLeft - (parseFloat(style.paddingRight) || 0));
   variantBarEl.style.setProperty("--bar-max", `${freeWidth}px`);
   const target = compare.isOn() ? compareViewEl.getBoundingClientRect() : screenHolderEl.getBoundingClientRect();
-  const half = Math.min(variantBarEl.offsetWidth, freeWidth) / 2;
   const center = target.left + target.width / 2 - viewRect.left;
-  variantBarEl.style.setProperty("--bar-center", `${Math.min(Math.max(center, freeLeft + half), freeLeft + freeWidth - half)}px`);
+  variantBarEl.style.setProperty("--bar-center", `${clampBarCenter(center, variantBarEl.offsetWidth, freeLeft, freeLeft + freeWidth)}px`);
 }
 
 function updateCanvas() {
@@ -2481,6 +2564,7 @@ function setupCardFold(panelEl, collapseBtn, prefKey) {
     apply(collapsed);
     writeBoolPref(prefsStorage, prefKey, collapsed);
     if (isMockupZoomActive()) updateMockupZoom();
+    revealPendingTreeGroup();
   });
 }
 

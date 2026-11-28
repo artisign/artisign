@@ -44,4 +44,10 @@ describe("canvases fill the window; the cards float over them", () => {
   it("the mockup comment banner keeps its place above the zoom pill", () => {
     expect(rule('#comment-banner[data-placement="bottom"]')).toMatch(/bottom:\s*var\(--shell-bottom\)/);
   });
+
+  it("the breadcrumb's free span is the constant open-card area, not a card's state", () => {
+    const view = rule("#screens-view");
+    expect(view).toMatch(/padding:[^;]*var\(--canvas-pad-left\)/);
+    expect(view).not.toMatch(/--reserve-left/);
+  });
 });

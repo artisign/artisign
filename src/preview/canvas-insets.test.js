@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeCanvasInsets } from "./canvas-insets.js";
+import { computeCanvasInsets, clampBarCenter } from "./canvas-insets.js";
 
 const BANDS = { top: 76, bottom: 80, gap: 16 };
 
@@ -26,6 +26,14 @@ describe("computeCanvasInsets", () => {
     expect(1600 - insets.left - insets.right).toBeGreaterThanOrEqual(200);
     expect(insets.left).toBeGreaterThan(0);
     expect(insets.right).toBeGreaterThan(0);
+  });
+
+  it("the breadcrumb stays out of the open-card area, whatever the frame does", () => {
+    // free span 356..1312 (the constant open layout); a frame fitted while folded centres at 698
+    expect(clampBarCenter(698, 736, 356, 1312)).toBe(356 + 368);
+    expect(clampBarCenter(1500, 736, 356, 1312)).toBe(1312 - 368);
+    expect(clampBarCenter(838, 736, 356, 1312)).toBe(838);
+    expect(clampBarCenter(838, 2000, 356, 1312)).toBe(834); // wider than the span: centred in it
   });
 
   it("no cards, no insets beyond the bands", () => {

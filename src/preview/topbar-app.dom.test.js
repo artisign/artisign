@@ -88,16 +88,16 @@ describe("topbar markup", () => {
     for (const [id, label, icon, key] of [
       ["comment-mode-toggle", "Comment", "add_comment", "C"],
       ["inspect-mode-toggle", "Inspect", "frame_inspect", "I"],
+      ["flow-mode-toggle", "Flow", "route", "F"],
       ["notes-tool-toggle", "Notes", "description", "N"],
       ["comments-tool-toggle", "Comments", "chat_bubble", "M"],
-      ["flow-mode-toggle", "Flow", "route", "F"],
-      ["design-system-tool", "Design system", "palette", "D"],
+      ["resolved-toggle", "Show resolved comments", "task_alt", "Shift+M"],
     ]) {
       const btn = document.getElementById(id);
       expect(btn.getAttribute("aria-label"), id).toBe(label);
       expect(btn.querySelector(".icon").textContent, id).toBe(icon);
       expect(btn.dataset.shortcut, id).toBe(key); // filled from the shortcut mapping (CHR-916)
-      expect(btn.title, id).toBe(key ? `${label} (${key})` : label); // the baseline tooltip where interest invokers are missing
+      expect(btn.title, id).toBe(id === "resolved-toggle" ? `${label} (0) (${key})` : key ? `${label} (${key})` : label); // the baseline tooltip where interest invokers are missing; Show resolved names the count (CHR-1292)
     }
     expect(document.getElementById("status-bar-toggle")).toBeNull(); // no status bar, no More menu (CHR-1268)
     expect(document.getElementById("more-tool-toggle")).toBeNull();

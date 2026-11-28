@@ -234,7 +234,7 @@ export function createUseCasesView(options) {
     for (const el of root.querySelectorAll(".uc-persona-open, .uc-dim-name, .uc-h2-action, .uc-persona-new, .uc-io-pencil, .uc-page-head .uc-actions button, .uc-world-page .uc-h2-row button, .uc-world-page .uc-link-row, .uc-world-page .uc-guide-actions button")) {
       if (el.disabled) continue;
       el.setAttribute("aria-disabled", "true");
-      el.title = reason;
+      el.dataset.tooltip = reason;
     }
   }
   const pausedReason = () => savingPausedReason({ problems: [loadProblem(), pool.worldError], warnings: [...listEntryWarnings, ...worldEntryWarnings] });
@@ -740,7 +740,7 @@ export function createUseCasesView(options) {
     // Paused, not disabled: the button stays focusable and says why (a dialog would open on incomplete pools and its save would be refused).
     const paused = pausedReason();
     addButton.setAttribute("aria-disabled", paused ? "true" : "false");
-    addButton.title = paused || addButton.getAttribute("aria-label");
+    addButton.dataset.tooltip = paused || addButton.getAttribute("aria-label");
     renderProblems();
     if (mode === "mapping" && detail?.view) return; // the mapping view owns the content
     if (loadProblem() && section !== "world") {

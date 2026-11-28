@@ -412,12 +412,12 @@ describe("canvas comments", () => {
     loadFrame();
     const toggle = $("#resolved-toggle");
     expect(pins()).toHaveLength(2); // open and detached
-    expect(toggle.title).toBe("Show resolved comments (1) (Shift+M)");
+    expect(toggle.dataset.tooltip).toBe("Show resolved comments (1)");
     toggle.click();
     expect(toggle.getAttribute("aria-pressed")).toBe("true");
     expect(pins()).toHaveLength(3);
     expect($("#tool-toast").hidden).toBe(true);
-    expect(toggle.title).toBe("Hide resolved comments (1) (Shift+M)");
+    expect(toggle.dataset.tooltip).toBe("Hide resolved comments (1)");
     $("#comments-tool-toggle").click();
     expect($("#comments-count-resolved, #comments-tab-resolved").textContent).toContain("1"); // the tab counts the same threads
     toggle.click();
@@ -432,7 +432,7 @@ describe("canvas comments", () => {
     await boot("one");
     loadFrame();
     const again = $("#resolved-toggle");
-    expect(again.title).toBe("Show resolved comments (0) (Shift+M)");
+    expect(again.dataset.tooltip).toBe("Show resolved comments (0)");
     again.click();
     expect(again.getAttribute("aria-pressed")).toBe("true");
     expect($("#tool-toast").textContent).toBe("No resolved comments on this screen");

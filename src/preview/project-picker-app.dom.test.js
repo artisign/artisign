@@ -255,7 +255,7 @@ describe("menu and empty-state rows are buttons without glyph icons (CHR-911)", 
     expect(row.tagName).toBe("BUTTON");
     // One link row per recent project: the folder icon, the path, a chevron.
     expect(row.querySelector(".empty-recent-name").textContent).toBe("/work/acme");
-    expect(row.title).toBe("/work/acme");
+    expect(row.dataset.tooltip).toBe("/work/acme");
     expect([...row.querySelectorAll(".icon")].map((i) => i.textContent)).toEqual(["folder", "chevron_right"]);
     expect($("#no-project-state").textContent).not.toMatch(GLYPH_ICON);
   });
@@ -382,6 +382,6 @@ describe("menu and empty-state rows are buttons without glyph icons (CHR-911)", 
     const rows = [...document.querySelectorAll("#menu-recent-list .menu-item")];
     expect(rows.map((r) => r.querySelector(".menu-item-name").textContent)).toEqual(["design", "design"]);
     expect(rows.map((r) => r.querySelector(".menu-item-path").textContent)).toEqual(["\u2026/acme/design", "\u2026/other/design"]);
-    expect(rows.map((r) => r.title)).toEqual(["/work/acme/design", "/work/other/design"]);
+    expect(rows.map((r) => r.dataset.tooltip)).toEqual(["/work/acme/design", "/work/other/design"]);
   });
 });

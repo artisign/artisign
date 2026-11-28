@@ -60,17 +60,17 @@ async function writeClipboard(text) {
  */
 export async function copyWithFeedback(text, iconEl, selectEl = null) {
   const button = iconEl.closest("button");
-  const title = button?.dataset.copyTitle ?? button?.title ?? "";
+  const title = button?.dataset.copyTitle ?? button?.dataset.tooltip ?? "";
   if (button) button.dataset.copyTitle = title;
   const ok = await writeClipboard(text);
   iconEl.textContent = ok ? "check" : "error";
   iconEl.dataset.copyState = ok ? "copied" : "failed";
-  if (button) button.title = ok ? title : "Copy failed. The text is selected: copy it by hand.";
+  if (button) button.dataset.tooltip = ok ? title : "Copy failed. The text is selected: copy it by hand.";
   if (!ok) selectText(selectEl);
   restoreLater(iconEl, () => {
     iconEl.textContent = "content_copy";
     delete iconEl.dataset.copyState;
-    if (button) button.title = title;
+    if (button) button.dataset.tooltip = title;
   }, ok ? COPIED_MS : FAILED_MS);
   return ok;
 }
@@ -109,7 +109,7 @@ export function createCodeField(text, { variant = "default", label } = {}) {
   copy.type = "button";
   copy.className = "float-icon-btn code-field-copy";
   copy.setAttribute("aria-label", label ?? `Copy ${text}`);
-  copy.title = "Copy";
+  copy.dataset.tooltip = "Copy";
   const glyph = document.createElement("span");
   glyph.className = "icon";
   glyph.setAttribute("aria-hidden", "true");

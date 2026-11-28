@@ -63,7 +63,7 @@ describe("step reordering", () => {
       expect($(".uc-drag-handle[aria-pressed=false]", row)).not.toBeNull();
       expect($("button[aria-haspopup=menu]", row)).not.toBeNull();
     }
-    expect($("button[title='Move up']")).toBeNull();
+    expect($("button[data-tooltip='Move up']")).toBeNull();
     // the key hint is the row's last line and carries both texts; CSS picks one by focus / grab state
     const hint = rows[0].lastElementChild;
     expect(hint.classList.contains("uc-step-keys")).toBe(true);

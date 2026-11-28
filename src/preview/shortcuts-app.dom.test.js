@@ -419,6 +419,7 @@ describe("Escape consumed by an overlay does not also leave the mode", () => {
     $("#flow-mode-toggle").click();
     // Chrome focuses a clicked toggle, so its tooltip is up while the mode is on.
     $("#zoom-out").dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 450)); // the open delay
     expect($("#chrome-tooltip").hidden).toBe(false);
     key("Escape");
     expect($("#chrome-tooltip").hidden).toBe(true);

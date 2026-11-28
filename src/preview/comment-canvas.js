@@ -193,7 +193,7 @@ export function renderCommentMessage(record) {
   badge.textContent = record.author === "agent" ? "Agent" : "Human";
   const time = document.createElement("time");
   time.dateTime = record.ts;
-  time.title = record.ts;
+  time.dataset.tooltip = record.ts;
   time.textContent = relativeTime(record.ts);
   meta.append(avatar, who, badge, time);
   const body = divEl("comment-message-body");

@@ -203,23 +203,23 @@ describe("renderScreenList — variant tree", () => {
     expect(row("cart-sheet-confirm").querySelector(".screen-item-text").textContent).toBe(
       "confirm",
     );
-    expect(row("cart-sheet-confirm").querySelector(".screen-item").title).toBe(
+    expect(row("cart-sheet-confirm").querySelector(".screen-item").dataset.tooltip).toBe(
       "cart-sheet-confirm\ncart › cart-sheet › cart-sheet-confirm",
     );
-    expect(row("cart").querySelector(".screen-item").title).toBe("");
+    expect(row("cart").querySelector(".screen-item").dataset.tooltip).toBeUndefined();
   });
 
   it("shows the first two tags plus a +N chip whose title lists every tag", () => {
     const listEl = render();
     const chips = [...listEl.querySelectorAll('[data-screen="cart"] .tag-chip')];
     expect(chips.map((c) => c.textContent)).toEqual(["a", "b", "+2"]);
-    expect(chips[2].title).toBe("a, b, c, d");
+    expect(chips[2].dataset.tooltip).toBe("a, b, c, d");
   });
 
   it("gives every tag chip its full name as title (a long tag is truncated by CSS)", () => {
     const listEl = render();
     const chips = [...listEl.querySelectorAll('[data-screen="cart"] .tag-chip:not(.tag-more)')];
-    expect(chips.map((c) => c.title)).toEqual(["a", "b"]);
+    expect(chips.map((c) => c.dataset.tooltip)).toEqual(["a", "b"]);
   });
 
   it("hides every chip when showTags is false", () => {

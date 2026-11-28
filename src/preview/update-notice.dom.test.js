@@ -124,11 +124,11 @@ describe("update toast", () => {
     await flush();
     expect(glyph.textContent).toBe("error");
     expect(glyph.dataset.copyState).toBe("failed");
-    expect(copy.title).toMatch(/copy failed/i);
+    expect(copy.dataset.tooltip).toMatch(/copy failed/i);
     expect(window.getSelection().toString()).toBe("artisign update");
     await new Promise((r) => setTimeout(r, 3100)); // the mark goes back by itself: the control is never stuck
     expect(glyph.textContent).toBe("content_copy");
-    expect(copy.title).toBe("Copy");
+    expect(copy.dataset.tooltip).toBe("Copy");
   });
 
   it("sits in the Notifications region as a manual popover, with a keyboard-reachable close button", async () => {
@@ -142,7 +142,7 @@ describe("update toast", () => {
     const close = $("#update-toast-close");
     expect(close.tagName).toBe("BUTTON");
     expect(close.getAttribute("aria-label")).toBe("Hide for today");
-    expect(close.title).toBe("Hide for today"); // a native title: the shared tooltip would sit under the top layer
+    expect(close.dataset.tooltip).toBe("Hide for today"); // the shared tooltip is a manual popover (top layer)
   });
 
   it("announces through one always-present polite status node, and only when the announced version changes", async () => {

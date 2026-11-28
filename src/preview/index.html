@@ -60,7 +60,7 @@
             </span>
             <span id="topbar-connection" class="live-chip" role="status" data-state="live" data-tooltip="Live reload: connected"><span class="live-chip-dot" aria-hidden="true"></span><span id="topbar-connection-label">Live</span></span>
           </span>
-          <button type="button" id="warning-badge" class="chrome-chip chrome-chip--warning" title="Render diagnostics — click to step through" hidden></button>
+          <button type="button" id="warning-badge" class="chrome-chip chrome-chip--warning" data-tooltip="Render diagnostics — click to step through" hidden></button>
           <!-- CHR-926: app settings (theme, the per-browser toggles), MCP setup and About. CHR-1272: a floating popover (design `float-popover`, `shell-settings-menu`), opened by its declared invoker, the gear; an ARIA menu wired by settings-menu.js. -->
           <div id="settings-controls">
             <button type="button" id="settings-trigger" class="chrome-icon-btn" popovertarget="settings-menu" aria-haspopup="menu" aria-expanded="false" aria-controls="settings-menu" aria-label="Settings" data-tooltip="Settings">
@@ -140,7 +140,7 @@
             </div>
           </div>
         </aside>
-        <!-- CHR-1268: the side tool bar between the left card and the screen (design `tool-bar` + `tool-btn`). Icon-only: aria-label is the accessible name, tool-bar.js adds the hint tooltips (popover="hint" + interestfor, ~2 s hover) and the roving focus. aria-disabled tools stay focusable; the tooltip says why. The grip drags the bar (position remembered), the chevron folds it. data-shortcut-id names the entry of the shortcut mapping (shortcuts.js); the key in the tooltip is filled in at boot. -->
+        <!-- CHR-1268: the side tool bar between the left card and the screen (design `tool-bar` + `tool-btn`). Icon-only: aria-label is the accessible name, tool-bar.js wires the tool tooltips (data-tooltip, shown by the shared tooltip, CHR-1285) and the roving focus. aria-disabled tools stay focusable; the tooltip says why. The grip drags the bar (position remembered), the chevron folds it. data-shortcut-id names the entry of the shortcut mapping (shortcuts.js); the key in the tooltip is filled in at boot. -->
         <div id="tool-bar" class="project-only" role="toolbar" aria-label="Screen tools" aria-orientation="vertical" focusgroup="toolbar wrap block" data-collapsed="false">
           <div id="tool-bar-head">
             <button type="button" id="tool-bar-grip" class="float-grip" aria-label="Tool bar handle. Use arrow keys to move." data-tooltip="Drag to move"><span class="icon" aria-hidden="true">drag_indicator</span></button>
@@ -313,7 +313,7 @@
                 </div>
                 <div id="update-toast-command"></div>
               </div>
-              <button type="button" id="update-toast-close" class="float-icon-btn" aria-label="Hide for today" title="Hide for today"><span class="icon" aria-hidden="true">close</span></button>
+              <button type="button" id="update-toast-close" class="float-icon-btn" aria-label="Hide for today" data-tooltip="Hide for today"><span class="icon" aria-hidden="true">close</span></button>
             </div>
           </section>
         </main>
@@ -448,7 +448,7 @@
             <h1 id="shortcuts-title" class="float-dialog-title">Keyboard shortcuts</h1>
           <p id="shortcuts-sub" class="float-dialog-sub">Single keys work while no text field has focus. Nothing fires with Ctrl, Cmd or Alt held, so browser shortcuts stay untouched.</p>
           </div>
-          <button type="button" id="shortcuts-close" class=" float-icon-btn" aria-label="Close" title="Close"><span class="icon" aria-hidden="true">close</span></button>
+          <button type="button" id="shortcuts-close" class=" float-icon-btn" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
         </header>
       <div id="shortcuts-columns" class="float-dialog-body"></div>
     </dialog>
@@ -460,7 +460,7 @@
             <h1 id="mcp-title" class="float-dialog-title">Connect AI tools</h1>
           <p id="mcp-sub" class="float-dialog-sub">Give your AI tools the artisign MCP server, then teach them the conventions with the agent skill.</p>
           </div>
-          <button type="button" id="mcp-close" class=" float-icon-btn" aria-label="Close" title="Close"><span class="icon" aria-hidden="true">close</span></button>
+          <button type="button" id="mcp-close" class=" float-icon-btn" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
         </header>
         <div class="mcp-tabs" role="tablist" aria-label="Setup">
           <button type="button" id="mcp-tab-mcp" class="float-btn" role="tab" aria-selected="true" aria-controls="mcp-panel-mcp">MCP server</button>
@@ -496,9 +496,9 @@
       </div>
       <div id="mcp-reader" class="mcp-view" hidden>
         <header class="float-dialog-head mcp-reader-head">
-          <button type="button" id="mcp-reader-back" class="float-icon-btn" aria-label="Back to Agent skill" title="Back to Agent skill"><span class="icon" aria-hidden="true">arrow_back</span></button>
+          <button type="button" id="mcp-reader-back" class="float-icon-btn" aria-label="Back to Agent skill" data-tooltip="Back to Agent skill"><span class="icon" aria-hidden="true">arrow_back</span></button>
           <h1 id="mcp-reader-title" class="float-dialog-title mcp-reader-title">SKILL.md</h1>
-          <button type="button" id="mcp-reader-close" class="float-icon-btn" aria-label="Close" title="Close"><span class="icon" aria-hidden="true">close</span></button>
+          <button type="button" id="mcp-reader-close" class="float-icon-btn" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
         </header>
         <p class="mcp-reader-meta">This is the file <code class="mcp-path">artisign setup --skill</code> puts into each tool's skills folder.</p>
         <div class="mcp-reader-frame">
@@ -520,7 +520,7 @@
             <h1 id="whats-new-title" class="float-dialog-title">What's New</h1>
           <p id="whats-new-sub" class="float-dialog-sub">Release notes of the version you run and the one before it.</p>
           </div>
-          <button type="button" id="whats-new-close" class=" float-icon-btn" aria-label="Close" title="Close"><span class="icon" aria-hidden="true">close</span></button>
+          <button type="button" id="whats-new-close" class=" float-icon-btn" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
         </header>
       <div class="whats-new-scroll">
         <div id="whats-new-body" class="whats-new-body-scroll" tabindex="0" role="region" aria-labelledby="whats-new-title"></div>
@@ -537,7 +537,7 @@
             <h1 id="open-project-title" class="float-dialog-title">Open project</h1>
           <p id="open-project-sub" class="float-dialog-sub">Pick the folder that holds the project.</p>
           </div>
-          <button type="button" class="dialog-close float-icon-btn" aria-label="Close" title="Close"><span class="icon" aria-hidden="true">close</span></button>
+          <button type="button" class="dialog-close float-icon-btn" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
         </header>
       <div class="float-dialog-body">
         <div class="quick-access" role="group" aria-label="Places">
@@ -568,7 +568,7 @@
             <h1 id="init-project-title" class="float-dialog-title">New project</h1>
           <p id="init-project-sub" class="float-dialog-sub">Choose where the new project folder is created.</p>
           </div>
-          <button type="button" class="dialog-close float-icon-btn" aria-label="Close" title="Close"><span class="icon" aria-hidden="true">close</span></button>
+          <button type="button" class="dialog-close float-icon-btn" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
         </header>
       <div class="float-dialog-body">
         <div class="quick-access" role="group" aria-label="Places">

@@ -1,23 +1,11 @@
-// CHR-1268 — the side tool bar (design `tool-bar`, `tool-btn`, `hint-tooltip`): a vertical, icon-only toolbar between the left card and the screen. This module owns what is not app logic: the fold control, the grip (position remembered), the hint tooltips, the roving focus and the disabled state. What a tool does is app.js's business.
+// CHR-1268 — the side tool bar (design `tool-bar`, `tool-btn`, `hint-tooltip`): a vertical, icon-only toolbar between the left card and the screen. This module owns what is not app logic: the fold control, the grip (position remembered), the tool tooltips' wiring, the roving focus and the disabled state. What a tool does is app.js's business.
 //
-// Hints: every tool's name (and shortcut) shows as a blue `popover="hint"` tooltip after the pointer rests on the tool for about two seconds (`interest-delay-start` in style.css), wired with `interestfor` — only where interest invokers and anchor positioning both work. Elsewhere the tool keeps a native `title` (modern-web-guidance `toolbar`: no polyfill). A tool that cannot act right now is `aria-disabled` (still focusable) and its hint says why; a tool that has no function in the view is `hidden` (CHR-1283, tool-states.js `TOOLS`).
+// Tooltips: every tool carries `data-tooltip` (its name, plus why it is unavailable) and `data-shortcut` (its key); the shared tooltip (tooltip.js, CHR-1285) shows them — right of a vertical bar, above a docked horizontal one (`data-tooltip-side` on the tools). A tool that cannot act right now is `aria-disabled` (still focusable) and its tooltip says why; a tool that has no function in the view is `hidden` (CHR-1283, tool-states.js `TOOLS`).
 
 import { makeCardDraggable, CARD_MARGIN } from "./float-card.js";
 import { computeDock, inDockZone, DOCK_ZONE } from "./tool-dock.js";
 import { readBoolPref, readStringPref, writeBoolPref, writeStringPref } from "./prefs.js";
 import { ariaKeyShortcut, formatShortcut, shortcutById } from "./shortcuts.js";
-
-/** Whether the browser can show interest-triggered hint popovers anchored to their tool. */
-export function supportsInterestHints() {
-  const probe = typeof document !== "undefined" ? document.createElement("button") : null;
-  return (
-    probe !== null &&
-    "interestForElement" in HTMLButtonElement.prototype &&
-    typeof CSS !== "undefined" &&
-    typeof CSS.supports === "function" &&
-    CSS.supports("position-area", "inline-end")
-  );
-}
 
 /**
  * The text of a tool's hint: its name, plus why it is unavailable.
@@ -38,17 +26,14 @@ export function hintText(name, reason) {
  *   liveEl: HTMLElement,
  *   storage: Storage,
  *   mac: boolean,
- *   interest?: boolean,
  *   dock?: { pillEl: HTMLElement, wrapEl: HTMLElement, panelEls?: () => (HTMLElement | null)[] },
- * }} args `interest` overrides the feature detection (tests). `dock`: the zoom pill (`pillEl`) and the element that centres it (`wrapEl`), which the horizontal bar docks beside (CHR-1287); `panelEls` returns the side panels whose shown widths bound the free span.
+ * }} args `dock`: the zoom pill (`pillEl`) and the element that centres it (`wrapEl`), which the horizontal bar docks beside (CHR-1287); `panelEls` returns the side panels whose shown widths bound the free span.
  */
-export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage, mac, interest = supportsInterestHints(), dock }) {
+export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage, mac, dock }) {
   const FOLD_KEY = "artisign.tool-bar.collapsed";
   const POSITION_KEY = "artisign.tool-bar.position";
   const ORIENTATION_KEY = "artisign.tool-bar.orientation";
   const buttons = /** @type {HTMLButtonElement[]} */ ([...toolsEl.querySelectorAll("button.tool-btn")]);
-  /** @type {Map<HTMLButtonElement, { hintEl: HTMLElement, labelEl: HTMLElement }>} */
-  const hints = new Map();
   const iconEl = /** @type {HTMLElement} */ (foldEl.querySelector(".icon"));
 
   // --- fold ---------------------------------------------------------------------
@@ -143,7 +128,7 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
     barEl.setAttribute("aria-orientation", next);
     barEl.setAttribute("focusgroup", next === "horizontal" ? "toolbar wrap inline" : "toolbar wrap block");
     for (const sep of separatorEls) sep.setAttribute("aria-orientation", next === "horizontal" ? "vertical" : "horizontal");
-    for (const { hintEl } of hints.values()) hintEl.dataset.placement = next === "horizontal" ? "top" : "end";
+    toolsEl.dataset.tooltipSide = next === "horizontal" ? "top" : "end";
     if (next === "vertical" && previous === "horizontal") {
       barEl.style.removeProperty("left"); // the docked place was computed, not the bar's own
       barEl.style.removeProperty("top");
@@ -225,22 +210,6 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
     },
   });
 
-  // --- hints --------------------------------------------------------------------
-  /** One tooltip per tool, kept outside the toolbar so an open hint is not part of it. */
-  function buildHint(button, index) {
-    const hintEl = document.createElement("div");
-    hintEl.id = `tool-hint-${index}`;
-    hintEl.className = "tool-hint";
-    hintEl.setAttribute("popover", "hint");
-    const labelEl = document.createElement("span");
-    labelEl.className = "tool-hint-label";
-    hintEl.append(labelEl);
-    (barEl.parentElement ?? document.body).append(hintEl);
-    button.setAttribute("interestfor", hintEl.id);
-    hintEl.dataset.placement = "end";
-    hints.set(button, { hintEl, labelEl, keyEl: null });
-  }
-  if (interest) buttons.forEach(buildHint);
   applyOrientation(orientation);
   if (typeof ResizeObserver === "function") {
     // The docked bar follows its own size (folding, tools shown or hidden per view), the zoom pill's (hidden while comparing) and the area's.
@@ -254,43 +223,13 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
   }
   window.addEventListener("resize", syncDock);
 
-  /** The key chip of a hint follows the tool's current shortcut id (the Flow tool is F in the Screens view and E on the Board). */
-  function syncHintKey(button, entry) {
-    const def = shortcutById(button.dataset.shortcutId ?? "");
-    if (!def) {
-      entry.keyEl?.remove();
-      entry.keyEl = null;
-      return;
-    }
-    if (!entry.keyEl) {
-      entry.keyEl = document.createElement("kbd");
-      entry.keyEl.className = "tool-hint-key";
-      entry.keyEl.setAttribute("aria-hidden", "true");
-      entry.hintEl.append(entry.keyEl);
-    }
-    entry.keyEl.textContent = formatShortcut(def, mac);
-  }
-
-  /** Brings the hint (or the title fallback) in line with the tool's current name and reason. A tool the design gives its own tooltip words (`data-tool-hint-text`) shows those instead. */
+  /** Brings the tooltip in line with the tool's current name and reason. A tool the design gives its own tooltip words (`data-tool-hint-text`) shows those instead. */
   function syncHint(button) {
     const name = button.getAttribute("aria-label") ?? "";
-    const text = button.dataset.toolHintText ?? hintText(name, button.dataset.toolReason);
-    const entry = hints.get(button);
-    if (!entry) {
-      const def = shortcutById(button.dataset.shortcutId ?? "");
-      button.title = def ? `${text} (${formatShortcut(def, mac)})` : text;
-      return;
-    }
-    entry.labelEl.textContent = text;
-    syncHintKey(button, entry);
-    // A hint that only repeats the accessible name adds nothing; one that says more (the reason) describes the tool.
-    if (text === name) {
-      entry.hintEl.removeAttribute("role");
-      button.removeAttribute("aria-describedby");
-    } else {
-      entry.hintEl.setAttribute("role", "tooltip");
-      button.setAttribute("aria-describedby", entry.hintEl.id);
-    }
+    button.dataset.tooltip = button.dataset.toolHintText ?? hintText(name, button.dataset.toolReason);
+    const def = shortcutById(button.dataset.shortcutId ?? "");
+    if (def) button.dataset.shortcut = formatShortcut(def, mac);
+    else delete button.dataset.shortcut;
   }
   buttons.forEach(syncHint);
 

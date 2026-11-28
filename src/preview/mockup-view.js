@@ -141,7 +141,7 @@ function renderColumn(variant, index, mockupTitle, fetchRenderFor, onColumnMeasu
   // The frame label (design `frame-label`): the mockup icon, the variant's letter and "<mockup title>: <variant title>", with the count chips next to it. The variant's description is its tooltip.
   const row = document.createElement("div");
   row.className = "mockup-column-label";
-  if (variant.description) row.title = variant.description;
+  if (variant.description) row.dataset.tooltip = variant.description;
   head.appendChild(row);
 
   const letter = variantLetter(index);

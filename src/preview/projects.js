@@ -107,7 +107,7 @@ export function createProjectUI(elements, callbacks) {
     row.setAttribute("role", isOpenProject ? "menuitemradio" : "menuitem");
     if (isOpenProject) row.setAttribute("aria-checked", String(isActive));
     row.className = "menu-item chrome-menu-item";
-    row.title = path;
+    row.dataset.tooltip = path;
     if (isActive) {
       row.classList.add("menu-item-active", "is-current");
       row.setAttribute("aria-current", "true");
@@ -193,7 +193,7 @@ export function createProjectUI(elements, callbacks) {
       const row = document.createElement("button");
       row.type = "button";
       row.className = "empty-recent-row";
-      row.title = path;
+      row.dataset.tooltip = path;
       row.dataset.key = path;
       const folder = document.createElement("span");
       folder.className = "empty-recent-icon icon";
@@ -246,7 +246,7 @@ export function createProjectUI(elements, callbacks) {
     state = next;
     const activeProject = state.open.find((p) => p.root === state.active);
     nameEl.textContent = activeProject ? activeProject.name : "No project";
-    nameEl.title = nameEl.textContent; // truncated by CSS when long
+    nameEl.dataset.tooltip = nameEl.textContent; // truncated by CSS when long
     triggerEl.classList.toggle("project-picker-empty", state.active === null);
     renderMenu();
     renderEmptyState();

@@ -263,7 +263,7 @@ export function createMcpDialog({ dialogEl, commandEl, clientsEl, summaryEl, clo
       chip.tabIndex = 0;
       chip.setAttribute("role", "note");
       chip.setAttribute("aria-describedby", describedBy);
-      chip.title = message;
+      chip.dataset.tooltip = message;
       head.append(hidden);
     }
     head.appendChild(el("span", "status-row-end"));

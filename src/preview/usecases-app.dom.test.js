@@ -364,7 +364,7 @@ describe("with use cases", () => {
     await flush();
     expect($(".uc-plist").textContent).toBe("Personas could not be loaded.");
     expect($("#uc-add").getAttribute("aria-disabled")).toBe("true");
-    expect($("#uc-add").title).toBe("Saving is paused until usecases/personas.json is fixed.");
+    expect($("#uc-add").dataset.tooltip).toBe("Saving is paused until usecases/personas.json is fixed.");
     $$(".uc-subtab")[3].click();
     await flush();
     expect($$(".uc-plist")[1].textContent).toBe("Data objects could not be loaded.");
@@ -400,10 +400,10 @@ describe("with use cases", () => {
     const add = $("#uc-add");
     expect(add.getAttribute("aria-disabled")).toBe("true");
     expect(add.disabled).toBe(false);
-    expect(add.title).toBe(reason);
+    expect(add.dataset.tooltip).toBe(reason);
     const edit = $$(".uc-actions .chrome-btn").find((b) => b.textContent.includes("Edit"));
     expect(edit.getAttribute("aria-disabled")).toBe("true");
-    expect(edit.title).toBe(reason);
+    expect(edit.dataset.tooltip).toBe(reason);
     expect($(".uc-variant-chip[data-kind=add]").getAttribute("aria-disabled")).toBe("true");
     calls.length = 0;
     add.click();
@@ -436,7 +436,7 @@ describe("with use cases", () => {
         for (const control of controls) {
           expect(control.getAttribute("aria-disabled"), selector).toBe("true");
           expect(control.disabled).toBeFalsy();
-          expect(control.title, selector).toBe(reason);
+          expect(control.dataset.tooltip, selector).toBe(reason);
           control.click();
         }
       }
@@ -457,14 +457,14 @@ describe("with use cases", () => {
       await openTab();
       const worldReason = "Saving is paused until usecases/world.json is fixed.";
       expect($("#uc-add").getAttribute("aria-disabled")).toBe("true");
-      expect($("#uc-add").title).toBe(worldReason);
+      expect($("#uc-add").dataset.tooltip).toBe(worldReason);
       const edit = $$(".uc-actions .chrome-btn").find((b) => b.textContent.includes("Edit"));
       expect(edit.getAttribute("aria-disabled")).toBe("true");
       $$(".uc-subtab").find((b) => b.dataset.section === "personas").click();
       await flush();
       const persona = $(".uc-content .uc-persona-new");
       expect(persona.getAttribute("aria-disabled")).toBe("true");
-      expect(persona.title).toBe(worldReason);
+      expect(persona.dataset.tooltip).toBe(worldReason);
       persona.click();
       await flush();
       expect($(".uc-dialog")).toBeNull();

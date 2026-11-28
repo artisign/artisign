@@ -155,7 +155,7 @@ function orphanChip(ctx, variantId, entry, value) {
   if (!orphan) return chip;
   chip.classList.add("is-orphan");
   chip.dataset.orphan = orphan;
-  chip.title = orphan === "dimension" ? "This dimension no longer exists" : "This value no longer exists";
+  chip.dataset.tooltip = orphan === "dimension" ? "This dimension no longer exists" : "This value no longer exists";
   chip.append(icon("warning"), hiddenNote(orphan === "dimension" ? "this dimension no longer exists" : "this value no longer exists"));
   return chip;
 }

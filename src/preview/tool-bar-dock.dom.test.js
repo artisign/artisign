@@ -41,7 +41,7 @@ function build(storage = memoryStorage()) {
     return { left, top, right: left + size().width, bottom: top + size().height, width: size().width, height: size().height };
   };
   $("grip").getBoundingClientRect = () => ({ left: 0, top: 0, width: 20, height: 20 });
-  const bar = createToolBar({ barEl: $("bar"), toolsEl: $("tools"), foldEl: $("fold"), gripEl: $("grip"), liveEl: $("live"), storage, mac: false, interest: false, dock: { pillEl: $("pill"), wrapEl: $("wrap") } });
+  const bar = createToolBar({ barEl: $("bar"), toolsEl: $("tools"), foldEl: $("fold"), gripEl: $("grip"), liveEl: $("live"), storage, mac: false, dock: { pillEl: $("pill"), wrapEl: $("wrap") } });
   return { bar, storage, $ };
 }
 
@@ -76,6 +76,7 @@ describe("the tool bar's layout", () => {
     expect($("bar").getAttribute("aria-orientation")).toBe("horizontal");
     expect($("bar").getAttribute("focusgroup")).toBe("toolbar wrap inline");
     expect(document.querySelector(".tool-sep").getAttribute("aria-orientation")).toBe("vertical");
+    expect($("tools").dataset.tooltipSide).toBe("top"); // docked: the tooltips go on top, not over the neighbours
     // the group of bar + gap + pill is centred, the pill is pushed over by the bar's width plus the gap
     expect(parseFloat($("bar").style.left)).toBe((1440 - (HORIZONTAL.width + 12 + PILL.width)) / 2);
     expect($("wrap").style.paddingLeft).toBe(`${HORIZONTAL.width + 12}px`);
@@ -91,6 +92,7 @@ describe("the tool bar's layout", () => {
     pointer($("grip"), "pointerdown", 330, 880, { button: 0 });
     pointer(window, "pointermove", 330, 400);
     expect(bar.orientation()).toBe("vertical");
+    expect($("tools").dataset.tooltipSide).toBe("end");
     expect($("wrap").style.paddingLeft).toBe("");
     pointer(window, "pointerup", 330, 400);
     expect(storage.map.get("artisign.tool-bar.orientation")).toBe("vertical");

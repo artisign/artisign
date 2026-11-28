@@ -216,10 +216,10 @@ describe("Board comments in the app", () => {
     await openBoard();
     const resolved = $("#resolved-toggle");
     expect(resolved.getAttribute("aria-pressed")).toBe("false");
-    expect(resolved.title).toBe("Show resolved comments (0) (Shift+M)"); // jsdom has no interest invokers: the title carries the tooltip text
+    expect(resolved.dataset.tooltip).toBe("Show resolved comments (0)"); // the shared tooltip carries the text, the key sits in data-shortcut
     resolved.click();
     expect(resolved.getAttribute("aria-pressed")).toBe("true"); // active = showResolved, not "has resolved comments"
-    expect(resolved.title).toBe("Hide resolved comments (0) (Shift+M)");
+    expect(resolved.dataset.tooltip).toBe("Hide resolved comments (0)");
     expect($("#tool-toast").hidden).toBe(false);
     expect($("#tool-toast").textContent).toBe("No resolved comments on the board");
     resolved.click();
@@ -229,9 +229,9 @@ describe("Board comments in the app", () => {
   it("Show resolved counts the resolved threads of the shown tiles in its tooltip", async () => {
     seed();
     await openBoard();
-    expect($("#resolved-toggle").title).toBe("Show resolved comments (1) (Shift+M)");
+    expect($("#resolved-toggle").dataset.tooltip).toBe("Show resolved comments (1)");
     $("#resolved-toggle").click();
-    expect($("#resolved-toggle").title).toBe("Hide resolved comments (1) (Shift+M)");
+    expect($("#resolved-toggle").dataset.tooltip).toBe("Hide resolved comments (1)");
     expect($("#tool-toast").hidden).toBe(true); // something to show: no hint
   });
 

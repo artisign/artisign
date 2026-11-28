@@ -62,8 +62,8 @@ describe("renderMockupView", () => {
     expect(labelB.querySelector(".frame-label-name").textContent).toBe("B");
     expect(labelB.querySelector(".frame-label-detail").textContent).toBe("Checkout Redesign: Variant B");
     // The variant's description is the label's tooltip; none -> no tooltip.
-    expect(labelA.title).toBe("Single page");
-    expect(labelB.hasAttribute("title")).toBe(false);
+    expect(labelA.dataset.tooltip).toBe("Single page");
+    expect(labelB.hasAttribute("data-tooltip")).toBe(false);
     expect(container.querySelector(".mockup-column-description, .mockup-column-title, .mockup-column-index")).toBeNull();
   });
 

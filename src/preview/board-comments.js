@@ -624,12 +624,12 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     /**
      * What the status line says about the shown screens.
      * @param {Iterable<string>} screens
-     * @returns {{ open: number, detached: number }}
+     * @returns {{ open: number, detached: number, resolved: number }}
      */
     summary(screens) {
       const shown = new Set(screens);
       const counts = screenCounts(threads.filter((t) => shown.has(t.screen)));
-      return { open: counts.openTotal, detached: counts.detached };
+      return { open: counts.openTotal, detached: counts.detached, resolved: counts.resolved };
     },
     close: () => closePreview(false),
     isOpen: () => active !== null,

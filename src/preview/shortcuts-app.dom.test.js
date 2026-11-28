@@ -365,16 +365,19 @@ describe("reference dialog", () => {
     expect(modalOpen("shortcuts-dialog")).toBe(true);
     // One `kbd` per key: "Shift+1" is two caps, shown here joined.
     const rows = [...document.querySelectorAll("#shortcuts-dialog .shortcut-row")].map((r) => [r.querySelector("dt").textContent, [...r.querySelectorAll("kbd")].map((k) => k.textContent).join("+")]);
-    for (const row of [["Comment", "C"], ["Inspect", "I"], ["Notes", "N"], ["Comments", "M"], ["Flow", "F"], ["Design system", "D"], ["Tool bar", "\\"]]) expect(rows).toContainEqual(row);
+    for (const row of [["Comment", "C"], ["Inspect", "I"], ["Notes", "N"], ["Comments", "M"], ["Tool bar", "\\"]]) expect(rows).toContainEqual(row);
+    // CHR-1283 / CHR-1284 / CHR-1288: the view a key belongs to is named in its row, and the Design system row is gone.
+    expect(rows).toContainEqual(["Flow · Screens", "F"]);
+    expect(rows.map((r) => r[0])).not.toContain("Design system");
     expect(rows).toContainEqual(["Fit", "Shift+1"]);
-    expect(rows).toContainEqual(["Collapse all", "Shift+G"]);
+    expect(rows).toContainEqual(["Collapse all · Board", "Shift+G"]);
     expect(rows).toContainEqual(["Zoom in, out", "+ + −".replace(/ /g, "")]); // the two zoom keys are one row, as designed
     expect(rows).toContainEqual(["Find a screen", "/"]);
     // The groups are in the design's order, General spanning two columns.
-    expect([...document.querySelectorAll("#shortcuts-dialog .shortcuts-group-title")].map((t) => t.textContent)).toEqual(["Tools", "Zoom", "Views", "Agent", "Board", "Fold cards", "Project", "General"]);
+    expect([...document.querySelectorAll("#shortcuts-dialog .shortcuts-group-title")].map((t) => t.textContent)).toEqual(["Canvas tools", "Panel tools", "Zoom", "Views", "Agent", "Fold cards", "Project", "General"]); // CHR-1288: canvas tools first, then panel tools
     expect(document.querySelector("#shortcuts-dialog .shortcuts-group--wide .shortcuts-group-title").textContent).toBe("General");
     expect(rows).toContainEqual(["Open project, in the menu", "O"]);
-    expect(rows).toContainEqual(["Flow arrows", "E"]);
+    expect(rows).toContainEqual(["Flow arrows · Board", "E"]);
     expect(rows).toContainEqual(["Show resolved comments", "Shift+M"]);
     expect(rows).toContainEqual(["Close, leave a tool", "Esc"]);
     key("f");

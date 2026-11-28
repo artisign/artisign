@@ -4,7 +4,10 @@ import { SHORTCUTS } from "./shortcuts.js";
 import { createModal } from "./float-dialog.js";
 
 /** Group order as drawn: three columns, read row by row. */
-const GROUPS = ["Tools", "Zoom", "Views", "Agent", "Board", "Fold cards", "Project", "General"];
+const GROUPS = ["Canvas tools", "Panel tools", "Zoom", "Views", "Agent", "Fold cards", "Project", "General"];
+
+/** The view a key is limited to, named in its row (CHR-1283): the reference must not suggest G works in the Screens view. */
+const VIEW_NAMES = { board: "Board", screens: "Screens" };
 
 /** Two mapping entries the design shows as one row. */
 const MERGED = { "zoom-in": { label: "Zoom in, out", also: "zoom-out" } };
@@ -39,6 +42,12 @@ export function createShortcutsDialog({ dialogEl, gridEl, closeEl, mac, fallback
       row.className = "shortcut-row";
       const label = document.createElement("dt");
       label.textContent = merged?.label ?? def.label;
+      if (def.view) {
+        const scope = document.createElement("span");
+        scope.className = "shortcut-scope";
+        scope.textContent = ` · ${VIEW_NAMES[def.view]}`;
+        label.append(scope);
+      }
       const keys = document.createElement("dd");
       keys.className = "shortcut-keys";
       for (const cap of caps) {

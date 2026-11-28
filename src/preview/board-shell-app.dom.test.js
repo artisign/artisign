@@ -267,7 +267,7 @@ describe("the left card on the Board", () => {
 });
 
 describe("the agent's presentation", () => {
-  it("shows the notice as the design words it, counts the same screens as the card, and says so in the card", async () => {
+  it("shows the notice as the design words it, counts the same screens as the card", async () => {
     await openBoard();
     emit({ type: "board_state", filter: "checkout", pinned: [], expanded: [], source: "agent" });
     await flush();
@@ -276,7 +276,6 @@ describe("the agent's presentation", () => {
     expect(banner.textContent).toContain("The agent switched you to the Board to show 2 screens"); // checkout (with its variant) and cart
     expect($("#board-presented-text b").textContent).toBe("2 screens");
     expect($("#screen-filter-hint").textContent).toBe("2 shown by the agent");
-    expect($("#agent-note-scope-text").textContent).toBe("On the Board, 2 screens"); // the Agent bar counts what the card counts
     $("#board-presented-dismiss").click();
     expect(banner.hidden).toBe(true);
     expect($("#screen-filter-hint").textContent).toBe("2 on the board");

@@ -370,6 +370,9 @@ describe("reference dialog", () => {
     expect(rows).toContainEqual(["Collapse all", "Shift+G"]);
     expect(rows).toContainEqual(["Zoom in, out", "+ + −".replace(/ /g, "")]); // the two zoom keys are one row, as designed
     expect(rows).toContainEqual(["Find a screen", "/"]);
+    // The groups are in the design's order, General spanning two columns.
+    expect([...document.querySelectorAll("#shortcuts-dialog .shortcuts-group-title")].map((t) => t.textContent)).toEqual(["Tools", "Zoom", "Views", "Agent", "Board", "Fold cards", "Project", "General"]);
+    expect(document.querySelector("#shortcuts-dialog .shortcuts-group--wide .shortcuts-group-title").textContent).toBe("General");
     expect(rows).toContainEqual(["Open project, in the menu", "O"]);
     expect(rows).toContainEqual(["Flow arrows", "E"]);
     expect(rows).toContainEqual(["Show resolved comments", "Shift+M"]);

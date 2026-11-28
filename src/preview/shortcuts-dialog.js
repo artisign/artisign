@@ -26,7 +26,7 @@ export function createShortcutsDialog({ dialogEl, gridEl, closeEl, mac, fallback
     const defs = SHORTCUTS.filter((d) => d.group === group && !skipped.has(d.id));
     if (defs.length === 0) continue;
     const section = document.createElement("section");
-    section.className = "shortcuts-group";
+    section.className = group === "General" ? "shortcuts-group shortcuts-group--wide" : "shortcuts-group";
     const title = document.createElement("h3");
     title.className = "shortcuts-group-title";
     title.textContent = group;

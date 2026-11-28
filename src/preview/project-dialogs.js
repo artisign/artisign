@@ -101,6 +101,8 @@ function createBrowser(dialogEl, { mode, onConfirm, onCancel }) {
             : " No project here yet.";
         setHint(`${picked}|${tail}`, ["Selected: ", strong(displayPath(picked)), `.${tail}`]);
       }
+      // The long hint of a just-made folder sets looser, as the design has it.
+      hintEl.classList.toggle("is-long", !selectedProjectPath && createdFolderPath !== null);
       confirmButton.disabled = busy || !selectedProjectPath;
       return;
     }

@@ -584,11 +584,6 @@
   white-space: nowrap;
 }
 
-/* A key or reference in the code face (shortcut reference, mono chips). */
-.chrome-chip--ref {
-  font-family: ui-monospace, Menlo, monospace;
-}
-
 .chrome-chip--hit {
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
@@ -11272,7 +11267,6 @@ button.status-row-head:hover {
 .status-row-detail {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
   padding: 0 var(--space-md) var(--space-md) 42px;
 }
 
@@ -11282,6 +11276,7 @@ button.status-row-head:hover {
 
 .status-row-hint {
   font-size: var(--ui-xs);
+  line-height: 16.9px; /* the line box the design's inline hint sits in: the body's 13px at 1.3 */
   color: var(--chrome-text-secondary);
 }
 
@@ -11670,6 +11665,17 @@ dialog.float-dialog::backdrop {
 
 .shortcuts-list {
   margin: 0;
+}
+
+/* The General group spans two columns and sets its rows in two, as drawn. */
+.shortcuts-group--wide {
+  grid-column: span 2;
+}
+
+.shortcuts-group--wide .shortcuts-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: var(--space-2xl);
 }
 
 .shortcut-row {
@@ -12173,8 +12179,11 @@ dialog.float-dialog::backdrop {
 .selection-hint {
   margin: 0;
   font-size: var(--ui-xs);
-  line-height: 1.5;
   color: var(--chrome-text-tertiary);
+}
+
+.selection-hint.is-long {
+  line-height: 1.5;
 }
 
 .selection-path {
@@ -12571,6 +12580,7 @@ body:has(#settings-menu:is(:popover-open, [data-open])) .update-toast {
   background: var(--chrome-float);
   backdrop-filter: blur(16px);
   box-shadow: var(--chrome-shadow-card);
+  line-height: 1.3;
   overflow-y: auto;
 }
 
@@ -12719,6 +12729,7 @@ body:has(#settings-menu:is(:popover-open, [data-open])) .update-toast {
   background: var(--chrome-float);
   backdrop-filter: blur(10px);
   box-shadow: var(--chrome-shadow-card);
+  line-height: 1.3;
 }
 
 #empty-guide[hidden] {

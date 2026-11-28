@@ -138,6 +138,21 @@ describe("settings trigger", () => {
     expect(menu().getAttribute("aria-label")).toBe("Settings");
   });
 
+  it("CHR-1294: every row that opens a dialog has exactly one chevron through the same row markup; toggle and info rows have none", async () => {
+    await boot();
+    const opening = $$("#settings-menu [data-opens-dialog]");
+    expect(opening.map((r) => r.id)).toEqual(["settings-mcp", "settings-whats-new"]);
+    for (const row of opening) {
+      expect(row.classList.contains("settings-item-detail")).toBe(true);
+      expect(row.querySelectorAll(".settings-item-chevron")).toHaveLength(1);
+      expect(row.lastElementChild.classList.contains("settings-item-chevron")).toBe(true);
+      expect(row.lastElementChild.textContent).toBe("chevron_right");
+    }
+    expect($$("#settings-menu .settings-item-chevron")).toHaveLength(2);
+    expect($$(".settings-toggle-row .settings-item-chevron")).toHaveLength(0);
+    expect($("#settings-about-row .settings-item-chevron")).toBeNull();
+  });
+
   it("carries the design's labels: App settings, four switches, MCP setup, About artisign, no Variant map", async () => {
     await boot();
     expect($$("#settings-menu .float-popover-label").map((l) => l.textContent)).toEqual(["App settings", "MCP setup", "About artisign"]);

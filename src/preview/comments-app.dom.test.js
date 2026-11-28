@@ -168,7 +168,7 @@ describe("canvas comments", () => {
     expect(pins()[0].dataset.active).toBe("true");
     expect($(".comment-target-outline").hidden).toBe(false);
     pins()[1].click();
-    expect(document.querySelectorAll(".comment-popover:not([hidden])")).toHaveLength(1);
+    expect(document.querySelectorAll(".comment-popover[open]")).toHaveLength(1);
     expect($(".comment-popover-header b").textContent).toBe("#2");
     expect($(".comment-popover-alert").hidden).toBe(false); // the detached thread offers Pick element
   });

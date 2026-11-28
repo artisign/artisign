@@ -2,13 +2,11 @@
 // edges drawn as SVG curves between them. All DOM/measurement work lives
 // here — the actual layout/edge/scroll math is in board.js.
 //
-// Comment mode is not supported on the board — the board's per-tile iframes
-// don't carry comment listeners at all, so toggling comment mode has no
-// effect while the board is showing (app.js falls back to "none" when
-// switching views away from a mode the new view doesn't support, except it
-// keeps flow mode since the board does support that). The comment pins on the
-// board (CHR-1264, board-comments.js) are a read-only overlay in the parent
-// document that measures tiles through commentGeometry().
+// The tiles' iframes carry no comment or inspect listeners: the Comment and
+// Inspect tools (CHR-1295, CHR-1296) catch the pointer in a parent-document
+// layer and hit-test the tile documents through tileFrames() (tile-hit.js).
+// The comment pins on the board (CHR-1264, board-comments.js) are an overlay
+// in the parent document that measures tiles through commentGeometry().
 
 import { fetchRender } from "./api.js";
 import { createCanvasInput } from "./canvas-input.js";
@@ -152,10 +150,12 @@ export function createBoardView({
   /** @type {Map<string, () => void>} */
   const modeCleanupByScreen = new Map();
   let flowModeOn = false;
+  /** Comment or Inspect is active (CHR-1295, CHR-1296): the tool owns the left button, like flow mode. */
+  let pickToolOn = false;
   // CHR-1290/CHR-1291 — the canvas input shared with the Screens view: a left-drag pans (the surface scrolls), the mouse wheel and a pinch zoom around the pointer, a trackpad two-finger scroll stays the surface's native scroll. Flow mode keeps the left button for its clicks.
   const canvasInput = createCanvasInput({
     surfaceEl,
-    isToolActive: () => flowModeOn,
+    isToolActive: () => flowModeOn || pickToolOn,
     canHandle: () => !isHidden(),
     ignoreSelector: "#board-comment-layer *",
     onManual: () => onManualNavigate?.(),
@@ -258,6 +258,22 @@ export function createBoardView({
     const scaledTile = { x: tile.x * scale, y: tile.y * scale, width: tile.width * scale, height: tile.height * scale };
     const { left, top } = scrollToCenter(scaledTile);
     surfaceEl.scrollTo({ left, top, behavior: "smooth" });
+  }
+
+  /**
+   * Brings a tile into view for a thread opened from the Comments panel: at least `minZoom`, the tile centred (instantly, so a popover can be placed right after). False when the screen has no tile here.
+   * @param {string} screen
+   * @param {number} minZoom
+   */
+  function revealTile(screen, minZoom) {
+    const tile = resolveEdgeEnd(layout, screen)?.rect;
+    if (!tile) return false;
+    if (zoom < minZoom) setZoom(minZoom);
+    const scale = zoom / 100;
+    const { left, top } = scrollToCenter({ x: tile.x * scale, y: tile.y * scale, width: tile.width * scale, height: tile.height * scale });
+    surfaceEl.scrollLeft = left;
+    surfaceEl.scrollTop = top;
+    return true;
   }
 
   function setHighlight(source) {
@@ -575,6 +591,18 @@ export function createBoardView({
   }
 
   /**
+   * Every tile as the shared hit-test (tile-hit.js) sees it, in paint order: its on-screen rect, its layout width and its rendered document, read live.
+   * @returns {import("./tile-hit.js").TileFrame[]}
+   */
+  function tileFrames() {
+    return layout.tiles.flatMap((t) => {
+      const iframe = iframesByScreen.get(t.screen);
+      if (!iframe) return [];
+      return [{ screen: t.screen, rect: () => iframe.getBoundingClientRect(), layoutWidth: () => iframe.offsetWidth, doc: () => iframe.contentDocument }];
+    });
+  }
+
+  /**
    * The screen the agent is writing now gets the violet ring and the "Writing" chip (design `board-cluster` writing); null clears it. A no-op while nothing changes, so the agent bar's regular refresh costs nothing.
    * @param {string | null} screen
    */
@@ -855,6 +883,10 @@ export function createBoardView({
       scheduleRelayout();
     });
     frame.appendChild(iframe);
+    // CHR-1295, CHR-1296: the pointer overlay of the Comment and Inspect tools (board-pick.js), inert until a tool is active.
+    const pick = document.createElement("div");
+    pick.className = "board-tile-pick";
+    frame.appendChild(pick);
     tile.appendChild(frame);
 
     const writing = document.createElement("span");
@@ -1050,6 +1082,12 @@ export function createBoardView({
     fitAll,
     zoomToTile,
     commentGeometry,
+    tileFrames,
+    revealTile,
+    /** @param {boolean} on */
+    setPickTool(on) {
+      pickToolOn = on;
+    },
     setEdgesVisible,
     setWritingScreen,
     setViewports,

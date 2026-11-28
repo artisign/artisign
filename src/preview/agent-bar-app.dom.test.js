@@ -195,24 +195,44 @@ describe("offline", () => {
 });
 
 describe("folding with the right column", () => {
-  it("folds above an open tool panel and comes back when it closes", async () => {
+  it("an open tool panel does not fold the bar: both are open and the column is split", async () => {
     await boot();
-    expect(collapsed()).toBe(false);
-    $("#comments-tool-toggle").click();
-    expect(collapsed()).toBe(true);
-    expect($("#agent-bar").dataset.panelFold).toBe("true");
-    expect($("#tool-panel").hidden).toBe(false);
-    $("#tool-panel-close").click();
-    expect(collapsed()).toBe(false);
+    for (const id of ["#comments-tool-toggle", "#notes-tool-toggle", "#inspect-mode-toggle"]) {
+      $(id).click();
+      expect(collapsed()).toBe(false);
+      expect($("#tool-panel").hidden).toBe(false);
+      await flush(); // the observer
+      expect($("#app").dataset.stack).toBe("split");
+    }
+    expect($("#agent-bar-fold").hasAttribute("aria-disabled")).toBe(false);
   });
 
-  it("stays folded while one panel replaces another, and every panel folds it", async () => {
+  it("the chevron folds the bar above an open panel (the panel starts under its head) and unfolds it again", async () => {
     await boot();
-    for (const id of ["#notes-tool-toggle", "#inspect-mode-toggle", "#comments-tool-toggle"]) {
-      $(id).click();
-      expect(collapsed()).toBe(true);
-    }
-    $("#comments-tool-toggle").click(); // toggles the panel off
+    $("#comments-tool-toggle").click();
+    $("#agent-bar-fold").click();
+    expect(collapsed()).toBe(true);
+    await flush();
+    expect($("#app").dataset.stack).toBe("below");
+    $("#agent-bar-fold").click();
+    expect(collapsed()).toBe(false);
+    await flush();
+    expect($("#app").dataset.stack).toBe("split");
+    $("#tool-panel-close").click();
+    await flush();
+    expect($("#app").dataset.stack).toBe("none");
+  });
+
+  it("a moved bar is not part of the stack and unfolds beside an open panel", async () => {
+    await boot();
+    $("#agent-bar").style.left = "300px";
+    $("#agent-bar").style.top = "200px";
+    $("#comments-tool-toggle").click();
+    await flush(); // the observer
+    expect($("#app").dataset.stack).toBe("none");
+    expect(collapsed()).toBe(false);
+    $("#agent-bar-fold").click();
+    $("#agent-bar-fold").click();
     expect(collapsed()).toBe(false);
   });
 
@@ -223,28 +243,25 @@ describe("folding with the right column", () => {
     expect(collapsed()).toBe(false);
   });
 
-  it("the user's fold is remembered, the ] key does it, and it survives a panel opening and closing", async () => {
+  it("the user's fold is remembered, the ] key does it in every state, and it survives a panel opening and closing", async () => {
     await boot();
     key("]");
     expect(collapsed()).toBe(true);
     $("#notes-tool-toggle").click();
+    expect(collapsed()).toBe(true);
+    key("]");
+    expect(collapsed()).toBe(false);
+    key("]");
     $("#tool-panel-close").click();
     expect(collapsed()).toBe(true);
     key("]");
     expect(collapsed()).toBe(false);
   });
 
-  it("] does nothing while a panel holds it folded", async () => {
-    await boot();
-    $("#notes-tool-toggle").click();
-    key("]");
-    $("#notes-tool-toggle").click();
-    expect(collapsed()).toBe(false); // no stored fold came out of the key
-  });
-
-  it("the panel opening on a screen shows the folded status in the head", async () => {
+  it("a folded bar above an open panel shows the folded status in the head", async () => {
     await boot();
     screenActivity("a", "write_html", "write");
+    key("]");
     $("#comments-tool-toggle").click();
     expect($("#agent-bar-folded-status").hidden).toBe(false);
     expect($("#agent-bar-folded-text").textContent).toBe("Writing a");

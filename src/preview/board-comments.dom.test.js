@@ -25,7 +25,7 @@ function setup(extra = {}) {
   document.body.innerHTML = '<div id="surface"><div id="canvas"><div id="layer"></div></div></div>';
   layer = document.getElementById("layer");
   surface = document.getElementById("surface");
-  calls = { open: [], zoom: [] };
+  calls = { open: [], zoom: [], thread: [] };
   const board = createBoardComments({
     layerEl: layer,
     surfaceEl: surface,
@@ -38,6 +38,7 @@ function setup(extra = {}) {
       docOf: (s) => docs[s] ?? null,
     }),
     onOpenInScreens: (screen, id) => calls.open.push([screen, id]),
+    onOpenThread: (id) => calls.thread.push(id),
     onZoomToTile: (screen) => calls.zoom.push(screen),
     ...extra,
   });
@@ -164,166 +165,57 @@ describe("pins and chips", () => {
   });
 });
 
-describe("the preview", () => {
+describe("opening a thread", () => {
   const data = () => ({
     comments: [record("a", "one", "btn-a", "Make it primary"), record("r", "one", "btn-a", "Done", { parent_id: "a", author: "agent", agent: "ux-agent" })],
     threads: [thread("a", "one", "btn-a", { reply_count: 1 }), thread("b", "one", "btn-b")],
   });
 
-  it("does nothing on hover and opens on a click with the messages, the status and Open in Screens", () => {
+  it("does nothing on hover; a click on a pin hands the thread to the comment canvas and opens no preview of its own", () => {
     const board = setup();
     board.setData(data());
     pins()[0].dispatchEvent(new MouseEvent("pointerover", { bubbles: true }));
     pins()[0].dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-    expect(preview().hidden).toBe(true);
+    expect(calls.thread).toEqual([]);
     press(pins()[0]);
-    expect(preview().hidden).toBe(false);
-    expect(preview().querySelector("b").textContent).toBe("#1");
-    expect([...preview().querySelectorAll(".comment-message-body")].map((n) => n.textContent)).toEqual(["Make it primary", "Done"]);
-    expect(preview().querySelector(".board-comment-preview-meta").textContent).toBe("2 messages · open");
-    expect(pins()[0].getAttribute("aria-expanded")).toBe("true");
-    const open = [...preview().querySelectorAll("button")].find((b) => b.textContent === "Open in Screens");
-    open.click();
-    expect(calls.open).toEqual([["one", "a"]]);
+    expect(calls.thread).toEqual(["a"]);
     expect(preview().hidden).toBe(true);
-  });
-
-  it("closes on Esc and returns the focus to the pin, and on an outside press without moving focus", () => {
-    const board = setup();
-    board.setData(data());
-    const first = pins()[0];
-    press(first);
-    esc();
-    expect(preview().hidden).toBe(true);
-    expect(document.activeElement).toBe(first);
-    press(first);
-    document.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
-    expect(preview().hidden).toBe(true);
-  });
-
-  it("switches to another pin in one press: the pointerdown on a marker does not close it first (no swallowed click)", () => {
-    const board = setup();
-    board.setData(data());
-    const [one, two] = pins();
-    press(one);
-    const kept = pins();
-    press(two);
-    expect(pins()).toEqual(kept); // opening and closing never rebuild the markers
-    expect(preview().querySelector("b").textContent).toBe("#2");
-    expect(one.getAttribute("aria-expanded")).toBe("false");
-    expect(two.getAttribute("aria-expanded")).toBe("true");
-  });
-
-  it("a second click on the open pin closes it", () => {
-    const board = setup();
-    board.setData(data());
-    press(pins()[0]);
-    press(pins()[0]);
-    expect(preview().hidden).toBe(true);
-  });
-
-  it("shows the detached notice and badge for a detached thread, and the resolved badge for a resolved one", () => {
-    const board = setup();
-    board.setShowResolved(true);
-    board.setData({
-      comments: [record("d", "one", "gone", "Gone?"), record("x", "one", "btn-a", "Fine", { resolved: true })],
-      threads: [thread("d", "one", "gone", { detached: true }), thread("x", "one", "btn-a", { status: "resolved" })],
-    });
-    press(pins().find((p) => p.dataset.state === "detached"));
-    expect(preview().textContent).toContain("This element is no longer on the screen. Open the screen to move the thread to another element.");
-    expect(preview().querySelector(".comment-badge--detached").textContent).toBe("Detached");
-    press(pins().find((p) => p.dataset.state === "resolved"));
-    expect(preview().querySelector(".comment-badge--resolved").textContent).toBe("Resolved");
-    expect(preview().querySelector(".board-comment-preview-meta").textContent).toBe("1 message · resolved");
-  });
-
-  it("closes when a refresh drops the thread, and stays open (same markers rebuilt) when it is still there", () => {
-    const board = setup();
-    board.setData(data());
-    press(pins()[0]);
-    board.setData(data());
-    expect(preview().hidden).toBe(false);
-    board.setData({ comments: [], threads: [thread("b", "one", "btn-b")] });
-    expect(preview().hidden).toBe(true);
-  });
-
-  it("Esc after a rebuild (tile load, refetch, zoom) still returns the focus to the new marker, chips included", () => {
-    const board = setup();
-    board.setData(data());
-    press(pins()[0]);
-    board.layout();
-    const fresh = pins()[0];
-    expect(fresh.getAttribute("aria-expanded")).toBe("true");
-    esc();
-    expect(document.activeElement).toBe(fresh);
-    press(chips()[0]);
-    board.layout();
-    expect(chips()[0].getAttribute("aria-expanded")).toBe("true");
-    esc();
-    expect(document.activeElement).toBe(chips()[0]);
-  });
-
-  describe("an outside press inside a tile", () => {
-    const realActive = Object.getOwnPropertyDescriptor(Document.prototype, "activeElement");
-    afterEach(() => {
-      delete document.activeElement;
-      if (realActive) Object.defineProperty(Document.prototype, "activeElement", realActive);
-    });
-
-    it("closes the preview when the focus moves into an iframe (no listener inside the tile)", () => {
-      const board = setup();
-      board.setData(data());
-      const frame = document.createElement("iframe");
-      document.body.append(frame);
-      press(pins()[0]);
-      Object.defineProperty(document, "activeElement", { configurable: true, get: () => frame });
-      window.dispatchEvent(new Event("blur"));
-      expect(preview().hidden).toBe(true);
-    });
-
-    it("ignores a window blur that does not land in an iframe", () => {
-      const board = setup();
-      board.setData(data());
-      press(pins()[0]);
-      window.dispatchEvent(new Event("blur"));
-      expect(preview().hidden).toBe(false);
-    });
-  });
-
-  it("leaves Esc alone while the board is not shown, and close() drops the preview", () => {
-    const board = setup();
-    board.setData(data());
-    press(pins()[0]);
-    surface.hidden = true;
-    const evt = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
-    document.body.dispatchEvent(evt);
-    expect(evt.defaultPrevented).toBe(false);
-    board.close();
-    expect(preview().hidden).toBe(true);
-  });
-
-  it("leaves Esc to an open modal dialog: the preview stays until the dialog is gone", () => {
-    const board = setup();
-    board.setData(data());
-    press(pins()[0]);
-    const dialog = document.body.appendChild(document.createElement("dialog"));
-    dialog.className = "float-dialog";
-    dialog.setAttribute("open", "");
-    const evt = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
-    document.body.dispatchEvent(evt);
-    expect(evt.defaultPrevented).toBe(false); // the browser can still close the dialog with it
-    expect(preview().hidden).toBe(false);
-    dialog.removeAttribute("open");
-    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
-    expect(preview().hidden).toBe(true);
-    dialog.remove();
   });
 
   it("a count chip opens its first thread of that kind", () => {
     const board = setup();
     board.setData(data());
     press(chips()[0]);
-    expect(preview().querySelector("b").textContent).toBe("#1");
+    expect(calls.thread).toEqual(["a"]);
+  });
+
+  it("marks the open thread's marker as active, and again after every rebuild", () => {
+    const board = setup();
+    board.setData(data());
+    board.setActiveThread("b");
+    expect(pins().map((x) => x.getAttribute("aria-expanded"))).toEqual(["false", "true"]);
+    expect(pins()[1].dataset.active).toBe("true");
+    board.layout();
+    expect(pins()[1].dataset.active).toBe("true");
+    board.setActiveThread(null);
+    expect(pins().map((x) => x.dataset.active)).toEqual([undefined, undefined]);
+  });
+
+  it("gives a thread's marker back for the focus, and its screen", () => {
+    const board = setup();
+    board.setData(data());
+    expect(board.markerOf("b")).toBe(pins()[1]);
+    expect(board.screenOf("b")).toBe("one");
+    expect(board.screenOf("nope")).toBeNull();
+  });
+
+  it("groups and the zoom to a tile are unchanged: a group opens no thread", () => {
+    docs.one = docWith({ "btn-a": [100, 100, 200, 140], "btn-b": [110, 104, 204, 140] });
+    const board = setup();
+    board.setData(data());
+    press(pins()[0]);
+    expect(calls.thread).toEqual([]);
+    expect(calls.zoom).toEqual(["one"]);
   });
 });
 
@@ -356,18 +248,76 @@ describe("below 15 % zoom", () => {
     expect(calls.open).toEqual([["one", "b"]]);
   });
 
-  it("closes a pin's preview when the zoom drops below 15 %, and the list when it comes back", () => {
+  it("closes the list when the pins come back with the zoom", () => {
+    zoom = 10;
     const board = setup();
     board.setData({ comments: [record("a", "one", "btn-a", "x")], threads: [thread("a", "one", "btn-a")] });
-    press(pins()[0]);
-    zoom = 10;
-    board.layout();
-    expect(preview().hidden).toBe(true);
     press(layer.querySelector(".board-comment-dot"));
     expect(preview().hidden).toBe(false);
     zoom = 100;
     board.layout();
     expect(preview().hidden).toBe(true);
+  });
+
+  it("closes the list on Esc and returns the focus to the dot; an outside press closes it without moving the focus", () => {
+    zoom = 10;
+    const board = setup();
+    board.setData({ comments: [], threads: [thread("a", "one", "btn-a")] });
+    const dot = layer.querySelector(".board-comment-dot");
+    press(dot);
+    esc();
+    expect(preview().hidden).toBe(true);
+    expect(document.activeElement).toBe(dot);
+    press(dot);
+    document.body.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    expect(preview().hidden).toBe(true);
+    press(dot);
+    board.close();
+    expect(preview().hidden).toBe(true);
+  });
+});
+
+describe("the list's closing rules", () => {
+  const realActive = Object.getOwnPropertyDescriptor(Document.prototype, "activeElement");
+  afterEach(() => {
+    delete document.activeElement;
+    if (realActive) Object.defineProperty(Document.prototype, "activeElement", realActive);
+  });
+  const open = () => {
+    zoom = 10;
+    const board = setup();
+    board.setData({ comments: [], threads: [thread("a", "one", "btn-a")] });
+    press(layer.querySelector(".board-comment-dot"));
+    return board;
+  };
+
+  it("closes when the focus moves into an iframe (no listener inside the tile), and ignores a blur that lands elsewhere", () => {
+    open();
+    window.dispatchEvent(new Event("blur"));
+    expect(preview().hidden).toBe(false);
+    const frame = document.createElement("iframe");
+    document.body.append(frame);
+    Object.defineProperty(document, "activeElement", { configurable: true, get: () => frame });
+    window.dispatchEvent(new Event("blur"));
+    expect(preview().hidden).toBe(true);
+  });
+
+  it("leaves Esc alone while the board is not shown, and to an open modal dialog", () => {
+    open();
+    surface.hidden = true;
+    const evt = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    document.body.dispatchEvent(evt);
+    expect(evt.defaultPrevented).toBe(false);
+    surface.hidden = false;
+    const dialog = document.body.appendChild(document.createElement("dialog"));
+    dialog.className = "float-dialog";
+    dialog.setAttribute("open", "");
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect(preview().hidden).toBe(false);
+    dialog.removeAttribute("open");
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect(preview().hidden).toBe(true);
+    dialog.remove();
   });
 });
 

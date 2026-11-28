@@ -293,8 +293,10 @@ let warningBadgeCleanup = () => {}; // click-to-cycle listener on the warning ba
 let warningCount = 0;
 /** @type {"fit" | number} */
 let zoom = "fit";
-// CHR-1290/CHR-1291 — the canvas pans by scrolling (drag, trackpad scroll) and zooms around the pointer by scrolling too. `canvasMoved`: the human moved or zoomed it by hand, so the tool bar keeps its place (CHR-1282). Fit, and a different screen, take it back.
+// CHR-1290/CHR-1291 — the canvas pans by scrolling where the frame overflows (drag, trackpad scroll) and by `canvasPan` where it fits; wheel zoom re-anchors through whichever applies. `canvasMoved`: the human moved or zoomed it by hand, so the tool bar keeps its place (CHR-1282). Fit, and a different screen, take it back.
 let canvasMoved = false;
+/** How far the frame was moved off its centring by hand on an axis where it fits (an overflowing axis scrolls instead); applyCanvas hands back what it could apply. */
+let canvasPan = { x: 0, y: 0 };
 // Separate zoom state for the mockup comparison row (see applyMockupZoom in
 // mockup-zoom.js) — the topbar's zoom buttons are shared between it and the
 // screen canvas, but each remembers its own level (see setZoom/isMockupZoomActive).
@@ -2478,6 +2480,7 @@ function measureCanvasInsets() {
 
 // CHR-1299 — the insets the Screens canvas fits and centres in. A snapshot, taken when a fit is asked for (first fit, a view or project switch, a window resize, the Fit control) and kept otherwise: folding or opening a card never moves the frame.
 let canvasInsets = null;
+let canvasTopInset = 0; // the band above the frame (caption or breadcrumb) the last updateCanvas reserved
 
 /** The variant breadcrumb is centred over the displayed screen (the compare area while comparing) and kept inside the constant area the open cards leave free (CHR-1280); folding a card never moves it. */
 function syncVariantBar() {
@@ -2500,7 +2503,9 @@ function updateCanvas() {
   const rendered = iframeRenderedScreen !== null && iframeRenderOk && !screenHolderEl.hidden;
   const showBar = variantLayoutShown && !screenHolderEl.hidden;
   const showCaption = rendered && !showBar;
-  const { width, height } = applyCanvas({ canvasEl, holderEl: screenHolderEl, iframeEl: screenFrame, zoom, topInset: showBar ? VARIANT_BAR_BAND : showCaption ? FRAME_CAPTION_BAND : 0, insets: canvasInsets });
+  canvasTopInset = showBar ? VARIANT_BAR_BAND : showCaption ? FRAME_CAPTION_BAND : 0;
+  const { width, height, pan } = applyCanvas({ canvasEl, holderEl: screenHolderEl, iframeEl: screenFrame, zoom, topInset: canvasTopInset, insets: canvasInsets, pan: canvasPan });
+  canvasPan = pan;
   frameCaptionEl.hidden = !showCaption;
   if (showCaption) renderFrameLabel(width, height);
   // The label sits above the frame's top-left corner.
@@ -2520,16 +2525,26 @@ function updateCanvas() {
 /** Takes a hand-moved canvas back to its centred place (Fit, a different screen). */
 function resetCanvasMove() {
   canvasMoved = false;
+  canvasPan = { x: 0, y: 0 };
   canvasEl.scrollLeft = 0;
   canvasEl.scrollTop = 0;
 }
 
-/** Pans by the pointer's delta (a drag, or a trackpad two-finger scroll): the canvas scrolls the other way. The scroll range (applyCanvas, `#canvas::after`) lets a zoomed-in frame leave the cards behind. */
+/** Whether the frame overflows the pane on an axis (then that axis scrolls) or fits it (then it is moved by `canvasPan`). */
+function frameOverflows(axis) {
+  const scale = parseFloat(screenHolderEl.style.getPropertyValue("--zoom")) || 1;
+  return axis === "x" ? (parseFloat(screenHolderEl.style.width) || 0) * scale > canvasEl.clientWidth - canvasInsets.left - canvasInsets.right : (parseFloat(screenHolderEl.style.height) || 0) * scale > canvasEl.clientHeight - canvasInsets.top - canvasInsets.bottom - canvasTopInset;
+}
+
+/** Pans by the pointer's delta (a drag, or a trackpad two-finger scroll): per axis the canvas scrolls the other way where the frame overflows, and the frame moves with the pointer where it fits. */
 function moveCanvasFrame(dx, dy) {
   if (screenHolderEl.hidden) return;
   canvasMoved = true;
-  canvasEl.scrollLeft -= dx;
-  canvasEl.scrollTop -= dy;
+  if (frameOverflows("x")) canvasEl.scrollLeft -= dx;
+  else canvasPan = { ...canvasPan, x: canvasPan.x + dx };
+  if (frameOverflows("y")) canvasEl.scrollTop -= dy;
+  else canvasPan = { ...canvasPan, y: canvasPan.y + dy };
+  updateCanvas();
 }
 
 let canvasZoomPrefTimer = null;
@@ -2542,16 +2557,24 @@ function zoomCanvasAt(factor, clientX, clientY) {
   const rect = canvasEl.getBoundingClientRect();
   const pointerX = clientX - rect.left;
   const pointerY = clientY - rect.top;
-  // The frame's edge in pane coordinates (scroll taken off), before and after the zoom.
+  // The frame's edge in pane coordinates (scroll taken off), before the zoom; where it must sit after.
   const oldLeft = (parseFloat(screenHolderEl.style.left) || 0) - canvasEl.scrollLeft;
   const oldTop = (parseFloat(screenHolderEl.style.top) || 0) - canvasEl.scrollTop;
+  const wantedLeft = anchoredPosition({ pointer: pointerX, position: oldLeft, oldScale, newScale: nextScale });
+  const wantedTop = anchoredPosition({ pointer: pointerY, position: oldTop, oldScale, newScale: nextScale });
   zoom = nextScale;
   canvasMoved = true;
   updateCanvas(); // the new scale, its centring and its scroll range
-  const wantedLeft = anchoredPosition({ pointer: pointerX, position: oldLeft, oldScale, newScale: nextScale });
-  const wantedTop = anchoredPosition({ pointer: pointerY, position: oldTop, oldScale, newScale: nextScale });
-  canvasEl.scrollLeft = (parseFloat(screenHolderEl.style.left) || 0) - wantedLeft;
-  canvasEl.scrollTop = (parseFloat(screenHolderEl.style.top) || 0) - wantedTop;
+  // Per axis: a frame that still fits is placed by the pan offset, an overflowing one by the scroll position.
+  const left = parseFloat(screenHolderEl.style.left) || 0;
+  const top = parseFloat(screenHolderEl.style.top) || 0;
+  const overflowX = frameOverflows("x");
+  const overflowY = frameOverflows("y");
+  if (!overflowX) canvasPan = { ...canvasPan, x: canvasPan.x + wantedLeft - left };
+  if (!overflowY) canvasPan = { ...canvasPan, y: canvasPan.y + wantedTop - top };
+  if (!overflowX || !overflowY) updateCanvas();
+  if (overflowX) canvasEl.scrollLeft = left - wantedLeft;
+  if (overflowY) canvasEl.scrollTop = top - wantedTop;
   commentCanvas.layout();
   clearTimeout(canvasZoomPrefTimer);
   canvasZoomPrefTimer = setTimeout(() => writeStringPref(prefsStorage, "artisign.zoom", String(zoom)), 200);
@@ -2566,6 +2589,7 @@ const canvasInput = createCanvasInput({
   onPan: moveCanvasFrame,
   onWheelPan: moveCanvasFrame,
   onZoom: zoomCanvasAt,
+  canHandle: () => !screenHolderEl.hidden, // the empty guide scrolls with the wheel
 });
 canvasInput.mount();
 let canvasInputDocCleanup = () => {};

@@ -47,16 +47,17 @@ export function anchoredPosition({ pointer, position, oldScale, newScale }) {
  *   onZoom: (factor: number, clientX: number, clientY: number) => void,
  *   onWheelPan?: (dx: number, dy: number) => void,
  *   onManual?: () => void,
+ *   canHandle?: () => boolean,
  *   ignoreSelector?: string,
  *   now?: () => number,
  * }} CanvasInputArgs
  */
 
 /**
- * @param {CanvasInputArgs} args `isToolActive`: a canvas tool (Comment, Inspect, Flow) keeps the left button; Space and the middle button pan regardless. `onPan` moves the canvas by the pointer's delta (the way the content follows the pointer). `onZoom` gets the zoom factor and the shell client point to hold in place. `onWheelPan` handles a trackpad scroll as a pan of the canvas; without it that wheel is left to the browser's native scroll. `onManual` fires once per gesture that moves or zooms the canvas by hand (it pauses Follow). `ignoreSelector` names shell controls inside the surface that keep their own pointer and wheel behaviour (matched on targets of the shell document only).
+ * @param {CanvasInputArgs} args `isToolActive`: a canvas tool (Comment, Inspect, Flow) keeps the left button; Space and the middle button pan regardless. `onPan` moves the canvas by the pointer's delta (the way the content follows the pointer). `onZoom` gets the zoom factor and the shell client point to hold in place. `onWheelPan` handles a trackpad scroll as a pan of the canvas; without it that wheel is left to the browser's native scroll. `onManual` fires once per gesture that moves or zooms the canvas by hand (it pauses Follow). `canHandle` says whether the view has anything to move right now (false: a hidden frame, the empty guide) — then pointer and wheel are left to the browser. `ignoreSelector` names shell controls inside the surface that keep their own pointer and wheel behaviour (matched on targets of the shell document only).
  * @returns {{ mount: () => () => void, attachDoc: (doc: Document | null, frameEl: HTMLElement) => () => void }} `mount` listens on the surface and returns the teardown; `attachDoc` forwards a screen document's events (call again after each load) and returns its teardown
  */
-export function createCanvasInput({ surfaceEl, isToolActive, onPan, onZoom, onWheelPan, onManual, ignoreSelector = "", now }) {
+export function createCanvasInput({ surfaceEl, isToolActive, onPan, onZoom, onWheelPan, onManual, canHandle = () => true, ignoreSelector = "", now }) {
   const classify = createWheelClassifier(now);
   const shellIgnore = ["button", "a[href]", "input", "textarea", "select", "[contenteditable]", "[role=dialog]", "[popover]", ignoreSelector].filter(Boolean).join(", ");
   /** @type {Map<Document, HTMLElement>} document -> the iframe that shows it */
@@ -141,7 +142,7 @@ export function createCanvasInput({ surfaceEl, isToolActive, onPan, onZoom, onWh
 
   /** @param {PointerEvent} evt @param {boolean} inDoc the press came from a forwarded screen document */
   function onPointerDown(evt, inDoc) {
-    if (drag || evt.pointerType === "touch" || (evt.button !== 0 && evt.button !== 1)) return;
+    if (drag || !canHandle() || evt.pointerType === "touch" || (evt.button !== 0 && evt.button !== 1)) return;
     const forced = evt.button === 1 || spaceHeld;
     if (!forced && isToolActive()) return;
     const target = /** @type {Element} */ (evt.target);
@@ -160,16 +161,19 @@ export function createCanvasInput({ surfaceEl, isToolActive, onPan, onZoom, onWh
   /** The wheel, from the surface or a forwarded document. */
   function onWheel(evt, inDoc) {
     const target = /** @type {Element} */ (evt.target);
+    if (!canHandle()) return;
     if (!inDoc && ignoreSelector && target.closest?.(ignoreSelector)) return; // a panel inside the surface scrolls itself
     const { x, y } = point(evt);
     if (classify(evt) === "zoom") {
       evt.preventDefault(); // never the browser's page zoom
       onManual?.();
       onZoom(computeWheelZoomFactor(evt.deltaY, evt.deltaMode, surfaceEl.clientHeight), x, y);
-    } else if (onWheelPan) {
-      evt.preventDefault();
-      onManual?.();
-      onWheelPan(-evt.deltaX, -evt.deltaY);
+    } else {
+      onManual?.(); // a trackpad scroll is manual navigation, whoever moves the canvas
+      if (onWheelPan) {
+        evt.preventDefault();
+        onWheelPan(-evt.deltaX, -evt.deltaY);
+      }
     }
   }
 

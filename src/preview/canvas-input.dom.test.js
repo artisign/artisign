@@ -249,3 +249,28 @@ describe("focus", () => {
     expect(calls.pan).toEqual([[30, 0]]);
   });
 });
+
+describe("what the view cannot handle", () => {
+  function remount(args) {
+    unmount();
+    input = createCanvasInput({ surfaceEl: surface, isToolActive: () => false, onPan: (dx, dy) => calls.pan.push([dx, dy]), onZoom: (...a) => calls.zoom.push(a), onManual: () => (calls.manual += 1), ...args });
+    unmount = input.mount();
+  }
+
+  it("leaves wheel and drag to the browser while canHandle is false (hidden frame, empty guide)", () => {
+    remount({ canHandle: () => false, onWheelPan: (dx, dy) => calls.wheelPan.push([dx, dy]) });
+    expect(wheelOn(inner, { deltaY: -100 }).defaultPrevented).toBe(false);
+    expect(wheelOn(inner, { deltaX: 3, deltaY: 5.5 }).defaultPrevented).toBe(false);
+    expect(wheelOn(inner, { ctrlKey: true, deltaY: -3 }).defaultPrevented).toBe(false);
+    pointer(inner, "pointerdown", 10, 10);
+    pointer(inner, "pointermove", 60, 10);
+    expect(calls).toMatchObject({ zoom: [], pan: [], wheelPan: [], manual: 0 });
+  });
+
+  it("a trackpad scroll the browser handles still counts as manual navigation", () => {
+    remount({});
+    const evt = wheelOn(inner, { deltaX: 4, deltaY: 7.5 });
+    expect(evt.defaultPrevented).toBe(false);
+    expect(calls.manual).toBe(1);
+  });
+});

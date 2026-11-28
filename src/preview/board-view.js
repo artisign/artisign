@@ -156,6 +156,7 @@ export function createBoardView({
   const canvasInput = createCanvasInput({
     surfaceEl,
     isToolActive: () => flowModeOn,
+    canHandle: () => !isHidden(),
     ignoreSelector: "#board-comment-layer *",
     onManual: () => onManualNavigate?.(),
     onPan: (dx, dy) => {
@@ -298,9 +299,9 @@ export function createBoardView({
     // "flow mode on" click behavior. It's a no-op when enabled is false, so
     // the highlight-on-click behavior for "flow mode off" is wired
     // separately by attachTileClicks regardless of flowModeOn.
+    const inputCleanup = canvasInput.attachDoc(doc, iframe); // first: the click that ends a drag is swallowed before the flow and highlight handlers see it
     const flowCleanup = applyFlowMode(doc, flowModeOn, (targetScreen) => centerOnScreen(targetScreen));
     const clickCleanup = flowModeOn ? () => {} : attachTileClicks(doc, screenId);
-    const inputCleanup = canvasInput.attachDoc(doc, iframe);
     if (onTileKeydown) doc.addEventListener("keydown", onTileKeydown);
     modeCleanupByScreen.set(screenId, () => {
       flowCleanup();

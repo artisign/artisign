@@ -60,4 +60,13 @@ describe("applyCanvas", () => {
     // free 700 wide, frame 97.5 wide: centred in it, offset by the left inset.
     expect(parseFloat(centred.holderEl.style.left)).toBeCloseTo(200 + (700 - 97.5) / 2, 5);
   });
+
+  it("leaves scroll room for what the cards cover beyond the frame's far edge (CHR-1299)", () => {
+    const props = {};
+    const c = { ...stubs(), canvasEl: { clientWidth: 1000, clientHeight: 700, style: { setProperty: (k, v) => (props[k] = v) } } };
+    applyCanvas({ ...c, zoom: 2, insets: { left: 100, right: 300, top: 76, bottom: 80 } });
+    // 390 x 844 at 200 %: 780 x 1688, starting at the insets (it is larger than the free area).
+    expect(props["--room-w"]).toBe(`${100 + 780 + 300}px`);
+    expect(props["--room-h"]).toBe(`${76 + 1688 + 80}px`);
+  });
 });

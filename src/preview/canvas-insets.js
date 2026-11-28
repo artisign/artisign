@@ -1,5 +1,8 @@
 // CHR-1299 — what the floating cards cover of a full-window canvas. The canvases (Screens, Board) fill the window and never move for a card; these insets only feed what is asked of the free area: the fit scale and where "Fit" / "Fit all" put the content.
 
+/** The narrowest free width a fit may be handed, in window pixels. */
+const MIN_FREE_WIDTH = 200;
+
 /**
  * @typedef {{ left: number, right: number, top: number, bottom: number }} Insets
  * @typedef {{ left: number, right: number }} CardRect horizontal extent of a visible card, in window pixels
@@ -18,6 +21,14 @@ export function computeCanvasInsets(viewportWidth, cards, { top, bottom, gap }) 
   for (const card of cards) {
     if ((card.left + card.right) / 2 < viewportWidth / 2) left = Math.max(left, card.right + gap);
     else right = Math.max(right, viewportWidth - card.left + gap);
+  }
+  // Two cards dragged toward the centre must not swallow the free area: keep a usable width by scaling both insets down together.
+  const minFree = Math.min(MIN_FREE_WIDTH, viewportWidth / 4);
+  const room = viewportWidth - minFree;
+  if (left + right > room) {
+    const k = Math.max(0, room) / (left + right);
+    left *= k;
+    right *= k;
   }
   return { left, right, top, bottom };
 }

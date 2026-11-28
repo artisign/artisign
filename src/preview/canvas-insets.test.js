@@ -17,6 +17,17 @@ describe("computeCanvasInsets", () => {
     expect(computeCanvasInsets(1600, [{ left: 16, right: 68 }], BANDS).left).toBe(84);
   });
 
+  it("cards dragged toward the centre never leave a collapsed free area", () => {
+    const cards = [
+      { left: 740, right: 792 }, // tool bar, centre left of 800
+      { left: 810, right: 1066 }, // Agent bar, centre right of 800
+    ];
+    const insets = computeCanvasInsets(1600, cards, BANDS);
+    expect(1600 - insets.left - insets.right).toBeGreaterThanOrEqual(200);
+    expect(insets.left).toBeGreaterThan(0);
+    expect(insets.right).toBeGreaterThan(0);
+  });
+
   it("no cards, no insets beyond the bands", () => {
     expect(computeCanvasInsets(1600, [], BANDS)).toEqual({ left: 0, right: 0, top: 76, bottom: 80 });
   });

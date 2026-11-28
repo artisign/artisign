@@ -2391,11 +2391,12 @@ function measureCanvasInsets() {
 // CHR-1299 — the insets the Screens canvas fits and centres in. A snapshot, taken when a fit is asked for (first fit, a view or project switch, a window resize, the Fit control) and kept otherwise: folding or opening a card never moves the frame.
 let canvasInsets = null;
 
-/** The variant breadcrumb is centred over the displayed screen (the compare area while comparing) and kept clear of the cards (CHR-1280). It never reads the Screens card's state, so folding it does not move the bar. */
+/** The variant breadcrumb is centred over the displayed screen (the compare area while comparing) and kept clear of the cards (CHR-1280). It clamps against the same insets snapshot the frame was placed with, never a live read of the cards, so folding a card neither moves the bar nor lets a later re-render move it. */
 function syncVariantBar() {
   if (variantBarEl.hidden) return;
   const viewRect = screensViewEl.getBoundingClientRect();
-  const insets = measureCanvasInsets();
+  canvasInsets ??= measureCanvasInsets();
+  const insets = canvasInsets;
   const freeLeft = insets.left;
   const freeWidth = Math.max(0, viewRect.width - insets.left - insets.right);
   variantBarEl.style.setProperty("--bar-max", `${freeWidth}px`);

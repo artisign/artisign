@@ -40,4 +40,8 @@ describe("canvases fill the window; the cards float over them", () => {
     expect(bar).toMatch(/translateX\(-50%\)/);
     expect(bar).not.toMatch(/--reserve|--frame-left/);
   });
+
+  it("the mockup comment banner keeps its place above the zoom pill", () => {
+    expect(rule('#comment-banner[data-placement="bottom"]')).toMatch(/bottom:\s*var\(--shell-bottom\)/);
+  });
 });

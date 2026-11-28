@@ -75,6 +75,10 @@ export function applyCanvas({ canvasEl, holderEl, iframeEl, zoom, topInset = 0, 
   holderEl.style.left = `${insets.left + Math.max(0, (availW - width * scale) / 2)}px`;
   holderEl.style.top = `${insets.top + topInset + Math.max(0, (availH - height * scale) / 2)}px`;
 
+  // Trailing scroll room: a frame wider or taller than the free area scrolls out from under the cards on the right and the zoom pill below (a ::after of the canvas, style.css, sized to the frame's far edge plus the insets).
+  canvasEl.style?.setProperty("--room-w", `${insets.left + Math.max(0, (availW - width * scale) / 2) + width * scale + insets.right}px`);
+  canvasEl.style?.setProperty("--room-h", `${insets.top + topInset + Math.max(0, (availH - height * scale) / 2) + height * scale + insets.bottom}px`);
+
   iframeEl.style.width = `${width}px`;
   iframeEl.style.height = `${height}px`;
   return { width, height };

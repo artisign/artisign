@@ -8321,7 +8321,7 @@ button.uc-target:hover {
 /* On the mockup columns the banner sits at the bottom of the stage, above the zoom pill (design `mockup-comments-mode`). */
 #comment-banner[data-placement="bottom"] {
   top: auto;
-  bottom: calc(2 * var(--shell-bottom));
+  bottom: var(--shell-bottom);
 }
 
 .comment-dim {
@@ -9331,6 +9331,17 @@ body {
   flex: 1;
   position: relative;
   overflow: auto;
+}
+
+/* The scroll range runs to the frame's far edge plus what the cards cover there, so a zoomed-in frame can be scrolled out from under them (applyCanvas sets the sizes). */
+#canvas::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--room-w, 0);
+  height: var(--room-h, 0);
+  pointer-events: none;
 }
 
 /* Positioned in JS (app.js) above the frame's top-left corner. */

@@ -114,13 +114,14 @@ describe("CHR-1290 — pan the Screens canvas by dragging", () => {
 
   it("leaves the tool bar where it is", async () => {
     await boot();
-    $("#app").style.setProperty("--toolbar-top", "77px");
     const canvas = $("#canvas");
     pointer(canvas, "pointerdown", 100, 100);
     pointer(canvas, "pointermove", 160, 130);
     pointer(canvas, "pointerup", 160, 130);
     wheel(canvas, { deltaY: -100 });
-    expect($("#app").style.getPropertyValue("--toolbar-top")).toBe("77px");
+    // The tool bar is fixed to the window: nothing the canvas does reaches its place (CHR-1282).
+    expect($("#app").style.getPropertyValue("--toolbar-top")).toBe("");
+    expect([$("#tool-bar").style.left, $("#tool-bar").style.top]).toEqual(["", ""]);
   });
 });
 

@@ -51,3 +51,12 @@ describe("canvases fill the window; the cards float over them", () => {
     expect(view).not.toMatch(/--reserve-left/);
   });
 });
+
+describe("the tool bar is fixed to the window (CHR-1282)", () => {
+  it("its default place comes from the window and the Screens card alone, never from the canvas frame", () => {
+    const bar = rule("#tool-bar");
+    expect(bar).toMatch(/top:\s*var\(--shell-top\)/);
+    expect(bar).toMatch(/position:\s*absolute/);
+    expect(css).not.toMatch(/--toolbar-top/); // the frame-aligned top moved with the zoom
+  });
+});

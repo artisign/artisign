@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
 import { fakeSettings } from "./fake-settings.test-helper.js";
+import { installDialogStubs, pressEscape } from "./dialog-stub.test-helper.js";
 
 const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
 
@@ -61,6 +62,7 @@ const flush = async () => {
 };
 const $ = (sel) => document.querySelector(sel);
 const pressed = (id) => document.getElementById(id).getAttribute("aria-pressed");
+const modalOpen = (id) => /** @type {HTMLDialogElement} */ (document.getElementById(id)).open;
 const zoomOpen = () => $("#zoom-menu").hasAttribute("data-open"); // jsdom has no Popover API, so the fallback toggles data-open
 /** Inspect mode's selection shows as the outline over the canvas (the Elements list is gone, CHR-1267). */
 const inspectFocused = () => !$("#inspect-overlay").hidden;
@@ -84,6 +86,7 @@ let documentListeners = [];
 const nativeAddEventListener = document.addEventListener.bind(document);
 
 beforeEach(() => {
+  installDialogStubs();
   memoryStorage.clear();
   vi.resetModules();
   document.body.innerHTML = bodyHtml;
@@ -173,8 +176,7 @@ describe("guards", () => {
 
   it("does nothing while a dialog is open, except its own keys", async () => {
     await boot();
-    $("#dialog-scrim").hidden = false;
-    $("#open-project-dialog").hidden = false;
+    $("#open-project-dialog").showModal();
     key("f");
     key("2");
     expect(pressed("flow-mode-toggle")).toBe("false");
@@ -346,35 +348,39 @@ describe("project menu", () => {
     key("Escape");
     expect($("#project-menu").hidden).toBe(true);
     key("o"); // outside the menu O is nothing
-    expect($("#dialog-scrim").hidden).toBe(true);
+    expect(modalOpen("open-project-dialog")).toBe(false);
     key("p");
     key("n");
     expect($("#project-menu").hidden).toBe(true);
-    expect($("#dialog-scrim").hidden).toBe(false);
-    expect($("#init-project-dialog").hidden).toBe(false);
+    expect(modalOpen("init-project-dialog")).toBe(true);
+    expect(modalOpen("open-project-dialog")).toBe(false);
   });
 });
 
 describe("reference dialog", () => {
   it("? opens the list built from the mapping, ? or Esc closes it, and no other key acts meanwhile", async () => {
     await boot();
-    expect($("#shortcuts-scrim").hidden).toBe(true);
+    expect(modalOpen("shortcuts-dialog")).toBe(false);
     key("?", { shiftKey: true });
-    expect($("#shortcuts-scrim").hidden).toBe(false);
-    const rows = [...document.querySelectorAll("#shortcuts-dialog .shortcuts-row")].map((r) => [r.firstChild.textContent, r.lastChild.textContent]);
+    expect(modalOpen("shortcuts-dialog")).toBe(true);
+    // One `kbd` per key: "Shift+1" is two caps, shown here joined.
+    const rows = [...document.querySelectorAll("#shortcuts-dialog .shortcut-row")].map((r) => [r.querySelector("dt").textContent, [...r.querySelectorAll("kbd")].map((k) => k.textContent).join("+")]);
     for (const row of [["Comment", "C"], ["Inspect", "I"], ["Notes", "N"], ["Comments", "M"], ["Flow", "F"], ["Design system", "D"], ["Tool bar", "\\"]]) expect(rows).toContainEqual(row);
     expect(rows).toContainEqual(["Fit", "Shift+1"]);
-    expect(rows).toContainEqual(["Collapse all clusters", "Shift+G"]);
+    expect(rows).toContainEqual(["Collapse all", "Shift+G"]);
+    expect(rows).toContainEqual(["Zoom in, out", "+ + −".replace(/ /g, "")]); // the two zoom keys are one row, as designed
+    expect(rows).toContainEqual(["Find a screen", "/"]);
+    expect(rows).toContainEqual(["Open project, in the menu", "O"]);
     expect(rows).toContainEqual(["Flow arrows", "E"]);
     expect(rows).toContainEqual(["Show resolved comments", "Shift+M"]);
     expect(rows).toContainEqual(["Close, leave a tool", "Esc"]);
     key("f");
     expect(pressed("flow-mode-toggle")).toBe("false");
-    key("Escape");
-    expect($("#shortcuts-scrim").hidden).toBe(true);
+    expect(pressEscape($("#shortcuts-dialog"))).toBe(true);
+    expect(modalOpen("shortcuts-dialog")).toBe(false);
     key("?", { shiftKey: true });
     key("?", { shiftKey: true });
-    expect($("#shortcuts-scrim").hidden).toBe(true);
+    expect(modalOpen("shortcuts-dialog")).toBe(false);
   });
 });
 
@@ -396,9 +402,9 @@ describe("Escape consumed by an overlay does not also leave the mode", () => {
     key("c");
     key("p");
     key("o");
-    expect($("#dialog-scrim").hidden).toBe(false);
-    key("Escape");
-    expect($("#dialog-scrim").hidden).toBe(true);
+    expect(modalOpen("open-project-dialog")).toBe(true);
+    pressEscape($("#open-project-dialog")); // the browser closes a modal dialog on Escape; the mode must stay
+    expect(modalOpen("open-project-dialog")).toBe(false);
     expect(pressed("comment-mode-toggle")).toBe("true");
   });
 
@@ -530,7 +536,7 @@ describe("reference dialog focus", () => {
     key("?", { shiftKey: true });
     expect(document.activeElement).toBe($("#shortcuts-dialog"));
     expect($("#chrome-tooltip").hidden).toBe(true);
-    key("Escape");
+    pressEscape($("#shortcuts-dialog"));
   });
 });
 
@@ -627,6 +633,6 @@ describe("a top-document overlay and the screen frame", () => {
     key("p");
     frameKey(doc, "n");
     expect($("#project-menu").hidden).toBe(true);
-    expect($("#dialog-scrim").hidden).toBe(false);
+    expect(modalOpen("init-project-dialog")).toBe(true);
   });
 });

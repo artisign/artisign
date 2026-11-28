@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 //
-// CHR-926 — the settings menu in the topbar (theme, per-browser toggles, MCP setup, About) and the Connect AI tools dialog, wired in app.js.
+// CHR-926 — the settings menu in the topbar (theme, per-browser toggles, MCP setup, About) and the Connect AI tools dialog, wired in app.js. CHR-1272: the menu is a floating popover (native where the browser has the API, a toggled box where it does not — jsdom has none, so the fallback is the default here), the dialog a native modal <dialog>.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
 import { fakeSettings } from "./fake-settings.test-helper.js";
+import { installDialogStubs, pressEscape, clickScrim, makeNativePopover } from "./dialog-stub.test-helper.js";
 
 const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
 
@@ -79,6 +80,9 @@ const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
 const trigger = () => $("#settings-trigger");
 const menu = () => $("#settings-menu");
+// The fallback box is open by `data-open`; a native popover by :popover-open (see the native tests below).
+const menuOpen = () => menu().hasAttribute("data-open");
+const mcpOpen = () => /** @type {HTMLDialogElement} */ ($("#mcp-dialog")).open;
 const row = (name) => $(`.settings-toggle-row[data-setting="${name}"]`);
 const press = (key, target = document.activeElement) => {
   const evt = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
@@ -97,6 +101,7 @@ async function openMenu() {
 }
 
 beforeEach(() => {
+  installDialogStubs();
   memoryStorage.clear();
   vi.resetModules();
   document.body.innerHTML = bodyHtml;
@@ -120,7 +125,28 @@ describe("settings trigger", () => {
     expect(trigger().dataset.tooltip).toBe("Settings");
     expect(trigger().querySelector(".icon").textContent).toBe("settings");
     expect(trigger().getAttribute("aria-expanded")).toBe("false");
-    expect(menu().hidden).toBe(true);
+    expect(menuOpen()).toBe(false);
+  });
+
+  it("is the declared invoker of a floating popover (popover=auto, float-popover), not a toggled hidden box", async () => {
+    await boot();
+    expect(trigger().getAttribute("popovertarget")).toBe("settings-menu");
+    expect(trigger().getAttribute("aria-controls")).toBe("settings-menu");
+    expect(menu().getAttribute("popover")).toBe("auto");
+    expect(menu().classList.contains("float-popover")).toBe(true);
+    expect(menu().hasAttribute("hidden")).toBe(false);
+    expect(menu().getAttribute("aria-label")).toBe("Settings");
+  });
+
+  it("carries the design's labels: App settings, four switches, MCP setup, About artisign, no Variant map", async () => {
+    await boot();
+    expect($$("#settings-menu .float-popover-label").map((l) => l.textContent)).toEqual(["App settings", "MCP setup", "About artisign"]);
+    expect($("#settings-theme-label").textContent).toBe("Theme");
+    expect($$(".settings-seg-button").map((b) => b.textContent.replace(/^[a-z_]+/, ""))).toEqual(["System", "Light", "Dark"]);
+    expect($$(".settings-toggle-row").map((b) => b.textContent)).toEqual(["Follow the agent by default", "Clusters on the Board", "Flow arrows on the Board", "Tags in the screen list"]);
+    expect($("#settings-mcp .settings-item-label").textContent).toBe("Connect AI tools…");
+    expect($("#settings-whats-new").textContent).toBe("new_releasesWhat's New");
+    expect(menu().textContent).not.toMatch(/variant map/i);
   });
 });
 
@@ -128,11 +154,11 @@ describe("opening and closing", () => {
   it("opens on click with focus on the current theme, and closes on a second click", async () => {
     await boot();
     trigger().click();
-    expect(menu().hidden).toBe(false);
+    expect(menuOpen()).toBe(true);
     expect(trigger().getAttribute("aria-expanded")).toBe("true");
     expect(document.activeElement.dataset.themePref).toBe("system");
     trigger().click();
-    expect(menu().hidden).toBe(true);
+    expect(menuOpen()).toBe(false);
     expect(trigger().getAttribute("aria-expanded")).toBe("false");
   });
 
@@ -140,7 +166,7 @@ describe("opening and closing", () => {
     await boot();
     await openMenu();
     press("Escape");
-    expect(menu().hidden).toBe(true);
+    expect(menuOpen()).toBe(false);
     expect(document.activeElement).toBe(trigger());
   });
 
@@ -148,14 +174,14 @@ describe("opening and closing", () => {
     await boot();
     await openMenu();
     $("#sidebar-screens").dispatchEvent(new Event("pointerdown", { bubbles: true }));
-    expect(menu().hidden).toBe(true);
+    expect(menuOpen()).toBe(false);
   });
 
   it("a press inside does not", async () => {
     await boot();
     await openMenu();
     menu().dispatchEvent(new Event("pointerdown", { bubbles: true }));
-    expect(menu().hidden).toBe(false);
+    expect(menuOpen()).toBe(true);
   });
 });
 
@@ -226,7 +252,7 @@ describe("theme", () => {
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
     expect($('.settings-seg-button[data-theme-pref="dark"]').getAttribute("aria-checked")).toBe("true");
     expect($('.settings-seg-button[data-theme-pref="system"]').getAttribute("aria-checked")).toBe("false");
-    expect(menu().hidden).toBe(false);
+    expect(menuOpen()).toBe(true);
     expect(memoryStorage.get("artisign.theme")).toBe("dark");
     await flush();
     expect(settings.prefs["artisign.theme"]).toBe("dark");
@@ -256,7 +282,7 @@ describe("toggles", () => {
     row("follow").click();
     expect(row("follow").getAttribute("aria-checked")).toBe("true");
     expect($("#follow-switch").checked).toBe(true);
-    expect(menu().hidden).toBe(false);
+    expect(menuOpen()).toBe(true);
     await flush();
     expect(settings.prefs["artisign.followEnabled"]).toBe("true");
     $("#follow-switch").click(); // and the other way round, seen on the next open
@@ -276,7 +302,7 @@ describe("toggles", () => {
     await flush();
     expect(settings.prefs["artisign.boardClusters"]).toBe("false");
     expect(settings.prefs["artisign.boardEdgesVisible"]).toBe("false");
-    expect(menu().hidden).toBe(false);
+    expect(menuOpen()).toBe(true);
   });
 
   it("changes made with the Board's tools show in the menu", async () => {
@@ -346,11 +372,11 @@ describe("MCP setup row and About", () => {
     await boot();
     await openMenu();
     $("#settings-mcp").click();
-    expect(menu().hidden).toBe(true);
-    expect($("#mcp-scrim").hidden).toBe(false);
+    expect(menuOpen()).toBe(false);
+    expect(mcpOpen()).toBe(true);
     await flush();
     $("#mcp-done").click();
-    expect($("#mcp-scrim").hidden).toBe(true);
+    expect(mcpOpen()).toBe(false);
     expect(document.activeElement).toBe(trigger());
   });
 });
@@ -362,50 +388,56 @@ describe("Connect AI tools dialog", () => {
     $("#settings-mcp").click();
     await flush();
   }
-  const clientRow = (name) => $$(".mcp-client").find((c) => c.querySelector(".mcp-client-name").textContent === name);
+  const clientRow = (name) => $$("#mcp-clients .status-row").find((c) => c.querySelector(".status-row-name").textContent === name);
 
   it("shows the command, one row per tool in order, status chips and the summary", async () => {
     await openDialog();
-    expect($("#mcp-command .mcp-code-text").textContent).toBe("artisign setup");
-    expect($$(".mcp-client-name").map((n) => n.textContent)).toEqual(["Claude Code", "Claude Desktop", "Cursor", "opencode"]);
-    expect($$(".mcp-status").map((c) => c.textContent.replace("check", ""))).toEqual(["Not connected", "Connected", "Not connected", "Not found"]);
+    expect($("#mcp-command .code-field-text").textContent).toBe("artisign setup");
+    expect($$("#mcp-clients .status-row-name").map((n) => n.textContent)).toEqual(["Claude Code", "Claude Desktop", "Cursor", "opencode"]);
+    expect($$("#mcp-clients .status-chip").map((c) => c.textContent.replace("check", ""))).toEqual(["Not connected", "Connected", "Not connected", "Not found"]);
     expect($("#mcp-summary").textContent).toBe("1 of 4 connected");
   });
 
   it("expands tools that are not connected, with the command or the config and its path", async () => {
     await openDialog();
+    // The first tool that is installed but not connected starts open (design: Claude Code expanded, Cursor expandable but collapsed).
     const code = clientRow("Claude Code");
-    expect(code.querySelector(".mcp-client-row").getAttribute("aria-expanded")).toBe("true");
-    expect(code.querySelector(".mcp-manual").hidden).toBe(false);
-    expect(code.querySelector(".mcp-hint").textContent).toBe("Run in a terminal:");
-    expect(code.querySelector(".mcp-code-text").textContent).toBe("claude mcp add artisign -- npx -y artisign@9.9.9 mcp");
+    expect(code.querySelector(".status-row-head").getAttribute("aria-expanded")).toBe("true");
+    expect(code.querySelector(".status-row-detail").hidden).toBe(false);
+    expect(code.querySelector(".status-row-hint").textContent).toBe("Run in a terminal:");
+    expect(code.querySelector(".code-field--block .code-field-text").textContent).toBe("claude mcp add artisign -- npx -y artisign@9.9.9 mcp");
     const cursor = clientRow("Cursor");
-    expect(cursor.querySelector(".mcp-hint").textContent).toBe("Add this to ~/.cursor/mcp.json:");
+    expect(cursor.querySelector(".status-row-head").getAttribute("aria-expanded")).toBe("false");
+    expect(cursor.querySelector(".status-row-detail").hidden).toBe(true);
+    cursor.querySelector(".status-row-head").click();
+    expect(cursor.querySelector(".status-row-hint").textContent).toBe("Add this to ~/.cursor/mcp.json:");
     expect(cursor.querySelector(".mcp-path").textContent).toBe("~/.cursor/mcp.json");
-    expect(cursor.querySelector(".mcp-code-text").textContent).toBe('{"mcpServers":{}}');
+    expect(cursor.querySelector(".code-field-text").textContent).toBe('{"mcpServers":{}}');
   });
 
   it("a connected tool has nothing to expand; a tool that is not found is collapsed but can be opened", async () => {
     await openDialog();
     const desktop = clientRow("Claude Desktop");
-    expect(desktop.querySelector("button.mcp-client-row")).toBeNull();
-    expect(desktop.querySelector(".mcp-manual")).toBeNull();
+    expect(desktop.querySelector("button.status-row-head")).toBeNull();
+    expect(desktop.querySelector(".status-row-detail")).toBeNull();
     const missing = clientRow("opencode");
-    const head = missing.querySelector(".mcp-client-row");
+    expect(missing.classList.contains("status-row--muted")).toBe(true);
+    const head = missing.querySelector(".status-row-head");
     expect(head.getAttribute("aria-expanded")).toBe("false");
-    expect(missing.querySelector(".mcp-manual").hidden).toBe(true);
+    expect(missing.querySelector(".status-row-detail").hidden).toBe(true);
     head.click();
     expect(head.getAttribute("aria-expanded")).toBe("true");
-    expect(missing.querySelector(".mcp-manual").hidden).toBe(false);
+    expect(missing.querySelector(".status-row-detail").hidden).toBe(false);
     head.click();
-    expect(missing.querySelector(".mcp-manual").hidden).toBe(true);
+    expect(missing.querySelector(".status-row-detail").hidden).toBe(true);
   });
 
   it("a not-connected row can be collapsed", async () => {
     await openDialog();
     const code = clientRow("Claude Code");
-    code.querySelector(".mcp-client-row").click();
-    expect(code.querySelector(".mcp-manual").hidden).toBe(true);
+    code.querySelector(".status-row-head").click();
+    expect(code.querySelector(".status-row-detail").hidden).toBe(true);
+    expect(code.classList.contains("is-open")).toBe(false);
   });
 
   it("copies the command and the snippets, showing a check mark for a moment", async () => {
@@ -415,38 +447,40 @@ describe("Connect AI tools dialog", () => {
     await flush();
     expect(writeText).toHaveBeenLastCalledWith("artisign setup");
     expect(copy.querySelector(".icon").textContent).toBe("check");
-    clientRow("Cursor").querySelector(".mcp-manual button").click();
+    clientRow("Cursor").querySelector(".status-row-detail button").click();
     await flush();
     expect(writeText).toHaveBeenLastCalledWith('{"mcpServers":{}}');
   });
 
-  it("tolerates a clipboard that refuses", async () => {
+  it("a clipboard that refuses shows an error mark and selects the command for a manual copy", async () => {
     await openDialog();
     writeText.mockRejectedValueOnce(new Error("denied"));
     const copy = $("#mcp-command button");
     copy.click();
     await flush();
-    expect(copy.querySelector(".icon").textContent).toBe("content_copy");
+    expect(copy.querySelector(".icon").textContent).toBe("error");
+    expect(copy.title).toMatch(/copy failed/i);
+    expect(window.getSelection().toString()).toBe("artisign setup");
   });
 
   it("says so when the status cannot be read, and still offers the command", async () => {
     setupResponse = null;
     await openDialog();
     expect($("#mcp-clients").textContent).toContain("Could not read the tool status");
-    expect($("#mcp-command .mcp-code-text").textContent).toBe("artisign setup");
+    expect($("#mcp-command .code-field-text").textContent).toBe("artisign setup");
   });
 
   it("closes with Escape, the close button, a scrim click and Done; focus returns to the settings trigger", async () => {
     await openDialog();
-    press("Escape");
-    expect($("#mcp-scrim").hidden).toBe(true);
+    expect(pressEscape($("#mcp-dialog"))).toBe(true);
+    expect(mcpOpen()).toBe(false);
     expect(document.activeElement).toBe(trigger());
-    for (const close of [() => $("#mcp-close").click(), () => $("#mcp-scrim").click(), () => $("#mcp-done").click()]) {
+    for (const close of [() => $("#mcp-close").click(), () => clickScrim($("#mcp-dialog")), () => $("#mcp-done").click()]) {
       trigger().click();
       $("#settings-mcp").click();
-      expect($("#mcp-scrim").hidden).toBe(false);
+      expect(mcpOpen()).toBe(true);
       close();
-      expect($("#mcp-scrim").hidden).toBe(true);
+      expect(mcpOpen()).toBe(false);
       expect(document.activeElement).toBe(trigger());
     }
   });
@@ -467,5 +501,73 @@ describe("Connect AI tools dialog", () => {
     $("#settings-mcp").click();
     await flush();
     expect(setupCalls).toBeGreaterThan(calls);
+  });
+});
+
+describe("native popover path (CHR-1272)", () => {
+  /** The menu with the Popover API's surface; the browser's own invoker toggling comes with it. */
+  function nativeMenu() {
+    return makeNativePopover($("#settings-menu"));
+  }
+
+  it("the declared invoker toggles it, aria-expanded follows, focus lands on the theme control, and a second click closes", async () => {
+    document.body.innerHTML = bodyHtml;
+    const popover = nativeMenu();
+    await boot();
+    trigger().click();
+    expect(popover.isOpen()).toBe(true);
+    expect(menuOpen()).toBe(false); // no fallback attribute: the browser owns the state
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement.dataset.themePref).toBe("system");
+    trigger().click();
+    expect(popover.isOpen()).toBe(false);
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("light dismiss (the browser closing it) keeps aria-expanded right and forgets the read", async () => {
+    document.body.innerHTML = bodyHtml;
+    const popover = nativeMenu();
+    await boot();
+    trigger().click();
+    await flush();
+    expect($("#settings-mcp-sub").hidden).toBe(false);
+    popover.lightDismiss(); // a press outside: the browser hides an auto popover by itself
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
+    expect($("#settings-mcp-sub").hidden).toBe(true); // nothing of this read stays for the next open
+  });
+
+  it("Escape (also one the screen frame handed over) closes it and puts focus on the trigger", async () => {
+    document.body.innerHTML = bodyHtml;
+    const popover = nativeMenu();
+    await boot();
+    trigger().click();
+    press("Escape", document.body);
+    expect(popover.isOpen()).toBe(false);
+    expect(document.activeElement).toBe(trigger());
+  });
+
+  it("focus moving into the screen frame (a press there never reaches this document) closes it", async () => {
+    document.body.innerHTML = bodyHtml;
+    const popover = nativeMenu();
+    await boot();
+    trigger().click();
+    const frame = $("#screen-frame") ?? $("iframe");
+    frame.focus();
+    window.dispatchEvent(new Event("blur"));
+    expect(popover.isOpen()).toBe(false);
+  });
+
+  it("holds the single-key shortcuts like any open menu, and picking Connect AI tools closes it before the dialog opens", async () => {
+    document.body.innerHTML = bodyHtml;
+    const popover = nativeMenu();
+    await boot();
+    trigger().click();
+    press("t", document.body);
+    expect(document.documentElement.getAttribute("data-theme")).not.toBe("dark");
+    $("#settings-mcp").click();
+    expect(popover.isOpen()).toBe(false);
+    expect(mcpOpen()).toBe(true);
+    pressEscape($("#mcp-dialog"));
+    expect(document.activeElement).toBe(trigger());
   });
 });

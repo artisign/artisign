@@ -118,6 +118,6 @@ describe("empty-project guide", () => {
     $("#empty-guide-copy").click();
     await flush();
     expect(writeText).toHaveBeenCalledWith("Design a login screen in my artisign project delete-me");
-    expect($("#empty-guide-copy").textContent).toBe("Copied");
+    expect($("#empty-guide-copy-label").textContent).toBe("Copied");
   });
 });

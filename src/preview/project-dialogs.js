@@ -1,37 +1,61 @@
-// Open/init project dialogs: a shared modal folder browser (no path typing
-// — a plain browser page can't expose absolute paths any other way). Both
-// dialogs share the scrim; only one section is shown at a time. Browsing
-// data comes from GET /api/fs/dirs (see api.js); the actual open/init POST
-// is owned by app.js, same split as comments.js's reply affordance — this
-// module is DOM wiring + directory-tree state only.
+// Open/init project dialogs: a modal folder browser (no path typing — a plain browser page can't expose absolute paths any other way). CHR-1272: each is a native <dialog> in the floating look (float-dialog.js) — Escape, the scrim and the close / Cancel buttons close it, the browser traps Tab and focus goes back to the opener. Browsing data comes from GET /api/fs/dirs (see api.js); the actual open/init POST is owned by app.js, same split as comments.js's reply affordance — this module is DOM wiring + directory-tree state only.
+//
+// The folder list is a listbox of options (design `chrome-list-row`): one tab stop, ↑/↓/Home/End move, Enter / Space / a click act. Open mode: a folder that holds a project is selected by activating it, any other folder is entered. New project: the folder the "New folder" row just made is the selected parent; every other folder is entered, project folders are inert.
 
 import { fetchFsDirs, createFsDir } from "./api.js";
-import { captureFocus, handleListArrowKeys, isShown, tabbableWithin, trapFocus } from "./menu-keys.js";
+import { captureFocus, handleListArrowKeys, setRovingTabindex, tabbableWithin } from "./menu-keys.js";
+import { createModal } from "./float-dialog.js";
+
+/** The name shown in the New project field while it is empty. */
+const NAME_PLACEHOLDER = "my-new-project";
+
+/** @param {string} tag @param {string} [className] @param {string} [text] */
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+/** @param {string} name */
+function icon(name) {
+  const node = el("span", "icon", name);
+  node.setAttribute("aria-hidden", "true");
+  return node;
+}
+
+/** The message for an action that failed without an answer (the request itself broke). @param {unknown} err */
+function failureMessage(err) {
+  return err instanceof Error && err.message ? err.message : "Could not reach artisign. Try again.";
+}
 
 /**
- * Wires one dialog section (open or init) to the shared `/api/fs/dirs`
- * browsing logic.
+ * Wires one dialog (open or init) to the shared `/api/fs/dirs` browsing logic.
  *
- * @param {HTMLElement} sectionEl
+ * @param {HTMLElement} dialogEl
  * @param {{ mode: "open" | "init", onConfirm: (target: { dir: string, name?: string }) => Promise<{ ok: true } | { ok: false, message: string }>, onCancel: () => void }} options
  */
-function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
-  const quickChips = sectionEl.querySelectorAll(".quick-chip");
-  const breadcrumbsEl = sectionEl.querySelector(".breadcrumbs");
-  const dirListEl = sectionEl.querySelector(".dir-list");
-  const selectionPathEl = sectionEl.querySelector(".selection-path");
-  const errorEl = sectionEl.querySelector(".dialog-error");
-  const confirmButton = sectionEl.querySelector(".btn-confirm");
-  const cancelButton = sectionEl.querySelector(".btn-cancel");
-  const nameInput = sectionEl.querySelector(".field-name-input");
-  const newFolderButton = sectionEl.querySelector(".btn-new-folder");
+function createBrowser(dialogEl, { mode, onConfirm, onCancel }) {
+  const quickChips = /** @type {HTMLElement[]} */ ([...dialogEl.querySelectorAll(".quick-chip")]);
+  const breadcrumbsEl = /** @type {HTMLElement} */ (dialogEl.querySelector(".breadcrumb-list"));
+  const dirListEl = /** @type {HTMLElement} */ (dialogEl.querySelector(".dir-list"));
+  const dirEmptyEl = /** @type {HTMLElement} */ (dialogEl.querySelector(".dir-list-empty"));
+  const newFolderSlot = /** @type {HTMLElement} */ (dialogEl.querySelector(".new-folder-slot"));
+  const hintEl = /** @type {HTMLElement} */ (dialogEl.querySelector(".selection-hint"));
+  const errorEl = /** @type {HTMLElement} */ (dialogEl.querySelector(".dialog-error"));
+  const confirmButton = /** @type {HTMLButtonElement} */ (dialogEl.querySelector(".btn-confirm"));
+  const cancelButton = /** @type {HTMLElement} */ (dialogEl.querySelector(".btn-cancel"));
+  const nameInput = /** @type {HTMLInputElement | null} */ (dialogEl.querySelector(".text-field-input"));
+  const newFolderButton = /** @type {HTMLButtonElement} */ (dialogEl.querySelector(".btn-new-folder"));
 
   let currentPath = null;
   let homePath = null;
   let workspacePath = null; // ~/Workspace — null until checked, false once checked-and-absent
   let selectedProjectPath = null; // "open" mode only: a badged row the user picked
-  let createdFolderPath = null; // the folder "New folder" just made: badged "new" and highlighted until the user navigates away
+  let createdFolderPath = null; // the folder "New folder" just made: marked created and selected until the user navigates away
   let newFolderRowEl = null; // the inline create row while it is open
+  let busy = false; // an open / init request is in flight
+  let loadSeq = 0; // a later load (or a close) supersedes an earlier one still in flight
 
   /** @param {string} path */
   function displayPath(path) {
@@ -40,45 +64,69 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
     return path;
   }
 
-  function updateHint() {
-    if (mode === "open") {
-      selectionPathEl.textContent = selectedProjectPath ? displayPath(selectedProjectPath) : "—";
-      confirmButton.disabled = !selectedProjectPath;
-    } else {
-      const target = initTargetDir();
-      selectionPathEl.textContent = target ? displayPath(target) : "—";
-      confirmButton.disabled = !nameInput.value.trim();
-    }
-  }
-
   /**
-   * The folder /api/projects/init scaffolds into: a folder named after the
-   * project, inside the folder "New folder" just made and selected, else
-   * inside the current one. `name` alone never creates a subfolder server-side.
+   * The folder /api/projects/init scaffolds into: a folder named after the project, inside the folder "New folder" just made and selected, else inside the current one. `name` alone never creates a subfolder server-side.
+   * @param {string} name
    * @returns {string | null}
    */
-  function initTargetDir() {
-    const name = nameInput.value.trim();
+  function initTargetDir(name) {
     if (!name) return null;
     const parent = createdFolderPath ?? currentPath;
+    if (!parent) return null;
     // The parent is "/" at the filesystem root — joining naively would give "//name".
     return `${parent === "/" ? "" : parent}/${name}`;
+  }
+
+  /** The hint is a live region (open): it only changes when what it says changes. @param {string} key @param {(Node | string)[]} parts */
+  function setHint(key, parts) {
+    if (hintEl.dataset.key === key) return;
+    hintEl.dataset.key = key;
+    hintEl.replaceChildren(...parts);
+  }
+
+  function strong(text) {
+    return el("b", "selection-path", text);
+  }
+
+  function updateHint() {
+    if (mode === "open") {
+      const picked = selectedProjectPath ?? createdFolderPath ?? currentPath;
+      if (!picked) {
+        setHint("", []);
+      } else {
+        const tail = selectedProjectPath
+          ? " Folders that already hold a project carry the Project badge."
+          : createdFolderPath
+            ? " No project here yet. Browse into a folder that holds one, or create a project from the empty state."
+            : " No project here yet.";
+        setHint(`${picked}|${tail}`, ["Selected: ", strong(displayPath(picked)), `.${tail}`]);
+      }
+      confirmButton.disabled = busy || !selectedProjectPath;
+      return;
+    }
+    const name = nameInput?.value.trim() ?? "";
+    const parent = createdFolderPath ?? currentPath;
+    if (!parent) {
+      setHint("", []);
+    } else {
+      const base = displayPath(parent === "/" ? "" : parent);
+      // The placeholder stands in while the name is empty, as the design shows it; the typed name is the strong part.
+      setHint(`${base}|${name}`, name ? [`Will create: ${base}/`, strong(name)] : [`Will create: ${base}/${NAME_PLACEHOLDER}`]);
+    }
+    confirmButton.disabled = busy || !name;
   }
 
   function renderQuickChips() {
     for (const chip of quickChips) {
       const target = chip.dataset.quick === "home" ? homePath : chip.dataset.quick === "workspace" ? workspacePath : `${homePath}/Desktop`;
       chip.hidden = chip.dataset.quick === "workspace" && !workspacePath;
-      chip.setAttribute("aria-current", String(target === currentPath));
+      chip.setAttribute("aria-pressed", String(target === currentPath));
     }
   }
 
   function renderBreadcrumbs() {
-    breadcrumbsEl.innerHTML = "";
-    // The chain starts at the filesystem root, not at the first segment of
-    // currentPath — without a root crumb every path outside the home tree
-    // (/private/tmp, /Volumes, an external drive) is unreachable, since the
-    // browser is the only way to name an absolute path.
+    breadcrumbsEl.replaceChildren();
+    // The chain starts at the filesystem root, not at the first segment of currentPath — without a root crumb every path outside the home tree (/private/tmp, /Volumes, an external drive) is unreachable, since the browser is the only way to name an absolute path.
     const crumbs = [{ label: "/", path: "/" }];
     let acc = "";
     for (const segment of currentPath.split("/").filter(Boolean)) {
@@ -86,110 +134,99 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
       crumbs.push({ label: segment, path: acc });
     }
     crumbs.forEach(({ label, path }, i) => {
-      // No separator after the root crumb — it already reads as one.
-      if (i > 1) {
-        const sep = document.createElement("span");
-        sep.className = "crumb-sep icon";
-        sep.setAttribute("aria-hidden", "true");
-        sep.textContent = "chevron_right";
-        breadcrumbsEl.appendChild(sep);
-      }
-      // The current crumb is plain text; the ones above it are buttons (Tab-reachable).
+      // The current crumb is plain text; the ones above it are buttons (Tab-reachable). The chevrons between crumbs are drawn by CSS (none after the root crumb: it already reads as a separator).
       const isCurrent = i === crumbs.length - 1;
-      const crumb = document.createElement(isCurrent ? "span" : "button");
-      if (!isCurrent) crumb.type = "button";
-      crumb.className = "crumb";
-      crumb.textContent = label;
+      const item = el("li", i > 1 ? "crumb-item crumb-item--sep" : "crumb-item");
       if (isCurrent) {
-        crumb.classList.add("crumb-current");
+        item.setAttribute("aria-current", "location");
+        item.classList.add("crumb-current");
+        item.textContent = label;
       } else {
-        crumb.addEventListener("click", () => loadPath(path));
+        const button = el("button", "crumb", label);
+        button.type = "button";
+        button.addEventListener("click", () => void loadPath(path));
+        item.append(button);
       }
-      breadcrumbsEl.appendChild(crumb);
+      breadcrumbsEl.append(item);
     });
+    // A deep path overflows the row: it scrolls to its end, where the current folder is.
+    breadcrumbsEl.parentElement.scrollLeft = breadcrumbsEl.parentElement.scrollWidth;
   }
+
+  /** @returns {HTMLElement[]} the options a key can land on */
+  const optionRows = () => /** @type {HTMLElement[]} */ ([...dirListEl.querySelectorAll('[role="option"]:not([aria-disabled="true"])')]);
 
   /** @param {{ name: string, path: string, isArtisignProject: boolean }[]} entries */
   function renderDirList(entries) {
     // The rows are rebuilt (navigating into a folder, picking a project): focus that was on a row stays on the same folder, or goes to the first row of the new list so the arrows keep working.
     const wasInList = dirListEl.contains(document.activeElement);
-    const restoreFocus = captureFocus(dirListEl, "data-key", () => /** @type {HTMLElement | undefined} */ (dirListEl.querySelector(".dir-row:not(:disabled)") ?? undefined));
-    dirListEl.innerHTML = "";
+    const restoreFocus = captureFocus(dirListEl, "data-key", () => optionRows()[0]);
+    dirListEl.replaceChildren();
+    dirListEl.hidden = entries.length === 0;
+    dirEmptyEl.hidden = entries.length > 0;
     if (entries.length === 0) {
-      const empty = document.createElement("p");
-      empty.className = "dir-list-empty";
-      empty.textContent = "No subfolders.";
-      dirListEl.appendChild(empty);
       // Focus was on a row that is gone: no rows to land on, so the first sensible control (the New folder button, else the first tabbable) — never <body>.
-      if (restoreFocus() === undefined && wasInList) focusFallback();
+      if (wasInList) focusFallback();
       return;
     }
     for (const entry of entries) {
-      // A button, so every row is reachable and shows the focus ring; the inert ones (init mode project folders) are disabled.
-      const row = document.createElement("button");
-      row.type = "button";
-      row.className = "dir-row";
+      const created = entry.path === createdFolderPath;
+      const selected = created || (mode === "open" && entry.isArtisignProject && selectedProjectPath === entry.path);
+      // A row is an option of the listbox; focus moves between them with the arrows (roving tab stop, set below).
+      const row = el("div", "dir-row");
+      row.setAttribute("role", "option");
+      row.setAttribute("aria-selected", String(selected));
       row.dataset.key = entry.path;
+      if (selected) row.classList.add("is-selected");
+      row.append(icon("folder"), el("span", "dir-row-name", entry.name));
 
-      const icon = document.createElement("span");
-      icon.className = "dir-row-icon icon";
-      icon.setAttribute("aria-hidden", "true");
-      icon.textContent = "folder";
-      row.appendChild(icon);
-
-      const name = document.createElement("span");
-      name.className = "dir-row-name";
-      name.textContent = entry.name;
-      row.appendChild(name);
-
-      if (entry.isArtisignProject) {
-        const badge = document.createElement("span");
-        badge.className = "dir-row-badge";
-        badge.textContent = "project";
-        row.appendChild(badge);
+      if (created) {
+        row.classList.add("is-created");
+        const badge = el("span", "dir-row-badge dir-row-badge--created");
+        badge.append(icon("check"), "Created");
+        row.append(badge);
+      } else if (entry.isArtisignProject) {
+        const badge = el("span", "dir-row-badge");
+        badge.append(icon("deployed_code"), "Project");
+        row.append(badge);
       }
 
-      // "open" mode: a project folder is the thing you pick, not a folder
-      // you drill into. "init" mode: a project folder can't be a target
-      // (per spec) — so it's inert, neither selectable nor navigable.
-      if (entry.path === createdFolderPath) {
-        row.classList.add("dir-row-selected", "dir-row-created");
-        // The created row stays selected until the user clicks away; Enter/Space on it (it holds focus after creating) must not navigate into it.
-        const swallowActivation = (evt) => {
-          if (evt.key === "Enter" || evt.key === " ") evt.preventDefault();
-        };
-        row.addEventListener("keydown", swallowActivation);
-        row.addEventListener("keyup", swallowActivation);
-        const badge = document.createElement("span");
-        badge.className = "dir-row-badge dir-row-badge-new";
-        badge.textContent = "new";
-        row.appendChild(badge);
-      }
-
+      // "open" mode: a project folder is the thing you pick, not a folder you drill into. "init" mode: a project folder can't be a target (per spec) — so it's inert, neither selectable nor navigable.
       if (mode === "open" && entry.isArtisignProject) {
-        row.classList.add("dir-row-selectable");
-        if (selectedProjectPath === entry.path) row.classList.add("dir-row-selected");
+        row.classList.add("is-actionable");
         row.addEventListener("click", () => {
           selectedProjectPath = entry.path;
           renderDirList(entries);
           updateHint();
         });
       } else if (!entry.isArtisignProject) {
-        row.classList.add("dir-row-navigable");
-        row.addEventListener("click", () => loadPath(entry.path));
+        row.classList.add("is-actionable");
+        row.addEventListener("click", () => void loadPath(entry.path));
       } else {
-        row.disabled = true;
+        row.setAttribute("aria-disabled", "true");
       }
-
-      dirListEl.appendChild(row);
+      if (created) {
+        // The created row stays selected until the user clicks away; Enter/Space on it (it holds focus after creating) must not navigate into it.
+        const swallowActivation = (evt) => {
+          if (evt.key === "Enter" || evt.key === " ") evt.preventDefault();
+        };
+        row.addEventListener("keydown", swallowActivation);
+        row.addEventListener("keyup", swallowActivation);
+      }
+      dirListEl.append(row);
     }
-    if (restoreFocus() === undefined && wasInList) focusFallback();
+    // The tab stop is set first: an option without a tabindex cannot take the focus the restore below hands it.
+    const rows = optionRows();
+    setRovingTabindex(rows, rows.find((r) => r.getAttribute("aria-selected") === "true") ?? rows[0]);
+    const restored = restoreFocus();
+    if (restored) setRovingTabindex(rows, restored);
+    else if (wasInList) focusFallback();
   }
 
   /** Focus was inside the list (a row, or the inline New folder row) and its element is gone: the first folder row, else the New folder button, else the first tabbable — never <body>. */
   function focusFallback() {
-    const firstRow = /** @type {HTMLElement | null} */ (dirListEl.querySelector(".dir-row:not(:disabled)"));
-    (firstRow ?? (newFolderButton.disabled ? tabbableWithin(sectionEl)[0] : newFolderButton))?.focus();
+    const firstRow = optionRows()[0];
+    (firstRow ?? (newFolderButton.disabled ? tabbableWithin(dialogEl)[0] : newFolderButton))?.focus();
   }
 
   function basename(path) {
@@ -198,62 +235,75 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
 
   /** @param {string} name @param {{ code?: string, message: string }} failure */
   function newFolderErrorText(name, failure) {
-    if (failure.code === "already_exists") return `A folder named \u201C${name}\u201D already exists here.`;
-    if (failure.code === "validation_failed") {
-      return "Folder names can\u2019t start with \u201C.\u201D, contain / or \\, or be empty.";
-    }
-    if (failure.code === "permission_denied") {
-      return `Can\u2019t create a folder in ${basename(currentPath)}: permission denied.`;
-    }
+    if (failure.code === "already_exists") return `A folder named “${name}” already exists here.`;
+    if (failure.code === "validation_failed") return "Folder names can’t contain / or \\ and can’t be empty, “.” or “..”.";
+    if (failure.code === "permission_denied") return `Can’t create a folder in ${basename(currentPath)}: permission denied.`;
     return failure.message;
   }
 
   function closeNewFolderRow() {
     newFolderRowEl?.remove();
     newFolderRowEl = null;
-    newFolderButton.setAttribute("aria-pressed", "false");
+    newFolderButton.setAttribute("aria-expanded", "false");
   }
 
-  /** Inline row at the top of the list; creates exactly one level inside `currentPath`. */
+  /** Inline row above the list (design `new-folder-row`); creates exactly one level inside `currentPath`. */
   function openNewFolderRow() {
     if (newFolderRowEl) {
-      newFolderRowEl.querySelector(".new-folder-input").focus();
+      /** @type {HTMLInputElement} */ (newFolderRowEl.querySelector(".new-folder-input")).focus();
       return;
     }
-    const row = document.createElement("div");
-    row.className = "new-folder-row";
-    row.innerHTML = `
-      <div class="new-folder-line">
-        <span class="new-folder-icon icon" aria-hidden="true">chevron_right</span>
-        <input type="text" class="new-folder-input chrome-field" placeholder="Folder name" autocomplete="off" aria-label="New folder name" />
-        <button type="button" class="new-folder-create chrome-btn chrome-btn--compact">Create</button>
-        <button type="button" class="new-folder-cancel chrome-btn chrome-btn--ghost chrome-btn--compact">Cancel</button>
-      </div>
-      <div class="new-folder-message" hidden></div>`;
-    const input = row.querySelector(".new-folder-input");
-    const messageEl = row.querySelector(".new-folder-message");
-    const createButton = row.querySelector(".new-folder-create");
+    const row = el("div", "new-folder-row");
+    const line = el("div", "new-folder-line");
+    const input = el("input", "new-folder-input");
+    input.type = "text";
+    input.autocomplete = "off";
+    input.setAttribute("aria-label", "New folder name");
+    const createButton = el("button", "new-folder-create", "Create");
+    createButton.type = "button";
+    const cancelNew = el("button", "new-folder-cancel", "Cancel");
+    cancelNew.type = "button";
+    line.append(icon("create_new_folder"), input, createButton, cancelNew);
+    const messageEl = el("div", "new-folder-message");
+    messageEl.id = `${dialogEl.id}-new-folder-message`;
+    messageEl.hidden = true;
+    row.append(line, messageEl);
 
     let creating = false;
     async function create() {
       if (creating) return;
       creating = true;
+      const seq = loadSeq;
       input.disabled = true;
       createButton.disabled = true;
       const name = input.value.trim();
-      const result = await createFsDir(currentPath, name);
-      if (!result.ok) {
+      let failure = null;
+      try {
+        const result = await createFsDir(currentPath, name);
+        if (seq !== loadSeq) return; // the dialog was closed (or the folder changed) meanwhile
+        if (result.ok) {
+          await loadPath(currentPath, { created: result.path });
+          dirListEl.querySelector(".is-created")?.focus();
+          return;
+        }
+        failure = newFolderErrorText(name, result);
+      } catch (err) {
+        failure = failureMessage(err);
+      } finally {
+        // Never stuck: the row's controls come back on every way out (a created folder replaced the row altogether).
         creating = false;
-        input.disabled = false;
-        createButton.disabled = false;
-        messageEl.textContent = newFolderErrorText(name, result);
-        messageEl.hidden = false;
-        row.classList.add("new-folder-row-error");
-        input.focus();
-        return;
+        if (newFolderRowEl === row) {
+          input.disabled = false;
+          createButton.disabled = false;
+        }
       }
-      await loadPath(currentPath, { created: result.path });
-      dirListEl.querySelector(".dir-row-created")?.focus();
+      if (failure === null || newFolderRowEl !== row) return;
+      messageEl.replaceChildren(icon("error"), el("span", "new-folder-message-text", failure));
+      messageEl.hidden = false;
+      row.classList.add("is-error");
+      input.setAttribute("aria-invalid", "true");
+      input.setAttribute("aria-describedby", messageEl.id);
+      input.focus();
     }
 
     function dismiss() {
@@ -263,179 +313,199 @@ function createBrowser(sectionEl, { mode, onConfirm, onCancel }) {
 
     input.addEventListener("input", () => {
       messageEl.hidden = true;
-      row.classList.remove("new-folder-row-error");
+      messageEl.replaceChildren();
+      row.classList.remove("is-error");
+      input.removeAttribute("aria-invalid");
+      input.removeAttribute("aria-describedby");
     });
-    // On the row, not the input: Esc with focus on Create/Cancel must close
-    // only the row too — the dialog-level Escape must not also fire.
+    // On the row, not the input: Esc with focus on Create/Cancel must close only the row too — the dialog's own Escape must not also fire.
     row.addEventListener("keydown", (evt) => {
       if (evt.key === "Enter" && evt.target === input) {
         evt.preventDefault();
-        create();
+        void create();
       } else if (evt.key === "Escape") {
+        evt.preventDefault(); // keeps the browser from also closing the dialog
         evt.stopPropagation();
         dismiss();
       }
     });
-    createButton.addEventListener("click", create);
-    row.querySelector(".new-folder-cancel").addEventListener("click", dismiss);
+    createButton.addEventListener("click", () => void create());
+    cancelNew.addEventListener("click", dismiss);
 
-    dirListEl.prepend(row);
+    newFolderSlot.append(row);
     newFolderRowEl = row;
-    newFolderButton.setAttribute("aria-pressed", "true");
+    newFolderButton.setAttribute("aria-expanded", "true");
     input.focus();
   }
 
   /** @param {string} [path] @param {{ created?: string }} [options] */
   async function loadPath(path, { created = null } = {}) {
+    const seq = ++loadSeq;
     errorEl.hidden = true;
-    const result = await fetchFsDirs(path);
-    if (!result.ok) {
-      errorEl.textContent = result.message;
+    try {
+      const result = await fetchFsDirs(path);
+      if (seq !== loadSeq) return;
+      if (!result.ok) {
+        errorEl.textContent = result.message;
+        errorEl.hidden = false;
+        return;
+      }
+      if (workspacePath === null) {
+        const candidate = `${result.home}/Workspace`;
+        const check = await fetchFsDirs(candidate);
+        if (seq !== loadSeq) return;
+        workspacePath = check.ok ? candidate : false;
+      }
+      currentPath = result.path;
+      homePath = result.home;
+      selectedProjectPath = null;
+      createdFolderPath = created;
+      // The new-folder row goes with the old folder; focus that was inside it must land on the new list, not on <body>.
+      const rowHadFocus = Boolean(newFolderRowEl?.contains(document.activeElement));
+      closeNewFolderRow();
+      dirListEl.setAttribute("aria-label", `Folders in ${basename(currentPath)}`);
+      renderQuickChips();
+      renderBreadcrumbs();
+      renderDirList(result.entries);
+      if (rowHadFocus && !dialogEl.contains(document.activeElement)) focusFallback();
+      updateHint();
+    } catch (err) {
+      if (seq !== loadSeq) return;
+      errorEl.textContent = failureMessage(err);
       errorEl.hidden = false;
-      return;
     }
-    currentPath = result.path;
-    homePath = result.home;
-    selectedProjectPath = null;
-    createdFolderPath = created;
-    newFolderRowEl = null;
-    newFolderButton.setAttribute("aria-pressed", "false");
-
-    if (workspacePath === null) {
-      const candidate = `${homePath}/Workspace`;
-      const check = await fetchFsDirs(candidate);
-      workspacePath = check.ok ? candidate : false;
-    }
-
-    renderQuickChips();
-    renderBreadcrumbs();
-    renderDirList(result.entries);
-    updateHint();
   }
 
   for (const chip of quickChips) {
     chip.addEventListener("click", () => {
       const target = chip.dataset.quick === "home" ? homePath : chip.dataset.quick === "workspace" ? workspacePath : `${homePath}/Desktop`;
-      if (target) loadPath(target);
+      if (target) void loadPath(target);
     });
   }
 
   newFolderButton.addEventListener("click", () => {
-    if (currentPath) openNewFolderRow();
+    if (!currentPath) return;
+    if (newFolderRowEl) {
+      closeNewFolderRow(); // the button toggles: a second press folds the row away
+      return;
+    }
+    openNewFolderRow();
   });
   nameInput?.addEventListener("input", updateHint);
-  // ↑/↓ (Home/End) walk the folder rows, Enter / Space activate the focused one as before. The folder rows stay buttons (CHR-920: a listbox role would fight them); keys typed in the inline "New folder" row are left alone.
+  // ↑/↓ (Home/End) walk the folder options and Enter / Space act on the focused one; keys typed elsewhere are left alone.
   dirListEl.addEventListener("keydown", (evt) => {
-    if (!(evt.target instanceof Element) || !evt.target.closest(".dir-row")) return;
-    handleListArrowKeys(evt, [...dirListEl.querySelectorAll(".dir-row")].filter((row) => !row.disabled), { wrap: false });
+    if (!(evt.target instanceof Element) || !evt.target.closest('[role="option"]')) return;
+    if ((evt.key === "Enter" || evt.key === " ") && !evt.defaultPrevented) {
+      evt.preventDefault();
+      /** @type {HTMLElement} */ (evt.target.closest('[role="option"]')).click();
+      return;
+    }
+    handleListArrowKeys(evt, optionRows(), { wrap: false });
+  });
+  // Roving tab stop: the option that has focus is the one a Tab stop lands on next time.
+  dirListEl.addEventListener("focusin", (evt) => {
+    const option = evt.target instanceof Element ? evt.target.closest('[role="option"]') : null;
+    if (option) setRovingTabindex(optionRows(), /** @type {HTMLElement} */ (option));
   });
   cancelButton.addEventListener("click", () => onCancel());
-  sectionEl.querySelector(".dialog-close")?.addEventListener("click", () => onCancel());
+  dialogEl.querySelector(".dialog-close")?.addEventListener("click", () => onCancel());
 
   confirmButton.addEventListener("click", async () => {
-    const target = mode === "open" ? { dir: selectedProjectPath } : { dir: initTargetDir(), name: nameInput.value.trim() };
-    confirmButton.disabled = true;
-    const result = await onConfirm(target);
-    confirmButton.disabled = false;
+    if (busy) return;
+    const name = nameInput?.value.trim() ?? "";
+    const target = mode === "open" ? { dir: selectedProjectPath } : { dir: initTargetDir(name), name };
+    if (!target.dir) return;
+    busy = true;
+    errorEl.hidden = true;
+    updateHint();
+    /** @type {{ ok: true } | { ok: false, message: string }} */
+    let result;
+    try {
+      result = await onConfirm(/** @type {{ dir: string, name?: string }} */ (target));
+    } catch (err) {
+      result = { ok: false, message: failureMessage(err) };
+    } finally {
+      busy = false; // never stuck: the button comes back whether the request answered, failed or threw
+    }
+    updateHint();
     if (!result.ok) {
       errorEl.textContent = result.message;
       errorEl.hidden = false;
-      return;
     }
   });
 
-  /** Resets to a fresh browse from home and shows the section. */
+  /** Resets to a fresh browse from home. */
   function reset() {
-    errorEl.hidden = true;
-    selectedProjectPath = null;
-    createdFolderPath = null;
-    if (nameInput) nameInput.value = "";
-    updateHint();
-    loadPath(homePath ?? undefined);
+    clear();
+    void loadPath(homePath ?? undefined);
   }
 
-  return { reset };
+  /** Back to nothing: no stale folders, name, hint or message stay behind a closed dialog, and a request still in flight cannot paint into it. */
+  function clear() {
+    loadSeq++;
+    busy = false;
+    currentPath = null;
+    selectedProjectPath = null;
+    createdFolderPath = null;
+    closeNewFolderRow();
+    errorEl.hidden = true;
+    errorEl.textContent = "";
+    if (nameInput) nameInput.value = "";
+    dirListEl.replaceChildren();
+    dirListEl.hidden = true;
+    dirEmptyEl.hidden = true;
+    breadcrumbsEl.replaceChildren();
+    setHint("", []);
+    confirmButton.disabled = true;
+  }
+
+  return { reset, clear };
 }
 
 /**
- * @param {{ scrimEl: HTMLElement, openSectionEl: HTMLElement, initSectionEl: HTMLElement, fallbackFocusEl?: HTMLElement }} elements `fallbackFocusEl`: where focus goes on close when the element that opened the dialog is gone or hidden
+ * @param {{ openDialogEl: HTMLDialogElement, initDialogEl: HTMLDialogElement, fallbackFocusEl?: HTMLElement }} elements `fallbackFocusEl`: where focus goes on close when the element that opened the dialog is gone or hidden
  * @param {{
  *   onOpen: (dir: string) => Promise<{ ok: true } | { ok: false, message: string }>,
  *   onInit: (dir: string, name: string) => Promise<{ ok: true } | { ok: false, message: string }>,
  * }} callbacks
  */
-export function createProjectDialogs({ scrimEl, openSectionEl, initSectionEl, fallbackFocusEl }, { onOpen, onInit }) {
-  /** Where focus goes back to when the dialog closes: whatever had it when the dialog opened (CHR-920). */
-  /** @type {Element | null} */
-  let returnFocusTo = null;
+export function createProjectDialogs({ openDialogEl, initDialogEl, fallbackFocusEl }, { onOpen, onInit }) {
+  // Whatever way a dialog closes (Escape, scrim, buttons, a finished open), what it showed is dropped.
+  const openModal = createModal(openDialogEl, { fallbackFocusEl, onClosed: () => openBrowser.clear() });
+  const initModal = createModal(initDialogEl, { fallbackFocusEl, onClosed: () => initBrowser.clear() });
 
-  function hide() {
-    scrimEl.hidden = true;
-    openSectionEl.hidden = true;
-    initSectionEl.hidden = true;
-    // The opener can be gone or hidden by now (the empty-state button after a successful open): fall back to the project picker.
-    const opener = returnFocusTo instanceof HTMLElement && isShown(returnFocusTo) ? returnFocusTo : fallbackFocusEl;
-    opener?.focus();
-    returnFocusTo = null;
-  }
-
-  function rememberOpener() {
-    const active = document.activeElement;
-    returnFocusTo = active && active !== document.body && !scrimEl.contains(active) ? active : returnFocusTo;
-  }
-
-  const openBrowser = createBrowser(openSectionEl, {
+  const openBrowser = createBrowser(openDialogEl, {
     mode: "open",
     onConfirm: async ({ dir }) => {
       const result = await onOpen(dir);
-      if (result.ok) hide();
+      if (result.ok) openModal.hide();
       return result;
     },
-    onCancel: hide,
+    onCancel: () => openModal.hide(),
   });
 
-  const initBrowser = createBrowser(initSectionEl, {
+  const initBrowser = createBrowser(initDialogEl, {
     mode: "init",
     onConfirm: async ({ dir, name }) => {
-      const result = await onInit(dir, name);
-      if (result.ok) hide();
+      const result = await onInit(dir, name ?? "");
+      if (result.ok) initModal.hide();
       return result;
     },
-    onCancel: hide,
+    onCancel: () => initModal.hide(),
   });
 
   function showOpenDialog() {
-    rememberOpener();
-    scrimEl.hidden = false;
-    openSectionEl.hidden = false;
-    initSectionEl.hidden = true;
-    openBrowser.reset();
-    openSectionEl.querySelector(".quick-chip")?.focus();
+    if (openModal.show()) openBrowser.reset();
   }
 
   function showInitDialog() {
-    rememberOpener();
-    scrimEl.hidden = false;
-    initSectionEl.hidden = false;
-    openSectionEl.hidden = true;
-    initBrowser.reset();
-    initSectionEl.querySelector(".field-name-input")?.focus();
+    if (initModal.show()) initBrowser.reset();
   }
 
-  scrimEl.addEventListener("click", (evt) => {
-    if (evt.target === scrimEl) hide();
-  });
-  // Modal: Tab and Shift+Tab cycle inside the visible dialog, Escape closes it. On the document, not the scrim: focus can be on <body> (a re-render dropped it) and Tab must still come back in.
-  document.addEventListener("keydown", (evt) => {
-    if (scrimEl.hidden) return;
-    if (evt.key === "Escape") {
-      evt.preventDefault(); // consumed: the global shortcut handler must not also leave the mode
-      hide();
-      return;
-    }
-    const section = [openSectionEl, initSectionEl].find((el) => !el.hidden);
-    if (section) trapFocus(evt, section);
-  });
+  function hide() {
+    openModal.hide();
+    initModal.hide();
+  }
 
-  return { showOpenDialog, showInitDialog, hide };
+  return { showOpenDialog, showInitDialog, hide, isOpen: () => openModal.isOpen() || initModal.isOpen() };
 }

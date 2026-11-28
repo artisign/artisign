@@ -3,6 +3,7 @@
 // CHR-920 end to end through app.js: the project menu as an ARIA menu with arrow keys and focus return, the dialogs' markup and focus round trip, the shortcut reference's focus trap.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
+import { installDialogStubs, pressEscape } from "./dialog-stub.test-helper.js";
 
 const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
 
@@ -55,6 +56,7 @@ let documentListeners = [];
 const nativeAddEventListener = document.addEventListener.bind(document);
 
 beforeEach(async () => {
+  installDialogStubs();
   memoryStorage.clear();
   vi.resetModules();
   document.body.innerHTML = bodyHtml;
@@ -155,7 +157,7 @@ describe("project menu", () => {
     $("#project-picker-trigger").click();
     $("#menu-action-open").click();
     expect($("#project-menu").hidden).toBe(true);
-    expect($("#dialog-scrim").hidden).toBe(false);
+    expect($("#open-project-dialog").open).toBe(true);
   });
 });
 
@@ -221,11 +223,11 @@ describe("choosing a project row", () => {
 });
 
 describe("project dialogs", () => {
-  it("are modal dialogs with a name; the focus round trip starts and ends on the trigger", async () => {
+  it("are native modal dialogs with a name; the focus round trip starts and ends on the trigger", async () => {
     for (const id of ["open-project-dialog", "init-project-dialog"]) {
       const dialog = document.getElementById(id);
-      expect(dialog.getAttribute("role")).toBe("dialog");
-      expect(dialog.getAttribute("aria-modal")).toBe("true");
+      expect(dialog.tagName).toBe("DIALOG"); // showModal() makes it modal and traps Tab; no role / aria-modal by hand
+      expect(dialog.getAttribute("closedby")).toBe("any");
       expect(document.getElementById(dialog.getAttribute("aria-labelledby")).textContent).toMatch(/project/i);
     }
     const trigger = $("#project-picker-trigger");
@@ -234,8 +236,8 @@ describe("project dialogs", () => {
     $("#menu-action-open").click(); // the menu closes and hands focus to the trigger, the dialog remembers it
     await flush();
     expect(document.activeElement).toBe($("#open-project-dialog .quick-chip"));
-    keydown(document.activeElement, "Escape");
-    expect($("#dialog-scrim").hidden).toBe(true);
+    expect(pressEscape($("#open-project-dialog"))).toBe(true);
+    expect($("#open-project-dialog").open).toBe(false);
     expect(document.activeElement).toBe(trigger);
     trigger.click();
     $("#menu-action-init").click();
@@ -252,28 +254,23 @@ describe("shortcut reference focus restore", () => {
     flow.focus();
     keydown(document.body, "?", { shiftKey: true });
     flow.hidden = true;
-    keydown(document.activeElement, "Escape");
-    expect($("#shortcuts-scrim").hidden).toBe(true);
+    pressEscape($("#shortcuts-dialog"));
+    expect($("#shortcuts-dialog").open).toBe(false);
     expect(document.activeElement).toBe($("#project-picker-trigger"));
   });
 });
 
 describe("shortcut reference", () => {
-  it("is a modal dialog whose Tab stays inside", () => {
+  it("is a native modal dialog (the browser traps Tab); Escape closes it and focus goes back to the opener", () => {
     const flow = $("#flow-mode-toggle");
     flow.focus();
     keydown(document.body, "?", { shiftKey: true });
     const dialog = $("#shortcuts-dialog");
-    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.tagName).toBe("DIALOG");
+    expect(dialog.hasAttribute("data-modal")).toBe(true); // opened with showModal(), not show()
     expect(document.activeElement).toBe(dialog);
-    const close = $("#shortcuts-close");
-    close.focus(); // where the browser's own Tab takes focus from the dialog
-    const tab = keydown(close, "Tab"); // the close button is the only control: Tab wraps onto itself
-    expect(tab.defaultPrevented).toBe(true);
-    expect(document.activeElement).toBe(close);
-    expect(keydown(close, "Tab", { shiftKey: true }).defaultPrevented).toBe(true);
-    keydown(close, "Escape");
-    expect($("#shortcuts-scrim").hidden).toBe(true);
+    pressEscape(dialog);
+    expect(dialog.open).toBe(false);
     expect(document.activeElement).toBe(flow);
   });
 });

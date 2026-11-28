@@ -6,6 +6,10 @@
 // The menu is an ARIA menu (CHR-920): role="menu", rows role="menuitem" (the open projects "menuitemradio", the current one checked), opening focuses the first actionable row, ↑/↓/Home/End move between rows with a roving tab stop, Escape closes and puts focus back on the trigger.
 
 import { captureFocus, setRovingTabindex, wireMenu } from "./menu-keys.js";
+import { createCodeField } from "./clipboard.js";
+
+/** The example prompt of the no-project card: an example to copy into an AI tool, not an action. */
+const EMPTY_PROMPT = "Create an artisign project in ~/work/acme";
 
 /** @typedef {{ active: string | null, open: { root: string, name: string }[], recent: string[] }} ProjectsState */
 
@@ -34,9 +38,9 @@ export function shortPath(path) {
  *   actionOpenEl: HTMLElement, actionInitEl: HTMLElement,
  *   noProjectEl: HTMLElement, bodyEl: HTMLElement,
  *   topbarEl: HTMLElement,
- *   emptyRecentListEl: HTMLElement, emptyBtnOpenEl: HTMLElement, emptyBtnInitEl: HTMLElement,
+ *   emptyRecentListEl: HTMLElement, emptyRecentEl: HTMLElement, emptyPromptEl: HTMLElement, emptyErrorEl: HTMLElement, emptyBtnOpenEl: HTMLElement, emptyBtnInitEl: HTMLElement,
  * }} elements
- * @param {{ onSwitch: (root: string) => void, onOpenRecent: (dir: string) => void, onOpenDialog: () => void, onInitDialog: () => void }} callbacks
+ * @param {{ onSwitch: (root: string) => void, onOpenRecent: (dir: string) => Promise<string | null | void> | void, onOpenDialog: () => void, onInitDialog: () => void }} callbacks
  */
 export function createProjectUI(elements, callbacks) {
   const {
@@ -54,6 +58,9 @@ export function createProjectUI(elements, callbacks) {
     bodyEl,
     topbarEl,
     emptyRecentListEl,
+    emptyRecentEl,
+    emptyPromptEl,
+    emptyErrorEl,
     emptyBtnOpenEl,
     emptyBtnInitEl,
   } = elements;
@@ -155,33 +162,61 @@ export function createProjectUI(elements, callbacks) {
     }
   }
 
+  let wasEmpty = false;
+
   function renderEmptyState() {
     const isEmpty = state.active === null;
+    const justEmptied = isEmpty && !wasEmpty;
+    wasEmpty = isEmpty;
     noProjectEl.hidden = !isEmpty;
     bodyEl.hidden = isEmpty;
     topbarEl.classList.toggle("is-empty", isEmpty); // hides every .project-only topbar element
-    if (!isEmpty) return;
+    if (!isEmpty) {
+      emptyErrorEl.hidden = true; // nothing of the empty card outlives it
+      return;
+    }
 
-    emptyRecentListEl.innerHTML = "";
+    // The card's primary action takes the focus when the card appears (design: autofocus on "Open project…"), unless focus is somewhere useful already. The `autofocus` attribute alone does not: the card is hidden when the page loads.
+    if (justEmptied && (document.activeElement === null || document.activeElement === document.body)) emptyBtnOpenEl.focus();
+
+    // Recent projects: one link row per path (folder icon, the path, a chevron). The section is left out while there are none.
+    emptyRecentEl.hidden = state.recent.length === 0;
+    emptyRecentListEl.replaceChildren();
     for (const path of state.recent) {
+      const item = document.createElement("li");
       const row = document.createElement("button");
       row.type = "button";
       row.className = "empty-recent-row";
-      const chevron = document.createElement("span");
-      chevron.className = "empty-recent-icon icon";
-      chevron.setAttribute("aria-hidden", "true");
-      chevron.textContent = "chevron_right";
+      row.title = path;
+      const folder = document.createElement("span");
+      folder.className = "empty-recent-icon icon";
+      folder.setAttribute("aria-hidden", "true");
+      folder.textContent = "folder";
       const name = document.createElement("span");
       name.className = "empty-recent-name";
-      name.textContent = baseName(path);
-      const pathEl = document.createElement("span");
-      pathEl.className = "empty-recent-path";
-      pathEl.textContent = path;
-      row.appendChild(chevron);
-      row.appendChild(name);
-      row.appendChild(pathEl);
-      row.addEventListener("click", () => onOpenRecent(path));
-      emptyRecentListEl.appendChild(row);
+      name.textContent = path;
+      const chevron = document.createElement("span");
+      chevron.className = "empty-recent-go icon";
+      chevron.setAttribute("aria-hidden", "true");
+      chevron.textContent = "chevron_right";
+      row.append(folder, name, chevron);
+      // A press opens the project; the row stays off while that runs and a failure is said in the card (never a dead click).
+      row.addEventListener("click", async () => {
+        if (row.disabled) return;
+        row.disabled = true;
+        emptyErrorEl.hidden = true;
+        try {
+          const message = await onOpenRecent(path);
+          if (message) {
+            emptyErrorEl.textContent = message;
+            emptyErrorEl.hidden = false;
+          }
+        } finally {
+          row.disabled = false;
+        }
+      });
+      item.append(row);
+      emptyRecentListEl.append(item);
     }
   }
 
@@ -189,7 +224,7 @@ export function createProjectUI(elements, callbacks) {
   function render(next) {
     state = next;
     const activeProject = state.open.find((p) => p.root === state.active);
-    nameEl.textContent = activeProject ? activeProject.name : "No project open";
+    nameEl.textContent = activeProject ? activeProject.name : "No project";
     nameEl.title = nameEl.textContent; // truncated by CSS when long
     triggerEl.classList.toggle("project-picker-empty", state.active === null);
     renderMenu();
@@ -224,6 +259,7 @@ export function createProjectUI(elements, callbacks) {
     closeMenu();
     onInitDialog();
   });
+  emptyPromptEl.replaceChildren(createCodeField(EMPTY_PROMPT, { label: "Copy the example prompt" }));
   emptyBtnOpenEl.addEventListener("click", () => onOpenDialog());
   emptyBtnInitEl.addEventListener("click", () => onInitDialog());
 

@@ -1064,8 +1064,7 @@ button.chrome-section-header:focus-visible {
   width: max-content;
 }
 
-/* The variant's letter: the mockup-column-header's variant-badge (CHR-1263). */
-.mockup-column-index,
+/* The variant's letter in a comment popover's title (CHR-1263). */
 .comment-variant-badge {
   display: inline-flex;
   align-items: center;
@@ -1082,12 +1081,17 @@ button.chrome-section-header:focus-visible {
   line-height: 1;
 }
 
-.mockup-column-row {
+/* The frame label above a column (design `frame-label`): icon, letter, text, then the count chips. */
+.mockup-column-label {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
   min-width: 0;
-  margin-bottom: var(--space-2xs);
+  height: 18px;
+  font-size: var(--ui-sm);
+  font-weight: 600;
+  color: var(--chrome-text-secondary);
+  white-space: nowrap;
 }
 
 .mockup-column-counts {
@@ -1148,7 +1152,7 @@ button.chrome-section-header:focus-visible {
   transform-origin: top left;
 }
 
-/* The header (index, title, description) sits on the canvas above the frame; the frame itself is the white card. */
+/* The frame label sits on the canvas above the frame; the frame itself is the white card. */
 .mockup-column {
   flex: 0 0 auto;
   min-width: 280px;
@@ -1156,28 +1160,10 @@ button.chrome-section-header:focus-visible {
   width: 360px;
 }
 
-.mockup-column-title {
+.mockup-column-text {
   min-width: 0;
-  font-size: var(--ui-base);
-  font-weight: 500;
-  color: var(--chrome-text);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mockup-column-description {
-  font-size: var(--ui-xs);
-  color: var(--chrome-text-secondary);
-  line-height: 1.5;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.mockup-column-description > * {
-  display: inline;
-  margin: 0;
 }
 
 .mockup-column-error {

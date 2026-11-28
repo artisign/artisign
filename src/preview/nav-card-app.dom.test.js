@@ -287,6 +287,7 @@ describe("mockup tree", () => {
     await flush();
     // Both trees are open now: Onboarding ideas' two variants, then Empty states' single one.
     expect(all("#mockup-list .mockup-variant-item").map((r) => r.getAttribute("aria-selected"))).toEqual(["true", "false", "false"]);
-    expect([...memoryStorage.values()].some((v) => String(v).includes("list"))).toBe(false);
+    // Nothing stored (key or value) names a variant id of the mockups: "tour", "list" or "a".
+    expect([...memoryStorage.entries()].flat().some((x) => /tour|list/.test(String(x)))).toBe(false);
   });
 });

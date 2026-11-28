@@ -2446,7 +2446,16 @@ function updateMockupZoom() {
   const columnsEl = mockupViewEl.querySelector(".mockup-columns");
   if (columnsEl) applyMockupZoom({ paneEl: mockupViewEl, columnsEl, zoom: mockupZoom });
   if (currentMockup !== null) commentCanvas.layout(); // pins follow the zoomed and re-fitted columns
+  syncMockupToolbarTop();
   syncZoomUI();
+}
+
+/** The tool bar's default top lines up with the columns' frames (design `chrome-c-mockup-columns`), below their labels; recomputed with every zoom, fit, resize and re-render. Only while the mockup view shows. */
+function syncMockupToolbarTop() {
+  const frame = currentView === "screens" && currentMockup !== null && !mockupViewEl.hidden ? mockupViewEl.querySelector(".mockup-column-frame") : null;
+  const top = frame ? frame.getBoundingClientRect().top - appEl.getBoundingClientRect().top : 0;
+  if (top > 0) appEl.style.setProperty("--toolbar-top", `${Math.round(top)}px`);
+  else appEl.style.removeProperty("--toolbar-top");
 }
 
 /** Re-fits whichever of the screen canvas / mockup row is actually showing — shared by every trigger whose available space can change without a view/selection switch of its own (pane resize, side-panel collapse). */
@@ -2757,7 +2766,8 @@ function applyMainVisibility() {
   // The shell lays the canvas and the full-height views out per view and per compare state (style.css).
   appEl.dataset.shellView = currentView;
   appEl.dataset.comparing = String(comparing);
-  if (currentView !== "screens" || showMockup || comparing) appEl.style.removeProperty("--toolbar-top"); // only the single frame has a top to align with
+  if (currentView !== "screens" || comparing) appEl.style.removeProperty("--toolbar-top"); // only a frame has a top to align with
+  else if (showMockup) syncMockupToolbarTop(); // the columns' frames
   // The zoom group stays visible over the mockup view too — it
   // scales the whole comparison row instead of the screen canvas.
   canvasControlsEl.hidden = currentView !== "screens" || comparing; // compare has its own zoom in its chip row

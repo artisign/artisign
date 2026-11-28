@@ -4,6 +4,7 @@
 // renderVariantCell).
 
 import { createFittingIframe } from "./iframe-fit.js";
+import { icon } from "./icons.js";
 import { setMarkdown } from "./markdown.js";
 
 /**
@@ -132,39 +133,29 @@ function renderColumn(variant, index, mockupTitle, fetchRenderFor, onColumnMeasu
   column.setAttribute("role", "group");
   column.setAttribute("aria-label", `${mockupTitle}: ${variant.title || variant.id}`);
 
-  // The header is chrome text, kept at native size under the row's zoom (see applyMockupZoom / .mockup-column-head).
+  // The label is chrome text, kept at native size under the row's zoom (see applyMockupZoom / .mockup-column-head).
   const head = document.createElement("div");
   head.className = "mockup-column-head";
   column.appendChild(head);
 
-  // The mockup-column-header: letter badge, title, count chips; the description below.
+  // The frame label (design `frame-label`): the mockup icon, the variant's letter and "<mockup title>: <variant title>", with the count chips next to it. The variant's description is its tooltip.
   const row = document.createElement("div");
-  row.className = "mockup-column-row";
+  row.className = "mockup-column-label";
+  if (variant.description) row.title = variant.description;
   head.appendChild(row);
 
   const letter = variantLetter(index);
-  const indexEl = document.createElement("span");
-  indexEl.className = "mockup-column-index variant-badge";
-  indexEl.textContent = letter;
-  indexEl.title = `Variant ${index + 1}`;
-  row.appendChild(indexEl);
-
-  const title = document.createElement("div");
-  title.className = "mockup-column-title";
-  title.textContent = variant.title;
-  row.appendChild(title);
+  const nameEl = document.createElement("span");
+  nameEl.className = "frame-label-name";
+  nameEl.textContent = letter;
+  const detailEl = document.createElement("span");
+  detailEl.className = "frame-label-detail mockup-column-text";
+  detailEl.textContent = `${mockupTitle}: ${variant.title || variant.id}`;
+  row.append(icon("view_column", "frame-label-icon"), nameEl, detailEl);
 
   const countsEl = document.createElement("div");
   countsEl.className = "mockup-column-counts";
   row.appendChild(countsEl);
-
-  if (variant.description) {
-    const description = document.createElement("div");
-    description.className = "mockup-column-description md";
-    setMarkdown(description, variant.description);
-    description.title = variant.description;
-    head.appendChild(description);
-  }
 
   const errorEl = document.createElement("p");
   errorEl.className = "mockup-column-error";
@@ -180,7 +171,7 @@ function renderColumn(variant, index, mockupTitle, fetchRenderFor, onColumnMeasu
   // rendered variant's natural width. Pin the COLUMN to that same width
   // (plus its own padding/border) so a long title/description can't
   // stretch the column past the variant it's describing — they
-  // wrap inside it instead (see .mockup-column-title/-description's
+  // wrap inside it instead (see .mockup-column-text's
   // overflow-wrap). .mockup-column's own min-width is the floor if the
   // variant itself renders narrower than that.
   iframe.addEventListener("load", () => {

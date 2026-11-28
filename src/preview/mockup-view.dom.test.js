@@ -33,7 +33,7 @@ describe("renderMockupView", () => {
     expect(container.querySelector(".mockup-view-header").classList.contains("visually-hidden")).toBe(true);
   });
 
-  it("renders the header (title/description) and one column per variant in order", () => {
+  it("renders the hidden mockup header and one column per variant in order", () => {
     const container = document.createElement("div");
     const mockup = {
       name: "checkout-redesign",
@@ -53,13 +53,26 @@ describe("renderMockupView", () => {
 
     const columns = container.querySelectorAll(".mockup-column");
     expect(columns).toHaveLength(2);
-    expect(columns[0].querySelector(".mockup-column-index").textContent).toBe("A");
-    expect(columns[0].querySelector(".mockup-column-title").textContent).toBe("Variant A");
-    expect(columns[0].querySelector(".mockup-column-description").textContent).toBe("Single page");
-    expect(columns[1].querySelector(".mockup-column-index").textContent).toBe("B");
-    expect(columns[1].querySelector(".mockup-column-title").textContent).toBe("Variant B");
-    // No description on variant B -> no description element at all.
-    expect(columns[1].querySelector(".mockup-column-description")).toBeNull();
+    const [labelA, labelB] = [...columns].map((c) => c.querySelector(".mockup-column-label"));
+    // The frame label: the mockup icon, the variant's letter, "<mockup title>: <variant title>", then the count chips' slot.
+    expect(labelA.querySelector(".frame-label-icon").textContent).toBe("view_column");
+    expect(labelA.querySelector(".frame-label-name").textContent).toBe("A");
+    expect(labelA.querySelector(".frame-label-detail").textContent).toBe("Checkout Redesign: Variant A");
+    expect(labelA.lastElementChild.classList.contains("mockup-column-counts")).toBe(true);
+    expect(labelB.querySelector(".frame-label-name").textContent).toBe("B");
+    expect(labelB.querySelector(".frame-label-detail").textContent).toBe("Checkout Redesign: Variant B");
+    // The variant's description is the label's tooltip; none -> no tooltip.
+    expect(labelA.title).toBe("Single page");
+    expect(labelB.hasAttribute("title")).toBe(false);
+    expect(container.querySelector(".mockup-column-description, .mockup-column-title, .mockup-column-index")).toBeNull();
+  });
+
+  it("puts the count chips next to the label, inside the counter-scaled head", () => {
+    const container = document.createElement("div");
+    const columns = renderMockupView(container, { name: "m", variants: [{ id: "a", title: "" }] }, { fetchRenderFor: () => new Promise(() => {}) });
+    const label = container.querySelector(".mockup-column-head > .mockup-column-label");
+    expect(label.querySelector(".frame-label-detail").textContent).toBe("m: a"); // no titles: the name and the id
+    expect(label.contains(columns[0].countsEl)).toBe(true);
   });
 
   it("falls back to the mockup's name when it has no title", () => {

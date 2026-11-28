@@ -27,13 +27,19 @@ describe("toolStates", () => {
   describe("the Board (design `board-view*`, `board-comments*`)", () => {
     const board = (over = {}) => toolStates(where({ view: "board", board: { commentsOn: true, tileCount: 5, openCount: 6, edgesOn: true, clustersOn: true, anyExpanded: true, ...over } }));
 
-    it("comment, inspect and notes are greyed, each with the design's own words", () => {
+    it("comment and inspect apply (CHR-1295, CHR-1296); notes alone is greyed, in the design's words", () => {
       const states = board();
-      expect(disabled(states)).toEqual(["comment", "inspect", "notes"]);
-      expect(states.comment.name).toBe("Comment, read-only on the Board: comment in the Screens view");
-      expect(states.comment.hint).toBe(states.comment.name);
-      expect(states.inspect.name).toBe("Inspect, not available on the Board");
+      expect(disabled(states)).toEqual(["notes"]);
+      expect(states.comment).toEqual({ disabled: false, reason: "" });
+      expect(states.inspect).toEqual({ disabled: false, reason: "" });
       expect(states.notes.name).toBe("Notes, not available on the Board");
+    });
+
+    it("comment and inspect need a tile: with nothing on the board they say so", () => {
+      const states = board({ tileCount: 0, openCount: 0 });
+      expect(states.comment.name).toBe("Comment, nothing on the board");
+      expect(states.inspect.name).toBe("Inspect, nothing on the board");
+      expect(states.comment.hint).toBe("Nothing on the board");
     });
 
     it("comments, show resolved, flow arrows, clusters and collapse all apply, named as the design names them", () => {

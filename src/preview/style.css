@@ -8295,7 +8295,9 @@ button.uc-target:hover {
 }
 
 /* CHR-1252 — comment mode's banner (above the zoom pill; the tools are in the side tool bar, CHR-1268). */
-#comment-banner {
+#comment-banner,
+#board-comment-banner,
+#board-inspect-hint {
   position: absolute;
   top: auto;
   bottom: var(--space-sm);
@@ -8340,15 +8342,20 @@ button.uc-target:hover {
   display: none;
 }
 
-#comment-banner[hidden] {
+#comment-banner[hidden],
+#board-comment-banner[hidden],
+#board-inspect-hint[hidden] {
   display: none;
 }
 
-#comment-banner .icon {
+#comment-banner .icon,
+#board-comment-banner .icon,
+#board-inspect-hint .icon {
   font-size: var(--size-icon-sm);
 }
 
-#comment-banner kbd {
+#comment-banner kbd,
+#board-comment-banner kbd {
   padding: 0 5px;
   border-radius: var(--radius-xs);
   background: rgba(255, 255, 255, 0.22);
@@ -12752,4 +12759,85 @@ body:has(#settings-menu:is(:popover-open, [data-open])) .update-toast {
 
 .new-folder-slot:empty {
   display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   CHR-1295, CHR-1296 — Comment and Inspect on the Board. The pick layer takes the
+   pointer while a tool is active; the outlines and the comment popover sit in two
+   layers over the board view, placed from the tiles' on-screen rects.
+   --------------------------------------------------------------------------- */
+#board-pick-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+#board-pick-layer[data-active="true"] {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+#board-inspect-layer,
+#board-comment-canvas-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#board-inspect-layer {
+  z-index: 4;
+}
+
+#board-comment-canvas-layer {
+  z-index: 6;
+}
+
+#board-comment-canvas-layer[hidden] {
+  display: none;
+}
+
+.board-inspect-box {
+  position: absolute;
+  outline: 2px solid var(--frame-inspect);
+  outline-offset: 1px;
+  background: var(--frame-inspect-wash);
+  pointer-events: none;
+}
+
+.board-inspect-box[data-hover] {
+  outline-width: 1px;
+  background: none;
+}
+
+.board-inspect-box[hidden] {
+  display: none;
+}
+
+/* The element's name on the outline's top-left edge, as in the Screens view's selection; inside the box when there is no room above it. */
+.board-inspect-box[data-label]::after {
+  content: attr(data-label);
+  position: absolute;
+  left: -3px;
+  bottom: calc(100% + 3px);
+  white-space: nowrap;
+  background: var(--frame-inspect);
+  color: var(--frame-on);
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: 3px 3px 0 0;
+}
+
+.board-inspect-box[data-label][data-flip]::after {
+  bottom: auto;
+  top: 0;
+  left: 0;
+  border-radius: 0 0 3px 0;
+}
+
+.comment-popover-locked {
+  padding: var(--space-md);
 }

@@ -55,8 +55,10 @@ import { renderMockupView, renderColumnChips, markSelectedColumn } from "./mocku
 import { applyMockupZoom } from "./mockup-zoom.js";
 import { applyFlowMode, updateFlowOverlay } from "./flows.js";
 import { bareNodeId } from "./comments.js";
-import { createCommentCanvas, countRow, threadKind } from "./comment-canvas.js";
-import { createScreenHost, createMockupHost } from "./comment-hosts.js";
+import { createCommentCanvas, countRow, threadKind, commentTarget } from "./comment-canvas.js";
+import { createScreenHost, createMockupHost, createBoardHost } from "./comment-hosts.js";
+import { createBoardPicker } from "./board-pick.js";
+import { elementClientBox } from "./tile-hit.js";
 import {
   pushActivityEntry,
   activityIsNavigable,
@@ -80,6 +82,7 @@ import { createBoardComments } from "./board-comments.js";
 import { createUseCasesView } from "./usecases.js";
 import {
   MIN_BOARD_ZOOM,
+  TOOL_MIN_ZOOM,
   MAX_BOARD_ZOOM,
   DEFAULT_BOARD_ZOOM,
   clampZoom,
@@ -105,8 +108,8 @@ import {
   parseEnumPref,
   parseBoardZoomPref,
 } from "./prefs.js";
-import { createInspectorPanel, applyInspectMode, updateInspectOverlay } from "./inspector.js";
-import { buildEntries } from "./inspector-data.js";
+import { createInspectorPanel, applyInspectMode, updateInspectOverlay, placeInspectBox } from "./inspector.js";
+import { buildEntries, resolveModelId } from "./inspector-data.js";
 import { loadDaemonStorage } from "./daemon-prefs.js";
 
 // CHR-924 — preferences live in the daemon's settings.json, not in this browser. They are loaded (top-level await) before anything below reads one; localStorage is only the source of the one-time carry-over and the pre-paint theme mirror. `localStorage` itself can throw on access in some privacy modes, so it is resolved tolerantly.
@@ -146,10 +149,15 @@ const variantUI = createVariantUI({
   },
 });
 
+/** The Inspect panel's "Variant" and "Also reached from" cards follow the inspected screen's data. */
+function refreshInspectorVariant() {
+  const screen = inspectedScreen();
+  renderVariantInspector(variantInspectorEl, variantContext(buildScreenTree(screens), screen), screenFlows, screen, selectScreenHuman);
+}
+
 function refreshVariantUI() {
   const shown = variantUI.update(screens, screenFlows, currentScreen);
-  // The Inspect panel's "Variant" and "Also reached from" cards follow the same data.
-  renderVariantInspector(variantInspectorEl, variantContext(buildScreenTree(screens), currentScreen), screenFlows, currentScreen, selectScreenHuman);
+  refreshInspectorVariant();
   // The breadcrumb takes a band above the frame, so the fit zoom has to be recomputed when it appears or goes.
   if (shown !== variantLayoutShown) {
     variantLayoutShown = shown;
@@ -190,6 +198,13 @@ const toolGroupSepEl = document.getElementById("tool-group-sep");
 const resolvedToggleBtn = document.getElementById("resolved-toggle");
 const toolToastEl = document.getElementById("tool-toast");
 const boardCommentLayerEl = document.getElementById("board-comment-layer");
+const boardPickLayerEl = document.getElementById("board-pick-layer");
+const boardInspectLayerEl = document.getElementById("board-inspect-layer");
+const boardInspectHoverEl = document.getElementById("board-inspect-hover");
+const boardInspectSelectionEl = document.getElementById("board-inspect-selection");
+const boardCommentCanvasLayerEl = document.getElementById("board-comment-canvas-layer");
+const boardCommentBannerEl = document.getElementById("board-comment-banner");
+const boardInspectHintEl = document.getElementById("board-inspect-hint");
 const boardPresentedBannerEl = document.getElementById("board-presented-banner");
 const boardPresentedTextEl = document.getElementById("board-presented-text");
 const boardPresentedDismissBtn = document.getElementById("board-presented-dismiss");
@@ -441,6 +456,10 @@ const board = createBoardView({
     boardZoom = value;
     scheduleBoardZoomPrefWrite(value);
     syncZoomUI();
+    if (currentView === "board") {
+      boardCanvas.layout(); // the tools' limit is the zoom: the banner and an open popover follow
+      syncBoardTools();
+    }
   },
   // CHR-623 review finding 2: a relayout can change the grid shape under a
   // `lastFitAllZoom` that was exact for the PREVIOUS shape — invalidate it
@@ -451,7 +470,13 @@ const board = createBoardView({
     syncZoomUI();
   },
   onTogglePin: (screen) => toggleScreenPin(screen),
-  onLayout: () => boardComments.layout(),
+  onLayout: () => {
+    boardComments.layout();
+    if (currentView !== "board") return;
+    boardCanvas.layout();
+    syncBoardInspectOverlay();
+    if (activeMode === "inspect") inspectorPanel.refreshExpanded(); // a reloaded tile: the selection's values are read again
+  },
   onTileKeydown: (evt) => onShortcutKeydown(evt),
 });
 board.mount();
@@ -470,8 +495,156 @@ const boardComments = createBoardComments({
   enabled: boardCommentsOn,
   showResolved: showResolvedOn,
   onZoomToTile: (screen) => board.zoomToTile(screen),
+  // A pin or chip opens the thread in the comment canvas's popover (CHR-1295); a second press on the open one closes it.
+  onOpenThread: (id) => (boardCanvas.activeThread() === id ? boardCanvas.dismiss() : boardCanvas.openThread(id)),
   onOpenInScreens: (screen, threadId) => void openScreenThread(screen, threadId),
 });
+
+// CHR-1295, CHR-1296 — Comment and Inspect on the Board. The comment canvas (comment-canvas.js) serves the popover and the new-thread composer on a board host; board-comments.js keeps drawing the pins. One pointer layer (board-pick.js) and one hit-test (tile-hit.js) feed both tools.
+/** The screen whose elements the Inspect panel lists while the Board shows (null: nothing inspected yet). */
+let boardInspectScreen = null;
+/** The element under the pointer in Inspect mode: its screen and DOM id, looked up again on every placement (a tile can reload under it). @type {{ screen: string, id: string } | null} */
+let boardInspectHover = null;
+/** The panel's entries for `boardInspectScreen` are on their way: a second click waits for them. @type {Promise<void> | null} */
+let boardInspectLoad = null;
+
+const boardHost = createBoardHost({
+  layerEl: boardCommentCanvasLayerEl,
+  stageEl: boardViewEl,
+  getFrames: () => board.tileFrames(),
+  getZoom: () => boardZoom,
+});
+
+/** Posts one thread action from the board's popover; the Board's threads reload at once (the SSE "comments" event would a moment later). @param {Parameters<typeof postComment>[0]} input */
+async function boardCommentAction(input) {
+  const result = await postComment(input, activeProjectRoot);
+  if (result.ok) await loadBoardComments();
+  return result;
+}
+
+const boardCanvas = createCommentCanvas({
+  host: boardHost,
+  bannerEl: boardCommentBannerEl,
+  keyOf: (t) => t.screen ?? null,
+  canWrite: () => boardZoom >= TOOL_MIN_ZOOM,
+  onActiveChange: () => boardComments.setActiveThread(boardCanvas.activeThread()),
+  // A resolve or delete takes its pin with it: the focus goes back to a marker of the thread, else the Comment tool.
+  fallbackFocus: (threadId) => (threadId ? boardComments.markerOf(threadId) : null) ?? commentModeToggle,
+  actions: {
+    setMode: (on) => {
+      if (on !== (activeMode === "comment")) setMode("comment");
+    },
+    create: (nodeId, text, screen) => (screen === null ? Promise.resolve({ ok: false, message: "No screen is open." }) : boardCommentAction({ screen, node_id: nodeId, text })),
+    reply: (rootId, text) => boardCommentAction({ parent_id: rootId, text }),
+    resolve: (rootId) => boardCommentAction({ parent_id: rootId, text: "", resolved: true }),
+    reopen: (rootId) => boardCommentAction({ action: "reopen", comment_id: rootId }),
+    remove: (rootId) => boardCommentAction({ action: "delete", comment_id: rootId }),
+    reanchor: () => Promise.resolve({ ok: false, message: "Moving a thread to another element is done in the Screens view." }),
+    copy: (text) => {
+      void navigator.clipboard?.writeText(text).catch(() => {});
+    },
+    openInScreens: (threadId) => {
+      const screen = boardComments.screenOf(threadId);
+      if (screen !== null) void openScreenThread(screen, threadId);
+    },
+  },
+});
+
+/** The element Inspect would select at a hit: the nearest one with an id, never the screen root. @param {Document} doc @param {Element | null} el */
+function inspectTarget(doc, el) {
+  const withId = el?.closest("[id]") ?? null;
+  return withId && withId !== doc.body.firstElementChild ? withId : null;
+}
+
+const boardPicker = createBoardPicker({
+  layerEl: boardPickLayerEl,
+  frames: () => board.tileFrames(),
+  onHover: (hit, el) => {
+    if (activeMode === "comment") {
+      boardCanvas.hover(hit?.screen ?? null, hit && el ? commentTarget(hit.doc, el) : null);
+    } else if (activeMode === "inspect") {
+      const target = hit && boardZoom >= TOOL_MIN_ZOOM ? inspectTarget(hit.doc, el) : null;
+      boardInspectHover = target ? { screen: hit.screen, id: target.id } : null;
+      syncBoardInspectOverlay();
+    }
+  },
+  onPick: (hit, el) => {
+    if (activeMode === "comment") {
+      if (hit && el) boardCanvas.pick(hit.screen, commentTarget(hit.doc, el)); // empty board space does nothing
+    } else if (activeMode === "inspect") {
+      if (boardZoom < TOOL_MIN_ZOOM) return;
+      const target = hit ? inspectTarget(hit.doc, el) : null;
+      if (hit && target) void inspectBoardElement(hit.screen, target.id);
+      else clearInspectFocus(); // empty board space, or the screen itself, clears the selection
+    }
+  },
+});
+
+/** Selects an element of a tile in the Inspect panel: the panel lists that tile's screen first when it showed another. @param {string} screen @param {string} domId */
+async function inspectBoardElement(screen, domId) {
+  if (boardInspectScreen !== screen) {
+    boardInspectScreen = screen;
+    syncPanelContext();
+    inspectorPanel.clearFocus();
+    boardInspectLoad = loadInspectorEntries();
+    refreshInspectorVariant();
+  }
+  await boardInspectLoad;
+  if (boardInspectScreen !== screen || currentView !== "board") return;
+  const { modelId } = resolveModelId(domId, inspectorPanel.getModelIds());
+  handleInspectSelect(modelId, domId);
+}
+
+/** Puts the hover and selection outlines over their elements in the tiles, from the tiles' on-screen rects (they follow pan, zoom and reloads). */
+function syncBoardInspectOverlay() {
+  const frames = board.tileFrames();
+  const origin = boardInspectLayerEl.getBoundingClientRect();
+  const boxOf = (screen, id) => {
+    const frame = frames.find((f) => f.screen === screen);
+    const el = frame?.doc()?.getElementById(id);
+    if (!frame || !el) return null;
+    const b = elementClientBox(frame, el);
+    return { left: b.left - origin.left, top: b.top - origin.top, right: b.right - origin.left, bottom: b.bottom - origin.top };
+  };
+  const inspecting = currentView === "board" && activeMode === "inspect";
+  placeInspectBox(boardInspectHoverEl, inspecting && boardInspectHover ? boxOf(boardInspectHover.screen, boardInspectHover.id) : null, boardInspectHover?.id ?? null);
+  const selected = inspecting ? inspectorPanel.getFocusedDomId() : null;
+  placeInspectBox(boardInspectSelectionEl, selected && boardInspectScreen ? boxOf(boardInspectScreen, selected) : null, inspectorPanel.getFocusedLabel());
+}
+
+/** Comment mode belongs to the canvas of the view that shows: the Screens view's or the Board's. */
+function syncCommentModes() {
+  commentCanvas.setMode(activeMode === "comment" && currentView !== "board");
+  syncBoardTools();
+}
+
+/** Whichever tool is active on the Board gets the pointer layer; below the zoom limit the tools say so instead of acting. */
+function syncBoardTools() {
+  const onBoard = currentView === "board";
+  boardCanvas.setMode(activeMode === "comment" && onBoard);
+  boardPicker.setActive(onBoard && (activeMode === "comment" || activeMode === "inspect"));
+  if (!(onBoard && activeMode === "inspect")) boardInspectHover = null;
+  const tooLow = onBoard && activeMode === "inspect" && boardZoom < TOOL_MIN_ZOOM;
+  boardInspectHintEl.hidden = !tooLow;
+  if (tooLow) boardInspectHintEl.textContent = "Zoom in to inspect";
+  syncBoardInspectOverlay();
+  boardPicker.refresh();
+}
+
+// The pick layer covers the tiles' canvas; the rest of the visible surface is empty board space too, and Inspect clears its selection there.
+boardSurfaceEl.addEventListener("click", (evt) => {
+  if (evt.target === boardSurfaceEl && activeMode === "inspect") clearInspectFocus();
+});
+
+boardSurfaceEl.addEventListener(
+  "scroll",
+  () => {
+    boardCanvas.layout();
+    syncBoardInspectOverlay();
+    boardPicker.refresh();
+  },
+  { passive: true },
+);
 
 /** The Comments tool on the Board: the pins and count chips on the tiles on/off. */
 function toggleBoardComments() {
@@ -519,6 +692,7 @@ async function loadBoardComments() {
   const result = await fetchScreenComments(project);
   if (requestId !== boardCommentsRequestId || project !== activeProjectRoot) return; // a newer request or a project switch moved on
   boardComments.setData({ comments: result.comments, threads: result.threads });
+  boardCanvas.setData({ scope: "board", comments: result.comments, threads: result.threads });
   renderBoardStatus();
 }
 
@@ -715,14 +889,20 @@ boardEdgesVisible = readBoolPref(prefsStorage, "artisign.boardEdgesVisible", boa
 board.setZoom(boardZoom);
 board.setEdgesVisible(boardEdgesVisible);
 
+/** The screen the Inspect panel lists: the open one, or on the Board the one last inspected on a tile. */
+function inspectedScreen() {
+  return currentView === "board" ? boardInspectScreen : currentScreen;
+}
+
 /** @param {string | null} screen */
 function getRenderedDocForScreen(screen) {
+  if (currentView === "board") return screen === null ? null : (board.tileFrames().find((f) => f.screen === screen)?.doc() ?? null);
   return screen !== null && iframeRenderedScreen === screen ? screenFrame.contentDocument : null;
 }
 
 const inspectorPanel = createInspectorPanel(
   { listEl: inspectorListEl, emptyEl: inspectorEmptyEl, errorEl: inspectorErrorEl, summaryEl: inspectorSummaryEl, detailsEl: inspectorDetailsEl },
-  { getRenderedDoc: getRenderedDocForScreen, onSelect: (id) => handleInspectSelect(id, id) }, // a row selects like a click on the canvas: the outline follows
+  { getRenderedDoc: getRenderedDocForScreen, onSelect: (id) => handleInspectSelect(id, id), showScreen: () => currentView === "board" }, // a row selects like a click on the canvas: the outline follows
 );
 
 const projectUI = createProjectUI(
@@ -859,6 +1039,9 @@ function resetProjectState() {
   pendingTreeReveal = null;
   boardCommentsRequestId++; // an answer still on its way belongs to the project we just left
   boardComments.setData({ comments: [], threads: [] });
+  boardCanvas.setData({ scope: null, comments: [], threads: [] });
+  boardInspectScreen = null;
+  boardInspectHover = null;
   activeMode = "none";
   syncToolStates();
   screenFrame.srcdoc = "";
@@ -1115,6 +1298,7 @@ async function handleChangeEvent(event) {
       if (visibilityChanged || variantLinks(previousScreens) !== variantLinks(screens)) await loadBoard();
       else {
         await board.refreshScreen(event.name, activeProjectRoot);
+        if (event.name === boardInspectScreen && currentView === "board") await loadInspectorEntries(); // the inspected tile's source changed — refs may have too
         // A screen with threads can lose or regain a thread's node: the server recomputes `detached`.
         if (boardComments.threadScreens().has(event.name)) await loadBoardComments();
       }
@@ -1131,10 +1315,8 @@ async function handleChangeEvent(event) {
     // carries expand/focus state over), and the iframe's own `load` handler
     // then refreshes those rows' bodies once the re-render lands.
     compare.reloadAll();
-    if (currentScreen) {
-      await loadCurrentScreen();
-      await loadInspectorEntries();
-    }
+    if (currentScreen) await loadCurrentScreen();
+    if (currentScreen || boardInspectScreen) await loadInspectorEntries();
     if (currentView === "design-system") await loadDesignSystem();
   } else if (event.kind === "usecases") {
     useCases.onChange(event); // personas, data-objects, cases/<id>: the tab reloads what it shows (nothing happens while it is closed)
@@ -2122,17 +2304,18 @@ function renderCommentsList() {
 /** Rebuilds the Elements panel's list from the current screen's nodes (see fetchScreenNodes/buildEntries). */
 async function loadInspectorEntries() {
   const requestId = ++inspectorRequestId;
-  if (!currentScreen) {
+  const screen = inspectedScreen();
+  if (!screen) {
     inspectorPanel.setEntries([], null);
     inspectorCountEl.textContent = "";
     syncInspectOverlay();
     return;
   }
-  const result = await fetchScreenNodes(currentScreen, activeProjectRoot);
+  const result = await fetchScreenNodes(screen, activeProjectRoot);
   if (requestId !== inspectorRequestId) return; // a newer request has since started — drop this stale result
   if (result.ok) {
     const entries = buildEntries(result.nodes);
-    inspectorPanel.setEntries(entries, currentScreen);
+    inspectorPanel.setEntries(entries, screen);
     inspectorCountEl.textContent = `${entries.length} node${entries.length === 1 ? "" : "s"}`;
   } else {
     inspectorPanel.setError(result.message);
@@ -2145,10 +2328,15 @@ async function loadInspectorEntries() {
 function clearInspectFocus() {
   inspectorPanel.clearFocus();
   updateInspectOverlay(inspectOverlayEl, null, null);
+  syncBoardInspectOverlay();
 }
 
 /** Keeps the canvas overlay in agreement with whatever the panel currently has focused (or hides it when nothing is) — called after anything that can change either side: a click, a list rebuild, or an iframe reload. */
 function syncInspectOverlay() {
+  if (currentView === "board") {
+    syncBoardInspectOverlay();
+    return;
+  }
   const domId = inspectorPanel.getFocusedDomId();
   updateInspectOverlay(inspectOverlayEl, domId ? getRenderedDocForScreen(currentScreen) : null, domId, inspectorPanel.getFocusedLabel());
 }
@@ -2306,6 +2494,8 @@ function syncPanelContext() {
   if (shown === "compare") {
     const { reference, selected } = compare.state();
     toolPanels.setContext(reference ? `${selected.join(", ")} vs. ${reference}` : "");
+  } else if (currentView === "board") {
+    toolPanels.setContext(shown === "inspect" && boardInspectScreen !== null ? screenContext(boardInspectScreen) : ""); // the Inspect panel names the inspected tile's screen
   } else if (currentMockup !== null) {
     toolPanels.setContext(`${mockupColumns.length} variant${mockupColumns.length === 1 ? "" : "s"}`); // design: the card's scope reads "3 variants"
   } else if (currentScreen !== null) {
@@ -2699,7 +2889,7 @@ function setMode(next) {
   if (activeMode === "inspect") toolPanels.open("inspect");
   else if (toolPanels.opened() === "inspect") toolPanels.close(false);
   syncToolStates();
-  commentCanvas.setMode(activeMode === "comment");
+  syncCommentModes();
   applyActiveMode();
   board.setFlowMode(activeMode === "flow");
 }
@@ -2859,6 +3049,7 @@ function applyMainVisibility() {
 
 function setView(view) {
   if (view !== currentView) zoomPill?.close(); // the menu belongs to the zoom it was opened for
+  const wasBoard = currentView === "board";
   currentView = view;
   writeStringPref(prefsStorage, "artisign.view", view);
   for (const tab of viewTabs) tab.setAttribute("aria-pressed", String(tab.dataset.view === view));
@@ -2869,11 +3060,17 @@ function setView(view) {
   // state with it already on would otherwise leave it stuck active behind
   // a now-disabled toggle. Same self-toggle-off path as its own button.
   if (showMockup && activeMode === "flow") setMode("flow");
-  // Comment/inspect mode have no board counterpart (see board-view.js) —
-  // picking the board while either is active turns it off, same as
-  // clicking its own toggle.
-  if ((view === "board" || view === "design-system") && activeMode === "comment") setMode("comment");
-  if (view === "board" && activeMode === "inspect") setMode("inspect");
+  // Comment and inspect mode carry over to the Board (CHR-1295, CHR-1296); the Design System has no counterpart to either.
+  if (view === "design-system" && activeMode === "comment") setMode("comment");
+  // The Inspect panel lists the Screens view's open screen or, on the Board, the inspected tile's screen: nothing carries over either way.
+  if (wasBoard !== (view === "board")) {
+    boardInspectScreen = null;
+    clearInspectFocus();
+    void loadInspectorEntries();
+    refreshInspectorVariant();
+    syncPanelContext();
+  }
+  syncCommentModes();
   // The Flow tool is the flow arrows on the Board: the flow mode does not come along.
   if (view === "board" && activeMode === "flow") setMode("flow");
   // None of the three modes has a Use Cases or Design System counterpart either (their tools are greyed out there): leaving them also closes inspect's panel.
@@ -2882,7 +3079,11 @@ function setView(view) {
   if (view === "usecases") useCases.show();
   else useCases.hide();
   if (view === "screens") updateScreenUseCases(); // the reverse entry may have use cases to show now
-  if (view !== "board") boardComments.close(); // a preview must not outlive the board (its Esc handling is the board's)
+  if (view !== "board") {
+    // A list or popover must not outlive the board (its Esc handling is the board's).
+    boardComments.close();
+    boardCanvas.dismiss();
+  }
   if (view === "board" && !boardBuilt) loadBoard();
   // CHR-623 review finding 5: an already-built board was `hidden` (clientWidth
   // 0) while another tab showed, so any relayout that ran while hidden used
@@ -3083,7 +3284,7 @@ function runShortcut(id) {
       return true;
     case "leave":
       // The comment layer's Escape first cancels a re-anchor pick or closes the popover; the next one leaves comment mode.
-      if (commentCanvas.handleEscape()) return true;
+      if (commentCanvas.handleEscape() || boardCanvas.handleEscape()) return true;
       // Inspect mode's Escape first clears the focused element, the next one leaves the mode.
       if (activeMode === "inspect" && inspectorPanel.getFocusedDomId()) clearInspectFocus();
       else if (activeMode !== "none") setMode(activeMode);

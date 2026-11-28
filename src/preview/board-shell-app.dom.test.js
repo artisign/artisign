@@ -125,8 +125,8 @@ describe("the Board's tool bar", () => {
     };
     await openBoard();
     expect($("#tool-bar").getAttribute("aria-label")).toBe("Board tools");
-    expect(label("comment-mode-toggle")).toBe("Comment, read-only on the Board: comment in the Screens view");
-    expect(label("inspect-mode-toggle")).toBe("Inspect, not available on the Board");
+    expect(label("comment-mode-toggle")).toBe("Comment");
+    expect(label("inspect-mode-toggle")).toBe("Inspect");
     expect(label("notes-tool-toggle")).toBe("Notes, not available on the Board");
     expect(label("comments-tool-toggle")).toBe("Comments on tiles, 1 open");
     expect(label("resolved-toggle")).toBe("Show resolved comments");
@@ -134,8 +134,8 @@ describe("the Board's tool bar", () => {
     expect(document.getElementById("design-system-tool")).toBeNull(); // CHR-1284
     expect(label("board-clusters-toggle")).toBe("Clusters");
     expect(label("board-collapse-all-btn")).toBe("Collapse all clusters, all are collapsed");
-    for (const id of ["comment-mode-toggle", "inspect-mode-toggle", "notes-tool-toggle", "board-collapse-all-btn"]) expect($(`#${id}`).getAttribute("aria-disabled")).toBe("true");
-    for (const id of ["comments-tool-toggle", "resolved-toggle", "flow-mode-toggle", "board-clusters-toggle"]) expect($(`#${id}`).hasAttribute("aria-disabled")).toBe(false);
+    for (const id of ["notes-tool-toggle", "board-collapse-all-btn"]) expect($(`#${id}`).getAttribute("aria-disabled")).toBe("true");
+    for (const id of ["comment-mode-toggle", "inspect-mode-toggle", "comments-tool-toggle", "resolved-toggle", "flow-mode-toggle", "board-clusters-toggle"]) expect($(`#${id}`).hasAttribute("aria-disabled")).toBe(false);
     expect($("#flow-mode-toggle").getAttribute("aria-pressed")).toBe("true");
     expect($("#board-clusters-toggle").getAttribute("aria-pressed")).toBe("true");
   });

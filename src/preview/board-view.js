@@ -2,13 +2,11 @@
 // edges drawn as SVG curves between them. All DOM/measurement work lives
 // here — the actual layout/edge/scroll math is in board.js.
 //
-// Comment mode is not supported on the board — the board's per-tile iframes
-// don't carry comment listeners at all, so toggling comment mode has no
-// effect while the board is showing (app.js falls back to "none" when
-// switching views away from a mode the new view doesn't support, except it
-// keeps flow mode since the board does support that). The comment pins on the
-// board (CHR-1264, board-comments.js) are a read-only overlay in the parent
-// document that measures tiles through commentGeometry().
+// The tiles' iframes carry no comment or inspect listeners: the Comment and
+// Inspect tools (CHR-1295, CHR-1296) catch the pointer in a parent-document
+// layer and hit-test the tile documents through tileFrames() (tile-hit.js).
+// The comment pins on the board (CHR-1264, board-comments.js) are an overlay
+// in the parent document that measures tiles through commentGeometry().
 
 import { fetchRender } from "./api.js";
 import { applyFlowMode } from "./flows.js";
@@ -527,6 +525,18 @@ export function createBoardView({
   }
 
   /**
+   * Every tile as the shared hit-test (tile-hit.js) sees it, in paint order: its on-screen rect, its layout width and its rendered document, read live.
+   * @returns {import("./tile-hit.js").TileFrame[]}
+   */
+  function tileFrames() {
+    return layout.tiles.flatMap((t) => {
+      const iframe = iframesByScreen.get(t.screen);
+      if (!iframe) return [];
+      return [{ screen: t.screen, rect: () => iframe.getBoundingClientRect(), layoutWidth: () => iframe.offsetWidth, doc: () => iframe.contentDocument }];
+    });
+  }
+
+  /**
    * The screen the agent is writing now gets the violet ring and the "Writing" chip (design `board-cluster` writing); null clears it. A no-op while nothing changes, so the agent bar's regular refresh costs nothing.
    * @param {string | null} screen
    */
@@ -1018,6 +1028,7 @@ export function createBoardView({
     fitAll,
     zoomToTile,
     commentGeometry,
+    tileFrames,
     setEdgesVisible,
     setWritingScreen,
     setViewports,

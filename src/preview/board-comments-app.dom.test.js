@@ -216,33 +216,40 @@ describe("Board comments in the app", () => {
     expect($("#resolved-toggle").getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("closes the preview when the board is left, so Esc in Screens is not swallowed", async () => {
+  it("closes a pin's thread popover when the board is left, so Esc in Screens is not swallowed", async () => {
     seed();
     await openBoard();
     press(boardPins()[0]);
-    expect($(".board-comment-preview").hidden).toBe(false);
+    expect($("#board-comment-canvas-layer .comment-popover").hasAttribute("open")).toBe(true);
     $('.view-tab[data-view="screens"]').click();
-    expect($(".board-comment-preview").hidden).toBe(true);
+    expect($("#board-comment-canvas-layer .comment-popover").hasAttribute("open")).toBe(false);
   });
 
-  it("a pin opens the read-only preview; Open in Screens shows that screen with the thread open", async () => {
+  it("a pin opens the thread in the comment canvas's popover; Open in Screens (More actions) shows that screen with the thread open", async () => {
     seed();
     await openBoard();
     const secondTilePin = boardPins()[1];
     press(secondTilePin);
-    const preview = $(".board-comment-preview");
-    expect(preview.hidden).toBe(false);
-    expect(preview.textContent).toContain("Check spacing");
-    expect(preview.textContent).toContain("ux-agent");
-    [...preview.querySelectorAll("button")].find((b) => b.textContent === "Open in Screens").click();
+    const popover = $("#board-comment-canvas-layer .comment-popover");
+    expect(popover.hasAttribute("open")).toBe(true);
+    expect(popover.textContent).toContain("Check spacing");
+    expect(popover.textContent).toContain("ux-agent");
+    expect(secondTilePin.getAttribute("aria-expanded")).toBe("true"); // the pin shows as the open one
+    // Reply, resolve and the menu are the Screens popover's own.
+    expect(popover.querySelector('textarea[aria-label="Reply"]')).not.toBeNull();
+    expect(popover.querySelector('button[aria-label="Resolve"]')).not.toBeNull();
+    popover.querySelector('button[aria-label="More actions"]').click();
+    const items = [...popover.querySelectorAll(".comment-popover-menu button")];
+    expect(items.some((b) => b.textContent.endsWith("Open in Screens"))).toBe(true);
+    expect(items.some((b) => b.textContent.includes("Re-anchor"))).toBe(false); // done in the Screens view
+    items.find((b) => b.textContent.endsWith("Open in Screens")).click();
     await flush();
     expect($('.view-tab[data-view="screens"]').getAttribute("aria-pressed")).toBe("true");
     expect($('.view-tab[data-view="board"]').getAttribute("aria-pressed")).toBe("false");
-    expect($("#board-comment-layer .board-comment-preview").hidden).toBe(true);
     // The Screens canvas shows screen "two" with its own thread popover open.
-    const popover = $("#comment-layer .comment-popover");
-    expect(popover.hasAttribute("open")).toBe(true);
-    expect(popover.textContent).toContain("Check spacing");
+    const screensPopover = $("#comment-layer .comment-popover");
+    expect(screensPopover.hasAttribute("open")).toBe(true);
+    expect(screensPopover.textContent).toContain("Check spacing");
   });
 
   it("an SSE comments event refetches with one more request; a screen event refetches only for a screen with threads", async () => {

@@ -40,8 +40,9 @@ function boardToolStates({ tileCount, openCount, clustersOn, anyExpanded }) {
   const unavailable = (tool) => no(`${tool}, not available on the Board`, `${tool}, not available on the Board`);
   const empty = tileCount === 0;
   return {
-    comment: no("Comment, read-only on the Board: comment in the Screens view", "Comment, read-only on the Board: comment in the Screens view"),
-    inspect: unavailable("Inspect"),
+    // CHR-1295, CHR-1296: both act on the tiles' elements, so they need a tile.
+    comment: empty ? no("Comment, nothing on the board", nothing) : OK,
+    inspect: empty ? no("Inspect, nothing on the board", nothing) : OK,
     notes: unavailable("Notes"),
     comments: empty
       ? no("Comments on tiles, nothing on the board", nothing)

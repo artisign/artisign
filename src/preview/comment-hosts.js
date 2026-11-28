@@ -6,8 +6,15 @@
 // Boxes are in layer coordinates: pixels from the layer's top-left, already
 // scaled by the frame's zoom; the controller multiplies an element's own
 // (unscaled) rect by `scale` and adds the frame's offset.
+//
+// Optional flags: `pins: false` — the host draws the pins itself; `reanchor:
+// false` — no pick-an-element flow; `noun` — what a frame is called in a
+// sentence (default "variant"); `numberPerFrame` — a thread is numbered among
+// its own frame's; `lockedHint` — what the popover says where writing is off.
 
 import { commentTarget, mockupCommentTarget } from "./comment-canvas.js";
+import { TOOL_MIN_ZOOM } from "./board.js";
+import { tileScale } from "./tile-hit.js";
 
 /**
  * @typedef {{ left: number, top: number, right: number, bottom: number }} Rect
@@ -24,6 +31,11 @@ import { commentTarget, mockupCommentTarget } from "./comment-canvas.js";
  *   stageEl: HTMLElement,
  *   placement?: "top" | "bottom",
  *   modeText?: string,
+ *   pins?: boolean,
+ *   reanchor?: boolean,
+ *   noun?: string,
+ *   numberPerFrame?: boolean,
+ *   lockedHint?: string,
  *   frames: () => CommentFrame[],
  *   view: () => Rect,
  * }} CommentHost
@@ -93,6 +105,44 @@ export function createMockupHost({ layerEl, stageEl, getColumns }) {
         },
         pick: (target) => mockupCommentTarget(target),
         hoverLabel: (hit) => `${letter} · ${hit.id ?? "variant"}`,
+      })),
+    view() {
+      const r = layerEl.getBoundingClientRect();
+      return { left: 0, top: 0, right: r.width, bottom: r.height };
+    },
+  };
+}
+
+/**
+ * The Board: the layer covers the board view, clipped to it, and every tile is a frame keyed by its screen. The pins are board-comments.js's (in the scrolled canvas); this host only serves the popover, the new-thread composer and the hover outline, and places them from each tile iframe's on-screen rect, so they follow pan, zoom and any padding of the surface.
+ * @param {{ layerEl: HTMLElement, stageEl: HTMLElement, getFrames: () => import("./tile-hit.js").TileFrame[], getZoom: () => number }} deps
+ * @returns {CommentHost}
+ */
+export function createBoardHost({ layerEl, stageEl, getFrames, getZoom }) {
+  return {
+    layerEl,
+    stageEl,
+    pins: false,
+    reanchor: false,
+    noun: "screen",
+    numberPerFrame: true,
+    lockedHint: "Zoom in to comment",
+    // Below the zoom limit writing is off, and the banner says why instead of inviting a click.
+    get modeText() {
+      return getZoom() < TOOL_MIN_ZOOM ? "Zoom in to comment" : "Comment mode: click an element to start a thread";
+    },
+    frames: () =>
+      getFrames().map((frame) => ({
+        key: frame.screen,
+        label: frame.screen,
+        getDoc: frame.doc,
+        box() {
+          const r = frame.rect();
+          const origin = layerEl.getBoundingClientRect();
+          return { left: r.left - origin.left, top: r.top - origin.top, width: r.width, height: r.height, scale: tileScale(frame) };
+        },
+        pick: (target, doc) => commentTarget(doc, target),
+        hoverLabel: (hit) => `${frame.screen} · ${hit.id ?? "screen"}`,
       })),
     view() {
       const r = layerEl.getBoundingClientRect();

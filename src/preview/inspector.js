@@ -127,12 +127,12 @@ function buildDetails(entry, details) {
  * Owns the Inspect panel's DOM (design `inspector-selected`): the selected element's summary, the Layers tree (`node-row`s, chevrons, the selected row tinted) and, below it, Box / Design system / Type for the selection. Inspect mode drives the selection from the canvas through `focusEntry`; a click on a row selects the same way (`onSelect`).
  *
  * @param {{ listEl: HTMLElement, emptyEl: HTMLElement, errorEl: HTMLElement, summaryEl: HTMLElement, detailsEl: HTMLElement }} elements
- * @param {{ getRenderedDoc: (screen: string) => Document | null, onSelect?: (id: string) => void }} deps —
+ * @param {{ getRenderedDoc: (screen: string) => Document | null, onSelect?: (id: string) => void, showScreen?: () => boolean }} deps — `showScreen`: the summary names the screen too (on the Board, where the selection can be on any tile's screen);
  *   reads the *current* iframe document lazily, at selection/refresh time,
  *   scoped to a screen name so a stale/mismatched iframe (still showing a
  *   different screen, or not loaded yet) is never read as if it were live.
  */
-export function createInspectorPanel({ listEl, emptyEl, errorEl, summaryEl, detailsEl }, { getRenderedDoc, onSelect }) {
+export function createInspectorPanel({ listEl, emptyEl, errorEl, summaryEl, detailsEl }, { getRenderedDoc, onSelect, showScreen = () => false }) {
   /** @type {{ id: string, tag: string, parentId: string | null, componentRef: string | null, variant: string | null, tokenRefs: { property: string, ref: unknown }[] }[]} */
   let entries = [];
   let entriesScreen = null;
@@ -285,6 +285,7 @@ export function createInspectorPanel({ listEl, emptyEl, errorEl, summaryEl, deta
     const where = ancestors(entry.id).slice(0, 2);
     const isPart = lastClickedDomId !== null && lastClickedDomId !== entry.id;
     summaryEl.replaceChildren(el("div", "inspect-summary-id", isPart ? lastClickedDomId : entry.id), el("div", "inspect-summary-sub", isPart ? `part of ${entry.id}` : `${entry.tag}${where.length > 0 ? ` in ${where.join(", ")}` : ""}`));
+    if (showScreen() && entriesScreen) summaryEl.append(el("div", "inspect-summary-sub", `Screen ${entriesScreen}`));
     summaryEl.hidden = false;
     const doc = getRenderedDoc(entriesScreen);
     detailsEl.replaceChildren();
@@ -505,3 +506,25 @@ export function updateInspectOverlay(overlayEl, renderedDoc, domId, label = null
 const INSPECT_LABEL_ROOM_PX = 22;
 const INSPECT_LABEL_CHAR_PX = 6.5;
 const INSPECT_LABEL_PAD_PX = 16;
+
+/**
+ * Positions an Inspect outline over a box in its own layer's pixels — the Board's counterpart of updateInspectOverlay: its layer is not zoomed, so the box is already on-screen size and the label needs no counter-scaling. Hidden for a null box.
+ * @param {HTMLElement} overlayEl
+ * @param {{ left: number, top: number, right: number, bottom: number } | null} box
+ * @param {string | null} [label] the element's name (or its component) on the outline's top-left edge; flips inside the outline when there is no room above
+ */
+export function placeInspectBox(overlayEl, box, label = null) {
+  if (!box) {
+    overlayEl.hidden = true;
+    return;
+  }
+  overlayEl.style.left = `${Math.round(box.left)}px`;
+  overlayEl.style.top = `${Math.round(box.top)}px`;
+  overlayEl.style.width = `${Math.round(box.right - box.left)}px`;
+  overlayEl.style.height = `${Math.round(box.bottom - box.top)}px`;
+  if (label) overlayEl.dataset.label = label;
+  else delete overlayEl.dataset.label;
+  if (box.top < INSPECT_LABEL_ROOM_PX) overlayEl.dataset.flip = "";
+  else delete overlayEl.dataset.flip;
+  overlayEl.hidden = false;
+}

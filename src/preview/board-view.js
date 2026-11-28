@@ -184,6 +184,13 @@ export function createBoardView({
   // named (not inline) so mount()'s teardown can actually remove them.
   let relayoutTimer = null;
   let lastWheelAt = 0;
+  // CHR-1298 — while the Board's view is `hidden` (display: none) nothing in it has a size: a relayout would lay the grid out for a 0 x 0 surface and a tile document that loads then reads 0 as its size. So nothing is measured or laid out while hidden; `unmeasured` holds the tiles whose documents loaded meanwhile (read on the next relayout), `hiddenSeen` says the view was away (the browser drops a hidden element's scroll position, so the pan is put back), `pan` is the last scroll position seen while visible.
+  const unmeasured = new Set();
+  let hiddenSeen = false;
+  let pan = { left: 0, top: 0 };
+  function isHidden() {
+    return surfaceEl.closest("[hidden]") !== null;
+  }
 
   function screenIdToNodeId(el) {
     return el.getAttribute("id");
@@ -317,6 +324,15 @@ export function createBoardView({
    * their cursor.
    */
   function relayout() {
+    if (isHidden()) {
+      hiddenSeen = true;
+      return; // measured and laid out when the view shows again (app.js's setView calls relayout then)
+    }
+    for (const screen of unmeasured) {
+      const iframe = iframesByScreen.get(screen);
+      if (iframe) measuredSizes[screen] = readNaturalSize(iframe);
+    }
+    unmeasured.clear();
     currentColumns = computeBoardColumns(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, gridOptions());
     layout = computeLayout(model.items, measuredSizes, { ...gridOptions(), scale: 1, columns: currentColumns });
     layout = { frames: [], mores: [], ...layout };
@@ -342,6 +358,12 @@ export function createBoardView({
     applyZoomSizing();
     applyZoomDependentTileChrome();
     drawEdges();
+    if (hiddenSeen) {
+      // Back from another view: zoom stays (it is a transform on the canvas), the pan comes back.
+      hiddenSeen = false;
+      surfaceEl.scrollLeft = pan.left;
+      surfaceEl.scrollTop = pan.top;
+    }
     onRelayout?.();
     onLayout?.();
   }
@@ -449,6 +471,7 @@ export function createBoardView({
    * action's — see relayout()'s own comment.
    */
   function fitAll() {
+    if (isHidden()) return; // the viewport is 0 x 0 then
     setZoom(
       computeFitAllZoom(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, { ...gridOptions(), columns: currentColumns }),
       { source: "fitall" },
@@ -775,8 +798,12 @@ export function createBoardView({
     // on #screen-frame for why).
     iframe.setAttribute("sandbox", "allow-same-origin");
     iframe.addEventListener("load", () => {
-      measuredSizes[screen] = readNaturalSize(iframe);
       applyTileMode(iframe, screen);
+      if (isHidden()) {
+        unmeasured.add(screen); // a hidden document has no size to read — see `unmeasured`
+        return;
+      }
+      measuredSizes[screen] = readNaturalSize(iframe);
       scheduleRelayout();
     });
     frame.appendChild(iframe);
@@ -807,6 +834,10 @@ export function createBoardView({
     setZoom(zoom * factor, { cursor: { clientX: evt.clientX, clientY: evt.clientY } });
   }
 
+  function handleSurfaceScroll() {
+    if (!isHidden()) pan = { left: surfaceEl.scrollLeft, top: surfaceEl.scrollTop };
+  }
+
   function handleSurfaceClick(evt) {
     if (evt.target === surfaceEl || evt.target === tilesEl) setHighlight(null);
   }
@@ -814,6 +845,7 @@ export function createBoardView({
   /** @returns {() => void} teardown for every listener/observer/timer mount() sets up. */
   function mount() {
     surfaceEl.addEventListener("click", handleSurfaceClick);
+    surfaceEl.addEventListener("scroll", handleSurfaceScroll, { passive: true });
     // Not passive: handleWheel calls preventDefault() to stop the browser's
     // own page-zoom/native-scroll response to a Ctrl/Cmd+wheel or pinch.
     surfaceEl.addEventListener("wheel", handleWheel, { passive: false });
@@ -822,10 +854,14 @@ export function createBoardView({
     // column count on every intermediate resize-observer tick (there can be
     // dozens during a drag-resize or a side-panel collapse animation) would
     // be wasted, possibly janky work.
-    resizeObserver = new ResizeObserver(() => scheduleRelayout());
+    resizeObserver = new ResizeObserver(() => {
+      if (isHidden()) hiddenSeen = true; // shrunk to nothing because the view went away: nothing to lay out
+      else scheduleRelayout();
+    });
     resizeObserver.observe(surfaceEl);
     return () => {
       surfaceEl.removeEventListener("click", handleSurfaceClick);
+      surfaceEl.removeEventListener("scroll", handleSurfaceScroll);
       surfaceEl.removeEventListener("wheel", handleWheel);
       clearTimeout(relayoutTimer);
       resizeObserver?.disconnect();

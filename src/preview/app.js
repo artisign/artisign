@@ -43,7 +43,7 @@ import { renderCommentsPanel } from "./comments-panel.js";
 import { renderScreenChips, renderTagNotes } from "./notes-panel.js";
 import { renderScreenUseCases } from "./usecases-screen-link.js";
 import { setMarkdown } from "./markdown.js";
-import { renderScreenList, renderBoardScreenList, filterScreens, buildScreenTree, flattenTree, ancestorNames, displayName, viewportIconName } from "./screens.js";
+import { renderScreenList, renderBoardScreenList, filterScreens, buildScreenTree, flattenTree, ancestorNames, subtreeNames, displayName, viewportIconName } from "./screens.js";
 import { icon } from "./icons.js";
 import { createVariantUI, variantContext } from "./variants.js";
 import { renderVariantInspector } from "./variant-inspector.js";
@@ -406,6 +406,8 @@ let boardEdgesVisible = true;
 // lifecycle as `pinnedScreens`), stored as given by the daemon.
 let boardClustersOn = true;
 let expandedClusters = [];
+// Whether `expandedClusters` holds a list the daemon sent for the current project (CHR-1297: the first one is only a baseline for the tree sync).
+let expandedClustersSeen = false;
 // The zoom "Fit all" last computed, if any — the only way to know whether
 // its quick-jump button should read active, since (unlike "100%") its
 // target isn't a fixed constant. Set from board.setZoom's onZoomChange
@@ -853,6 +855,8 @@ function resetProjectState() {
   clearTimeout(boardFilterWriteTimer);
   hideAgentPresentedBanner(); // CHR-625 — a presentation is per-project; don't carry it over to the next
   boardBuilt = false;
+  expandedClustersSeen = false;
+  pendingTreeReveal = null;
   boardCommentsRequestId++; // an answer still on its way belongs to the project we just left
   boardComments.setData({ comments: [], threads: [] });
   activeMode = "none";
@@ -932,7 +936,10 @@ function lastScreenKey(projectRoot) {
 function applyBoardState(filter, pinned, forceInputSync = false, expanded = []) {
   const expandedOnly = boardBuilt && (filter ?? "") === screenFilter && arraysEqual(pinned ?? [], pinnedScreens);
   screenFilter = filter ?? "";
+  const previousExpanded = expandedClustersSeen ? expandedClusters : null; // the first list of a project is the baseline, not a change
   expandedClusters = expanded ?? [];
+  expandedClustersSeen = true;
+  if (previousExpanded) syncBoardExpandedToTree(previousExpanded, expandedClusters); // CHR-1297
   // Skip while the human is typing in this very input (review fix 1) — the
   // broadcast this fires from is an echo of ITS OWN write (or a whitespace-
   // only filter the daemon normalised to `null`, board-state.ts), so writing
@@ -1676,6 +1683,51 @@ function revealScreenInSidebar(screen) {
   saveExpandedScreens();
 }
 
+/** The group the card still has to scroll to and light up (CHR-1297): set by a Board expand, done once the Screens list is on screen. */
+let pendingTreeReveal = null;
+const TREE_FLASH_MS = 1200;
+
+/**
+ * CHR-1297 — one-way sync Board -> card tree. The Board's `expanded` names went from `before` to `after`: a group expanded there opens in the tree with its parents, a group collapsed there closes with everything below it (Shift+G collapses them all). The tree never writes back: toggling it is navigation and leaves the Board alone. The state is shared (`expandedScreens`), so it also holds while the card is folded or shows Mockups; only the scroll and the highlight wait for the Screens list to be visible.
+ */
+function syncBoardExpandedToTree(before, after) {
+  const was = new Set(before);
+  const now = new Set(after);
+  const added = after.filter((name) => !was.has(name));
+  const removed = before.filter((name) => !now.has(name));
+  if (added.length === 0 && removed.length === 0) return;
+  const tree = buildScreenTree(screens);
+  const expanded = currentExpandedScreens();
+  for (const name of removed) {
+    const node = tree.nodes.get(name);
+    if (node) for (const member of subtreeNames(node)) expanded.delete(member);
+    else expanded.delete(name);
+  }
+  let reveal = null;
+  for (const name of added) {
+    if (!tree.nodes.has(name)) continue;
+    for (const ancestor of ancestorNames(tree, name)) expanded.add(ancestor);
+    expanded.add(name);
+    reveal ??= name;
+  }
+  saveExpandedScreens();
+  if (reveal) pendingTreeReveal = reveal;
+}
+
+/** Scrolls the pending group into view inside the card (`nearest`: no move when it is already visible) and lights it up briefly. Waits while the Screens list is not on screen; call again when it is. */
+function revealPendingTreeGroup() {
+  if (!pendingTreeReveal) return;
+  const listShown = navTab === "screens" && !sidebarScreensEl.hidden && sidebarScreensEl.dataset.collapsed !== "true";
+  if (!listShown) return;
+  const name = pendingTreeReveal;
+  pendingTreeReveal = null;
+  const row = [...screenListEl.querySelectorAll("li.screen-item-row")].find((li) => li.dataset.screen === name);
+  if (!row) return; // a filter hides it
+  row.scrollIntoView({ block: "nearest" });
+  row.classList.add("tree-reveal");
+  setTimeout(() => row.classList.remove("tree-reveal"), TREE_FLASH_MS);
+}
+
 screenTagsToggle.setAttribute("aria-pressed", String(showSidebarTags));
 /** Tags in the sidebar on/off, shared by the Tags button and the settings menu (CHR-926). */
 function setSidebarTags(on) {
@@ -1756,6 +1808,7 @@ function refreshSidebar() {
   syncPanelContext();
   renderBoardStatus();
   renderAgentBar(); // a feed row's target may have appeared or gone, and the Board's screen count moves with the list
+  revealPendingTreeGroup();
 }
 
 /** Fills the Notes panel for the open screen: its notes as Markdown, its tag chips, the notes of the tags it carries (collapsible), the use cases that map to it. */
@@ -2473,6 +2526,7 @@ function setupCardFold(panelEl, collapseBtn, prefKey) {
     apply(collapsed);
     writeBoolPref(prefsStorage, prefKey, collapsed);
     refitActivePane();
+    revealPendingTreeGroup();
   });
 }
 

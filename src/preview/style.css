@@ -12684,11 +12684,21 @@ body:has(#settings-menu:is(:popover-open, [data-open])) .update-toast {
 }
 
 .empty-recent-name {
+  display: flex;
   flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.empty-recent-dir {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.empty-recent-base {
+  flex: none;
 }
 
 .empty-recent-go {

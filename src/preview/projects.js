@@ -192,9 +192,17 @@ export function createProjectUI(elements, callbacks) {
       folder.className = "empty-recent-icon icon";
       folder.setAttribute("aria-hidden", "true");
       folder.textContent = "folder";
+      // The path in one line; a long one gives way in its folders, never in the project's own name.
       const name = document.createElement("span");
       name.className = "empty-recent-name";
-      name.textContent = path;
+      const cut = path.lastIndexOf("/") + 1;
+      const dir = document.createElement("span");
+      dir.className = "empty-recent-dir";
+      dir.textContent = path.slice(0, cut);
+      const base = document.createElement("span");
+      base.className = "empty-recent-base";
+      base.textContent = path.slice(cut);
+      name.append(dir, base);
       const chevron = document.createElement("span");
       chevron.className = "empty-recent-go icon";
       chevron.setAttribute("aria-hidden", "true");

@@ -59,10 +59,11 @@ function readScreenSize(iframeEl) {
  *   zoom: "fit" | number,
  *   topInset?: number,
  *   insets?: { left: number, right: number, top: number, bottom: number },
- * }} args `topInset` reserves a band above the frame (the frame caption, CHR-912).
- * @returns {{ width: number, height: number }} the screen's unscaled size
+ *   pan?: { x: number, y: number },
+ * }} args `topInset` reserves a band above the frame (the frame caption, CHR-912). `pan` (CHR-1290) is how far the human moved the frame off its centring by hand; it applies only on an axis where the frame fits the free area (there is nothing to scroll), kept inside the pane. Where the frame overflows, the scroll model below moves it.
+ * @returns {{ width: number, height: number, pan: { x: number, y: number } }} the screen's unscaled size and the pan actually applied
  */
-export function applyCanvas({ canvasEl, holderEl, iframeEl, zoom, topInset = 0, insets = { left: 0, right: 0, top: 0, bottom: 0 } }) {
+export function applyCanvas({ canvasEl, holderEl, iframeEl, zoom, topInset = 0, insets = { left: 0, right: 0, top: 0, bottom: 0 }, pan = { x: 0, y: 0 } }) {
   const { width, height } = readScreenSize(iframeEl);
   const availW = canvasEl.clientWidth - insets.left - insets.right;
   const availH = canvasEl.clientHeight - insets.top - insets.bottom - topInset;
@@ -72,14 +73,20 @@ export function applyCanvas({ canvasEl, holderEl, iframeEl, zoom, topInset = 0, 
   holderEl.style.height = `${height}px`;
   holderEl.style.transform = `scale(${scale})`;
   holderEl.style.setProperty("--zoom", String(scale)); // overlay labels counter-scale with it (CHR-780)
-  holderEl.style.left = `${insets.left + Math.max(0, (availW - width * scale) / 2)}px`;
-  holderEl.style.top = `${insets.top + topInset + Math.max(0, (availH - height * scale) / 2)}px`;
+  const drawnW = width * scale;
+  const drawnH = height * scale;
+  const centredLeft = insets.left + Math.max(0, (availW - drawnW) / 2);
+  const centredTop = insets.top + topInset + Math.max(0, (availH - drawnH) / 2);
+  const left = drawnW <= availW ? Math.min(Math.max(0, canvasEl.clientWidth - drawnW), Math.max(0, centredLeft + pan.x)) : centredLeft;
+  const top = drawnH <= availH ? Math.min(Math.max(0, canvasEl.clientHeight - drawnH), Math.max(0, centredTop + pan.y)) : centredTop;
+  holderEl.style.left = `${left}px`;
+  holderEl.style.top = `${top}px`;
 
   // Trailing scroll room: a frame wider or taller than the free area scrolls out from under the cards on the right and the zoom pill below (a ::after of the canvas, style.css, sized to the frame's far edge plus the insets).
-  canvasEl.style?.setProperty("--room-w", `${insets.left + Math.max(0, (availW - width * scale) / 2) + width * scale + insets.right}px`);
-  canvasEl.style?.setProperty("--room-h", `${insets.top + topInset + Math.max(0, (availH - height * scale) / 2) + height * scale + insets.bottom}px`);
+  canvasEl.style?.setProperty("--room-w", `${left + drawnW + insets.right}px`);
+  canvasEl.style?.setProperty("--room-h", `${top + drawnH + insets.bottom}px`);
 
   iframeEl.style.width = `${width}px`;
   iframeEl.style.height = `${height}px`;
-  return { width, height };
+  return { width, height, pan: { x: left - centredLeft, y: top - centredTop } };
 }

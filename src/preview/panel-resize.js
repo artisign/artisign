@@ -43,10 +43,14 @@ export function makePanelResizable({ handleEls, cardEls, edge, min, max, default
   const limit = () => Math.max(min, Math.min(max, availableMax()));
   let width = clampPanelWidth(parsePanelWidth(readStringPref(storage, key, null)) ?? defaultWidth, min, limit());
 
+  let shownWidth = width;
   const show = () => {
     const shown = clampPanelWidth(width, min, limit());
+    shownWidth = shown;
     // A dragged right-column card keeps its right edge, so its left edge follows the handle.
-    const rights = edge === "left" ? cardEls.filter((el) => el.style.left !== "").map((el) => [el, el.getBoundingClientRect().right]) : [];
+    // A card without a layout box (hidden) has no right edge to keep: it is left alone.
+    const boxes = edge === "left" ? cardEls.filter((el) => el.style.left !== "").map((el) => [el, el.getBoundingClientRect()]) : [];
+    const rights = boxes.filter(([, rect]) => rect.width > 0).map(([el, rect]) => [el, rect.right]);
     apply(shown);
     for (const [el, right] of rights) el.style.left = `${right - shown}px`;
     for (const handle of handleEls) {
@@ -122,5 +126,5 @@ export function makePanelResizable({ handleEls, cardEls, edge, min, max, default
     });
   }
 
-  return { getWidth: () => width };
+  return { getWidth: () => shownWidth };
 }

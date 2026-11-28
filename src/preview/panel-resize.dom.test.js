@@ -164,3 +164,19 @@ describe("the panel handles (CHR-1281)", () => {
     expect(appVar("--size-nav-card")).toBe("320px");
   });
 });
+
+describe("a hidden card in the right column (CHR-1281 review)", () => {
+  it("a closed tool panel with a stored position is not moved by a resize", async () => {
+    await boot();
+    const panel = $("tool-panel");
+    panel.style.left = "700px"; // where the grip left it
+    expect(panel.hidden).toBe(true);
+    placeCard($("agent-bar"), 1000, 1248);
+    panel.getBoundingClientRect = () => ({ left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0 });
+    const before = panel.style.left;
+    key($("agent-bar-resize"), "ArrowLeft");
+    expect(appVar("--panel-right-w")).toBe("264px");
+    expect(panel.style.left).toBe(before);
+    expect(before).toBe("700px");
+  });
+});

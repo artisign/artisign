@@ -9400,6 +9400,25 @@ body.is-panel-resizing {
   overflow: auto;
 }
 
+/* CHR-1290 — drag to pan (canvas-input.js sets data-pan on the surface). grab while a drag can start, grabbing during one; the frames' iframes let go of the pointer while dragging so the surface sees every move. The cursor inside a screen's own document is set on its root by the script. */
+#canvas[data-pan="grab"],
+#board-surface[data-pan="grab"] {
+  cursor: grab;
+}
+
+#canvas[data-pan="grabbing"],
+#canvas[data-pan="grabbing"] *,
+#board-surface[data-pan="grabbing"],
+#board-surface[data-pan="grabbing"] * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+#canvas[data-pan="grabbing"] iframe,
+#board-surface[data-pan="grabbing"] iframe {
+  pointer-events: none;
+}
+
 /* The scroll range runs to the frame's far edge plus what the cards cover there, so a zoomed-in frame can be scrolled out from under them (applyCanvas sets the sizes). */
 #canvas::after {
   content: "";

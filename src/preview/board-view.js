@@ -11,6 +11,7 @@
 // document that measures tiles through commentGeometry().
 
 import { fetchRender } from "./api.js";
+import { createCanvasInput } from "./canvas-input.js";
 import { applyFlowMode } from "./flows.js";
 import { icon } from "./icons.js";
 import { DESKTOP_MIN_WIDTH } from "./screens.js";
@@ -29,7 +30,6 @@ import {
   computeFitAllZoom,
   computeBoardColumns,
   computeZoomAroundCursor,
-  computeWheelZoomFactor,
   labelDisplayMode,
   BASE_GAP,
   BASE_GAP_Y,
@@ -76,6 +76,7 @@ const ZOOM_GESTURE_QUIET_MS = 150;
  *   onTogglePin?: (screen: string) => void,
  *   onToggleCluster?: (cluster: { root: string, expanded: boolean, memberNames: string[] }) => void,
  *   onTileKeydown?: (event: KeyboardEvent) => void,
+ *   onManualNavigate?: () => void,
  * }} args `onZoomChange` fires whenever zoom changes for ANY reason —
  *   quick-jump/step buttons, Fit all, the range input, or Ctrl/Cmd+wheel/
  *   pinch on the canvas — so app.js can keep the toolbar's range input,
@@ -100,6 +101,7 @@ const ZOOM_GESTURE_QUIET_MS = 150;
  *   inside a tile's document (same-origin srcdoc) — a press that never
  *   reaches the top document, so the shell's keyboard shortcuts keep working
  *   once a tile was clicked, as they do inside the Screens view's frame.
+ *   `onManualNavigate` (CHR-1290/CHR-1291) fires when a drag or the wheel moves or zooms the canvas by hand — app.js pauses Follow.
  *   `getInsets` (CHR-1299) returns what the floating cards cover of the window right now; it feeds Fit all and the centring, never the canvas origin.
  *   `emptyStateEl`/`emptyStateBodyEl` (CHR-624) — shown/filled by setScreens
  *   whenever the visible set is empty, per the `board-view-empty` design.
@@ -118,6 +120,7 @@ export function createBoardView({
   onTogglePin,
   onToggleCluster,
   onTileKeydown,
+  onManualNavigate,
   getInsets,
 }) {
   /** @type {string[]} */
@@ -149,6 +152,22 @@ export function createBoardView({
   /** @type {Map<string, () => void>} */
   const modeCleanupByScreen = new Map();
   let flowModeOn = false;
+  // CHR-1290/CHR-1291 — the canvas input shared with the Screens view: a left-drag pans (the surface scrolls), the mouse wheel and a pinch zoom around the pointer, a trackpad two-finger scroll stays the surface's native scroll. Flow mode keeps the left button for its clicks.
+  const canvasInput = createCanvasInput({
+    surfaceEl,
+    isToolActive: () => flowModeOn,
+    canHandle: () => !isHidden(),
+    ignoreSelector: "#board-comment-layer *",
+    onManual: () => onManualNavigate?.(),
+    onPan: (dx, dy) => {
+      surfaceEl.scrollLeft -= dx;
+      surfaceEl.scrollTop -= dy;
+    },
+    onZoom: (factor, clientX, clientY) => {
+      lastWheelAt = performance.now();
+      setZoom(zoom * factor, { cursor: { clientX, clientY } });
+    },
+  });
   /** @type {{ from: string } | null} */
   let highlightedSource = null;
   let resizeObserver;
@@ -280,12 +299,14 @@ export function createBoardView({
     // "flow mode on" click behavior. It's a no-op when enabled is false, so
     // the highlight-on-click behavior for "flow mode off" is wired
     // separately by attachTileClicks regardless of flowModeOn.
+    const inputCleanup = canvasInput.attachDoc(doc, iframe); // first: the click that ends a drag is swallowed before the flow and highlight handlers see it
     const flowCleanup = applyFlowMode(doc, flowModeOn, (targetScreen) => centerOnScreen(targetScreen));
     const clickCleanup = flowModeOn ? () => {} : attachTileClicks(doc, screenId);
     if (onTileKeydown) doc.addEventListener("keydown", onTileKeydown);
     modeCleanupByScreen.set(screenId, () => {
       flowCleanup();
       clickCleanup();
+      inputCleanup();
       if (onTileKeydown) doc.removeEventListener("keydown", onTileKeydown);
     });
   }
@@ -847,20 +868,6 @@ export function createBoardView({
     return tile;
   }
 
-  /**
-   * Ctrl/Cmd+scroll-wheel and trackpad pinch (Chrome/Firefox synthesize
-   * pinch as a `wheel` event with `ctrlKey: true`) zoom around the cursor —
-   * a plain wheel/two-finger scroll (neither modifier) is left alone so
-   * #board-surface's native scroll still pans the canvas.
-   */
-  function handleWheel(evt) {
-    if (!evt.ctrlKey && !evt.metaKey) return;
-    evt.preventDefault();
-    lastWheelAt = performance.now();
-    const factor = computeWheelZoomFactor(evt.deltaY, evt.deltaMode, surfaceEl.clientHeight);
-    setZoom(zoom * factor, { cursor: { clientX: evt.clientX, clientY: evt.clientY } });
-  }
-
   function handleSurfaceScroll() {
     if (!isHidden()) pan = { left: surfaceEl.scrollLeft, top: surfaceEl.scrollTop };
   }
@@ -872,10 +879,8 @@ export function createBoardView({
   /** @returns {() => void} teardown for every listener/observer/timer mount() sets up. */
   function mount() {
     surfaceEl.addEventListener("click", handleSurfaceClick);
+    const unmountInput = canvasInput.mount();
     surfaceEl.addEventListener("scroll", handleSurfaceScroll, { passive: true });
-    // Not passive: handleWheel calls preventDefault() to stop the browser's
-    // own page-zoom/native-scroll response to a Ctrl/Cmd+wheel or pinch.
-    surfaceEl.addEventListener("wheel", handleWheel, { passive: false });
     // A resized #board-surface (window resize, side-panel collapse) also
     // goes through scheduleRelayout — see its own comment; recomputing the
     // column count on every intermediate resize-observer tick (there can be
@@ -888,8 +893,8 @@ export function createBoardView({
     resizeObserver.observe(surfaceEl);
     return () => {
       surfaceEl.removeEventListener("click", handleSurfaceClick);
+      unmountInput();
       surfaceEl.removeEventListener("scroll", handleSurfaceScroll);
-      surfaceEl.removeEventListener("wheel", handleWheel);
       clearTimeout(relayoutTimer);
       resizeObserver?.disconnect();
     };

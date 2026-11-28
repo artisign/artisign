@@ -1,6 +1,6 @@
 // CHR-1269 — the Agent bar: the right column's floating card (design `float-card` + `agent-status` + `agent-activity` + `live-chip` + `agent-bar-folded`). It says what the agent is doing now, carries the Follow switch, and lists the Activity feed. The feed, the follow state machine and the navigation stay in activity.js / app.js; this module is the card: the status words (pure) and the DOM.
 //
-// Folding: the bar folds to its head (grip, "Agent", the live status, the Live chip, the chevron) by the user's choice (remembered, key `]`) and by itself while a tool panel takes the column below it; the panel closing brings it back. A panel-fold is never stored: it is derived from "a panel is open" every time.
+// Folding: the bar folds to its head (grip, "Agent", the live status, the Live chip, the chevron) by the user's choice (remembered, key `]`) only. A tool panel open below it does not fold it: the two share the column (CHR-1286, right-column.js).
 
 import { describeActivity, fillActivityText, formatActivityTime, renderActivityFeed } from "./activity.js";
 import { makeCardDraggable } from "./float-card.js";
@@ -79,28 +79,22 @@ export function createAgentBar({ barEl, topbarEl, storage, onFollow, onResume, o
 
   const FOLD_KEY = "artisign.agent-bar.collapsed";
   let userFolded = readBoolPref(storage, FOLD_KEY, false);
-  let panelOpen = false;
 
   makeCardDraggable({ cardEl: barEl, gripEl: $("agent-bar-grip"), storage, key: "artisign.agent-bar.position", label: "Agent bar", liveEl });
 
   function applyFold() {
-    const folded = userFolded || panelOpen;
+    const folded = userFolded;
     barEl.dataset.collapsed = String(folded);
-    barEl.dataset.panelFold = String(panelOpen);
     foldedStatusEl.hidden = !folded;
     foldEl.setAttribute("aria-expanded", String(!folded));
     foldIconEl.textContent = folded ? "keyboard_arrow_down" : "keyboard_arrow_up";
-    // A bar folded by an open panel stays folded until the panel closes: its control says so instead of doing nothing.
-    const label = panelOpen ? "Agent bar is folded while a panel is open" : folded ? "Unfold Agent bar" : "Fold Agent bar";
+    const label = folded ? "Unfold Agent bar" : "Fold Agent bar";
     foldEl.setAttribute("aria-label", label);
     foldEl.dataset.tooltip = label;
-    if (panelOpen) foldEl.setAttribute("aria-disabled", "true");
-    else foldEl.removeAttribute("aria-disabled");
     // Focus inside a body that just went away would fall to the page: it stays on the card, at the fold control.
     if (folded && bodyEl.contains(document.activeElement)) foldEl.focus();
   }
   foldEl.addEventListener("click", () => {
-    if (panelOpen) return;
     userFolded = !userFolded;
     writeBoolPref(storage, FOLD_KEY, userFolded);
     applyFold();
@@ -165,12 +159,6 @@ export function createAgentBar({ barEl, topbarEl, storage, onFollow, onResume, o
 
       renderActivityFeed(feedEl, $("agent-feed-empty"), feed, { exists, onSelect, now: () => now });
       syncFade();
-    },
-    /** A tool panel took (or gave back) the column below: fold (or unfold) with it. @param {boolean} open */
-    setPanelOpen(open) {
-      if (panelOpen === open) return;
-      panelOpen = open;
-      applyFold();
     },
   };
 }

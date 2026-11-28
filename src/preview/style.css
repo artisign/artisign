@@ -10200,8 +10200,8 @@ body.is-panel-resizing {
   width: var(--panel-right-w, var(--size-agent-bar));
 }
 
-/* The Agent bar above it is folded to its head while a panel is open, so the panel starts a gap below it. */
-#app[data-panel-open="true"] #tool-panel {
+/* The Agent bar above it is folded to its head, so the panel starts a gap below it (right-column.js sets data-stack). */
+#app[data-stack="below"] #tool-panel {
   top: calc(var(--shell-top) + var(--agent-folded-height) + var(--space-md));
 }
 
@@ -10218,6 +10218,25 @@ body.is-panel-resizing {
 
 #agent-bar[data-collapsed="true"] {
   bottom: auto;
+}
+
+/* CHR-1286 — Agent bar and a panel open in the docked column share its height: 40 % / 60 % of what is left after the gap, each at least a head plus ~120px. A free card is not part of the stack. */
+#app[data-stack="split"] {
+  --stack-agent-h: max(calc((100% - var(--shell-top) - 18px - var(--space-md)) * 0.4), 168px);
+}
+
+#app[data-stack="split"] #agent-bar {
+  bottom: auto;
+  height: var(--stack-agent-h);
+}
+
+#app[data-stack="split"] #tool-panel {
+  top: calc(var(--shell-top) + var(--stack-agent-h) + var(--space-md));
+  min-height: 168px;
+}
+
+#agent-bar[data-collapsed="false"] {
+  min-height: 168px;
 }
 
 /* Folded, the bar is its head alone (the panel below starts a gap under it). */

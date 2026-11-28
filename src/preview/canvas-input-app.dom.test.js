@@ -261,6 +261,9 @@ describe("the empty guide", () => {
 });
 
 describe("the Board", () => {
+  // The Board defers a coalesced relayout while a zoom gesture is fresh (150 ms quiet time + 50 ms coalescing). Let that timer fire while the stubbed CSS still exists, or it runs after the teardown and throws.
+  afterEach(() => new Promise((r) => setTimeout(r, 250)));
+
   async function onBoard() {
     await boot();
     $('.view-tab[data-view="board"]').click();

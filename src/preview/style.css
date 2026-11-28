@@ -1730,8 +1730,8 @@ button.chrome-section-header:focus-visible {
 #board-view {
   /* The workspace dots of #app show through. */
   background: none;
-  right: var(--reserve-right);
-  bottom: var(--shell-bottom);
+  /* CHR-1299: the canvas fills the window; the cards float over it and never move its origin. */
+  inset: 0;
   overflow: hidden;
 }
 
@@ -1749,13 +1749,15 @@ button.chrome-section-header:focus-visible {
   position: absolute;
   inset: 0;
   overflow: auto;
+  /* Where the content starts: the open cards' area, a constant of the layout. The card state never changes it; Fit all scrolls the content into the area that is actually free (board-view.js). */
+  padding: var(--shell-top) var(--reserve-right) var(--shell-bottom) var(--canvas-pad-left);
 }
 
 /* CHR-625 — the pill above the zoom pill: the agent switched the human to the Board. Independent of #board-canvas's zoom transform and scroll position. A live region: it is unhidden before its text is written. */
 #board-presented-banner {
   position: absolute;
-  bottom: var(--space-md);
-  left: 50%;
+  bottom: calc(var(--shell-bottom) + var(--space-md));
+  left: calc(var(--canvas-pad-left) + (100% - var(--canvas-pad-left) - var(--reserve-right)) / 2);
   transform: translateX(-50%);
   z-index: 2;
   display: flex;
@@ -1815,8 +1817,8 @@ button.chrome-section-header:focus-visible {
 /* CHR-624 — the card in the middle of the board when nothing is on it (design `board-view-empty`). Independent of the canvas's zoom and scroll. */
 #board-empty-state {
   position: absolute;
-  top: 50%;
-  left: 50%;
+  top: calc(var(--shell-top) + (100% - var(--shell-top) - var(--shell-bottom)) / 2);
+  left: calc(var(--canvas-pad-left) + (100% - var(--canvas-pad-left) - var(--reserve-right)) / 2);
   transform: translate(-50%, -50%);
   z-index: 2;
   display: flex;
@@ -2346,8 +2348,8 @@ button.chrome-section-header:focus-visible {
 
 /* CHR-738 — side-by-side variant compare (approved `variants-compare` a-column-compare). A mode of the screen view: #compare-view takes #screens-stage's place, the chip row sits above the columns, the compare panel replaces the Elements/Activity panel. */
 #compare-view {
-  flex: 1;
-  min-height: 0;
+  position: absolute;
+  inset: var(--shell-top) var(--reserve-right) var(--shell-bottom) var(--canvas-pad-left);
   display: flex;
   flex-direction: column;
 }
@@ -8298,8 +8300,8 @@ button.uc-target:hover {
 #comment-banner {
   position: absolute;
   top: auto;
-  bottom: var(--space-sm);
-  left: 50%;
+  bottom: calc(var(--shell-bottom) + var(--space-sm));
+  left: calc(var(--canvas-pad-left) + (100% - var(--canvas-pad-left) - var(--reserve-right)) / 2);
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -8628,7 +8630,9 @@ body {
   /* Where the canvas may draw: below the top groups, right of the card and the tool bar, above the zoom pill. */
   --shell-top: 76px;
   --shell-bottom: 80px;
-  --reserve-left: 356px;
+  /* The area the open cards take on the left (card + tool bar + gaps). A constant of the layout: the canvases start here whether the card is open or folded (CHR-1299). */
+  --canvas-pad-left: 356px;
+  --reserve-left: var(--canvas-pad-left);
   /* The Agent bar folded to its head: the tool panel below it starts a gap under this. */
   --agent-folded-height: 48px;
   /* The right column (the Agent bar, and the tool panel under it) takes its width from the canvas: card + the gap on both sides. */
@@ -9130,6 +9134,17 @@ body {
   background: var(--chrome-hover);
 }
 
+/* CHR-1297: a group the Board just expanded, lit up for a moment once the card has scrolled to it. */
+.screen-item-row.tree-reveal > .screen-item {
+  animation: tree-reveal 1.2s ease-out;
+}
+
+@keyframes tree-reveal {
+  from {
+    background: var(--chrome-accent-subtle);
+  }
+}
+
 .screen-item[aria-current="true"] {
   background: var(--chrome-accent-subtle);
   color: var(--chrome-accent);
@@ -9294,23 +9309,25 @@ body {
   overflow: auto;
 }
 
-#screens-view,
 #mockup-view {
   right: var(--reserve-right);
   bottom: var(--shell-bottom);
 }
 
+/* CHR-1299: the Screens canvas fills the window like the Board's; the cards float over it. */
 #screens-view {
+  inset: 0;
   display: flex;
   flex-direction: column;
   overflow: visible;
+  /* The area the open cards take, a constant of the layout: the breadcrumb is kept out of it (app.js reads it), the compare view sits in it. */
+  padding: var(--shell-top) var(--reserve-right) var(--shell-bottom) var(--canvas-pad-left);
 }
 
 #screens-stage {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  position: relative; /* anchors the comment banner and the floating canvas toolbar (CHR-1252) */
+  position: absolute;
+  inset: 0;
+  display: flex; /* anchors the comment banner and the floating canvas toolbar (CHR-1252) */
 }
 
 #screens-stage > #canvas {
@@ -9325,7 +9342,7 @@ body {
 #canvas {
   flex: 1;
   position: relative;
-  overflow: hidden; /* CHR-1290: the frame is moved by the pan offset, never by native scroll */
+  overflow: auto;
 }
 
 /* CHR-1290 — drag to pan (canvas-input.js sets data-pan on the surface). grab while a drag can start, grabbing during one; the frames' iframes let go of the pointer while dragging so the surface sees every move. The cursor inside a screen's own document is set on its root by the script. */
@@ -9344,6 +9361,17 @@ body {
 
 #canvas[data-pan="grabbing"] iframe,
 #board-surface[data-pan="grabbing"] iframe {
+  pointer-events: none;
+}
+
+/* The scroll range runs to the frame's far edge plus what the cards cover there, so a zoomed-in frame can be scrolled out from under them (applyCanvas sets the sizes). */
+#canvas::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--room-w, 0);
+  height: var(--room-h, 0);
   pointer-events: none;
 }
 
@@ -9379,13 +9407,14 @@ body {
   box-shadow: var(--chrome-shadow-frame);
 }
 
-/* The variant breadcrumb floats above the frame, left-aligned with it. */
+/* The variant breadcrumb floats over the displayed screen, centred on it: app.js sets --bar-center (the screen's centre, kept clear of the cards) and --bar-max (the free width). The Screens card state never moves it (CHR-1280). */
 #variant-bar {
   position: absolute;
   z-index: 6;
-  top: var(--space-xs);
-  left: var(--frame-left, 0);
-  max-width: 100%;
+  top: calc(var(--shell-top) + var(--space-xs));
+  left: var(--bar-center, 50%);
+  transform: translateX(-50%);
+  max-width: var(--bar-max, 100%);
   display: flex;
   align-items: center;
   gap: var(--space-2xs);
@@ -9401,11 +9430,7 @@ body {
   display: none;
 }
 
-/* Comparing: the bar sits over the compare view's top-left, which makes room. */
-#app[data-comparing="true"] #variant-bar {
-  left: 0;
-}
-
+/* Comparing: the bar sits over the compare view's top, which makes room. */
 #app[data-comparing="true"] #compare-view {
   margin-top: 52px;
 }
@@ -9580,8 +9605,9 @@ body {
   position: absolute;
   z-index: 20;
   bottom: 18px;
-  left: var(--reserve-left);
-  right: var(--reserve-right);
+  /* Anchored to the window, not to the canvas between the cards (CHR-1299). */
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: center;
   pointer-events: none;
@@ -9663,7 +9689,7 @@ body {
   position: fixed;
   inset: auto;
   bottom: 70px;
-  left: calc((var(--reserve-left) + 100vw - var(--reserve-right)) / 2 - 136px);
+  left: calc(50vw - 136px);
   width: 272px;
   margin: 0;
   padding: var(--space-md) var(--space-lg) var(--space-sm);
@@ -9909,6 +9935,12 @@ body {
   cursor: pointer;
 }
 
+/* CHR-1283: a tool without a function in the view is hidden. The class sets `display`, which would beat the `hidden` attribute and leave the tool (and a gap) in the bar. */
+.tool-btn[hidden],
+.tool-sep[hidden] {
+  display: none;
+}
+
 .tool-btn .icon {
   font-size: var(--size-icon);
 }
@@ -9961,6 +9993,22 @@ body {
   height: 0;
   margin: var(--space-xs) 0;
   border-top: 1px solid var(--chrome-border);
+}
+
+/* CHR-1292: a short, non-blocking hint at the bottom of the canvas (e.g. "No resolved comments on this screen"). */
+#tool-toast {
+  position: fixed;
+  bottom: var(--space-2xl);
+  left: 50%;
+  z-index: 40;
+  transform: translateX(-50%);
+  max-width: min(480px, calc(100vw - 2 * var(--space-xl)));
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-item);
+  background: var(--chrome-tooltip);
+  color: var(--chrome-tooltip-text);
+  font-size: var(--ui-sm);
+  pointer-events: none;
 }
 
 /* Hint tooltips: blue, after ~2 s of hover, to the right of the tool. The popover is only drawn while open (display is set for :popover-open alone, so the UA's closed state stays). */
@@ -11613,6 +11661,11 @@ dialog.float-dialog::backdrop {
   margin: 0;
 }
 
+/* CHR-1283: the view a key is limited to ("Flow arrows · Board"). */
+.shortcut-scope {
+  color: var(--chrome-text-secondary);
+}
+
 .shortcut-keys {
   display: flex;
   gap: var(--space-xs);
@@ -12641,8 +12694,8 @@ body:has(#settings-menu:is(:popover-open, [data-open])) .update-toast {
 
 #empty-guide {
   position: absolute;
-  top: calc(210px - var(--shell-top)); /* the design puts the card 210px from the window's top; the canvas starts at --shell-top */
-  left: 50%;
+  top: 210px; /* the design puts the card 210px from the window's top */
+  left: calc(var(--canvas-pad-left) + (100% - var(--canvas-pad-left) - var(--reserve-right)) / 2);
   transform: translateX(-50%);
   width: 440px;
   padding: var(--space-2xl);

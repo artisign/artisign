@@ -5,8 +5,6 @@ import { computeWheelZoomFactor } from "./board.js";
 
 /** A press moves the canvas only once it travelled this far (px), so a click stays a click. */
 export const PAN_THRESHOLD = 4;
-/** A drag or scroll never takes the frame farther than this many px of it off the pane. */
-export const KEEP_IN_VIEW = 64;
 // A trackpad flick keeps sending small deltas for a while (inertia): after one pan event, the next events within this window stay pan.
 const PAN_LATCH_MS = 200;
 // A notched mouse wheel steps in whole pixels of at least this size per event (Chrome: 100, Windows: 120).
@@ -32,27 +30,13 @@ export function createWheelClassifier(now = () => performance.now()) {
 }
 
 /**
- * Where a frame edge sits after a zoom that keeps the point under the pointer in place: one axis, in the pane's own coordinates.
+ * Where a frame edge sits after a zoom that keeps the point under the pointer in place: one axis, in the pane's own (viewport) coordinates.
  *
  * @param {{ pointer: number, position: number, oldScale: number, newScale: number }} args `position` is the frame's current edge (left or top)
  * @returns {number}
  */
 export function anchoredPosition({ pointer, position, oldScale, newScale }) {
   return pointer - (pointer - position) * (newScale / oldScale);
-}
-
-/**
- * Keeps at least `keep` px of a frame inside the pane on one axis.
- *
- * @param {number} position the frame's edge (left or top)
- * @param {number} size the frame's size on that axis, as drawn
- * @param {number} avail the pane's size on that axis
- * @param {number} [keep]
- * @returns {number}
- */
-export function clampFramePosition(position, size, avail, keep = KEEP_IN_VIEW) {
-  const visible = Math.min(keep, size, avail);
-  return Math.min(avail - visible, Math.max(visible - size, position));
 }
 
 /**

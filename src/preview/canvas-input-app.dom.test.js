@@ -64,8 +64,6 @@ const wheel = (target, over) => {
   target.dispatchEvent(evt);
   return evt;
 };
-const left = () => parseFloat($("#screen-holder").style.left);
-const top = () => parseFloat($("#screen-holder").style.top);
 
 async function boot() {
   localStorage.setItem("artisign.last-screen:/p", "a");
@@ -85,23 +83,22 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("CHR-1290 — pan the Screens canvas by dragging", () => {
-  it("moves the frame by the drag, leaves the zoom alone and pauses Follow", async () => {
+  it("scrolls the canvas the other way by the drag, leaves the zoom alone and pauses Follow", async () => {
     await boot();
     expect(followState()).toBe("following");
     const label = $("#zoom-label").textContent;
-    const [x0, y0] = [left(), top()];
     const canvas = $("#canvas");
+    canvas.scrollLeft = 200;
+    canvas.scrollTop = 100;
     pointer(canvas, "pointerdown", 100, 100);
     pointer(canvas, "pointermove", 101, 100);
-    expect(left()).toBe(x0); // below the threshold: nothing moves
+    expect(canvas.scrollLeft).toBe(200); // below the threshold: nothing moves
     expect(followState()).toBe("following");
     pointer(canvas, "pointermove", 160, 130);
     pointer(canvas, "pointerup", 160, 130);
+    expect([canvas.scrollLeft, canvas.scrollTop]).toEqual([140, 70]);
     expect(followState()).toBe("paused");
     expect($("#zoom-label").textContent).toBe(label);
-    // the frame may be held back to keep a corner on the pane; it never moves the other way
-    expect(left()).toBeGreaterThanOrEqual(x0);
-    expect(top()).toBeGreaterThanOrEqual(y0);
   });
 
   it("an active tool keeps the left button", async () => {
@@ -109,11 +106,11 @@ describe("CHR-1290 — pan the Screens canvas by dragging", () => {
     $("#inspect-mode-toggle").click();
     await flush();
     $("#follow-resume").click();
-    const [x0, y0] = [left(), top()];
+    $("#canvas").scrollLeft = 200;
     pointer($("#canvas"), "pointermove", 100, 100, { buttons: 0 });
     pointer($("#canvas"), "pointerdown", 100, 100);
     pointer($("#canvas"), "pointermove", 160, 130);
-    expect([left(), top()]).toEqual([x0, y0]);
+    expect($("#canvas").scrollLeft).toBe(200);
     expect(followState()).toBe("following");
   });
 
@@ -180,10 +177,11 @@ describe("CHR-1291 — wheel zoom", () => {
 
   it("Fit takes a hand-moved canvas back", async () => {
     await boot();
-    const [x0, y0] = [left(), top()];
+    $("#canvas").scrollLeft = 300;
     wheel($("#canvas"), { deltaX: 40, deltaY: 6.5 });
+    expect($("#canvas").scrollLeft).toBe(340);
     $("#zoom-fit").click();
-    expect([left(), top()]).toEqual([x0, y0]);
+    expect([$("#canvas").scrollLeft, $("#canvas").scrollTop]).toEqual([0, 0]);
   });
 });
 

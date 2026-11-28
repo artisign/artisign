@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { anchoredPosition, clampFramePosition, createWheelClassifier } from "./canvas-input.js";
+import { anchoredPosition, createWheelClassifier } from "./canvas-input.js";
 
 const wheel = (over) => ({ ctrlKey: false, metaKey: false, deltaX: 0, deltaY: 0, deltaMode: 0, ...over });
 
@@ -45,17 +45,5 @@ describe("anchoredPosition", () => {
 
   it("leaves the frame alone when the scale does not change", () => {
     expect(anchoredPosition({ pointer: 40, position: 12, oldScale: 0.5, newScale: 0.5 })).toBe(12);
-  });
-});
-
-describe("clampFramePosition", () => {
-  it("keeps a corner of the frame on the pane", () => {
-    expect(clampFramePosition(-5000, 400, 1000, 64)).toBe(-336); // 64 px of it stay in view on the left
-    expect(clampFramePosition(5000, 400, 1000, 64)).toBe(936);
-    expect(clampFramePosition(120, 400, 1000, 64)).toBe(120);
-  });
-
-  it("never asks for more of a tiny frame than it has", () => {
-    expect(clampFramePosition(-5000, 20, 1000, 64)).toBe(0);
   });
 });

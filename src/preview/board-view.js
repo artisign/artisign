@@ -24,7 +24,6 @@ import {
   elementSideAnchor,
   tileAnchor,
   bezierPath,
-  computeCenterScroll,
   edgesFromNode,
   screenIdFromRef,
   clampZoom,
@@ -103,6 +102,7 @@ const ZOOM_GESTURE_QUIET_MS = 150;
  *   reaches the top document, so the shell's keyboard shortcuts keep working
  *   once a tile was clicked, as they do inside the Screens view's frame.
  *   `onManualNavigate` (CHR-1290/CHR-1291) fires when a drag or the wheel moves or zooms the canvas by hand — app.js pauses Follow.
+ *   `getInsets` (CHR-1299) returns what the floating cards cover of the window right now; it feeds Fit all and the centring, never the canvas origin.
  *   `emptyStateEl`/`emptyStateBodyEl` (CHR-624) — shown/filled by setScreens
  *   whenever the visible set is empty, per the `board-view-empty` design.
  */
@@ -121,6 +121,7 @@ export function createBoardView({
   onToggleCluster,
   onTileKeydown,
   onManualNavigate,
+  getInsets,
 }) {
   /** @type {string[]} */
   let screens = [];
@@ -202,9 +203,49 @@ export function createBoardView({
   // named (not inline) so mount()'s teardown can actually remove them.
   let relayoutTimer = null;
   let lastWheelAt = 0;
+  // CHR-1298 — while the Board's view is `hidden` (display: none) nothing in it has a size: a relayout would lay the grid out for a 0 x 0 surface and a tile document that loads then reads 0 as its size. So nothing is measured or laid out while hidden; `unmeasured` holds the tiles whose documents loaded meanwhile (read on the next relayout), `hiddenSeen` says the view was away (the browser drops a hidden element's scroll position, so the pan is put back), `pan` is the last scroll position seen while visible.
+  const unmeasured = new Set();
+  let hiddenSeen = false;
+  let pan = { left: 0, top: 0 };
+  function isHidden() {
+    return surfaceEl.closest("[hidden]") !== null;
+  }
 
   function screenIdToNodeId(el) {
     return el.getAttribute("id");
+  }
+
+  /**
+   * CHR-1299 — the surface fills the window; its padding is the constant area the cards take when open, where the content starts at scroll 0. A card never changes it. (style.css `#board-surface`)
+   * @returns {{ left: number, right: number, top: number, bottom: number }}
+   */
+  function contentPad() {
+    const style = getComputedStyle(surfaceEl);
+    return { left: parseFloat(style.paddingLeft) || 0, right: parseFloat(style.paddingRight) || 0, top: parseFloat(style.paddingTop) || 0, bottom: parseFloat(style.paddingBottom) || 0 };
+  }
+
+  /** The area the cards leave free right now, in surface pixels — what Fit all fits into and centring aims at. `getInsets` (app.js) measures the cards; without it the content area stands in. */
+  function freeArea() {
+    const insets = getInsets?.() ?? contentPad();
+    return {
+      left: insets.left,
+      top: insets.top,
+      width: Math.max(0, surfaceEl.clientWidth - insets.left - insets.right),
+      height: Math.max(0, surfaceEl.clientHeight - insets.top - insets.bottom),
+    };
+  }
+
+  /** The scroll offset that puts the centre of a box (board px at the current zoom) in the middle of the free area, clamped to the scrollable range. */
+  function scrollToCenter(box) {
+    const pad = contentPad();
+    const scale = zoom / 100;
+    const free = freeArea();
+    const maxLeft = Math.max(0, pad.left + layout.contentWidth * scale + pad.right - surfaceEl.clientWidth);
+    const maxTop = Math.max(0, pad.top + layout.contentHeight * scale + pad.bottom - surfaceEl.clientHeight);
+    return {
+      left: Math.min(Math.max(0, pad.left + box.x + box.width / 2 - (free.left + free.width / 2)), maxLeft),
+      top: Math.min(Math.max(0, pad.top + box.y + box.height / 2 - (free.top + free.height / 2)), maxTop),
+    };
   }
 
   function centerOnScreen(screenId) {
@@ -214,13 +255,7 @@ export function createBoardView({
     if (!tile) return;
     const scale = zoom / 100;
     const scaledTile = { x: tile.x * scale, y: tile.y * scale, width: tile.width * scale, height: tile.height * scale };
-    const { left, top } = computeCenterScroll(
-      scaledTile,
-      surfaceEl.clientWidth,
-      surfaceEl.clientHeight,
-      layout.contentWidth * scale,
-      layout.contentHeight * scale,
-    );
+    const { left, top } = scrollToCenter(scaledTile);
     surfaceEl.scrollTo({ left, top, behavior: "smooth" });
   }
 
@@ -337,7 +372,17 @@ export function createBoardView({
    * their cursor.
    */
   function relayout() {
-    currentColumns = computeBoardColumns(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, gridOptions());
+    if (isHidden()) {
+      hiddenSeen = true;
+      return; // measured and laid out when the view shows again (app.js's setView calls relayout then)
+    }
+    for (const screen of unmeasured) {
+      const iframe = iframesByScreen.get(screen);
+      if (iframe) measuredSizes[screen] = readNaturalSize(iframe);
+    }
+    unmeasured.clear();
+    const pad = contentPad();
+    currentColumns = computeBoardColumns(model.items, measuredSizes, surfaceEl.clientWidth - pad.left - pad.right, surfaceEl.clientHeight - pad.top - pad.bottom, gridOptions());
     layout = computeLayout(model.items, measuredSizes, { ...gridOptions(), scale: 1, columns: currentColumns });
     layout = { frames: [], mores: [], ...layout };
     tilesEl.style.width = `${layout.contentWidth}px`;
@@ -362,6 +407,12 @@ export function createBoardView({
     applyZoomSizing();
     applyZoomDependentTileChrome();
     drawEdges();
+    if (hiddenSeen) {
+      // Back from another view: zoom stays (it is a transform on the canvas), the pan comes back.
+      hiddenSeen = false;
+      surfaceEl.scrollLeft = pan.left;
+      surfaceEl.scrollTop = pan.top;
+    }
     onRelayout?.();
     onLayout?.();
   }
@@ -435,17 +486,18 @@ export function createBoardView({
     }
     if (cursor) {
       const rect = surfaceEl.getBoundingClientRect();
+      const pad = contentPad(); // the content starts `pad` into the scroll area: measure the cursor and the viewport from there
       const { left, top } = computeZoomAroundCursor({
-        cursorX: cursor.clientX - rect.left,
-        cursorY: cursor.clientY - rect.top,
+        cursorX: cursor.clientX - rect.left - pad.left,
+        cursorY: cursor.clientY - rect.top - pad.top,
         scrollLeft: surfaceEl.scrollLeft,
         scrollTop: surfaceEl.scrollTop,
         oldZoomPercent: zoom,
         newZoomPercent: clamped,
         contentWidth: layout.contentWidth,
         contentHeight: layout.contentHeight,
-        viewportWidth: surfaceEl.clientWidth,
-        viewportHeight: surfaceEl.clientHeight,
+        viewportWidth: surfaceEl.clientWidth - pad.left - pad.right,
+        viewportHeight: surfaceEl.clientHeight - pad.top - pad.bottom,
       });
       zoom = clamped;
       applyZoomSizing();
@@ -469,10 +521,13 @@ export function createBoardView({
    * action's — see relayout()'s own comment.
    */
   function fitAll() {
-    setZoom(
-      computeFitAllZoom(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, { ...gridOptions(), columns: currentColumns }),
-      { source: "fitall" },
-    );
+    if (isHidden()) return; // the viewport is 0 x 0 then
+    const free = freeArea();
+    setZoom(computeFitAllZoom(model.items, measuredSizes, free.width, free.height, { ...gridOptions(), columns: currentColumns }), { source: "fitall" });
+    // The content starts at the constant pad; bring it to where the free area starts (CHR-1299).
+    const pad = contentPad();
+    surfaceEl.scrollLeft = Math.max(0, pad.left - free.left);
+    surfaceEl.scrollTop = Math.max(0, pad.top - free.top);
   }
 
   /**
@@ -484,16 +539,11 @@ export function createBoardView({
     const tile = findTile(layout.tiles, screen);
     if (!tile) return;
     const room = 2 * BASE_PADDING;
-    const fit = Math.min(surfaceEl.clientWidth / (tile.width + room), surfaceEl.clientHeight / (tile.height + room)) * 100;
+    const free = freeArea();
+    const fit = Math.min(free.width / (tile.width + room), free.height / (tile.height + room)) * 100;
     setZoom(Math.max(100, zoom * 1.5, fit));
     const scale = zoom / 100;
-    const { left, top } = computeCenterScroll(
-      { x: tile.x * scale, y: tile.y * scale, width: tile.width * scale, height: tile.height * scale },
-      surfaceEl.clientWidth,
-      surfaceEl.clientHeight,
-      layout.contentWidth * scale,
-      layout.contentHeight * scale,
-    );
+    const { left, top } = scrollToCenter({ x: tile.x * scale, y: tile.y * scale, width: tile.width * scale, height: tile.height * scale });
     surfaceEl.scrollLeft = left;
     surfaceEl.scrollTop = top;
   }
@@ -795,8 +845,12 @@ export function createBoardView({
     // on #screen-frame for why).
     iframe.setAttribute("sandbox", "allow-same-origin");
     iframe.addEventListener("load", () => {
-      measuredSizes[screen] = readNaturalSize(iframe);
       applyTileMode(iframe, screen);
+      if (isHidden()) {
+        unmeasured.add(screen); // a hidden document has no size to read — see `unmeasured`
+        return;
+      }
+      measuredSizes[screen] = readNaturalSize(iframe);
       scheduleRelayout();
     });
     frame.appendChild(iframe);
@@ -813,6 +867,10 @@ export function createBoardView({
     return tile;
   }
 
+  function handleSurfaceScroll() {
+    if (!isHidden()) pan = { left: surfaceEl.scrollLeft, top: surfaceEl.scrollTop };
+  }
+
   function handleSurfaceClick(evt) {
     if (evt.target === surfaceEl || evt.target === tilesEl) setHighlight(null);
   }
@@ -821,16 +879,21 @@ export function createBoardView({
   function mount() {
     surfaceEl.addEventListener("click", handleSurfaceClick);
     const unmountInput = canvasInput.mount();
+    surfaceEl.addEventListener("scroll", handleSurfaceScroll, { passive: true });
     // A resized #board-surface (window resize, side-panel collapse) also
     // goes through scheduleRelayout — see its own comment; recomputing the
     // column count on every intermediate resize-observer tick (there can be
     // dozens during a drag-resize or a side-panel collapse animation) would
     // be wasted, possibly janky work.
-    resizeObserver = new ResizeObserver(() => scheduleRelayout());
+    resizeObserver = new ResizeObserver(() => {
+      if (isHidden()) hiddenSeen = true; // shrunk to nothing because the view went away: nothing to lay out
+      else scheduleRelayout();
+    });
     resizeObserver.observe(surfaceEl);
     return () => {
       surfaceEl.removeEventListener("click", handleSurfaceClick);
       unmountInput();
+      surfaceEl.removeEventListener("scroll", handleSurfaceScroll);
       clearTimeout(relayoutTimer);
       resizeObserver?.disconnect();
     };

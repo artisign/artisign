@@ -257,10 +257,12 @@ describe("canvas comments", () => {
     const bar = $("#tool-bar");
     expect([bar.getAttribute("role"), bar.getAttribute("aria-orientation"), bar.getAttribute("focusgroup")]).toEqual(["toolbar", "vertical", "toolbar wrap block"]);
     const all = [...document.querySelectorAll("#tool-bar-tools .tool-btn")];
-    // The Board's own tools are in the bar but hidden here, so they are neither a tab stop nor an arrow-key stop.
-    expect(all.filter((b) => b.hidden).map((b) => b.id)).toEqual(["board-resolved-toggle", "board-clusters-toggle", "board-collapse-all-btn"]);
+    // The Board's own tools are in the bar but hidden here (CHR-1283), so they are neither a tab stop nor an arrow-key stop. Canvas tools first, then the panel tools (CHR-1288); no Design system button (CHR-1284).
+    expect(all.filter((b) => b.hidden).map((b) => b.id)).toEqual(["board-clusters-toggle", "board-collapse-all-btn"]);
     const tools = all.filter((b) => !b.hidden);
-    expect(tools.map((b) => b.id)).toEqual(["comment-mode-toggle", "inspect-mode-toggle", "notes-tool-toggle", "comments-tool-toggle", "flow-mode-toggle", "design-system-tool"]);
+    expect(tools.map((b) => b.id)).toEqual(["comment-mode-toggle", "inspect-mode-toggle", "flow-mode-toggle", "notes-tool-toggle", "comments-tool-toggle", "resolved-toggle"]);
+    expect(document.getElementById("design-system-tool")).toBeNull();
+    expect([...$("#tool-bar-tools").children].map((el) => el.id).filter(Boolean).indexOf("tool-group-sep")).toBe(5); // the divider sits after the canvas group
     expect(all.map((b) => b.tabIndex).filter((i) => i === 0)).toHaveLength(1);
     expect(tools.map((b) => b.tabIndex)).toEqual([0, -1, -1, -1, -1, -1]);
     tools[0].focus();
@@ -392,16 +394,49 @@ describe("canvas comments", () => {
     await boot("one");
     loadFrame();
     $("#inspect-mode-toggle").click();
-    $("#design-system-tool").click();
+    $('[data-view="design-system"]').click();
     await flush();
     expect($("#inspect-mode-toggle").getAttribute("aria-pressed")).toBe("false");
     expect($("#tool-panel").hidden).toBe(true);
     $('[data-view="screens"]').click();
     await flush();
     $("#flow-mode-toggle").click();
-    $("#design-system-tool").click();
+    $('[data-view="design-system"]').click();
     await flush();
     expect($("#flow-mode-toggle").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("Show resolved is a switch in the Screens view; its tooltip count is the Resolved tab's (CHR-1292)", async () => {
+    seedThreads();
+    await boot("one");
+    loadFrame();
+    const toggle = $("#resolved-toggle");
+    expect(pins()).toHaveLength(2); // open and detached
+    expect(toggle.title).toBe("Show resolved comments (1) (Shift+M)");
+    toggle.click();
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    expect(pins()).toHaveLength(3);
+    expect($("#tool-toast").hidden).toBe(true);
+    expect(toggle.title).toBe("Hide resolved comments (1) (Shift+M)");
+    $("#comments-tool-toggle").click();
+    expect($("#comments-count-resolved, #comments-tab-resolved").textContent).toContain("1"); // the tab counts the same threads
+    toggle.click();
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(pins()).toHaveLength(2);
+  });
+
+  it("Show resolved with 0 resolved comments: the click still switches, the button shows it, a hint says why nothing appears (CHR-1292)", async () => {
+    seedThreads();
+    threadData.threads = threadData.threads.filter((t) => t.status !== "resolved");
+    threadData.comments = threadData.comments.filter((c) => !c.resolved);
+    await boot("one");
+    loadFrame();
+    const again = $("#resolved-toggle");
+    expect(again.title).toBe("Show resolved comments (0) (Shift+M)");
+    again.click();
+    expect(again.getAttribute("aria-pressed")).toBe("true");
+    expect($("#tool-toast").textContent).toBe("No resolved comments on this screen");
+    expect($("#tool-toast").hidden).toBe(false);
   });
 
   it("the tool keys keep working while the tool bar is folded", async () => {
@@ -418,7 +453,10 @@ describe("canvas comments", () => {
     expect($("#tool-panel-title").textContent).toBe("Comments");
     press("f");
     expect($("#flow-mode-toggle").getAttribute("aria-pressed")).toBe("true");
-    press("d");
+    press("d"); // CHR-1284: D is unassigned
+    await flush();
+    expect($('[data-view="design-system"]').getAttribute("aria-pressed")).not.toBe("true");
+    press("3");
     await flush();
     expect($('[data-view="design-system"]').getAttribute("aria-pressed")).toBe("true");
   });

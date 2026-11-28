@@ -68,6 +68,7 @@ const flush = async () => {
 };
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
+const all = $$;
 const rowNames = () => $$("#screen-list .screen-item-row[data-screen]").map((r) => r.dataset.screen);
 
 async function boot() {
@@ -125,7 +126,8 @@ describe("segmented control", () => {
     $(".mockup-item").click();
     await flush();
     expect($("#nav-tab-mockups").getAttribute("aria-selected")).toBe("true");
-    expect($(".mockup-item").getAttribute("aria-current")).toBe("true");
+    // The open mockup's tree opens and its first variant carries the selection.
+    expect($(".mockup-variant-item").getAttribute("aria-current")).toBe("true");
     $("#nav-tab-screens").click();
     $('.screen-item-row[data-screen="checkout"] .screen-item').click();
     await flush();
@@ -138,7 +140,7 @@ describe("segmented control", () => {
     memoryStorage.set("artisign.last-screen:/p", "mockup:empty-states");
     await boot();
     expect($("#nav-tab-mockups").getAttribute("aria-selected")).toBe("true");
-    expect($('.mockup-item[data-mockup-name="empty-states"]').getAttribute("aria-current")).toBe("true");
+    expect($('.mockup-variant-item[aria-current="true"]')).not.toBeNull();
   });
 });
 
@@ -253,6 +255,38 @@ describe("mockup tree", () => {
     expect($$("#mockup-list .mockup-variant-item .screen-item-name").map((n) => n.textContent)).toEqual(["Guided tour", "Checklist"]);
     $(".mockup-variant-item").click();
     await flush();
-    expect($('.mockup-item[data-mockup-name="onboarding-ideas"]').getAttribute("aria-current")).toBe("true");
+    expect($('.mockup-item[data-mockup-name="onboarding-ideas"]').getAttribute("aria-current")).toBe("false");
+    expect($(".mockup-variant-item").getAttribute("aria-current")).toBe("true");
+  });
+
+  it("a variant row selects that variant (aria-selected, aria-current), and the canvas column follows", async () => {
+    await boot();
+    $("#nav-tab-mockups").click();
+    $(".mockup-item-row .screen-item-toggle").click();
+    const [guided, checklist] = all("#mockup-list .mockup-variant-item");
+    checklist.click();
+    await flush();
+    expect(all("#mockup-list .mockup-variant-item").map((r) => r.getAttribute("aria-selected"))).toEqual(["false", "true"]);
+    expect(all("#mockup-view .mockup-column").map((c) => c.classList.contains("is-selected"))).toEqual([false, true]);
+    expect($("#mockup-view .mockup-column.is-selected").getAttribute("aria-current")).toBe("true");
+    guided.click();
+    await flush();
+    expect(all("#mockup-list .mockup-variant-item").map((r) => r.getAttribute("aria-selected"))).toEqual(["true", "false"]);
+    expect(all("#mockup-view .mockup-column").map((c) => c.classList.contains("is-selected"))).toEqual([true, false]);
+  });
+
+  it("another mockup opens on its first variant, and the selection is never persisted", async () => {
+    await boot();
+    $("#nav-tab-mockups").click();
+    $(".mockup-item-row .screen-item-toggle").click();
+    all("#mockup-list .mockup-variant-item")[1].click();
+    await flush();
+    all("#mockup-list .mockup-item")[1].click();
+    await flush();
+    all("#mockup-list .mockup-item")[0].click();
+    await flush();
+    // Both trees are open now: Onboarding ideas' two variants, then Empty states' single one.
+    expect(all("#mockup-list .mockup-variant-item").map((r) => r.getAttribute("aria-selected"))).toEqual(["true", "false", "false"]);
+    expect([...memoryStorage.values()].some((v) => String(v).includes("list"))).toBe(false);
   });
 });

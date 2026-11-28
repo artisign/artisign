@@ -21,13 +21,14 @@ import { setMarkdown } from "./markdown.js";
  *   still reports its CSS-default placeholder height. `onFrameLoad` fires
  *   on every load of a column's iframe (the comment layer attaches to the
  *   fresh document there).
- * @returns {{ variantId: string, letter: string, iframe: HTMLIFrameElement, countsEl: HTMLElement }[]} the columns, in order
+ * @returns {{ variantId: string, letter: string, iframe: HTMLIFrameElement, countsEl: HTMLElement, columnEl: HTMLElement }[]} the columns, in order
  */
 export function renderMockupView(container, mockup, { fetchRenderFor, onColumnMeasured, onFrameLoad }) {
   container.innerHTML = "";
 
   const header = document.createElement("div");
-  header.className = "mockup-view-header";
+  // Visually hidden: the design shows only the columns on the canvas — the open mockup is named by the card's selected row and each column's label.
+  header.className = "mockup-view-header visually-hidden";
   const title = document.createElement("h1");
   title.textContent = mockup.title ?? mockup.name;
   header.appendChild(title);
@@ -55,13 +56,27 @@ export function renderMockupView(container, mockup, { fetchRenderFor, onColumnMe
   const columns = document.createElement("div");
   columns.className = "mockup-columns";
   const rendered = mockup.variants.map((variant, index) => {
-    const column = renderColumn(variant, index, fetchRenderFor, onColumnMeasured, onFrameLoad);
+    const column = renderColumn(variant, index, mockup.title ?? mockup.name, fetchRenderFor, onColumnMeasured, onFrameLoad);
     columns.appendChild(column.el);
     return column.handle;
   });
   columnsWrap.appendChild(columns);
   container.appendChild(columnsWrap);
   return rendered;
+}
+
+/**
+ * Marks one column as the selected variant (the teal ring around its frame, `aria-current` on its group); `null` marks none.
+ * @param {{ variantId: string, columnEl: HTMLElement }[]} columns
+ * @param {string | null} variantId
+ */
+export function markSelectedColumn(columns, variantId) {
+  for (const column of columns) {
+    const on = column.variantId === variantId;
+    column.columnEl.classList.toggle("is-selected", on);
+    if (on) column.columnEl.setAttribute("aria-current", "true");
+    else column.columnEl.removeAttribute("aria-current");
+  }
 }
 
 /** A column's letter: A, B, C … — the number once the alphabet runs out. @param {number} index */
@@ -106,13 +121,16 @@ export function renderColumnChips(countsEl, counts, { showResolved, activeKind, 
  * @param {{ id: string, title: string, description?: string }} variant
  * @param {number} index array position — array order is column order, per
  *   ADR-003 — rendered as the 1-based "Variant N" label.
+ * @param {string} mockupTitle the column group's accessible name is "<mockup title>: <variant title>"
  * @param {(variantId: string) => Promise<{ ok: true, html: string } | { ok: false, message: string }>} fetchRenderFor
  * @param {(() => void) | undefined} onColumnMeasured
  * @param {((variantId: string, iframe: HTMLIFrameElement) => void) | undefined} onFrameLoad
  */
-function renderColumn(variant, index, fetchRenderFor, onColumnMeasured, onFrameLoad) {
+function renderColumn(variant, index, mockupTitle, fetchRenderFor, onColumnMeasured, onFrameLoad) {
   const column = document.createElement("div");
   column.className = "mockup-column";
+  column.setAttribute("role", "group");
+  column.setAttribute("aria-label", `${mockupTitle}: ${variant.title || variant.id}`);
 
   // The header is chrome text, kept at native size under the row's zoom (see applyMockupZoom / .mockup-column-head).
   const head = document.createElement("div");
@@ -190,5 +208,5 @@ function renderColumn(variant, index, fetchRenderFor, onColumnMeasured, onFrameL
     }
   });
 
-  return { el: column, handle: { variantId: variant.id, letter, iframe, countsEl } };
+  return { el: column, handle: { variantId: variant.id, letter, iframe, countsEl, columnEl: column } };
 }

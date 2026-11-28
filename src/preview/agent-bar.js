@@ -37,15 +37,18 @@ export function agentStatus({ feed, follow, connected, now, exists }) {
 }
 
 /**
- * Where the note field's thread would land, and whether it can: on the open screen, anchored to the screen root. The Board, a mockup and a compare have no single screen to anchor to, so the field is off there and says why (the same words as the tool bar's greyed tools).
- * @param {{ view: string, showMockup: boolean, comparing: boolean, screen: string | null, screenLabel: string, mockup: string | null, boardCount: number }} where
+ * Where the note field's thread would land, and whether it can: on the open screen, anchored to the screen root, or on the selected variant of the open mockup, anchored to the whole variant (CHR-1270). The Board and a compare have no single target to anchor to, so the field is off there and says why (the same words as the tool bar's greyed tools).
+ * @param {{ view: string, showMockup: boolean, comparing: boolean, screen: string | null, screenLabel: string, mockup: string | null, mockupVariant?: { id: string, label: string } | null, boardCount: number }} where
  * @returns {{ enabled: boolean, key: string, icon: string, scope: string, reason: string }}
  */
-export function noteState({ view, showMockup, comparing, screen, screenLabel, mockup, boardCount }) {
+export function noteState({ view, showMockup, comparing, screen, screenLabel, mockup, mockupVariant = null, boardCount }) {
   if (view === "board") {
     return { enabled: false, key: "board", icon: "grid_view", scope: `On the Board, ${boardCount} screen${boardCount === 1 ? "" : "s"}`, reason: "Not available on the Board" };
   }
-  if (showMockup) return { enabled: false, key: `mockup:${mockup}`, icon: "view_column", scope: `On ${mockup}`, reason: "Not available for mockups" };
+  if (showMockup) {
+    if (mockupVariant === null) return { enabled: false, key: `mockup:${mockup}`, icon: "view_column", scope: `On ${mockup}`, reason: "This mockup has no variants" };
+    return { enabled: true, key: `mockup:${mockup}#${mockupVariant.id}`, icon: "view_column", scope: `On ${mockup}, ${mockupVariant.label}`, reason: "" };
+  }
   if (screen === null) return { enabled: false, key: "none", icon: "desktop_windows", scope: "No screen open", reason: "No screen is open" };
   if (comparing) return { enabled: false, key: `screen:${screen}`, icon: "desktop_windows", scope: `On ${screenLabel}`, reason: "Not available while comparing variants" };
   return { enabled: true, key: `screen:${screen}`, icon: "desktop_windows", scope: `On ${screenLabel}`, reason: "" };

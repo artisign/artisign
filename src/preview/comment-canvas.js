@@ -457,7 +457,7 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
       bannerEl.append(icon("my_location"), `Click the element to move #${number} to`, kbd("Esc"), muted("cancels"));
       bannerEl.hidden = false;
     } else if (modeOn) {
-      bannerEl.append(icon("chat_bubble"), host.modeText ?? "Comment mode — click an element to start a thread", kbd("Esc"), muted("to exit"));
+      bannerEl.append(icon("chat_bubble"), host.modeText ?? "Comment mode: click an element to start a thread", kbd("Esc"), muted("to exit"));
       bannerEl.hidden = false;
     } else {
       bannerEl.hidden = true;

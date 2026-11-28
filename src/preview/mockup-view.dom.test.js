@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
-import { renderMockupView } from "./mockup-view.js";
+import { renderMockupView, markSelectedColumn } from "./mockup-view.js";
 
 /** Flushes the microtask queue so a resolved/rejected fetchRenderFor promise's .then() has run. */
 async function flush() {
@@ -9,6 +9,30 @@ async function flush() {
 }
 
 describe("renderMockupView", () => {
+  it("names each column '<mockup title>: <variant title>' and marks the selected variant's column", () => {
+    const container = document.createElement("div");
+    const mockup = { name: "cart", title: "Cart options", variants: [{ id: "a", title: "Sticky total" }, { id: "b", title: "" }] };
+    const columns = renderMockupView(container, mockup, { fetchRenderFor: () => new Promise(() => {}) });
+    const groups = container.querySelectorAll(".mockup-column");
+    expect(groups[0].getAttribute("role")).toBe("group");
+    expect(groups[0].getAttribute("aria-label")).toBe("Cart options: Sticky total");
+    expect(groups[1].getAttribute("aria-label")).toBe("Cart options: b"); // no title: the id
+    expect(columns.map((c) => c.columnEl)).toEqual([...groups]);
+
+    markSelectedColumn(columns, "b");
+    expect([...groups].map((g) => g.classList.contains("is-selected"))).toEqual([false, true]);
+    expect(groups[1].getAttribute("aria-current")).toBe("true");
+    expect(groups[0].hasAttribute("aria-current")).toBe(false);
+    markSelectedColumn(columns, null);
+    expect([...groups].some((g) => g.classList.contains("is-selected") || g.hasAttribute("aria-current"))).toBe(false);
+  });
+
+  it("keeps the mockup's title and description for assistive tech only (the canvas shows the columns)", () => {
+    const container = document.createElement("div");
+    renderMockupView(container, { name: "m", title: "M", description: "d", variants: [] }, { fetchRenderFor: () => new Promise(() => {}) });
+    expect(container.querySelector(".mockup-view-header").classList.contains("visually-hidden")).toBe(true);
+  });
+
   it("renders the header (title/description) and one column per variant in order", () => {
     const container = document.createElement("div");
     const mockup = {

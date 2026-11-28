@@ -106,6 +106,7 @@
       <div id="body">
         <!-- CHR-1267: the left floating card — Screens | Mockups, find field, tag toggle, the tree. Grip drags it (position remembered per viewer), the chevron folds it; it runs down to the zoom pill's bottom line and scrolls inside. -->
         <aside id="sidebar-screens" class="float-card" data-collapsed="false" aria-label="Screens and mockups">
+          <div id="sidebar-screens-resize" class="panel-resize" data-edge="right" role="separator" aria-orientation="vertical" aria-label="Resize Screens panel. Use left and right arrow keys; double-click to reset." tabindex="0"></div>
           <div class="float-card-head">
             <button type="button" id="sidebar-screens-grip" class="float-grip" aria-label="Screens card handle. Use arrow keys to move." data-tooltip="Drag to move"><span class="icon" aria-hidden="true">drag_indicator</span></button>
             <div id="nav-tabs" class="seg-tabs" role="tablist" aria-label="Browse">
@@ -314,6 +315,7 @@
         </main>
         <!-- CHR-1269: the Agent bar — the right column's floating card (design `float-card` + `agent-status` + `agent-activity`). What the agent is doing now, the Follow switch and the Activity feed. It folds to its head by itself while a tool panel below takes the column (agent-bar.js). The grip drags it (position remembered), the chevron folds it. -->
         <aside id="agent-bar" class="float-card" data-collapsed="false" aria-labelledby="agent-bar-title">
+          <div id="agent-bar-resize" class="panel-resize" data-edge="left" role="separator" aria-orientation="vertical" aria-label="Resize right panels. Use left and right arrow keys; double-click to reset." tabindex="0"></div>
           <div class="float-card-head">
             <button type="button" id="agent-bar-grip" class="float-grip" aria-label="Agent bar handle. Use arrow keys to move." data-tooltip="Drag to move"><span class="icon" aria-hidden="true">drag_indicator</span></button>
             <h2 id="agent-bar-title" class="float-card-title">Agent</h2>
@@ -348,6 +350,7 @@
         </aside>
         <!-- CHR-1268: the right column's floating panel — Inspect, Notes, Comments or Compare's Differences, one at a time (tool-panels.js). It sits below the Agent bar, which folds to its head above it. The grip drags it (position remembered), the cross closes it. -->
         <aside id="tool-panel" class="float-card" hidden aria-labelledby="tool-panel-title">
+          <div id="tool-panel-resize" class="panel-resize" data-edge="left" role="separator" aria-orientation="vertical" aria-label="Resize right panels. Use left and right arrow keys; double-click to reset." tabindex="0"></div>
           <div class="float-card-head">
             <button type="button" id="tool-panel-grip" class="float-grip" aria-label="Panel handle. Use arrow keys to move." data-tooltip="Drag to move"><span class="icon" aria-hidden="true">drag_indicator</span></button>
             <h2 id="tool-panel-title" class="float-card-title">Comments</h2>

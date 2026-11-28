@@ -20,9 +20,10 @@ describe("computeDock", () => {
     const group = bar.width + DOCK_GAP + pill.width;
     expect(dock.left).toBe((1440 - group) / 2);
     // the pill, centred in the area minus the inset, starts exactly one gap after the bar
-    const pillLeft = dock.pillInset + (area.width - dock.pillInset) / 2 - pill.width / 2;
+    const pillLeft = dock.padLeft + (area.width - dock.padLeft - dock.padRight) / 2 - pill.width / 2;
     expect(pillLeft).toBe(dock.left + bar.width + DOCK_GAP);
-    expect(dock.pillInset).toBe(bar.width + DOCK_GAP);
+    expect(dock.padLeft).toBe(bar.width + DOCK_GAP);
+    expect(dock.padRight).toBe(0);
   });
 
   it("shares the pill's baseline: both centred on one line", () => {
@@ -31,11 +32,32 @@ describe("computeDock", () => {
   });
 
   it("without a pill the bar is centred alone on the pill's bottom line", () => {
-    expect(computeDock(area, bar, null)).toEqual({ left: (1440 - 400) / 2, top: 900 - DOCK_BOTTOM - 56, pillInset: 0 });
-    expect(computeDock(area, bar, { ...pill, width: 0 }).pillInset).toBe(0);
+    expect(computeDock(area, bar, null)).toEqual({ left: (1440 - 400) / 2, top: 900 - DOCK_BOTTOM - 56, padLeft: 0, padRight: 0 });
+    expect(computeDock(area, bar, { ...pill, width: 0 }).padLeft).toBe(0);
   });
 
   it("a group wider than the area stays at the left margin", () => {
     expect(computeDock({ width: 500, height: 900 }, bar, pill, { margin: 8 }).left).toBe(8);
+  });
+
+  it("wide panels on both sides keep the group inside the free span between them, the pill following", () => {
+    const span = { left: 504, right: 1432 };
+    const dock = computeDock(area, bar, pill, { span });
+    const group = bar.width + DOCK_GAP + pill.width;
+    expect(dock.left).toBeGreaterThanOrEqual(span.left);
+    expect(dock.left + group).toBeLessThanOrEqual(span.right);
+    const pillLeft = dock.padLeft + (area.width - dock.padLeft - dock.padRight) / 2 - pill.width / 2;
+    expect(pillLeft).toBeCloseTo(dock.left + bar.width + DOCK_GAP, 6);
+  });
+
+  it("a left panel alone pushes the group right; a right panel alone pushes it left, padding the other side", () => {
+    const right = computeDock(area, bar, pill, { span: { left: 8, right: 800 } });
+    expect(right.left + bar.width + DOCK_GAP + pill.width).toBeLessThanOrEqual(800);
+    expect(right.padRight).toBeGreaterThan(0);
+    expect(right.padLeft).toBe(0);
+  });
+
+  it("a group wider than the span stays centred", () => {
+    expect(computeDock(area, bar, pill, { span: { left: 600, right: 700 } }).left).toBe((1440 - (bar.width + DOCK_GAP + pill.width)) / 2);
   });
 });

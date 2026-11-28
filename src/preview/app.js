@@ -2236,7 +2236,7 @@ const toolBar = createToolBar({
   liveEl: document.getElementById("tool-bar-live"),
   storage: prefsStorage,
   mac: macPlatform,
-  dock: { pillEl: document.getElementById("canvas-controls"), wrapEl: document.getElementById("zoom-pill-wrap") },
+  dock: { pillEl: document.getElementById("canvas-controls"), wrapEl: document.getElementById("zoom-pill-wrap"), panelEls: () => [sidebarScreensEl, document.getElementById("agent-bar"), document.getElementById("tool-panel")] },
 });
 
 /** The tool button that opens each panel. */

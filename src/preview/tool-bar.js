@@ -39,8 +39,8 @@ export function hintText(name, reason) {
  *   storage: Storage,
  *   mac: boolean,
  *   interest?: boolean,
- *   dock?: { pillEl: HTMLElement, wrapEl: HTMLElement },
- * }} args `interest` overrides the feature detection (tests). `dock`: the zoom pill (`pillEl`) and the element that centres it (`wrapEl`), which the horizontal bar docks beside (CHR-1287).
+ *   dock?: { pillEl: HTMLElement, wrapEl: HTMLElement, panelEls?: () => (HTMLElement | null)[] },
+ * }} args `interest` overrides the feature detection (tests). `dock`: the zoom pill (`pillEl`) and the element that centres it (`wrapEl`), which the horizontal bar docks beside (CHR-1287); `panelEls` returns the side panels whose shown widths bound the free span.
  */
 export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage, mac, interest = supportsInterestHints(), dock }) {
   const FOLD_KEY = "artisign.tool-bar.collapsed";
@@ -82,12 +82,23 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
     if (!area || size.width === 0) return null;
     const areaRect = area.getBoundingClientRect();
     const pillRect = dock?.pillEl.offsetWidth ? dock.pillEl.getBoundingClientRect() : null;
-    return computeDock(
-      { width: dock?.wrapEl.offsetWidth || areaRect.width, height: areaRect.height },
-      size,
-      pillRect ? { width: pillRect.width, top: pillRect.top - areaRect.top, height: pillRect.height } : null,
-      { margin: CARD_MARGIN },
-    );
+    const width = dock?.wrapEl.offsetWidth || areaRect.width;
+    const height = areaRect.height;
+    const pill = pillRect ? { width: pillRect.width, top: pillRect.top - areaRect.top, height: pillRect.height } : null;
+    // The panels that reach down into the bar's band bound the free span (their shown widths, not defaults).
+    const bandTop = (pill ? pill.top : height - 60) + areaRect.top;
+    let spanLeft = CARD_MARGIN;
+    let spanRight = width - CARD_MARGIN;
+    for (const el of dock?.panelEls?.() ?? []) {
+      if (!el || el.hidden || el === barEl) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.bottom <= bandTop) continue;
+      const left = rect.left - areaRect.left;
+      const right = rect.right - areaRect.left;
+      if ((left + right) / 2 < width / 2) spanLeft = Math.max(spanLeft, right + CARD_MARGIN);
+      else spanRight = Math.min(spanRight, left - CARD_MARGIN);
+    }
+    return computeDock({ width, height }, size, pill, { margin: CARD_MARGIN, span: { left: spanLeft, right: spanRight } });
   }
 
   /** The bar's size were it horizontal: measured by switching for the length of one synchronous read (nothing paints in between). */
@@ -99,18 +110,27 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
     return size;
   }
 
+  /** Moves the pill over (paddings of its centring element) to make room for a docked bar; null frees it. */
+  function setPillRoom(place) {
+    if (!dock) return;
+    for (const [prop, value] of [["padding-left", place?.padLeft ?? 0], ["padding-right", place?.padRight ?? 0]]) {
+      if (value > 0) dock.wrapEl.style.setProperty(prop, `${value}px`);
+      else dock.wrapEl.style.removeProperty(prop);
+    }
+  }
+
   /** Puts a docked bar in its place and makes room for it beside the zoom pill; frees the pill again otherwise. */
   function syncDock() {
     if (previewEl && !previewEl.hidden) return; // the preview owns the pill's room while it shows
     if (orientation !== "horizontal") {
-      if (dock) dock.wrapEl.style.removeProperty("padding-left");
+      if (dock) {
+        dock.wrapEl.style.removeProperty("padding-left");
+        dock.wrapEl.style.removeProperty("padding-right");
+      }
       return;
     }
     const place = dockGeometry();
-    if (dock) {
-      if (place && place.pillInset > 0) dock.wrapEl.style.paddingLeft = `${place.pillInset}px`;
-      else dock.wrapEl.style.removeProperty("padding-left");
-    }
+    if (dock) setPillRoom(place);
     if (!place) return;
     barEl.style.left = `${place.left}px`;
     barEl.style.top = `${place.top}px`;
@@ -148,7 +168,7 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
       previewEl.setAttribute("aria-hidden", "true");
       (barEl.parentElement ?? document.body).append(previewEl);
     }
-    if (dock) dock.wrapEl.style.paddingLeft = `${place.pillInset}px`; // the pill makes room for the preview, as it will for the bar
+    setPillRoom(place); // the pill makes room for the preview, as it will for the bar
     Object.assign(previewEl.style, { left: `${place.left}px`, top: `${place.top}px`, width: `${size.width}px`, height: `${size.height}px` });
     previewEl.hidden = false;
   }
@@ -226,6 +246,7 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
     if (dock) {
       observer.observe(dock.pillEl);
       observer.observe(dock.wrapEl);
+      for (const el of dock.panelEls?.() ?? []) if (el) observer.observe(el); // a resized or folded panel moves the free span
     }
   }
   window.addEventListener("resize", syncDock);

@@ -35,7 +35,7 @@ describe("applyCanvas", () => {
   }
 
   it("returns the screen's unscaled size for the frame caption", () => {
-    expect(applyCanvas({ ...stubs(), zoom: "fit" })).toEqual({ width: 390, height: 844 });
+    expect(applyCanvas({ ...stubs(), zoom: "fit" })).toMatchObject({ width: 390, height: 844 });
   });
 
   it("reserves a top band: the fit scale shrinks and the frame sits below it", () => {
@@ -68,5 +68,30 @@ describe("applyCanvas", () => {
     // 390 x 844 at 200 %: 780 x 1688, starting at the insets (it is larger than the free area).
     expect(props["--room-w"]).toBe(`${100 + 780 + 300}px`);
     expect(props["--room-h"]).toBe(`${76 + 1688 + 80}px`);
+  });
+
+  it("pans a frame that fits by the offset, per axis, inside the pane (CHR-1290)", () => {
+    const centred = stubs();
+    applyCanvas({ ...centred, zoom: 0.25 });
+    const moved = stubs();
+    const out = applyCanvas({ ...moved, zoom: 0.25, pan: { x: 40, y: -25 } });
+    expect(parseFloat(moved.holderEl.style.left)).toBe(parseFloat(centred.holderEl.style.left) + 40);
+    expect(parseFloat(moved.holderEl.style.top)).toBe(parseFloat(centred.holderEl.style.top) - 25);
+    expect(out.pan).toEqual({ x: 40, y: -25 });
+    const far = stubs();
+    const clamped = applyCanvas({ ...far, zoom: 0.25, pan: { x: 99999, y: -99999 } });
+    expect(parseFloat(far.holderEl.style.left)).toBe(1000 - 390 * 0.25); // the frame stays inside the pane
+    expect(parseFloat(far.holderEl.style.top)).toBe(0);
+    expect(clamped.pan.x).toBeGreaterThan(0);
+  });
+
+  it("ignores the offset on an axis where the frame overflows: that axis scrolls (CHR-1290)", () => {
+    const a = stubs();
+    applyCanvas({ ...a, zoom: 2 });
+    const b = stubs();
+    const out = applyCanvas({ ...b, zoom: 2, pan: { x: 40, y: 40 } });
+    expect(parseFloat(b.holderEl.style.left)).toBe(parseFloat(a.holderEl.style.left) + 40); // 780 fits the 1000 wide pane: the offset applies
+    expect(b.holderEl.style.top).toBe(a.holderEl.style.top); // 1688 does not fit 700: scroll, no offset
+    expect(out.pan).toEqual({ x: 40, y: 0 });
   });
 });

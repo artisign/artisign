@@ -121,8 +121,8 @@ describe("compare mode in the screen view", () => {
     expect($("#tool-panel").hidden).toBe(false);
     expect($("#tool-panel-title").textContent).toBe("Differences");
     expect($("#compare-panel .compare-summary-line").textContent).toMatch(/differ from the base|Comparing/);
-    // CHR-1269: the Agent bar folds above it
-    expect($("#agent-bar").dataset.collapsed).toBe("true");
+    // CHR-1286: the Agent bar stays open, the column splits
+    expect($("#agent-bar").dataset.collapsed).toBe("false");
   });
 
   it("Single goes back to the screen that was open before compare", async () => {

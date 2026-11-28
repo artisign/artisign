@@ -40,6 +40,7 @@ import { makeCardDraggable } from "./float-card.js";
 import { makePanelResizable, LEFT_PANEL, RIGHT_PANEL, MIN_CANVAS_SPACE } from "./panel-resize.js";
 import { createToolBar } from "./tool-bar.js";
 import { createToolPanels } from "./tool-panels.js";
+import { createRightColumn } from "./right-column.js";
 import { renderCommentsPanel } from "./comments-panel.js";
 import { renderScreenChips, renderTagNotes } from "./notes-panel.js";
 import { renderScreenUseCases } from "./usecases-screen-link.js";
@@ -2283,7 +2284,6 @@ const toolPanels = createToolPanels({
   onLeaveCompare: () => leaveCompare(),
   onChange: (shown) => {
     appEl.dataset.panelOpen = String(shown !== null);
-    agentBar.setPanelOpen(shown !== null);
     syncPanelContext();
     if (shown === "notes") updateNotesPanel();
     if (shown === "comments") renderCommentsList();
@@ -2292,6 +2292,8 @@ const toolPanels = createToolPanels({
     refitActivePane(); // the column takes width from the canvas
   },
 });
+
+createRightColumn({ appEl, agentEl: document.getElementById("agent-bar"), panelEl: toolPanelEl });
 
 /** Whether a native popover is open (false where the browser has no Popover API). @param {HTMLElement} el */
 function isPopoverOpen(el) {

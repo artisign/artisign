@@ -332,11 +332,13 @@ describe("menu and empty-state rows are buttons without glyph icons (CHR-911)", 
       if (applied && path === "/api/screens") throw new Error("screens exploded");
       return realFetch(url, init);
     });
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     await boot();
     $("#empty-recent-list .empty-recent-row").click();
     await flush();
     expect($("#empty-error").textContent).not.toBe("Could not reach artisign. Try again.");
+    // The cause is logged, not only drawn into a line the next render may hide.
+    expect(consoleError.mock.calls.some(([e]) => e instanceof Error && /screens exploded/.test(e.message))).toBe(true);
   });
 
   it("the message of an earlier visit to the no-project card does not come back with it", async () => {

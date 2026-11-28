@@ -225,6 +225,7 @@ export function createProjectUI(elements, callbacks) {
         try {
           message = (await onOpenRecent(path)) ?? null;
         } catch (err) {
+          console.error(err); // the card's line may be hidden by the next render: the console keeps the real cause
           message = err instanceof Error && err.message ? err.message : "Could not open the project. Try again.";
         } finally {
           row.removeAttribute("aria-disabled");

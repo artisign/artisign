@@ -46,4 +46,14 @@ describe("applyCanvas", () => {
     expect(parseFloat(banded.holderEl.style.transform.slice(6))).toBeLessThan(parseFloat(plain.holderEl.style.transform.slice(6)));
     expect(parseFloat(banded.holderEl.style.top)).toBeGreaterThanOrEqual(28);
   });
+
+  it("moves the frame off its centred place by the pan offset (CHR-1290)", () => {
+    const centred = stubs();
+    applyCanvas({ ...centred, zoom: 1 });
+    const panned = stubs();
+    applyCanvas({ ...panned, zoom: 1, pan: { x: 40, y: -25 } });
+    expect(parseFloat(panned.holderEl.style.left)).toBe(parseFloat(centred.holderEl.style.left) + 40);
+    expect(parseFloat(panned.holderEl.style.top)).toBe(parseFloat(centred.holderEl.style.top) - 25);
+    expect(panned.holderEl.style.transform).toBe(centred.holderEl.style.transform);
+  });
 });

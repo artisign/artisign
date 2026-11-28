@@ -35,7 +35,7 @@ import { createSettingsMenu } from "./settings-menu.js";
 import { createMcpDialog } from "./mcp-dialog.js";
 import { createUpdateNotice, UPDATE_DISMISSED_KEY } from "./update-notice.js";
 import { copyWithLabel } from "./clipboard.js";
-import { createZoomPill } from "./zoom-pill.js";
+import { createZoomPill, MAX_ZOOM_PERCENT, MIN_ZOOM_PERCENT } from "./zoom-pill.js";
 import { makeCardDraggable } from "./float-card.js";
 import { createToolBar } from "./tool-bar.js";
 import { createToolPanels } from "./tool-panels.js";
@@ -74,6 +74,7 @@ import {
 import { renderDesignSystem } from "./design-system.js";
 import { connectEvents } from "./sse.js";
 import { applyCanvas } from "./canvas.js";
+import { anchoredPosition, clampFramePosition, createCanvasInput } from "./canvas-input.js";
 import { updateWarningBadge } from "./warnings.js";
 import { createBoardView } from "./board-view.js";
 import { createBoardComments } from "./board-comments.js";
@@ -289,6 +290,9 @@ let warningBadgeCleanup = () => {}; // click-to-cycle listener on the warning ba
 let warningCount = 0;
 /** @type {"fit" | number} */
 let zoom = "fit";
+// CHR-1290/CHR-1291 — how far the frame was moved off its centred place by hand (drag, trackpad scroll, wheel zoom at the pointer). `canvasMoved`: the human moved or zoomed the canvas by hand, so the tool bar keeps its place (CHR-1282). Fit, and a different screen, take both back.
+let canvasPan = { x: 0, y: 0 };
+let canvasMoved = false;
 // Separate zoom state for the mockup comparison row (see applyMockupZoom in
 // mockup-zoom.js) — the topbar's zoom buttons are shared between it and the
 // screen canvas, but each remembers its own level (see setZoom/isMockupZoomActive).
@@ -450,6 +454,7 @@ const board = createBoardView({
   onTogglePin: (screen) => toggleScreenPin(screen),
   onLayout: () => boardComments.layout(),
   onTileKeydown: (evt) => onShortcutKeydown(evt),
+  onManualNavigate: () => pauseFollow(), // a drag or the wheel on the Board is human navigation (ADR-005 pause rule 1)
 });
 board.mount();
 
@@ -2409,7 +2414,7 @@ function updateCanvas() {
   const rendered = iframeRenderedScreen !== null && iframeRenderOk && !screenHolderEl.hidden;
   const showBar = variantLayoutShown && !screenHolderEl.hidden;
   const showCaption = rendered && !showBar;
-  const { width, height } = applyCanvas({ canvasEl, holderEl: screenHolderEl, iframeEl: screenFrame, zoom, topInset: showBar ? VARIANT_BAR_BAND : showCaption ? FRAME_CAPTION_BAND : 0 });
+  const { width, height } = applyCanvas({ canvasEl, holderEl: screenHolderEl, iframeEl: screenFrame, zoom, pan: canvasPan, topInset: showBar ? VARIANT_BAR_BAND : showCaption ? FRAME_CAPTION_BAND : 0 });
   frameCaptionEl.hidden = !showCaption;
   if (showCaption) renderFrameLabel(width, height);
   // The label and the breadcrumb sit above the frame's top-left corner.
@@ -2419,11 +2424,77 @@ function updateCanvas() {
   screensStageEl.style.setProperty("--frame-left", frameLeft);
   // The tool bar's default top lines up with the frame's top (design); a dragged bar keeps its own place.
   const frameTop = rendered && !screenHolderEl.hidden ? canvasEl.getBoundingClientRect().top - appEl.getBoundingClientRect().top + parseFloat(screenHolderEl.style.top || "0") : null;
-  if (frameTop !== null && frameTop > 0) appEl.style.setProperty("--toolbar-top", `${Math.round(frameTop)}px`);
+  if (canvasMoved) {
+    // A hand-moved canvas leaves the tool bar where it is (CHR-1282).
+  } else if (frameTop !== null && frameTop > 0) appEl.style.setProperty("--toolbar-top", `${Math.round(frameTop)}px`);
   else appEl.style.removeProperty("--toolbar-top");
   commentCanvas.layout(); // pins follow zoom, resize and every re-render
   syncZoomUI();
 }
+
+/** Takes a hand-moved canvas back to its centred place (Fit, a different screen). */
+function resetCanvasMove() {
+  canvasPan = { x: 0, y: 0 };
+  canvasMoved = false;
+}
+
+/** Keeps a corner of the frame on the pane: a drag or a trackpad flick never loses the screen. Reads the frame's drawn box, folds the correction into the pan. */
+function clampCanvasPan() {
+  const scale = parseFloat(screenHolderEl.style.getPropertyValue("--zoom")) || 1;
+  const left = parseFloat(screenHolderEl.style.left) || 0;
+  const top = parseFloat(screenHolderEl.style.top) || 0;
+  const nextLeft = clampFramePosition(left, (parseFloat(screenHolderEl.style.width) || 0) * scale, canvasEl.clientWidth);
+  const nextTop = clampFramePosition(top, (parseFloat(screenHolderEl.style.height) || 0) * scale, canvasEl.clientHeight);
+  if (nextLeft === left && nextTop === top) return;
+  canvasPan = { x: canvasPan.x + nextLeft - left, y: canvasPan.y + nextTop - top };
+  updateCanvas();
+}
+
+/** Moves the frame by the pointer's delta (a drag, or a trackpad two-finger scroll). */
+function moveCanvasFrame(dx, dy) {
+  if (screenHolderEl.hidden) return;
+  canvasPan = { x: canvasPan.x + dx, y: canvasPan.y + dy };
+  canvasMoved = true;
+  updateCanvas();
+  clampCanvasPan();
+}
+
+let canvasZoomPrefTimer = null;
+/** Wheel zoom: scales the frame by `factor` (5-200 %) and keeps the point under the pointer where it is. */
+function zoomCanvasAt(factor, clientX, clientY) {
+  if (screenHolderEl.hidden) return;
+  const oldScale = effectiveZoomScale();
+  const nextScale = Math.min(MAX_ZOOM_PERCENT, Math.max(MIN_ZOOM_PERCENT, oldScale * factor * 100)) / 100;
+  if (nextScale === oldScale) return;
+  const rect = canvasEl.getBoundingClientRect();
+  const pointerX = clientX - rect.left;
+  const pointerY = clientY - rect.top;
+  const oldLeft = parseFloat(screenHolderEl.style.left) || 0;
+  const oldTop = parseFloat(screenHolderEl.style.top) || 0;
+  zoom = nextScale;
+  canvasMoved = true;
+  updateCanvas(); // the new scale at the current pan
+  const wantedLeft = anchoredPosition({ pointer: pointerX, position: oldLeft, oldScale, newScale: nextScale });
+  const wantedTop = anchoredPosition({ pointer: pointerY, position: oldTop, oldScale, newScale: nextScale });
+  canvasPan = { x: canvasPan.x + wantedLeft - (parseFloat(screenHolderEl.style.left) || 0), y: canvasPan.y + wantedTop - (parseFloat(screenHolderEl.style.top) || 0) };
+  updateCanvas();
+  clampCanvasPan();
+  clearTimeout(canvasZoomPrefTimer);
+  canvasZoomPrefTimer = setTimeout(() => writeStringPref(prefsStorage, "artisign.zoom", String(zoom)), 200);
+}
+
+// CHR-1290/CHR-1291 — left-drag pan, wheel zoom at the pointer, pinch and trackpad scroll on the Screens canvas. The screen's own document forwards through attachDoc (re-attached after every load).
+const canvasInput = createCanvasInput({
+  surfaceEl: canvasEl,
+  isToolActive: () => activeMode !== "none",
+  ignoreSelector: "#comment-layer *",
+  onManual: () => pauseFollow(),
+  onPan: moveCanvasFrame,
+  onWheelPan: moveCanvasFrame,
+  onZoom: zoomCanvasAt,
+});
+canvasInput.mount();
+let canvasInputDocCleanup = () => {};
 
 /** Whether the zoom buttons currently control the mockup row instead of the screen canvas — see applyMainVisibility. */
 function isMockupZoomActive() {
@@ -2502,6 +2573,8 @@ screenFrame.addEventListener("load", () => {
   // createInspectorPanel.setEntries' same-screen carry-over (see its own
   // comment) — nothing to redo for it here.
   const doc = screenFrame.contentDocument;
+  canvasInputDocCleanup();
+  canvasInputDocCleanup = canvasInput.attachDoc(doc, screenFrame); // drag, wheel and Space inside the screen's own document (CHR-1290/CHR-1291)
   // The screen document is same-origin (srcdoc) and replaced on every load: forward its keys into the same shortcut path (the typing guard looks at the frame's own target, so inputs inside a user screen keep their keys).
   doc?.addEventListener("keydown", onShortcutKeydown);
   doc?.addEventListener("pointerdown", closeOverlaysOnFramePress, true);
@@ -2510,6 +2583,7 @@ screenFrame.addEventListener("load", () => {
   // iframeRenderedScreen. Setting it before refreshExpanded()/
   // syncInspectOverlay() below lets both correctly read this (now current)
   // document instead of treating it as still-loading.
+  if (pendingRenderScreen !== iframeRenderedScreen) resetCanvasMove(); // another screen opens centred; a reload of the same one keeps the view
   iframeRenderedScreen = pendingRenderScreen;
   iframeRenderOk = pendingRenderOk;
   inspectorPanel.refreshExpanded(); // re-reads computed values for whatever's still expanded against the fresh document
@@ -2597,6 +2671,7 @@ document.addEventListener(
 
 /** Sets the zoom level for whichever the buttons currently target — the Board, the mockup row or the screen canvas (see isMockupZoomActive) — each remembered under its own pref key. */
 function setZoom(next) {
+  pauseFollow(); // the zoom controls are human navigation (ADR-005 pause rule 1)
   if (currentView === "board") {
     // The Board keeps its zoom in percent; Fit all is the board's own computation.
     if (next === "fit") board.fitAll();
@@ -2607,6 +2682,7 @@ function setZoom(next) {
     updateMockupZoom();
   } else {
     zoom = next;
+    if (next === "fit") resetCanvasMove();
     writeStringPref(prefsStorage, "artisign.zoom", String(next));
     updateCanvas();
   }
@@ -2624,7 +2700,10 @@ const ZOOM_STEPS = [0.05, 0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
 /** One step along the ladder from the effective scale (also from Fit); out of Fit never zooms in, nor in out. */
 function stepZoom(direction) {
-  if (currentView === "board") return board.setZoom(direction > 0 ? stepZoomUp(boardZoom) : stepZoomDown(boardZoom));
+  if (currentView === "board") {
+    pauseFollow();
+    return board.setZoom(direction > 0 ? stepZoomUp(boardZoom) : stepZoomDown(boardZoom));
+  }
   const target = nextZoomLevel(effectiveZoomScale(), direction, ZOOM_STEPS);
   if (target !== undefined) setZoom(target);
 }

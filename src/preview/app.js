@@ -37,6 +37,7 @@ import { createUpdateNotice, UPDATE_DISMISSED_KEY } from "./update-notice.js";
 import { copyWithLabel } from "./clipboard.js";
 import { createZoomPill } from "./zoom-pill.js";
 import { makeCardDraggable } from "./float-card.js";
+import { makePanelResizable, LEFT_PANEL, RIGHT_PANEL, MIN_CANVAS_SPACE } from "./panel-resize.js";
 import { createToolBar } from "./tool-bar.js";
 import { createToolPanels } from "./tool-panels.js";
 import { renderCommentsPanel } from "./comments-panel.js";
@@ -2481,8 +2482,10 @@ function syncVariantBar() {
   const viewRect = screensViewEl.getBoundingClientRect();
   // The constant open-card area (#screens-view's padding), not the snapshot or a live card: the bar is never under an open card and never moves on fold or unfold.
   const style = getComputedStyle(screensViewEl);
-  const freeLeft = parseFloat(style.paddingLeft) || 0;
-  const freeWidth = Math.max(0, viewRect.width - freeLeft - (parseFloat(style.paddingRight) || 0));
+  // A panel dragged wider than its default reaches into that area: the bar keeps out of the extra too (CHR-1281). The extra is only read here, and syncVariantBar runs when a resize is done, so a drag never moves the bar.
+  const extra = (name) => Math.max(0, parseFloat(appEl.style.getPropertyValue(name)) || 0);
+  const freeLeft = (parseFloat(style.paddingLeft) || 0) + extra("--panel-left-extra");
+  const freeWidth = Math.max(0, viewRect.width - freeLeft - (parseFloat(style.paddingRight) || 0) - extra("--panel-right-extra"));
   variantBarEl.style.setProperty("--bar-max", `${freeWidth}px`);
   const target = compare.isOn() ? compareViewEl.getBoundingClientRect() : screenHolderEl.getBoundingClientRect();
   const center = target.left + target.width / 2 - viewRect.left;
@@ -2571,6 +2574,49 @@ function setupCardFold(panelEl, collapseBtn, prefKey) {
 setupCardFold(sidebarScreensEl, sidebarScreensCollapseBtn, "artisign.sidebar-screens.collapsed");
 // The grip moves the card; where it was left is remembered per viewer.
 makeCardDraggable({ cardEl: sidebarScreensEl, gripEl: sidebarScreensGripEl, storage: prefsStorage, key: "artisign.sidebar-screens.position", label: "Screens card", liveEl: document.getElementById("sidebar-screens-live") });
+
+// CHR-1281 — the panels' widths. The width is a CSS variable on #app; only the cards, the tool bar beside the left card and the mockup row's reserve follow it. The Screens and Board canvases keep their constant pad (style.css `--canvas-pad-left`), so a resize never moves them or the breadcrumb: a wider panel simply floats over more of the canvas until the next Fit, which measures the cards as they are.
+const setPanelVar = (name, value) => (value === null ? appEl.style.removeProperty(name) : appEl.style.setProperty(name, `${value}px`));
+const afterPanelResize = () => {
+  syncVariantBar();
+  if (isMockupZoomActive()) updateMockupZoom();
+};
+let leftPanel = null;
+let rightPanel = null;
+/** What a panel may take: the window minus the other panel and the room the canvas keeps. Unlimited before the first layout. */
+const panelRoom = (other, otherDefault) => (appEl.clientWidth > 0 ? appEl.clientWidth - (other?.getWidth() ?? otherDefault) - MIN_CANVAS_SPACE : Infinity);
+rightPanel = makePanelResizable({
+  handleEls: [document.getElementById("agent-bar-resize"), document.getElementById("tool-panel-resize")],
+  cardEls: [document.getElementById("agent-bar"), toolPanelEl],
+  edge: "left",
+  ...RIGHT_PANEL,
+  storage: prefsStorage,
+  key: "artisign.panel.right.width",
+  label: "Right panels",
+  liveEl: document.getElementById("agent-bar-live"),
+  availableMax: () => panelRoom(leftPanel, LEFT_PANEL.defaultWidth),
+  apply: (width) => {
+    setPanelVar("--panel-right-w", width === RIGHT_PANEL.defaultWidth ? null : width);
+    setPanelVar("--panel-right-extra", width > RIGHT_PANEL.defaultWidth ? width - RIGHT_PANEL.defaultWidth : null);
+  },
+  onCommit: afterPanelResize,
+});
+leftPanel = makePanelResizable({
+  handleEls: [document.getElementById("sidebar-screens-resize")],
+  cardEls: [sidebarScreensEl],
+  edge: "right",
+  ...LEFT_PANEL,
+  storage: prefsStorage,
+  key: "artisign.panel.left.width",
+  label: "Screens panel",
+  liveEl: document.getElementById("sidebar-screens-live"),
+  availableMax: () => panelRoom(rightPanel, RIGHT_PANEL.defaultWidth),
+  apply: (width) => {
+    setPanelVar("--size-nav-card", width === LEFT_PANEL.defaultWidth ? null : width);
+    setPanelVar("--panel-left-extra", width > LEFT_PANEL.defaultWidth ? width - LEFT_PANEL.defaultWidth : null);
+  },
+  onCommit: afterPanelResize,
+});
 
 zoom = parseZoomPref(readStringPref(prefsStorage, "artisign.zoom", null), zoom);
 mockupZoom = parseZoomPref(readStringPref(prefsStorage, "artisign.mockupZoom", null), mockupZoom);

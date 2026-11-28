@@ -8632,7 +8632,8 @@ body {
   --shell-bottom: 80px;
   /* The area the open cards take on the left (card + tool bar + gaps). A constant of the layout: the canvases start here whether the card is open or folded (CHR-1299). */
   --canvas-pad-left: 356px;
-  --reserve-left: var(--canvas-pad-left);
+  /* CHR-1281: how much wider than its default a panel was dragged (app.js sets the vars). Only the views that sit beside the cards take it (mockup row, Design System); the Screens and Board canvases keep their constant pad, so a resize never moves them. */
+  --reserve-left: calc(var(--canvas-pad-left) + var(--panel-left-extra, 0px));
   /* The Agent bar folded to its head: the tool panel below it starts a gap under this. */
   --agent-folded-height: 48px;
   /* The right column (the Agent bar, and the tool panel under it) takes its width from the canvas: card + the gap on both sides. */
@@ -8646,7 +8647,7 @@ body {
 
 /* The Design System view keeps its look, beside the card; Use Cases has its own list panel and no card. */
 #app[data-shell-view="design-system"] {
-  --reserve-left: 288px;
+  --reserve-left: calc(288px + var(--panel-left-extra, 0px));
 }
 
 #app[data-shell-view="usecases"] {
@@ -8852,6 +8853,60 @@ body {
 
 .float-card.is-dragging .float-grip {
   cursor: grabbing;
+}
+
+/* CHR-1281 — the resize handle on a card's canvas-facing edge: a 6px hit area, the line shows on hover and while dragging. */
+.panel-resize {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.panel-resize[data-edge="right"] {
+  right: 0;
+}
+
+.panel-resize[data-edge="left"] {
+  left: 0;
+}
+
+.panel-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+
+.panel-resize[data-edge="right"]::after {
+  right: 0;
+}
+
+.panel-resize[data-edge="left"]::after {
+  left: 0;
+}
+
+.panel-resize:hover::after,
+.panel-resize.is-dragging::after {
+  background: var(--chrome-accent);
+}
+
+.panel-resize:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
+/* While a handle is dragged the cursor stays a resize cursor wherever the pointer is, and nothing selects text. */
+body.is-panel-resizing {
+  cursor: col-resize;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* ---- The left card ---- */
@@ -9310,7 +9365,7 @@ body {
 }
 
 #mockup-view {
-  right: var(--reserve-right);
+  right: calc(var(--reserve-right) + var(--panel-right-extra, 0px));
   bottom: var(--shell-bottom);
 }
 
@@ -9335,7 +9390,7 @@ body {
 }
 
 #mockup-comment-layer {
-  inset: var(--shell-top) var(--reserve-right) var(--shell-bottom) var(--reserve-left);
+  inset: var(--shell-top) calc(var(--reserve-right) + var(--panel-right-extra, 0px)) var(--shell-bottom) var(--reserve-left);
 }
 
 /* Pane the frame is clipped and centred in — its own size (not the frame's) is what "fit" zoom measures against. The workspace dots show through. */
@@ -10053,7 +10108,7 @@ body {
   top: var(--shell-top);
   right: var(--space-xl);
   bottom: 18px;
-  width: var(--size-agent-bar);
+  width: var(--panel-right-w, var(--size-agent-bar));
 }
 
 /* The Agent bar above it is folded to its head while a panel is open, so the panel starts a gap below it. */
@@ -10069,7 +10124,7 @@ body {
   top: var(--shell-top);
   right: var(--space-xl);
   bottom: 18px;
-  width: var(--size-agent-bar);
+  width: var(--panel-right-w, var(--size-agent-bar));
 }
 
 #agent-bar[data-collapsed="true"] {

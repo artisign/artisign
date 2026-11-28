@@ -1,9 +1,9 @@
-// CHR-1264 — read-only comment pins on the Board: the open threads of every
-// screen tile as pins at their nodes, a count chip per tile, a group pin where
-// pins overlap, a detached pin, and — below 15 % board zoom — one count dot per
-// tile. A click (never a hover) on a pin opens a read-only preview with "Open
-// in Screens"; a click on a dot opens the screen's read-only thread list.
-// Reply, resolve and re-anchor stay in the Screens view.
+// CHR-1264 — comment pins on the Board: the open threads of every screen tile
+// as pins at their nodes, a count chip per tile, a group pin where pins
+// overlap, a detached pin, and — below 15 % board zoom — one count dot per
+// tile. A click (never a hover) on a pin or a chip opens the thread in the
+// comment canvas's popover (CHR-1295: reply, resolve, reopen, "Open in
+// Screens"); a click on a dot opens the screen's thread list.
 //
 // Everything is an overlay in the PARENT document (#board-comment-layer, in
 // #board-canvas's scrolled coordinates, next to the zoomed #board-canvas-inner).
@@ -12,10 +12,10 @@
 // message and chip looks are the canvas's (comment-canvas.js, style.css).
 //
 // The module fetches nothing: app.js hands it the one GET /api/comments?scope=screens
-// answer and the "open in Screens" action.
+// answer and the actions.
 
 import { icon } from "./icons.js";
-import { authorLabel, bareId, numberThreads, pinnedThreads, placePopover, relativeTime, renderCommentMessage, threadKind } from "./comment-canvas.js";
+import { authorLabel, bareId, numberThreads, pinnedThreads, placePopover, relativeTime, threadKind } from "./comment-canvas.js";
 import { OVERVIEW_ZOOM_BELOW } from "./board.js";
 
 const PIN_SIZE = 24;
@@ -82,7 +82,7 @@ function plural(n, noun) {
 /**
  * @typedef {{ id: string, screen: string, node_id: string | null, author: "human" | "agent", agent?: string, status: "open" | "resolved", detached: boolean, reply_count: number }} BoardThread
  * @typedef {{ id: string, screen?: string, node_id: string | null, text: string, author: "human" | "agent", agent?: string, parent_id: string | null, resolved: boolean, ts: string }} BoardRecord
- * @typedef {{ type: "thread", id: string } | { type: "list", screen: string }} Active
+ * @typedef {{ type: "list", screen: string }} Active the thread list a count dot opens
  */
 
 /**
@@ -91,12 +91,13 @@ function plural(n, noun) {
  *   surfaceEl: HTMLElement,
  *   geometry: () => ReturnType<ReturnType<typeof import("./board-view.js").createBoardView>["commentGeometry"]>,
  *   onOpenInScreens: (screen: string, threadId: string | null) => void,
+ *   onOpenThread: (threadId: string) => void,
  *   onZoomToTile: (screen: string) => void,
  *   enabled?: boolean,
  *   showResolved?: boolean,
  * }} opts
  */
-export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScreens, onZoomToTile, enabled: initialEnabled = true, showResolved: initialShowResolved = false }) {
+export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScreens, onOpenThread, onZoomToTile, enabled: initialEnabled = true, showResolved: initialShowResolved = false }) {
   let enabled = initialEnabled;
   let showResolved = initialShowResolved;
   /** @type {BoardThread[]} */
@@ -105,7 +106,9 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
   let comments = [];
   /** @type {Active | null} */
   let active = null;
-  /** The element the open preview came from, so Esc can give the focus back. @type {HTMLElement | null} */
+  /** The thread whose popover the comment canvas has open: its marker shows as active. @type {string | null} */
+  let activeThreadId = null;
+  /** The element the open list came from, so Esc can give the focus back. @type {HTMLElement | null} */
   let trigger = null;
   /** Its marker key: layout() rebuilds the markers, so the element is looked up again by it. @type {string | null} */
   let triggerKey = null;
@@ -163,8 +166,8 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     const focusInPreview = previewEl.contains(document.activeElement);
     const g = geometry();
     const low = g.zoom < OVERVIEW_ZOOM_BELOW;
-    // A thread preview belongs to a pin, a list to a dot: the other zoom mode has no such marker.
-    if (active && (low ? active.type === "thread" : active.type === "list")) closePreview(false);
+    // A list belongs to a dot: the pins' zoom mode has no such marker.
+    if (active && !low) closePreview(false);
     markers = new Map();
     anchors = new Map();
     chipRows = [];
@@ -211,7 +214,7 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     markersEl.replaceChildren(...nodes);
     placeChips(g);
     trigger = triggerKey ? (markers.get(triggerKey) ?? null) : null;
-    if (active) syncActive();
+    syncActive();
     if (focusedKey) markers.get(focusedKey)?.focus();
     else if (focusInPreview && active) previewEl.focus();
   }
@@ -271,7 +274,8 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     else pin.textContent = String(numbers.get(t.id));
     pin.addEventListener("click", (evt) => {
       evt.stopPropagation();
-      toggle({ type: "thread", id: t.id }, pin);
+      closePreview(false);
+      onOpenThread(t.id);
     });
     return register(key.pin(t.id), pin, [t.id]);
   }
@@ -318,7 +322,10 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
       chip.addEventListener("click", (evt) => {
         evt.stopPropagation();
         const first = all.find((t) => threadKind(t) === kind);
-        if (first) toggle({ type: "thread", id: first.id }, chip);
+        if (first) {
+          closePreview(false);
+          onOpenThread(first.id);
+        }
       });
       // The first thread of the chip's kind may have no pin (grouped, or resolved and hidden): the chip is its anchor then.
       const firstOfKind = all.find((t) => threadKind(t) === kind);
@@ -350,12 +357,9 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
 
   // ------------------------------------------------------------------ preview
 
-  /** @param {Active | null} a @param {Active} b */
-  const same = (a, b) => a !== null && a.type === b.type && (a.type === "list" ? a.screen === /** @type {{ screen: string }} */ (b).screen : a.id === /** @type {{ id: string }} */ (b).id);
-
   /** @param {Active} next @param {HTMLElement} from */
   function toggle(next, from) {
-    if (same(active, next)) {
+    if (active !== null && active.screen === next.screen) {
       closePreview(true);
       return;
     }
@@ -366,18 +370,22 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     previewEl.focus();
   }
 
-  /** The marker the open preview hangs off, or null when layout() no longer draws one. @param {Active} a */
+  /** The marker the open list hangs off, or null when layout() no longer draws one. @param {Active} a */
   function anchorOf(a) {
-    if (a.type === "list") return markers.get(key.dot(a.screen)) ?? null;
-    const k = anchors.get(a.id);
-    return k ? (markers.get(k) ?? null) : null;
+    return markers.get(key.dot(a.screen)) ?? null;
   }
 
-  /** Marks the open marker (aria-expanded, active ring), builds the preview and places it. Touches no marker's identity. */
+  /** Marks the open markers (aria-expanded, active ring), builds the list and places it. Touches no marker's identity. */
   function syncActive() {
     for (const el of markers.values()) {
       el.setAttribute("aria-expanded", "false");
       delete el.dataset.active;
+    }
+    const threadKey = activeThreadId ? anchors.get(activeThreadId) : null;
+    const threadMarker = threadKey ? markers.get(threadKey) : null;
+    if (threadMarker) {
+      threadMarker.setAttribute("aria-expanded", "true");
+      threadMarker.dataset.active = "true";
     }
     if (!active) {
       previewEl.hidden = true;
@@ -394,13 +402,7 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
       el.setAttribute("aria-expanded", "true");
       el.dataset.active = "true";
     }
-    const open = active.type === "thread" ? thread(active.id) : null;
-    if (active.type === "thread" && !open) {
-      closePreview(false);
-      return;
-    }
-    if (open) buildThreadPreview(open);
-    else buildListPreview(/** @type {{ screen: string }} */ (active).screen);
+    buildListPreview(active.screen);
     previewEl.hidden = false;
     anchor.setAttribute("aria-controls", previewEl.id);
     place(anchor);
@@ -421,45 +423,6 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     previewEl.style.left = `${spot.left}px`;
     previewEl.style.top = `${spot.top}px`;
     previewEl.dataset.side = spot.side;
-  }
-
-  /** @param {BoardThread} t */
-  function buildThreadPreview(t) {
-    const numbers = numberThreads(threadsOf(t.screen));
-    const records = comments.filter((c) => c.id === t.id || c.parent_id === t.id);
-    const resolved = t.status === "resolved";
-    previewEl.setAttribute("aria-label", "Comment, read only");
-    previewEl.dataset.mode = "thread";
-
-    const head = div("board-comment-preview-head");
-    const title = document.createElement("b");
-    title.textContent = `#${numbers.get(t.id)}`;
-    const node = document.createElement("code");
-    node.className = "comment-popover-node";
-    node.textContent = bareId(t.node_id) ?? "screen";
-    head.append(title, node);
-    if (t.detached) {
-      node.classList.add("is-detached");
-      head.append(badge("Detached", "detached"));
-    } else if (resolved) head.append(badge("Resolved", "resolved"));
-    head.append(div("comment-popover-spacer"), closeButton());
-
-    const parts = [head];
-    if (t.detached) {
-      const alert = div("comment-popover-alert");
-      alert.setAttribute("role", "note");
-      const text = document.createElement("p");
-      text.textContent = "This element is no longer on the screen. Open the screen to move the thread to another element.";
-      alert.append(icon("warning"), text);
-      parts.push(alert);
-    }
-    const list = document.createElement("ol");
-    list.className = "comment-popover-messages";
-    for (const record of records) list.append(renderCommentMessage(record));
-    parts.push(list);
-    const messages = records.length;
-    parts.push(foot(`${plural(messages, "message")} · ${resolved ? "resolved" : "open"}`, t.screen, t.id));
-    previewEl.replaceChildren(...parts);
   }
 
   /** @param {string} screen */
@@ -607,7 +570,6 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     setData(data) {
       comments = data.comments;
       threads = data.threads;
-      if (active?.type === "thread" && !thread(active.id)) closePreview(false);
       layout();
     },
     /** Re-measures every marker — after a relayout, a zoom or a tile reload. */
@@ -635,6 +597,18 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
       const counts = screenCounts(threads.filter((t) => shown.has(t.screen)));
       return { open: counts.openTotal, detached: counts.detached, resolved: counts.resolved };
     },
+    /** The thread whose popover is open in the comment canvas (null: none); its pin shows as active. @param {string | null} id */
+    setActiveThread(id) {
+      activeThreadId = id;
+      syncActive();
+    },
+    /** The marker that stands for a thread, to give the focus back to. @param {string} id @returns {HTMLElement | null} */
+    markerOf(id) {
+      const k = anchors.get(id);
+      return k ? (markers.get(k) ?? null) : null;
+    },
+    /** @param {string} id the screen a thread is on, or null @returns {string | null} */
+    screenOf: (id) => thread(id)?.screen ?? null,
     close: () => closePreview(false),
     isOpen: () => active !== null,
   };

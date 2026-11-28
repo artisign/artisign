@@ -4,9 +4,9 @@ import { icon } from "./icons.js";
 import { authorLabel, bareId, numberThreads, relativeTime, threadKind } from "./comment-canvas.js";
 
 /**
- * @typedef {{ id: string, node_id: string | null, author: "human" | "agent", agent?: string, status: "open" | "resolved", detached: boolean, variant?: string }} PanelThread
+ * @typedef {{ id: string, node_id: string | null, screen?: string, author: "human" | "agent", agent?: string, status: "open" | "resolved", detached: boolean, variant?: string }} PanelThread
  * @typedef {{ id: string, text: string, author: "human" | "agent", agent?: string, parent_id: string | null, ts: string }} PanelComment
- * @typedef {{ id: string, number: number, kind: "open" | "detached" | "resolved", author: "human" | "agent", node: string | null, time: string, preview: string, variant: string | null, label: string }} PanelRow
+ * @typedef {{ id: string, number: number, kind: "open" | "detached" | "resolved", author: "human" | "agent", node: string | null, time: string, preview: string, variant: string | null, screen: string | null, label: string }} PanelRow
  */
 
 /**
@@ -14,11 +14,11 @@ import { authorLabel, bareId, numberThreads, relativeTime, threadKind } from "./
  * @param {PanelThread[]} threads in log order
  * @param {PanelComment[]} comments every message of the scope, in log order
  * @param {"open" | "resolved"} tab
- * @param {{ now?: number, variantLabel?: (variant: string) => string }} [opts] `variantLabel` names a mockup variant (its column letter)
+ * @param {{ now?: number, variantLabel?: (variant: string) => string, perScreen?: boolean }} [opts] `variantLabel` names a mockup variant (its column letter); `perScreen`: the threads are the Board's, of many screens — each is numbered among its own screen's (as its pin is) and its row names the screen
  * @returns {PanelRow[]}
  */
-export function panelRows(threads, comments, tab, { now = Date.now(), variantLabel } = {}) {
-  const numbers = numberThreads(threads);
+export function panelRows(threads, comments, tab, { now = Date.now(), variantLabel, perScreen = false } = {}) {
+  const numbers = perScreen ? new Map([...new Set(threads.map((t) => t.screen))].flatMap((screen) => [...numberThreads(threads.filter((t) => t.screen === screen))])) : numberThreads(threads);
   const rows = threads
     .filter((t) => (tab === "resolved" ? t.status === "resolved" : t.status === "open"))
     .map((t) => {
@@ -36,7 +36,8 @@ export function panelRows(threads, comments, tab, { now = Date.now(), variantLab
         time: relativeTime(last?.ts, now),
         preview: last ? `${authorLabel(last)}: ${last.text}` : "",
         variant,
-        label: `Comment ${numbers.get(t.id)}${variant ? ` in variant ${variant}` : ""} on ${node ?? "the whole screen"}${kind === "detached" ? ", detached" : ""}${kind === "resolved" ? ", resolved" : ""}`,
+        screen: perScreen ? (t.screen ?? null) : null,
+        label: `Comment ${numbers.get(t.id)}${variant ? ` in variant ${variant}` : ""}${perScreen && t.screen ? ` in ${t.screen}` : ""} on ${node ?? "the whole screen"}${kind === "detached" ? ", detached" : ""}${kind === "resolved" ? ", resolved" : ""}`,
       };
     });
   return [...rows.filter((r) => r.kind === "detached"), ...rows.filter((r) => r.kind !== "detached")];
@@ -57,9 +58,9 @@ export function panelFootText(rows, tab) {
 /**
  * Draws the list.
  * @param {{ tabOpenEl: HTMLElement, tabResolvedEl: HTMLElement, countOpenEl: HTMLElement, countResolvedEl: HTMLElement, listEl: HTMLElement, emptyEl: HTMLElement, footEl: HTMLElement }} els
- * @param {{ threads: PanelThread[], comments: PanelComment[], tab: "open" | "resolved", activeId: string | null, variantLabel?: (variant: string) => string, onOpen: (id: string) => void }} data
+ * @param {{ threads: PanelThread[], comments: PanelComment[], tab: "open" | "resolved", activeId: string | null, variantLabel?: (variant: string) => string, perScreen?: boolean, onOpen: (id: string) => void }} data
  */
-export function renderCommentsPanel(els, { threads, comments, tab, activeId, variantLabel, onOpen }) {
+export function renderCommentsPanel(els, { threads, comments, tab, activeId, variantLabel, perScreen, onOpen }) {
   const openCount = threads.filter((t) => t.status === "open").length;
   const resolvedCount = threads.length - openCount;
   els.countOpenEl.textContent = String(openCount);
@@ -70,7 +71,7 @@ export function renderCommentsPanel(els, { threads, comments, tab, activeId, var
   els.tabResolvedEl.tabIndex = tab === "resolved" ? 0 : -1;
   els.listEl.setAttribute("aria-labelledby", tab === "open" ? els.tabOpenEl.id : els.tabResolvedEl.id);
 
-  const rows = panelRows(threads, comments, tab, { variantLabel });
+  const rows = panelRows(threads, comments, tab, { variantLabel, perScreen });
   els.listEl.replaceChildren(
     ...rows.map((row) => {
       const li = document.createElement("li");
@@ -93,6 +94,12 @@ export function renderCommentsPanel(els, { threads, comments, tab, activeId, var
 
       const head = document.createElement("span");
       head.className = "comment-row-head";
+      if (row.screen) {
+        const screen = document.createElement("span");
+        screen.className = "comment-row-variant";
+        screen.textContent = row.screen;
+        head.append(screen);
+      }
       if (row.variant) {
         const letter = document.createElement("span");
         letter.className = "comment-row-variant";

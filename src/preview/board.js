@@ -475,6 +475,11 @@ export function stepZoomUp(zoom, step = BOARD_ZOOM_STEP, max = MAX_BOARD_ZOOM) {
 export const OVERVIEW_ZOOM_BELOW = 15;
 
 /**
+ * Below this board zoom the Comment and Inspect tools cannot act (CHR-1295, CHR-1296): an element is a few pixels wide and a click would hit the wrong one. Pins and the count dots keep showing; the tools say "Zoom in to comment" / "Zoom in to inspect".
+ */
+export const TOOL_MIN_ZOOM = 30;
+
+/**
  * A variant tile inside an expanded cluster keeps no caption below this zoom: its caption (one size at every zoom) would not fit the room (CAPTION_ROOM) the cluster's layout leaves below the row.
  */
 export const MEMBER_LABEL_MIN_ZOOM = 24;

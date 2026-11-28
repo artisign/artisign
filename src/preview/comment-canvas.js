@@ -15,6 +15,11 @@
 // layer, the scroll pane and the frames are; a thread belongs to the frame
 // whose key is its `variant` (a screen's thread has none: key null).
 //
+// The Board is a host too (CHR-1295): one frame per tile, keyed by screen (the
+// `keyOf` option), its pins drawn by board-comments.js (`host.pins: false`) and
+// its pointer caught in a parent layer (board-pick.js), which hands the hit it
+// found to `hover` and `pick` instead of this module listening in the tile.
+//
 // The module owns no data fetching: app.js hands it the shown scope's
 // comments (GET /api/comments, events already applied server-side) and the
 // actions that post to the daemon.
@@ -220,6 +225,7 @@ function divEl(className) {
  *   remove: (rootId: string) => Promise<ActionResult>,
  *   reanchor: (rootId: string, domId: string, variant: string | null) => Promise<ActionResult>,
  *   copy?: (text: string) => void,
+ *   openInScreens?: (rootId: string) => void,
  * }} CanvasActions
  * @typedef {import("./comment-hosts.js").CommentHost} CommentHost
  * @typedef {import("./comment-hosts.js").CommentFrame} CommentFrame
@@ -232,12 +238,14 @@ function divEl(className) {
  *   bannerEl: HTMLElement,
  *   actions: CanvasActions,
  *   fallbackFocus?: (threadId: string | null) => HTMLElement | null,
+ *   keyOf?: (thread: ThreadInfo) => string | null,
+ *   canWrite?: () => boolean,
  *   prefs?: { showResolved: boolean },
  *   onPrefsChange?: (prefs: { showResolved: boolean }) => void,
  *   onActiveChange?: () => void,
  * }} opts
  */
-export function createCommentCanvas({ host: initialHost, bannerEl, actions, prefs, onPrefsChange, onActiveChange, fallbackFocus }) {
+export function createCommentCanvas({ host: initialHost, bannerEl, actions, prefs, onPrefsChange, onActiveChange, fallbackFocus, keyOf: keyOfThread = (t) => t.variant ?? null, canWrite = () => true }) {
   let host = initialHost;
   /** @type {string | null} what the data belongs to ("screen:<name>" / "mockup:<name>"); a change closes the popover */
   let scope = null;
@@ -261,6 +269,8 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
   let errorText = "";
   let menuOpen = false;
   let confirmDelete = false;
+  /** Whether the last render knew writing as allowed: a zoom across the Board's limit re-renders the popover and the banner. */
+  let wasWritable = true;
   /** The attached documents, one per frame key, each with its listener cleanup. @type {Map<string | null, () => void>} */
   const attached = new Map();
 
@@ -311,11 +321,15 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
   const popFoot = div("comment-popover-foot");
   popFoot.append(popHint, cancelBtn);
   popComposer.append(composerRow, mentionList, popError, popFoot);
+  // Where writing is off (the Board below its zoom limit) the composer gives way to this line.
+  const popLocked = document.createElement("p");
+  popLocked.className = "comment-popover-hint comment-popover-locked";
+  popLocked.hidden = true;
   const menuEl = document.createElement("div");
   menuEl.className = "chrome-menu comment-popover-menu";
   menuEl.setAttribute("role", "menu");
   menuEl.hidden = true;
-  popoverEl.append(popHeader, popAlert, popMessages, popComposer, menuEl);
+  popoverEl.append(popHeader, popAlert, popMessages, popComposer, popLocked, menuEl);
 
   // Popover wiring.
   popComposer.addEventListener("submit", (evt) => {
@@ -347,8 +361,8 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
     if (activeId === null) return;
     const target = /** @type {Node} */ (evt.target);
     if (popoverEl.contains(target) || pinsEl.contains(target)) return;
-    // A column header's count chip and a row of the Comments panel open a thread themselves: closing first would rebuild them away from under the press.
-    if (typeof (/** @type {Element} */ (target).closest) === "function" && /** @type {Element} */ (target).closest(".comment-count-chip, .comment-row")) return;
+    // A column header's count chip, a row of the Comments panel and a pin the Board draws open a thread themselves: closing first would rebuild them away from under the press.
+    if (typeof (/** @type {Element} */ (target).closest) === "function" && /** @type {Element} */ (target).closest(".comment-count-chip, .comment-row, .board-comment-pin")) return;
     close(false);
   };
   document.addEventListener("pointerdown", onOutsidePress, true);
@@ -374,7 +388,13 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
   }
 
   /** A thread's frame key: its variant for a mockup thread, null on a screen. */
-  const keyOf = (t) => t.variant ?? null;
+  const keyOf = keyOfThread;
+
+  /** A thread's number: among all threads of the scope, or — where the host draws its pins per frame (the Board) — among those of its own frame. */
+  function numberOf(t) {
+    const same = host.numberPerFrame ? threads.filter((x) => keyOf(x) === keyOf(t)) : threads;
+    return numberThreads(same).get(t.id);
+  }
 
   /** The frame a thread's pin sits in: its own, or — when its variant no longer exists — the first one, in the detached stack. @returns {CommentFrame | null} */
   function homeFrame(t) {
@@ -414,7 +434,7 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
   }
 
   function threadLabel(t) {
-    const number = numberThreads(threads).get(t.id);
+    const number = numberOf(t);
     const name = frameName(keyOf(t));
     const node = bareId(t.node_id);
     const target = name === null ? (node ?? "screen") : `${name}${node ? `, ${node}` : ""}`;
@@ -453,7 +473,8 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
   function renderBanner() {
     bannerEl.replaceChildren();
     if (reanchorFor !== null) {
-      const number = numberThreads(threads).get(reanchorFor);
+      const reanchored = thread(reanchorFor);
+      const number = reanchored ? numberOf(reanchored) : undefined;
       bannerEl.append(icon("my_location"), `Click the element to move #${number} to`, kbd("Esc"), muted("cancels"));
       bannerEl.hidden = false;
     } else if (modeOn) {
@@ -478,6 +499,7 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
   }
 
   function renderPins() {
+    if (host.pins === false) return; // the host draws its own pins (the Board's)
     const focusedId = pinsEl.contains(document.activeElement) ? /** @type {HTMLElement} */ (document.activeElement).dataset.thread : undefined;
     pinsEl.replaceChildren();
     const numbers = numberThreads(threads);
@@ -570,6 +592,8 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
       return;
     }
     if (!popoverEl.open) popoverEl.show();
+    const writable = canWrite();
+    wasWritable = writable;
     popoverEl.dataset.mode = isNew ? "new" : "thread";
     const popKey = isNew ? newKey : keyOf(/** @type {ThreadInfo} */ (t));
     const popFrame = popKey === null ? null : frameName(popKey);
@@ -578,7 +602,7 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
     // Header.
     popHeader.replaceChildren();
     const title = document.createElement("b");
-    title.textContent = isNew ? "New thread" : `#${numberThreads(threads).get(/** @type {ThreadInfo} */ (t).id)}`;
+    title.textContent = isNew ? "New thread" : `#${numberOf(/** @type {ThreadInfo} */ (t))}`;
     const node = document.createElement("code");
     node.className = "comment-popover-node";
     node.textContent = (isNew ? newTarget : bareId(/** @type {ThreadInfo} */ (t).node_id)) ?? (popKey === null ? "screen" : "variant");
@@ -608,13 +632,14 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
       const resolved = t.status === "resolved";
       const statusBtn = headerBtn(resolved ? "undo" : "check", resolved ? "Reopen" : "Resolve");
       statusBtn.addEventListener("click", () => void run(() => (resolved ? actions.reopen(t.id) : actions.resolve(t.id)), !resolved));
+      if (writable) popHeader.append(statusBtn);
       const moreBtn = headerBtn("more_horiz", "More actions");
       moreBtn.setAttribute("aria-haspopup", "menu");
       moreBtn.setAttribute("aria-expanded", String(menuOpen));
       moreBtn.addEventListener("click", () => setMenu(!menuOpen));
       const closeBtn = headerBtn("close", "Close");
       closeBtn.addEventListener("click", () => close(true));
-      popHeader.append(statusBtn, moreBtn, closeBtn);
+      popHeader.append(moreBtn, closeBtn);
     } else {
       const discard = headerBtn("close", "Discard");
       discard.addEventListener("click", () => close(true));
@@ -626,14 +651,18 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
     popAlert.hidden = !t?.detached;
     if (t?.detached) {
       const text = document.createElement("p");
-      const where = popKey === null ? "on this screen" : `in variant ${popFrame}`;
-      text.textContent = `${bareId(t.node_id)} no longer exists ${where}. Move the thread to the element that replaced it, or resolve it.`;
-      const pick = document.createElement("button");
-      pick.type = "button";
-      pick.className = "chrome-btn chrome-btn--primary chrome-btn--compact";
-      pick.textContent = "Pick element";
-      pick.addEventListener("click", () => startReanchor(t.id));
-      popAlert.append(icon("warning"), text, pick);
+      const where = popKey === null ? "on this screen" : `in ${host.noun ?? "variant"} ${popFrame}`;
+      const canMove = host.reanchor !== false && writable;
+      text.textContent = `${bareId(t.node_id)} no longer exists ${where}. ${canMove ? "Move the thread to the element that replaced it, or resolve it." : "Open the screen to move the thread to another element."}`;
+      popAlert.append(icon("warning"), text);
+      if (canMove) {
+        const pick = document.createElement("button");
+        pick.type = "button";
+        pick.className = "chrome-btn chrome-btn--primary chrome-btn--compact";
+        pick.textContent = "Pick element";
+        pick.addEventListener("click", () => startReanchor(t.id));
+        popAlert.append(pick);
+      }
     }
 
     // Messages.
@@ -645,6 +674,9 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
     }
 
     // Composer.
+    popComposer.hidden = !writable;
+    popLocked.hidden = writable;
+    popLocked.textContent = host.lockedHint ?? "";
     textarea.placeholder = isNew ? "Write a comment, @ to mention an agent" : "Reply, @ to mention an agent";
     textarea.setAttribute("aria-label", isNew ? "Comment" : "Reply");
     sendBtn.hidden = isNew;
@@ -704,21 +736,30 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
       menuEl.append(b);
       return b;
     };
-    item("my_location", "Re-anchor to element…", () => startReanchor(t.id));
+    const writable = canWrite();
+    if (actions.openInScreens) {
+      item("open_in_new", "Open in Screens", () => {
+        setMenu(false);
+        actions.openInScreens?.(t.id);
+      });
+    }
+    if (host.reanchor !== false && writable) item("my_location", "Re-anchor to element…", () => startReanchor(t.id));
     if (t.node_id) {
       item("content_copy", "Copy node ref", () => {
         actions.copy?.(/** @type {string} */ (t.node_id));
         setMenu(false);
       });
     }
-    item("delete", confirmDelete ? "Click again to delete" : "Delete thread", () => {
-      if (!confirmDelete) {
-        confirmDelete = true;
-        renderMenu(t);
-        return;
-      }
-      void run(() => actions.remove(t.id), true);
-    }, true);
+    if (writable) {
+      item("delete", confirmDelete ? "Click again to delete" : "Delete thread", () => {
+        if (!confirmDelete) {
+          confirmDelete = true;
+          renderMenu(t);
+          return;
+        }
+        void run(() => actions.remove(t.id), true);
+      }, true);
+    }
   }
 
   function setMenu(on) {
@@ -736,6 +777,11 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
     else {
       const t = thread(/** @type {string} */ (activeId));
       if (t && !t.detached) anchor = boxFor(keyOf(t), bareId(t.node_id));
+      // Where the host draws no pins, a detached thread hangs off its frame's top-left corner.
+      if (!anchor && t && host.pins === false) {
+        const box = frameOf(keyOf(t)) ? boxFor(keyOf(t), null) : null;
+        if (box) anchor = { left: box.left, top: box.top, right: box.left, bottom: box.top };
+      }
       if (!anchor) {
         const pin = pinFor(/** @type {string} */ (activeId));
         if (pin) {
@@ -948,12 +994,7 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
     if (hover?.key === key) hover = null;
     if (!doc) return;
     const picks = (target) => frameOf(key)?.pick(target, doc) ?? null;
-    const onMove = (evt) => {
-      if ((!modeOn && reanchorFor === null) || !pickable(key)) return;
-      const hit = picks(evt.target);
-      hover = hit ? { key, hit } : null;
-      renderHover();
-    };
+    const onMove = (evt) => hoverHit(key, picks(evt.target));
     const onLeave = () => {
       if (hover?.key === key) hover = null;
       renderHover();
@@ -962,26 +1003,7 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
       if (!modeOn && reanchorFor === null) return;
       evt.preventDefault();
       evt.stopPropagation();
-      if (!pickable(key)) return;
-      const hit = picks(evt.target);
-      if (!hit) return;
-      if (reanchorFor !== null) {
-        if (hit.id === null) return; // a thread re-anchors to an element, never back to the whole screen or variant
-        const id = reanchorFor;
-        reanchorFor = null;
-        hover = null;
-        render();
-        void actions.reanchor(id, hit.id, key).then((result) => {
-          if (result.ok) open(id);
-          else {
-            open(id);
-            errorText = result.message;
-            renderPopover();
-          }
-        });
-        return;
-      }
-      startNew(key, hit.id);
+      pickHit(key, picks(evt.target));
     };
     const onPress = (evt) => {
       if (modeOn || reanchorFor !== null) return;
@@ -1001,6 +1023,35 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
       doc.removeEventListener("click", onClick, true);
       doc.removeEventListener("pointerdown", onPress, true);
     });
+  }
+
+  /** The pointer is over `hit` in frame `key` (null: over nothing there): comment mode's hover outline. */
+  function hoverHit(key, hit) {
+    if ((!modeOn && reanchorFor === null) || !pickable(key)) return;
+    hover = hit ? { key, hit } : null;
+    renderHover();
+  }
+
+  /** A click on `hit` in frame `key`: starts a new thread there, or — while a re-anchor pick waits — moves the thread. Nothing where writing is off. */
+  function pickHit(key, hit) {
+    if ((!modeOn && reanchorFor === null) || !pickable(key) || !hit || !canWrite()) return;
+    if (reanchorFor !== null) {
+      if (hit.id === null) return; // a thread re-anchors to an element, never back to the whole screen or variant
+      const id = reanchorFor;
+      reanchorFor = null;
+      hover = null;
+      render();
+      void actions.reanchor(id, hit.id, key).then((result) => {
+        if (result.ok) open(id);
+        else {
+          open(id);
+          errorText = result.message;
+          renderPopover();
+        }
+      });
+      return;
+    }
+    startNew(key, hit.id);
   }
 
   function detachAll() {
@@ -1072,8 +1123,17 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
       renderHover();
     },
     attachDoc,
+    /** The Board's pointer layer found `hit` under the pointer in frame `key` (null: nothing): comment mode's hover outline. @param {string | null} key @param {Hit | null} hit */
+    hover: hoverHit,
+    /** The Board's pointer layer saw a click on `hit` in frame `key`. @param {string | null} key @param {Hit | null} hit */
+    pick: pickHit,
     /** Re-measures pins, outline and popover — after a frame load, zoom, scroll or resize. */
     layout() {
+      if (canWrite() !== wasWritable) {
+        wasWritable = canWrite();
+        renderBanner();
+        renderPopover();
+      }
       renderPins();
       renderDims();
       renderOutline();
@@ -1115,6 +1175,8 @@ export function createCommentCanvas({ host: initialHost, bannerEl, actions, pref
       if (!threads.some((t) => t.id === id)) return;
       open(id);
     },
+    /** Closes the popover (or a new thread) without moving the focus — a view change. */
+    dismiss: () => close(false),
     isOpen: () => activeId !== null,
     /** The open thread's id, or null (also for a new thread). */
     activeThread: () => (activeId === "new" ? null : activeId),

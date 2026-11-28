@@ -265,18 +265,22 @@
                 #board-canvas is sized in JS to the tile content's SCALED (zoomed) pixel size — its child #board-canvas-inner
                 is transformed (scale) around the content's unscaled (100%-zoom) size, same wrapper/transform split as
                 mockup-zoom.js's applyMockupZoom, so native scrolling (including smooth-scroll centering on flow navigation and
-                zoom-around-cursor) works against the real post-zoom size without any extra pan/zoom logic. Comment mode has no
-                effect here — see board-view.js's module comment.
+                zoom-around-cursor) works against the real post-zoom size without any extra pan/zoom logic.
               -->
               <div id="board-canvas">
                 <div id="board-canvas-inner">
                   <div id="board-tiles"></div>
                   <svg id="board-edges"></svg>
                 </div>
-                <!-- CHR-1264: the read-only comment overlay (board-comments.js), in the parent document at the zoomed size, next to the transformed inner box. -->
+                <!-- CHR-1264: the comment pins and count chips (board-comments.js), in the parent document at the zoomed size, next to the transformed inner box. -->
                 <div id="board-comment-layer"></div>
               </div>
             </div>
+            <!-- CHR-1295, CHR-1296: the Inspect outlines and the comment popover, positioned from each tile iframe's on-screen rect and clipped to the board view (the same way as the mockup columns' layer). -->
+            <div id="board-inspect-layer"><div id="board-inspect-hover" class="board-inspect-box" data-hover hidden></div><div id="board-inspect-selection" class="board-inspect-box" hidden></div></div>
+            <div id="board-comment-canvas-layer"></div>
+            <div id="board-comment-banner" role="status" hidden></div>
+            <div id="board-inspect-hint" role="status" hidden></div>
             <!--
               CHR-625/ADR-005 — shown when an agent's set_board_state call switched the human here: a pill above the zoom pill that stays until dismissed.
               Overlays the board area directly (outside #board-canvas's zoom-transform coordinate space) so it stays put regardless of scroll/zoom.
@@ -380,6 +384,8 @@
                 <button type="button" id="comments-tab-open" class="seg-tab" role="tab" aria-selected="true" aria-controls="comments-list">Open<span id="comments-count-open" class="seg-count">0</span></button>
                 <button type="button" id="comments-tab-resolved" class="seg-tab" role="tab" aria-selected="false" aria-controls="comments-list">Resolved<span id="comments-count-resolved" class="seg-count">0</span></button>
               </div>
+              <!-- CHR-1295: on the Board the tile pins are a choice of their own (the panel lists the threads either way). -->
+              <div id="comments-pins-row" hidden><label for="comments-pins-toggle">Pins on tiles</label><input type="checkbox" id="comments-pins-toggle" class="follow-switch" role="switch" switch checked /></div>
               <ul id="comments-list" role="tabpanel" aria-labelledby="comments-tab-open"></ul>
               <p id="comments-empty" hidden></p>
               <p id="comments-foot"></p>

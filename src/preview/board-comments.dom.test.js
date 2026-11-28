@@ -115,20 +115,42 @@ describe("pins and chips", () => {
     expect(pins()[0].style.left).toBe(`${500 - 12}px`);
   });
 
-  it("sets the chips right after where the tile's label text ends, on its line", () => {
+  it("makes room for the chips in the label (name, count, chips, pin mark) and sets them where that room starts", () => {
+    const reserved = [];
     const board = setup({
       geometry: () => ({
         zoom,
         tiles: [{ screen: "one", x: 0, y: 0, width: 200, height: 300, naturalWidth: 400 }],
         docOf: (s) => docs[s] ?? null,
-        labelEnd: () => ({ right: 90, top: -26, height: 18 }),
+        chipsAt: () => ({ left: 90, top: -26, height: 18 }),
+        reserveChips: (screen, width) => reserved.push([screen, width]),
       }),
     });
     board.setData({ comments: [], threads: [thread("a", "one", "btn-a")] });
     const row = layer.querySelector(".board-comment-chips");
     const layerLeft = layer.getBoundingClientRect().left;
-    expect(row.style.left).toBe(`${90 - layerLeft + 8}px`);
+    expect(reserved).toHaveLength(1);
+    expect(reserved[0][0]).toBe("one");
+    expect(reserved[0][1]).toBe(row.getBoundingClientRect().width + 8); // the room is the chips and a gap before the pin mark
+    expect(row.style.left).toBe(`${90 - layerLeft}px`);
     expect(row.style.height).toBe("18px");
+  });
+
+  it("keeps chips out that would run into the next tile's label, and gives the label its room back", () => {
+    const reserved = [];
+    const board = setup({
+      geometry: () => ({
+        zoom,
+        tiles: [{ screen: "one", x: 0, y: 0, width: 200, height: 300, naturalWidth: 400 }],
+        docOf: (s) => docs[s] ?? null,
+        chipsAt: () => ({ left: 900, top: -26, height: 18 }), // far past the tile's right edge (200) and half the gap beyond it
+        reserveChips: (screen, width) => reserved.push(width),
+      }),
+    });
+    board.setData({ comments: [], threads: [thread("a", "one", "btn-a")] });
+    expect(layer.querySelector(".board-comment-chips").hidden).toBe(true);
+    expect(reserved.at(-1)).toBe(0);
+    expect(pins()).toHaveLength(1); // the pin still says it
   });
 
   it("draws nothing while Comments is off, and again when it is back on", () => {

@@ -33,7 +33,6 @@
   --chrome-activity-read: #0d9488;
   --chrome-activity-write: #7c3aed;
   --chrome-edge: #9aa0c0;
-  --chrome-connector: #c4c4c4;
   --chrome-shadow-float: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 10px 28px rgba(40, 30, 20, 0.14);
   /* CHR-1267 — the Stitch chrome: dotted workspace, translucent floating surfaces, hint blue, agent violet. */
   --chrome-workspace: #f3f3f1;
@@ -145,7 +144,6 @@
   --chrome-activity-read: #2dd4bf;
   --chrome-activity-write: #a78bfa;
   --chrome-edge: #6b7090;
-  --chrome-connector: #4a4743;
   --chrome-shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.55);
   --chrome-workspace: #1a1917;
   --chrome-workspace-dot: #35322e;
@@ -2052,6 +2050,15 @@ button.chrome-section-header:focus-visible {
   box-shadow: 0 0 0 calc(2px / var(--bz, 1)) var(--chrome-agent), var(--chrome-shadow-frame);
 }
 
+/* The main screen of an expanded cluster is its `current` member (design `cluster-member` current): ringed in accent. */
+.board-tile.current {
+  box-shadow: 0 0 0 calc(2px / var(--bz, 1)) var(--chrome-accent), var(--chrome-shadow-frame);
+}
+
+.board-tile.current.writing {
+  box-shadow: 0 0 0 calc(2px / var(--bz, 1)) var(--chrome-agent), var(--chrome-shadow-frame);
+}
+
 /* The card of a tile outside a cluster (design `board-cluster`): label zone above, padding around. Behind the frame, never in the way of a press. */
 .board-tile:not(.in-cluster)::before {
   content: "";
@@ -2091,8 +2098,40 @@ button.chrome-section-header:focus-visible {
   pointer-events: none;
 }
 
-.board-tile-label[data-mode="hidden"] {
+.board-tile-label[data-mode="hidden"],
+.board-tile-caption[data-mode="hidden"] {
   display: none;
+}
+
+/* The caption of a variant in an expanded cluster (design `cluster-member`): below its frame, a small name; its pin mark and chips come after it. The main screen's caption is plain text, "default", in accent. */
+.board-tile.member .board-tile-label,
+.board-tile-caption {
+  top: 100%;
+  bottom: auto;
+  height: 16px;
+  margin: calc(8px / var(--bz, 1)) 0 0;
+  font-size: var(--ui-2xs);
+  font-weight: 500;
+  transform-origin: left top;
+}
+
+.board-tile-caption {
+  position: absolute;
+  left: 0;
+  width: max(calc(100% * var(--bz, 1)), 60px);
+  overflow: hidden;
+  color: var(--chrome-accent);
+  font-weight: 600;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: scale(calc(1 / var(--bz, 1)));
+  pointer-events: none;
+}
+
+/* The room the label keeps for the comment chips, which board-comments.js draws over it. */
+.board-tile-chips-slot {
+  flex: none;
 }
 
 /* At 100 % and above the full name shows, whatever the tile's width. */
@@ -2748,7 +2787,8 @@ button.chrome-section-header:focus-visible {
 /* The toggle (design `cluster-toggle`) keeps one size at every zoom. Collapsed it waits beside the card until the header is hovered or focused; expanded it sits in the header, always shown. */
 .board-cluster-toggle {
   position: absolute;
-  top: calc(10px / var(--bz, 1));
+  /* On the label's row: its bottom edge is 8px (on screen) above the main frame, which starts 64 board px (header + label room) below the card's top. */
+  top: calc(64px - 28px / var(--bz, 1));
   left: calc(100% + 8px / var(--bz, 1));
   display: inline-flex;
   align-items: center;
@@ -2856,12 +2896,6 @@ button.chrome-section-header:focus-visible {
 
 .board-tile.context {
   opacity: 0.55;
-}
-
-.board-connector {
-  fill: none;
-  stroke: var(--chrome-connector);
-  stroke-width: 2px;
 }
 
 .board-edge-label rect {
@@ -9713,6 +9747,10 @@ button.uc-target:hover {
 }
 
 /* The tile's count chips (design `board-cluster`): in the label row above the tile, right after the label's text; board-comments.js sets left, top and height from where the label ends. Native size at every zoom, like the label. */
+.board-comment-chips[hidden] {
+  display: none;
+}
+
 .board-comment-chips {
   position: absolute;
   display: flex;

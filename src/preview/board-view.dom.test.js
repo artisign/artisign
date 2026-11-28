@@ -108,12 +108,10 @@ describe("board clusters — DOM", () => {
     expect(tileNames(tiles).sort()).toEqual(["cart", "cart-clear", "cart-clear-confirm", "dash", "plain"]);
     expect(tiles.querySelector('.board-tile[data-screen="cart"] iframe')).toBe(before);
     expect(fetchRender.mock.calls.map((c) => c[0]).sort()).toEqual(["cart-clear", "cart-clear-confirm"]);
-    expect(document.getElementById("edges").querySelectorAll(".board-connector")).toHaveLength(2);
 
     await board.setClusterState({ expanded: [] });
     expect(frameRoots(tiles)).toEqual(["dash", "cart"]);
     expect(tileNames(tiles).sort()).toEqual(["cart", "dash", "plain"]);
-    expect(document.getElementById("edges").querySelectorAll(".board-connector")).toHaveLength(0);
   });
 
   it("labels a docked edge end with the variant it really touches", async () => {
@@ -146,7 +144,7 @@ describe("board clusters — DOM", () => {
     const offHtml = off.tiles.innerHTML.replace(/<div class="board-frames"><\/div>/, "");
     expect(off.tiles.querySelector(".board-cluster-frame")).toBeNull();
     expect(tileNames(off.tiles)).toEqual(names);
-    expect(off.edges.querySelector(".board-connector, .board-edge-label")).toBeNull();
+    expect(off.edges.querySelector(".board-edge-label")).toBeNull();
 
     const flat = setup(); // today's call: no cluster info at all
     await flat.board.setScreens(names, flows, "p");
@@ -246,5 +244,100 @@ describe("keys inside a tile", () => {
     await board.setScreens([], [], "p", { screens, expanded: [], clusters: false });
     iframe.contentDocument.dispatchEvent(new KeyboardEvent("keydown", { key: "e", bubbles: true }));
     expect(onTileKeydown).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("expanded clusters (design `board-cluster-expanded`)", () => {
+  it("the main screen is the ringed current member with the caption \"default\"; its label is the card's header", async () => {
+    const { board, tiles } = setup();
+    await board.setScreens(names, [], "p", { screens, expanded: ["cart"], clusters: true });
+    const cart = tiles.querySelector('.board-tile[data-screen="cart"]');
+    expect(cart.classList.contains("current")).toBe(true);
+    expect(cart.classList.contains("member")).toBe(false);
+    expect(cart.querySelector(".board-tile-caption").textContent).toBe("default");
+    expect(cart.querySelector(".board-tile-label .board-tile-name").textContent).toBe("cart");
+    expect(cart.querySelector(".board-tile-label .board-tile-count").textContent).toBe("2 variants");
+  });
+
+  it("a variant is a member: its caption below is its name without the family's prefix, with room for chips and the pin mark, no header label", async () => {
+    const { board, tiles } = setup();
+    await board.setScreens(names, [], "p", { screens, pinned: ["cart-clear"], expanded: ["cart"], clusters: true });
+    const member = tiles.querySelector('.board-tile[data-screen="cart-clear"]');
+    expect(member.classList.contains("member")).toBe(true);
+    expect(member.classList.contains("current")).toBe(false);
+    expect(member.querySelector(".board-tile-caption")).toBeNull();
+    const label = member.querySelector(".board-tile-label");
+    expect([...label.children].map((c) => c.className)).toEqual(["board-tile-name", "board-tile-chips-slot", "board-tile-pin"]); // name, chips, pin mark
+    expect(label.querySelector(".board-tile-name").textContent).toBe("clear");
+    expect(label.querySelector(".board-tile-viewport")).toBeNull();
+    expect(label.querySelector(".board-tile-pin").hidden).toBe(false);
+  });
+
+  it("a plain tile's label reads icon, name, count, chips, pin mark", async () => {
+    const { board, tiles } = setup();
+    await board.setScreens(names, [], "p", { screens, expanded: [], clusters: true });
+    const label = tiles.querySelector('.board-tile[data-screen="cart"] .board-tile-label');
+    expect([...label.children].map((c) => c.className.split(" ")[c.className.includes("icon") ? 1 : 0])).toEqual(["board-tile-viewport", "board-tile-name", "board-tile-count", "board-tile-chips-slot", "board-tile-pin"]);
+  });
+
+  it("a tile that stays when its cluster expands changes its part without reloading", async () => {
+    const { board, tiles } = setup();
+    await board.setScreens(names, [], "p", { screens, expanded: [], clusters: true });
+    const iframe = tiles.querySelector('.board-tile[data-screen="cart"] iframe');
+    await board.setClusterState({ expanded: ["cart"] });
+    const cart = tiles.querySelector('.board-tile[data-screen="cart"]');
+    expect(cart.classList.contains("current")).toBe(true);
+    expect(cart.querySelector("iframe")).toBe(iframe);
+    expect(cart.querySelectorAll(".board-tile-label")).toHaveLength(1);
+    await board.setClusterState({ expanded: [] });
+    expect(tiles.querySelector('.board-tile[data-screen="cart"]').classList.contains("current")).toBe(false);
+    expect(tiles.querySelector('.board-tile[data-screen="cart"] .board-tile-caption')).toBeNull();
+  });
+
+  it("the captions are hidden below 24 % and the labels below 15 %", async () => {
+    const { board, tiles } = setup();
+    await board.setScreens(names, [], "p", { screens, expanded: ["cart"], clusters: true });
+    const caption = tiles.querySelector(".board-tile-caption");
+    board.setZoom(20);
+    expect(caption.dataset.mode).toBe("hidden");
+    expect(tiles.querySelector('.board-tile[data-screen="cart"] .board-tile-label').dataset.mode).toBe("truncated");
+    expect(tiles.querySelector('.board-tile[data-screen="cart-clear"] .board-tile-label').dataset.mode).toBe("hidden");
+    board.setZoom(24);
+    expect(caption.dataset.mode).toBe("truncated");
+  });
+});
+
+describe("collapsed cluster thumbnails (design `board-cluster`)", () => {
+  const thumbs = (tiles, root) => [...tiles.querySelectorAll(`[data-root="${root}"] .board-cluster-thumb`)].map((el) => [el.classList.contains("desktop") ? "desktop" : "mobile", el.classList.contains("on")]);
+
+  it("take their shape from the project's viewport data, also for variants that are not on the board", async () => {
+    const { board, tiles } = setup();
+    const viewports = new Map([["dash", { width: 1200, height: 800 }], ["dash-empty", { width: 1200, height: 800 }], ["cart", { width: 390, height: 844 }], ["cart-clear", { width: 390, height: 844 }], ["cart-clear-confirm", { width: 390, height: 844 }]]);
+    await board.setScreens(["dash", "cart"], [], "p", { screens, expanded: [], clusters: true, viewports });
+    // dash: the frame and its one variant; cart: the frame and both variants of its family, only the main screen being on the board
+    expect(thumbs(tiles, "dash")).toEqual([["desktop", true], ["desktop", false]]);
+    expect(thumbs(tiles, "cart")).toEqual([["mobile", true], ["mobile", false], ["mobile", false]]);
+  });
+
+  it("follow viewport data that arrives later, and the label's glyph with it", async () => {
+    const { board, tiles } = setup();
+    await board.setScreens(["dash"], [], "p", { screens, expanded: [], clusters: true });
+    expect(thumbs(tiles, "dash")).toEqual([["mobile", true], ["mobile", false]]); // nothing known: a phone, as everywhere
+    board.setViewports(new Map([["dash", { width: 1440, height: 900 }], ["dash-empty", { width: 1440, height: 900 }]]));
+    expect(thumbs(tiles, "dash")).toEqual([["desktop", true], ["desktop", false]]);
+    expect(tiles.querySelector('.board-tile[data-screen="dash"] .board-tile-viewport').textContent).toBe("desktop_windows");
+  });
+});
+
+describe("the label's room for comment chips", () => {
+  it("is reserved by the comment layer and read back as where the chips start", async () => {
+    const { board, tiles } = setup();
+    await board.setScreens(["plain"], [], "p", { screens, expanded: [], clusters: false });
+    const g = board.commentGeometry();
+    g.reserveChips("plain", 52);
+    expect(tiles.querySelector(".board-tile-chips-slot").style.width).toBe("52px");
+    expect(g.chipsAt("plain")).toEqual({ left: 0, top: 0, height: 0 }); // jsdom lays nothing out
+    board.setZoom(10);
+    expect(board.commentGeometry().chipsAt("plain")).toBeNull(); // no label, no room
   });
 });

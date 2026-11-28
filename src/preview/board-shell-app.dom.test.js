@@ -140,6 +140,18 @@ describe("the Board's tool bar", () => {
     expect($("#board-clusters-toggle").getAttribute("aria-pressed")).toBe("true");
   });
 
+  it("the Flow tool answers to E on the Board and F elsewhere, in aria-keyshortcuts and its key too, on every view switch", async () => {
+    await openBoard();
+    const flow = $("#flow-mode-toggle");
+    expect([flow.getAttribute("aria-keyshortcuts"), flow.dataset.shortcut]).toEqual(["E", "E"]);
+    $('.view-tab[data-view="screens"]').click();
+    expect([flow.getAttribute("aria-keyshortcuts"), flow.dataset.shortcut]).toEqual(["F", "F"]);
+    $('.view-tab[data-view="board"]').click();
+    expect(flow.getAttribute("aria-keyshortcuts")).toBe("E");
+    $('.view-tab[data-view="design-system"]').click();
+    expect(flow.getAttribute("aria-keyshortcuts")).toBe("F");
+  });
+
   it("with nothing on the board, comments, show resolved and collapse all say so", async () => {
     boardState = { filter: "xyzzy", pinned: [], expanded: [] };
     await openBoard();
@@ -208,7 +220,7 @@ describe("the left card on the Board", () => {
   it("says what is on the board, groups the list, and shows Clear pins while something is pinned", async () => {
     boardState = { filter: "checkout", pinned: ["home"], expanded: [] };
     await openBoard();
-    expect(status()).toBe("4 on the board"); // checkout, its variant, cart, and the pinned home
+    expect(status()).toBe("3 on the board"); // checkout (with its variant), cart and the pinned home: clusters and screens, not variants
     expect(sections()).toEqual(["Matches 2", "Pinned 1"]);
     expect($("#board-clear-pins-btn").hidden).toBe(false);
     expect($("#board-clear-pins-btn").textContent).toBe("Clear pins");
@@ -220,7 +232,7 @@ describe("the left card on the Board", () => {
   it("with no filter it reads All N on the board, and the list is Pinned / All screens", async () => {
     boardState = { filter: null, pinned: ["settings"], expanded: [] };
     await openBoard();
-    expect(status()).toBe("All 5 on the board");
+    expect(status()).toBe("All 4 on the board"); // checkout (with its variant), cart, home, settings
     expect(sections()).toEqual(["Pinned 1", "All screens 3"]);
   });
 
@@ -254,12 +266,13 @@ describe("the agent's presentation", () => {
     await flush();
     const banner = $("#board-presented-banner");
     expect(banner.hidden).toBe(false);
-    expect(banner.textContent).toContain("The agent switched you to the Board to show 3 screens");
-    expect($("#board-presented-text b").textContent).toBe("3 screens");
-    expect($("#screen-filter-hint").textContent).toBe("3 shown by the agent");
+    expect(banner.textContent).toContain("The agent switched you to the Board to show 2 screens"); // checkout (with its variant) and cart
+    expect($("#board-presented-text b").textContent).toBe("2 screens");
+    expect($("#screen-filter-hint").textContent).toBe("2 shown by the agent");
+    expect($("#agent-note-scope-text").textContent).toBe("On the Board, 2 screens"); // the Agent bar counts what the card counts
     $("#board-presented-dismiss").click();
     expect(banner.hidden).toBe(true);
-    expect($("#screen-filter-hint").textContent).toBe("3 on the board");
+    expect($("#screen-filter-hint").textContent).toBe("2 on the board");
   });
 
   it("does not rewrite the notice's words while they read the same (a live region speaks only for a real change)", async () => {

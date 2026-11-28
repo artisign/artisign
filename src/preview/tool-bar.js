@@ -4,7 +4,7 @@
 
 import { makeCardDraggable } from "./float-card.js";
 import { readBoolPref, writeBoolPref } from "./prefs.js";
-import { formatShortcut, shortcutById } from "./shortcuts.js";
+import { ariaKeyShortcut, formatShortcut, shortcutById } from "./shortcuts.js";
 
 /** Whether the browser can show interest-triggered hint popovers anchored to their tool. */
 export function supportsInterestHints() {
@@ -182,7 +182,18 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
      */
     setState(button, { disabled = false, reason = "", pressed, name, hint, shortcut }) {
       if (name !== undefined) button.setAttribute("aria-label", name);
-      if (shortcut !== undefined) button.dataset.shortcutId = shortcut;
+      if (shortcut !== undefined) {
+        // The key the tool answers to now, for the hint, `data-shortcut` and assistive tech alike.
+        button.dataset.shortcutId = shortcut;
+        const def = shortcutById(shortcut);
+        if (def) {
+          button.dataset.shortcut = formatShortcut(def, mac);
+          button.setAttribute("aria-keyshortcuts", ariaKeyShortcut(def));
+        } else {
+          delete button.dataset.shortcut;
+          button.removeAttribute("aria-keyshortcuts");
+        }
+      }
       if (disabled) button.setAttribute("aria-disabled", "true");
       else button.removeAttribute("aria-disabled");
       if (disabled && reason) button.dataset.toolReason = reason;

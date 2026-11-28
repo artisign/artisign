@@ -291,21 +291,28 @@ export function renderBoardScreenList(listEl, screens, activeScreen, onSelect, f
   const tree = buildScreenTree(screens);
   const expanded = opts.expanded ?? new Set();
   const pinned = opts.pinned ?? new Set();
-  const hasPin = (root) => subtreeNames(root).some((name) => pinned.has(name));
   const rowCount = (rows) => rows.filter((r) => r.type === "screen" && r.node.parent === null).length;
   const needle = filter.trim();
+  const found = needle ? flattenTree(tree, { expanded, filter }) : { rows: [] };
+  const foundNames = new Set(found.rows.filter((r) => r.type === "screen").map((r) => r.node.name));
+  // A pinned screen the Matches rows do not show is listed under Pinned with its toggle: its tree is opened down to it, unless a fully pinned ancestor's row stands for it.
+  const hiddenPins = [...pinned].filter((name) => tree.nodes.has(name) && !foundNames.has(name));
+  const openForPins = new Set(expanded);
+  for (const name of hiddenPins) {
+    const ancestors = [];
+    for (let p = tree.nodes.get(name).parent; p; p = p.parent) ancestors.push(p);
+    if (ancestors.some((a) => subtreeNames(a).every((n) => pinned.has(n)))) continue;
+    for (const a of ancestors) openForPins.add(a.name);
+  }
+  const pinnedRoots = tree.roots.filter((root) => subtreeNames(root).some((n) => hiddenPins.includes(n)));
   /** @type {{ title: string, rows: SidebarRow[], emptyText?: string }[]} */
   const groups = [];
   if (needle) {
-    const found = flattenTree(tree, { expanded, filter });
-    const foundRoots = new Set(found.rows.filter((r) => r.type === "screen" && r.node.parent === null).map((r) => r.node.name));
-    const pinnedOnly = tree.roots.filter((root) => !foundRoots.has(root.name) && hasPin(root));
     groups.push({ title: "Matches", rows: found.rows, emptyText: `No screen or tag matches \u201c${needle}\u201d.` });
-    if (pinnedOnly.length > 0) groups.push({ title: "Pinned", rows: flattenTree({ roots: pinnedOnly }, { expanded }).rows });
+    if (pinnedRoots.length > 0) groups.push({ title: "Pinned", rows: flattenTree({ roots: pinnedRoots }, { expanded: openForPins }).rows });
   } else {
-    const pinnedRoots = tree.roots.filter(hasPin);
-    const rest = tree.roots.filter((root) => !hasPin(root));
-    if (pinnedRoots.length > 0) groups.push({ title: "Pinned", rows: flattenTree({ roots: pinnedRoots }, { expanded }).rows });
+    const rest = tree.roots.filter((root) => !pinnedRoots.includes(root));
+    if (pinnedRoots.length > 0) groups.push({ title: "Pinned", rows: flattenTree({ roots: pinnedRoots }, { expanded: openForPins }).rows });
     groups.push({ title: "All screens", rows: flattenTree({ roots: rest }, { expanded }).rows });
   }
   const drawn = [];

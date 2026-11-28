@@ -118,7 +118,11 @@ describe("hints where interest invokers work", () => {
     bar.setState($("a"), { shortcut: "board-edges" });
     expect($("a").dataset.shortcutId).toBe("board-edges");
     expect(hint.querySelector("kbd").textContent).toBe("E");
+    expect([$("a").getAttribute("aria-keyshortcuts"), $("a").dataset.shortcut]).toEqual(["E", "E"]); // for assistive tech too
+    bar.setState($("a"), { shortcut: "comment" });
+    expect([$("a").getAttribute("aria-keyshortcuts"), $("a").dataset.shortcut]).toEqual(["C", "C"]);
     bar.setState($("a"), { shortcut: "" });
+    expect($("a").hasAttribute("aria-keyshortcuts")).toBe(false);
     expect(hint.querySelector("kbd")).toBeNull();
   });
 

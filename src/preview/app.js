@@ -87,6 +87,7 @@ import {
   computeBoardVisibility,
   clusterToggleWrite,
   formatBoardStatus,
+  countBoardItems,
 } from "./board.js";
 import { createProjectUI } from "./projects.js";
 import { createProjectDialogs } from "./project-dialogs.js";
@@ -404,7 +405,7 @@ let expandedClusters = [];
 // The zoom "Fit all" last computed, if any — the only way to know whether
 // its quick-jump button should read active, since (unlike "100%") its
 // target isn't a fixed constant. Set from board.setZoom's onZoomChange
-// callback (source === "fitall"), read by updateBoardToolbar.
+// callback (source === "fitall"), read by syncZoomUI (the pill's Fit button).
 let lastFitAllZoom = null;
 // Debounces the board zoom preference write (CHR-623 review finding 3) — a
 // slider drag fires onZoomChange, and so a localStorage write, on every
@@ -588,10 +589,15 @@ function hideAgentPresentedBanner() {
 
 boardPresentedDismissBtn.addEventListener("click", () => hideAgentPresentedBanner());
 
+/** What the Board counts: clusters and plain screens, not every variant (see countBoardItems). */
+function boardItemCount(visibility = computeBoardVisibility(screens, screenFilter, pinnedScreens)) {
+  return countBoardItems(screens, visibility.visibleNames, boardClustersOn);
+}
+
 /** The banner's words (design `board-view-presented`): "The agent switched you to the Board to show **5 screens**". Never rewritten while they read the same, so the live region speaks only for a real change. */
 function updateAgentPresentedBannerText() {
   if (!agentPresentationActive) return;
-  const shownCount = computeBoardVisibility(screens, screenFilter, pinnedScreens).shownCount;
+  const shownCount = boardItemCount();
   const text = shownCount === 0 ? "The agent switched you to the Board" : `The agent switched you to the Board to show ${shownCount} screen${shownCount === 1 ? "" : "s"}`;
   if (boardPresentedTextEl.textContent === text) return;
   const parts = [document.createTextNode("The agent switched you to the Board")];
@@ -607,7 +613,7 @@ function updateAgentPresentedBannerText() {
 function renderBoardStatus() {
   const visibility = computeBoardVisibility(screens, screenFilter, pinnedScreens);
   const boardCard = currentView === "board" && navTab === "screens";
-  if (boardCard) screenFilterHint.textContent = formatBoardStatus(visibility, { filtered: screenFilter.trim() !== "", presented: agentPresentationActive });
+  if (boardCard) screenFilterHint.textContent = formatBoardStatus(boardItemCount(visibility), { filtered: screenFilter.trim() !== "", presented: agentPresentationActive });
   // Gated on the raw pin list, not `visibility.pinnedCount`: the latter is the CLEANED count (a pin whose screen no longer exists is dropped from it), so a project whose pins are entirely ghosts — a branch switch or a hand-deleted file the daemon never pruned — would hide the one button that can get rid of them.
   boardClearPinsBtn.hidden = !boardCard || pinnedScreens.length === 0;
   boardEmptyClearBtn.hidden = screenFilter.trim() === "";
@@ -1248,7 +1254,7 @@ function renderAgentBar() {
       screenLabel: currentScreen === null ? "" : screenContext(currentScreen),
       mockup: currentMockup,
       mockupVariant: mockupVariantForNote(),
-      boardCount: computeBoardVisibility(screens, screenFilter, pinnedScreens).shownCount,
+      boardCount: boardItemCount(),
     }),
   });
 }
@@ -1841,6 +1847,7 @@ async function refreshViewports() {
     const sizes = await fetchScreenViewports(project);
     if (project === activeProjectRoot) {
       screenViewports = sizes;
+      board.setViewports(screenViewports);
       refreshSidebar();
     }
   } finally {
@@ -2733,6 +2740,7 @@ async function loadBoard() {
     screens,
     expanded: expandedClusters,
     clusters: boardClustersOn,
+    viewports: screenViewports,
   });
   boardBuilt = true;
   await commentsLoaded;

@@ -398,6 +398,38 @@ describe("renderBoardScreenList (the Board's card)", () => {
     expect(layout).toEqual(["# Matches 0", "No screen or tag matches \u201cxyzzy\u201d.", "# Pinned 1", "home"]);
   });
 
+  it("a pinned variant is listed with its toggle when the filter matches only its siblings (the board still shows it)", () => {
+    const family = [
+      { name: "cart", tags: [] },
+      { name: "cart-empty", tags: [], variant_of: "cart", variant_kind: "state" },
+      { name: "cart-updated", tags: [], variant_of: "cart", variant_kind: "state" },
+    ];
+    const listEl = document.createElement("ul");
+    const drawn = renderBoardScreenList(listEl, family, null, () => {}, "cart-empty", { pinned: new Set(["cart-updated"]), onTogglePin: () => {} });
+    expect(drawn).toEqual([{ title: "Matches", count: 1 }, { title: "Pinned", count: 1 }]);
+    const pinnedRow = listEl.querySelector('[data-screen="cart-updated"]');
+    expect(pinnedRow).not.toBeNull();
+    expect(pinnedRow.querySelector(".screen-item-pin").getAttribute("aria-label")).toBe("Unpin cart-updated from the board");
+    expect(pinnedRow.querySelector(".screen-item-pin").classList.contains("pinned")).toBe(true);
+    // Every screen that is pinned has a row with a toggle somewhere in the list.
+    expect([...listEl.querySelectorAll(".screen-item-pin.pinned")].map((b) => b.closest("li").dataset.screen)).toContain("cart-updated");
+  });
+
+  it("without a filter a pinned variant under a root that is not fully pinned is opened up to, while a fully pinned family stays one row", () => {
+    const family = [
+      { name: "cart", tags: [] },
+      { name: "cart-empty", tags: [], variant_of: "cart", variant_kind: "state" },
+      { name: "cart-updated", tags: [], variant_of: "cart", variant_kind: "state" },
+      { name: "home", tags: [] },
+      { name: "home-empty", tags: [], variant_of: "home", variant_kind: "state" },
+    ];
+    const listEl = document.createElement("ul");
+    renderBoardScreenList(listEl, family, null, () => {}, "", { pinned: new Set(["cart-updated", "home", "home-empty"]), onTogglePin: () => {} });
+    const rows = [...listEl.querySelectorAll("li[data-screen]")].map((li) => li.dataset.screen);
+    expect(rows).toContain("cart-updated");
+    expect(rows).not.toContain("home-empty"); // home's row stands for its fully pinned family
+  });
+
   it("every row's pin toggle is always shown on the Board's list", () => {
     const { listEl } = draw("", ["home"]);
     const pins = [...listEl.querySelectorAll(".screen-item-pin")];

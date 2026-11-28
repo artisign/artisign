@@ -13,7 +13,7 @@
 import { fetchRender } from "./api.js";
 import { applyFlowMode } from "./flows.js";
 import { icon } from "./icons.js";
-import { DESKTOP_MIN_WIDTH, viewportIconName } from "./screens.js";
+import { DESKTOP_MIN_WIDTH } from "./screens.js";
 import {
   computeLayout,
   buildBoardModel,
@@ -33,6 +33,7 @@ import {
   computeWheelZoomFactor,
   labelDisplayMode,
   BASE_GAP,
+  BASE_GAP_Y,
   BASE_PADDING,
   DEFAULT_BOARD_ZOOM,
 } from "./board.js";
@@ -49,7 +50,7 @@ const EDGE_LABEL_ARROW_PX = 16;
 // cursor exact (computeZoomAroundCursor) instead of an approximation.
 // `columns` is NOT fixed here (CHR-623 review) — it's chosen dynamically by
 // computeBoardColumns, see relayout()/GRID_OPTIONS.
-const GRID_OPTIONS = { gapX: BASE_GAP, gapY: BASE_GAP, padding: BASE_PADDING };
+const GRID_OPTIONS = { gapX: BASE_GAP, gapY: BASE_GAP_Y, padding: BASE_PADDING };
 // A batch of near-simultaneous iframe `load` events (e.g. ~186 screens all
 // finishing at once) coalesces into a single relayout — see
 // scheduleRelayout's own comment.
@@ -133,8 +134,8 @@ export function createBoardView({
   let clustersOn = false;
   let currentProject = "";
   let model = buildBoardModel([], [], [], { clusters: false });
-  /** @type {{ tiles: object[], frames: object[], mores: object[], connectors: { from: string, to: string, more?: boolean }[], contentWidth: number, contentHeight: number }} */
-  let layout = { tiles: [], frames: [], mores: [], connectors: [], contentWidth: 0, contentHeight: 0 };
+  /** @type {{ tiles: object[], frames: object[], mores: object[], contentWidth: number, contentHeight: number }} */
+  let layout = { tiles: [], frames: [], mores: [], contentWidth: 0, contentHeight: 0 };
   const framesEl = document.createElement("div");
   framesEl.className = "board-frames";
   // The column count the CURRENT `layout` was built with — set only by
@@ -159,6 +160,14 @@ export function createBoardView({
   // comment), never patched independently.
   let pinnedScreens = new Set();
   let outsideFilterScreens = new Set();
+
+  /** The size of every screen of the project (get_project's viewport data), for the glyph of a label and the shape of a thumbnail — also of variants that have no tile on the board. @type {Map<string, { width: number, height: number }>} */
+  let viewports = new Map();
+  /** Whether a screen is drawn as a desktop frame: its viewport, else the size its tile was measured at, else a phone. */
+  function isDesktop(screen) {
+    const size = viewports.get(screen) ?? measuredSizes[screen];
+    return (size?.width ?? 0) >= DESKTOP_MIN_WIDTH;
+  }
 
   /** The screen the agent is writing right now (design: violet ring and a "Writing" chip), or null. */
   let writingName = null;
@@ -263,6 +272,7 @@ export function createBoardView({
   /** The zoom-dependent label rule (board.js's labelDisplayMode): hidden when the board is an overview, truncated to the tile's width on screen below 100 %, full from there. The sizes are style.css's (the label keeps one size at every zoom). */
   function applyZoomDependentTileChrome() {
     for (const label of tilesEl.querySelectorAll(".board-tile-label")) label.dataset.mode = labelDisplayMode(zoom, { member: label.parentElement?.classList.contains("member") });
+    for (const caption of tilesEl.querySelectorAll(".board-tile-caption")) caption.dataset.mode = labelDisplayMode(zoom, { member: true });
     // An expanded cluster's toggle sits inside its header when the card is wide enough on screen to hold it beside the label, and beside the card otherwise.
     for (const frame of layout.frames) {
       framesEl.querySelector(`.board-cluster-frame[data-root="${CSS.escape(frame.root)}"]`)?.classList.toggle("roomy", (frame.width * zoom) / 100 >= ROOMY_FRAME_WIDTH);
@@ -277,12 +287,23 @@ export function createBoardView({
     }
   }
 
-  /** The viewport glyph of each label follows the size the tile was measured at: a monitor for a wide screen, a phone otherwise. */
+  /** The viewport glyph of each label: a monitor for a wide screen, a phone otherwise. */
   function applyViewportIcons() {
     for (const tile of layout.tiles) {
       const el = tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(tile.screen)}"] .board-tile-viewport`);
-      if (el) el.textContent = viewportIconName({ width: tile.naturalWidth });
+      if (el) el.textContent = isDesktop(tile.screen) ? "desktop_windows" : "smartphone";
     }
+  }
+
+  /**
+   * The project's viewport data arrived or changed: glyphs and thumbnails follow.
+   * @param {Map<string, { width: number, height: number }>} next
+   */
+  function setViewports(next) {
+    viewports = next;
+    if (layout.frames.length > 0) renderFrames();
+    applyViewportIcons();
+    applyZoomDependentTileChrome();
   }
 
   /**
@@ -298,7 +319,7 @@ export function createBoardView({
   function relayout() {
     currentColumns = computeBoardColumns(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, gridOptions());
     layout = computeLayout(model.items, measuredSizes, { ...gridOptions(), scale: 1, columns: currentColumns });
-    layout = { frames: [], mores: [], connectors: [], ...layout };
+    layout = { frames: [], mores: [], ...layout };
     tilesEl.style.width = `${layout.contentWidth}px`;
     tilesEl.style.height = `${layout.contentHeight}px`;
     edgesEl.setAttribute("width", String(layout.contentWidth));
@@ -461,19 +482,23 @@ export function createBoardView({
    * What the read-only comment overlay measures against (CHR-1264): the zoom,
    * every tile's base-layout box, and each tile's rendered document — read
    * like flow edges read their elements, never written to.
-   * @returns {{ zoom: number, tiles: { screen: string, x: number, y: number, width: number, height: number, naturalWidth: number }[], docOf: (screen: string) => Document | null, labelEnd: (screen: string) => { right: number, top: number, height: number } | null }} `labelEnd`: where a tile's label text ends on screen (viewport pixels), null while the label is not drawn
+   * @returns {{ zoom: number, tiles: { screen: string, x: number, y: number, width: number, height: number, naturalWidth: number }[], docOf: (screen: string) => Document | null, chipsAt: (screen: string) => { left: number, top: number, height: number } | null, reserveChips: (screen: string, width: number) => void }} `chipsAt`: where the room the label keeps for the count chips starts on screen (viewport pixels), null while the label is not drawn; `reserveChips` makes that room as wide as the chips
    */
   function commentGeometry() {
     return {
       zoom,
       tiles: layout.tiles.map((t) => ({ screen: t.screen, x: t.x, y: t.y, width: t.width, height: t.height, naturalWidth: t.naturalWidth })),
       docOf: (screen) => iframesByScreen.get(screen)?.contentDocument ?? null,
-      labelEnd: (screen) => {
-        const label = tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(screen)}"] .board-tile-label`);
-        if (!label || label.dataset.mode === "hidden") return null;
-        const last = label.querySelector(".board-tile-count") ?? label.querySelector(".board-tile-name");
-        const labelBox = label.getBoundingClientRect();
-        return { right: (last ?? label).getBoundingClientRect().right, top: labelBox.top, height: labelBox.height };
+      chipsAt: (screen) => {
+        const slot = tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(screen)}"] .board-tile-chips-slot`);
+        const label = slot?.parentElement;
+        if (!slot || !label || label.dataset.mode === "hidden") return null;
+        const box = slot.getBoundingClientRect();
+        return { left: box.left, top: label.getBoundingClientRect().top, height: label.getBoundingClientRect().height };
+      },
+      reserveChips: (screen, width) => {
+        const slot = tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(screen)}"] .board-tile-chips-slot`);
+        if (slot && slot.style.width !== `${width}px`) slot.style.width = `${width}px`;
       },
     };
   }
@@ -569,20 +594,6 @@ export function createBoardView({
 
   function drawEdges() {
     edgesEl.innerHTML = "";
-    // Variant-of connectors are structure, not flow — drawn even with edges off.
-    for (const connector of layout.connectors) {
-      const parent = findTile(layout.tiles, connector.from);
-      const child = connector.more ? layout.mores.find((m) => m.id === connector.to) : findTile(layout.tiles, connector.to);
-      if (!parent || !child) continue;
-      const startX = parent.x + parent.width;
-      const midX = (startX + child.x) / 2;
-      const startY = parent.y + parent.height / 2;
-      const endY = child.y + child.height / 2;
-      const path = document.createElementNS(SVG_NS, "path");
-      path.setAttribute("d", `M ${startX} ${startY} H ${midX} V ${endY} H ${child.x}`);
-      path.setAttribute("class", "board-connector");
-      edgesEl.appendChild(path);
-    }
     // With edges hidden, flow-mode centering (attachTileClicks/applyFlowMode
     // -> centerOnScreen) and highlight-on-click still work exactly as
     // before — setHighlight just has nothing to paint while this is false.
@@ -642,12 +653,11 @@ export function createBoardView({
         strip.style.top = `${main ? main.y - frame.y + main.height + 12 : frame.headerHeight}px`;
         // The first thumb stands for the frame above it (design `cluster-thumb` desktop-on / mobile-on); the others are its variants.
         const own = document.createElement("span");
-        own.className = `board-cluster-thumb on ${viewportIconName({ width: main?.naturalWidth ?? 0 }) === "desktop_windows" ? "desktop" : "mobile"}`;
+        own.className = `board-cluster-thumb on ${isDesktop(frame.root) ? "desktop" : "mobile"}`;
         strip.appendChild(own);
         for (const thumb of frame.thumbs) {
           const micro = document.createElement("span");
-          const wide = (measuredSizes[thumb.screen]?.width ?? 0) >= DESKTOP_MIN_WIDTH;
-          micro.className = `board-cluster-thumb kind-${thumb.kind ?? "state"} ${wide ? "desktop" : "mobile"}`;
+          micro.className = `board-cluster-thumb kind-${thumb.kind ?? "state"} ${isDesktop(thumb.screen) ? "desktop" : "mobile"}`;
           micro.classList.toggle("deeper", thumb.deeper);
           micro.title = thumb.screen;
           strip.appendChild(micro);
@@ -676,41 +686,55 @@ export function createBoardView({
     }
   }
 
-  function buildTile(screen) {
-    const tile = document.createElement("div");
-    tile.className = "board-tile";
-    tile.dataset.screen = screen;
-    const isPinned = pinnedScreens.has(screen);
-    // A tile on the board SOLELY because it is pinned, not because it also matches the shared filter, gets the dashed accent outline (design `board-cluster` outside). Purely visual: `.board-tile` does not clip, so the card and the label around it sit outside its box without touching computeBoardLayout's geometry.
+  /** The caption of a variant tile in an expanded cluster: its name without the family's prefix ("cart-empty" under "cart" reads "empty"). */
+  function captionOf(screen, root) {
+    return screen.startsWith(`${root}-`) && screen.length > root.length + 1 ? screen.slice(root.length + 1) : screen;
+  }
+
+  /**
+   * What a tile is in the cluster layout, as classes, and its label chrome built to match — called for a new tile and again for a kept one whose cluster expanded or collapsed.
+   * - a plain tile or a collapsed cluster's main tile: the label above it (viewport glyph, name, variant count of a cluster's main screen, room for the comment chips, a pin mark while pinned);
+   * - an expanded cluster's main tile: the same label is the card's header, and the tile is the ringed `current` member with the caption "default" below it;
+   * - a variant tile of an expanded cluster (`member`): only its caption below (name, chips, pin mark).
+   */
+  function applyTileRole(tile, screen) {
+    const cluster = model.clusters.find((c) => c.memberNames.includes(screen));
+    const isRoot = cluster?.root === screen;
+    const member = Boolean(cluster?.expanded && !isRoot);
     tile.classList.toggle("outside-filter", outsideFilterScreens.has(screen));
     tile.classList.toggle("context", model.contextNames.has(screen));
     // Inside a cluster's frame the frame is the card; every other tile draws its own.
-    tile.classList.toggle("in-cluster", model.clusters.some((c) => c.memberNames.includes(screen)));
-    tile.classList.toggle("member", model.clusters.some((c) => c.root !== screen && c.memberNames.includes(screen)));
+    tile.classList.toggle("in-cluster", Boolean(cluster));
+    tile.classList.toggle("member", member);
+    tile.classList.toggle("current", Boolean(cluster?.expanded && isRoot));
     tile.classList.toggle("writing", screen === writingName);
+    tile.querySelector(".board-tile-label")?.remove();
+    tile.querySelector(".board-tile-caption")?.remove();
 
-    // The label (design `frame-label`): viewport glyph, name, the variant count of a cluster's main screen, a pin mark while pinned. Its text is the screen's name; the rest is decoration around it.
     const label = document.createElement("div");
     label.className = "board-tile-label";
-    const glyph = icon("smartphone", "board-tile-viewport");
     const name = document.createElement("span");
     name.className = "board-tile-name";
-    name.textContent = screen;
-    label.append(glyph, name);
-    const cluster = model.clusters.find((c) => c.root === screen);
-    if (cluster) {
-      const count = document.createElement("span");
-      count.className = "board-tile-count";
-      count.textContent = `${cluster.size} variant${cluster.size === 1 ? "" : "s"}`;
-      label.append(count);
+    name.textContent = member ? captionOf(screen, cluster.root) : screen;
+    if (member) label.append(name);
+    else {
+      label.append(icon("smartphone", "board-tile-viewport"), name);
+      if (cluster) {
+        const count = document.createElement("span");
+        count.className = "board-tile-count";
+        count.textContent = `${cluster.size} variant${cluster.size === 1 ? "" : "s"}`;
+        label.append(count);
+      }
     }
-    tile.appendChild(label);
-
+    // Reserved by board-comments.js for the count chips, which sit in the overlay layer: name, count, chips, pin mark.
+    const slot = document.createElement("span");
+    slot.className = "board-tile-chips-slot";
+    label.append(slot);
     // The pin mark is a button: the only way to unpin from the board itself (pinning starts in the card's list).
     const pin = document.createElement("button");
     pin.type = "button";
     pin.className = "board-tile-pin";
-    pin.hidden = !isPinned;
+    pin.hidden = !pinnedScreens.has(screen);
     pin.setAttribute("aria-label", `Unpin ${screen} from the board`);
     pin.setAttribute("aria-pressed", "true");
     pin.appendChild(icon("keep", "icon-xs"));
@@ -719,7 +743,26 @@ export function createBoardView({
       evt.stopPropagation();
       onTogglePin?.(screen);
     });
-    label.appendChild(pin);
+    label.append(pin);
+    tile.prepend(label);
+    if (cluster?.expanded && isRoot) {
+      const caption = document.createElement("span");
+      caption.className = "board-tile-caption";
+      caption.textContent = "default";
+      tile.append(caption);
+    }
+    applyViewportIconIn(tile, screen);
+  }
+
+  function applyViewportIconIn(tile, screen) {
+    const el = tile.querySelector(".board-tile-viewport");
+    if (el) el.textContent = isDesktop(screen) ? "desktop_windows" : "smartphone";
+  }
+
+  function buildTile(screen) {
+    const tile = document.createElement("div");
+    tile.className = "board-tile";
+    tile.dataset.screen = screen;
 
     const frame = document.createElement("div");
     frame.className = "board-tile-frame";
@@ -745,6 +788,7 @@ export function createBoardView({
     writing.append(icon("edit", "icon-xs"), "Writing");
     tile.appendChild(writing);
 
+    applyTileRole(tile, screen);
     iframesByScreen.set(screen, iframe);
     return tile;
   }
@@ -836,6 +880,7 @@ export function createBoardView({
     allScreens = pinInfo.screens ?? nextScreens.map((name) => ({ name, tags: [] }));
     expandedNames = pinInfo.expanded ?? [];
     clustersOn = pinInfo.clusters ?? false;
+    if (pinInfo.viewports) viewports = pinInfo.viewports;
     model = buildBoardModel(allScreens, screens, expandedNames, { clusters: clustersOn });
     pinnedScreens = new Set(pinInfo.pinned ?? []);
     outsideFilterScreens = new Set(pinInfo.outsideFilter ?? []);
@@ -892,8 +937,10 @@ export function createBoardView({
     }
     const added = model.tileNames.filter((screen) => !iframesByScreen.has(screen));
     for (const screen of added) tilesEl.appendChild(buildTile(screen));
+    // A kept tile may have changed its part in the cluster (a member now, the main screen now ringed): its chrome follows, its iframe stays.
     for (const screen of model.tileNames) {
-      tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(screen)}"]`)?.classList.toggle("context", model.contextNames.has(screen));
+      const el = tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(screen)}"]`);
+      if (el) applyTileRole(el, screen);
     }
     relayout();
     await Promise.all(added.map((screen) => loadTileRender(screen, currentProject)));
@@ -937,6 +984,7 @@ export function createBoardView({
     commentGeometry,
     setEdgesVisible,
     setWritingScreen,
+    setViewports,
     // CHR-623 review finding 7: switching TO an already-built board tab
     // must relayout immediately, not through scheduleRelayout's coalescing
     // delay — #board-view is `hidden` (clientWidth 0) while another tab

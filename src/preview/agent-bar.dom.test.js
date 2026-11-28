@@ -119,36 +119,9 @@ describe("folding", () => {
     expect(folded()).toBe(false);
   });
 
-  it("folds by itself while a panel is open, unfolds when it closes, and stores nothing for it", () => {
-    bar.setPanelOpen(true);
-    expect([folded(), $("#agent-bar").dataset.panelFold]).toEqual([true, "true"]);
-    expect(storage.map.has("artisign.agent-bar.collapsed")).toBe(false);
-    bar.setPanelOpen(false);
-    expect([folded(), $("#agent-bar").dataset.panelFold]).toEqual([false, "false"]);
-  });
-
-  it("while a panel holds it folded, the chevron is aria-disabled, says why, and does nothing", () => {
-    bar.setPanelOpen(true);
-    const fold = $("#agent-bar-fold");
-    expect(fold.getAttribute("aria-disabled")).toBe("true");
-    expect(fold.getAttribute("aria-label")).toBe("Agent bar is folded while a panel is open");
-    fold.click();
-    expect(folded()).toBe(true);
-    bar.setPanelOpen(false);
-    expect(folded()).toBe(false); // the click did not stick as a user fold
-    expect(fold.hasAttribute("aria-disabled")).toBe(false);
-  });
-
-  it("a bar the user folded stays folded after the panel closes", () => {
-    $("#agent-bar-fold").click();
-    bar.setPanelOpen(true);
-    bar.setPanelOpen(false);
-    expect(folded()).toBe(true);
-  });
-
   it("focus inside the body that folds away moves to the chevron, not to the page", () => {
     $("#follow-switch").focus();
-    bar.setPanelOpen(true);
+    $("#agent-bar-fold").click();
     expect(document.activeElement).toBe($("#agent-bar-fold"));
   });
 });

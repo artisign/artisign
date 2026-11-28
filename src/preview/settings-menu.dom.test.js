@@ -145,7 +145,7 @@ describe("settings trigger", () => {
     expect($$(".settings-seg-button").map((b) => b.textContent.replace(/^[a-z_]+/, ""))).toEqual(["System", "Light", "Dark"]);
     expect($$(".settings-toggle-row").map((b) => b.textContent)).toEqual(["Follow the agent by default", "Clusters on the Board", "Flow arrows on the Board", "Tags in the screen list"]);
     expect($("#settings-mcp .settings-item-label").textContent).toBe("Connect AI tools…");
-    expect($("#settings-whats-new").textContent).toBe("new_releasesWhat's New");
+    expect($("#settings-whats-new .settings-item-label").textContent).toBe("What's New");
     expect(menu().textContent).not.toMatch(/variant map/i);
   });
 });

@@ -31,6 +31,16 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
   const updateCmdEl = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-update-cmd"));
   const whatsNewItem = /** @type {HTMLElement} */ (menuEl.querySelector("#settings-whats-new"));
 
+  // The one rule for the chevron: a row that opens a dialog or sub-view says so with `data-opens-dialog` (icon · label · optional subtitle · chevron). Static markup carries the attribute; the chevron comes from here, so a new entry follows the rule by setting it.
+  for (const row of menuEl.querySelectorAll("[data-opens-dialog]")) {
+    if (row.querySelector(".settings-item-chevron")) continue;
+    const chevron = document.createElement("span");
+    chevron.className = "icon settings-item-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    chevron.textContent = "chevron_right";
+    row.append(chevron);
+  }
+
   let setupToken = 0;
 
   const native = typeof menuEl.showPopover === "function";

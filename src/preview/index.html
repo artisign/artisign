@@ -82,10 +82,9 @@
               <button type="button" class="settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="sidebar-tags"><span>Tags in the screen list</span><span class="settings-switch" aria-hidden="true"></span></button>
               <span class="float-popover-divider" role="separator"></span>
               <span class="float-popover-label" role="presentation">MCP setup</span>
-              <button type="button" id="settings-mcp" class="settings-item-detail" role="menuitem">
+              <button type="button" id="settings-mcp" class="settings-item-detail" role="menuitem" data-opens-dialog>
                 <span class="settings-item-icon" aria-hidden="true"><span class="icon">electrical_services</span></span>
                 <span class="settings-item-text"><span class="settings-item-label">Connect AI tools…</span><span id="settings-mcp-sub" class="settings-item-sub" hidden></span></span>
-                <span class="icon settings-item-chevron" aria-hidden="true">chevron_right</span>
               </button>
               <div id="settings-about" role="presentation" hidden>
                 <span class="float-popover-divider" role="separator"></span>
@@ -95,7 +94,10 @@
                   <span id="settings-update-status" class="settings-update-status" hidden><span id="settings-update-icon" class="icon" aria-hidden="true"></span><span id="settings-update-text"></span></span>
                 </div>
                 <div id="settings-update-cmd" class="settings-update-cmd" role="presentation" hidden></div>
-                <button type="button" id="settings-whats-new" class="float-menu-item" role="menuitem" tabindex="-1"><span class="icon float-menu-icon" aria-hidden="true">new_releases</span>What's New</button>
+                <button type="button" id="settings-whats-new" class="settings-item-detail" role="menuitem" tabindex="-1" data-opens-dialog>
+                  <span class="settings-item-icon" aria-hidden="true"><span class="icon">new_releases</span></span>
+                  <span class="settings-item-text"><span class="settings-item-label">What's New</span></span>
+                </button>
               </div>
             </div>
           </div>

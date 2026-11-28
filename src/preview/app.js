@@ -49,8 +49,8 @@ import { renderVariantInspector } from "./variant-inspector.js";
 import { createCompareView } from "./compare.js";
 import { toolStates } from "./tool-states.js";
 import { createAgentBar, noteState, IDLE_AFTER_MS } from "./agent-bar.js";
-import { renderMockupList, filterMockups } from "./mockups.js";
-import { renderMockupView, renderColumnChips } from "./mockup-view.js";
+import { renderMockupList, filterMockups, mockupExpandKey } from "./mockups.js";
+import { renderMockupView, renderColumnChips, markSelectedColumn } from "./mockup-view.js";
 import { applyMockupZoom } from "./mockup-zoom.js";
 import { applyFlowMode, updateFlowOverlay } from "./flows.js";
 import { bareNodeId } from "./comments.js";
@@ -261,6 +261,9 @@ let currentScreen = null;
 let mockups = [];
 // Mutually exclusive with currentScreen — see selectScreen/selectMockup.
 let currentMockup = null;
+// The selected variant of currentMockup (CHR-1270) — the one the tree highlights, the canvas rings and the Agent bar's note lands on. In memory only: it resets with the mockup and is never persisted. Null while no mockup is open (or it has no variants).
+/** @type {string | null} */
+let currentMockupVariant = null;
 // The Board's shared filter (CHR-624/ADR-005) — daemon-held, per project,
 // not reset locally on a project switch (unlike the old purely-local
 // version of this variable): loadBoardState() populates it from
@@ -869,6 +872,7 @@ function resetProjectState() {
   updateInspectOverlay(inspectOverlayEl, null, null);
   mockups = [];
   currentMockup = null;
+  currentMockupVariant = null;
   mockupViewEl.innerHTML = "";
   mockupRequestId++; // discards any in-flight render from the project we just left — see loadCurrentMockup
   // CHR-631 — the activity feed is in-memory only, per the design spec
@@ -1052,6 +1056,7 @@ async function resyncCurrentProject() {
 /** Falls back from a currentMockup selection that no longer exists (deleted on disk) to the first available screen — same as boot's "nothing persisted" path — or, if the project has no screens either, just refreshes the sidebar/main state around the now-empty selection. Shared by the SSE mockup handler and resyncCurrentProject. */
 async function fallbackFromVanishedMockup() {
   currentMockup = null;
+  currentMockupVariant = null;
   if (screens.length > 0) await selectScreen(pickInitialScreen(screens, null));
   else {
     refreshSidebar();
@@ -1292,9 +1297,16 @@ function renderAgentBar() {
       screen: currentScreen,
       screenLabel: currentScreen === null ? "" : screenContext(currentScreen),
       mockup: currentMockup,
+      mockupVariant: mockupVariantForNote(),
       boardCount: computeBoardVisibility(screens, screenFilter, pinnedScreens).shownCount,
     }),
   });
+}
+
+/** The open mockup's selected variant as the note field needs it, or null (no mockup open, or it has no variants). */
+function mockupVariantForNote() {
+  const variant = mockups.find((m) => m.name === currentMockup)?.variants.find((v) => v.id === currentMockupVariant);
+  return variant ? { id: variant.id, label: variant.title || variant.id } : null;
 }
 
 /** A feed row's click is human navigation like any other (ADR-005 pause rule 1) — it pauses follow the way a sidebar click or a tab switch does, then goes to that entry's target. Without the pause the next live call would pull the view straight back. */
@@ -1303,13 +1315,18 @@ function handleActivityFeedSelect(event) {
   navigateToActivity(event);
 }
 
-/** The note field: a new comment thread on the screen it was written for, anchored to the screen itself (`node_id: null`) — the comments API as it is, human author. The thread shows in the Comments tool and its badge. @param {string} text @param {string} noteKey "screen:<name>" */
+/** The note field: a new comment thread on the target it was written for, anchored to the target itself (`node_id: null`) — the comments API as it is, human author. A screen note anchors to the screen, a mockup note to the whole selected variant. The thread shows in the Comments tool and its badge. @param {string} text @param {string} noteKey "screen:<name>" or "mockup:<name>#<variant>" */
 async function sendAgentNote(text, noteKey) {
-  const screen = noteKey.startsWith("screen:") ? noteKey.slice("screen:".length) : null;
-  if (screen === null) return { ok: false, message: "no screen is open" };
-  const result = await postComment({ screen, node_id: null, text }, activeProjectRoot);
+  let input;
+  if (noteKey.startsWith("screen:")) input = { screen: noteKey.slice("screen:".length), node_id: null, text };
+  else if (noteKey.startsWith("mockup:")) {
+    const [mockup, variant] = noteKey.slice("mockup:".length).split("#");
+    if (!variant) return { ok: false, message: "no variant is selected" };
+    input = { mockup, variant, node_id: null, text };
+  } else return { ok: false, message: "nothing is open" };
+  const result = await postComment(input, activeProjectRoot);
   // The note is on disk once the post answered: a failing refresh must not read as a failed send (a resend would start a second thread). The SSE "comments" event refreshes a moment later anyway.
-  if (result.ok && screen === currentScreen) await loadComments().catch(() => {});
+  if (result.ok && (input.screen ? input.screen === currentScreen : input.mockup === currentMockup)) await loadComments().catch(() => {});
   return result;
 }
 
@@ -1625,6 +1642,30 @@ function selectMockupHuman(name) {
   return selectMockup(name);
 }
 
+/** A variant row of the mockup tree: opens its mockup (when another one is open) with that variant selected; within the open mockup it only moves the selection. */
+function selectMockupVariantHuman(name, variantId) {
+  pauseFollow();
+  if (name !== currentMockup) return selectMockup(name, variantId);
+  setMockupVariant(variantId);
+  return Promise.resolve();
+}
+
+/** Moves the selected variant of the open mockup — tree row, canvas ring and the Agent bar's note scope follow. */
+function setMockupVariant(variantId) {
+  if (currentMockupVariant === variantId) return;
+  currentMockupVariant = variantId;
+  markSelectedColumn(mockupColumns, currentMockupVariant);
+  refreshSidebar();
+}
+
+/** Expands the open mockup's variant tree so the selected variant's row is visible. */
+function revealMockupInSidebar(name) {
+  const expanded = currentExpandedScreens();
+  if (expanded.has(mockupExpandKey(name))) return;
+  expanded.add(mockupExpandKey(name));
+  saveExpandedScreens();
+}
+
 // CHR-731 — sidebar tree view state, per browser (never sent to the daemon).
 // The expanded set is per project and loaded lazily the first time the
 // sidebar renders for a project root, so no project-switch hook is needed.
@@ -1733,7 +1774,9 @@ function refreshSidebar() {
   const filteredMockups = filterMockups(mockups, screenFilter);
   renderMockupList(mockupListEl, filteredMockups, {
     activeName: currentMockup,
+    activeVariant: currentMockupVariant,
     onSelect: selectMockupHuman,
+    onSelectVariant: selectMockupVariantHuman,
     showTags: showSidebarTags,
     expanded: currentExpandedScreens(),
     onToggleExpand: toggleScreenExpanded,
@@ -1911,6 +1954,7 @@ async function selectScreen(screen) {
   clearTimeout(activityHighlightGraceTimer);
   currentScreen = screen;
   currentMockup = null; // screens and mockups are never selected at the same time
+  currentMockupVariant = null;
   navTab = "screens";
   if (activeProjectRoot) writeStringPref(prefsStorage, lastScreenKey(activeProjectRoot), screen);
   revealScreenInSidebar(screen);
@@ -1926,8 +1970,9 @@ async function selectScreen(screen) {
  * the mockup view) via the same toggle-off path their own buttons use, and
  * clears the screen selection highlight.
  * @param {string} name
+ * @param {string} [variantId] the variant to select; without one, the same mockup keeps its selection and another mockup starts on its first variant
  */
-async function selectMockup(name) {
+async function selectMockup(name, variantId) {
   compare.leave();
   if (activeMode !== "none" && activeMode !== "comment") setMode(activeMode); // flow and inspect have no mockup counterpart; comment mode carries over (CHR-1263). Passing the CURRENT mode always resolves to "none" — see setMode
   clearInspectFocus();
@@ -1935,8 +1980,12 @@ async function selectMockup(name) {
   pendingActivityHighlight = null;
   clearTimeout(activityHighlightGraceTimer);
   currentScreen = null;
+  const variants = mockups.find((m) => m.name === name)?.variants ?? [];
+  const wanted = variantId ?? (name === currentMockup ? currentMockupVariant : null);
+  currentMockupVariant = variants.some((v) => v.id === wanted) ? wanted : (variants[0]?.id ?? null);
   currentMockup = name;
   navTab = "mockups";
+  revealMockupInSidebar(name);
   commentCanvas.setHost(mockupHost);
   commentCanvas.setData({ scope: `mockup:${name}`, comments: [], threads: [] });
   latestComments = { comments: [], threads: [] };
@@ -2250,7 +2299,7 @@ function syncPanelContext() {
     const { reference, selected } = compare.state();
     toolPanels.setContext(reference ? `${selected.join(", ")} vs. ${reference}` : "");
   } else if (currentMockup !== null) {
-    toolPanels.setContext(`${currentMockup}, ${mockupColumns.length} variant${mockupColumns.length === 1 ? "" : "s"}`);
+    toolPanels.setContext(`${mockupColumns.length} variant${mockupColumns.length === 1 ? "" : "s"}`); // design: the card's scope reads "3 variants"
   } else if (currentScreen !== null) {
     toolPanels.setContext(shown === "notes" ? currentScreen : screenContext(currentScreen));
   } else toolPanels.setContext("");
@@ -2261,6 +2310,7 @@ function syncToolStates() {
   const showMockup = currentView === "screens" && currentMockup !== null;
   const comparing = compare.isOn() && currentView === "screens" && !showMockup;
   const states = toolStates({ view: currentView, showMockup, comparing, hasScreen: currentScreen !== null });
+  document.getElementById("tool-bar").setAttribute("aria-label", showMockup ? "Mockup tools" : "Screen tools"); // design: the bar is named for what it works on
   toolBar.setState(commentModeToggle, { ...states.comment, pressed: activeMode === "comment" });
   toolBar.setState(inspectModeToggle, { ...states.inspect, pressed: activeMode === "inspect" });
   toolBar.setState(notesToolToggle, { ...states.notes, pressed: toolPanels.opened() === "notes" });
@@ -2396,7 +2446,16 @@ function updateMockupZoom() {
   const columnsEl = mockupViewEl.querySelector(".mockup-columns");
   if (columnsEl) applyMockupZoom({ paneEl: mockupViewEl, columnsEl, zoom: mockupZoom });
   if (currentMockup !== null) commentCanvas.layout(); // pins follow the zoomed and re-fitted columns
+  syncMockupToolbarTop();
   syncZoomUI();
+}
+
+/** The tool bar's default top lines up with the columns' frames (design `chrome-c-mockup-columns`), below their labels; recomputed with every zoom, fit, resize and re-render. Only while the mockup view shows. */
+function syncMockupToolbarTop() {
+  const frame = currentView === "screens" && currentMockup !== null && !mockupViewEl.hidden ? mockupViewEl.querySelector(".mockup-column-frame") : null;
+  const top = frame ? frame.getBoundingClientRect().top - appEl.getBoundingClientRect().top : 0;
+  if (top > 0) appEl.style.setProperty("--toolbar-top", `${Math.round(top)}px`);
+  else appEl.style.removeProperty("--toolbar-top");
 }
 
 /** Re-fits whichever of the screen canvas / mockup row is actually showing — shared by every trigger whose available space can change without a view/selection switch of its own (pane resize, side-panel collapse). */
@@ -2625,6 +2684,10 @@ async function loadCurrentMockup() {
       commentCanvas.layout();
     },
   });
+  // A rewrite may have dropped the selected variant: fall back to the first one.
+  if (!mockup.variants.some((v) => v.id === currentMockupVariant)) currentMockupVariant = mockup.variants[0]?.id ?? null;
+  markSelectedColumn(mockupColumns, currentMockupVariant);
+  refreshSidebar();
   renderMockupChips(); // the new header's chips, from the threads already loaded
   updateMockupZoom(); // initial pass — columns start at their CSS default width, before any iframe has measured its variant
 }
@@ -2703,7 +2766,8 @@ function applyMainVisibility() {
   // The shell lays the canvas and the full-height views out per view and per compare state (style.css).
   appEl.dataset.shellView = currentView;
   appEl.dataset.comparing = String(comparing);
-  if (currentView !== "screens" || showMockup || comparing) appEl.style.removeProperty("--toolbar-top"); // only the single frame has a top to align with
+  if (currentView !== "screens" || comparing) appEl.style.removeProperty("--toolbar-top"); // only a frame has a top to align with
+  else if (showMockup) syncMockupToolbarTop(); // the columns' frames
   // The zoom group stays visible over the mockup view too — it
   // scales the whole comparison row instead of the screen canvas.
   canvasControlsEl.hidden = currentView !== "screens" || comparing; // compare has its own zoom in its chip row

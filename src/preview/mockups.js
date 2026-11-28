@@ -30,13 +30,15 @@ export function filterMockups(mockups, filter) {
  * @param {{ name: string, title?: string, tags?: string[], variants: { id: string, title: string }[] }[]} mockups
  * @param {{
  *   activeName: string | null,
+ *   activeVariant?: string | null,
  *   onSelect: (name: string) => void,
+ *   onSelectVariant?: (name: string, variantId: string) => void,
  *   showTags?: boolean,
  *   expanded?: Set<string>,
  *   onToggleExpand?: (key: string) => void,
- * }} options `expanded` holds `mockupExpandKey(name)` entries. A mockup shows all its variants side by side, so a variant row opens its mockup.
+ * }} options `expanded` holds `mockupExpandKey(name)` entries. A mockup shows all its variants side by side; a variant row opens its mockup with that variant selected (`activeVariant` marks the selected one of the active mockup).
  */
-export function renderMockupList(listEl, mockups, { activeName, onSelect, showTags = true, expanded = new Set(), onToggleExpand }) {
+export function renderMockupList(listEl, mockups, { activeName, activeVariant = null, onSelect, onSelectVariant, showTags = true, expanded = new Set(), onToggleExpand }) {
   listEl.innerHTML = "";
   for (const mockup of mockups) {
     const hasVariants = mockup.variants.length > 0;
@@ -52,8 +54,10 @@ export function renderMockupList(listEl, mockups, { activeName, onSelect, showTa
     button.className = "mockup-item screen-item";
     button.setAttribute("role", "treeitem");
     button.setAttribute("aria-level", "1");
-    button.setAttribute("aria-current", String(isActive));
-    button.setAttribute("aria-selected", String(isActive));
+    // With the tree open the selection sits on the variant row (design `tree-variant-row` selected); the mockup row steps back to plain.
+    const variantSelected = isActive && open && activeVariant !== null;
+    button.setAttribute("aria-selected", String(isActive && !variantSelected));
+    button.setAttribute("aria-current", String(isActive && !variantSelected));
     if (hasVariants) button.setAttribute("aria-expanded", String(open));
     // CHR-631 — lets follow mode cue this row for a mockup activity target.
     button.dataset.mockupName = mockup.name;
@@ -113,7 +117,9 @@ export function renderMockupList(listEl, mockups, { activeName, onSelect, showTa
       variantButton.className = "screen-item mockup-variant-item";
       variantButton.setAttribute("role", "treeitem");
       variantButton.setAttribute("aria-level", "2");
-      variantButton.setAttribute("aria-selected", "false");
+      const selected = isActive && variant.id === activeVariant;
+      variantButton.setAttribute("aria-selected", String(selected));
+      variantButton.setAttribute("aria-current", String(selected));
       variantButton.dataset.variantId = variant.id;
       variantButton.appendChild(icon("layers", "kind-icon"));
       const variantMain = document.createElement("div");
@@ -123,7 +129,7 @@ export function renderMockupList(listEl, mockups, { activeName, onSelect, showTa
       variantName.textContent = variant.title || variant.id;
       variantMain.appendChild(variantName);
       variantButton.appendChild(variantMain);
-      variantButton.addEventListener("click", () => onSelect(mockup.name));
+      variantButton.addEventListener("click", () => (onSelectVariant ?? ((name) => onSelect(name)))(mockup.name, variant.id));
       row.appendChild(variantButton);
       listEl.appendChild(row);
     }

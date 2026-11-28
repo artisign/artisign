@@ -317,7 +317,7 @@ describe("the note field", () => {
     expect($("#agent-note-field").getAttribute("aria-disabled")).toBe("false");
   });
 
-  it("is off for a mockup", async () => {
+  it("is off for a mockup without variants and says why", async () => {
     mockups = [{ name: "m", variants: [], tags: [] }];
     await boot();
     document.querySelector("#nav-tab-mockups").click();
@@ -325,8 +325,56 @@ describe("the note field", () => {
     document.querySelector("#mockup-list button").click();
     await flush();
     expect($("#agent-note-field").getAttribute("aria-disabled")).toBe("true");
-    expect($("#agent-note-field").placeholder).toBe("Not available for mockups");
+    expect($("#agent-note-field").placeholder).toBe("This mockup has no variants");
     expect($("#agent-note-scope-text").textContent).toBe("On m");
+  });
+
+  describe("on a mockup", () => {
+    const openMockup = async () => {
+      mockups = [{ name: "m", title: "M", tags: [], variants: [{ id: "a", title: "Alpha" }, { id: "b", title: "Beta" }] }];
+      await boot();
+      document.querySelector("#nav-tab-mockups").click();
+      await flush();
+      document.querySelector("#mockup-list button.mockup-item").click();
+      await flush();
+    };
+    const variantRow = (id) => $(`#mockup-list button.mockup-variant-item[data-variant-id="${id}"]`);
+
+    it("is scoped to the selected variant (the first one on opening) and posts a thread on it, without a node", async () => {
+      await openMockup();
+      expect($("#agent-note-field").getAttribute("aria-disabled")).toBe("false");
+      expect($("#agent-note-scope-text").textContent).toBe("On m, Alpha");
+      typeNote("Make A calmer");
+      $("#agent-note").requestSubmit();
+      await flush();
+      expect(posts).toEqual([{ mockup: "m", variant: "a", node_id: null, text: "Make A calmer" }]);
+      expect($("#agent-note-field").value).toBe("");
+    });
+
+    it("follows the variant picked in the tree: the scope changes, each variant keeps its own unsent text, the post goes to the new variant", async () => {
+      await openMockup();
+      typeNote("for alpha");
+      variantRow("b").click();
+      await flush();
+      expect($("#agent-note-scope-text").textContent).toBe("On m, Beta");
+      expect($("#agent-note-field").value).toBe("");
+      typeNote("for beta");
+      $("#agent-note").requestSubmit();
+      await flush();
+      expect(posts).toEqual([{ mockup: "m", variant: "b", node_id: null, text: "for beta" }]);
+      variantRow("a").click();
+      await flush();
+      expect($("#agent-note-field").value).toBe("for alpha");
+    });
+
+    it("leaving the mockup for a screen scopes the note to the screen again", async () => {
+      await openMockup();
+      document.querySelector("#nav-tab-screens").click();
+      await flush();
+      rowButton("a").click();
+      await flush();
+      expect($("#agent-note-scope-text").textContent).toBe("On a");
+    });
   });
 });
 

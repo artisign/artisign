@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from "vitest";
-import { renderMockupView } from "./mockup-view.js";
+import { renderMockupView, markSelectedColumn } from "./mockup-view.js";
 
 /** Flushes the microtask queue so a resolved/rejected fetchRenderFor promise's .then() has run. */
 async function flush() {
@@ -9,7 +9,31 @@ async function flush() {
 }
 
 describe("renderMockupView", () => {
-  it("renders the header (title/description) and one column per variant in order", () => {
+  it("names each column '<mockup title>: <variant title>' and marks the selected variant's column", () => {
+    const container = document.createElement("div");
+    const mockup = { name: "cart", title: "Cart options", variants: [{ id: "a", title: "Sticky total" }, { id: "b", title: "" }] };
+    const columns = renderMockupView(container, mockup, { fetchRenderFor: () => new Promise(() => {}) });
+    const groups = container.querySelectorAll(".mockup-column");
+    expect(groups[0].getAttribute("role")).toBe("group");
+    expect(groups[0].getAttribute("aria-label")).toBe("Cart options: Sticky total");
+    expect(groups[1].getAttribute("aria-label")).toBe("Cart options: b"); // no title: the id
+    expect(columns.map((c) => c.columnEl)).toEqual([...groups]);
+
+    markSelectedColumn(columns, "b");
+    expect([...groups].map((g) => g.classList.contains("is-selected"))).toEqual([false, true]);
+    expect(groups[1].getAttribute("aria-current")).toBe("true");
+    expect(groups[0].hasAttribute("aria-current")).toBe(false);
+    markSelectedColumn(columns, null);
+    expect([...groups].some((g) => g.classList.contains("is-selected") || g.hasAttribute("aria-current"))).toBe(false);
+  });
+
+  it("keeps the mockup's title and description for assistive tech only (the canvas shows the columns)", () => {
+    const container = document.createElement("div");
+    renderMockupView(container, { name: "m", title: "M", description: "d", variants: [] }, { fetchRenderFor: () => new Promise(() => {}) });
+    expect(container.querySelector(".mockup-view-header").classList.contains("visually-hidden")).toBe(true);
+  });
+
+  it("renders the hidden mockup header and one column per variant in order", () => {
     const container = document.createElement("div");
     const mockup = {
       name: "checkout-redesign",
@@ -29,13 +53,26 @@ describe("renderMockupView", () => {
 
     const columns = container.querySelectorAll(".mockup-column");
     expect(columns).toHaveLength(2);
-    expect(columns[0].querySelector(".mockup-column-index").textContent).toBe("A");
-    expect(columns[0].querySelector(".mockup-column-title").textContent).toBe("Variant A");
-    expect(columns[0].querySelector(".mockup-column-description").textContent).toBe("Single page");
-    expect(columns[1].querySelector(".mockup-column-index").textContent).toBe("B");
-    expect(columns[1].querySelector(".mockup-column-title").textContent).toBe("Variant B");
-    // No description on variant B -> no description element at all.
-    expect(columns[1].querySelector(".mockup-column-description")).toBeNull();
+    const [labelA, labelB] = [...columns].map((c) => c.querySelector(".mockup-column-label"));
+    // The frame label: the mockup icon, the variant's letter, "<mockup title>: <variant title>", then the count chips' slot.
+    expect(labelA.querySelector(".frame-label-icon").textContent).toBe("view_column");
+    expect(labelA.querySelector(".frame-label-name").textContent).toBe("A");
+    expect(labelA.querySelector(".frame-label-detail").textContent).toBe("Checkout Redesign: Variant A");
+    expect(labelA.lastElementChild.classList.contains("mockup-column-counts")).toBe(true);
+    expect(labelB.querySelector(".frame-label-name").textContent).toBe("B");
+    expect(labelB.querySelector(".frame-label-detail").textContent).toBe("Checkout Redesign: Variant B");
+    // The variant's description is the label's tooltip; none -> no tooltip.
+    expect(labelA.title).toBe("Single page");
+    expect(labelB.hasAttribute("title")).toBe(false);
+    expect(container.querySelector(".mockup-column-description, .mockup-column-title, .mockup-column-index")).toBeNull();
+  });
+
+  it("puts the count chips next to the label, inside the counter-scaled head", () => {
+    const container = document.createElement("div");
+    const columns = renderMockupView(container, { name: "m", variants: [{ id: "a", title: "" }] }, { fetchRenderFor: () => new Promise(() => {}) });
+    const label = container.querySelector(".mockup-column-head > .mockup-column-label");
+    expect(label.querySelector(".frame-label-detail").textContent).toBe("m: a"); // no titles: the name and the id
+    expect(label.contains(columns[0].countsEl)).toBe(true);
   });
 
   it("falls back to the mockup's name when it has no title", () => {

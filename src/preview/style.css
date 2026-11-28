@@ -1052,8 +1052,10 @@ button.chrome-section-header:focus-visible {
 .mockup-columns {
   display: flex;
   flex-wrap: nowrap;
-  gap: var(--space-xl);
-  padding-bottom: var(--space-md);
+  /* The gap between frames stays 24px on screen at any zoom (counter-scaled like the headers), about what the design draws. */
+  gap: calc(var(--space-2xl) / var(--zoom, 1));
+  /* Room for the selected frame's ring (counter-scaled like the headers), which the zoom wrapper's overflow would clip at the row's edges. */
+  padding: calc(6px / var(--zoom, 1)) calc(6px / var(--zoom, 1)) var(--space-md);
   /* Always sizes to its own (unscaled) content, never to its zoom wrapper's
      JS-set width — otherwise, as a block-level flex container, it would
      shrink to that width and its own scrollable overflow would clip the row
@@ -1062,8 +1064,7 @@ button.chrome-section-header:focus-visible {
   width: max-content;
 }
 
-/* The variant's letter: the mockup-column-header's variant-badge (CHR-1263). */
-.mockup-column-index,
+/* The variant's letter in a comment popover's title (CHR-1263). */
 .comment-variant-badge {
   display: inline-flex;
   align-items: center;
@@ -1080,12 +1081,17 @@ button.chrome-section-header:focus-visible {
   line-height: 1;
 }
 
-.mockup-column-row {
+/* The frame label above a column (design `frame-label`): icon, letter, text, then the count chips. */
+.mockup-column-label {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
   min-width: 0;
-  margin-bottom: var(--space-2xs);
+  height: 18px;
+  font-size: var(--ui-sm);
+  font-weight: 600;
+  color: var(--chrome-text-secondary);
+  white-space: nowrap;
 }
 
 .mockup-column-counts {
@@ -1139,12 +1145,14 @@ button.chrome-section-header:focus-visible {
 
 /* Counter-scaled against the row's zoom (--zoom, set by applyMockupZoom): the header paints at native chrome size, laid out at width x zoom so its wrapping matches the column. */
 .mockup-column-head {
+  /* Padding, not a child's margin: a margin would collapse out of the head and drop out of its measured height (layoutHeads). */
+  padding-bottom: var(--space-md);
   width: calc(100% * var(--zoom, 1));
   transform: scale(calc(1 / var(--zoom, 1)));
   transform-origin: top left;
 }
 
-/* The header (index, title, description) sits on the canvas above the frame; the frame itself is the white card. */
+/* The frame label sits on the canvas above the frame; the frame itself is the white card. */
 .mockup-column {
   flex: 0 0 auto;
   min-width: 280px;
@@ -1152,29 +1160,10 @@ button.chrome-section-header:focus-visible {
   width: 360px;
 }
 
-.mockup-column-title {
+.mockup-column-text {
   min-width: 0;
-  font-size: var(--ui-base);
-  font-weight: 500;
-  color: var(--chrome-text);
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mockup-column-description {
-  font-size: var(--ui-xs);
-  color: var(--chrome-text-secondary);
-  line-height: 1.5;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: var(--space-md);
-}
-
-.mockup-column-description > * {
-  display: inline;
-  margin: 0;
 }
 
 .mockup-column-error {
@@ -1190,11 +1179,16 @@ button.chrome-section-header:focus-visible {
 .mockup-column-frame {
   display: block;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-frame);
   background: var(--frame-surface);
-  box-shadow: var(--frame-shadow);
+  box-shadow: var(--chrome-shadow-frame);
   width: 360px;
   height: 200px;
+}
+
+/* The selected variant: a teal ring (design `canvas-frame` selected), counter-scaled so it reads 2px at any zoom. */
+.mockup-column.is-selected .mockup-column-frame {
+  box-shadow: 0 0 0 calc(2px / var(--zoom, 1)) var(--chrome-accent), var(--chrome-shadow-frame);
 }
 
 #screen-holder {
@@ -9723,9 +9717,10 @@ button.uc-target:hover {
   pointer-events: none;
 }
 
-/* On the mockup columns the banner sits at the bottom of the stage too. */
+/* On the mockup columns the banner sits at the bottom of the stage, above the zoom pill (design `mockup-comments-mode`). */
 #comment-banner[data-placement="bottom"] {
   top: auto;
+  bottom: var(--shell-bottom);
 }
 
 .comment-dim {

@@ -20,7 +20,7 @@ export function toolStates({ view, showMockup, comparing, hasScreen }) {
   }
   if (showMockup) {
     const reason = "Not available for mockups";
-    return { comment: OK, inspect: no(reason), notes: no(reason), comments: OK, flow: no(reason), designSystem: OK };
+    return { comment: OK, inspect: no(reason), notes: no(reason), comments: OK, flow: no(reason), designSystem: no(reason) };
   }
   if (comparing) {
     const reason = "Not available while comparing variants";

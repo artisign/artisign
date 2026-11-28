@@ -80,7 +80,7 @@ export function createMockupHost({ layerEl, stageEl, getColumns }) {
     layerEl,
     stageEl,
     placement: "bottom",
-    modeText: "Comment mode — click an element in any variant to start a thread",
+    modeText: "Comment mode: click an element in any variant to start a thread",
     frames: () =>
       getColumns().map(({ variantId, letter, iframe }) => ({
         key: variantId,

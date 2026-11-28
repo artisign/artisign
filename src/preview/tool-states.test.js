@@ -17,10 +17,11 @@ describe("toolStates", () => {
     expect(states.notes).toEqual({ disabled: false, reason: "" });
   });
 
-  it("a mockup: only comment, comments and the design system apply (CHR-1263)", () => {
+  it("a mockup: only comment and comments apply — the design system is greyed too (CHR-1263, CHR-1270)", () => {
     const states = toolStates(where({ showMockup: true }));
-    expect(disabled(states)).toEqual(["inspect", "notes", "flow"]);
+    expect(disabled(states)).toEqual(["inspect", "notes", "flow", "designSystem"]);
     expect(states.inspect.reason).toBe("Not available for mockups");
+    expect(states.designSystem.reason).toBe("Not available for mockups");
   });
 
   it("the Board: flow (it arms the tile jump) and the design system apply", () => {

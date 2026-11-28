@@ -53,8 +53,18 @@ describe("noteState", () => {
     expect(noteState({ ...where, view: "board", boardCount: 1 }).scope).toBe("On the Board, 1 screen");
   });
 
-  it("is off for a mockup and while comparing, with the tool bar's reasons", () => {
-    expect(noteState({ ...where, showMockup: true, mockup: "orders-layout" })).toMatchObject({ enabled: false, icon: "view_column", scope: "On orders-layout", reason: "Not available for mockups" });
+  it("is on for the selected variant of an open mockup, scoped by mockup and variant", () => {
+    expect(noteState({ ...where, showMockup: true, mockup: "orders-layout", mockupVariant: { id: "b", label: "Order cards" } })).toEqual({
+      enabled: true,
+      key: "mockup:orders-layout#b",
+      icon: "view_column",
+      scope: "On orders-layout, Order cards",
+      reason: "",
+    });
+  });
+
+  it("is off for a mockup without variants, and while comparing, with a reason", () => {
+    expect(noteState({ ...where, showMockup: true, mockup: "orders-layout" })).toMatchObject({ enabled: false, icon: "view_column", scope: "On orders-layout", reason: "This mockup has no variants" });
     expect(noteState({ ...where, comparing: true })).toMatchObject({ enabled: false, reason: "Not available while comparing variants" });
   });
 

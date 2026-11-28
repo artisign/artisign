@@ -259,4 +259,32 @@ describe("initTooltips", () => {
     // jsdom viewport 1024x768, tooltip size 0: "end" = right of the trigger (46), vertically centred (114).
     expect([tip().style.left, tip().style.top]).toEqual(["46px", "114px"]);
   });
+
+  it("measures at the origin, so the previous tooltip's position cannot squeeze the next one", () => {
+    const seen = [];
+    const desc = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetWidth");
+    Object.defineProperty(tip(), "offsetWidth", { configurable: true, get: () => (seen.push(tip().style.left), 100) });
+    tip().style.left = "900px"; // where the previous tooltip was clamped
+    over(btn);
+    vi.advanceTimersByTime(OPEN_DELAY);
+    expect(seen[0]).toBe("0px");
+    if (desc) Object.defineProperty(HTMLElement.prototype, "offsetWidth", desc);
+  });
+
+  it("marks the key slot aria-hidden, so the description is the label only", () => {
+    expect(tip().querySelector(".chrome-tooltip-key").getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("re-enters the top layer when it switches trigger, so a modal opened in between cannot cover it", () => {
+    const show = vi.fn();
+    const hidePopover = vi.fn();
+    tip().showPopover = show;
+    tip().hidePopover = hidePopover;
+    over(btn);
+    vi.advanceTimersByTime(OPEN_DELAY);
+    expect(show).toHaveBeenCalledTimes(1);
+    over(other); // a tooltip is up: the neighbour shows at once
+    expect(hidePopover).toHaveBeenCalledTimes(1);
+    expect(show).toHaveBeenCalledTimes(2);
+  });
 });

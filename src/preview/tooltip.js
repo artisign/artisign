@@ -52,6 +52,7 @@ export function initTooltips(doc) {
   const labelEl = doc.createElement("span");
   const keyEl = doc.createElement("span");
   keyEl.className = "chrome-tooltip-key";
+  keyEl.setAttribute("aria-hidden", "true"); // the description reads "Comment", not "Comment C"
   tip.append(labelEl, keyEl);
   doc.body.append(tip);
 
@@ -88,6 +89,7 @@ export function initTooltips(doc) {
 
   function show(target) {
     clearTimer();
+    const switching = current !== target;
     if (current && current !== target) unlink();
     if (current !== target) {
       describedBefore = target.getAttribute("aria-describedby");
@@ -99,10 +101,15 @@ export function initTooltips(doc) {
     keyEl.textContent = shortcut;
     keyEl.hidden = shortcut === "";
     tip.hidden = false;
-    if (!inTopLayer && tip.showPopover) {
-      tip.showPopover();
+    if (tip.showPopover) {
+      // Re-shown when it switches trigger: the top layer is ordered by when an element entered it, so a modal opened in between would cover the tooltip.
+      if (inTopLayer && switching) tip.hidePopover();
+      if (!inTopLayer || switching) tip.showPopover();
       inTopLayer = true;
     }
+    // Measured at the origin: a position left over from the previous tooltip (clamped at the right edge) would squeeze the new one.
+    tip.style.left = "0px";
+    tip.style.top = "0px";
     const view = doc.defaultView;
     const side = target.closest("[data-tooltip-side]")?.getAttribute("data-tooltip-side");
     const pos = placeTooltip(

@@ -48,7 +48,7 @@ describe("resolveShortcut", () => {
     expect(press("]")).toBe("panel-agent"); // the Agent bar's fold (CHR-1269)
     expect(press("n")).toBe("notes");
     expect(press("m")).toBe("comments");
-    expect(press("d")).toBe("design-system");
+    expect(press("d")).toBeNull(); // CHR-1284: the Design system button and D are gone; the view tab and 3 switch views
     expect(press("p")).toBe("project-menu");
     expect(press("/")).toBe("filter");
     expect(press("t")).toBe("theme");
@@ -78,11 +78,11 @@ describe("resolveShortcut", () => {
     expect(press("e", {}, { view: "board" })).toBe("board-edges");
   });
 
-  it("M is Comments everywhere, Shift+M is Show resolved on the Board only", () => {
+  it("M is Comments everywhere, Shift+M is Show resolved (Screens view and Board)", () => {
     expect(press("m")).toBe("comments");
     expect(press("m", {}, { view: "board" })).toBe("comments");
-    expect(press("M", { shiftKey: true }, { view: "board" })).toBe("board-show-resolved");
-    expect(press("M", { shiftKey: true })).toBeNull();
+    expect(press("M", { shiftKey: true }, { view: "board" })).toBe("show-resolved");
+    expect(press("M", { shiftKey: true })).toBe("show-resolved");
   });
 
   it("E / G / Shift+G are Board only", () => {

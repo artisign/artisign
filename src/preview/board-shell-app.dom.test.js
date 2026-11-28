@@ -129,13 +129,13 @@ describe("the Board's tool bar", () => {
     expect(label("inspect-mode-toggle")).toBe("Inspect, not available on the Board");
     expect(label("notes-tool-toggle")).toBe("Notes, not available on the Board");
     expect(label("comments-tool-toggle")).toBe("Comments on tiles, 1 open");
-    expect(label("board-resolved-toggle")).toBe("Show resolved comments");
+    expect(label("resolved-toggle")).toBe("Show resolved comments");
     expect(label("flow-mode-toggle")).toBe("Flow arrows");
-    expect(label("design-system-tool")).toBe("Design system, not available on the Board");
+    expect(document.getElementById("design-system-tool")).toBeNull(); // CHR-1284
     expect(label("board-clusters-toggle")).toBe("Clusters");
     expect(label("board-collapse-all-btn")).toBe("Collapse all clusters, all are collapsed");
-    for (const id of ["comment-mode-toggle", "inspect-mode-toggle", "notes-tool-toggle", "design-system-tool", "board-collapse-all-btn"]) expect($(`#${id}`).getAttribute("aria-disabled")).toBe("true");
-    for (const id of ["comments-tool-toggle", "board-resolved-toggle", "flow-mode-toggle", "board-clusters-toggle"]) expect($(`#${id}`).hasAttribute("aria-disabled")).toBe(false);
+    for (const id of ["comment-mode-toggle", "inspect-mode-toggle", "notes-tool-toggle", "board-collapse-all-btn"]) expect($(`#${id}`).getAttribute("aria-disabled")).toBe("true");
+    for (const id of ["comments-tool-toggle", "resolved-toggle", "flow-mode-toggle", "board-clusters-toggle"]) expect($(`#${id}`).hasAttribute("aria-disabled")).toBe(false);
     expect($("#flow-mode-toggle").getAttribute("aria-pressed")).toBe("true");
     expect($("#board-clusters-toggle").getAttribute("aria-pressed")).toBe("true");
   });
@@ -152,23 +152,30 @@ describe("the Board's tool bar", () => {
     expect(flow.getAttribute("aria-keyshortcuts")).toBe("F");
   });
 
-  it("with nothing on the board, comments, show resolved and collapse all say so", async () => {
+  it("with nothing on the board, comments and collapse all say so; Show resolved stays a working switch (CHR-1292)", async () => {
     boardState = { filter: "xyzzy", pinned: [], expanded: [] };
     await openBoard();
     expect(label("comments-tool-toggle")).toBe("Comments on tiles, nothing on the board");
-    expect(label("board-resolved-toggle")).toBe("Show resolved comments, nothing on the board");
+    expect(label("resolved-toggle")).toBe("Show resolved comments");
+    expect($("#resolved-toggle").hasAttribute("aria-disabled")).toBe(false);
     expect(label("board-collapse-all-btn")).toBe("Collapse all clusters, nothing on the board");
     expect($("#comments-tool-toggle").getAttribute("aria-disabled")).toBe("true");
   });
 
-  it("the Board's own tools and Show resolved are hidden outside the Board, and the tools are the Screens view's again", async () => {
+  it("Clusters and Collapse all are hidden outside the Board (no gap, no stale state), and the tools are the Screens view's again (CHR-1283)", async () => {
     await openBoard();
     $('.view-tab[data-view="screens"]').click();
-    for (const id of ["board-resolved-toggle", "board-clusters-toggle", "board-collapse-all-btn", "board-tools-sep"]) expect($(`#${id}`).hidden).toBe(true);
+    for (const id of ["board-clusters-toggle", "board-collapse-all-btn"]) expect($(`#${id}`).hidden).toBe(true);
+    expect($("#resolved-toggle").hidden).toBe(false);
+    expect($("#tool-group-sep").hidden).toBe(false);
+    // G and Shift+G do nothing in the Screens view, and the hidden Clusters tool keeps its state for the way back.
+    const pressedBefore = $("#board-clusters-toggle").getAttribute("aria-pressed");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "g", code: "KeyG", bubbles: true, cancelable: true }));
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "G", code: "KeyG", shiftKey: true, bubbles: true, cancelable: true }));
+    expect($("#board-clusters-toggle").getAttribute("aria-pressed")).toBe(pressedBefore);
     expect($("#tool-bar").getAttribute("aria-label")).toBe("Screen tools");
     expect(label("flow-mode-toggle")).toBe("Flow");
     expect(label("comment-mode-toggle")).toBe("Comment");
-    expect(label("design-system-tool")).toBe("Design system");
     expect($("#flow-mode-toggle").dataset.shortcutId).toBe("flow");
   });
 

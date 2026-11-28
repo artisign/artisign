@@ -375,8 +375,8 @@ describe("summary", () => {
   it("counts open threads (detached included) and detached ones of the shown screens only", () => {
     const board = setup();
     board.setData({ comments: [], threads: [thread("a", "one", "btn-a"), thread("d", "one", "gone", { detached: true }), thread("x", "one", "btn-b", { status: "resolved" }), thread("c", "two", "hero")] });
-    expect(board.summary(["one"])).toEqual({ open: 2, detached: 1 });
-    expect(board.summary(["one", "two"])).toEqual({ open: 3, detached: 1 });
+    expect(board.summary(["one"])).toEqual({ open: 2, detached: 1, resolved: 1 });
+    expect(board.summary(["one", "two"])).toEqual({ open: 3, detached: 1, resolved: 1 });
     expect(board.threadScreens()).toEqual(new Set(["one", "two"]));
   });
 });

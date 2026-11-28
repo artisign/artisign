@@ -48,7 +48,7 @@ import { icon } from "./icons.js";
 import { createVariantUI, variantContext } from "./variants.js";
 import { renderVariantInspector } from "./variant-inspector.js";
 import { createCompareView } from "./compare.js";
-import { toolStates } from "./tool-states.js";
+import { TOOLS, toolShown, toolStates } from "./tool-states.js";
 import { writingScreen, createAgentBar, IDLE_AFTER_MS } from "./agent-bar.js";
 import { renderMockupList, filterMockups, mockupExpandKey } from "./mockups.js";
 import { renderMockupView, renderColumnChips, markSelectedColumn } from "./mockup-view.js";
@@ -186,8 +186,9 @@ const boardEmptyClearBtn = document.getElementById("board-empty-clear");
 const boardClearPinsBtn = document.getElementById("board-clear-pins-btn");
 const boardClustersToggleBtn = document.getElementById("board-clusters-toggle");
 const boardCollapseAllBtn = document.getElementById("board-collapse-all-btn");
-const boardToolsSepEl = document.getElementById("board-tools-sep");
-const boardResolvedToggleBtn = document.getElementById("board-resolved-toggle");
+const toolGroupSepEl = document.getElementById("tool-group-sep");
+const resolvedToggleBtn = document.getElementById("resolved-toggle");
+const toolToastEl = document.getElementById("tool-toast");
 const boardCommentLayerEl = document.getElementById("board-comment-layer");
 const boardPresentedBannerEl = document.getElementById("board-presented-banner");
 const boardPresentedTextEl = document.getElementById("board-presented-text");
@@ -197,7 +198,6 @@ const flowModeToggle = document.getElementById("flow-mode-toggle");
 const commentModeToggle = document.getElementById("comment-mode-toggle");
 const notesToolToggle = document.getElementById("notes-tool-toggle");
 const commentsToolToggle = document.getElementById("comments-tool-toggle");
-const designSystemTool = document.getElementById("design-system-tool");
 const toolPanelEl = document.getElementById("tool-panel");
 const canvasControlsEl = document.getElementById("canvas-controls");
 const zoomButtons = document.querySelectorAll(".zoom-button");
@@ -276,6 +276,7 @@ let pinnedScreens = [];
 let currentView = "screens";
 /** The open-thread count of the shown scope (the Comments tool's badge) and the shown scope's threads and messages (the Comments panel's list). */
 let openCommentCount = 0;
+let resolvedThreadCount = 0; // CHR-1292: the threads the Comments panel counts on its Resolved tab
 let latestComments = { comments: [], threads: [] };
 /** @type {"open" | "resolved"} the Comments panel's tab; Resolved also puts a check pin on every resolved thread. */
 let commentsTab = "open";
@@ -457,14 +458,15 @@ board.mount();
 const BOARD_COMMENTS_KEY = "artisign.board.comments";
 const BOARD_RESOLVED_KEY = "artisign.board.showResolved";
 let boardCommentsOn = readBoolPref(prefsStorage, BOARD_COMMENTS_KEY, true);
-let boardShowResolved = readBoolPref(prefsStorage, BOARD_RESOLVED_KEY, false);
+// CHR-1292 — the Show resolved switch is one state for the Screens view and the Board, kept in the view state and the prefs, never derived from the comments (the key keeps its old name so a stored choice survives).
+let showResolvedOn = readBoolPref(prefsStorage, BOARD_RESOLVED_KEY, false);
 let boardCommentsRequestId = 0;
 const boardComments = createBoardComments({
   layerEl: boardCommentLayerEl,
   surfaceEl: boardSurfaceEl,
   geometry: () => board.commentGeometry(),
   enabled: boardCommentsOn,
-  showResolved: boardShowResolved,
+  showResolved: showResolvedOn,
   onZoomToTile: (screen) => board.zoomToTile(screen),
   onOpenInScreens: (screen, threadId) => void openScreenThread(screen, threadId),
 });
@@ -476,12 +478,36 @@ function toggleBoardComments() {
   boardComments.setEnabled(boardCommentsOn);
   renderBoardStatus(); // the Comments tool's state follows
 }
-boardResolvedToggleBtn.addEventListener("click", () => {
-  boardShowResolved = !boardShowResolved;
-  writeBoolPref(prefsStorage, BOARD_RESOLVED_KEY, boardShowResolved);
-  boardComments.setShowResolved(boardShowResolved);
-  renderBoardStatus();
+resolvedToggleBtn.addEventListener("click", () => {
+  showResolvedOn = !showResolvedOn;
+  writeBoolPref(prefsStorage, BOARD_RESOLVED_KEY, showResolvedOn);
+  boardComments.setShowResolved(showResolvedOn);
+  syncResolvedPins(); // the Screens view's pins
+  syncToolStates();
+  if (showResolvedOn) showResolvedHint();
 });
+
+/** CHR-1292 — a short, non-blocking hint beside the tool bar; no modal. */
+let toolToastTimer;
+function showToolToast(text) {
+  toolToastEl.textContent = text;
+  toolToastEl.hidden = false;
+  clearTimeout(toolToastTimer);
+  toolToastTimer = setTimeout(() => (toolToastEl.hidden = true), 3500);
+}
+
+/** Switching Show resolved on says why nothing appears: no resolved comments, or the pins are off. */
+function showResolvedHint() {
+  const onBoard = currentView === "board";
+  if (resolvedCommentCount() === 0) showToolToast(onBoard ? "No resolved comments on the board" : currentMockup !== null ? "No resolved comments on this mockup" : "No resolved comments on this screen");
+  else if (onBoard && !boardCommentsOn) showToolToast("Comments are off on the Board: turn them on to see the resolved pins");
+}
+
+/** The resolved threads the switch is about: the shown tiles on the Board, the open screen (or mockup) elsewhere. The Comments panel's Resolved tab counts the same threads. */
+function resolvedCommentCount() {
+  if (currentView === "board") return boardComments.summary(computeBoardVisibility(screens, screenFilter, pinnedScreens).visibleNames).resolved;
+  return resolvedThreadCount;
+}
 
 /** One request for every screen's threads; the board's markers and status line follow. */
 async function loadBoardComments() {
@@ -2003,6 +2029,7 @@ function renderMockupChips() {
 /** CHR-1268 — the open-thread count: the badge on the Comments tool and its accessible name. */
 function renderCommentCount(threads) {
   openCommentCount = countRow(threads).open;
+  resolvedThreadCount = threads.filter((t) => t.status === "resolved").length;
   syncToolStates(); // the badge and the tool's name follow
 }
 
@@ -2234,7 +2261,10 @@ function syncPanelContext() {
 }
 
 /** The tools' names outside the Board (the Board names its own, in the design's words). */
-const TOOL_NAMES = { comment: "Comment", inspect: "Inspect", notes: "Notes", flow: "Flow", designSystem: "Design system" };
+const TOOL_NAMES = { comment: "Comment", inspect: "Inspect", notes: "Notes", flow: "Flow" };
+
+/** The tool bar's buttons by tool key (tool-states.js, TOOLS). */
+const TOOL_BUTTONS = { comment: commentModeToggle, inspect: inspectModeToggle, flow: flowModeToggle, clusters: boardClustersToggleBtn, collapseAll: boardCollapseAllBtn, notes: notesToolToggle, comments: commentsToolToggle, showResolved: resolvedToggleBtn };
 
 /** Every tool's pressed state, availability and name, from the current view and modes. A panel whose tool no longer applies closes. */
 function syncToolStates() {
@@ -2252,8 +2282,9 @@ function syncToolStates() {
       : undefined,
   });
   document.getElementById("tool-bar").setAttribute("aria-label", onBoard ? "Board tools" : showMockup ? "Mockup tools" : "Screen tools"); // design: the bar is named for what it works on
-  // Shown only on the Board; the roving tab stop follows what shows.
-  for (const el of [boardResolvedToggleBtn, boardToolsSepEl, boardClustersToggleBtn, boardCollapseAllBtn]) el.hidden = !onBoard;
+  // CHR-1283: a tool without a function in this view is hidden, not greyed (tool-states.js, TOOLS); the bar shrinks with it and the roving tab stop follows what shows. The divider stays only between two groups that both have a tool.
+  for (const [key, el] of Object.entries(TOOL_BUTTONS)) el.hidden = !toolShown(key, currentView);
+  toolGroupSepEl.hidden = !["canvas", "panel"].every((group) => TOOLS.some((t) => t.group === group && toolShown(t.key, currentView)));
   const named = (key, extra = {}) => ({ ...states[key], name: states[key].name ?? TOOL_NAMES[key], ...extra });
   toolBar.setState(commentModeToggle, { ...named("comment"), pressed: activeMode === "comment" });
   toolBar.setState(inspectModeToggle, { ...named("inspect"), pressed: activeMode === "inspect" });
@@ -2270,9 +2301,12 @@ function syncToolStates() {
   commentCountBadge.textContent = String(badgeCount);
   // The Flow tool is the flow mode of a screen, and the flow arrows on the Board (E there, F elsewhere).
   toolBar.setState(flowModeToggle, onBoard ? { ...named("flow"), pressed: boardEdgesVisible, shortcut: "board-edges" } : { ...named("flow"), pressed: activeMode === "flow", shortcut: "flow" });
-  toolBar.setState(designSystemTool, { ...named("designSystem") });
+  // CHR-1292: the switch is `showResolvedOn`, whatever the data; the tooltip names the state and the count.
+  if (toolShown("showResolved", currentView)) {
+    const count = resolvedCommentCount();
+    toolBar.setState(resolvedToggleBtn, { ...states.showResolved, name: "Show resolved comments", pressed: showResolvedOn, ...(states.showResolved.disabled ? {} : { hint: `${showResolvedOn ? "Hide" : "Show"} resolved comments (${count})` }) });
+  }
   if (onBoard) {
-    toolBar.setState(boardResolvedToggleBtn, { ...states.showResolved, pressed: boardShowResolved });
     toolBar.setState(boardClustersToggleBtn, { ...states.clusters, pressed: boardClustersOn });
     toolBar.setState(boardCollapseAllBtn, { ...states.collapseAll });
   }
@@ -2292,11 +2326,6 @@ for (const [id, button] of [["notes", notesToolToggle], ["comments", commentsToo
   });
 }
 
-designSystemTool.addEventListener("click", () => {
-  pauseFollow();
-  setView("design-system");
-});
-
 // Comments panel: Open | Resolved (a tablist: arrows and Home/End move between the tabs, like the left card's). Resolved also shows the check pins — only while this panel is open.
 const commentTabEls = { open: document.getElementById("comments-tab-open"), resolved: document.getElementById("comments-tab-resolved") };
 function setCommentsTab(tab, focus = false) {
@@ -2306,7 +2335,8 @@ function setCommentsTab(tab, focus = false) {
   if (focus) commentTabEls[tab].focus();
 }
 function syncResolvedPins() {
-  commentCanvas.setShowResolved(toolPanels.shown() === "comments" && commentsTab === "resolved");
+  // The Resolved tab shows the pins while it is open; the tool bar's switch shows them whatever tab is up (CHR-1292).
+  commentCanvas.setShowResolved(showResolvedOn || (toolPanels.shown() === "comments" && commentsTab === "resolved"));
 }
 for (const tab of ["open", "resolved"]) commentTabEls[tab].addEventListener("click", () => setCommentsTab(tab));
 document.getElementById("comments-tabs").addEventListener("keydown", (evt) => {
@@ -2315,6 +2345,7 @@ document.getElementById("comments-tabs").addEventListener("keydown", (evt) => {
   evt.preventDefault();
   setCommentsTab(next, true);
 });
+syncResolvedPins(); // a stored Show resolved choice reaches the Screens view
 syncToolStates(); // the initial state: nothing is open yet
 
 

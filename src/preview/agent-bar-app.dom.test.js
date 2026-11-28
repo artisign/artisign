@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// CHR-1269 — the Agent bar in the real app (real index.html, stubbed daemon): the live status from the activity stream, Follow, a feed click, folding with the right column's panels, the offline state and the note field posting a thread through the comments API.
+// CHR-1269 — the Agent bar in the real app (real index.html, stubbed daemon): the live status from the activity stream, Follow, a feed click, folding with the right column's panels, the offline state (the note field was removed in CHR-1293).
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
 
@@ -10,8 +10,6 @@ const s = (name) => ({ name, tags: [], notes: "" });
 let sources;
 let screens;
 let mockups;
-let posts;
-let postResult;
 
 const memoryStorage = new Map();
 const storageStub = {
@@ -27,20 +25,14 @@ function stubDaemon() {
   vi.stubGlobal("localStorage", storageStub);
   Object.defineProperty(window, "localStorage", { configurable: true, value: storageStub });
   sources = [];
-  posts = [];
-  postResult = { ok: true, status: 201, json: async () => ({}) };
   vi.stubGlobal("EventSource", class { constructor() { sources.push(this); } close() {} });
   vi.stubGlobal("requestAnimationFrame", (cb) => cb());
   vi.stubGlobal("CSS", { escape: (v) => v });
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   Element.prototype.scrollIntoView = vi.fn();
-  vi.stubGlobal("fetch", async (url, init) => {
+  vi.stubGlobal("fetch", async (url) => {
     const path = String(url).split("?")[0];
     const json = (body) => ({ ok: true, status: 200, json: async () => body, text: async () => "" });
-    if (path === "/api/comments" && init?.method === "POST") {
-      posts.push(JSON.parse(init.body));
-      return postResult;
-    }
     if (path === "/api/projects") return json({ active: "/p", open: [{ root: "/p", name: "p" }], recent: [] });
     if (path === "/api/screens") return json({ screens });
     if (path === "/api/mockups") return json({ mockups });
@@ -68,10 +60,6 @@ const rowButton = (name) => $(`#screen-list li[data-screen="${name}"] button.scr
 const followState = () => (!$("#agent-follow-paused-row").hidden ? "paused" : $("#follow-switch").checked ? "following" : "off");
 const key = (k) => document.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
 const collapsed = () => $("#agent-bar").dataset.collapsed === "true";
-const typeNote = (text) => {
-  $("#agent-note-field").value = text;
-  $("#agent-note-field").dispatchEvent(new Event("input", { bubbles: true }));
-};
 
 async function boot() {
   localStorage.setItem("artisign.last-screen:/p", "a");
@@ -263,121 +251,6 @@ describe("folding with the right column", () => {
   });
 });
 
-describe("the note field", () => {
-  it("posts a new thread on the open screen, anchored to the screen itself, through the comments API", async () => {
-    await boot();
-    expect($("#agent-note-scope-text").textContent).toBe("On a");
-    typeNote("Make the button smaller");
-    $("#agent-note").requestSubmit();
-    await flush();
-    expect(posts).toEqual([{ screen: "a", node_id: null, text: "Make the button smaller" }]);
-    expect($("#agent-note-field").value).toBe("");
-    expect($("#agent-note-error").hidden).toBe(true);
-  });
-
-  it("a rejected post keeps the text and shows the daemon's message", async () => {
-    await boot();
-    postResult = { ok: false, status: 400, statusText: "Bad Request", json: async () => ({ message: "screen not found" }) };
-    typeNote("hello");
-    $("#agent-note").requestSubmit();
-    await flush();
-    expect($("#agent-note-field").value).toBe("hello");
-    expect($("#agent-note-error").textContent).toBe("Could not send the note: screen not found");
-  });
-
-  it("follows the open screen: a screen picked in the list changes the scope and the target", async () => {
-    await boot();
-    typeNote("for a");
-    rowButton("b").click();
-    await flush();
-    expect($("#agent-note-scope-text").textContent).toBe("On b");
-    expect($("#agent-note-field").value).toBe("");
-    typeNote("for b");
-    $("#agent-note").requestSubmit();
-    await flush();
-    expect(posts).toEqual([{ screen: "b", node_id: null, text: "for b" }]);
-    rowButton("a").click();
-    await flush();
-    expect($("#agent-note-field").value).toBe("for a"); // still there, still for a
-  });
-
-  it("is off on the Board and says so, with the Board's scope line", async () => {
-    await boot();
-    tab("board").click();
-    await flush();
-    expect($("#agent-note-field").getAttribute("aria-disabled")).toBe("true");
-    expect($("#agent-note-field").placeholder).toBe("Not available on the Board");
-    expect($("#agent-note-scope-text").textContent).toMatch(/^On the Board, \d+ screens?$/);
-    typeNote("nope");
-    $("#agent-note").requestSubmit();
-    await flush();
-    expect(posts).toEqual([]);
-    tab("screens").click();
-    await flush();
-    expect($("#agent-note-field").getAttribute("aria-disabled")).toBe("false");
-  });
-
-  it("is off for a mockup without variants and says why", async () => {
-    mockups = [{ name: "m", variants: [], tags: [] }];
-    await boot();
-    document.querySelector("#nav-tab-mockups").click();
-    await flush();
-    document.querySelector("#mockup-list button").click();
-    await flush();
-    expect($("#agent-note-field").getAttribute("aria-disabled")).toBe("true");
-    expect($("#agent-note-field").placeholder).toBe("This mockup has no variants");
-    expect($("#agent-note-scope-text").textContent).toBe("On m");
-  });
-
-  describe("on a mockup", () => {
-    const openMockup = async () => {
-      mockups = [{ name: "m", title: "M", tags: [], variants: [{ id: "a", title: "Alpha" }, { id: "b", title: "Beta" }] }];
-      await boot();
-      document.querySelector("#nav-tab-mockups").click();
-      await flush();
-      document.querySelector("#mockup-list button.mockup-item").click();
-      await flush();
-    };
-    const variantRow = (id) => $(`#mockup-list button.mockup-variant-item[data-variant-id="${id}"]`);
-
-    it("is scoped to the selected variant (the first one on opening) and posts a thread on it, without a node", async () => {
-      await openMockup();
-      expect($("#agent-note-field").getAttribute("aria-disabled")).toBe("false");
-      expect($("#agent-note-scope-text").textContent).toBe("On m, Alpha");
-      typeNote("Make A calmer");
-      $("#agent-note").requestSubmit();
-      await flush();
-      expect(posts).toEqual([{ mockup: "m", variant: "a", node_id: null, text: "Make A calmer" }]);
-      expect($("#agent-note-field").value).toBe("");
-    });
-
-    it("follows the variant picked in the tree: the scope changes, each variant keeps its own unsent text, the post goes to the new variant", async () => {
-      await openMockup();
-      typeNote("for alpha");
-      variantRow("b").click();
-      await flush();
-      expect($("#agent-note-scope-text").textContent).toBe("On m, Beta");
-      expect($("#agent-note-field").value).toBe("");
-      typeNote("for beta");
-      $("#agent-note").requestSubmit();
-      await flush();
-      expect(posts).toEqual([{ mockup: "m", variant: "b", node_id: null, text: "for beta" }]);
-      variantRow("a").click();
-      await flush();
-      expect($("#agent-note-field").value).toBe("for alpha");
-    });
-
-    it("leaving the mockup for a screen scopes the note to the screen again", async () => {
-      await openMockup();
-      document.querySelector("#nav-tab-screens").click();
-      await flush();
-      rowButton("a").click();
-      await flush();
-      expect($("#agent-note-scope-text").textContent).toBe("On a");
-    });
-  });
-});
-
 describe("the Design System view and Use Cases (no Agent bar there)", () => {
   const topFollow = () => (!$("#topbar-follow-paused").hidden ? "paused" : $("#topbar-follow-switch").checked ? "following" : "off");
 
@@ -428,40 +301,14 @@ describe("the Design System view and Use Cases (no Agent bar there)", () => {
   });
 });
 
-describe("the note field and the network", () => {
-  it("a post that rejects (daemon gone) shows the error, keeps the text, and a second send works", async () => {
+describe("no note field (CHR-1293)", () => {
+  it("the Agent bar has no input, send button or scope line in any view", async () => {
     await boot();
-    const realFetch = globalThis.fetch;
-    let down = true;
-    vi.stubGlobal("fetch", async (url, init) => {
-      if (down && String(url).startsWith("/api/comments") && init?.method === "POST") throw new TypeError("Failed to fetch");
-      return realFetch(url, init);
-    });
-    typeNote("hello");
-    $("#agent-note").requestSubmit();
-    await flush();
-    expect($("#agent-note-error").textContent).toBe("Could not send the note: Failed to fetch");
-    expect($("#agent-note-field").value).toBe("hello");
-    down = false;
-    $("#agent-note").requestSubmit();
-    await flush();
-    expect(posts).toEqual([{ screen: "a", node_id: null, text: "hello" }]);
-    expect($("#agent-note-field").value).toBe("");
-  });
-
-  it("a refresh that fails after a successful post is not a failed send (no resend, no second thread)", async () => {
-    await boot();
-    const realFetch = globalThis.fetch;
-    vi.stubGlobal("fetch", async (url, init) => {
-      if (String(url).startsWith("/api/comments") && init?.method !== "POST") throw new TypeError("Failed to fetch");
-      return realFetch(url, init);
-    });
-    typeNote("once");
-    $("#agent-note").requestSubmit();
-    await flush();
-    expect(posts).toHaveLength(1);
-    expect($("#agent-note-error").hidden).toBe(true);
-    expect($("#agent-note-field").value).toBe("");
+    expect($("#agent-bar textarea, #agent-bar input[type=text]")).toBeNull();
+    expect($("#agent-note")).toBeNull();
+    expect($("#agent-note-field")).toBeNull();
+    expect($("#agent-note-send")).toBeNull();
+    expect($("#agent-bar").textContent).not.toMatch(/note for the agent/i);
   });
 });
 

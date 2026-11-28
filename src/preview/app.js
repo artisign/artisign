@@ -49,7 +49,7 @@ import { createVariantUI, variantContext } from "./variants.js";
 import { renderVariantInspector } from "./variant-inspector.js";
 import { createCompareView } from "./compare.js";
 import { toolStates } from "./tool-states.js";
-import { writingScreen, createAgentBar, noteState, IDLE_AFTER_MS } from "./agent-bar.js";
+import { writingScreen, createAgentBar, IDLE_AFTER_MS } from "./agent-bar.js";
 import { renderMockupList, filterMockups, mockupExpandKey } from "./mockups.js";
 import { renderMockupView, renderColumnChips, markSelectedColumn } from "./mockup-view.js";
 import { applyMockupZoom } from "./mockup-zoom.js";
@@ -261,7 +261,7 @@ let currentScreen = null;
 let mockups = [];
 // Mutually exclusive with currentScreen — see selectScreen/selectMockup.
 let currentMockup = null;
-// The selected variant of currentMockup (CHR-1270) — the one the tree highlights, the canvas rings and the Agent bar's note lands on. In memory only: it resets with the mockup and is never persisted. Null while no mockup is open (or it has no variants).
+// The selected variant of currentMockup (CHR-1270) — the one the tree highlights, the canvas rings. In memory only: it resets with the mockup and is never persisted. Null while no mockup is open (or it has no variants).
 /** @type {string | null} */
 let currentMockupVariant = null;
 // The Board's shared filter (CHR-624/ADR-005) — daemon-held, per project,
@@ -856,7 +856,6 @@ function resetProjectState() {
   // followState), so only `paused` resets here — nothing is pending a
   // resume for in the project we're leaving.
   activityFeed = [];
-  agentBar.reset();
   clearActivityHighlights();
   mockupCueCleanup();
   mockupCueCleanup = () => {};
@@ -1256,54 +1255,22 @@ function currentActivityLists() {
   return { screenNames: screens.map((s) => s.name), mockupNames: mockups.map((m) => m.name) };
 }
 
-/** Re-draws the Agent bar — status, Follow, feed, note field — from the current follow state, feed, connection and open view. The feed's rows look at the live screens/mockups lists (a target's existence changes independently of the feed itself — see activityTargetExists). */
+/** Re-draws the Agent bar — status, Follow, feed — from the current follow state, feed, connection and open view. The feed's rows look at the live screens/mockups lists (a target's existence changes independently of the feed itself — see activityTargetExists). */
 function renderAgentBar() {
   board.setWritingScreen(writingScreen({ feed: activityFeed, connected: eventsConnected, now: Date.now() })); // the Board rings the screen the status box says is being written
-  const showMockup = currentView === "screens" && currentMockup !== null;
   const lists = currentActivityLists();
   agentBar.render({
     feed: activityFeed,
     follow: followState,
     connected: eventsConnected,
     exists: (event) => activityTargetExists(event, lists),
-    note: noteState({
-      view: currentView,
-      showMockup,
-      comparing: compare.isOn() && currentView === "screens" && !showMockup,
-      screen: currentScreen,
-      screenLabel: currentScreen === null ? "" : screenContext(currentScreen),
-      mockup: currentMockup,
-      mockupVariant: mockupVariantForNote(),
-      boardCount: boardItemCount(),
-    }),
   });
-}
-
-/** The open mockup's selected variant as the note field needs it, or null (no mockup open, or it has no variants). */
-function mockupVariantForNote() {
-  const variant = mockups.find((m) => m.name === currentMockup)?.variants.find((v) => v.id === currentMockupVariant);
-  return variant ? { id: variant.id, label: variant.title || variant.id } : null;
 }
 
 /** A feed row's click is human navigation like any other (ADR-005 pause rule 1) — it pauses follow the way a sidebar click or a tab switch does, then goes to that entry's target. Without the pause the next live call would pull the view straight back. */
 function handleActivityFeedSelect(event) {
   pauseFollow();
   navigateToActivity(event);
-}
-
-/** The note field: a new comment thread on the target it was written for, anchored to the target itself (`node_id: null`) — the comments API as it is, human author. A screen note anchors to the screen, a mockup note to the whole selected variant. The thread shows in the Comments tool and its badge. @param {string} text @param {string} noteKey "screen:<name>" or "mockup:<name>#<variant>" */
-async function sendAgentNote(text, noteKey) {
-  let input;
-  if (noteKey.startsWith("screen:")) input = { screen: noteKey.slice("screen:".length), node_id: null, text };
-  else if (noteKey.startsWith("mockup:")) {
-    const [mockup, variant] = noteKey.slice("mockup:".length).split("#");
-    if (!variant) return { ok: false, message: "no variant is selected" };
-    input = { mockup, variant, node_id: null, text };
-  } else return { ok: false, message: "nothing is open" };
-  const result = await postComment(input, activeProjectRoot);
-  // The note is on disk once the post answered: a failing refresh must not read as a failed send (a resend would start a second thread). The SSE "comments" event refreshes a moment later anyway.
-  if (result.ok && (input.screen ? input.screen === currentScreen : input.mockup === currentMockup)) await loadComments().catch(() => {});
-  return result;
 }
 
 /**
@@ -1626,7 +1593,7 @@ function selectMockupVariantHuman(name, variantId) {
   return Promise.resolve();
 }
 
-/** Moves the selected variant of the open mockup — tree row, canvas ring and the Agent bar's note scope follow. */
+/** Moves the selected variant of the open mockup — tree row and canvas ring follow. */
 function setMockupVariant(variantId) {
   if (currentMockupVariant === variantId) return;
   currentMockupVariant = variantId;
@@ -2201,7 +2168,6 @@ const agentBar = createAgentBar({
   onFollow: (on) => applyFollowToggleAction(on ? "toggle-on" : "toggle-off"),
   onResume: () => applyFollowToggleAction("resume"),
   onSelect: handleActivityFeedSelect,
-  onSend: sendAgentNote,
 });
 // The status goes idle on its own, and the feed's relative times move on.
 setInterval(() => {
@@ -2317,7 +2283,7 @@ function syncToolStates() {
   toolBar.syncRoving();
   // The Comments panel is the Screens view's; on the Board the same tool only switches the tile pins.
   for (const id of ["notes", "comments"]) if ((states[id].disabled || (onBoard && id === "comments")) && toolPanels.opened() === id) toolPanels.close(false);
-  renderAgentBar(); // the note field's scope follows the same view state
+  renderAgentBar();
 }
 
 for (const [id, button] of [["notes", notesToolToggle], ["comments", commentsToolToggle]]) {

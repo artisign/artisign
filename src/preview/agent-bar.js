@@ -1,4 +1,4 @@
-// CHR-1269 — the Agent bar: the right column's floating card (design `float-card` + `agent-status` + `agent-activity` + `agent-note` + `live-chip` + `agent-bar-folded`). It says what the agent is doing now, carries the Follow switch, lists the Activity feed and takes a note for the agent. The feed, the follow state machine and the navigation stay in activity.js / app.js; this module is the card: the status words (pure), the note's scope (pure) and the DOM.
+// CHR-1269 — the Agent bar: the right column's floating card (design `float-card` + `agent-status` + `agent-activity` + `live-chip` + `agent-bar-folded`). It says what the agent is doing now, carries the Follow switch, and lists the Activity feed. The feed, the follow state machine and the navigation stay in activity.js / app.js; this module is the card: the status words (pure) and the DOM.
 //
 // Folding: the bar folds to its head (grip, "Agent", the live status, the Live chip, the chevron) by the user's choice (remembered, key `]`) and by itself while a tool panel takes the column below it; the panel closing brings it back. A panel-fold is never stored: it is derived from "a panel is open" every time.
 
@@ -49,24 +49,6 @@ export function writingScreen({ feed, connected, now }) {
 }
 
 /**
- * Where the note field's thread would land, and whether it can: on the open screen, anchored to the screen root, or on the selected variant of the open mockup, anchored to the whole variant (CHR-1270). The Board and a compare have no single target to anchor to, so the field is off there and says why (the same words as the tool bar's greyed tools).
- * @param {{ view: string, showMockup: boolean, comparing: boolean, screen: string | null, screenLabel: string, mockup: string | null, mockupVariant?: { id: string, label: string } | null, boardCount: number }} where
- * @returns {{ enabled: boolean, key: string, icon: string, scope: string, reason: string }}
- */
-export function noteState({ view, showMockup, comparing, screen, screenLabel, mockup, mockupVariant = null, boardCount }) {
-  if (view === "board") {
-    return { enabled: false, key: "board", icon: "grid_view", scope: `On the Board, ${boardCount} screen${boardCount === 1 ? "" : "s"}`, reason: "Not available on the Board" };
-  }
-  if (showMockup) {
-    if (mockupVariant === null) return { enabled: false, key: `mockup:${mockup}`, icon: "view_column", scope: `On ${mockup}`, reason: "This mockup has no variants" };
-    return { enabled: true, key: `mockup:${mockup}#${mockupVariant.id}`, icon: "view_column", scope: `On ${mockup}, ${mockupVariant.label}`, reason: "" };
-  }
-  if (screen === null) return { enabled: false, key: "none", icon: "desktop_windows", scope: "No screen open", reason: "No screen is open" };
-  if (comparing) return { enabled: false, key: `screen:${screen}`, icon: "desktop_windows", scope: `On ${screenLabel}`, reason: "Not available while comparing variants" };
-  return { enabled: true, key: `screen:${screen}`, icon: "desktop_windows", scope: `On ${screenLabel}`, reason: "" };
-}
-
-/**
  * @param {{
  *   barEl: HTMLElement,
  *   topbarEl: HTMLElement,
@@ -74,10 +56,9 @@ export function noteState({ view, showMockup, comparing, screen, screenLabel, mo
  *   onFollow: (on: boolean) => void,
  *   onResume: () => void,
  *   onSelect: (event: object) => void,
- *   onSend: (text: string, noteKey: string) => Promise<{ ok: true } | { ok: false, message: string }>,
- * }} args `onSend` posts the note for the scope the field showed when it was sent (`noteKey`). `topbarEl` holds the Live chip and Follow control the top bar shows in the views that have no Agent bar (Design System, Use Cases); the stylesheet picks which of the two sets shows.
+ * }} args `topbarEl` holds the Live chip and Follow control the top bar shows in the views that have no Agent bar (Design System, Use Cases); the stylesheet picks which of the two sets shows.
  */
-export function createAgentBar({ barEl, topbarEl, storage, onFollow, onResume, onSelect, onSend }) {
+export function createAgentBar({ barEl, topbarEl, storage, onFollow, onResume, onSelect }) {
   const $ = (id) => /** @type {HTMLElement} */ (barEl.querySelector(`#${id}`));
   const foldEl = /** @type {HTMLButtonElement} */ ($("agent-bar-fold"));
   const foldIconEl = $("agent-bar-fold-icon");
@@ -90,10 +71,6 @@ export function createAgentBar({ barEl, topbarEl, storage, onFollow, onResume, o
   const followRowEl = $("agent-follow-row");
   const pausedRowEl = $("agent-follow-paused-row");
   const feedEl = $("agent-feed");
-  const noteFormEl = /** @type {HTMLFormElement} */ ($("agent-note"));
-  const fieldEl = /** @type {HTMLTextAreaElement} */ ($("agent-note-field"));
-  const errorEl = $("agent-note-error");
-  const sendEl = /** @type {HTMLButtonElement} */ ($("agent-note-send"));
   const tb = (id) => /** @type {HTMLElement} */ (topbarEl.querySelector(`#${id}`));
   const topSwitchEl = /** @type {HTMLInputElement} */ (tb("topbar-follow-switch"));
   const topChipEl = tb("topbar-connection");
@@ -151,89 +128,12 @@ export function createAgentBar({ barEl, topbarEl, storage, onFollow, onResume, o
   feedEl.addEventListener("scroll", syncFade, { passive: true });
   if (typeof ResizeObserver !== "undefined") new ResizeObserver(syncFade).observe(feedEl); // the card's height changes with the window and the fold
 
-  // --- The note field -------------------------------------------------------
-
-  /** @type {ReturnType<typeof noteState>} */
-  let note = { enabled: false, key: "none", icon: "desktop_windows", scope: "", reason: "" };
-  /** Each scope keeps its own unsent text: follow can move the open screen while one types, and the note must not land on a screen it was not written for. */
-  const drafts = new Map();
-  let sending = false;
-
-  function syncSend() {
-    const blocked = !note.enabled || sending || fieldEl.value.trim() === "";
-    sendEl.setAttribute("aria-disabled", String(blocked));
-  }
-  function showError(message) {
-    errorEl.textContent = message;
-    errorEl.hidden = message === "";
-  }
-
-  function renderNote(next) {
-    if (next.key !== note.key) {
-      drafts.set(note.key, fieldEl.value);
-      fieldEl.value = drafts.get(next.key) ?? "";
-      showError("");
-    }
-    note = next;
-    // Read-only and aria-disabled, not `disabled`: it stays focusable, and its description says why it is off (like the greyed tools).
-    fieldEl.readOnly = !next.enabled;
-    fieldEl.setAttribute("aria-disabled", String(!next.enabled));
-    $("agent-note-reason").textContent = next.reason;
-    fieldEl.placeholder = next.enabled ? "Leave a note for the agent" : next.reason;
-    $("agent-note-scope-icon").textContent = next.icon;
-    $("agent-note-scope-text").textContent = next.scope;
-    sendEl.dataset.tooltip = next.enabled ? "Send note" : next.reason;
-    sendEl.setAttribute("aria-label", next.enabled ? "Send note" : `Send note, unavailable: ${next.reason}`);
-    syncSend();
-  }
-
-  fieldEl.addEventListener("input", () => {
-    showError("");
-    syncSend();
-  });
-  // Enter sends, Shift+Enter breaks the line — like the comment popover. An Enter that confirms an IME conversion is not a send.
-  fieldEl.addEventListener("keydown", (evt) => {
-    if (evt.key !== "Enter" || evt.shiftKey || evt.ctrlKey || evt.metaKey || evt.altKey) return;
-    evt.preventDefault();
-    if (evt.isComposing || evt.keyCode === 229) return;
-    noteFormEl.requestSubmit();
-  });
-  noteFormEl.addEventListener("submit", async (evt) => {
-    evt.preventDefault();
-    const text = fieldEl.value.trim();
-    if (!note.enabled || sending || text === "") return;
-    const key = note.key;
-    sending = true;
-    syncSend();
-    showError("");
-    /** @type {{ ok: true } | { ok: false, message: string }} */
-    let result;
-    try {
-      result = await onSend(text, key);
-    } catch (err) {
-      // The daemon being unreachable rejects the request: the text stays, the field stays editable.
-      result = { ok: false, message: err instanceof Error ? err.message : String(err) };
-    } finally {
-      sending = false;
-    }
-    if (result.ok) {
-      // The field may show another scope by now (follow moved on): only the scope the note was written for forgets its text.
-      if (note.key === key) fieldEl.value = "";
-      else drafts.delete(key);
-      liveEl.textContent = "Note sent";
-      setTimeout(() => {
-        if (liveEl.textContent === "Note sent") liveEl.textContent = "";
-      }, 2000);
-    } else showError(`Could not send the note: ${result.message}`);
-    syncSend();
-  });
-
   return {
     /**
      * Draws the whole bar from the current state.
-     * @param {{ feed: object[], follow: { enabled: boolean, paused: boolean }, connected: boolean, now?: number, exists: (event: object) => boolean, note: ReturnType<typeof noteState> }} state
+     * @param {{ feed: object[], follow: { enabled: boolean, paused: boolean }, connected: boolean, now?: number, exists: (event: object) => boolean }} state
      */
-    render({ feed, follow, connected, now = Date.now(), exists, note: nextNote }) {
+    render({ feed, follow, connected, now = Date.now(), exists }) {
       const chipState = connected ? "live" : "offline";
       const chipLabel = connected ? "Live" : "Offline";
       const chipTip = connected ? "Live reload: connected" : "Live reload disconnected, retrying";
@@ -265,21 +165,12 @@ export function createAgentBar({ barEl, topbarEl, storage, onFollow, onResume, o
 
       renderActivityFeed(feedEl, $("agent-feed-empty"), feed, { exists, onSelect, now: () => now });
       syncFade();
-      renderNote(nextNote);
     },
     /** A tool panel took (or gave back) the column below: fold (or unfold) with it. @param {boolean} open */
     setPanelOpen(open) {
       if (panelOpen === open) return;
       panelOpen = open;
       applyFold();
-    },
-    /** A new project: nothing typed for the last one carries over. */
-    reset() {
-      drafts.clear();
-      fieldEl.value = "";
-      note = { ...note, key: "none" };
-      showError("");
-      syncSend();
     },
   };
 }

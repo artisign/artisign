@@ -2502,10 +2502,6 @@ function updateCanvas() {
   // The label sits above the frame's top-left corner.
   frameCaptionEl.style.left = screenHolderEl.style.left || "0px";
   frameCaptionEl.style.top = `${Math.max(0, parseFloat(screenHolderEl.style.top || "0") - FRAME_CAPTION_BAND + 4)}px`;
-  // The tool bar's default top lines up with the frame's top (design); a dragged bar keeps its own place.
-  const frameTop = rendered && !screenHolderEl.hidden ? canvasEl.getBoundingClientRect().top - appEl.getBoundingClientRect().top + parseFloat(screenHolderEl.style.top || "0") : null;
-  if (frameTop !== null && frameTop > 0) appEl.style.setProperty("--toolbar-top", `${Math.round(frameTop)}px`);
-  else appEl.style.removeProperty("--toolbar-top");
   syncVariantBar();
   commentCanvas.layout(); // pins follow zoom, resize and every re-render
   syncZoomUI();
@@ -2525,16 +2521,7 @@ function updateMockupZoom() {
   const columnsEl = mockupViewEl.querySelector(".mockup-columns");
   if (columnsEl) applyMockupZoom({ paneEl: mockupViewEl, columnsEl, zoom: mockupZoom });
   if (currentMockup !== null) commentCanvas.layout(); // pins follow the zoomed and re-fitted columns
-  syncMockupToolbarTop();
   syncZoomUI();
-}
-
-/** The tool bar's default top lines up with the columns' frames (design `chrome-c-mockup-columns`), below their labels; recomputed with every zoom, fit, resize and re-render. Only while the mockup view shows. */
-function syncMockupToolbarTop() {
-  const frame = currentView === "screens" && currentMockup !== null && !mockupViewEl.hidden ? mockupViewEl.querySelector(".mockup-column-frame") : null;
-  const top = frame ? frame.getBoundingClientRect().top - appEl.getBoundingClientRect().top : 0;
-  if (top > 0) appEl.style.setProperty("--toolbar-top", `${Math.round(top)}px`);
-  else appEl.style.removeProperty("--toolbar-top");
 }
 
 /** Re-fits whichever of the screen canvas / mockup row is actually showing — shared by every trigger whose available space can change without a view/selection switch of its own (pane resize, side-panel collapse). */
@@ -2878,8 +2865,6 @@ function applyMainVisibility() {
   // The shell lays the canvas and the full-height views out per view and per compare state (style.css).
   appEl.dataset.shellView = currentView;
   appEl.dataset.comparing = String(comparing);
-  if (currentView !== "screens" || comparing) appEl.style.removeProperty("--toolbar-top"); // only a frame has a top to align with
-  else if (showMockup) syncMockupToolbarTop(); // the columns' frames
   // The zoom group stays visible over the mockup view too — it
   // scales the whole comparison row instead of the screen canvas.
   canvasControlsEl.hidden = (currentView !== "screens" && currentView !== "board") || comparing; // compare has its own zoom in its chip row

@@ -9838,7 +9838,7 @@ body {
 #tool-bar {
   position: absolute;
   z-index: 20;
-  top: var(--toolbar-top, var(--shell-top)); /* aligned with the open frame's top (app.js sets --toolbar-top); the card's top elsewhere */
+  top: var(--shell-top); /* fixed to the window: zoom and pan never move it (CHR-1282) */
   left: calc(var(--space-xl) + var(--size-nav-card) + var(--space-xl));
   display: flex;
   flex-direction: column;

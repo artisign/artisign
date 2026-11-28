@@ -46,4 +46,18 @@ describe("applyCanvas", () => {
     expect(parseFloat(banded.holderEl.style.transform.slice(6))).toBeLessThan(parseFloat(plain.holderEl.style.transform.slice(6)));
     expect(parseFloat(banded.holderEl.style.top)).toBeGreaterThanOrEqual(28);
   });
+
+  it("fits and centres in the area the cards leave free, without moving the canvas origin (CHR-1299)", () => {
+    const open = stubs();
+    applyCanvas({ ...open, zoom: 1, insets: { left: 356, right: 288, top: 76, bottom: 80 } });
+    // 1000 - 356 - 288 = 356 free: the 390px frame no longer fits; it starts at the left inset.
+    expect(parseFloat(open.holderEl.style.left)).toBe(356);
+    const fit = stubs();
+    applyCanvas({ ...fit, zoom: "fit", insets: { left: 356, right: 288, top: 76, bottom: 80 } });
+    expect(parseFloat(fit.holderEl.style.transform.slice(6))).toBeCloseTo(544 / 844, 5); // height is the tighter side: 700 - 76 - 80
+    const centred = stubs();
+    applyCanvas({ ...centred, zoom: 0.25, insets: { left: 200, right: 100, top: 0, bottom: 0 } });
+    // free 700 wide, frame 97.5 wide: centred in it, offset by the left inset.
+    expect(parseFloat(centred.holderEl.style.left)).toBeCloseTo(200 + (700 - 97.5) / 2, 5);
+  });
 });

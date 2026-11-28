@@ -74,6 +74,7 @@ import {
 import { renderDesignSystem } from "./design-system.js";
 import { connectEvents } from "./sse.js";
 import { applyCanvas } from "./canvas.js";
+import { computeCanvasInsets } from "./canvas-insets.js";
 import { updateWarningBadge } from "./warnings.js";
 import { createBoardView } from "./board-view.js";
 import { createBoardComments } from "./board-comments.js";
@@ -135,8 +136,9 @@ const screenFrame = document.getElementById("screen-frame");
 const canvasEl = document.getElementById("canvas");
 // CHR-732 — the variant breadcrumb above the frame. onSelect is the nav tree's own human-navigation path (pauses follow).
 let variantLayoutShown = false;
+const variantBarEl = document.getElementById("variant-bar");
 const variantUI = createVariantUI({
-  barEl: document.getElementById("variant-bar"),
+  barEl: variantBarEl,
   onSelect: (name) => selectScreenHuman(name),
   // CHR-738 — the Single | Compare toggle and the popover checkboxes; `compare` (below) is only read once the UI renders.
   compare: {
@@ -450,6 +452,7 @@ const board = createBoardView({
   onTogglePin: (screen) => toggleScreenPin(screen),
   onLayout: () => boardComments.layout(),
   onTileKeydown: (evt) => onShortcutKeydown(evt),
+  getInsets: measureCanvasInsets,
 });
 board.mount();
 
@@ -801,6 +804,7 @@ async function syncProjects() {
 
 /** Resets every module-level piece of state tied to the previously active project, ready for a fresh boot. */
 function resetProjectState() {
+  canvasInsets = null;
   modeCleanup();
   modeCleanup = () => {};
   compare.reset(); // the stored mode flag stays: bootScreens restores it for the next project
@@ -2403,24 +2407,56 @@ function renderFrameLabel(width, height) {
   frameCaptionEl.replaceChildren(icon(viewportIconName(screenViewports.get(name) ?? { width }), "frame-label-icon"), nameEl, detailEl);
 }
 
+/** The gap kept between a card and the content (`--space-xl`). */
+const CARD_GAP = 16;
+
+/** What the floating cards cover of the window right now (canvas-insets.js). A folded Screens card covers only its head, which sits where the tool bar slides to, so it counts only while open. */
+function measureCanvasInsets() {
+  const cards = [];
+  for (const el of [sidebarScreensEl.dataset.collapsed === "true" ? null : sidebarScreensEl, document.getElementById("tool-bar"), document.getElementById("agent-bar"), toolPanelEl]) {
+    if (!el || el.hidden) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0) cards.push({ left: rect.left, right: rect.right });
+  }
+  const style = getComputedStyle(appEl);
+  return computeCanvasInsets(appEl.clientWidth, cards, { top: parseFloat(style.getPropertyValue("--shell-top")) || 0, bottom: parseFloat(style.getPropertyValue("--shell-bottom")) || 0, gap: CARD_GAP });
+}
+
+// CHR-1299 — the insets the Screens canvas fits and centres in. A snapshot, taken when a fit is asked for (first fit, a view or project switch, a window resize, the Fit control) and kept otherwise: folding or opening a card never moves the frame.
+let canvasInsets = null;
+
+/** The variant breadcrumb is centred over the displayed screen (the compare area while comparing) and kept clear of the cards (CHR-1280). It never reads the Screens card's state, so folding it does not move the bar. */
+function syncVariantBar() {
+  if (variantBarEl.hidden) return;
+  const viewRect = screensViewEl.getBoundingClientRect();
+  const insets = measureCanvasInsets();
+  const freeLeft = insets.left;
+  const freeWidth = Math.max(0, viewRect.width - insets.left - insets.right);
+  variantBarEl.style.setProperty("--bar-max", `${freeWidth}px`);
+  const target = compare.isOn() ? compareViewEl.getBoundingClientRect() : screenHolderEl.getBoundingClientRect();
+  const half = Math.min(variantBarEl.offsetWidth, freeWidth) / 2;
+  const center = target.left + target.width / 2 - viewRect.left;
+  variantBarEl.style.setProperty("--bar-center", `${Math.min(Math.max(center, freeLeft + half), freeLeft + freeWidth - half)}px`);
+}
+
 function updateCanvas() {
+  canvasInsets ??= measureCanvasInsets();
   // "<screen> <variant> · <w> × <h>" above the frame, in a reserved band; not while the how-to-start guide replaces the frame, and the variant breadcrumb takes its place on a variant family.
   // Name and size come from the same rendered document: while a newly selected screen is still loading, the frame (and so its size) is the previous one, and a failed render shows an error note, not a screen.
   const rendered = iframeRenderedScreen !== null && iframeRenderOk && !screenHolderEl.hidden;
   const showBar = variantLayoutShown && !screenHolderEl.hidden;
   const showCaption = rendered && !showBar;
-  const { width, height } = applyCanvas({ canvasEl, holderEl: screenHolderEl, iframeEl: screenFrame, zoom, topInset: showBar ? VARIANT_BAR_BAND : showCaption ? FRAME_CAPTION_BAND : 0 });
+  const { width, height } = applyCanvas({ canvasEl, holderEl: screenHolderEl, iframeEl: screenFrame, zoom, topInset: showBar ? VARIANT_BAR_BAND : showCaption ? FRAME_CAPTION_BAND : 0, insets: canvasInsets });
   frameCaptionEl.hidden = !showCaption;
   if (showCaption) renderFrameLabel(width, height);
-  // The label and the breadcrumb sit above the frame's top-left corner.
-  const frameLeft = screenHolderEl.style.left || "0px";
-  frameCaptionEl.style.left = frameLeft;
+  // The label sits above the frame's top-left corner.
+  frameCaptionEl.style.left = screenHolderEl.style.left || "0px";
   frameCaptionEl.style.top = `${Math.max(0, parseFloat(screenHolderEl.style.top || "0") - FRAME_CAPTION_BAND + 4)}px`;
-  screensStageEl.style.setProperty("--frame-left", frameLeft);
   // The tool bar's default top lines up with the frame's top (design); a dragged bar keeps its own place.
   const frameTop = rendered && !screenHolderEl.hidden ? canvasEl.getBoundingClientRect().top - appEl.getBoundingClientRect().top + parseFloat(screenHolderEl.style.top || "0") : null;
   if (frameTop !== null && frameTop > 0) appEl.style.setProperty("--toolbar-top", `${Math.round(frameTop)}px`);
   else appEl.style.removeProperty("--toolbar-top");
+  syncVariantBar();
   commentCanvas.layout(); // pins follow zoom, resize and every re-render
   syncZoomUI();
 }
@@ -2453,13 +2489,15 @@ function syncMockupToolbarTop() {
 
 /** Re-fits whichever of the screen canvas / mockup row is actually showing — shared by every trigger whose available space can change without a view/selection switch of its own (pane resize, side-panel collapse). */
 function refitActivePane() {
-  if (compare.isOn()) compare.relayout();
-  else if (isMockupZoomActive()) updateMockupZoom();
+  if (compare.isOn()) {
+    compare.relayout();
+    syncVariantBar();
+  } else if (isMockupZoomActive()) updateMockupZoom();
   else updateCanvas();
 }
 
 /**
- * Wires the left card's fold control: applies the persisted state up front, then toggles + persists + re-fits the canvas on every click. The DOM (`panelEl.dataset.collapsed`) is the single source of truth — no parallel module-level boolean to keep in sync. The card's folded state also frees the canvas's left reserve (`#app[data-card-folded]`, style.css), so the fit zoom is recomputed.
+ * Wires the left card's fold control: applies the persisted state up front, then toggles + persists + re-fits the canvas on every click. The DOM (`panelEl.dataset.collapsed`) is the single source of truth — no parallel module-level boolean to keep in sync. The Screens canvas and the Board fill the window and the card floats over them (CHR-1299): folding does not touch them. Only the mockup row still takes its left reserve from the card's state, so it re-fits.
  */
 function setupCardFold(panelEl, collapseBtn, prefKey) {
   const iconEl = collapseBtn.querySelector(".side-panel-collapse-icon");
@@ -2475,7 +2513,7 @@ function setupCardFold(panelEl, collapseBtn, prefKey) {
     const collapsed = panelEl.dataset.collapsed !== "true";
     apply(collapsed);
     writeBoolPref(prefsStorage, prefKey, collapsed);
-    refitActivePane();
+    if (isMockupZoomActive()) updateMockupZoom();
   });
 }
 
@@ -2534,8 +2572,14 @@ screenFrame.addEventListener("load", () => {
 
 // Only "fit" needs to react to the pane resizing — a fixed zoom level keeps
 // its scale regardless of the available space.
+canvasEl.addEventListener("scroll", () => syncVariantBar(), { passive: true }); // the bar follows the screen when the canvas is panned
+// The bar's own width (its content changes) and the compare area (shown, hidden, resized) move its centre too.
+const variantBarObserver = new ResizeObserver(() => syncVariantBar());
+variantBarObserver.observe(variantBarEl);
+variantBarObserver.observe(compareViewEl);
 mockupViewEl.addEventListener("scroll", () => commentCanvas.layout(), { passive: true }); // the layer is not part of the scrolled content: pins are re-placed per scroll
 window.addEventListener("resize", () => {
+  canvasInsets = null; // a new window size is a new fit: measure the free area again
   if (compare.isOn()) {
     if (compare.getZoom() === "fit") compare.relayout();
     return;
@@ -2608,6 +2652,7 @@ function setZoom(next) {
   } else {
     zoom = next;
     writeStringPref(prefsStorage, "artisign.zoom", String(next));
+    if (next === "fit") canvasInsets = null; // Fit fits the area the cards leave free right now
     updateCanvas();
   }
 }
@@ -2842,6 +2887,7 @@ function setView(view) {
   // A sidebar toggle while another view was active runs against a
   // display:none canvas (clientWidth 0) — re-fit now that it's visible
   // again, in case its available width changed while we were away.
+  canvasInsets = null;
   if (view === "screens" && currentMockup === null) updateCanvas();
 }
 

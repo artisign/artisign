@@ -48,27 +48,32 @@ function readScreenSize(iframeEl) {
  * Called after every iframe load (a fresh document each time, possibly a
  * different screen size) and on window resize while zoom is "fit".
  *
+ * The canvas fills the window; the floating cards lie over it. `insets` is
+ * the part the cards cover, and only the fit scale and the centring read it —
+ * the canvas origin itself never depends on a card.
+ *
  * @param {{
  *   canvasEl: HTMLElement,
  *   holderEl: HTMLElement,
  *   iframeEl: HTMLIFrameElement,
  *   zoom: "fit" | number,
  *   topInset?: number,
+ *   insets?: { left: number, right: number, top: number, bottom: number },
  * }} args `topInset` reserves a band above the frame (the frame caption, CHR-912).
  * @returns {{ width: number, height: number }} the screen's unscaled size
  */
-export function applyCanvas({ canvasEl, holderEl, iframeEl, zoom, topInset = 0 }) {
+export function applyCanvas({ canvasEl, holderEl, iframeEl, zoom, topInset = 0, insets = { left: 0, right: 0, top: 0, bottom: 0 } }) {
   const { width, height } = readScreenSize(iframeEl);
-  const availW = canvasEl.clientWidth;
-  const availH = canvasEl.clientHeight - topInset;
+  const availW = canvasEl.clientWidth - insets.left - insets.right;
+  const availH = canvasEl.clientHeight - insets.top - insets.bottom - topInset;
   const scale = zoom === "fit" ? fitScale(availW, availH, width, height) : zoom;
 
   holderEl.style.width = `${width}px`;
   holderEl.style.height = `${height}px`;
   holderEl.style.transform = `scale(${scale})`;
   holderEl.style.setProperty("--zoom", String(scale)); // overlay labels counter-scale with it (CHR-780)
-  holderEl.style.left = `${Math.max(0, (availW - width * scale) / 2)}px`;
-  holderEl.style.top = `${topInset + Math.max(0, (availH - height * scale) / 2)}px`;
+  holderEl.style.left = `${insets.left + Math.max(0, (availW - width * scale) / 2)}px`;
+  holderEl.style.top = `${insets.top + topInset + Math.max(0, (availH - height * scale) / 2)}px`;
 
   iframeEl.style.width = `${width}px`;
   iframeEl.style.height = `${height}px`;

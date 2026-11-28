@@ -294,8 +294,7 @@ let warningBadgeCleanup = () => {}; // click-to-cycle listener on the warning ba
 let warningCount = 0;
 /** @type {"fit" | number} */
 let zoom = "fit";
-// CHR-1290/CHR-1291 — the canvas pans by scrolling where the frame overflows (drag, trackpad scroll) and by `canvasPan` where it fits; wheel zoom re-anchors through whichever applies. `canvasMoved`: the human moved or zoomed it by hand, so the tool bar keeps its place (CHR-1282). Fit, and a different screen, take it back.
-let canvasMoved = false;
+// CHR-1290/CHR-1291 — the canvas pans by scrolling where the frame overflows (drag, trackpad scroll) and by `canvasPan` where it fits; wheel zoom re-anchors through whichever applies.
 /** How far the frame was moved off its centring by hand on an axis where it fits (an overflowing axis scrolls instead); applyCanvas hands back what it could apply. */
 let canvasPan = { x: 0, y: 0 };
 // Separate zoom state for the mockup comparison row (see applyMockupZoom in
@@ -2242,6 +2241,7 @@ const toolBar = createToolBar({
   liveEl: document.getElementById("tool-bar-live"),
   storage: prefsStorage,
   mac: macPlatform,
+  dock: { pillEl: document.getElementById("canvas-controls"), wrapEl: document.getElementById("zoom-pill-wrap"), panelEls: () => [sidebarScreensEl, document.getElementById("agent-bar"), document.getElementById("tool-panel")] },
 });
 
 /** The tool button that opens each panel. */
@@ -2470,13 +2470,18 @@ const CARD_GAP = 16;
 /** What the floating cards cover of the window right now (canvas-insets.js). A folded Screens card covers only its head, which sits where the tool bar slides to, so it counts only while open. */
 function measureCanvasInsets() {
   const cards = [];
+  let dockedTop = null; // CHR-1287: a bar docked at the bottom takes from the bottom inset, not from a side
   for (const el of [sidebarScreensEl.dataset.collapsed === "true" ? null : sidebarScreensEl, document.getElementById("tool-bar"), document.getElementById("agent-bar"), toolPanelEl]) {
     if (!el || el.hidden) continue;
     const rect = el.getBoundingClientRect();
-    if (rect.width > 0) cards.push({ left: rect.left, right: rect.right });
+    if (rect.width <= 0) continue;
+    if (el.id === "tool-bar" && toolBar.orientation() === "horizontal") dockedTop = rect.top;
+    else cards.push({ left: rect.left, right: rect.right });
   }
   const style = getComputedStyle(appEl);
-  return computeCanvasInsets(appEl.clientWidth, cards, { top: parseFloat(style.getPropertyValue("--shell-top")) || 0, bottom: parseFloat(style.getPropertyValue("--shell-bottom")) || 0, gap: CARD_GAP });
+  const insets = computeCanvasInsets(appEl.clientWidth, cards, { top: parseFloat(style.getPropertyValue("--shell-top")) || 0, bottom: parseFloat(style.getPropertyValue("--shell-bottom")) || 0, gap: CARD_GAP });
+  if (dockedTop !== null) insets.bottom = Math.max(insets.bottom, appEl.getBoundingClientRect().bottom - dockedTop + CARD_GAP);
+  return insets;
 }
 
 // CHR-1299 — the insets the Screens canvas fits and centres in. A snapshot, taken when a fit is asked for (first fit, a view or project switch, a window resize, the Fit control) and kept otherwise: folding or opening a card never moves the frame.
@@ -2514,12 +2519,6 @@ function updateCanvas() {
   // The label sits above the frame's top-left corner.
   frameCaptionEl.style.left = screenHolderEl.style.left || "0px";
   frameCaptionEl.style.top = `${Math.max(0, parseFloat(screenHolderEl.style.top || "0") - FRAME_CAPTION_BAND + 4)}px`;
-  // The tool bar's default top lines up with the frame's top (design); a dragged bar keeps its own place.
-  const frameTop = rendered && !screenHolderEl.hidden ? canvasEl.getBoundingClientRect().top - appEl.getBoundingClientRect().top + parseFloat(screenHolderEl.style.top || "0") : null;
-  if (canvasMoved) {
-    // A hand-moved canvas leaves the tool bar where it is (CHR-1282).
-  } else if (frameTop !== null && frameTop > 0) appEl.style.setProperty("--toolbar-top", `${Math.round(frameTop)}px`);
-  else appEl.style.removeProperty("--toolbar-top");
   syncVariantBar();
   commentCanvas.layout(); // pins follow zoom, resize and every re-render
   syncZoomUI();
@@ -2527,7 +2526,6 @@ function updateCanvas() {
 
 /** Takes a hand-moved canvas back to its centred place (Fit, a different screen). */
 function resetCanvasMove() {
-  canvasMoved = false;
   canvasPan = { x: 0, y: 0 };
   canvasEl.scrollLeft = 0;
   canvasEl.scrollTop = 0;
@@ -2542,7 +2540,6 @@ function frameOverflows(axis) {
 /** Pans by the pointer's delta (a drag, or a trackpad two-finger scroll): per axis the canvas scrolls the other way where the frame overflows, and the frame moves with the pointer where it fits. */
 function moveCanvasFrame(dx, dy) {
   if (screenHolderEl.hidden) return;
-  canvasMoved = true;
   if (frameOverflows("x")) canvasEl.scrollLeft -= dx;
   else canvasPan = { ...canvasPan, x: canvasPan.x + dx };
   if (frameOverflows("y")) canvasEl.scrollTop -= dy;
@@ -2566,7 +2563,6 @@ function zoomCanvasAt(factor, clientX, clientY) {
   const wantedLeft = anchoredPosition({ pointer: pointerX, position: oldLeft, oldScale, newScale: nextScale });
   const wantedTop = anchoredPosition({ pointer: pointerY, position: oldTop, oldScale, newScale: nextScale });
   zoom = nextScale;
-  canvasMoved = true;
   updateCanvas(); // the new scale, its centring and its scroll range
   // Per axis: a frame that still fits is placed by the pan offset, an overflowing one by the scroll position.
   const left = parseFloat(screenHolderEl.style.left) || 0;
@@ -2611,16 +2607,7 @@ function updateMockupZoom() {
   const columnsEl = mockupViewEl.querySelector(".mockup-columns");
   if (columnsEl) applyMockupZoom({ paneEl: mockupViewEl, columnsEl, zoom: mockupZoom });
   if (currentMockup !== null) commentCanvas.layout(); // pins follow the zoomed and re-fitted columns
-  syncMockupToolbarTop();
   syncZoomUI();
-}
-
-/** The tool bar's default top lines up with the columns' frames (design `chrome-c-mockup-columns`), below their labels; recomputed with every zoom, fit, resize and re-render. Only while the mockup view shows. */
-function syncMockupToolbarTop() {
-  const frame = currentView === "screens" && currentMockup !== null && !mockupViewEl.hidden ? mockupViewEl.querySelector(".mockup-column-frame") : null;
-  const top = frame ? frame.getBoundingClientRect().top - appEl.getBoundingClientRect().top : 0;
-  if (top > 0) appEl.style.setProperty("--toolbar-top", `${Math.round(top)}px`);
-  else appEl.style.removeProperty("--toolbar-top");
 }
 
 /** Re-fits whichever of the screen canvas / mockup row is actually showing — shared by every trigger whose available space can change without a view/selection switch of its own (pane resize, side-panel collapse). */
@@ -3015,8 +3002,6 @@ function applyMainVisibility() {
   // The shell lays the canvas and the full-height views out per view and per compare state (style.css).
   appEl.dataset.shellView = currentView;
   appEl.dataset.comparing = String(comparing);
-  if (currentView !== "screens" || comparing) appEl.style.removeProperty("--toolbar-top"); // only a frame has a top to align with
-  else if (showMockup) syncMockupToolbarTop(); // the columns' frames
   // The zoom group stays visible over the mockup view too — it
   // scales the whole comparison row instead of the screen canvas.
   canvasControlsEl.hidden = (currentView !== "screens" && currentView !== "board") || comparing; // compare has its own zoom in its chip row

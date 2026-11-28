@@ -2,7 +2,7 @@
 //
 // CHR-1267 — the floating card's grip: pointer and keyboard moves, the position kept per viewer, and the clamp that keeps the grip reachable.
 import { describe, it, expect, beforeEach } from "vitest";
-import { makeCardDraggable, parseCardPosition, clampCardPosition, CARD_MIN_VISIBLE, CARD_KEY_STEP } from "./float-card.js";
+import { makeCardDraggable, parseCardPosition, clampCardPosition, topBarLimit, CARD_MARGIN, CARD_MIN_VISIBLE, CARD_KEY_STEP } from "./float-card.js";
 
 function memoryStorage(initial = {}) {
   const map = new Map(Object.entries(initial));
@@ -43,11 +43,35 @@ describe("parseCardPosition", () => {
 });
 
 describe("clampCardPosition", () => {
-  it("keeps a strip of the card inside the window on every side", () => {
-    const win = { width: 1440, height: 900 };
-    expect(clampCardPosition({ left: 5000, top: 5000 }, box, win)).toEqual({ left: 1440 - CARD_MIN_VISIBLE, top: 900 - CARD_MIN_VISIBLE });
-    expect(clampCardPosition({ left: -5000, top: -5000 }, box, win)).toEqual({ left: CARD_MIN_VISIBLE - 256, top: 0 });
+  const win = { width: 1440, height: 900 };
+
+  it("keeps the card inside the window minus a margin; only its head has to stay above the bottom edge", () => {
+    expect(clampCardPosition({ left: 5000, top: 5000 }, box, win)).toEqual({ left: 1440 - 256 - CARD_MARGIN, top: 900 - CARD_MIN_VISIBLE });
+    expect(clampCardPosition({ left: -5000, top: -5000 }, box, win)).toEqual({ left: CARD_MARGIN, top: 0 });
     expect(clampCardPosition({ left: 200, top: 100 }, box, win)).toEqual({ left: 200, top: 100 });
+  });
+
+  it("never lets a card above the top bar's lower edge", () => {
+    expect(clampCardPosition({ left: 200, top: -40 }, box, win, { top: 68 })).toEqual({ left: 200, top: 68 });
+    expect(clampCardPosition({ left: 200, top: 30 }, box, win, { top: 68 })).toEqual({ left: 200, top: 68 });
+  });
+
+  it("a fully-inside card keeps its whole body above the bottom margin", () => {
+    expect(clampCardPosition({ left: 200, top: 5000 }, { width: 52, height: 300 }, win, { fullyInside: true })).toEqual({ left: 200, top: 900 - 300 - CARD_MARGIN });
+  });
+
+  it("a card taller than the room sits at the top limit instead of flipping", () => {
+    expect(clampCardPosition({ left: 200, top: 400 }, { width: 52, height: 2000 }, win, { top: 68, fullyInside: true })).toEqual({ left: 200, top: 68 });
+  });
+});
+
+describe("topBarLimit", () => {
+  it("is the top bar's lower edge plus the margin, read from the DOM; 0 without a top bar", () => {
+    expect(topBarLimit()).toBe(0);
+    document.body.insertAdjacentHTML("beforeend", '<header id="topbar"></header>');
+    const bar = document.getElementById("topbar");
+    bar.getBoundingClientRect = () => ({ bottom: 60 });
+    expect(topBarLimit()).toBe(60 + CARD_MARGIN);
   });
 });
 
@@ -64,7 +88,50 @@ describe("makeCardDraggable", () => {
     const other = document.getElementById("card");
     stubRect(other);
     makeCardDraggable({ cardEl: other, gripEl: document.getElementById("grip"), storage: memoryStorage({ pos: "9000,9000" }), key: "pos" });
-    expect([other.style.left, other.style.top]).toEqual([`${1440 - CARD_MIN_VISIBLE}px`, `${900 - CARD_MIN_VISIBLE}px`]);
+    expect([other.style.left, other.style.top]).toEqual([`${1440 - 256 - CARD_MARGIN}px`, `${900 - CARD_MIN_VISIBLE}px`]);
+  });
+
+  it("corrects a saved position under the top bar to the nearest valid one on load, and again when the window resizes", () => {
+    document.body.insertAdjacentHTML("beforeend", '<header id="topbar"></header>');
+    document.getElementById("topbar").getBoundingClientRect = () => ({ bottom: 60 });
+    makeCardDraggable({ cardEl: card, gripEl: grip, storage: memoryStorage({ pos: "300,10" }), key: "pos" });
+    expect([card.style.left, card.style.top]).toEqual(["300px", `${60 + CARD_MARGIN}px`]);
+    card.style.top = "20px"; // e.g. the top bar grew
+    window.dispatchEvent(new Event("resize"));
+    expect(card.style.top).toBe(`${60 + CARD_MARGIN}px`);
+    window.innerWidth = 400; // a narrower window pulls the card back in
+    window.dispatchEvent(new Event("resize"));
+    expect(card.style.left).toBe(`${400 - 256 - CARD_MARGIN}px`);
+  });
+
+  it("a drag cannot take the card above the top bar", () => {
+    document.body.insertAdjacentHTML("beforeend", '<header id="topbar"></header>');
+    document.getElementById("topbar").getBoundingClientRect = () => ({ bottom: 60 });
+    makeCardDraggable({ cardEl: card, gripEl: grip, storage: memoryStorage(), key: "pos" });
+    pointer(grip, "pointerdown", 30, 100, { button: 0 });
+    pointer(window, "pointermove", 30, -500);
+    expect(card.style.top).toBe(`${60 + CARD_MARGIN}px`);
+    pointer(window, "pointerup", 30, -500);
+  });
+
+  it("hooks: onDragMove sees the pointer and can re-anchor, onDragEnd can take over the placement, canPlace false skips the saved position", () => {
+    const storage = memoryStorage({ pos: "300,120" });
+    const seen = [];
+    makeCardDraggable({
+      cardEl: card,
+      gripEl: grip,
+      storage,
+      key: "pos",
+      canPlace: () => false,
+      onDragMove: ({ x, y }) => void seen.push([x, y]),
+      onDragEnd: () => true,
+    });
+    expect(card.style.left).toBe("");
+    pointer(grip, "pointerdown", 30, 100, { button: 0 });
+    pointer(window, "pointermove", 40, 110);
+    pointer(window, "pointerup", 40, 110);
+    expect(seen).toEqual([[40, 110]]);
+    expect(storage.map.get("pos")).toBe("300,120"); // onDragEnd placed the card: nothing saved over it
   });
 
   it("a pointer drag on the grip moves the card with the pointer, marks it while dragging and remembers where it was left", () => {

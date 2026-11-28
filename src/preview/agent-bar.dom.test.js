@@ -157,10 +157,10 @@ describe("the card", () => {
   it("is named by its title and its grip moves it with the arrow keys", () => {
     expect($("#agent-bar").getAttribute("aria-labelledby")).toBe("agent-bar-title");
     expect($("#agent-bar-title").textContent).toBe("Agent");
-    const spy = vi.spyOn($("#agent-bar"), "getBoundingClientRect").mockReturnValue({ left: 800, top: 78, width: 248, height: 700, right: 1048, bottom: 778 });
+    const spy = vi.spyOn($("#agent-bar"), "getBoundingClientRect").mockReturnValue({ left: 700, top: 78, width: 248, height: 700, right: 948, bottom: 778 });
     $("#agent-bar-grip").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
-    expect($("#agent-bar").style.left).toBe("784px");
-    expect(storage.map.get("artisign.agent-bar.position")).toBe("800,78");
+    expect($("#agent-bar").style.left).toBe("684px");
+    expect(storage.map.get("artisign.agent-bar.position")).toBe("700,78");
     spy.mockRestore();
   });
 });

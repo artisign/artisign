@@ -21,7 +21,6 @@ import {
   elementSideAnchor,
   tileAnchor,
   bezierPath,
-  computeCenterScroll,
   edgesFromNode,
   screenIdFromRef,
   clampZoom,
@@ -99,6 +98,7 @@ const ZOOM_GESTURE_QUIET_MS = 150;
  *   inside a tile's document (same-origin srcdoc) — a press that never
  *   reaches the top document, so the shell's keyboard shortcuts keep working
  *   once a tile was clicked, as they do inside the Screens view's frame.
+ *   `getInsets` (CHR-1299) returns what the floating cards cover of the window right now; it feeds Fit all and the centring, never the canvas origin.
  *   `emptyStateEl`/`emptyStateBodyEl` (CHR-624) — shown/filled by setScreens
  *   whenever the visible set is empty, per the `board-view-empty` design.
  */
@@ -116,6 +116,7 @@ export function createBoardView({
   onTogglePin,
   onToggleCluster,
   onTileKeydown,
+  getInsets,
 }) {
   /** @type {string[]} */
   let screens = [];
@@ -194,6 +195,39 @@ export function createBoardView({
     return el.getAttribute("id");
   }
 
+  /**
+   * CHR-1299 — the surface fills the window; its padding is the constant area the cards take when open, where the content starts at scroll 0. A card never changes it. (style.css `#board-surface`)
+   * @returns {{ left: number, right: number, top: number, bottom: number }}
+   */
+  function contentPad() {
+    const style = getComputedStyle(surfaceEl);
+    return { left: parseFloat(style.paddingLeft) || 0, right: parseFloat(style.paddingRight) || 0, top: parseFloat(style.paddingTop) || 0, bottom: parseFloat(style.paddingBottom) || 0 };
+  }
+
+  /** The area the cards leave free right now, in surface pixels — what Fit all fits into and centring aims at. `getInsets` (app.js) measures the cards; without it the content area stands in. */
+  function freeArea() {
+    const insets = getInsets?.() ?? contentPad();
+    return {
+      left: insets.left,
+      top: insets.top,
+      width: Math.max(0, surfaceEl.clientWidth - insets.left - insets.right),
+      height: Math.max(0, surfaceEl.clientHeight - insets.top - insets.bottom),
+    };
+  }
+
+  /** The scroll offset that puts the centre of a box (board px at the current zoom) in the middle of the free area, clamped to the scrollable range. */
+  function scrollToCenter(box) {
+    const pad = contentPad();
+    const scale = zoom / 100;
+    const free = freeArea();
+    const maxLeft = Math.max(0, pad.left + layout.contentWidth * scale + pad.right - surfaceEl.clientWidth);
+    const maxTop = Math.max(0, pad.top + layout.contentHeight * scale + pad.bottom - surfaceEl.clientHeight);
+    return {
+      left: Math.min(Math.max(0, pad.left + box.x + box.width / 2 - (free.left + free.width / 2)), maxLeft),
+      top: Math.min(Math.max(0, pad.top + box.y + box.height / 2 - (free.top + free.height / 2)), maxTop),
+    };
+  }
+
   function centerOnScreen(screenId) {
     // A variant inside a collapsed cluster centres the cluster frame (it is
     // never auto-expanded); one folded into "+N more" centres that tile.
@@ -201,13 +235,7 @@ export function createBoardView({
     if (!tile) return;
     const scale = zoom / 100;
     const scaledTile = { x: tile.x * scale, y: tile.y * scale, width: tile.width * scale, height: tile.height * scale };
-    const { left, top } = computeCenterScroll(
-      scaledTile,
-      surfaceEl.clientWidth,
-      surfaceEl.clientHeight,
-      layout.contentWidth * scale,
-      layout.contentHeight * scale,
-    );
+    const { left, top } = scrollToCenter(scaledTile);
     surfaceEl.scrollTo({ left, top, behavior: "smooth" });
   }
 
@@ -331,7 +359,8 @@ export function createBoardView({
       if (iframe) measuredSizes[screen] = readNaturalSize(iframe);
     }
     unmeasured.clear();
-    currentColumns = computeBoardColumns(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, gridOptions());
+    const pad = contentPad();
+    currentColumns = computeBoardColumns(model.items, measuredSizes, surfaceEl.clientWidth - pad.left - pad.right, surfaceEl.clientHeight - pad.top - pad.bottom, gridOptions());
     layout = computeLayout(model.items, measuredSizes, { ...gridOptions(), scale: 1, columns: currentColumns });
     layout = { frames: [], mores: [], ...layout };
     tilesEl.style.width = `${layout.contentWidth}px`;
@@ -435,17 +464,18 @@ export function createBoardView({
     }
     if (cursor) {
       const rect = surfaceEl.getBoundingClientRect();
+      const pad = contentPad(); // the content starts `pad` into the scroll area: measure the cursor and the viewport from there
       const { left, top } = computeZoomAroundCursor({
-        cursorX: cursor.clientX - rect.left,
-        cursorY: cursor.clientY - rect.top,
+        cursorX: cursor.clientX - rect.left - pad.left,
+        cursorY: cursor.clientY - rect.top - pad.top,
         scrollLeft: surfaceEl.scrollLeft,
         scrollTop: surfaceEl.scrollTop,
         oldZoomPercent: zoom,
         newZoomPercent: clamped,
         contentWidth: layout.contentWidth,
         contentHeight: layout.contentHeight,
-        viewportWidth: surfaceEl.clientWidth,
-        viewportHeight: surfaceEl.clientHeight,
+        viewportWidth: surfaceEl.clientWidth - pad.left - pad.right,
+        viewportHeight: surfaceEl.clientHeight - pad.top - pad.bottom,
       });
       zoom = clamped;
       applyZoomSizing();
@@ -470,10 +500,12 @@ export function createBoardView({
    */
   function fitAll() {
     if (isHidden()) return; // the viewport is 0 x 0 then
-    setZoom(
-      computeFitAllZoom(model.items, measuredSizes, surfaceEl.clientWidth, surfaceEl.clientHeight, { ...gridOptions(), columns: currentColumns }),
-      { source: "fitall" },
-    );
+    const free = freeArea();
+    setZoom(computeFitAllZoom(model.items, measuredSizes, free.width, free.height, { ...gridOptions(), columns: currentColumns }), { source: "fitall" });
+    // The content starts at the constant pad; bring it to where the free area starts (CHR-1299).
+    const pad = contentPad();
+    surfaceEl.scrollLeft = Math.max(0, pad.left - free.left);
+    surfaceEl.scrollTop = Math.max(0, pad.top - free.top);
   }
 
   /**
@@ -485,16 +517,11 @@ export function createBoardView({
     const tile = findTile(layout.tiles, screen);
     if (!tile) return;
     const room = 2 * BASE_PADDING;
-    const fit = Math.min(surfaceEl.clientWidth / (tile.width + room), surfaceEl.clientHeight / (tile.height + room)) * 100;
+    const free = freeArea();
+    const fit = Math.min(free.width / (tile.width + room), free.height / (tile.height + room)) * 100;
     setZoom(Math.max(100, zoom * 1.5, fit));
     const scale = zoom / 100;
-    const { left, top } = computeCenterScroll(
-      { x: tile.x * scale, y: tile.y * scale, width: tile.width * scale, height: tile.height * scale },
-      surfaceEl.clientWidth,
-      surfaceEl.clientHeight,
-      layout.contentWidth * scale,
-      layout.contentHeight * scale,
-    );
+    const { left, top } = scrollToCenter({ x: tile.x * scale, y: tile.y * scale, width: tile.width * scale, height: tile.height * scale });
     surfaceEl.scrollLeft = left;
     surfaceEl.scrollTop = top;
   }

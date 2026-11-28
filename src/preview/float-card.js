@@ -62,8 +62,8 @@ export function clampCardPosition({ left, top }, card, win, { top: topLimit = 0,
  *   onDragStart?: () => void,
  *   onDragMove?: (info: { x: number, y: number, left: number, top: number }) => boolean | void,
  *   onDragEnd?: (info: { x: number, y: number }) => boolean | void,
- *   onKeyMove?: (direction: "left" | "right" | "up" | "down", rect: DOMRect) => boolean,
- * }} args `label` and `liveEl` (a visually hidden `aria-live` region) announce a move to screen readers. `fullyInside`: the whole card, not only its head, stays inside the window (the tool bar). `canPlace` false: the card's place is not its own (a docked bar), so nothing is restored, clamped on resize or saved. The hooks let an owner react to a drag: `onDragMove` returns true when it changed the card's layout (the grab point is then re-anchored on the grip); `onDragEnd` returns true when it placed the card itself (nothing is saved); `onKeyMove` returns true when it handled the arrow key.
+ *   onKeyMove?: (direction: "left" | "right" | "up" | "down", rect: DOMRect) => boolean | "ignored",
+ * }} args `label` and `liveEl` (a visually hidden `aria-live` region) announce a move to screen readers. `fullyInside`: the whole card, not only its head, stays inside the window (the tool bar). `canPlace` false: the card's place is not its own (a docked bar), so nothing is restored, clamped on resize or saved. The hooks let an owner react to a drag: `onDragMove` returns true when it changed the card's layout (the grab point is then re-anchored on the grip); `onDragEnd` returns true when it placed the card itself (nothing is saved); `onKeyMove` returns true when it handled the arrow key (announced), "ignored" when it swallowed the key without any move (not announced).
  * @returns {{ moveTo: (position: { left: number, top: number }) => void, save: () => void, reclamp: () => void }}
  */
 export function makeCardDraggable({ cardEl, gripEl, storage, key, label = "Card", liveEl, fullyInside = false, canPlace = () => true, onDragStart, onDragMove, onDragEnd, onKeyMove }) {
@@ -152,8 +152,9 @@ export function makeCardDraggable({ cardEl, gripEl, storage, key, label = "Card"
     evt.preventDefault();
     const step = CARD_KEY_STEP * (evt.shiftKey ? 4 : 1);
     const rect = cardEl.getBoundingClientRect();
-    if (onKeyMove?.(direction, rect) === true) {
-      announce(`${label} moved ${direction}`);
+    const handled = onKeyMove?.(direction, rect);
+    if (handled === true || handled === "ignored") {
+      if (handled === true) announce(`${label} moved ${direction}`);
       return;
     }
     moveTo({ left: rect.left + delta[0] * step, top: rect.top + delta[1] * step });

@@ -196,16 +196,19 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
         return true; // the grip is somewhere else now
       }
     },
-    onDragEnd({ y }) {
+    onDragEnd() {
+      const previewing = previewEl !== null && !previewEl.hidden; // the preview shows only after a real move into the zone
       showPreview(false);
-      if (!inDockZone(y, window.innerHeight)) return false;
-      applyOrientation("horizontal");
-      persistOrientation();
-      return true;
+      if (previewing) {
+        applyOrientation("horizontal");
+        persistOrientation();
+        return true;
+      }
+      return orientation === "horizontal"; // a click on a docked bar's grip: nothing moved, its own place is not saved
     },
     onKeyMove(direction, rect) {
       if (orientation === "horizontal") {
-        if (direction !== "up") return true; // docked: only Up leaves the dock
+        if (direction !== "up") return "ignored"; // docked: only Up leaves the dock
         applyOrientation("vertical");
         persistOrientation();
         const height = barEl.offsetHeight;

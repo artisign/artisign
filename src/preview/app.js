@@ -294,8 +294,7 @@ let warningBadgeCleanup = () => {}; // click-to-cycle listener on the warning ba
 let warningCount = 0;
 /** @type {"fit" | number} */
 let zoom = "fit";
-// CHR-1290/CHR-1291 — the canvas pans by scrolling where the frame overflows (drag, trackpad scroll) and by `canvasPan` where it fits; wheel zoom re-anchors through whichever applies. `canvasMoved`: the human moved or zoomed it by hand, so the tool bar keeps its place (CHR-1282). Fit, and a different screen, take it back.
-let canvasMoved = false;
+// CHR-1290/CHR-1291 — the canvas pans by scrolling where the frame overflows (drag, trackpad scroll) and by `canvasPan` where it fits; wheel zoom re-anchors through whichever applies.
 /** How far the frame was moved off its centring by hand on an axis where it fits (an overflowing axis scrolls instead); applyCanvas hands back what it could apply. */
 let canvasPan = { x: 0, y: 0 };
 // Separate zoom state for the mockup comparison row (see applyMockupZoom in
@@ -2527,7 +2526,6 @@ function updateCanvas() {
 
 /** Takes a hand-moved canvas back to its centred place (Fit, a different screen). */
 function resetCanvasMove() {
-  canvasMoved = false;
   canvasPan = { x: 0, y: 0 };
   canvasEl.scrollLeft = 0;
   canvasEl.scrollTop = 0;
@@ -2542,7 +2540,6 @@ function frameOverflows(axis) {
 /** Pans by the pointer's delta (a drag, or a trackpad two-finger scroll): per axis the canvas scrolls the other way where the frame overflows, and the frame moves with the pointer where it fits. */
 function moveCanvasFrame(dx, dy) {
   if (screenHolderEl.hidden) return;
-  canvasMoved = true;
   if (frameOverflows("x")) canvasEl.scrollLeft -= dx;
   else canvasPan = { ...canvasPan, x: canvasPan.x + dx };
   if (frameOverflows("y")) canvasEl.scrollTop -= dy;
@@ -2566,7 +2563,6 @@ function zoomCanvasAt(factor, clientX, clientY) {
   const wantedLeft = anchoredPosition({ pointer: pointerX, position: oldLeft, oldScale, newScale: nextScale });
   const wantedTop = anchoredPosition({ pointer: pointerY, position: oldTop, oldScale, newScale: nextScale });
   zoom = nextScale;
-  canvasMoved = true;
   updateCanvas(); // the new scale, its centring and its scroll range
   // Per axis: a frame that still fits is placed by the pan offset, an overflowing one by the scroll position.
   const left = parseFloat(screenHolderEl.style.left) || 0;

@@ -123,6 +123,36 @@ describe("the tool bar's layout", () => {
     expect([$("bar").style.left, $("bar").style.top]).toEqual(["300px", "120px"]);
   });
 
+  it("a plain click on the grip never docks: the preview shows only after a real move into the zone", () => {
+    const { bar, storage, $ } = build();
+    pointer($("grip"), "pointerdown", 20, 20, { button: 0 });
+    pointer(window, "pointerup", 20, 890); // released in the zone without a pointermove
+    expect(bar.orientation()).toBe("vertical");
+    expect(document.querySelector(".tool-dock-preview")).toBeNull();
+    expect(storage.map.get("artisign.tool-bar.orientation")).toBeUndefined();
+  });
+
+  it("a click on a docked bar's grip keeps it docked and does not save the docked place as its own", () => {
+    const { bar, storage, $ } = build(memoryStorage({ "artisign.tool-bar.orientation": "horizontal", "artisign.tool-bar.position": "300,120" }));
+    pointer($("grip"), "pointerdown", 20, 20, { button: 0 });
+    pointer(window, "pointerup", 20, 20);
+    expect(bar.orientation()).toBe("horizontal");
+    expect(storage.map.get("artisign.tool-bar.position")).toBe("300,120");
+  });
+
+  it("a docked bar swallows Left, Right and Down without announcing a move; Up leaves the dock and announces it", () => {
+    const { bar, $ } = build(memoryStorage({ "artisign.tool-bar.orientation": "horizontal" }));
+    const press = (key) => $("grip").dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    for (const key of ["ArrowLeft", "ArrowRight", "ArrowDown"]) {
+      press(key);
+      expect($("live").textContent).toBe("");
+      expect(bar.orientation()).toBe("horizontal");
+    }
+    press("ArrowUp");
+    expect(bar.orientation()).toBe("vertical");
+    expect($("live").textContent).toBe("Tool bar moved up");
+  });
+
   it("keyboard: Down at the bottom docks, Up leaves the dock", () => {
     const { bar, $ } = build(memoryStorage({ "artisign.tool-bar.position": `300,${900 - VERTICAL.height - 8}` }));
     $("grip").dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));

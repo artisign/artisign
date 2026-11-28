@@ -52,7 +52,7 @@ export const SHORTCUTS = [
   { id: "board-edges", group: "Board", label: "Flow arrows", key: "e", display: "E", view: "board" },
   { id: "board-show-resolved", group: "Board", label: "Show resolved comments", key: "m", shift: true, display: "M", view: "board" },
   { id: "board-clusters", group: "Board", label: "Clusters", key: "g", display: "G", view: "board" },
-  { id: "board-collapse-all", group: "Board", label: "Collapse all clusters", key: "g", shift: true, display: "G", view: "board" },
+  { id: "board-collapse-all", group: "Board", label: "Collapse all", key: "g", shift: true, display: "G", view: "board" },
 
   { id: "follow", group: "Agent", label: "Follow the agent", key: "w", display: "W" },
   { id: "follow-resume", group: "Agent", label: "Resume following", key: "r", display: "R" },
@@ -62,10 +62,10 @@ export const SHORTCUTS = [
   { id: "panel-agent", group: "Fold cards", label: "Agent bar", key: "]", char: true, display: "]" },
 
   { id: "project-menu", group: "Project", label: "Project menu", key: "p", display: "P" },
-  { id: "menu-open", group: "Project", label: "Open project (in menu)", key: "o", display: "O", overlay: "project-menu" },
-  { id: "menu-new", group: "Project", label: "New project (in menu)", key: "n", display: "N", overlay: "project-menu" },
+  { id: "menu-open", group: "Project", label: "Open project, in the menu", key: "o", display: "O", overlay: "project-menu" },
+  { id: "menu-new", group: "Project", label: "New project, in the menu", key: "n", display: "N", overlay: "project-menu" },
 
-  { id: "filter", group: "General", label: "Filter screens", key: "/", char: true, display: "/" },
+  { id: "filter", group: "General", label: "Find a screen", key: "/", char: true, display: "/" },
   { id: "theme", group: "General", label: "Cycle theme", key: "t", display: "T" },
   { id: "leave", group: "General", label: "Close, leave a tool", key: "Escape", display: "Esc", aria: "Escape" },
   { id: "help", group: "General", label: "This list", key: "?", char: true, display: "?" },

@@ -37,8 +37,8 @@ describe("floating surfaces and empty states in index.html", () => {
     for (const dialog of doc.querySelectorAll(".project-dialog")) {
       const close = dialog.querySelector(".dialog-close");
       expect(close.getAttribute("aria-label")).toBe("Close");
-      expect(close.dataset.tooltip).toBe("Close");
-      expect(close.classList.contains("chrome-icon-btn--sm")).toBe(true);
+      expect(close.title).toBe("Close"); // a native title: the shared tooltip sits under the top layer a modal dialog is in
+      expect(close.classList.contains("float-icon-btn")).toBe(true);
       expect(close.querySelector(".icon").textContent).toBe("close");
       expect(dialog.querySelector(".btn-new-folder").textContent.trim()).toBe("create_new_folderNew folder");
     }
@@ -46,5 +46,17 @@ describe("floating surfaces and empty states in index.html", () => {
 
   it("the close button gets the shared keyboard focus ring", () => {
     expect(css).toMatch(/\.chrome-icon-btn:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--chrome-focus-ring\)/);
+    // The floating dialogs' own controls carry one too.
+    expect(css).toMatch(/\.float-icon-btn:focus-visible,[^{]*\.dialog-btn:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--chrome-focus-ring\)/);
+  });
+
+  it("every dialog is a native <dialog> with an accessible name and closedby=any", () => {
+    for (const dialog of doc.querySelectorAll("dialog.float-dialog")) {
+      expect(dialog.hasAttribute("aria-labelledby")).toBe(true);
+      expect(doc.getElementById(dialog.getAttribute("aria-labelledby"))).not.toBeNull();
+      expect(dialog.getAttribute("closedby")).toBe("any");
+      expect(dialog.hasAttribute("open")).toBe(false); // closed until showModal()
+    }
+    expect([...doc.querySelectorAll("dialog.float-dialog")].map((d) => d.id)).toEqual(["shortcuts-dialog", "mcp-dialog", "whats-new-dialog", "open-project-dialog", "init-project-dialog"]);
   });
 });

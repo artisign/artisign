@@ -1,9 +1,10 @@
-// "Connect AI tools" dialog (CHR-926): the `artisign setup` command, and per AI tool its status plus what to copy to connect it by hand. Statuses are read from GET /api/setup each time the dialog opens (the daemon looks at the disk then); nothing here writes a config. Same modal conventions as the shortcut reference: Escape, scrim click, the close and Done buttons close it, Tab is trapped, focus goes back to the opener.
+// "Connect AI tools" dialog (CHR-926): the `artisign setup` command, and per AI tool its status plus what to copy to connect it by hand. Statuses are read from GET /api/setup each time the dialog opens (the daemon looks at the disk then); nothing here writes a config. CHR-1272: a native modal <dialog> in the floating look (float-dialog.js): Escape, the scrim, the close and Done buttons close it, the browser traps Tab, focus goes back to the opener. State resets on close: the next open starts on the MCP tab with nothing of the last read left.
 // CHR-1048: a second tab, "Agent skill", shows the artisign skill from the `skill` part of the same response: SKILL.md readable before installing (a reader step that swaps in for the tabs), the command that installs it, a status per tool, and copy / download of SKILL.md. Still copy-only: the download is a client-side Blob.
 
 import { fetchSetup } from "./api.js";
-import { isShown, trapFocus } from "./menu-keys.js";
-import { copyWithFeedback, copyWithLabel } from "./clipboard.js";
+import { isShown } from "./menu-keys.js";
+import { copyWithLabel, createCodeField } from "./clipboard.js";
+import { createModal } from "./float-dialog.js";
 import { setMarkdown } from "./markdown.js";
 
 const CLIENT_ICONS = { "Claude Code": "terminal", "Claude Desktop": "desktop_windows", Cursor: "ads_click", "Codex CLI": "terminal", "VS Code": "code", opencode: "terminal" };
@@ -37,25 +38,12 @@ function icon(name) {
   return node;
 }
 
-/**
- * A read-only code box with a copy button (feedback and failure handling: clipboard.js).
- *
- * @param {string} text
- * @param {"line" | "block"} kind
- * @param {string} label accessible name of the copy button
- */
-function codeField(text, kind, label) {
-  const field = el("div", `mcp-code mcp-code--${kind}`);
-  const code = el("code", "mcp-code-text", text);
-  const copy = el("button", "chrome-icon-btn chrome-icon-btn--sm");
-  copy.type = "button";
-  copy.setAttribute("aria-label", label);
-  copy.dataset.tooltip = "Copy";
-  const glyph = icon("content_copy");
-  copy.appendChild(glyph);
-  copy.addEventListener("click", () => copyWithFeedback(text, glyph));
-  field.append(code, copy);
-  return field;
+/** The status chip of a row (design `chrome-status-chip`): `key` picks the look, `icon` the optional glyph before the label. @param {string} key @param {string} label @param {string} [iconName] */
+function statusChip(key, label, iconName) {
+  const chip = el("span", `status-chip status-chip--${key}`);
+  if (iconName) chip.appendChild(icon(iconName));
+  chip.append(label);
+  return chip;
 }
 
 /** @param {{ found: boolean, connected: boolean }} client */
@@ -83,11 +71,10 @@ function downloadText(name, text) {
 }
 
 /**
- * @param {{ scrimEl: HTMLElement, commandEl: HTMLElement, clientsEl: HTMLElement, summaryEl: HTMLElement, closeEl: HTMLElement, doneEl: HTMLElement, fallbackFocusEl?: HTMLElement }} els `fallbackFocusEl`: where focus goes on close when the opener is gone or hidden
+ * @param {{ dialogEl: HTMLDialogElement, commandEl: HTMLElement, clientsEl: HTMLElement, summaryEl: HTMLElement, closeEl: HTMLElement, doneEl: HTMLElement, fallbackFocusEl?: HTMLElement }} els `fallbackFocusEl`: where focus goes on close when the opener is gone or hidden
  * @returns {{ show: () => void, hide: () => void, isOpen: () => boolean }}
  */
-export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, closeEl, doneEl, fallbackFocusEl }) {
-  const dialogEl = /** @type {HTMLElement} */ (scrimEl.querySelector("#mcp-dialog"));
+export function createMcpDialog({ dialogEl, commandEl, clientsEl, summaryEl, closeEl, doneEl, fallbackFocusEl }) {
   const $ = (selector) => /** @type {HTMLElement} */ (dialogEl.querySelector(selector));
   const mainEl = $("#mcp-main");
   const readerEl = $("#mcp-reader");
@@ -95,20 +82,30 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
   const skillCardEl = $("#skill-card");
   const skillCommandEl = $("#skill-command");
   const skillClientsEl = $("#skill-clients");
-  const skillSummaryEl = $("#skill-summary");
   const tabs = [
     { key: "mcp", tab: $("#mcp-tab-mcp"), panel: $("#mcp-panel-mcp") },
     { key: "skill", tab: $("#mcp-tab-skill"), panel: $("#mcp-panel-skill") },
   ];
-  /** @type {Element | null} */
-  let returnFocusTo = null;
   let loadToken = 0;
   /** @type {HTMLElement | null} */
   let readButton = null;
   let skillContent = "";
+  let activeTab = "mcp";
+  /** The footer line per tab; the footer shows the selected tab's. @type {Record<string, { text: string, icon?: string }>} */
+  const summaries = { mcp: { text: "" }, skill: { text: "" } };
+
+  /** The footer's live region only changes when what it says changes: switching tabs or a re-read with the same answer announces nothing twice. */
+  function renderSummary() {
+    const { text, icon: iconName } = summaries[activeTab];
+    const key = `${iconName ?? ""}|${text}`;
+    if (summaryEl.dataset.key === key) return;
+    summaryEl.dataset.key = key;
+    summaryEl.replaceChildren(...(iconName && text ? [icon(iconName), text] : text ? [text] : []));
+  }
 
   /** @param {string} key @param {boolean} [focus] */
   function selectTab(key, focus = false) {
+    activeTab = key;
     for (const t of tabs) {
       const on = t.key === key;
       t.tab.setAttribute("aria-selected", String(on));
@@ -116,10 +113,11 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
       t.panel.hidden = !on;
       if (on && focus) t.tab.focus();
     }
+    renderSummary();
   }
 
-  /** The reader replaces the tabs inside the same modal; `open` false returns to the Agent skill tab. @param {boolean} open */
-  function showReader(open) {
+  /** The reader replaces the tabs inside the same modal; `open` false returns to the Agent skill tab. @param {boolean} open @param {boolean} [moveFocus] false when the dialog is only being reset before it opens: focus must stay where the opener had it */
+  function showReader(open, moveFocus = true) {
     mainEl.hidden = open;
     readerEl.hidden = !open;
     dialogEl.classList.toggle("mcp-dialog--reader", open);
@@ -130,138 +128,132 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
       readerBodyEl.focus();
     } else {
       readerBodyEl.replaceChildren();
-      (readButton && isShown(readButton) ? readButton : tabs[1].tab).focus();
+      if (moveFocus) (readButton && isShown(readButton) ? readButton : tabs[1].tab).focus();
     }
   }
 
   /** @param {string} label @param {() => void} onClick */
-  function compactButton(label, onClick) {
-    const button = el("button", "chrome-btn chrome-btn--compact", label);
+  function actionButton(label, onClick) {
+    const button = el("button", "dialog-btn", label);
     button.type = "button";
     button.addEventListener("click", onClick);
     return button;
   }
 
   function renderCommand(command) {
-    commandEl.replaceChildren(codeField(command, "line", `Copy ${command}`), el("div", "mcp-hint", "Run in a terminal — it connects every tool it finds."));
+    commandEl.replaceChildren(createCodeField(command, { label: `Copy ${command}` }), el("p", "float-dialog-hint", "Run it in a terminal. It connects every AI tool it finds."));
   }
 
-  /** @param {{ name: string, found: boolean, connected: boolean, manual: { kind: "command" | "config", path?: string, text: string } }} client @param {number} index */
-  function clientRow(client, index) {
+  /** @param {{ name: string, found: boolean, connected: boolean, manual: { kind: "command" | "config", path?: string, text: string } }} client @param {number} index @param {boolean} open whether the row starts expanded */
+  function clientRow(client, index, open) {
     const status = statusOf(client);
-    const wrap = el("div", `mcp-client mcp-client--${status.key}`);
-    const head = el(status.key === "connected" ? "div" : "button", "mcp-client-row");
-    head.append(icon(CLIENT_ICONS[client.name] ?? "terminal"), el("span", "mcp-client-name", client.name), el("span", "mcp-client-spacer"));
-    const chip = el("span", `mcp-status mcp-status--${status.key}`);
-    if (status.key === "connected") chip.appendChild(icon("check"));
-    chip.append(status.label);
-    head.appendChild(chip);
-    wrap.appendChild(head);
+    const row = el("li", `status-row${status.key === "not-found" ? " status-row--muted" : ""}`);
+    const head = el(status.key === "connected" ? "div" : "button", "status-row-head");
+    head.append(icon(CLIENT_ICONS[client.name] ?? "terminal"), el("span", "status-row-name", client.name), statusChip(status.key, status.label, status.key === "connected" ? "check" : undefined));
+    row.appendChild(head);
     if (status.key === "connected") {
-      head.appendChild(el("span", "mcp-chevron-slot")); // keeps the chips of every row in one column
-      return wrap;
+      head.appendChild(el("span", "status-row-end")); // keeps the chips of every row in one column
+      return row;
     }
-    // Only a tool that is not connected has something to copy; not-installed ones stay collapsed until asked.
+    // Only a tool that is not connected has something to copy; the first one that is installed starts open, the rest stay collapsed until asked.
     const panelId = `mcp-manual-${index}`;
     const chevron = icon("expand_more");
-    chevron.classList.add("mcp-chevron");
+    chevron.classList.add("status-row-end");
     head.appendChild(chevron);
     head.type = "button";
     head.setAttribute("aria-controls", panelId);
-    const panel = el("div", "mcp-manual");
+    const panel = el("div", "status-row-detail");
     panel.id = panelId;
-    const hint = el("div", "mcp-hint mcp-hint--small");
+    const hint = el("span", "status-row-hint");
     const { manual } = client;
     if (manual.kind === "command") hint.textContent = "Run in a terminal:";
     else if (manual.path) hint.append("Add this to ", el("span", "mcp-path", manual.path), ":");
     else hint.textContent = "Add this config:";
-    panel.append(hint, codeField(manual.text, "block", `Copy ${client.name} setup`));
-    const setOpen = (open) => {
-      panel.hidden = !open;
-      head.setAttribute("aria-expanded", String(open));
-      chevron.textContent = open ? "expand_less" : "expand_more";
+    panel.append(hint, createCodeField(manual.text, { variant: "block", label: `Copy ${client.name} setup` }));
+    const setOpen = (value) => {
+      panel.hidden = !value;
+      row.classList.toggle("is-open", value);
+      head.setAttribute("aria-expanded", String(value));
+      chevron.textContent = value ? "expand_less" : "expand_more";
     };
-    setOpen(status.key === "not-connected");
+    setOpen(open);
     head.addEventListener("click", () => setOpen(panel.hidden));
-    wrap.appendChild(panel);
-    return wrap;
+    row.appendChild(panel);
+    return row;
   }
 
   /** Names the key to type (`r`) in the code font, as the design does. */
   function skillHint() {
-    const hint = el("div", "mcp-hint mcp-hint--base");
-    hint.append("Run in a terminal — it asks before installing into each tool; answer ", el("span", "mcp-path", "r"), " to read SKILL.md first.");
+    const hint = el("p", "float-dialog-hint");
+    hint.append("Run it in a terminal. It asks before installing into each tool; answer ", el("kbd", "mcp-key", "r"), " to read SKILL.md first.");
     return hint;
   }
 
   /** @param {string} text */
   function noteBox(text) {
-    return el("div", "mcp-note", text);
+    return el("p", "float-dialog-hint", text);
   }
 
   /** The Agent skill tab while the status is read (`setup` undefined) or cannot be shown (`setup` null: failed request or an older daemon without `skill`). @param {Awaited<ReturnType<typeof fetchSetup>> | null | undefined} setup */
   function renderSkill(setup) {
     const skill = setup?.skill ?? null;
     skillContent = skill?.content ?? "";
-    const head = el("div", "mcp-card-head");
-    head.append(icon("description"), el("span", "mcp-card-name", "artisign skill"));
+    const iconBox = el("span", "skill-card-icon");
+    iconBox.appendChild(icon("description"));
+    const text = el("div", "skill-card-text");
+    text.append(el("span", "skill-card-name", "artisign skill"), el("span", "skill-card-desc", "Teaches your AI tools artisign's conventions: tag every screen, use screen variants, design system first."));
     readButton = null;
+    skillCardEl.replaceChildren(iconBox, text);
     if (skill) {
-      readButton = compactButton("Read SKILL.md", () => showReader(true));
-      head.appendChild(readButton);
+      readButton = actionButton("Read SKILL.md", () => showReader(true));
+      skillCardEl.appendChild(readButton);
     }
-    skillCardEl.replaceChildren(head, el("div", "mcp-card-desc", "Teaches your AI tools artisign's conventions: tag every screen, use screen variants, design system first."));
-    skillCommandEl.replaceChildren(
-      codeField(skill?.command ?? FALLBACK_SKILL_COMMAND, "line", `Copy ${skill?.command ?? FALLBACK_SKILL_COMMAND}`),
-      skillHint(),
-    );
-    skillSummaryEl.textContent = "";
+    skillCommandEl.replaceChildren(createCodeField(skill?.command ?? FALLBACK_SKILL_COMMAND, { label: `Copy ${skill?.command ?? FALLBACK_SKILL_COMMAND}` }), skillHint());
+    summaries.skill = { text: "" };
     if (setup === undefined) {
       skillClientsEl.replaceChildren(noteBox("Checking installed tools…"));
-      return;
-    }
-    if (!skill) {
-      const box = el("div", "mcp-note-box");
+    } else if (!skill) {
+      const box = el("div", "status-note");
       box.setAttribute("role", "status");
-      const text = el("div", "mcp-note-box-text");
-      const sub = el("span", "mcp-note-box-sub");
+      const noteText = el("div", "status-note-text");
+      const sub = el("span", "status-note-body");
       sub.append("The command above still works. To read SKILL.md first, run ", el("span", "mcp-path", "artisign skill"), " in a terminal.");
-      text.append(el("span", "", "Could not read the skill status."), sub);
-      box.append(icon("info"), text);
+      noteText.append(el("span", "status-note-title", "Could not read the skill status."), sub);
+      box.append(icon("info"), noteText);
       skillClientsEl.replaceChildren(box);
-      return;
-    }
-    const list = el("div", "mcp-clients");
-    let found = 0;
-    let installed = 0;
-    skill.clients.forEach((client, index) => {
-      // "Not found" comes from the MCP part of the response and wins over the skill status.
-      const notFound = setup.clients.find((c) => c.name === client.name)?.found === false;
-      // A tool without a skills folder (status "unsupported", Claude Desktop) gets no row.
-      if (client.status === "unsupported") return;
-      if (!notFound) {
-        found++;
-        if (client.status === "installed") installed++;
+    } else {
+      const list = el("ul", "status-list");
+      let found = 0;
+      let installed = 0;
+      skill.clients.forEach((client, index) => {
+        // "Not found" comes from the MCP part of the response and wins over the skill status.
+        const notFound = setup.clients.find((c) => c.name === client.name)?.found === false;
+        // A tool without a skills folder (status "unsupported", Claude Desktop) gets no row.
+        if (client.status === "unsupported") return;
+        if (!notFound) {
+          found++;
+          if (client.status === "installed") installed++;
+        }
+        list.appendChild(skillRow(client, notFound, index));
+      });
+      skillClientsEl.replaceChildren(list);
+      if (found > 0) {
+        const all = installed === found;
+        summaries.skill = { text: all ? (found === 1 ? "The tool has the current skill" : `All ${found} tools have the current skill`) : `${installed} of ${found} tool${found === 1 ? "" : "s"} ${found === 1 ? "has" : "have"} the current skill`, icon: all ? "check_circle" : undefined };
       }
-      list.appendChild(skillRow(client, notFound, skill.content, index));
-    });
-    skillClientsEl.replaceChildren(list);
-    if (found > 0) {
-      skillSummaryEl.textContent = installed === found ? (found === 1 ? "The tool has the current skill" : `All ${found} tools have the current skill`) : `${installed} of ${found} tool${found === 1 ? "" : "s"} ${found === 1 ? "has" : "have"} the current skill`;
     }
+    renderSummary();
   }
 
-  /** @param {import("./api.js").SkillClient} client @param {boolean} notFound @param {string} content @param {number} index */
-  function skillRow(client, notFound, content, index) {
+  /** @param {import("./api.js").SkillClient} client @param {boolean} notFound @param {number} index */
+  function skillRow(client, notFound, index) {
     const key = notFound ? "not-found" : client.status === "missing" ? "skill-missing" : client.status;
-    const wrap = el("div", `mcp-client${notFound ? " mcp-client--not-found" : ""}`);
-    const row = el("div", "mcp-client-row");
-    row.append(icon(CLIENT_ICONS[client.name] ?? "terminal"), el("span", "mcp-client-name", client.name), el("span", "mcp-client-spacer"));
-    wrap.appendChild(row);
+    const row = el("li", `status-row${notFound ? " status-row--muted" : ""}`);
+    const head = el("div", "status-row-head");
+    head.append(icon(CLIENT_ICONS[client.name] ?? "terminal"), el("span", "status-row-name", client.name));
     const chipSpec = SKILL_CHIPS[key] ?? SKILL_CHIPS["skill-missing"];
-    const chip = el("span", `mcp-status mcp-status--${key}`);
-    if (chipSpec.icon) chip.appendChild(icon(chipSpec.icon));
-    chip.append(chipSpec.label);
+    const chip = statusChip(key, chipSpec.label, chipSpec.icon);
+    head.appendChild(chip);
     if (key === "unreadable" && client.error) {
       // The error text is reachable by keyboard: the chip is focusable and described by a visually hidden copy; hover shows the title.
       const message = client.error;
@@ -272,57 +264,63 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
       chip.setAttribute("role", "note");
       chip.setAttribute("aria-describedby", describedBy);
       chip.title = message;
-      row.append(chip, hidden);
-      return wrap;
+      head.append(hidden);
     }
-    row.appendChild(chip);
-    return wrap;
+    head.appendChild(el("span", "status-row-end"));
+    row.appendChild(head);
+    return row;
   }
 
   async function load() {
     const token = ++loadToken;
     renderCommand(FALLBACK_COMMAND);
-    clientsEl.replaceChildren(el("div", "mcp-note", "Checking installed tools…"));
-    summaryEl.textContent = "";
+    clientsEl.replaceChildren(noteBox("Checking installed tools…"));
+    summaries.mcp = { text: "" };
     renderSkill(undefined);
     const setup = await fetchSetup();
     if (token !== loadToken) return;
     renderSkill(setup);
     if (!setup) {
-      clientsEl.replaceChildren(el("div", "mcp-note", "Could not read the tool status. The command above still works."));
+      clientsEl.replaceChildren(noteBox("Could not read the tool status. The command above still works."));
       return;
     }
     renderCommand(setup.command);
-    clientsEl.replaceChildren(...setup.clients.map(clientRow));
-    summaryEl.textContent = `${setup.clients.filter((c) => c.connected).length} of ${setup.clients.length} connected`;
+    const firstOpen = setup.clients.findIndex((c) => !c.connected && c.found);
+    clientsEl.replaceChildren(...setup.clients.map((client, index) => clientRow(client, index, index === firstOpen)));
+    summaries.mcp = { text: `${setup.clients.filter((c) => c.connected).length} of ${setup.clients.length} connected` };
+    renderSummary();
   }
 
-  function isOpen() {
-    return !scrimEl.hidden;
-  }
+  // Whatever way the dialog closes, the next open starts clean: the MCP tab, no reader, nothing of the last read.
+  const modal = createModal(dialogEl, {
+    fallbackFocusEl,
+    onClosed: () => {
+      loadToken++;
+      skillContent = "";
+      readButton = null;
+      readerBodyEl.replaceChildren();
+      commandEl.replaceChildren();
+      clientsEl.replaceChildren();
+      skillCardEl.replaceChildren();
+      skillCommandEl.replaceChildren();
+      skillClientsEl.replaceChildren();
+      summaries.mcp = { text: "" };
+      summaries.skill = { text: "" };
+      renderSummary();
+    },
+  });
 
   function show() {
-    if (isOpen()) return;
-    returnFocusTo = document.activeElement;
-    showReader(false);
+    if (modal.isOpen()) return;
+    showReader(false, false);
     selectTab("mcp");
-    scrimEl.hidden = false;
-    dialogEl.focus();
+    modal.show();
     void load();
   }
 
-  function hide() {
-    if (!isOpen()) return;
-    loadToken++;
-    scrimEl.hidden = true;
-    (returnFocusTo instanceof HTMLElement && isShown(returnFocusTo) ? returnFocusTo : (fallbackFocusEl ?? document.body)).focus();
-    returnFocusTo = null;
-  }
-
-  closeEl.addEventListener("click", hide);
-  doneEl.addEventListener("click", hide);
-  $("#skill-done").addEventListener("click", hide);
-  $("#mcp-reader-close").addEventListener("click", hide);
+  closeEl.addEventListener("click", () => modal.hide());
+  doneEl.addEventListener("click", () => modal.hide());
+  $("#mcp-reader-close").addEventListener("click", () => modal.hide());
   $("#mcp-reader-back").addEventListener("click", () => showReader(false));
   $("#mcp-reader-done").addEventListener("click", () => showReader(false));
   $("#mcp-reader-copy").addEventListener("click", function () {
@@ -343,18 +341,6 @@ export function createMcpDialog({ scrimEl, commandEl, clientsEl, summaryEl, clos
     evt.preventDefault();
     selectTab(tabs[next].key, true);
   });
-  scrimEl.addEventListener("click", (evt) => {
-    if (evt.target === scrimEl) hide();
-  });
-  document.addEventListener("keydown", (evt) => {
-    if (!isOpen()) return;
-    trapFocus(evt, dialogEl);
-    if (evt.key === "Escape") {
-      evt.preventDefault();
-      evt.stopImmediatePropagation();
-      hide();
-    }
-  });
 
-  return { show, hide, isOpen };
+  return { show, hide: modal.hide, isOpen: modal.isOpen };
 }

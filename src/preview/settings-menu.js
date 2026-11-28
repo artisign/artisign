@@ -1,13 +1,13 @@
-// The settings menu (CHR-926): app settings (theme, five per-browser toggles), MCP setup and About, behind the gear at the right end of the topbar. An ARIA menu like the zoom menu (CHR-920) over static markup in index.html; this module only wires it. The state itself lives in app.js — the menu reads it through `getTheme` / `toggles[id].get` and changes it through the same setters the existing controls use, so both always agree.
+// The settings menu (CHR-926): app settings (theme, four per-browser toggles), MCP setup and About, behind the gear at the right end of the topbar. CHR-1272: a floating popover (design `float-popover`), native `popover="auto"` where the browser has the API (top layer, light dismiss, Escape, focus back to the trigger) and a plain toggled box with the same outside-click and Escape behaviour where it does not — like the zoom pill's. An ARIA menu (CHR-920) over static markup in index.html; this module only wires it. The state itself lives in app.js — the menu reads it through `getTheme` / `toggles[id].get` and changes it through the same setters the existing controls use, so both always agree.
 
 import { fetchSetup } from "./api.js";
-import { createCopyChip } from "./clipboard.js";
+import { createCodeField } from "./clipboard.js";
 import { setRovingTabindex, wireMenu } from "./menu-keys.js";
 
 /**
  * @param {{
  *   controlsEl: HTMLElement,
- *   triggerEl: HTMLElement,
+ *   triggerEl: HTMLButtonElement,
  *   menuEl: HTMLElement,
  *   getTheme: () => string,
  *   setTheme: (pref: string) => void,
@@ -33,7 +33,8 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
 
   let setupToken = 0;
 
-  const isOpen = () => !menuEl.hidden;
+  const native = typeof menuEl.showPopover === "function";
+  const isOpen = () => (native ? menuEl.matches(":popover-open") : menuEl.hasAttribute("data-open"));
 
   /** The theme control is one row for the arrow keys: the segment that has focus, else the checked one. */
   const segRow = () => segButtons.find((b) => b === document.activeElement) ?? segButtons.find((b) => b.getAttribute("aria-checked") === "true") ?? segButtons[0];
@@ -68,10 +69,11 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
     }
     const showCmd = status?.state === "available";
     if (showCmd && updateCmdEl.hidden) {
-      const chip = createCopyChip("artisign update");
-      chip.setAttribute("role", "menuitem");
-      chip.tabIndex = -1; // a row of the menu: reached with the arrows
-      updateCmdEl.replaceChildren(chip);
+      const field = createCodeField("artisign update", { variant: "compact" });
+      const copy = /** @type {HTMLElement} */ (field.querySelector("button"));
+      copy.setAttribute("role", "menuitem");
+      copy.tabIndex = -1; // a row of the menu: reached with the arrows
+      updateCmdEl.replaceChildren(field);
     }
     updateCmdEl.hidden = !showCmd;
   }
@@ -86,8 +88,8 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
     mcpSub.hidden = false;
   }
 
-  function open() {
-    menuEl.hidden = false;
+  /** Runs whenever the menu has just opened (either path): the rows are synced, focus goes to the theme control. */
+  function onOpened() {
     triggerEl.setAttribute("aria-expanded", "true");
     sync();
     const start = segRow();
@@ -98,10 +100,34 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
     void loadSetupSummary();
   }
 
-  function close() {
-    menuEl.hidden = true;
+  /** Whatever closed it: nothing of this read stays for the next open. */
+  function onClosed() {
     triggerEl.setAttribute("aria-expanded", "false");
+    setupToken++;
+    mcpSub.hidden = true;
   }
+
+  function open() {
+    if (isOpen()) return;
+    if (native) menuEl.showPopover();
+    else {
+      menuEl.setAttribute("data-open", "");
+      onOpened();
+    }
+  }
+
+  function close() {
+    if (!isOpen()) return;
+    if (native) menuEl.hidePopover();
+    else menuEl.removeAttribute("data-open");
+    onClosed();
+  }
+
+  // Native: the trigger is the popover's declared invoker (`popovertarget` in index.html), so the browser toggles it and light dismiss leaves the invoker alone — a second click closes instead of reopening. Only the fallback toggles by hand. The `toggle` event keeps aria-expanded right and starts the open work, whichever way the browser opened or closed it.
+  menuEl.addEventListener("toggle", () => {
+    if (isOpen()) onOpened();
+    else onClosed();
+  });
 
   wireMenu(menuEl, rows, {
     onTabOut: () => {
@@ -109,16 +135,18 @@ export function createSettingsMenu({ controlsEl, triggerEl, menuEl, getTheme, se
     },
   });
 
-  triggerEl.addEventListener("click", () => (isOpen() ? close() : open()));
-  // Capture on pointerdown, like the zoom menu: other triggers stop click propagation.
-  document.addEventListener(
-    "pointerdown",
-    (evt) => {
-      if (isOpen() && !controlsEl.contains(/** @type {Node} */ (evt.target))) close();
-    },
-    true,
-  );
-  // Capture + stopImmediatePropagation: this Escape only closes the menu (inspect mode's Escape must not also fire).
+  if (!native) {
+    triggerEl.addEventListener("click", () => (isOpen() ? close() : open()));
+    // Capture on pointerdown, like the zoom menu: other triggers stop click propagation.
+    document.addEventListener(
+      "pointerdown",
+      (evt) => {
+        if (isOpen() && !controlsEl.contains(/** @type {Node} */ (evt.target))) close();
+      },
+      true,
+    );
+  }
+  // Capture + stopImmediatePropagation: this Escape only closes the menu (inspect mode's Escape must not also fire). It also answers an Escape the screen frame handed over, which the browser's own close handling never sees.
   document.addEventListener(
     "keydown",
     (evt) => {

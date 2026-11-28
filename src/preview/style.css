@@ -425,27 +425,6 @@
   border-color: var(--chrome-error);
 }
 
-.chrome-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 30; /* above the update notice (CHR-927) and the menus */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--chrome-scrim);
-}
-
-.chrome-dialog {
-  width: 520px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
-  padding: var(--space-3xl);
-  border-radius: var(--radius-md);
-  background: var(--chrome-raised);
-  box-shadow: var(--chrome-shadow-float);
-}
-
 /* Keyboard focus ring for every control of the floating surfaces, dialogs and empty states. Rows inside clipped lists inset it. */
 .chrome-btn:focus-visible,
 .chrome-menu-item:focus-visible,
@@ -532,7 +511,8 @@
 }
 
 /* Shared utility: text for assistive tech only. */
-.visually-hidden {
+.visually-hidden,
+.mcp-visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -602,11 +582,6 @@
   font: inherit;
   font-size: var(--ui-chip);
   white-space: nowrap;
-}
-
-/* A key or reference in the code face (shortcut reference, mono chips). */
-.chrome-chip--ref {
-  font-family: ui-monospace, Menlo, monospace;
 }
 
 .chrome-chip--hit {
@@ -1201,104 +1176,6 @@ button.chrome-section-header:focus-visible {
   width: 100%;
   height: 100%;
   background: var(--frame-surface);
-}
-
-/* CHR-890 — the how-to-start guide sits on the bare canvas while the project has no screens: native size, centred, outside the zoomed #screen-holder (which is hidden then). */
-#empty-guide {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 480px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2xl);
-}
-
-#empty-guide[hidden] {
-  display: none;
-}
-
-#empty-guide p,
-#empty-guide h2,
-#empty-guide ol {
-  margin: 0;
-}
-
-#empty-guide-head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-#empty-guide-label {
-  font-size: 0.7rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--chrome-text-tertiary);
-}
-
-#empty-guide-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-#empty-guide-steps {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xl);
-}
-
-#empty-guide-steps li {
-  display: flex;
-  gap: var(--space-lg);
-  align-items: flex-start;
-}
-
-.empty-guide-num {
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-pill);
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-  font-weight: 600;
-  font-size: 0.78rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.empty-guide-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
-}
-
-.empty-guide-text {
-  font-size: 0.85rem;
-  line-height: 22px;
-  color: var(--chrome-text);
-}
-
-#empty-guide-prompt-box {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xl);
-  padding: var(--space-lg) var(--space-xl);
-  background: var(--chrome-raised);
-  border: 1px solid var(--chrome-border-strong);
-  border-radius: 6px;
-}
-
-#empty-guide-prompt {
-  flex: 1;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8rem;
-  color: var(--chrome-text);
 }
 
 /* Inspect mode selection overlay — see index.html's comment on #inspect-overlay. */
@@ -2243,7 +2120,6 @@ button.chrome-section-header:focus-visible {
 }
 
 #project-picker-trigger.project-picker-empty {
-  border-style: dashed;
   color: var(--chrome-text-secondary);
 }
 
@@ -2253,10 +2129,6 @@ button.chrome-section-header:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
-}
-
-.project-picker-empty #project-picker-name {
-  font-weight: 400;
 }
 
 #project-menu {
@@ -2285,457 +2157,6 @@ button.chrome-section-header:focus-visible {
 
 .menu-item-active .menu-item-name {
   font-weight: 600;
-}
-
-/* No-project empty state */
-
-#no-project-state {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-}
-
-#no-project-state[hidden] {
-  display: none;
-}
-
-#empty-card {
-  width: 460px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-xl);
-  background: var(--chrome-raised);
-  border: 1px solid var(--chrome-border);
-  border-radius: 10px;
-  padding: 40px;
-}
-
-#empty-icon {
-  font-size: 32px;
-  color: var(--chrome-text);
-}
-
-#empty-title {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 600;
-}
-
-#empty-copy {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--chrome-text-secondary);
-  text-align: center;
-  line-height: 1.5;
-}
-
-#empty-actions {
-  display: flex;
-  gap: var(--space-md);
-  margin-top: var(--space-md);
-}
-
-#empty-ai {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  padding: var(--space-lg) var(--space-xl);
-  background: var(--chrome-field);
-  border: 1px solid var(--chrome-border);
-  border-radius: 6px;
-}
-
-#empty-ai p {
-  margin: 0;
-}
-
-#empty-ai-label {
-  font-size: 0.7rem;
-  color: var(--chrome-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-#empty-ai-prompt {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.8rem;
-  color: var(--chrome-text);
-}
-
-#empty-ai-more {
-  font-size: 0.75rem;
-  color: var(--chrome-text-secondary);
-}
-
-#empty-recent {
-  margin-top: var(--space-xl);
-  border-top: 1px solid var(--chrome-border);
-  padding-top: var(--space-xl);
-  width: 100%;
-}
-
-#empty-recent-label {
-  margin: 0 0 var(--space-md);
-  font-size: 0.8rem;
-  color: var(--chrome-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.empty-recent-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  width: 100%;
-  padding: var(--space-md);
-  border: none;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.empty-recent-row:hover {
-  background: var(--chrome-hover);
-}
-
-.empty-recent-icon {
-  flex: none;
-  font-size: var(--size-icon-xs);
-  color: var(--chrome-text-tertiary);
-}
-
-
-
-.empty-recent-name {
-  flex: none;
-  font-size: var(--ui-base);
-  color: var(--chrome-text);
-}
-
-.empty-recent-path {
-  font-size: 0.8rem;
-  color: var(--chrome-text-secondary);
-  min-width: 0;
-  margin-left: auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Open/init project dialogs */
-
-#dialog-scrim {
-  z-index: 30;
-}
-
-#dialog-scrim[hidden] {
-  display: none;
-}
-
-.project-dialog[hidden] {
-  display: none;
-}
-
-.dialog-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-}
-
-.dialog-title {
-  margin: 0;
-  font-size: var(--ui-title);
-  font-weight: 600;
-  color: var(--chrome-text);
-}
-
-.dialog-sub {
-  margin: calc(-1 * var(--space-sm)) 0 0;
-  font-size: var(--ui-base);
-  color: var(--chrome-text-secondary);
-}
-
-.quick-access {
-  display: flex;
-  gap: var(--space-md);
-}
-
-.quick-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
-  height: var(--size-control-compact);
-  padding: 0 var(--space-pad);
-  border: 1px solid var(--chrome-border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--chrome-raised);
-  color: var(--chrome-text);
-  font: inherit;
-  font-size: var(--ui-base);
-  cursor: pointer;
-}
-
-.quick-chip .icon {
-  font-size: var(--size-icon-sm);
-}
-
-.quick-chip:hover {
-  background: var(--chrome-hover);
-}
-
-.quick-chip[hidden] {
-  display: none;
-}
-
-.quick-chip[aria-current="true"] {
-  border-color: var(--chrome-accent);
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-  font-weight: 500;
-}
-
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  font-size: var(--ui-base);
-  color: var(--chrome-text-secondary);
-  overflow-x: auto;
-  white-space: nowrap;
-}
-
-.browse-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-}
-
-.browse-bar .breadcrumbs {
-  flex: 1;
-  min-width: 0;
-}
-
-.new-folder-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  padding: var(--space-md) var(--space-lg);
-  background: var(--chrome-accent-subtle);
-  border-bottom: 1px solid var(--chrome-border);
-}
-
-.new-folder-line {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-}
-
-.new-folder-icon {
-  font-size: var(--size-icon-sm);
-  color: var(--chrome-text-tertiary);
-}
-
-.new-folder-input {
-  flex: 1;
-  min-width: 0;
-  border-color: var(--chrome-accent);
-  background: var(--chrome-raised);
-  font-size: var(--ui-sm);
-}
-
-.new-folder-row-error .new-folder-input {
-  border-color: var(--chrome-error);
-}
-
-.new-folder-create {
-  border-color: transparent;
-  background: var(--chrome-accent);
-  color: var(--chrome-primary-text);
-  font-size: var(--ui-sm);
-  font-weight: 500;
-}
-
-.new-folder-create:hover:not(:disabled) {
-  background: var(--chrome-accent);
-  filter: brightness(1.08);
-}
-
-.new-folder-row-error .new-folder-create {
-  opacity: 0.4;
-}
-
-.new-folder-cancel {
-  color: var(--chrome-text-secondary);
-  font-size: var(--ui-sm);
-}
-
-.new-folder-message {
-  color: var(--chrome-error);
-  font-size: var(--ui-xs);
-  padding-left: 18px;
-}
-
-.new-folder-message[hidden] {
-  display: none;
-}
-
-.breadcrumbs .crumb,
-.breadcrumbs .crumb-sep {
-  flex-shrink: 0;
-}
-
-.breadcrumbs .crumb {
-  padding: 0 var(--space-xs);
-  border: none;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.breadcrumbs button.crumb:hover {
-  color: var(--chrome-text);
-  background: var(--chrome-hover);
-}
-
-.breadcrumbs .crumb-current {
-  color: var(--chrome-text);
-  font-weight: 500;
-  cursor: default;
-}
-
-.breadcrumbs .crumb-sep {
-  font-size: var(--size-icon-xs);
-  color: var(--chrome-text-tertiary);
-}
-
-.dir-list {
-  padding: var(--space-xs);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  background: var(--chrome-bar);
-  height: 240px;
-  overflow-y: auto;
-}
-
-.dir-list-empty {
-  margin: 0;
-  padding: var(--space-xl);
-  font-size: var(--ui-sm);
-  color: var(--chrome-text-tertiary);
-}
-
-.dir-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  width: 100%;
-  height: var(--size-control);
-  padding: 0 var(--space-md);
-  border: none;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--chrome-text);
-  font: inherit;
-  font-size: var(--ui-base);
-  text-align: left;
-}
-
-.dir-row-icon {
-  flex: none;
-  font-size: var(--size-icon);
-  color: var(--chrome-text-secondary);
-}
-
-.dir-row-navigable,
-.dir-row-selectable {
-  cursor: pointer;
-}
-
-.dir-row:disabled {
-  cursor: default;
-}
-
-.dir-row-navigable:hover {
-  background: var(--chrome-hover);
-}
-
-.dir-row-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dir-row-badge {
-  display: inline-flex;
-  align-items: center;
-  flex: none;
-  margin-left: auto;
-  height: var(--size-chip-h);
-  padding: 0 var(--space-sm);
-  border-radius: var(--radius-pill);
-  background: var(--chrome-field);
-  color: var(--chrome-text-secondary);
-  font-size: var(--ui-chip);
-}
-
-.dir-row-badge-new {
-  background: var(--chrome-accent-subtle);
-  color: var(--chrome-accent);
-}
-
-.dir-row-selected {
-  background: var(--chrome-active);
-}
-
-.dir-row-selected .dir-row-icon {
-  color: var(--chrome-text);
-}
-
-.field-name {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.field-name label {
-  font-size: var(--ui-xs);
-  color: var(--chrome-text-secondary);
-}
-
-.selection-hint {
-  margin: 0;
-  font-size: var(--ui-xs);
-  color: var(--chrome-text-tertiary);
-}
-
-.selection-path {
-  color: var(--chrome-text);
-}
-
-.dialog-error {
-  margin: 0;
-  font-size: var(--ui-sm);
-  color: var(--chrome-danger);
-}
-
-.dialog-error[hidden] {
-  display: none;
-}
-
-.dialog-actions {
-  display: flex;
-  gap: var(--space-md);
-  justify-content: flex-end;
 }
 
 .screen-item-toggle:disabled {
@@ -3318,765 +2739,6 @@ li.has-compare > .screen-item {
   flex: none;
   margin: 0 0 0 6px;
   accent-color: var(--chrome-accent);
-}
-
-/* Keyboard shortcut reference (CHR-916, `chrome-c-shell-shortcuts`): three columns of groups, label left, key chip right. */
-#shortcuts-scrim[hidden] {
-  display: none;
-}
-
-#shortcuts-dialog {
-  width: 640px;
-  max-width: calc(100vw - 2 * var(--space-2xl));
-}
-
-#shortcuts-columns {
-  display: flex;
-  gap: var(--space-3xl);
-}
-
-.shortcuts-column {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
-}
-
-.shortcuts-group-title {
-  padding: var(--space-sm) 0;
-  font-size: var(--ui-chip);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--chrome-text-tertiary);
-}
-
-.shortcuts-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  height: var(--size-control);
-  font-size: var(--ui-base);
-  color: var(--chrome-text);
-}
-
-/* Settings menu (CHR-926, `shell-settings-menu`): theme segmented control, switch rows, MCP setup, About. Built on the zoom menu's .chrome-menu pattern. */
-#settings-controls {
-  position: relative;
-}
-
-#settings-controls .chrome-icon-btn[aria-expanded="true"] {
-  background: var(--chrome-hover);
-}
-
-#settings-menu {
-  position: absolute;
-  top: calc(100% + var(--space-xs));
-  right: 0;
-  width: 288px;
-  z-index: 20;
-}
-
-#settings-menu[hidden],
-#settings-about[hidden],
-#settings-mcp-sub[hidden],
-#mcp-scrim[hidden],
-.mcp-view[hidden],
-.mcp-manual[hidden] {
-  display: none;
-}
-
-.settings-theme-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  height: var(--size-bar-sub);
-  padding: 0 var(--space-md);
-  font-size: var(--ui-base);
-}
-
-.settings-seg {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2xs);
-  width: 216px;
-  height: var(--size-control);
-  margin-left: auto;
-  padding: var(--space-2xs);
-  border-radius: var(--radius-sm);
-  background: var(--chrome-field);
-}
-
-.settings-seg-button {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-xs);
-  height: var(--size-control-sm);
-  padding: 0;
-  border: none;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  color: var(--chrome-text-secondary);
-  font: inherit;
-  font-size: var(--ui-sm);
-  cursor: pointer;
-}
-
-.settings-seg-button .icon {
-  font-size: var(--size-icon-xs);
-}
-
-.settings-seg-button[aria-checked="true"] {
-  background: var(--chrome-raised);
-  box-shadow: 0 0 0 1px var(--chrome-border-strong);
-  color: var(--chrome-text);
-  font-weight: 500;
-}
-
-.settings-seg-button:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: 1px;
-}
-
-.settings-toggle-row {
-  justify-content: space-between;
-}
-
-.settings-switch {
-  position: relative;
-  flex: none;
-  width: 28px;
-  height: 16px;
-  border-radius: var(--radius-pill);
-  background: var(--chrome-border-strong);
-}
-
-.settings-switch::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 12px;
-  height: 12px;
-  border-radius: var(--radius-pill);
-  background: #fff;
-}
-
-.settings-toggle-row[aria-checked="true"] .settings-switch {
-  background: var(--chrome-accent);
-}
-
-.settings-toggle-row[aria-checked="true"] .settings-switch::after {
-  left: 14px;
-}
-
-.settings-item-detail {
-  height: 40px;
-}
-
-.settings-item-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.settings-item-sub {
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-}
-
-.settings-about-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  height: var(--size-row-menu);
-  padding: 0 var(--space-md);
-  font-size: var(--ui-base);
-}
-
-/* Connect AI tools dialog (CHR-926, `shell-mcp-setup-dialog`). */
-/* Anchored at a fixed top offset (about where the tallest view, the reader, is centred) instead of re-centring on content, so the title and the tabs stay put when the tab, the reader or the loading state changes (CHR-1048). */
-#mcp-scrim {
-  --mcp-top: max(var(--space-2xl), calc(50vh - 360px));
-  align-items: flex-start;
-  padding-top: var(--mcp-top);
-}
-
-#mcp-dialog {
-  width: 560px;
-  max-width: calc(100vw - 2 * var(--space-2xl));
-  max-height: calc(100vh - var(--mcp-top) - var(--space-2xl));
-  overflow-y: auto;
-}
-
-#mcp-dialog.mcp-dialog--reader {
-  width: 640px;
-}
-
-.mcp-view {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
-}
-
-.mcp-tabs {
-  display: flex;
-  align-items: stretch;
-  height: var(--size-row-section);
-  margin-bottom: var(--space-xs);
-  border-bottom: 1px solid var(--chrome-border);
-}
-
-.mcp-tabs .chrome-tab {
-  margin-bottom: -1px;
-  white-space: nowrap;
-}
-
-.mcp-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.mcp-hint {
-  font-size: var(--ui-sm);
-  color: var(--chrome-text-secondary);
-}
-
-.mcp-hint--base {
-  font-size: var(--ui-base);
-}
-
-.mcp-hint--small {
-  font-size: var(--ui-xs);
-}
-
-.mcp-path {
-  font-family: ui-monospace, Menlo, monospace;
-  color: var(--chrome-text);
-}
-
-.mcp-list-label {
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-tertiary);
-}
-
-.mcp-note {
-  padding: var(--space-lg);
-  font-size: var(--ui-sm);
-  color: var(--chrome-text-secondary);
-}
-
-.mcp-code {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  background: var(--chrome-field);
-  font-family: ui-monospace, Menlo, monospace;
-  color: var(--chrome-text);
-}
-
-.mcp-code--line {
-  height: 36px;
-  padding: 0 var(--space-xs) 0 var(--space-lg);
-  font-size: 12.5px;
-}
-
-.mcp-code--block {
-  align-items: flex-start;
-  padding: var(--space-md) var(--space-xs) var(--space-md) var(--space-lg);
-  font-size: var(--ui-sm);
-  line-height: 1.5;
-}
-
-.mcp-code-text {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-}
-
-.mcp-code--line .mcp-code-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mcp-code--block .mcp-code-text {
-  padding-top: var(--space-xs);
-  word-break: break-all;
-}
-
-.mcp-clients {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.mcp-client + .mcp-client {
-  border-top: 1px solid var(--chrome-border);
-}
-
-.mcp-client-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  width: 100%;
-  height: var(--size-panel-header);
-  padding: 0 var(--space-md) 0 var(--space-lg);
-  border: none;
-  background: transparent;
-  color: var(--chrome-text);
-  font: inherit;
-  font-size: var(--ui-base);
-  text-align: left;
-}
-
-button.mcp-client-row {
-  cursor: pointer;
-}
-
-button.mcp-client-row:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: -2px;
-}
-
-.mcp-client-row > .icon:first-child {
-  font-size: var(--size-icon);
-  color: var(--chrome-text-secondary);
-}
-
-.mcp-client-spacer {
-  flex: 1;
-}
-
-.mcp-client--not-found .mcp-client-name,
-.mcp-client--not-found .mcp-client-row > .icon:first-child {
-  color: var(--chrome-text-tertiary);
-}
-
-.mcp-chevron,
-.mcp-chevron-slot {
-  flex: none;
-  width: var(--size-icon-sm);
-  font-size: var(--size-icon-sm);
-  color: var(--chrome-text-secondary);
-}
-
-.mcp-status {
-  display: inline-flex;
-  align-items: center;
-  flex: none;
-  gap: var(--space-xs);
-  height: 20px;
-  padding: 0 var(--space-md);
-  border-radius: var(--radius-pill);
-  font-size: var(--ui-2xs);
-  white-space: nowrap;
-}
-
-.mcp-status--connected,
-.mcp-status--installed {
-  padding-left: var(--space-sm);
-  background: color-mix(in srgb, var(--chrome-ok) 14%, transparent);
-  color: var(--chrome-ok);
-  font-weight: 500;
-}
-
-.mcp-status--connected .icon,
-.mcp-status--installed .icon,
-.mcp-status--outdated .icon,
-.mcp-status--unreadable .icon {
-  font-size: var(--size-icon-xs);
-}
-
-.mcp-status--outdated,
-.mcp-status--unreadable {
-  padding-left: var(--space-sm);
-  background: var(--chrome-warning-subtle);
-  color: var(--chrome-warning);
-  font-weight: 500;
-}
-
-.mcp-status--unreadable:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: 1px;
-}
-
-.mcp-status--not-connected,
-.mcp-status--skill-missing {
-  border: 1px solid var(--chrome-border-strong);
-  color: var(--chrome-text-secondary);
-}
-
-.mcp-status--not-found {
-  background: var(--chrome-field);
-  color: var(--chrome-text-tertiary);
-}
-
-.mcp-manual {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  padding: var(--space-xs) var(--space-lg) var(--space-lg) 42px;
-}
-
-.mcp-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-}
-
-.mcp-actions-spacer {
-  flex: 1;
-}
-
-/* Agent skill tab (CHR-1048, `shell-mcp-setup-dialog-skill`). */
-.mcp-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  padding: var(--space-lg);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-}
-
-.mcp-card-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  min-height: var(--size-control-compact);
-}
-
-.mcp-card-head > .icon {
-  font-size: var(--size-icon);
-  color: var(--chrome-text-secondary);
-}
-
-.mcp-card-name {
-  flex: 1;
-  font-size: var(--ui-base);
-  font-weight: 500;
-}
-
-.mcp-card-desc {
-  padding-left: 26px;
-  font-size: var(--ui-sm);
-  color: var(--chrome-text-secondary);
-}
-
-.mcp-note-box {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-md);
-  padding: var(--space-lg);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  background: var(--chrome-field);
-  font-size: var(--ui-base);
-}
-
-.mcp-note-box > .icon {
-  font-size: var(--size-icon);
-  color: var(--chrome-text-secondary);
-}
-
-.mcp-note-box-text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.mcp-note-box-sub {
-  font-size: var(--ui-sm);
-  color: var(--chrome-text-secondary);
-}
-
-.mcp-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-/* SKILL.md reader step: 640px, a fixed-height frame that scrolls, a fade at the bottom edge. */
-.mcp-reader-head {
-  justify-content: flex-start;
-}
-
-.mcp-reader-title {
-  flex: 1;
-}
-
-.mcp-reader-meta {
-  margin-top: calc(-1 * var(--space-sm));
-  font-size: var(--ui-xs);
-  color: var(--chrome-text-secondary);
-}
-
-.mcp-reader-frame {
-  position: relative;
-  height: min(560px, calc(100vh - 230px));
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.mcp-reader-body {
-  height: 100%;
-  padding: var(--space-xl) var(--space-3xl);
-  overflow-y: auto;
-  font-size: var(--ui-base);
-  line-height: 1.55;
-  color: var(--chrome-text-secondary);
-}
-
-.mcp-reader-body:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: -2px;
-}
-
-.mcp-reader-fade {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 48px;
-  background: linear-gradient(to bottom, transparent, var(--chrome-raised));
-  pointer-events: none;
-}
-
-.mcp-summary {
-  font-size: var(--ui-xs);
-  color: var(--chrome-text-tertiary);
-}
-
-/* Update notice (CHR-927, `shell-update-notice`): a toast in the upper right corner, right below the settings trigger and aligned to it like the settings menu — over the side panels if they are open (CHR-929). Fixed, so it never moves the layout; the settings menu and dialogs sit above it. */
-#update-notice {
-  position: fixed;
-  top: calc(var(--size-bar-main) + var(--space-xs));
-  right: var(--space-lg);
-  z-index: 10;
-  pointer-events: none;
-}
-
-/* Same anchor as the settings menu: the toast steps aside while the menu is open (CHR-929, design note). */
-body:has(#settings-menu:not([hidden])) #update-notice {
-  visibility: hidden;
-}
-
-.update-toast {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-md);
-  width: 360px;
-  max-width: calc(100vw - 2 * var(--space-xl));
-  padding: var(--space-lg) var(--space-md) var(--space-lg) var(--space-lg);
-  border-radius: var(--radius-md);
-  background: var(--chrome-raised);
-  box-shadow: var(--chrome-shadow-float);
-  color: var(--chrome-text);
-  font-size: var(--ui-base);
-  pointer-events: auto;
-}
-
-.update-toast[hidden] {
-  display: none;
-}
-
-.update-toast-icon {
-  margin-top: var(--space-2xs);
-  font-size: 20px;
-  color: var(--chrome-accent);
-}
-
-.update-toast-body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-md);
-  min-width: 0;
-}
-
-.update-toast-title {
-  margin-top: var(--space-xs);
-  font-weight: 500;
-}
-
-/* One-button chip that copies a command (clipboard.js). */
-.copy-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-sm);
-  height: var(--size-control);
-  padding: 0 var(--space-md);
-  border: 1px solid var(--chrome-border);
-  border-radius: var(--radius-sm);
-  background: var(--chrome-field);
-  color: var(--chrome-text);
-  font: inherit;
-  cursor: pointer;
-}
-
-.copy-chip code {
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: var(--ui-sm);
-}
-
-.copy-chip .icon {
-  font-size: var(--size-icon-sm);
-  color: var(--chrome-text-secondary);
-}
-
-.copy-chip:focus-visible {
-  outline: 2px solid var(--chrome-focus-ring);
-  outline-offset: 1px;
-}
-
-/* Settings menu About status (CHR-927). */
-#settings-update-status[hidden],
-#settings-update-cmd[hidden] {
-  display: none;
-}
-
-.settings-update-status {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  margin-left: auto;
-  font-size: var(--ui-2xs);
-  color: var(--chrome-text-secondary);
-}
-
-.settings-update-status .icon {
-  font-size: var(--size-icon-xs);
-}
-
-.settings-update-status[data-state="current"] .icon {
-  color: var(--chrome-ok);
-}
-
-.settings-update-status[data-state="available"] .icon {
-  color: var(--chrome-accent);
-}
-
-.settings-update-status[data-state="off"] {
-  color: var(--chrome-text-tertiary);
-}
-
-.settings-update-status[data-state="off"] .icon {
-  color: var(--chrome-text-tertiary);
-}
-
-.settings-update-cmd {
-  padding: 0 var(--space-md) var(--space-sm);
-}
-
-/* What's New dialog (CHR-928, `shell-whats-new`): fixed size, only the body scrolls. */
-#whats-new-scrim[hidden] {
-  display: none;
-}
-
-#whats-new-dialog {
-  width: 640px;
-  height: 640px;
-  max-width: calc(100vw - 2 * var(--space-2xl));
-  max-height: calc(100vh - 2 * var(--space-2xl));
-  padding: 0;
-  gap: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.whats-new-head {
-  padding: var(--space-2xl) var(--space-2xl) var(--space-md);
-}
-
-.whats-new-body-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 0 var(--space-2xl) var(--space-2xl);
-  border-top: 1px solid var(--chrome-border);
-}
-
-.whats-new-release {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
-  padding: var(--space-xl) 0;
-}
-
-.whats-new-release + .whats-new-release {
-  border-top: 1px solid var(--chrome-border);
-}
-
-.whats-new-heading {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-md);
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--chrome-text);
-}
-
-.whats-new-date {
-  font-size: var(--ui-xs);
-  font-weight: 400;
-  color: var(--chrome-text-tertiary);
-}
-
-.whats-new-body {
-  font-size: var(--ui-base);
-  line-height: 1.5;
-  color: var(--chrome-text-secondary);
-}
-
-.whats-new-body h5 {
-  margin: var(--space-md) 0 var(--space-xs);
-  font-size: var(--ui-chip);
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--chrome-text-tertiary);
-}
-
-.whats-new-body li {
-  margin-bottom: var(--space-sm);
-  color: var(--chrome-text);
-}
-
-.whats-new-empty {
-  padding: var(--space-xl) 0;
-  color: var(--chrome-text-tertiary);
-}
-
-.whats-new-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  padding: var(--space-md) var(--space-2xl);
-  border-top: 1px solid var(--chrome-border);
-}
-
-.whats-new-summary {
-  font-size: var(--ui-xs);
-  color: var(--chrome-text-tertiary);
 }
 
 /* ==========================================================================================================
@@ -10056,10 +8718,6 @@ body {
   background: var(--chrome-hover);
 }
 
-#topbar #project-picker-trigger.project-picker-empty {
-  border: 1px dashed var(--chrome-border-strong);
-}
-
 #topbar #project-picker-trigger[aria-expanded="true"] {
   box-shadow: 0 0 0 2px var(--chrome-focus-ring);
 }
@@ -11141,44 +9799,9 @@ body {
 
 /* ---- Full-height views and project-less state under the floating bar ---- */
 
-#update-notice {
-  top: calc(var(--space-xl) + var(--size-float-control) + var(--space-2xl));
-  right: var(--space-xl);
-}
-
-#no-project-state {
-  position: absolute;
-  inset: 0;
-  padding-top: var(--shell-top);
-}
-
-#empty-card {
-  border: none;
-  border-radius: var(--radius-card);
-  background: var(--chrome-float);
-  backdrop-filter: blur(10px);
-  box-shadow: var(--chrome-shadow-card);
-}
-
 #usecases-view {
   top: 0;
   padding-top: var(--shell-top);
-}
-
-/* The how-to-start guide is the get-started card (design `get-started-card`): a float surface with the prompt in a tray. */
-#empty-guide {
-  width: 440px;
-  padding: var(--space-3xl) var(--space-2xl);
-  border-radius: var(--radius-card);
-  background: var(--chrome-float);
-  backdrop-filter: blur(10px);
-  box-shadow: var(--chrome-shadow-card);
-}
-
-#empty-guide-prompt-box {
-  border: none;
-  border-radius: var(--radius-md);
-  background: var(--chrome-field);
 }
 
 /* ==========================================================================================================
@@ -12317,4 +10940,1876 @@ button.agent-activity:focus-visible {
 .inspect-kv-link:focus-visible {
   outline: 2px solid var(--chrome-focus-ring);
   outline-offset: 1px;
+}
+
+/* ==========================================================================================================
+   CHR-1272 — overlays, dialogs and project start in the Stitch chrome (design pattern `float-dialog`, components
+   `float-popover`, `float-icon-btn`, `float-btn`, `btn`, `code-field`, `status-row`, `text-field`, `float-menu-item`,
+   `get-started-card`). Dark follows the theme setting: every colour is a --chrome-* variable of the active group.
+   The dialogs are native <dialog>s opened with showModal(); the settings menu and the update toast are native
+   popovers (a fixed box where the browser has no Popover API).
+   ========================================================================================================== */
+
+/* ---- Buttons ---- */
+
+.float-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--size-control);
+  height: var(--size-control);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--chrome-text-secondary);
+  cursor: pointer;
+}
+
+.float-icon-btn .icon {
+  font-size: var(--size-icon-sm);
+}
+
+.float-icon-btn:hover {
+  background: var(--chrome-hover);
+  color: var(--chrome-text);
+}
+
+/* A tab of a pill tray (design `float-btn`): the selected one is the dark pill. */
+.float-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: none;
+  height: var(--size-float-control);
+  padding: 0 var(--space-lg);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--chrome-text-secondary);
+  font: inherit;
+  font-size: var(--ui-base);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.float-btn:hover {
+  background: var(--chrome-hover);
+  color: var(--chrome-text);
+}
+
+.float-btn[aria-selected="true"] {
+  background: var(--chrome-primary);
+  color: var(--chrome-primary-text);
+}
+
+.float-btn--field {
+  background: var(--chrome-field);
+  color: var(--chrome-text);
+}
+
+/* The dialog button (design `btn`): raised pill; `--confirm` is the one primary, `--ghost` a quiet one. */
+.dialog-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  flex: none;
+  height: var(--size-field-lg);
+  padding: 0 var(--space-xl);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-raised);
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-base);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dialog-btn:hover:not(:disabled) {
+  background: var(--chrome-hover);
+}
+
+.dialog-btn--confirm {
+  background: var(--chrome-primary);
+  box-shadow: none;
+  color: var(--chrome-primary-text);
+  font-weight: 600;
+}
+
+.dialog-btn--confirm:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--chrome-primary) 85%, var(--chrome-primary-text));
+}
+
+.dialog-btn--ghost {
+  padding: 0 var(--space-lg);
+  background: none;
+  box-shadow: none;
+  color: var(--chrome-text-secondary);
+}
+
+.dialog-btn:disabled {
+  background: var(--chrome-field);
+  box-shadow: none;
+  color: var(--chrome-text-tertiary);
+  font-weight: 600;
+  cursor: not-allowed;
+}
+
+.float-icon-btn:focus-visible,
+.float-btn:focus-visible,
+.dialog-btn:focus-visible,
+.quick-chip:focus-visible,
+.new-folder-btn:focus-visible,
+.new-folder-create:focus-visible,
+.new-folder-cancel:focus-visible,
+.status-chip[tabindex]:focus-visible,
+.settings-seg-button:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: 2px;
+}
+
+.settings-toggle-row:focus-visible,
+.settings-item-detail:focus-visible,
+.float-menu-item:focus-visible,
+.status-row-head:focus-visible,
+.dir-row:focus-visible,
+.crumb:focus-visible {
+  outline: 2px solid var(--chrome-focus-ring);
+  outline-offset: -2px;
+}
+
+.dialog-error {
+  margin: 0;
+  font-size: var(--ui-sm);
+  color: var(--chrome-error);
+}
+
+.dialog-error[hidden] {
+  display: none;
+}
+
+/* ---- Code field (design `code-field`): a command to copy; only the icon copies ---- */
+
+.code-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  height: 40px;
+  padding: 0 var(--space-xs) 0 var(--space-lg);
+  border-radius: var(--radius-item);
+  background: var(--chrome-field);
+}
+
+.code-field-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-sm);
+  color: var(--chrome-text);
+}
+
+.code-field--compact {
+  display: inline-flex;
+  gap: var(--space-sm);
+  height: var(--size-field-lg);
+  padding: 0 var(--space-2xs) 0 var(--space-lg);
+  border-radius: var(--radius-pill);
+}
+
+.code-field--compact .code-field-text {
+  flex: none;
+  overflow: visible;
+}
+
+.code-field--block {
+  align-items: flex-start;
+  height: auto;
+  padding: var(--space-sm) var(--space-xs) var(--space-sm) var(--space-lg);
+}
+
+.code-field--block .code-field-text {
+  padding-top: var(--space-sm);
+  overflow: visible;
+  line-height: 1.5;
+  white-space: normal;
+  word-break: break-all;
+}
+
+.code-field-copy .icon[data-copy-state="copied"] {
+  color: var(--chrome-ok);
+}
+
+.code-field-copy .icon[data-copy-state="failed"] {
+  color: var(--chrome-error);
+}
+
+/* ---- Text field (design `text-field`) ---- */
+
+.text-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.text-field-label {
+  font-size: var(--ui-xs);
+  font-weight: 600;
+  color: var(--chrome-text-secondary);
+}
+
+.text-field-input {
+  height: var(--size-field-lg);
+  padding: 0 var(--space-lg);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--chrome-field);
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-base);
+}
+
+.text-field-input::placeholder {
+  color: var(--chrome-text-tertiary);
+}
+
+.text-field-input:focus {
+  outline: none;
+  background: var(--chrome-raised);
+  box-shadow:
+    0 0 0 1px var(--chrome-accent),
+    0 0 0 4px var(--chrome-focus-ring);
+}
+
+.text-field-hint {
+  margin: 0;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+/* ---- Status row (design `status-row`): a tool and its status; an expandable one carries its detail ---- */
+
+.status-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: var(--space-xs);
+  border-radius: var(--radius-inset);
+  background: var(--chrome-field);
+  list-style: none;
+}
+
+.status-row {
+  list-style: none;
+  border-radius: var(--radius-md);
+  color: var(--chrome-text);
+  font-size: var(--ui-base);
+}
+
+.status-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--space-md) 0 var(--space-lg);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.status-row-head {
+  cursor: pointer;
+}
+
+button.status-row-head:hover {
+  background: var(--chrome-hover);
+}
+
+.status-row-head > .icon:first-child {
+  font-size: var(--size-icon);
+  color: var(--chrome-text-secondary);
+}
+
+.status-row-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.status-row-end {
+  flex: none;
+  width: var(--size-icon-sm);
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.status-row.is-open {
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-raised);
+}
+
+.status-row.is-open > .status-row-head:hover {
+  background: none;
+}
+
+.status-row-detail {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--space-md) var(--space-md) 42px;
+}
+
+.status-row-detail[hidden] {
+  display: none;
+}
+
+.status-row-hint {
+  font-size: var(--ui-xs);
+  line-height: 16.9px; /* the line box the design's inline hint sits in: the body's 13px at 1.3 */
+  color: var(--chrome-text-secondary);
+}
+
+.status-row--muted {
+  color: var(--chrome-text-tertiary);
+}
+
+.status-row--muted .status-row-head > .icon:first-child,
+.status-row--muted .status-row-end {
+  color: var(--chrome-text-tertiary);
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: none;
+  height: 20px;
+  padding: 0 var(--space-md) 0 var(--space-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--ui-2xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-chip .icon {
+  font-size: var(--size-icon-xs);
+}
+
+.status-chip--connected,
+.status-chip--installed {
+  background: color-mix(in srgb, var(--chrome-ok) 14%, transparent);
+  color: var(--chrome-ok);
+}
+
+.status-chip--outdated,
+.status-chip--unreadable {
+  background: var(--chrome-warning-subtle);
+  color: var(--chrome-warning);
+}
+
+.status-chip--not-connected,
+.status-chip--skill-missing {
+  padding: 0 var(--space-md);
+  border: 1px solid var(--chrome-border-strong);
+  color: var(--chrome-text-secondary);
+  font-weight: 400;
+}
+
+.status-chip--not-found {
+  padding: 0 var(--space-md);
+  background: var(--chrome-field);
+  color: var(--chrome-text-tertiary);
+  font-weight: 400;
+}
+
+.status-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border-radius: var(--radius-inset);
+  background: var(--chrome-info-subtle);
+}
+
+.status-note > .icon {
+  color: var(--chrome-info);
+}
+
+.status-note-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.status-note-title {
+  font-weight: 600;
+}
+
+.status-note-body {
+  font-size: var(--ui-sm);
+  line-height: 1.45;
+  color: var(--chrome-text-secondary);
+}
+
+/* ---- The dialog shell (pattern `float-dialog`) ---- */
+
+dialog.float-dialog {
+  --fd-top: 64px;
+  --fd-width: 560px;
+  position: fixed;
+  inset: auto;
+  left: 50%;
+  top: var(--fd-top);
+  transform: translateX(-50%);
+  width: min(var(--fd-width), calc(100vw - 2 * var(--space-xl)));
+  max-height: calc(100vh - var(--fd-top) - var(--space-2xl));
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--chrome-float);
+  backdrop-filter: blur(16px);
+  color: var(--chrome-text);
+  box-shadow: var(--chrome-shadow-card);
+  font-size: var(--ui-base);
+  line-height: 1.3;
+  overflow: hidden;
+}
+
+dialog.float-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+dialog.float-dialog::backdrop {
+  background: var(--chrome-scrim);
+}
+
+dialog.float-dialog:focus {
+  outline: none;
+}
+
+/* Scrolling over the scrim or inside the dialog must not scroll the page behind it. */
+dialog.float-dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog.float-dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.float-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-lg);
+  flex: none;
+  padding: var(--space-2xl) var(--space-2xl) var(--space-lg);
+}
+
+.float-dialog-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.float-dialog-title {
+  margin: 0;
+  font-size: var(--ui-title);
+  font-weight: 600;
+}
+
+.float-dialog-sub {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.float-dialog-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: var(--space-lg);
+  min-height: 0;
+  padding: var(--space-sm) var(--space-2xl) var(--space-lg);
+  overflow-y: auto;
+}
+
+.float-dialog-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.float-dialog-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.float-dialog-group-label {
+  margin: 0;
+  font-size: var(--ui-xs);
+  font-weight: 600;
+  color: var(--chrome-text-secondary);
+}
+
+.float-dialog-hint {
+  margin: 0;
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.float-dialog-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex: none;
+  padding: var(--space-sm) var(--space-2xl) var(--space-2xl);
+}
+
+.float-dialog-foot--end {
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.float-dialog-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 1;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.float-dialog-summary:has(.icon) {
+  color: var(--chrome-text-secondary);
+}
+
+.float-dialog-summary .icon {
+  font-size: var(--size-icon-xs);
+  color: var(--chrome-ok);
+}
+
+/* ---- Connect AI tools ---- */
+
+.mcp-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.mcp-view[hidden] {
+  display: none;
+}
+
+.mcp-tabs {
+  display: flex;
+  align-self: flex-start;
+  flex: none;
+  gap: var(--space-2xs);
+  margin: 0 var(--space-2xl);
+  padding: var(--space-2xs);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-field);
+}
+
+.mcp-body {
+  padding-top: var(--space-xl);
+  padding-bottom: var(--space-xl);
+  gap: var(--space-xl);
+}
+
+.mcp-body > .mcp-view {
+  gap: var(--space-xl);
+  flex: none;
+}
+
+.mcp-path,
+.mcp-key {
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--chrome-text);
+}
+
+#skill-card {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border-radius: var(--radius-inset);
+  background: var(--chrome-field);
+}
+
+.skill-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--size-float-control);
+  height: var(--size-float-control);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-raised);
+  color: var(--chrome-text-secondary);
+}
+
+.skill-card-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+
+.skill-card-name {
+  font-weight: 600;
+}
+
+.skill-card-desc {
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+}
+
+/* The SKILL.md reader replaces the tabs inside the same dialog, a little wider. */
+#mcp-dialog.mcp-dialog--reader {
+  --fd-width: 600px;
+}
+
+.mcp-reader-head {
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-xl) var(--space-2xl) var(--space-md) var(--space-lg);
+}
+
+.mcp-reader-title {
+  flex: 1;
+}
+
+.mcp-reader-meta {
+  margin: 0;
+  padding: 0 var(--space-2xl) var(--space-md);
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.mcp-reader-frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0 var(--space-md);
+  border-radius: var(--radius-inset);
+  background: var(--chrome-field);
+  overflow: hidden;
+}
+
+.mcp-reader-body {
+  height: min(470px, calc(100vh - 340px));
+  padding: var(--space-xl) var(--space-2xl);
+  overflow-y: auto;
+  font-size: var(--ui-sm);
+  line-height: 1.55;
+  color: var(--chrome-text);
+}
+
+.mcp-reader-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 48px;
+  background: linear-gradient(transparent, var(--chrome-field));
+  pointer-events: none;
+}
+
+.mcp-reader-foot {
+  padding-top: var(--space-lg);
+  gap: var(--space-sm);
+}
+
+.mcp-actions-spacer {
+  flex: 1;
+}
+
+/* ---- Keyboard shortcuts ---- */
+
+#shortcuts-dialog {
+  --fd-top: 92px;
+  --fd-width: 780px;
+  background: var(--chrome-raised);
+}
+
+#shortcuts-columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg) var(--space-2xl);
+  padding: 0 var(--space-2xl) var(--space-2xl);
+}
+
+.shortcuts-group-title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--ui-xs);
+  font-weight: 600;
+  color: var(--chrome-text-secondary);
+}
+
+.shortcuts-list {
+  margin: 0;
+}
+
+/* The General group spans two columns and sets its rows in two, as drawn. */
+.shortcuts-group--wide {
+  grid-column: span 2;
+}
+
+.shortcuts-group--wide .shortcuts-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: var(--space-2xl);
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  height: 30px;
+  font-size: var(--ui-sm);
+  color: var(--chrome-text);
+}
+
+.shortcut-row dt {
+  margin: 0;
+}
+
+.shortcut-keys {
+  display: flex;
+  gap: var(--space-xs);
+  margin: 0;
+}
+
+.kbd-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--chrome-field);
+  box-shadow: inset 0 -1px 0 var(--chrome-border-strong);
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-xs);
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* ---- What's New ---- */
+
+#whats-new-dialog {
+  --fd-top: 130px;
+  --fd-width: 640px;
+  height: min(640px, calc(100vh - var(--fd-top) - var(--space-2xl)));
+}
+
+.whats-new-scroll {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin: 0 var(--space-md);
+  border-radius: var(--radius-inset);
+  background: var(--chrome-field);
+}
+
+.whats-new-body-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  height: 100%;
+  padding: var(--space-xl) var(--space-xl) var(--space-2xl);
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+.whats-new-release {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-xl) var(--space-xl);
+  border-radius: var(--radius-item);
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-raised);
+}
+
+.whats-new-heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.whats-new-date {
+  font-size: var(--ui-xs);
+  font-weight: 400;
+  color: var(--chrome-text-tertiary);
+}
+
+.whats-new-installed {
+  display: inline-flex;
+  align-items: center;
+  height: var(--size-tag);
+  margin-left: auto;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+  font-size: var(--ui-chip);
+  font-weight: 600;
+}
+
+.whats-new-body {
+  font-size: var(--ui-base);
+  color: var(--chrome-text);
+}
+
+.whats-new-body h3,
+.whats-new-body h4,
+.whats-new-body h5,
+.whats-new-body h6 {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--ui-xs);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--chrome-text-secondary);
+}
+
+.whats-new-body p {
+  margin: 0;
+  color: var(--chrome-text-secondary);
+}
+
+.whats-new-body ul,
+.whats-new-body ol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin: 0;
+  padding-left: 18px;
+}
+
+.whats-new-body li {
+  margin: 0;
+  color: var(--chrome-text);
+}
+
+.whats-new-body code {
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  background: var(--chrome-field);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-sm);
+}
+
+.whats-new-empty {
+  margin: 0;
+  padding: var(--space-xl);
+  color: var(--chrome-text-tertiary);
+}
+
+/* ---- Open project / New project ---- */
+
+#open-project-dialog {
+  --fd-top: 120px;
+}
+
+#init-project-dialog {
+  --fd-top: 96px;
+}
+
+.quick-access {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.quick-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: var(--size-control);
+  padding: 0 var(--space-lg) 0 var(--space-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-field);
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.quick-chip .icon {
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.quick-chip:hover {
+  background: var(--chrome-hover);
+}
+
+.quick-chip[aria-pressed="true"] {
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+  font-weight: 600;
+}
+
+.quick-chip[aria-pressed="true"] .icon {
+  color: inherit;
+}
+
+.quick-chip[hidden] {
+  display: none;
+}
+
+.browse-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.breadcrumbs {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+  list-style: none;
+  white-space: nowrap;
+}
+
+.crumb-item {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+/* The chevron between two crumbs is the item's own, not a node of its own. */
+.crumb-item--sep::before {
+  content: "chevron_right";
+  margin-right: var(--space-2xs);
+  font-family: "Material Symbols Rounded";
+  font-size: var(--size-icon-xs);
+  font-feature-settings: "liga";
+  color: var(--chrome-text-tertiary);
+}
+
+.crumb {
+  padding: 0 var(--space-xs);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.crumb:hover {
+  background: var(--chrome-hover);
+  color: var(--chrome-text);
+}
+
+.crumb-current {
+  padding: 0 var(--space-xs);
+  font-weight: 600;
+  color: var(--chrome-text);
+}
+
+.new-folder-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: none;
+  height: var(--size-control);
+  padding: 0 var(--space-lg) 0 var(--space-pad);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.new-folder-btn .icon {
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.new-folder-btn:hover {
+  background: var(--chrome-hover);
+}
+
+.new-folder-btn[aria-expanded="true"] {
+  background: var(--chrome-active);
+}
+
+.new-folder-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--chrome-accent-subtle);
+}
+
+.new-folder-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.new-folder-line > .icon {
+  width: var(--size-control);
+  text-align: center;
+  color: var(--chrome-accent);
+}
+
+.new-folder-input {
+  flex: 1;
+  min-width: 0;
+  height: var(--size-control);
+  padding: 0 var(--space-pad);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--chrome-raised);
+  box-shadow:
+    0 0 0 1px var(--chrome-accent),
+    0 0 0 4px var(--chrome-focus-ring);
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-sm);
+}
+
+.new-folder-input:focus {
+  outline: none;
+}
+
+.new-folder-row.is-error .new-folder-input {
+  box-shadow: 0 0 0 1.5px var(--chrome-error);
+}
+
+.new-folder-create,
+.new-folder-cancel {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: var(--size-control);
+  border: 0;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--ui-sm);
+  cursor: pointer;
+}
+
+.new-folder-create {
+  padding: 0 var(--space-lg);
+  background: var(--chrome-primary);
+  color: var(--chrome-primary-text);
+  font-weight: 600;
+}
+
+.new-folder-row.is-error .new-folder-create,
+.new-folder-create:disabled {
+  background: var(--chrome-raised);
+  color: var(--chrome-text-tertiary);
+}
+
+.new-folder-cancel {
+  padding: 0 var(--space-md);
+  background: none;
+  color: var(--chrome-text-secondary);
+  font-weight: 500;
+}
+
+.new-folder-message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: 0 0 var(--space-2xs) 36px;
+  font-size: var(--ui-xs);
+  line-height: 1.4;
+  color: var(--chrome-error);
+}
+
+.new-folder-message[hidden] {
+  display: none;
+}
+
+.new-folder-message .icon {
+  font-size: var(--size-icon-xs);
+  line-height: 1.3;
+}
+
+.dir-tray {
+  max-height: 240px;
+  padding: var(--space-xs);
+  border-radius: var(--radius-inset);
+  background: var(--chrome-field);
+  overflow-y: auto;
+}
+
+.dir-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.dir-list[hidden],
+.dir-list-empty[hidden] {
+  display: none;
+}
+
+.dir-list-empty {
+  margin: 0;
+  padding: var(--space-xl);
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-tertiary);
+}
+
+.dir-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  height: var(--size-field-lg);
+  padding: 0 var(--space-md) 0 var(--space-pad);
+  border-radius: var(--radius-md);
+  color: var(--chrome-text);
+  font-size: var(--ui-base);
+}
+
+.dir-row > .icon:first-child {
+  font-size: var(--size-icon);
+  color: var(--chrome-text-secondary);
+}
+
+.dir-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dir-row.is-actionable {
+  cursor: pointer;
+}
+
+.dir-row.is-actionable:hover {
+  background: var(--chrome-hover);
+}
+
+.dir-row.is-selected {
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+  font-weight: 600;
+}
+
+.dir-row.is-selected > .icon:first-child {
+  color: inherit;
+}
+
+.dir-row-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex: none;
+  height: var(--size-tag);
+  padding: 0 var(--space-sm) 0 var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-raised);
+  color: var(--chrome-text-secondary);
+  font-size: var(--ui-chip);
+  font-weight: 500;
+}
+
+.dir-row-badge .icon {
+  font-size: 12px;
+}
+
+.dir-row.is-selected .dir-row-badge {
+  color: var(--chrome-accent);
+}
+
+.dir-row-badge--created {
+  background: var(--chrome-accent);
+  box-shadow: none;
+  color: var(--chrome-primary-text);
+  font-weight: 600;
+}
+
+.dir-row.is-selected .dir-row-badge--created {
+  color: var(--chrome-primary-text);
+}
+
+.selection-hint {
+  margin: 0;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.selection-hint.is-long {
+  line-height: 1.5;
+}
+
+.selection-path {
+  font-weight: 600;
+  color: var(--chrome-text);
+}
+
+/* ---- Settings menu and the popover it is (design `float-popover`, `float-menu-item`) ---- */
+
+#settings-trigger[aria-expanded="true"] {
+  box-shadow: 0 0 0 2px var(--chrome-focus-ring);
+}
+
+.float-popover {
+  position: fixed;
+  inset: auto;
+  z-index: 50; /* only the fallback box needs it: a native popover is in the top layer */
+  right: var(--space-xl);
+  top: 66px;
+  width: 304px;
+  margin: 0;
+  padding: var(--space-xs);
+  border: 0;
+  border-radius: var(--radius-item);
+  background: var(--chrome-raised);
+  color: var(--chrome-text);
+  box-shadow: var(--chrome-shadow-card);
+  font-size: var(--ui-base);
+  line-height: 1.3;
+  overflow: visible;
+}
+
+.float-popover:not(:is(:popover-open, [data-open])) {
+  display: none;
+}
+
+.float-popover-label {
+  display: block;
+  padding: var(--space-sm) var(--space-md) var(--space-xs);
+  font-size: var(--ui-2xs);
+  font-weight: 600;
+  color: var(--chrome-text-tertiary);
+}
+
+.float-popover-divider {
+  display: block;
+  height: 1px;
+  margin: var(--space-xs) var(--space-sm);
+  background: var(--chrome-border);
+}
+
+#settings-about[hidden],
+#settings-mcp-sub[hidden],
+#settings-update-status[hidden],
+#settings-update-cmd[hidden] {
+  display: none;
+}
+
+.float-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  height: var(--size-row-menu);
+  padding: 0 var(--space-md);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-sm);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.float-menu-item:hover,
+.settings-toggle-row:hover {
+  background: var(--chrome-hover);
+}
+
+.float-menu-icon {
+  width: var(--size-icon-sm);
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-secondary);
+}
+
+.settings-theme-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  height: 40px;
+  padding: 0 var(--space-xs) 0 var(--space-md);
+  font-size: var(--ui-sm);
+}
+
+.settings-theme-row > span:first-child {
+  flex: 1;
+}
+
+.settings-seg {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-2xs);
+  width: 216px;
+  height: var(--size-field-lg);
+  padding: var(--space-2xs);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-field);
+}
+
+.settings-seg-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: var(--space-xs);
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--chrome-text-secondary);
+  font: inherit;
+  font-size: var(--ui-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.settings-seg-button .icon {
+  font-size: var(--size-icon-xs);
+}
+
+.settings-seg-button[aria-checked="true"] {
+  background: var(--chrome-raised);
+  box-shadow: var(--chrome-shadow-raised);
+  color: var(--chrome-text);
+  font-weight: 600;
+}
+
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  width: 100%;
+  height: var(--size-field-lg);
+  padding: 0 var(--space-md);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-switch {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-border-strong);
+}
+
+.settings-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.settings-toggle-row[aria-checked="true"] .settings-switch {
+  background: var(--chrome-accent);
+}
+
+.settings-toggle-row[aria-checked="true"] .settings-switch::after {
+  left: 14px;
+}
+
+.settings-item-detail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  height: 46px;
+  padding: 0 var(--space-md) 0 var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-item-detail:hover {
+  background: var(--chrome-hover);
+}
+
+.settings-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--size-control);
+  height: var(--size-control);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-field);
+  color: var(--chrome-text-secondary);
+}
+
+.settings-item-icon .icon {
+  font-size: var(--size-icon-sm);
+}
+
+.settings-item-detail:hover .settings-item-icon {
+  background: var(--chrome-raised);
+  color: var(--chrome-text);
+}
+
+.settings-item-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-item-label {
+  font-weight: 500;
+}
+
+.settings-item-sub {
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-tertiary);
+}
+
+.settings-item-chevron {
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-tertiary);
+}
+
+.settings-about-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  height: var(--size-row-menu);
+  padding: 0 var(--space-md);
+  font-size: var(--ui-sm);
+}
+
+#settings-version {
+  flex: 1;
+}
+
+.settings-update-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--ui-2xs);
+  color: var(--chrome-text-secondary);
+}
+
+.settings-update-status .icon {
+  font-size: var(--size-icon-xs);
+}
+
+.settings-update-status[data-state="current"] .icon {
+  color: var(--chrome-ok);
+}
+
+.settings-update-status[data-state="available"] .icon {
+  color: var(--chrome-accent);
+}
+
+.settings-update-status[data-state="off"],
+.settings-update-status[data-state="off"] .icon {
+  color: var(--chrome-text-tertiary);
+}
+
+.settings-update-cmd {
+  padding: 0 var(--space-md) var(--space-sm);
+}
+
+/* ---- Update notice: the toast under the settings button, in the "Notifications" region ---- */
+
+.update-toast {
+  position: fixed;
+  inset: auto;
+  z-index: 50;
+  right: var(--space-xl);
+  top: 66px;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-lg);
+  width: 360px;
+  max-width: calc(100vw - 2 * var(--space-xl));
+  margin: 0;
+  padding: var(--space-lg) var(--space-sm) var(--space-lg) var(--space-lg);
+  border: 0;
+  border-radius: var(--radius-item);
+  background: var(--chrome-raised);
+  color: var(--chrome-text);
+  box-shadow: var(--chrome-shadow-card);
+  font-size: var(--ui-base);
+  line-height: 1.3;
+  overflow: visible;
+}
+
+.update-toast:not(:is(:popover-open, [data-open])) {
+  display: none;
+}
+
+/* The settings menu opens in the same spot: the toast steps aside while it is open. */
+body:has(#settings-menu:is(:popover-open, [data-open])) .update-toast {
+  visibility: hidden;
+}
+
+.update-toast-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--size-float-control);
+  height: var(--size-float-control);
+  border-radius: var(--radius-pill);
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+}
+
+.update-toast-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.update-toast-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.update-toast-title {
+  font-weight: 600;
+}
+
+.update-toast-sub {
+  font-size: var(--ui-sm);
+  color: var(--chrome-text-secondary);
+}
+
+#update-toast-command {
+  align-self: flex-start;
+}
+
+/* ---- No project open: the card on the dotted workspace (design `no-project-empty-state`) ---- */
+
+#no-project-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--shell-top) var(--space-xl);
+}
+
+#no-project-state[hidden],
+#empty-recent[hidden] {
+  display: none;
+}
+
+#empty-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xl);
+  width: 480px;
+  max-width: 100%;
+  max-height: 100%;
+  padding: var(--space-3xl) var(--space-2xl) var(--space-2xl);
+  border-radius: var(--radius-card);
+  background: var(--chrome-float);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--chrome-shadow-card);
+  line-height: 1.3;
+  overflow-y: auto;
+}
+
+#empty-icon-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-field);
+  color: var(--chrome-text-secondary);
+}
+
+#empty-icon {
+  font-size: 28px;
+}
+
+#empty-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+#empty-title {
+  margin: 0;
+  font-size: var(--ui-title);
+  font-weight: 600;
+}
+
+#empty-copy {
+  max-width: 360px;
+  margin: 0;
+  font-size: var(--ui-sm);
+  line-height: 1.5;
+  text-align: center;
+  color: var(--chrome-text-secondary);
+}
+
+#empty-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+#empty-ai,
+#empty-recent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+#empty-recent {
+  gap: var(--space-xs);
+}
+
+#empty-ai-label,
+#empty-recent-label {
+  margin: 0 0 0 var(--space-md);
+  font-size: var(--ui-xs);
+  font-weight: 600;
+  color: var(--chrome-text-secondary);
+}
+
+#empty-ai-more {
+  margin: 0 0 0 var(--space-md);
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
+}
+
+#empty-recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.empty-recent-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  height: var(--size-field-lg);
+  padding: 0 var(--space-md);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--chrome-text);
+  font: inherit;
+  font-size: var(--ui-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.empty-recent-row:hover:not([aria-disabled="true"]) {
+  background: var(--chrome-hover);
+}
+
+.empty-recent-row[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.empty-recent-icon {
+  font-size: var(--size-icon);
+  color: var(--chrome-text-secondary);
+}
+
+.empty-recent-name {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.empty-recent-dir {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty-recent-base {
+  flex: none;
+}
+
+.empty-recent-go {
+  font-size: var(--size-icon-sm);
+  color: var(--chrome-text-tertiary);
+}
+
+/* ---- Empty project: the get-started card on the canvas (design `get-started-card`) ---- */
+
+#empty-guide {
+  position: absolute;
+  top: calc(210px - var(--shell-top)); /* the design puts the card 210px from the window's top; the canvas starts at --shell-top */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 440px;
+  padding: var(--space-2xl);
+  border-radius: var(--radius-card);
+  background: var(--chrome-float);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--chrome-shadow-card);
+  line-height: 1.3;
+}
+
+#empty-guide[hidden] {
+  display: none;
+}
+
+#empty-guide-label {
+  margin: 0;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text-secondary);
+}
+
+#empty-guide-title {
+  margin: var(--space-xs) 0 var(--space-xl);
+  font-size: var(--ui-title);
+  font-weight: 600;
+}
+
+#empty-guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#empty-guide-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+
+.empty-guide-num {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--chrome-accent-subtle);
+  color: var(--chrome-accent);
+  font-size: var(--ui-xs);
+  font-weight: 600;
+}
+
+.empty-guide-body {
+  flex: 1;
+  min-width: 0;
+  padding-top: var(--space-2xs);
+}
+
+.empty-guide-text {
+  margin: 0;
+  font-size: var(--ui-sm);
+  color: var(--chrome-text);
+}
+
+#empty-guide-prompt-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--chrome-field);
+}
+
+#empty-guide-prompt {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: var(--ui-xs);
+  color: var(--chrome-text);
+}
+
+#empty-guide-copy .icon {
+  font-size: var(--size-icon-sm);
+}
+
+.new-folder-slot:empty {
+  display: none;
 }

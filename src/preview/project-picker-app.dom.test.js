@@ -161,7 +161,7 @@ describe("project picker is tab-local (CHR-775)", () => {
   it("an empty tab picks up the daemon default on a lifecycle event", async () => {
     projects = { active: null, open: [], recent: [] };
     await boot();
-    expect(pickerName()).toBe("No project open");
+    expect(pickerName()).toBe("No project"); // the design's label for the picker without a project
 
     projects = { active: "/p", open: [{ root: "/p", name: "alpha" }], recent: [] };
     emit(liveSource(), { type: "project-opened", root: "/p" });
@@ -251,10 +251,129 @@ describe("menu and empty-state rows are buttons without glyph icons (CHR-911)", 
   it("renders the empty-state recent rows as buttons", async () => {
     projects = { active: null, open: [], recent: ["/work/acme"] };
     await boot();
-    const row = $("#empty-recent-list .empty-recent-row");
+    const row = $("#empty-recent-list li > .empty-recent-row");
     expect(row.tagName).toBe("BUTTON");
-    expect(row.querySelector(".empty-recent-name").textContent).toBe("acme");
+    // One link row per recent project: the folder icon, the path, a chevron.
+    expect(row.querySelector(".empty-recent-name").textContent).toBe("/work/acme");
+    expect(row.title).toBe("/work/acme");
+    expect([...row.querySelectorAll(".icon")].map((i) => i.textContent)).toEqual(["folder", "chevron_right"]);
     expect($("#no-project-state").textContent).not.toMatch(GLYPH_ICON);
+  });
+
+  it("the no-project card: Recent only while there is one, the example prompt in a code field that copies it", async () => {
+    projects = { active: null, open: [], recent: [] };
+    await boot();
+    expect($("#empty-recent").hidden).toBe(true);
+    expect($("#empty-ai-prompt .code-field-text").textContent).toBe("Create an artisign project in ~/work/acme");
+    expect($("#empty-ai-prompt .code-field-copy").getAttribute("aria-label")).toBe("Copy the example prompt");
+    expect($("#empty-ai-prompt button")).not.toBeNull();
+    // The code itself is not a button: only the copy icon is.
+    expect($("#empty-ai-prompt .code-field-text").closest("button")).toBeNull();
+    expect($("#empty-btn-open").hasAttribute("autofocus")).toBe(true);
+    projects = { active: null, open: [], recent: ["/work/acme"] };
+    emit(liveSource(), { type: "project-closed", root: "/x" });
+    await flush();
+    expect($("#empty-recent").hidden).toBe(false);
+  });
+
+  it("opening a recent project keeps the row off while it runs, and says so in the card when it fails", async () => {
+    projects = { active: null, open: [], recent: ["/work/gone"] };
+    const realFetch = globalThis.fetch;
+    let release;
+    vi.stubGlobal("fetch", async (url, init) => {
+      if (String(url) === "/api/projects/open") {
+        await new Promise((r) => (release = r));
+        return { ok: false, status: 404, statusText: "Not Found", json: async () => ({ message: "No artisign project at /work/gone." }) };
+      }
+      return realFetch(url, init);
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await boot();
+    const row = () => $("#empty-recent-list .empty-recent-row");
+    row().click();
+    await flush();
+    expect(row().getAttribute("aria-disabled")).toBe("true"); // a second press cannot start a second open
+    row().focus();
+    expect(document.activeElement).toBe(row()); // still focusable: the press does not drop the focus
+    release();
+    await flush();
+    expect($("#empty-error").hidden).toBe(false);
+    expect($("#empty-error").textContent).toBe("No artisign project at /work/gone.");
+    expect($("#empty-error").getAttribute("role")).toBe("alert");
+    expect(row().hasAttribute("aria-disabled")).toBe(false); // never stuck
+  });
+
+  it("the pressed recent row keeps the focus while it opens and after a failure", async () => {
+    projects = { active: null, open: [], recent: ["/work/gone"] };
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (url, init) => (String(url) === "/api/projects/open" ? { ok: false, status: 404, statusText: "x", json: async () => ({ message: "gone" }) } : realFetch(url, init)));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await boot();
+    const row = $("#empty-recent-list .empty-recent-row");
+    row.focus();
+    row.click();
+    expect(document.activeElement).toBe(row);
+    await flush(); // the failure re-reads the projects and rebuilds the rows
+    expect($("#empty-error").textContent).toBe("gone");
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it("a failure while applying an opened project is reported as what it is, not as a lost connection", async () => {
+    projects = { active: null, open: [], recent: ["/work/acme"] };
+    const realFetch = globalThis.fetch;
+    let applied = false;
+    vi.stubGlobal("fetch", async (url, init) => {
+      const path = String(url).split("?")[0];
+      if (path === "/api/projects/open") {
+        applied = true;
+        projects = { active: "/work/acme", open: [{ root: "/work/acme", name: "acme" }], recent: [] };
+        return { ok: true, status: 200, json: async () => projects };
+      }
+      if (applied && path === "/api/screens") throw new Error("screens exploded");
+      return realFetch(url, init);
+    });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    await boot();
+    $("#empty-recent-list .empty-recent-row").click();
+    await flush();
+    expect($("#empty-error").textContent).not.toBe("Could not reach artisign. Try again.");
+    // The cause is logged, not only drawn into a line the next render may hide.
+    expect(consoleError.mock.calls.some(([e]) => e instanceof Error && /screens exploded/.test(e.message))).toBe(true);
+  });
+
+  it("the message of an earlier visit to the no-project card does not come back with it", async () => {
+    projects = { active: null, open: [], recent: ["/work/gone"] };
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (url, init) => (String(url) === "/api/projects/open" ? { ok: false, status: 404, statusText: "x", json: async () => ({ message: "gone" }) } : realFetch(url, init)));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await boot();
+    $("#empty-recent-list .empty-recent-row").click();
+    await flush();
+    expect($("#empty-error").hidden).toBe(false);
+    projects = { active: "/p", open: [{ root: "/p", name: "alpha" }], recent: [] };
+    emit(liveSource(), { type: "project-opened", root: "/p" });
+    await flush();
+    projects = { active: null, open: [], recent: ["/work/gone"] };
+    emit(liveSource(), { type: "project-closed", root: "/p" });
+    await flush();
+    expect($("#no-project-state").hidden).toBe(false);
+    expect($("#empty-error").hidden).toBe(true);
+    expect($("#empty-error").textContent).toBe("");
+  });
+
+  it("a request that breaks says so too, and the row comes back", async () => {
+    projects = { active: null, open: [], recent: ["/work/acme"] };
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (url, init) => {
+      if (String(url) === "/api/projects/open") throw new Error("network down");
+      return realFetch(url, init);
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await boot();
+    $("#empty-recent-list .empty-recent-row").click();
+    await flush();
+    expect($("#empty-error").textContent).toBe("Could not reach artisign. Try again.");
+    expect($("#empty-recent-list .empty-recent-row").hasAttribute("aria-disabled")).toBe(false);
   });
 
   it("tells recents that share a base name apart by their shortened path, with the full path as title", async () => {

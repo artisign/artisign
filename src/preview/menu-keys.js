@@ -1,4 +1,4 @@
-// Keyboard helpers shared by the project menu, the variant popover, the project dialogs and the shortcut reference (CHR-920): arrow-key movement through a list of rows, a roving tab stop, and a Tab focus trap. Plain functions over DOM nodes, no state.
+// Keyboard helpers shared by the project menu, the variant popover, the project dialogs and the shortcut reference (CHR-920): arrow-key movement through a list of rows, a roving tab stop, and the focused-row bookkeeping around a rebuild (a modal dialog's Tab trap is the browser's). Plain functions over DOM nodes, no state.
 
 const FOCUSABLE = 'button, [href], input:not([type="hidden"]), select, textarea, [tabindex]';
 
@@ -56,38 +56,6 @@ export function handleListArrowKeys(evt, rows, { wrap = true } = {}) {
  */
 export function setRovingTabindex(rows, active) {
   for (const row of rows) row.tabIndex = row === active ? 0 : -1;
-}
-
-/**
- * Keeps Tab / Shift+Tab inside `container`: past the last control it wraps to the first and the other way round; with focus outside, Tab enters at the first. Returns whether it took over the key.
- *
- * @param {KeyboardEvent} evt
- * @param {HTMLElement} container
- * @returns {boolean}
- */
-export function trapFocus(evt, container) {
-  if (evt.key !== "Tab" || evt.defaultPrevented || evt.ctrlKey || evt.metaKey || evt.altKey) return false;
-  const items = tabbableWithin(container);
-  if (items.length === 0) {
-    evt.preventDefault();
-    container.focus();
-    return true;
-  }
-  const first = items[0];
-  const last = items[items.length - 1];
-  const active = document.activeElement;
-  const inside = container.contains(active);
-  if (evt.shiftKey && (!inside || active === first || active === container)) {
-    evt.preventDefault();
-    last.focus();
-    return true;
-  }
-  if (!evt.shiftKey && (!inside || active === last)) {
-    evt.preventDefault();
-    first.focus();
-    return true;
-  }
-  return false;
 }
 
 /**

@@ -1,7 +1,7 @@
-// Update notice (CHR-927, `shell-update-notice`): a toast in the upper right corner, right below the settings trigger (CHR-929) when the daemon reports a newer release. Closing it hides that version for the rest of the local calendar day; the pref (`<day>|<version>`) is daemon-stored, so it holds in every browser, and a newer release shows again at once. Copy only — updating is `artisign update` in a terminal.
+// Update notice (CHR-927, `shell-update-notice`): a toast in the upper right corner, right below the settings trigger (CHR-929) when the daemon reports a newer release. CHR-1272: a `popover="manual"` in the "Notifications" region (top layer, no light dismiss, never takes focus) where the browser has the API, a plain fixed box where it does not; the announcement is a polite status node that only changes when the announced version does. Closing it hides that version for the rest of the local calendar day; the pref (`<day>|<version>`) is daemon-stored, so it holds in every browser, and a newer release shows again at once. Copy only — updating is `artisign update` in a terminal.
 
 import { readStringPref, writeStringPref } from "./prefs.js";
-import { createCopyChip } from "./clipboard.js";
+import { createCodeField } from "./clipboard.js";
 
 export const UPDATE_DISMISSED_KEY = "artisign.updateNoticeDismissedOn";
 export const UPDATE_COMMAND = "artisign update";
@@ -18,28 +18,53 @@ export function localDay(now = new Date()) {
 }
 
 /**
- * @param {{ toastEl: HTMLElement, titleEl: HTMLElement, commandEl: HTMLElement, closeEl: HTMLElement, storage: Storage | null }} els `commandEl` receives the copy chip
+ * @param {{ toastEl: HTMLElement, titleEl: HTMLElement, commandEl: HTMLElement, closeEl: HTMLElement, liveEl: HTMLElement, storage: Storage | null, fallbackFocusEl?: HTMLElement }} els `commandEl` receives the code field; `liveEl` is the always-present polite status node the announcement goes through; `fallbackFocusEl`: where focus goes when the toast closes with focus inside it
  * @returns {{ render: (about: { updateAvailable: boolean, latest?: string } | null) => void }}
  */
-export function createUpdateNotice({ toastEl, titleEl, commandEl, closeEl, storage }) {
-  commandEl.replaceChildren(createCopyChip(UPDATE_COMMAND));
+export function createUpdateNotice({ toastEl, titleEl, commandEl, closeEl, liveEl, storage, fallbackFocusEl }) {
+  const native = typeof toastEl.showPopover === "function";
+  commandEl.replaceChildren(createCodeField(UPDATE_COMMAND, { variant: "compact" }));
   /** @type {{ updateAvailable: boolean, latest?: string } | null} */
   let current = null;
 
-  /** Applies the rule to the latest daemon facts: shown only for an available update that was not dismissed today. Called again by the hourly re-read, so a notice dismissed yesterday reappears after midnight. */
+  const isShown = () => (native ? toastEl.matches(":popover-open") : toastEl.hasAttribute("data-open"));
+
+  /** The toast is wanted (an update that was not dismissed), whether or not it can show right now. */
+  let wanted = false;
+  /** A modal dialog owns the page: a toast shown over its scrim would sit in the top layer above it, and inert. */
+  const dialogOpen = () => document.querySelector("dialog.float-dialog[open], dialog.uc-dialog[open]") !== null;
+
+  /** @param {boolean} show */
+  function setShown(show) {
+    if (show && dialogOpen()) show = false; // it shows once that dialog has closed
+    if (show === isShown()) return;
+    if (native) {
+      if (show) toastEl.showPopover();
+      else toastEl.hidePopover();
+    } else toastEl.toggleAttribute("data-open", show);
+  }
+
+  /** Applies the rule to the latest daemon facts: shown only for an available update that was not dismissed today. Called again by the hourly re-read, so a notice dismissed yesterday reappears after midnight. The announcement changes only when the notice appears or names another version, never on a re-read that finds the same. */
   function render(about) {
     current = about;
     const dismissed = Boolean(about?.latest) && readStringPref(storage, UPDATE_DISMISSED_KEY, null) === `${localDay()}|${about.latest}`;
     const show = Boolean(about?.updateAvailable && about.latest) && !dismissed;
-    if (show) titleEl.textContent = `artisign ${about.latest} is available`;
-    toastEl.hidden = !show;
+    const title = show ? `artisign ${about.latest} is available` : "";
+    if (show && titleEl.textContent !== title) titleEl.textContent = title;
+    if (liveEl.textContent !== title) liveEl.textContent = title;
+    wanted = show;
+    setShown(show);
   }
+
+  // `close` does not bubble: capture it on the document to learn that a dialog has closed.
+  document.addEventListener("close", () => setShown(wanted), true);
 
   closeEl.addEventListener("click", () => {
     if (current?.latest) writeStringPref(storage, UPDATE_DISMISSED_KEY, `${localDay()}|${current.latest}`);
+    const hadFocus = toastEl.contains(document.activeElement);
     render(current);
+    if (hadFocus) fallbackFocusEl?.focus(); // the focused control is gone with the toast: focus must not fall to <body>
   });
 
   return { render };
 }
-

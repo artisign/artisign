@@ -575,6 +575,8 @@ export function createBoardComments({ layerEl, surfaceEl, geometry, onOpenInScre
     (evt) => {
       // Only while the board shows: the capture listener must not swallow Esc in another view.
       if (evt.key !== "Escape" || !active || layerEl.closest("[hidden]")) return;
+      // A modal dialog owns Escape (the browser closes it); a preview behind it must not take the key first.
+      if (document.querySelector("dialog.float-dialog[open], dialog.uc-dialog[open]")) return;
       evt.preventDefault();
       evt.stopPropagation();
       closePreview(true);

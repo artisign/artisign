@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import html from "./index.html?raw";
 import { fakeSettings } from "./fake-settings.test-helper.js";
+import { installDialogStubs, pressEscape, clickScrim } from "./dialog-stub.test-helper.js";
 
 const bodyHtml = html.slice(html.indexOf("<body>") + 6, html.lastIndexOf('<script type="module"'));
 
@@ -63,7 +64,7 @@ const flush = async () => {
 };
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
-const dialogOpen = () => !$("#whats-new-scrim").hidden;
+const dialogOpen = () => /** @type {HTMLDialogElement} */ ($("#whats-new-dialog")).open;
 
 async function boot(prefs) {
   stubDaemon(prefs);
@@ -72,8 +73,7 @@ async function boot(prefs) {
 }
 
 beforeEach(() => {
-  // A previous test's app.js keeps its document listeners; an Escape closes whatever dialog it left open so it cannot swallow this test's keys.
-  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+  installDialogStubs();
   memoryStorage.clear();
   vi.resetModules();
   document.body.innerHTML = bodyHtml;
@@ -88,7 +88,7 @@ describe("What's New after an update", () => {
     expect($$(".whats-new-version").map((e) => e.textContent)).toEqual(["2.2.0", "2.1.1"]);
     expect($(".whats-new-date").textContent).toBe("2026-11-02");
     expect($$(".whats-new-body h5").map((e) => e.textContent)).toEqual(["Added", "Fixed"]);
-    expect($("#whats-new-summary").textContent).toBe("Showing 2 releases · full history in CHANGELOG.md");
+    expect($("#whats-new-summary").textContent).toBe("Showing 2 releases. The full history is in CHANGELOG.md.");
     expect(settings.prefs["artisign.whatsNewSeen"]).toBe("2.1.0");
 
     $("#whats-new-done").click();
@@ -105,10 +105,32 @@ describe("What's New after an update", () => {
 
   it("Escape closes it and also records the version", async () => {
     await boot({ "artisign.whatsNewSeen": "2.1.1" });
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    expect(pressEscape($("#whats-new-dialog"))).toBe(true);
     await flush();
     expect(dialogOpen()).toBe(false);
     expect(settings.prefs["artisign.whatsNewSeen"]).toBe("2.2.0");
+  });
+
+  it("marks the release of the running version Installed, and only that one", async () => {
+    await boot({ "artisign.whatsNewSeen": "2.1.0" });
+    const releases = $$(".whats-new-release");
+    expect(releases.map((r) => r.querySelector(".whats-new-installed")?.textContent ?? null)).toEqual(["Installed", null]);
+    expect(releases[0].querySelector(".whats-new-version").textContent).toBe("2.2.0");
+  });
+
+  it("every way of closing it (button, X, scrim, Escape) records the version and drops the notes", async () => {
+    for (const close of [() => $("#whats-new-done").click(), () => $("#whats-new-close").click(), () => clickScrim($("#whats-new-dialog")), () => pressEscape($("#whats-new-dialog"))]) {
+      document.body.innerHTML = bodyHtml;
+      vi.resetModules();
+      await boot({ "artisign.whatsNewSeen": "2.1.0" });
+      expect(dialogOpen()).toBe(true);
+      close();
+      await flush();
+      expect(dialogOpen()).toBe(false);
+      expect(settings.prefs["artisign.whatsNewSeen"]).toBe("2.2.0");
+      expect($("#whats-new-body").children).toHaveLength(0); // nothing stale behind a closed dialog
+      expect($("#whats-new-summary").textContent).toBe("");
+    }
   });
 
   it("records the version silently on a fresh install", async () => {
@@ -137,7 +159,7 @@ describe("What's New from the settings menu", () => {
     expect(dialogOpen()).toBe(true);
     expect(whatsNewQueries).toEqual([null]);
     expect($$(".whats-new-version").map((e) => e.textContent)).toEqual(["2.2.0", "2.1.1", "2.1.0"]);
-    expect($("#whats-new-summary").textContent).toBe("Showing 3 releases · full history in CHANGELOG.md");
+    expect($("#whats-new-summary").textContent).toBe("Showing 3 releases. The full history is in CHANGELOG.md.");
     $("#whats-new-close").click();
     expect(dialogOpen()).toBe(false);
     expect(document.activeElement).toBe($("#settings-trigger"));

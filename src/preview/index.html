@@ -61,13 +61,13 @@
             <span id="topbar-connection" class="live-chip" role="status" data-state="live" data-tooltip="Live reload: connected"><span class="live-chip-dot" aria-hidden="true"></span><span id="topbar-connection-label">Live</span></span>
           </span>
           <button type="button" id="warning-badge" class="chrome-chip chrome-chip--warning" title="Render diagnostics — click to step through" hidden></button>
-          <!-- CHR-926: app settings (theme, the per-browser toggles), MCP setup and About. An ARIA menu like the zoom menu (CHR-920); wired by settings-menu.js. -->
+          <!-- CHR-926: app settings (theme, the per-browser toggles), MCP setup and About. CHR-1272: a floating popover (design `float-popover`, `shell-settings-menu`), opened by its declared invoker, the gear; an ARIA menu wired by settings-menu.js. -->
           <div id="settings-controls">
-            <button type="button" id="settings-trigger" class="chrome-icon-btn" aria-haspopup="true" aria-expanded="false" aria-controls="settings-menu" aria-label="Settings" data-tooltip="Settings">
+            <button type="button" id="settings-trigger" class="chrome-icon-btn" popovertarget="settings-menu" aria-haspopup="menu" aria-expanded="false" aria-controls="settings-menu" aria-label="Settings" data-tooltip="Settings">
               <span class="icon" aria-hidden="true">settings</span>
             </button>
-            <div id="settings-menu" class="chrome-menu" role="menu" aria-label="Settings" hidden>
-              <h4 class="chrome-menu-label" role="presentation">App settings</h4>
+            <div id="settings-menu" class="float-popover" popover="auto" role="menu" aria-label="Settings">
+              <span class="float-popover-label" role="presentation">App settings</span>
               <div class="settings-theme-row" role="presentation">
                 <span id="settings-theme-label">Theme</span>
                 <div id="settings-theme" class="settings-seg" role="group" aria-labelledby="settings-theme-label">
@@ -76,25 +76,26 @@
                   <button type="button" class="settings-seg-button" role="menuitemradio" aria-checked="false" data-theme-pref="dark"><span class="icon" aria-hidden="true">dark_mode</span>Dark</button>
                 </div>
               </div>
-              <button type="button" class="chrome-menu-item settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="follow"><span>Follow agent by default</span><span class="settings-switch" aria-hidden="true"></span></button>
-              <button type="button" class="chrome-menu-item settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="clusters"><span>Board clusters</span><span class="settings-switch" aria-hidden="true"></span></button>
-              <button type="button" class="chrome-menu-item settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="edges"><span>Board edges</span><span class="settings-switch" aria-hidden="true"></span></button>
-              <button type="button" class="chrome-menu-item settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="sidebar-tags"><span>Tags in sidebar</span><span class="settings-switch" aria-hidden="true"></span></button>
-              <div class="chrome-menu-divider" role="separator"></div>
-              <h4 class="chrome-menu-label" role="presentation">MCP setup</h4>
-              <button type="button" id="settings-mcp" class="chrome-menu-item settings-item-detail" role="menuitem">
-                <span class="icon chrome-menu-icon" aria-hidden="true">electrical_services</span>
-                <span class="settings-item-text"><span>Connect AI tools…</span><span id="settings-mcp-sub" class="settings-item-sub" hidden></span></span>
+              <button type="button" class="settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="follow"><span>Follow the agent by default</span><span class="settings-switch" aria-hidden="true"></span></button>
+              <button type="button" class="settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="clusters"><span>Clusters on the Board</span><span class="settings-switch" aria-hidden="true"></span></button>
+              <button type="button" class="settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="edges"><span>Flow arrows on the Board</span><span class="settings-switch" aria-hidden="true"></span></button>
+              <button type="button" class="settings-toggle-row" role="menuitemcheckbox" aria-checked="false" data-setting="sidebar-tags"><span>Tags in the screen list</span><span class="settings-switch" aria-hidden="true"></span></button>
+              <span class="float-popover-divider" role="separator"></span>
+              <span class="float-popover-label" role="presentation">MCP setup</span>
+              <button type="button" id="settings-mcp" class="settings-item-detail" role="menuitem">
+                <span class="settings-item-icon" aria-hidden="true"><span class="icon">electrical_services</span></span>
+                <span class="settings-item-text"><span class="settings-item-label">Connect AI tools…</span><span id="settings-mcp-sub" class="settings-item-sub" hidden></span></span>
+                <span class="icon settings-item-chevron" aria-hidden="true">chevron_right</span>
               </button>
               <div id="settings-about" role="presentation" hidden>
-                <div class="chrome-menu-divider" role="separator"></div>
-                <h4 class="chrome-menu-label" role="presentation">About artisign</h4>
+                <span class="float-popover-divider" role="separator"></span>
+                <span class="float-popover-label" role="presentation">About artisign</span>
                 <div id="settings-about-row" class="settings-about-row" role="presentation">
                   <span id="settings-version"></span>
                   <span id="settings-update-status" class="settings-update-status" hidden><span id="settings-update-icon" class="icon" aria-hidden="true"></span><span id="settings-update-text"></span></span>
                 </div>
                 <div id="settings-update-cmd" class="settings-update-cmd" role="presentation" hidden></div>
-                <button type="button" id="settings-whats-new" class="chrome-menu-item" role="menuitem" tabindex="-1"><span class="icon chrome-menu-icon" aria-hidden="true">new_releases</span>What's New</button>
+                <button type="button" id="settings-whats-new" class="float-menu-item" role="menuitem" tabindex="-1"><span class="icon float-menu-icon" aria-hidden="true">new_releases</span>What's New</button>
               </div>
             </div>
           </div>
@@ -168,33 +169,31 @@
             <nav id="variant-bar" aria-label="Variant path" hidden></nav>
             <div id="screens-stage">
             <div id="canvas">
-              <!-- CHR-890: how-to-start guide, shown on the bare canvas (the frame is hidden) while the project has no screens. Native size, outside the zoomed #screen-holder. -->
-              <div id="empty-guide" hidden>
-                <div id="empty-guide-head">
-                  <p id="empty-guide-label">Get started</p>
-                  <h2 id="empty-guide-title">Design your first screen</h2>
-                </div>
+              <!-- CHR-890: how-to-start guide, shown on the bare canvas (the frame is hidden) while the project has no screens. CHR-1272: a floating card (design `get-started-card`) centred on the dotted workspace, not zoom-scaled. -->
+              <section id="empty-guide" aria-labelledby="empty-guide-title" hidden>
+                <p id="empty-guide-label">Get started</p>
+                <h2 id="empty-guide-title">Design your first screen</h2>
                 <ol id="empty-guide-steps">
                   <li>
-                    <span class="empty-guide-num">1</span>
+                    <span class="empty-guide-num" aria-hidden="true">1</span>
                     <div class="empty-guide-body">
-                      <div class="empty-guide-text">Ask your AI tool to design a screen in this project.</div>
+                      <p class="empty-guide-text">Ask your AI tool to design a screen in this project.</p>
                       <div id="empty-guide-prompt-box">
-                        <span id="empty-guide-prompt"></span>
-                        <button type="button" id="empty-guide-copy" class="chrome-btn chrome-btn--compact">Copy</button>
+                        <code id="empty-guide-prompt"></code>
+                        <button type="button" id="empty-guide-copy" class="float-btn float-btn--field"><span class="icon" aria-hidden="true">content_copy</span><span id="empty-guide-copy-label">Copy</span></button>
                       </div>
                     </div>
                   </li>
                   <li>
-                    <span class="empty-guide-num">2</span>
-                    <div class="empty-guide-body"><div class="empty-guide-text">Watch it appear here while the agent works.</div></div>
+                    <span class="empty-guide-num" aria-hidden="true">2</span>
+                    <div class="empty-guide-body"><p class="empty-guide-text">Watch it appear here while the agent works.</p></div>
                   </li>
                   <li>
-                    <span class="empty-guide-num">3</span>
-                    <div class="empty-guide-body"><div class="empty-guide-text">Review it. Use Comment mode to leave feedback the agent reads.</div></div>
+                    <span class="empty-guide-num" aria-hidden="true">3</span>
+                    <div class="empty-guide-body"><p class="empty-guide-text">Review it. Use the Comment tool to leave feedback the agent reads.</p></div>
                   </li>
                 </ol>
-              </div>
+              </section>
               <div id="frame-caption" hidden></div>
               <div id="screen-holder">
                 <!--
@@ -295,17 +294,21 @@
               <button type="button" id="board-empty-clear" class="chrome-btn">Clear filter</button>
             </div>
           </div>
-          <!-- CHR-927: update notice. A polite live region that is always present (so the toast is announced when it appears); the toast over the canvas never moves the layout. -->
-          <div id="update-notice" role="status" aria-live="polite">
-            <div id="update-toast" class="update-toast" hidden>
-              <span class="icon update-toast-icon" aria-hidden="true">upgrade</span>
+          <!-- CHR-927: update notice. CHR-1272: the "Notifications" region of the floating chrome (design `shell-update-notice`); the toast is a `popover="manual"` under the settings button (no light dismiss, never takes focus). The status node is the one live region, always present, and only changes when the announced version does. -->
+          <section id="toast-region" role="region" aria-label="Notifications">
+            <p id="update-live" class="visually-hidden" role="status"></p>
+            <div id="update-toast" class="update-toast" popover="manual">
+              <span class="update-toast-icon-box" aria-hidden="true"><span class="icon">upgrade</span></span>
               <div class="update-toast-body">
-                <span id="update-toast-title" class="update-toast-title"></span>
+                <div class="update-toast-text">
+                  <span id="update-toast-title" class="update-toast-title"></span>
+                  <span class="update-toast-sub">Run this in a terminal. It restarts artisign on the same port.</span>
+                </div>
                 <div id="update-toast-command"></div>
               </div>
-              <button type="button" id="update-toast-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Hide for today" data-tooltip="Hide for today"><span class="icon" aria-hidden="true">close</span></button>
+              <button type="button" id="update-toast-close" class="float-icon-btn" aria-label="Hide for today" title="Hide for today"><span class="icon" aria-hidden="true">close</span></button>
             </div>
-          </div>
+          </section>
         </main>
         <!-- CHR-1269: the Agent bar — the right column's floating card (design `float-card` + `agent-status` + `agent-activity` + `agent-note`). What the agent is doing now, the Follow switch, the Activity feed and the note field for the agent. It folds to its head by itself while a tool panel below takes the column (agent-bar.js). The grip drags it (position remembered), the chevron folds it. -->
         <aside id="agent-bar" class="float-card" data-collapsed="false" aria-labelledby="agent-bar-title">
@@ -412,159 +415,187 @@
           </div>
         </div>
       </div>
+      <!-- CHR-1272: no project open (design `no-project-empty-state`). Only the brand with the "No project" picker and the settings button stay in the top bar (the rest is project-only); this card sits on the dotted workspace. -->
       <main id="no-project-state" hidden>
-        <section id="empty-card">
-          <span id="empty-icon" class="icon" aria-hidden="true">folder_open</span>
-          <h1 id="empty-title">No project open</h1>
-          <p id="empty-copy">artisign is running, but no project is open yet. Open or create one here, or ask your AI tool to do it.</p>
-          <div id="empty-actions">
-            <button type="button" id="empty-btn-open" class="chrome-btn chrome-btn--primary">Open project…</button>
-            <button type="button" id="empty-btn-init" class="chrome-btn">New project…</button>
+        <section id="empty-card" aria-labelledby="empty-title">
+          <span id="empty-icon-box" aria-hidden="true"><span id="empty-icon" class="icon">folder_open</span></span>
+          <div id="empty-text">
+            <h1 id="empty-title">No project open</h1>
+            <p id="empty-copy">artisign is running, but no project is open yet. Open or create one here, or ask your AI tool to do it.</p>
           </div>
+          <div id="empty-actions">
+            <button type="button" id="empty-btn-open" class="dialog-btn dialog-btn--confirm" autofocus>Open project…</button>
+            <button type="button" id="empty-btn-init" class="dialog-btn">New project…</button>
+          </div>
+          <p id="empty-error" class="dialog-error" role="alert" hidden></p>
           <div id="empty-ai">
-            <p id="empty-ai-label">Or ask your AI tool</p>
-            <p id="empty-ai-prompt">Create an artisign project in ~/work/acme</p>
+            <h2 id="empty-ai-label">Or ask your AI tool</h2>
+            <div id="empty-ai-prompt"></div>
             <p id="empty-ai-more">To pick up an existing one, ask: “Open my project acme”.</p>
           </div>
-          <div id="empty-recent">
-            <p id="empty-recent-label">Recent</p>
-            <div id="empty-recent-list"></div>
-          </div>
+          <nav id="empty-recent" aria-labelledby="empty-recent-label" hidden>
+            <h2 id="empty-recent-label">Recent</h2>
+            <ul id="empty-recent-list"></ul>
+          </nav>
         </section>
       </main>
     </div>
-    <!-- CHR-916: the keyboard shortcut reference (?), built from the shortcut mapping by shortcuts-dialog.js. -->
-    <div id="shortcuts-scrim" class="chrome-scrim" hidden>
-      <section id="shortcuts-dialog" class="chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" tabindex="-1">
-        <div class="dialog-head">
-          <h1 id="shortcuts-title" class="dialog-title">Keyboard shortcuts</h1>
-          <button type="button" id="shortcuts-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
-        </div>
-        <p class="dialog-sub">Single keys work while no text field has focus. Nothing fires with Ctrl, Cmd or Alt held, so browser shortcuts stay untouched.</p>
-        <div id="shortcuts-columns"></div>
-      </section>
-    </div>
+    <!-- CHR-916: the keyboard shortcut reference (?), built from the shortcut mapping by shortcuts-dialog.js. CHR-1272: every dialog below is a native modal <dialog> in the floating look (design pattern `float-dialog`): opened with showModal() (the browser traps Tab, closes on Escape and, with closedby="any", on a click on the scrim); focus goes back to the opener (float-dialog.js). -->
+    <dialog id="shortcuts-dialog" class="float-dialog" aria-labelledby="shortcuts-title" closedby="any" tabindex="-1">
+        <header class="float-dialog-head">
+          <div class="float-dialog-titles">
+            <h1 id="shortcuts-title" class="float-dialog-title">Keyboard shortcuts</h1>
+          <p id="shortcuts-sub" class="float-dialog-sub">Single keys work while no text field has focus. Nothing fires with Ctrl, Cmd or Alt held, so browser shortcuts stay untouched.</p>
+          </div>
+          <button type="button" id="shortcuts-close" class=" float-icon-btn" aria-label="Close" title="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </header>
+      <div id="shortcuts-columns" class="float-dialog-body"></div>
+    </dialog>
     <!-- CHR-926: Connect AI tools — which tools are connected and what to copy to connect the rest (copy only). CHR-1048: a second tab shows the artisign agent skill (SKILL.md: read, copy, download; per-tool status), and a reader step swaps in for the tabs. Content built by mcp-dialog.js from GET /api/setup. -->
-    <div id="mcp-scrim" class="chrome-scrim" hidden>
-      <section id="mcp-dialog" class="chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="mcp-title" tabindex="-1">
-        <div id="mcp-main" class="mcp-view">
-          <div class="dialog-head">
-            <h1 id="mcp-title" class="dialog-title">Connect AI tools</h1>
-            <button type="button" id="mcp-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
+    <dialog id="mcp-dialog" class="float-dialog" aria-labelledby="mcp-title" closedby="any">
+      <div id="mcp-main" class="mcp-view">
+        <header class="float-dialog-head">
+          <div class="float-dialog-titles">
+            <h1 id="mcp-title" class="float-dialog-title">Connect AI tools</h1>
+          <p id="mcp-sub" class="float-dialog-sub">Give your AI tools the artisign MCP server, then teach them the conventions with the agent skill.</p>
           </div>
-          <div class="mcp-tabs" role="tablist" aria-label="Connect AI tools">
-            <button type="button" id="mcp-tab-mcp" class="chrome-tab" role="tab" aria-selected="true" aria-controls="mcp-panel-mcp">MCP server</button>
-            <button type="button" id="mcp-tab-skill" class="chrome-tab" role="tab" aria-selected="false" aria-controls="mcp-panel-skill" tabindex="-1">Agent skill</button>
-          </div>
+          <button type="button" id="mcp-close" class=" float-icon-btn" aria-label="Close" title="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </header>
+        <div class="mcp-tabs" role="tablist" aria-label="Setup">
+          <button type="button" id="mcp-tab-mcp" class="float-btn" role="tab" aria-selected="true" aria-controls="mcp-panel-mcp">MCP server</button>
+          <button type="button" id="mcp-tab-skill" class="float-btn" role="tab" aria-selected="false" aria-controls="mcp-panel-skill" tabindex="-1">Agent skill</button>
+        </div>
+        <div class="float-dialog-body mcp-body">
           <div id="mcp-panel-mcp" class="mcp-view" role="tabpanel" aria-labelledby="mcp-tab-mcp">
-            <div id="mcp-command" class="mcp-group"></div>
-            <div class="mcp-group">
-              <div class="mcp-list-label">Or add it by hand, per tool</div>
-              <div id="mcp-clients" class="mcp-clients"></div>
+            <div class="float-dialog-group">
+              <h2 class="float-dialog-group-label">All tools at once</h2>
+              <div id="mcp-command" class="float-dialog-group-body"></div>
             </div>
-            <div class="mcp-actions">
-              <span id="mcp-summary" class="mcp-summary"></span>
-              <button type="button" id="mcp-done" class="chrome-btn chrome-btn--primary">Done</button>
+            <div class="float-dialog-group">
+              <h2 class="float-dialog-group-label">Or one tool at a time</h2>
+              <ul id="mcp-clients" class="status-list"></ul>
             </div>
           </div>
           <div id="mcp-panel-skill" class="mcp-view" role="tabpanel" aria-labelledby="mcp-tab-skill" hidden>
-            <div id="skill-card" class="mcp-card"></div>
-            <div id="skill-command" class="mcp-group"></div>
-            <div class="mcp-group">
-              <div class="mcp-list-label">Status per tool</div>
+            <div id="skill-card"></div>
+            <div class="float-dialog-group">
+              <h2 class="float-dialog-group-label">Install it</h2>
+              <div id="skill-command" class="float-dialog-group-body"></div>
+            </div>
+            <div class="float-dialog-group">
+              <h2 class="float-dialog-group-label">Status per tool</h2>
               <div id="skill-clients"></div>
             </div>
-            <div class="mcp-actions">
-              <span id="skill-summary" class="mcp-summary"></span>
-              <button type="button" id="skill-done" class="chrome-btn chrome-btn--primary">Done</button>
-            </div>
           </div>
         </div>
-        <div id="mcp-reader" class="mcp-view" hidden>
-          <div class="dialog-head mcp-reader-head">
-            <button type="button" id="mcp-reader-back" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Back to Agent skill" data-tooltip="Back"><span class="icon" aria-hidden="true">arrow_back</span></button>
-            <h1 id="mcp-reader-title" class="dialog-title mcp-reader-title">SKILL.md</h1>
-            <button type="button" id="mcp-reader-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
-          </div>
-          <div class="mcp-reader-meta">This is the file <span class="mcp-path">artisign setup --skill</span> puts into each tool's skills folder.</div>
-          <div class="mcp-reader-frame">
-            <div id="mcp-reader-body" class="md mcp-reader-body" tabindex="0" role="region" aria-label="SKILL.md"></div>
-            <div class="mcp-reader-fade" aria-hidden="true"></div>
-          </div>
-          <div class="mcp-actions">
-            <button type="button" id="mcp-reader-copy" class="chrome-btn">Copy SKILL.md</button>
-            <button type="button" id="mcp-reader-download" class="chrome-btn">Download</button>
-            <span class="mcp-actions-spacer"></span>
-            <button type="button" id="mcp-reader-done" class="chrome-btn chrome-btn--primary">Back</button>
-          </div>
+        <footer class="float-dialog-foot">
+          <span id="mcp-summary" class="float-dialog-summary" role="status"></span>
+          <button type="button" id="mcp-done" class="dialog-btn dialog-btn--confirm" autofocus>Done</button>
+        </footer>
+      </div>
+      <div id="mcp-reader" class="mcp-view" hidden>
+        <header class="float-dialog-head mcp-reader-head">
+          <button type="button" id="mcp-reader-back" class="float-icon-btn" aria-label="Back to Agent skill" title="Back to Agent skill"><span class="icon" aria-hidden="true">arrow_back</span></button>
+          <h1 id="mcp-reader-title" class="float-dialog-title mcp-reader-title">SKILL.md</h1>
+          <button type="button" id="mcp-reader-close" class="float-icon-btn" aria-label="Close" title="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </header>
+        <p class="mcp-reader-meta">This is the file <code class="mcp-path">artisign setup --skill</code> puts into each tool's skills folder.</p>
+        <div class="mcp-reader-frame">
+          <article id="mcp-reader-body" class="md mcp-reader-body" tabindex="0" aria-label="SKILL.md"></article>
+          <div class="mcp-reader-fade" aria-hidden="true"></div>
         </div>
-      </section>
-    </div>
+        <footer class="float-dialog-foot mcp-reader-foot">
+          <button type="button" id="mcp-reader-copy" class="dialog-btn">Copy SKILL.md</button>
+          <button type="button" id="mcp-reader-download" class="dialog-btn dialog-btn--ghost">Download</button>
+          <span class="mcp-actions-spacer"></span>
+          <button type="button" id="mcp-reader-done" class="dialog-btn dialog-btn--confirm">Back</button>
+        </footer>
+      </div>
+    </dialog>
     <!-- CHR-928: What's New — the CHANGELOG sections since the last seen version, once after an update; reopened from the settings menu. Content built by whats-new.js from GET /api/whats-new. -->
-    <div id="whats-new-scrim" class="chrome-scrim" hidden>
-      <section id="whats-new-dialog" class="chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="whats-new-title" tabindex="-1">
-        <div class="dialog-head whats-new-head">
-          <h1 id="whats-new-title" class="dialog-title">What's New</h1>
-          <button type="button" id="whats-new-close" class="chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
-        </div>
-        <div id="whats-new-body" class="whats-new-body-scroll"></div>
-        <div class="whats-new-foot">
-          <span id="whats-new-summary" class="whats-new-summary"></span>
-          <button type="button" id="whats-new-done" class="chrome-btn chrome-btn--primary">Close</button>
-        </div>
-      </section>
-    </div>
-    <div id="dialog-scrim" class="chrome-scrim" hidden>
-      <section id="open-project-dialog" class="project-dialog chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="open-project-title" tabindex="-1" hidden>
-        <div class="dialog-head">
-          <h1 id="open-project-title" class="dialog-title">Open project</h1>
-          <button type="button" class="dialog-close chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
-        </div>
-        <div class="quick-access">
-          <button type="button" class="quick-chip" data-quick="home"><span class="icon" aria-hidden="true">home</span>Home</button>
-          <button type="button" class="quick-chip" data-quick="workspace"><span class="icon" aria-hidden="true">folder_special</span>Workspace</button>
-          <button type="button" class="quick-chip" data-quick="desktop"><span class="icon" aria-hidden="true">desktop_windows</span>Desktop</button>
-        </div>
-        <div class="browse-bar">
-          <nav class="breadcrumbs"></nav>
-          <button type="button" class="btn-new-folder chrome-btn chrome-btn--ghost" aria-pressed="false"><span class="icon" aria-hidden="true">create_new_folder</span>New folder</button>
-        </div>
-        <div class="dir-list"></div>
-        <p class="selection-hint">Selected: <span class="selection-path">—</span> — folders already containing a project are badged.</p>
-        <p class="dialog-error" hidden></p>
-        <div class="dialog-actions">
-          <button type="button" class="btn-cancel chrome-btn">Cancel</button>
-          <button type="button" class="btn-confirm chrome-btn chrome-btn--primary" disabled>Open</button>
-        </div>
-      </section>
-      <section id="init-project-dialog" class="project-dialog chrome-dialog" role="dialog" aria-modal="true" aria-labelledby="init-project-title" tabindex="-1" hidden>
-        <div class="dialog-head">
-          <h1 id="init-project-title" class="dialog-title">New project</h1>
-          <button type="button" class="dialog-close chrome-icon-btn chrome-icon-btn--sm" aria-label="Close" data-tooltip="Close"><span class="icon" aria-hidden="true">close</span></button>
-        </div>
-        <p class="dialog-sub">Choose where the new project folder is created.</p>
-        <div class="quick-access">
-          <button type="button" class="quick-chip" data-quick="home"><span class="icon" aria-hidden="true">home</span>Home</button>
-          <button type="button" class="quick-chip" data-quick="workspace"><span class="icon" aria-hidden="true">folder_special</span>Workspace</button>
-          <button type="button" class="quick-chip" data-quick="desktop"><span class="icon" aria-hidden="true">desktop_windows</span>Desktop</button>
+    <dialog id="whats-new-dialog" class="float-dialog" aria-labelledby="whats-new-title" closedby="any">
+        <header class="float-dialog-head">
+          <div class="float-dialog-titles">
+            <h1 id="whats-new-title" class="float-dialog-title">What's New</h1>
+          <p id="whats-new-sub" class="float-dialog-sub">Release notes of the version you run and the one before it.</p>
+          </div>
+          <button type="button" id="whats-new-close" class=" float-icon-btn" aria-label="Close" title="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </header>
+      <div class="whats-new-scroll">
+        <div id="whats-new-body" class="whats-new-body-scroll" tabindex="0" role="region" aria-labelledby="whats-new-title"></div>
+      </div>
+      <footer class="float-dialog-foot">
+        <span id="whats-new-summary" class="float-dialog-summary"></span>
+        <button type="button" id="whats-new-done" class="dialog-btn dialog-btn--confirm" autofocus>Close</button>
+      </footer>
+    </dialog>
+    <!-- CHR-1272: Open project and New project (also opened from the project menu inside a project): one folder browser each, built by project-dialogs.js. -->
+    <dialog id="open-project-dialog" class="float-dialog project-dialog" aria-labelledby="open-project-title" aria-describedby="open-project-sub" closedby="any">
+        <header class="float-dialog-head">
+          <div class="float-dialog-titles">
+            <h1 id="open-project-title" class="float-dialog-title">Open project</h1>
+          <p id="open-project-sub" class="float-dialog-sub">Pick the folder that holds the project.</p>
+          </div>
+          <button type="button" class="dialog-close float-icon-btn" aria-label="Close" title="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </header>
+      <div class="float-dialog-body">
+        <div class="quick-access" role="group" aria-label="Places">
+          <button type="button" class="quick-chip" data-quick="home" aria-pressed="false" autofocus><span class="icon" aria-hidden="true">home</span>Home</button>
+          <button type="button" class="quick-chip" data-quick="workspace" aria-pressed="false"><span class="icon" aria-hidden="true">folder_special</span>Workspace</button>
+          <button type="button" class="quick-chip" data-quick="desktop" aria-pressed="false"><span class="icon" aria-hidden="true">desktop_windows</span>Desktop</button>
         </div>
         <div class="browse-bar">
-          <nav class="breadcrumbs"></nav>
-          <button type="button" class="btn-new-folder chrome-btn chrome-btn--ghost" aria-pressed="false"><span class="icon" aria-hidden="true">create_new_folder</span>New folder</button>
+          <nav class="breadcrumbs" aria-label="Folder path"><ol class="breadcrumb-list"></ol></nav>
+          <button type="button" class="btn-new-folder new-folder-btn" aria-expanded="false"><span class="icon" aria-hidden="true">create_new_folder</span>New folder</button>
         </div>
-        <div class="dir-list"></div>
-        <div class="field-name">
-          <label for="init-name-input">Project name</label>
-          <input type="text" id="init-name-input" class="field-name-input chrome-field" placeholder="my-new-project" autocomplete="off" />
+        <div class="new-folder-slot"></div>
+        <div class="dir-tray">
+          <div class="dir-list" role="listbox" aria-label="Folders" hidden></div>
+          <p class="dir-list-empty" hidden>No subfolders.</p>
         </div>
-        <p class="selection-hint">Will create: <span class="selection-path">—</span></p>
-        <p class="dialog-error" hidden></p>
-        <div class="dialog-actions">
-          <button type="button" class="btn-cancel chrome-btn">Cancel</button>
-          <button type="button" class="btn-confirm chrome-btn chrome-btn--primary" disabled>Create &amp; open</button>
+        <p class="selection-hint" aria-live="polite"></p>
+        <p class="dialog-error" role="alert" hidden></p>
+      </div>
+      <footer class="float-dialog-foot float-dialog-foot--end">
+        <button type="button" class="btn-cancel dialog-btn">Cancel</button>
+        <button type="button" class="btn-confirm dialog-btn dialog-btn--confirm" disabled>Open</button>
+      </footer>
+    </dialog>
+    <dialog id="init-project-dialog" class="float-dialog project-dialog" aria-labelledby="init-project-title" aria-describedby="init-project-sub" closedby="any">
+        <header class="float-dialog-head">
+          <div class="float-dialog-titles">
+            <h1 id="init-project-title" class="float-dialog-title">New project</h1>
+          <p id="init-project-sub" class="float-dialog-sub">Choose where the new project folder is created.</p>
+          </div>
+          <button type="button" class="dialog-close float-icon-btn" aria-label="Close" title="Close"><span class="icon" aria-hidden="true">close</span></button>
+        </header>
+      <div class="float-dialog-body">
+        <div class="quick-access" role="group" aria-label="Places">
+          <button type="button" class="quick-chip" data-quick="home" aria-pressed="false"><span class="icon" aria-hidden="true">home</span>Home</button>
+          <button type="button" class="quick-chip" data-quick="workspace" aria-pressed="false"><span class="icon" aria-hidden="true">folder_special</span>Workspace</button>
+          <button type="button" class="quick-chip" data-quick="desktop" aria-pressed="false"><span class="icon" aria-hidden="true">desktop_windows</span>Desktop</button>
         </div>
-      </section>
-    </div>
+        <div class="browse-bar">
+          <nav class="breadcrumbs" aria-label="Folder path"><ol class="breadcrumb-list"></ol></nav>
+          <button type="button" class="btn-new-folder new-folder-btn" aria-expanded="false"><span class="icon" aria-hidden="true">create_new_folder</span>New folder</button>
+        </div>
+        <div class="new-folder-slot"></div>
+        <div class="dir-tray">
+          <div class="dir-list" role="listbox" aria-label="Folders" hidden></div>
+          <p class="dir-list-empty" hidden>No subfolders.</p>
+        </div>
+        <div class="text-field">
+          <label for="init-name-input" class="text-field-label">Project name</label>
+          <input type="text" id="init-name-input" class="text-field-input" placeholder="my-new-project" autocomplete="off" spellcheck="false" aria-describedby="init-name-hint" autofocus />
+          <p id="init-name-hint" class="text-field-hint selection-hint"></p>
+        </div>
+        <p class="dialog-error" role="alert" hidden></p>
+      </div>
+      <footer class="float-dialog-foot float-dialog-foot--end">
+        <button type="button" class="btn-cancel dialog-btn">Cancel</button>
+        <button type="button" class="btn-confirm dialog-btn dialog-btn--confirm" disabled>Create &amp; open</button>
+      </footer>
+    </dialog>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

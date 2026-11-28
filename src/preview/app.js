@@ -34,6 +34,7 @@ import { createShortcutsDialog } from "./shortcuts-dialog.js";
 import { createSettingsMenu } from "./settings-menu.js";
 import { createMcpDialog } from "./mcp-dialog.js";
 import { createUpdateNotice, UPDATE_DISMISSED_KEY } from "./update-notice.js";
+import { copyWithLabel } from "./clipboard.js";
 import { createZoomPill } from "./zoom-pill.js";
 import { makeCardDraggable } from "./float-card.js";
 import { createToolBar } from "./tool-bar.js";
@@ -239,9 +240,11 @@ const menuRecentList = document.getElementById("menu-recent-list");
 const menuActionOpen = document.getElementById("menu-action-open");
 const menuActionInit = document.getElementById("menu-action-init");
 const emptyRecentList = document.getElementById("empty-recent-list");
+const emptyRecentEl = document.getElementById("empty-recent");
+const emptyPromptEl = document.getElementById("empty-ai-prompt");
+const emptyErrorEl = document.getElementById("empty-error");
 const emptyBtnOpen = document.getElementById("empty-btn-open");
 const emptyBtnInit = document.getElementById("empty-btn-init");
-const dialogScrim = document.getElementById("dialog-scrim");
 const openProjectDialogEl = document.getElementById("open-project-dialog");
 const initProjectDialogEl = document.getElementById("init-project-dialog");
 
@@ -710,6 +713,9 @@ const projectUI = createProjectUI(
     bodyEl,
     topbarEl: document.getElementById("topbar"),
     emptyRecentListEl: emptyRecentList,
+    emptyRecentEl,
+    emptyPromptEl,
+    emptyErrorEl,
     emptyBtnOpenEl: emptyBtnOpen,
     emptyBtnInitEl: emptyBtnInit,
   },
@@ -720,13 +726,23 @@ const projectUI = createProjectUI(
       renderProjects(projectsState, root); // before the load, so the picker never lags behind (or lies after a failed boot)
       await switchToProject(root);
     },
+    // Answers the message to show when it fails (the no-project card says it; the project menu has no place for one).
     onOpenRecent: async (dir) => {
-      const result = await openProject(dir);
-      if (result.ok) await applyProjectsResult(result.projects);
-      else {
-        console.error(result.message);
-        await syncProjects(); // the recent path may no longer exist — drop it from the list
+      // Only the request itself is "could not reach artisign"; a failure while applying its result is reported as what it is (it propagates to the card).
+      let result;
+      try {
+        result = await openProject(dir);
+      } catch (err) {
+        console.error(err);
+        return "Could not reach artisign. Try again.";
       }
+      if (result.ok) {
+        await applyProjectsResult(result.projects);
+        return null;
+      }
+      console.error(result.message);
+      await syncProjects(); // the recent path may no longer exist — drop it from the list
+      return result.message;
     },
     onOpenDialog: () => projectDialogs.showOpenDialog(),
     onInitDialog: () => projectDialogs.showInitDialog(),
@@ -734,7 +750,7 @@ const projectUI = createProjectUI(
 );
 
 const projectDialogs = createProjectDialogs(
-  { scrimEl: dialogScrim, openSectionEl: openProjectDialogEl, initSectionEl: initProjectDialogEl, fallbackFocusEl: projectPickerTrigger },
+  { openDialogEl: openProjectDialogEl, initDialogEl: initProjectDialogEl, fallbackFocusEl: projectPickerTrigger },
   {
     onOpen: async (dir) => {
       const result = await openProject(dir);
@@ -1887,19 +1903,9 @@ function syncGuidePrompt() {
   emptyGuidePromptEl.textContent = `Design a login screen in my artisign project ${projectPickerName.textContent}`;
 }
 
-let guideCopyTimer;
-emptyGuideCopyBtn.addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(emptyGuidePromptEl.textContent);
-  } catch {
-    return; // clipboard denied — the prompt stays selectable text
-  }
-  emptyGuideCopyBtn.textContent = "Copied";
-  clearTimeout(guideCopyTimer);
-  guideCopyTimer = setTimeout(() => {
-    emptyGuideCopyBtn.textContent = "Copy";
-  }, 1500);
-});
+const emptyGuideCopyLabel = document.getElementById("empty-guide-copy-label");
+// Copy: "Copied" on success, "Copy failed" (and the prompt stays selectable text) when the clipboard refuses (clipboard.js).
+emptyGuideCopyBtn.addEventListener("click", () => void copyWithLabel(emptyGuidePromptEl.textContent, emptyGuideCopyLabel));
 
 async function selectScreen(screen) {
   if (compare.isOn() && !compare.inFamily(screen)) compare.leave(); // compare belongs to one variant family (CHR-738)
@@ -2571,7 +2577,9 @@ zoomPill = createZoomPill({
 
 // A press inside a Board tile's document never reaches this one (no listener goes into a tile): the focus moving into the iframe is how it shows up here, and a native popover's light dismiss does not see it.
 window.addEventListener("blur", () => {
-  if (document.activeElement?.tagName === "IFRAME" && zoomPill?.isOpen()) zoomPill.close();
+  if (document.activeElement?.tagName !== "IFRAME") return;
+  if (zoomPill?.isOpen()) zoomPill.close();
+  settingsMenu.close();
 });
 
 // Capture + stopImmediatePropagation: this Escape only closes the popover, so inspect mode's Escape (clears its focus) must not also fire.
@@ -2848,14 +2856,14 @@ for (const tab of viewTabs) {
 // One keydown handler. shortcuts.js decides WHAT a key means (mapping, modifier / typing / IME / overlay guards); this only runs the matching action, through the control the click would use, so a disabled or hidden control makes the key a no-op. The handler listens on the top document and on each screen frame's document (same-origin srcdoc, re-attached on every load), so keys keep working once focus is inside the screen; the typing guard then looks at the frame's own target, so inputs in a user screen keep their keys. Inspect mode's own in-frame Escape (deselect) runs first (capture) and marks the event handled.
 
 const shortcutsDialog = createShortcutsDialog({
-  scrimEl: document.getElementById("shortcuts-scrim"),
-  columnsEl: document.getElementById("shortcuts-columns"),
+  dialogEl: document.getElementById("shortcuts-dialog"),
+  gridEl: document.getElementById("shortcuts-columns"),
   closeEl: document.getElementById("shortcuts-close"),
   mac: macPlatform,
   fallbackFocusEl: projectPickerTrigger,
 });
 const mcpDialog = createMcpDialog({
-  scrimEl: document.getElementById("mcp-scrim"),
+  dialogEl: document.getElementById("mcp-dialog"),
   commandEl: document.getElementById("mcp-command"),
   clientsEl: document.getElementById("mcp-clients"),
   summaryEl: document.getElementById("mcp-summary"),
@@ -2864,7 +2872,7 @@ const mcpDialog = createMcpDialog({
   fallbackFocusEl: projectPickerTrigger,
 });
 const whatsNewDialog = createWhatsNewDialog({
-  scrimEl: document.getElementById("whats-new-scrim"),
+  dialogEl: document.getElementById("whats-new-dialog"),
   bodyEl: document.getElementById("whats-new-body"),
   summaryEl: document.getElementById("whats-new-summary"),
   closeEl: document.getElementById("whats-new-close"),
@@ -2875,7 +2883,7 @@ const whatsNewDialog = createWhatsNewDialog({
 /** Every released section, from the settings menu (CHR-928). */
 async function openWhatsNew() {
   const notes = await fetchWhatsNew();
-  if (notes) whatsNewDialog.show(notes.releases);
+  if (notes) whatsNewDialog.show(notes.releases, { running: notes.version });
 }
 
 /** Once after an update: the releases since the last seen version; closing records the running one. Nothing stored yet → only record it (CHR-928). */
@@ -2897,7 +2905,7 @@ async function showWhatsNewAfterUpdate() {
     record();
     return;
   }
-  whatsNewDialog.show(notes.releases, record);
+  whatsNewDialog.show(notes.releases, { running: notes.version, onClose: record });
 }
 
 const settingsMenu = createSettingsMenu({
@@ -2929,7 +2937,9 @@ const updateNotice = createUpdateNotice({
   titleEl: document.getElementById("update-toast-title"),
   commandEl: document.getElementById("update-toast-command"),
   closeEl: document.getElementById("update-toast-close"),
+  liveEl: document.getElementById("update-live"),
   storage: prefsStorage,
+  fallbackFocusEl: document.getElementById("settings-trigger"),
 });
 const ABOUT_REFRESH_MS = 60 * 60 * 1000;
 
@@ -2945,7 +2955,6 @@ async function refreshAbout() {
 void refreshAbout();
 setInterval(refreshAbout, ABOUT_REFRESH_MS);
 const topbarEl = document.getElementById("topbar");
-const dialogScrimEl = document.getElementById("dialog-scrim");
 const projectMenuEl = document.getElementById("project-menu");
 
 /** Clicks `el` unless it is disabled or sits inside a hidden container; true when it acted. */
@@ -2957,10 +2966,12 @@ function pressControl(el) {
 
 /** The open menu / dialog / popover, if any — while one is open only its own keys act. */
 function openOverlay() {
-  if (!dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen() || whatsNewDialog.isOpen() || document.querySelector("dialog.uc-dialog[open]")) return "other";
+  // Any open modal: the shortcut list, the MCP and What's New dialogs, the project dialogs, the Use Cases forms.
+  if (document.querySelector("dialog.float-dialog[open], dialog.uc-dialog[open]")) return "other";
   if (!projectMenuEl.hidden) return "project-menu";
   if (zoomPill?.isOpen()) return "zoom-menu";
   // A native popover menu (the Use Cases filter and sort menus) is open or not by :popover-open, never by `hidden`.
+  if (settingsMenu.isOpen()) return "other";
   const menus = [...document.querySelectorAll(".chrome-menu")];
   return menus.some((menu) => (menu.hasAttribute("popover") ? isPopoverOpen(menu) : !menu.hidden)) ? "other" : null;
 }
@@ -3043,7 +3054,7 @@ function onShortcutKeydown(evt) {
     return;
   }
   // Escape pressed inside the screen frame while a top-document overlay is open: the overlay's own Escape handlers listen on the top document, so hand the key over to them. It closes that overlay and nothing else.
-  if (evt.key === "Escape" && overlay && evt.target?.ownerDocument !== document) {
+  if (evt.key === "Escape" && overlay && evt.target?.ownerDocument && evt.target.ownerDocument !== document) {
     evt.preventDefault();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
     return;
@@ -3059,8 +3070,10 @@ document.addEventListener("keydown", onShortcutKeydown);
 /** A press inside the screen frame never reaches the top document, where the open menus and popovers listen for "outside" clicks: replay it on the body so they close like for any outside click. Dialogs are modal and stay. */
 function closeOverlaysOnFramePress(evt) {
   const overlay = openOverlay();
-  if (!overlay || !dialogScrimEl.hidden || shortcutsDialog.isOpen() || mcpDialog.isOpen() || whatsNewDialog.isOpen()) return;
-  if (overlay === "zoom-menu") zoomPill.close(); // a native popover's light dismiss never sees a press inside the frame's document
+  if (!overlay || document.querySelector("dialog.float-dialog[open]")) return; // dialogs are modal and stay
+  // A native popover's light dismiss never sees a press inside the frame's document.
+  if (overlay === "zoom-menu") zoomPill.close();
+  settingsMenu.close();
   document.body.dispatchEvent(new (evt.type === "click" ? MouseEvent : Event)(evt.type, { bubbles: true }));
 }
 

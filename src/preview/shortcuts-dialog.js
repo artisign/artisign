@@ -1,83 +1,74 @@
-// The keyboard shortcut reference (CHR-916, screen `chrome-c-shell-shortcuts`): three columns of grouped rows, label left, key chip right. Built from the same SHORTCUTS mapping the keys are bound from. Escape, a click on the scrim, the close button and "?" close it.
+// The keyboard shortcut reference (CHR-916, screen `chrome-c-shell-shortcuts`, CHR-1272): a native modal <dialog> with the groups in a three-column grid, label left, `kbd` keys right. Built from the same SHORTCUTS mapping the keys are bound from. Escape, a click on the scrim, the close button and "?" close it.
 
-import { SHORTCUTS, formatShortcut } from "./shortcuts.js";
-import { isShown, trapFocus } from "./menu-keys.js";
+import { SHORTCUTS } from "./shortcuts.js";
+import { createModal } from "./float-dialog.js";
 
-/** Group order per column, as drawn. */
-const COLUMNS = [["Tools", "Agent", "Project"], ["Zoom", "Board", "General"], ["Views", "Fold cards"]];
+/** Group order as drawn: three columns, read row by row. */
+const GROUPS = ["Tools", "Zoom", "Views", "Agent", "Board", "Fold cards", "Project", "General"];
+
+/** Two mapping entries the design shows as one row. */
+const MERGED = { "zoom-in": { label: "Zoom in, out", also: "zoom-out" } };
+
+/** @param {import("./shortcuts.js").ShortcutDef} def @param {boolean} mac @returns {string[]} one string per key cap: "⇧" / "Shift" and the key */
+function keyCaps(def, mac) {
+  return def.shift ? [mac ? "⇧" : "Shift", def.display] : [def.display];
+}
 
 /**
- * @param {{ scrimEl: HTMLElement, columnsEl: HTMLElement, closeEl: HTMLElement, mac: boolean, fallbackFocusEl?: HTMLElement }} els `fallbackFocusEl`: where focus goes on close when the opener is gone or hidden
+ * @param {{ dialogEl: HTMLDialogElement, gridEl: HTMLElement, closeEl: HTMLElement, mac: boolean, fallbackFocusEl?: HTMLElement }} els `fallbackFocusEl`: where focus goes on close when the opener is gone or hidden
  * @returns {{ show: () => void, hide: () => void, isOpen: () => boolean }}
  */
-export function createShortcutsDialog({ scrimEl, columnsEl, closeEl, mac, fallbackFocusEl }) {
-  const dialogEl = /** @type {HTMLElement} */ (scrimEl.querySelector("#shortcuts-dialog"));
-  /** @type {Element | null} */
-  let returnFocusTo = null;
+export function createShortcutsDialog({ dialogEl, gridEl, closeEl, mac, fallbackFocusEl }) {
+  const modal = createModal(dialogEl, { fallbackFocusEl });
+  const skipped = new Set(Object.values(MERGED).map((m) => m.also));
 
-  for (const groups of COLUMNS) {
-    const column = document.createElement("div");
-    column.className = "shortcuts-column";
-    for (const group of groups) {
-      const section = document.createElement("div");
-      section.className = "shortcuts-group";
-      const title = document.createElement("div");
-      title.className = "shortcuts-group-title";
-      title.textContent = group;
-      section.appendChild(title);
-      for (const def of SHORTCUTS.filter((d) => d.group === group)) {
-        const row = document.createElement("div");
-        row.className = "shortcuts-row";
-        const label = document.createElement("span");
-        label.textContent = def.label;
-        const key = document.createElement("span");
-        key.className = "chrome-chip chrome-chip--ref";
-        key.textContent = formatShortcut(def, mac);
-        row.append(label, key);
-        section.appendChild(row);
+  for (const group of GROUPS) {
+    const defs = SHORTCUTS.filter((d) => d.group === group && !skipped.has(d.id));
+    if (defs.length === 0) continue;
+    const section = document.createElement("section");
+    section.className = group === "General" ? "shortcuts-group shortcuts-group--wide" : "shortcuts-group";
+    const title = document.createElement("h3");
+    title.className = "shortcuts-group-title";
+    title.textContent = group;
+    const list = document.createElement("dl");
+    list.className = "shortcuts-list";
+    for (const def of defs) {
+      const merged = MERGED[def.id];
+      const caps = merged ? [...keyCaps(def, mac), ...keyCaps(SHORTCUTS.find((d) => d.id === merged.also) ?? def, mac)] : keyCaps(def, mac);
+      const row = document.createElement("div");
+      row.className = "shortcut-row";
+      const label = document.createElement("dt");
+      label.textContent = merged?.label ?? def.label;
+      const keys = document.createElement("dd");
+      keys.className = "shortcut-keys";
+      for (const cap of caps) {
+        const kbd = document.createElement("kbd");
+        kbd.className = "kbd-key";
+        kbd.textContent = cap;
+        keys.append(kbd);
       }
-      column.appendChild(section);
+      row.append(label, keys);
+      list.append(row);
     }
-    columnsEl.appendChild(column);
+    section.append(title, list);
+    gridEl.append(section);
   }
 
-  function isOpen() {
-    return !scrimEl.hidden;
-  }
-
-  function show() {
-    if (isOpen()) return;
-    returnFocusTo = document.activeElement;
-    scrimEl.hidden = false;
-    // Focus the dialog itself, not its close button: that would pop the button's tooltip. Tab is trapped inside (below).
-    dialogEl.focus();
-  }
-
-  function hide() {
-    if (!isOpen()) return;
-    scrimEl.hidden = true;
-    // The opener can be gone or hidden by now: the project picker, or <body> as a last resort.
-    (returnFocusTo instanceof HTMLElement && isShown(returnFocusTo) ? returnFocusTo : (fallbackFocusEl ?? document.body)).focus();
-    returnFocusTo = null;
-  }
-
-  closeEl.addEventListener("click", hide);
-  // On the document, not the scrim: with focus on <body> Tab must still enter the dialog.
+  closeEl.addEventListener("click", () => modal.hide());
+  // "?" closes the dialog it opened. The key is consumed here: the global shortcut handler (registered later) must not read it as "open the list" again. On the document, not the dialog: focus can be on <body> after a click on the dialog's plain surface.
   document.addEventListener("keydown", (evt) => {
-    if (isOpen()) trapFocus(evt, dialogEl);
-  });
-  scrimEl.addEventListener("click", (evt) => {
-    if (evt.target === scrimEl) hide();
-  });
-  document.addEventListener("keydown", (evt) => {
-    if (!isOpen()) return;
-    if (evt.key === "Escape" || (evt.key === "?" && !evt.ctrlKey && !evt.metaKey && !evt.altKey)) {
-      evt.preventDefault();
-      // This key only closes the dialog: the global shortcut handler (registered later) must not see it as "open the list" again.
-      evt.stopImmediatePropagation();
-      hide();
-    }
+    if (!modal.isOpen() || evt.key !== "?" || evt.ctrlKey || evt.metaKey || evt.altKey) return;
+    evt.preventDefault();
+    evt.stopImmediatePropagation();
+    modal.hide();
   });
 
-  return { show, hide, isOpen };
+  return {
+    show() {
+      // Focus goes to the dialog itself, not to its close button (the first focusable one, where the browser would put it).
+      if (modal.show()) dialogEl.focus();
+    },
+    hide: modal.hide,
+    isOpen: modal.isOpen,
+  };
 }

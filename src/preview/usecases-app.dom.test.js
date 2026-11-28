@@ -613,7 +613,7 @@ describe("review fixes", () => {
       .click();
     await flush();
     expect(calls.some((c) => c.path === "/api/use-case")).toBe(true);
-    expect($("dialog")).not.toBeNull();
+    expect($("dialog.uc-dialog")).not.toBeNull();
   });
 
   it("a group with a trailing slash (not addressable as a tree path) switches to the flat list, so every case is reachable", async () => {
@@ -775,7 +775,7 @@ describe("world pool", () => {
     await flush();
     $$("#usecases-view .uc-world-page .uc-h2-row button").find((b) => b.textContent === "New entity").click();
     await flush();
-    const field = document.querySelector("dialog input[autofocus]");
+    const field = document.querySelector("dialog.uc-dialog input[autofocus]");
     field.value = "Household policy";
     field.dispatchEvent(new Event("input", { bubbles: true }));
     [...document.querySelectorAll("dialog .uc-foot-actions button")].find((b) => b.textContent === "Create entity").click();
@@ -786,7 +786,7 @@ describe("world pool", () => {
     // an entry opens its dialog, and a delete names the entity kind (and nothing else)
     $(".uc-world-page tr[data-id=leo] .uc-link-row").click();
     await flush();
-    expect(document.querySelector("dialog h1").textContent).toBe("Edit entity");
+    expect(document.querySelector("dialog.uc-dialog h1").textContent).toBe("Edit entity");
     [...document.querySelectorAll("dialog .uc-foot-actions button")].find((b) => b.textContent === "Delete").click();
     await flush();
     [...document.querySelectorAll("dialog .uc-foot-actions button")].find((b) => b.textContent === "Delete Leo").click();
@@ -804,7 +804,7 @@ describe("world pool", () => {
     const dialogButton = (label) => [...document.querySelectorAll("dialog .uc-foot-actions button")].find((b) => b.textContent === label);
     $$("#usecases-view .uc-world-page .uc-h2-row button").find((b) => b.textContent === "New relationship type").click();
     await flush();
-    const label = document.querySelector("dialog input[autofocus]");
+    const label = document.querySelector("dialog.uc-dialog input[autofocus]");
     label.value = "holds";
     label.dispatchEvent(new Event("input", { bubbles: true }));
     dialogButton("Create relationship type").click();
@@ -812,7 +812,7 @@ describe("world pool", () => {
     expect(calls.filter((c) => c.tool === "set_use_cases").at(-1).body).toEqual({ relationship_types: [{ id: "holds", label: "holds" }] });
     $(".uc-cst[data-constellation=couple] .uc-link-row").click();
     await flush();
-    expect(document.querySelector("dialog h1").textContent).toBe("Edit constellation");
+    expect(document.querySelector("dialog.uc-dialog h1").textContent).toBe("Edit constellation");
     dialogButton("Delete").click();
     await flush();
     dialogButton("Delete Couple without children").click();
@@ -836,7 +836,7 @@ describe("world pool", () => {
     await flush();
     $$("#usecases-view .uc-world-page .uc-h2-row button").find((b) => b.textContent === "Generate…").click();
     await flush();
-    expect(document.querySelector("dialog .uc-segmented [aria-checked=true]").textContent).toBe("Constellations");
+    expect(document.querySelector("dialog.uc-dialog .uc-segmented [aria-checked=true]").textContent).toBe("Constellations");
     [...document.querySelectorAll("dialog button")].find((b) => b.textContent.includes("Preview")).click();
     await flush();
     const dry = calls.find((c) => c.tool === "generate_personas");
@@ -853,7 +853,7 @@ describe("world pool", () => {
     expect($$(".uc-guide-steps button").map((b) => b.textContent)).toEqual(["addNew entity", "addNew relationship type", "addNew constellation", "Generate constellations"]);
     $$(".uc-guide-steps button").find((b) => b.textContent.endsWith("New constellation")).click();
     await flush();
-    expect(document.querySelector("dialog h1").textContent).toBe("New constellation");
+    expect(document.querySelector("dialog.uc-dialog h1").textContent).toBe("New constellation");
   });
 
   it("a world that cannot be read says so in the World tab, the filter menu and a toast, never an empty world", async () => {

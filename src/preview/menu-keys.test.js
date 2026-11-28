@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from "vitest";
-import { captureFocus, handleListArrowKeys, setRovingTabindex, tabbableWithin, trapFocus, wireMenu } from "./menu-keys.js";
+import { captureFocus, handleListArrowKeys, setRovingTabindex, tabbableWithin, wireMenu } from "./menu-keys.js";
 
 const key = (k, target, init = {}) => {
   const evt = new KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...init });
@@ -68,38 +68,12 @@ describe("setRovingTabindex", () => {
   });
 });
 
-describe("trapFocus", () => {
-  it("wraps Tab at the last and Shift+Tab at the first control", () => {
+describe("tabbableWithin", () => {
+  it("skips disabled and hidden controls", () => {
     const c = document.getElementById("c");
-    rows[2].focus();
-    expect(trapFocus(key("Tab", rows[2]), c)).toBe(true);
-    expect(document.activeElement).toBe(rows[0]);
-    expect(trapFocus(key("Tab", rows[0], { shiftKey: true }), c)).toBe(true);
-    expect(document.activeElement).toBe(rows[2]);
-    rows[1].focus();
-    expect(trapFocus(key("Tab", rows[1]), c)).toBe(false); // the browser moves within
-  });
-
-  it("pulls focus in from outside and skips disabled / hidden controls", () => {
-    document.body.insertAdjacentHTML("beforeend", "<button id='out'></button>");
     rows[0].disabled = true;
-    const c = document.getElementById("c");
     c.insertAdjacentHTML("beforeend", "<div hidden><button id='h'></button></div>");
     expect(tabbableWithin(c).map((e) => e.id)).toEqual(["b", "d"]);
-    document.getElementById("out").focus();
-    expect(trapFocus(key("Tab", document.getElementById("out")), c)).toBe(true);
-    expect(document.activeElement).toBe(rows[1]);
-    expect(trapFocus(key("a", rows[1]), c)).toBe(false);
-  });
-});
-
-describe("trapFocus with nothing tabbable", () => {
-  it("lands focus on the container itself (it needs tabindex -1 to take it)", () => {
-    document.body.innerHTML = '<section id="d" tabindex="-1"><p>text only</p></section><button id="out"></button>';
-    const d = document.getElementById("d");
-    document.getElementById("out").focus();
-    expect(trapFocus(key("Tab", document.activeElement), d)).toBe(true);
-    expect(document.activeElement).toBe(d);
   });
 });
 

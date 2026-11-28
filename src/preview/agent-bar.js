@@ -37,6 +37,18 @@ export function agentStatus({ feed, follow, connected, now, exists }) {
 }
 
 /**
+ * The screen the agent is writing right now, for the Board's violet ring and "Writing" chip: the newest feed entry, when it is a screen write that worked, is recent (the status box says "Writing …" for as long) and the connection is up.
+ * @param {{ feed: object[], connected: boolean, now: number }} state
+ * @returns {string | null}
+ */
+export function writingScreen({ feed, connected, now }) {
+  const latest = feed[0];
+  if (!connected || !latest || !latest.ok || now - latest.at > IDLE_AFTER_MS) return null;
+  if (latest.kind !== "write" || latest.tool === "delete_entity" || latest.target?.kind !== "screen") return null;
+  return latest.target.name;
+}
+
+/**
  * Where the note field's thread would land, and whether it can: on the open screen, anchored to the screen root, or on the selected variant of the open mockup, anchored to the whole variant (CHR-1270). The Board and a compare have no single target to anchor to, so the field is off there and says why (the same words as the tool bar's greyed tools).
  * @param {{ view: string, showMockup: boolean, comparing: boolean, screen: string | null, screenLabel: string, mockup: string | null, mockupVariant?: { id: string, label: string } | null, boardCount: number }} where
  * @returns {{ enabled: boolean, key: string, icon: string, scope: string, reason: string }}

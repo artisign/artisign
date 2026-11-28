@@ -13,7 +13,7 @@
 import { fetchRender } from "./api.js";
 import { applyFlowMode } from "./flows.js";
 import { icon } from "./icons.js";
-import { PIN_ICON_SVG } from "./screens.js";
+import { DESKTOP_MIN_WIDTH, viewportIconName } from "./screens.js";
 import {
   computeLayout,
   buildBoardModel,
@@ -22,7 +22,6 @@ import {
   findTile,
   elementSideAnchor,
   tileAnchor,
-  OUTSIDE_FILTER_BADGE,
   bezierPath,
   computeCenterScroll,
   edgesFromNode,
@@ -33,7 +32,6 @@ import {
   computeZoomAroundCursor,
   computeWheelZoomFactor,
   labelDisplayMode,
-  LOW_ZOOM_AFFORDANCE_THRESHOLD,
   BASE_GAP,
   BASE_PADDING,
   DEFAULT_BOARD_ZOOM,
@@ -56,6 +54,12 @@ const GRID_OPTIONS = { gapX: BASE_GAP, gapY: BASE_GAP, padding: BASE_PADDING };
 // finishing at once) coalesces into a single relayout — see
 // scheduleRelayout's own comment.
 const RELAYOUT_COALESCE_MS = 50;
+/** A cluster card at least this wide on screen (px) has room for its Collapse toggle beside the label. */
+const ROOMY_FRAME_WIDTH = 200;
+/** The card's padding right of its last tile, in board px (board.js's frame padding). */
+const FRAME_RIGHT_PAD = 24;
+/** What the Collapse toggle takes of a header, in px on screen (its width, its gap and a little air). */
+const COLLAPSE_TOGGLE_WIDTH = 104;
 // If a wheel/pinch zoom gesture fired more recently than this, a coalesced
 // relayout defers instead of running — the grid shape (in particular the
 // column count) must not change mid-gesture, or tiles jump under the
@@ -71,6 +75,7 @@ const ZOOM_GESTURE_QUIET_MS = 150;
  *   onRelayout?: () => void,
  *   onTogglePin?: (screen: string) => void,
  *   onToggleCluster?: (cluster: { root: string, expanded: boolean, memberNames: string[] }) => void,
+ *   onTileKeydown?: (event: KeyboardEvent) => void,
  * }} args `onZoomChange` fires whenever zoom changes for ANY reason —
  *   quick-jump/step buttons, Fit all, the range input, or Ctrl/Cmd+wheel/
  *   pinch on the canvas — so app.js can keep the toolbar's range input,
@@ -91,6 +96,10 @@ const ZOOM_GESTURE_QUIET_MS = 150;
  *   `onToggleCluster` (CHR-733) fires when a cluster frame's header is
  *   clicked — like `onTogglePin`, app.js owns the write (`set_board_state`
  *   `expanded`) and the SSE broadcast is what actually re-renders.
+ *   `onTileKeydown` (CHR-1271) receives every key pressed while the focus is
+ *   inside a tile's document (same-origin srcdoc) — a press that never
+ *   reaches the top document, so the shell's keyboard shortcuts keep working
+ *   once a tile was clicked, as they do inside the Screens view's frame.
  *   `emptyStateEl`/`emptyStateBodyEl` (CHR-624) — shown/filled by setScreens
  *   whenever the visible set is empty, per the `board-view-empty` design.
  */
@@ -107,6 +116,7 @@ export function createBoardView({
   onLayout,
   onTogglePin,
   onToggleCluster,
+  onTileKeydown,
 }) {
   /** @type {string[]} */
   let screens = [];
@@ -150,9 +160,11 @@ export function createBoardView({
   let pinnedScreens = new Set();
   let outsideFilterScreens = new Set();
 
-  /** GRID_OPTIONS plus the tiles that draw the outside-filter badge, so cluster frames leave room for it. */
+  /** The screen the agent is writing right now (design: violet ring and a "Writing" chip), or null. */
+  let writingName = null;
+
   function gridOptions() {
-    return { ...GRID_OPTIONS, badged: outsideFilterScreens };
+    return GRID_OPTIONS;
   }
   let edgesVisible = true;
   // CHR-623 review findings 3/5: a single coalescing timer shared by every
@@ -226,9 +238,11 @@ export function createBoardView({
     // separately by attachTileClicks regardless of flowModeOn.
     const flowCleanup = applyFlowMode(doc, flowModeOn, (targetScreen) => centerOnScreen(targetScreen));
     const clickCleanup = flowModeOn ? () => {} : attachTileClicks(doc, screenId);
+    if (onTileKeydown) doc.addEventListener("keydown", onTileKeydown);
     modeCleanupByScreen.set(screenId, () => {
       flowCleanup();
       clickCleanup();
+      if (onTileKeydown) doc.removeEventListener("keydown", onTileKeydown);
     });
   }
 
@@ -241,33 +255,33 @@ export function createBoardView({
   function applyZoomSizing() {
     const scale = zoom / 100;
     canvasInnerEl.style.transform = `scale(${scale})`;
+    canvasInnerEl.style.setProperty("--bz", String(scale)); // chrome that keeps its size at every zoom divides by it (style.css)
     canvasEl.style.width = `${layout.contentWidth * scale}px`;
     canvasEl.style.height = `${layout.contentHeight * scale}px`;
   }
 
-  /**
-   * Two zoom-dependent tile chrome rules from the chr-621 tag notes, both
-   * driven by the same LOW_ZOOM_AFFORDANCE_THRESHOLD: the label's display
-   * mode (hidden/truncated/full — board.js's labelDisplayMode), and the
-   * UNPINNED pin button's visibility (CHR-624) — below the threshold it's
-   * hover-revealed instead of always shown (a static/headless check can't
-   * express hover, so it's simply absent below the threshold here); a
-   * PINNED tile's button always stays visible at any zoom, since it carries
-   * information ("this is here because it's pinned") a hover can't replace.
-   */
+  /** The zoom-dependent label rule (board.js's labelDisplayMode): hidden when the board is an overview, truncated to the tile's width on screen below 100 %, full from there. The sizes are style.css's (the label keeps one size at every zoom). */
   function applyZoomDependentTileChrome() {
-    const mode = labelDisplayMode(zoom);
-    const showUnpinnedAffordance = zoom >= LOW_ZOOM_AFFORDANCE_THRESHOLD;
-    for (const tile of layout.tiles) {
-      const el = tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(tile.screen)}"]`);
-      if (!el) continue;
-      const label = el.querySelector(".board-tile-label");
-      if (label) {
-        label.dataset.mode = mode;
-        label.style.maxWidth = mode === "truncated" ? `${tile.width}px` : "";
+    for (const label of tilesEl.querySelectorAll(".board-tile-label")) label.dataset.mode = labelDisplayMode(zoom, { member: label.parentElement?.classList.contains("member") });
+    // An expanded cluster's toggle sits inside its header when the card is wide enough on screen to hold it beside the label, and beside the card otherwise.
+    for (const frame of layout.frames) {
+      framesEl.querySelector(`.board-cluster-frame[data-root="${CSS.escape(frame.root)}"]`)?.classList.toggle("roomy", (frame.width * zoom) / 100 >= ROOMY_FRAME_WIDTH);
+      // The label of an expanded cluster's main tile has the whole card to its right, not just the (smaller) tile's width.
+      const main = findTile(layout.tiles, frame.root);
+      const label = tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(frame.root)}"] .board-tile-label`);
+      if (main && label) {
+        const room = ((frame.x + frame.width - main.x - FRAME_RIGHT_PAD) * zoom) / 100;
+        const roomy = (frame.width * zoom) / 100 >= ROOMY_FRAME_WIDTH;
+        label.style.width = frame.expanded ? `${Math.max(88, room - (roomy ? COLLAPSE_TOGGLE_WIDTH : 0))}px` : ""; // the Collapse toggle takes its share of a roomy card's header
       }
-      const pin = el.querySelector(".board-tile-pin");
-      if (pin) pin.hidden = !pinnedScreens.has(tile.screen) && !showUnpinnedAffordance;
+    }
+  }
+
+  /** The viewport glyph of each label follows the size the tile was measured at: a monitor for a wide screen, a phone otherwise. */
+  function applyViewportIcons() {
+    for (const tile of layout.tiles) {
+      const el = tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(tile.screen)}"] .board-tile-viewport`);
+      if (el) el.textContent = viewportIconName({ width: tile.naturalWidth });
     }
   }
 
@@ -303,6 +317,7 @@ export function createBoardView({
       frame.style.transform = `scale(${tile.width / tile.naturalWidth})`;
     }
     renderFrames();
+    applyViewportIcons();
     applyZoomSizing();
     applyZoomDependentTileChrome();
     drawEdges();
@@ -446,14 +461,36 @@ export function createBoardView({
    * What the read-only comment overlay measures against (CHR-1264): the zoom,
    * every tile's base-layout box, and each tile's rendered document — read
    * like flow edges read their elements, never written to.
-   * @returns {{ zoom: number, tiles: { screen: string, x: number, y: number, width: number, height: number, naturalWidth: number }[], docOf: (screen: string) => Document | null }}
+   * @returns {{ zoom: number, tiles: { screen: string, x: number, y: number, width: number, height: number, naturalWidth: number }[], docOf: (screen: string) => Document | null, labelEnd: (screen: string) => { right: number, top: number, height: number } | null }} `labelEnd`: where a tile's label text ends on screen (viewport pixels), null while the label is not drawn
    */
   function commentGeometry() {
     return {
       zoom,
       tiles: layout.tiles.map((t) => ({ screen: t.screen, x: t.x, y: t.y, width: t.width, height: t.height, naturalWidth: t.naturalWidth })),
       docOf: (screen) => iframesByScreen.get(screen)?.contentDocument ?? null,
+      labelEnd: (screen) => {
+        const label = tilesEl.querySelector(`.board-tile[data-screen="${CSS.escape(screen)}"] .board-tile-label`);
+        if (!label || label.dataset.mode === "hidden") return null;
+        const last = label.querySelector(".board-tile-count") ?? label.querySelector(".board-tile-name");
+        const labelBox = label.getBoundingClientRect();
+        return { right: (last ?? label).getBoundingClientRect().right, top: labelBox.top, height: labelBox.height };
+      },
     };
+  }
+
+  /**
+   * The screen the agent is writing now gets the violet ring and the "Writing" chip (design `board-cluster` writing); null clears it. A no-op while nothing changes, so the agent bar's regular refresh costs nothing.
+   * @param {string | null} screen
+   */
+  function setWritingScreen(screen) {
+    if (screen === writingName) return;
+    writingName = screen;
+    for (const el of tilesEl.querySelectorAll(".board-tile")) {
+      const on = el.dataset.screen === screen;
+      el.classList.toggle("writing", on);
+      const chip = el.querySelector(".board-tile-writing");
+      if (chip) chip.hidden = !on;
+    }
   }
 
   function setEdgesVisible(visible) {
@@ -570,13 +607,14 @@ export function createBoardView({
     }
   }
 
-  /** Cluster frames (header, thumbnail strip) and "+N more" tiles — a layer under the tiles, rebuilt on every relayout. */
+  /** Cluster frames (the card, its Expand / Collapse toggle, the variant thumbnails) and "+N more" tiles — a layer under the tiles, rebuilt on every relayout. The cluster's label (icon, name, variant count, pin mark) is its main tile's own label. */
   function renderFrames() {
     framesEl.innerHTML = "";
     for (const frame of layout.frames) {
       const cluster = model.clusters.find((c) => c.root === frame.root);
       const el = document.createElement("div");
       el.className = frame.expanded ? "board-cluster-frame expanded" : "board-cluster-frame";
+      el.classList.toggle("outside-filter", outsideFilterScreens.has(frame.root));
       el.dataset.root = frame.root;
       el.style.left = `${frame.x}px`;
       el.style.top = `${frame.y}px`;
@@ -588,20 +626,10 @@ export function createBoardView({
       header.setAttribute("aria-expanded", String(frame.expanded));
       header.setAttribute("aria-label", `${frame.expanded ? "Collapse" : "Expand"} ${frame.root}`);
       header.style.height = `${frame.headerHeight}px`;
-      const name = document.createElement("b");
-      const nameText = document.createElement("span");
-      nameText.className = "board-cluster-name";
-      nameText.textContent = frame.root;
-      name.append(icon(frame.expanded ? "expand_more" : "chevron_right", "board-cluster-chevron"), nameText);
-      const meta = document.createElement("span");
-      meta.textContent = `${frame.size} in subtree · depth ${frame.depth}`;
-      header.append(name, meta);
-      if (frame.expanded) {
-        const action = document.createElement("span");
-        action.className = "board-cluster-action";
-        action.append(icon("expand_less", "icon-xs"), "collapse");
-        header.appendChild(action);
-      }
+      const toggle = document.createElement("span");
+      toggle.className = "board-cluster-toggle";
+      toggle.append(icon(frame.expanded ? "keyboard_arrow_up" : "keyboard_arrow_down", "icon-xs"), frame.expanded ? "Collapse" : "Expand");
+      header.appendChild(toggle);
       header.addEventListener("click", (evt) => {
         evt.stopPropagation();
         if (cluster) onToggleCluster?.(cluster);
@@ -612,9 +640,14 @@ export function createBoardView({
         const strip = document.createElement("div");
         strip.className = "board-cluster-thumbs";
         strip.style.top = `${main ? main.y - frame.y + main.height + 12 : frame.headerHeight}px`;
+        // The first thumb stands for the frame above it (design `cluster-thumb` desktop-on / mobile-on); the others are its variants.
+        const own = document.createElement("span");
+        own.className = `board-cluster-thumb on ${viewportIconName({ width: main?.naturalWidth ?? 0 }) === "desktop_windows" ? "desktop" : "mobile"}`;
+        strip.appendChild(own);
         for (const thumb of frame.thumbs) {
           const micro = document.createElement("span");
-          micro.className = `board-cluster-thumb kind-${thumb.kind ?? "state"}`;
+          const wide = (measuredSizes[thumb.screen]?.width ?? 0) >= DESKTOP_MIN_WIDTH;
+          micro.className = `board-cluster-thumb kind-${thumb.kind ?? "state"} ${wide ? "desktop" : "mobile"}`;
           micro.classList.toggle("deeper", thumb.deeper);
           micro.title = thumb.screen;
           strip.appendChild(micro);
@@ -648,26 +681,45 @@ export function createBoardView({
     tile.className = "board-tile";
     tile.dataset.screen = screen;
     const isPinned = pinnedScreens.has(screen);
-    // The dashed-border/badge `outside-filter` treatment (CHR-624) — a tile
-    // that's on the board SOLELY because it's pinned, not because it also
-    // matches the shared filter. Purely visual: `.board-tile`'s own
-    // overflow isn't clipped (unlike `.board-tile-frame`), so the label
-    // above and the badge/pin below/beside it can sit outside the tile's
-    // own box without affecting computeBoardLayout's geometry at all.
+    // A tile on the board SOLELY because it is pinned, not because it also matches the shared filter, gets the dashed accent outline (design `board-cluster` outside). Purely visual: `.board-tile` does not clip, so the card and the label around it sit outside its box without touching computeBoardLayout's geometry.
     tile.classList.toggle("outside-filter", outsideFilterScreens.has(screen));
     tile.classList.toggle("context", model.contextNames.has(screen));
+    // Inside a cluster's frame the frame is the card; every other tile draws its own.
+    tile.classList.toggle("in-cluster", model.clusters.some((c) => c.memberNames.includes(screen)));
+    tile.classList.toggle("member", model.clusters.some((c) => c.root !== screen && c.memberNames.includes(screen)));
+    tile.classList.toggle("writing", screen === writingName);
 
+    // The label (design `frame-label`): viewport glyph, name, the variant count of a cluster's main screen, a pin mark while pinned. Its text is the screen's name; the rest is decoration around it.
     const label = document.createElement("div");
     label.className = "board-tile-label";
-    label.textContent = screen;
+    const glyph = icon("smartphone", "board-tile-viewport");
+    const name = document.createElement("span");
+    name.className = "board-tile-name";
+    name.textContent = screen;
+    label.append(glyph, name);
+    const cluster = model.clusters.find((c) => c.root === screen);
+    if (cluster) {
+      const count = document.createElement("span");
+      count.className = "board-tile-count";
+      count.textContent = `${cluster.size} variant${cluster.size === 1 ? "" : "s"}`;
+      label.append(count);
+    }
     tile.appendChild(label);
 
-    if (outsideFilterScreens.has(screen)) {
-      const badge = document.createElement("span");
-      badge.className = "board-tile-badge";
-      badge.textContent = OUTSIDE_FILTER_BADGE;
-      tile.appendChild(badge);
-    }
+    // The pin mark is a button: the only way to unpin from the board itself (pinning starts in the card's list).
+    const pin = document.createElement("button");
+    pin.type = "button";
+    pin.className = "board-tile-pin";
+    pin.hidden = !isPinned;
+    pin.setAttribute("aria-label", `Unpin ${screen} from the board`);
+    pin.setAttribute("aria-pressed", "true");
+    pin.appendChild(icon("keep", "icon-xs"));
+    pin.addEventListener("click", (evt) => {
+      // Tiles have their own click handling for flow-source highlighting (see attachTileClicks, wired inside the iframe's own document — unaffected by this); stopPropagation keeps the press from also reaching #board-surface's own click listener (setHighlight(null)).
+      evt.stopPropagation();
+      onTogglePin?.(screen);
+    });
+    label.appendChild(pin);
 
     const frame = document.createElement("div");
     frame.className = "board-tile-frame";
@@ -687,28 +739,11 @@ export function createBoardView({
     frame.appendChild(iframe);
     tile.appendChild(frame);
 
-    // A <button>, not the design's plain <span> — this one is clickable, so
-    // it needs the native focus/keyboard-activation/role a real button
-    // gives for free. Visibility (hidden below LOW_ZOOM_AFFORDANCE_THRESHOLD
-    // when unpinned) is applied right after by applyZoomDependentTileChrome
-    // (called from relayout(), right after setScreens rebuilds every tile).
-    const pin = document.createElement("button");
-    pin.type = "button";
-    pin.className = "board-tile-pin pin-button";
-    pin.classList.toggle("pinned", isPinned);
-    pin.setAttribute("aria-label", isPinned ? `Unpin ${screen}` : `Pin ${screen}`);
-    pin.setAttribute("aria-pressed", String(isPinned));
-    pin.innerHTML = PIN_ICON_SVG;
-    pin.addEventListener("click", (evt) => {
-      // Tiles have their own click handling for flow-source highlighting
-      // (see attachTileClicks, wired inside the iframe's own document —
-      // unaffected by this) and centerOnScreen navigation; this button
-      // isn't inside the iframe, but stopPropagation keeps it from also
-      // reaching #board-surface's own click listener (setHighlight(null)).
-      evt.stopPropagation();
-      onTogglePin?.(screen);
-    });
-    tile.appendChild(pin);
+    const writing = document.createElement("span");
+    writing.className = "board-tile-writing";
+    writing.hidden = screen !== writingName;
+    writing.append(icon("edit", "icon-xs"), "Writing");
+    tile.appendChild(writing);
 
     iframesByScreen.set(screen, iframe);
     return tile;
@@ -809,7 +844,7 @@ export function createBoardView({
     if (emptyStateBodyEl && isEmpty) {
       const filter = pinInfo.filter ?? "";
       emptyStateBodyEl.textContent = filter
-        ? `"${filter}" matches nothing, and nothing is pinned. Clear the filter or pin a screen from the sidebar to bring it onto the board.`
+        ? `No screen matches \u201c${filter}\u201d and nothing is pinned.\nClear the filter, or pin a screen from the list.`
         : "This project has no screens yet.";
     }
     for (const cleanup of modeCleanupByScreen.values()) cleanup();
@@ -901,6 +936,7 @@ export function createBoardView({
     zoomToTile,
     commentGeometry,
     setEdgesVisible,
+    setWritingScreen,
     // CHR-623 review finding 7: switching TO an already-built board tab
     // must relayout immediately, not through scheduleRelayout's coalescing
     // delay — #board-view is `hidden` (clientWidth 0) while another tab

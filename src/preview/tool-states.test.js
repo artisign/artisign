@@ -24,10 +24,52 @@ describe("toolStates", () => {
     expect(states.designSystem.reason).toBe("Not available for mockups");
   });
 
-  it("the Board: flow (it arms the tile jump) and the design system apply", () => {
-    const states = toolStates(where({ view: "board" }));
-    expect(disabled(states)).toEqual(["comment", "inspect", "notes", "comments"]);
-    expect(states.comment.reason).toBe("Not available on the Board");
+  describe("the Board (design `board-view*`, `board-comments*`)", () => {
+    const board = (over = {}) => toolStates(where({ view: "board", board: { commentsOn: true, tileCount: 5, openCount: 6, edgesOn: true, clustersOn: true, anyExpanded: true, ...over } }));
+
+    it("comment, inspect, notes and the design system are greyed, each with the design's own words", () => {
+      const states = board();
+      expect(disabled(states)).toEqual(["comment", "inspect", "notes", "designSystem"]);
+      expect(states.comment.name).toBe("Comment, read-only on the Board: comment in the Screens view");
+      expect(states.comment.hint).toBe(states.comment.name);
+      expect(states.inspect.name).toBe("Inspect, not available on the Board");
+      expect(states.notes.name).toBe("Notes, not available on the Board");
+      expect(states.designSystem.name).toBe("Design system, not available on the Board");
+    });
+
+    it("comments, show resolved, flow arrows, clusters and collapse all apply, named as the design names them", () => {
+      const states = board();
+      expect(states.comments).toEqual({ disabled: false, reason: "", name: "Comments on tiles, 6 open" });
+      expect(states.showResolved.name).toBe("Show resolved comments");
+      expect(states.flow.name).toBe("Flow arrows");
+      expect(states.clusters.name).toBe("Clusters");
+      expect(states.collapseAll.name).toBe("Collapse all clusters");
+      expect(board({ openCount: 0 }).comments.name).toBe("Comments on tiles");
+    });
+
+    it("Show resolved waits for the comments: greyed with the reason while they are off", () => {
+      const states = board({ commentsOn: false });
+      expect(states.showResolved.disabled).toBe(true);
+      expect(states.showResolved.name).toBe("Show resolved comments, turn on comments first");
+      expect(states.showResolved.hint).toBe("Show resolved comments, turn on comments first");
+    });
+
+    it("nothing on the board: comments, show resolved and collapse all are greyed and say so", () => {
+      const states = board({ tileCount: 0 });
+      expect(disabled(states)).toEqual(["comment", "inspect", "notes", "comments", "showResolved", "designSystem", "collapseAll"]);
+      expect(states.comments.name).toBe("Comments on tiles, nothing on the board");
+      expect(states.comments.hint).toBe("Nothing on the board");
+      expect(states.collapseAll.name).toBe("Collapse all clusters, nothing on the board");
+      expect(states.flow.disabled).toBe(false);
+      expect(states.clusters.disabled).toBe(false);
+    });
+
+    it("collapse all is greyed while every cluster is collapsed, and while clusters are off", () => {
+      const collapsed = board({ anyExpanded: false });
+      expect(collapsed.collapseAll.name).toBe("Collapse all clusters, all are collapsed");
+      expect(collapsed.collapseAll.hint).toBe("All clusters are collapsed");
+      expect(board({ clustersOn: false }).collapseAll.disabled).toBe(true);
+    });
   });
 
   it("the design system and Use Cases: only the design system tool applies", () => {

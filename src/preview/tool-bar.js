@@ -79,24 +79,33 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
     const labelEl = document.createElement("span");
     labelEl.className = "tool-hint-label";
     hintEl.append(labelEl);
-    const def = shortcutById(button.dataset.shortcutId ?? "");
-    if (def) {
-      const key = document.createElement("kbd");
-      key.className = "tool-hint-key";
-      key.setAttribute("aria-hidden", "true");
-      key.textContent = formatShortcut(def, mac);
-      hintEl.append(key);
-    }
     (barEl.parentElement ?? document.body).append(hintEl);
     button.setAttribute("interestfor", hintEl.id);
-    hints.set(button, { hintEl, labelEl });
+    hints.set(button, { hintEl, labelEl, keyEl: null });
   }
   if (interest) buttons.forEach(buildHint);
 
-  /** Brings the hint (or the title fallback) in line with the tool's current name and reason. */
+  /** The key chip of a hint follows the tool's current shortcut id (the Flow tool is F in the Screens view and E on the Board). */
+  function syncHintKey(button, entry) {
+    const def = shortcutById(button.dataset.shortcutId ?? "");
+    if (!def) {
+      entry.keyEl?.remove();
+      entry.keyEl = null;
+      return;
+    }
+    if (!entry.keyEl) {
+      entry.keyEl = document.createElement("kbd");
+      entry.keyEl.className = "tool-hint-key";
+      entry.keyEl.setAttribute("aria-hidden", "true");
+      entry.hintEl.append(entry.keyEl);
+    }
+    entry.keyEl.textContent = formatShortcut(def, mac);
+  }
+
+  /** Brings the hint (or the title fallback) in line with the tool's current name and reason. A tool the design gives its own tooltip words (`data-tool-hint-text`) shows those instead. */
   function syncHint(button) {
     const name = button.getAttribute("aria-label") ?? "";
-    const text = hintText(name, button.dataset.toolReason);
+    const text = button.dataset.toolHintText ?? hintText(name, button.dataset.toolReason);
     const entry = hints.get(button);
     if (!entry) {
       const def = shortcutById(button.dataset.shortcutId ?? "");
@@ -104,6 +113,7 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
       return;
     }
     entry.labelEl.textContent = text;
+    syncHintKey(button, entry);
     // A hint that only repeats the accessible name adds nothing; one that says more (the reason) describes the tool.
     if (text === name) {
       entry.hintEl.removeAttribute("role");
@@ -124,7 +134,7 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
       if (button?.getAttribute("aria-disabled") === "true") {
         evt.preventDefault();
         evt.stopImmediatePropagation();
-        announce(button.dataset.toolReason ? `${button.getAttribute("aria-label")}: ${button.dataset.toolReason}` : "");
+        announce(button.dataset.toolHintText ?? (button.dataset.toolReason ? hintText(button.getAttribute("aria-label") ?? "", button.dataset.toolReason) : ""));
       }
     },
     true,
@@ -137,18 +147,28 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
   }
 
   // --- roving focus where the browser has no focusgroup --------------------------------
-  if (!("focusGroup" in HTMLElement.prototype)) {
-    buttons.forEach((b, i) => (b.tabIndex = i === 0 ? 0 : -1));
+  // Only the tools that show take part: the Board adds tools and the Screens view hides them again.
+  const roving = !("focusGroup" in HTMLElement.prototype);
+  const visibleButtons = () => buttons.filter((b) => !b.hidden);
+  function syncRoving() {
+    if (!roving) return;
+    const visible = visibleButtons();
+    const stop = visible.find((b) => b.tabIndex === 0) ?? visible[0];
+    for (const b of buttons) b.tabIndex = b === stop ? 0 : -1;
+  }
+  if (roving) {
+    syncRoving();
     toolsEl.addEventListener("focusin", (evt) => {
       if (buttons.includes(/** @type {HTMLButtonElement} */ (evt.target))) buttons.forEach((b) => (b.tabIndex = b === evt.target ? 0 : -1));
     });
     toolsEl.addEventListener("keydown", (evt) => {
-      const index = buttons.indexOf(/** @type {HTMLButtonElement} */ (evt.target));
+      const visible = visibleButtons();
+      const index = visible.indexOf(/** @type {HTMLButtonElement} */ (evt.target));
       if (index === -1 || evt.ctrlKey || evt.metaKey || evt.altKey) return;
-      const next = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: buttons.length - 1 }[evt.key];
+      const next = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: visible.length - 1 }[evt.key];
       if (next === undefined) return;
       evt.preventDefault();
-      buttons[(next + buttons.length) % buttons.length].focus();
+      visible[(next + visible.length) % visible.length].focus();
     });
   }
 
@@ -158,16 +178,21 @@ export function createToolBar({ barEl, toolsEl, foldEl, gripEl, liveEl, storage,
     isFolded: () => barEl.dataset.collapsed === "true",
     /**
      * @param {HTMLButtonElement} button
-     * @param {{ disabled?: boolean, reason?: string, pressed?: boolean, name?: string }} state `reason` is why the tool does not apply right now (ignored unless disabled); `pressed` is the toggle state (omit for a tool that has none); `name` replaces the accessible name.
+     * @param {{ disabled?: boolean, reason?: string, pressed?: boolean, name?: string, hint?: string, shortcut?: string }} state `reason` is why the tool does not apply right now (ignored unless disabled); `pressed` is the toggle state (omit for a tool that has none); `name` replaces the accessible name; `hint` replaces the tooltip text of a disabled tool (default: name and reason); `shortcut` is the id of the key the tool answers to now.
      */
-    setState(button, { disabled = false, reason = "", pressed, name }) {
+    setState(button, { disabled = false, reason = "", pressed, name, hint, shortcut }) {
       if (name !== undefined) button.setAttribute("aria-label", name);
+      if (shortcut !== undefined) button.dataset.shortcutId = shortcut;
       if (disabled) button.setAttribute("aria-disabled", "true");
       else button.removeAttribute("aria-disabled");
       if (disabled && reason) button.dataset.toolReason = reason;
       else delete button.dataset.toolReason;
+      if (hint !== undefined && disabled) button.dataset.toolHintText = hint;
+      else delete button.dataset.toolHintText;
       if (pressed !== undefined) button.setAttribute("aria-pressed", String(pressed));
       syncHint(button);
     },
+    /** Call after tools were shown or hidden: the roving tab stop moves to a visible tool when its own is gone. */
+    syncRoving,
   };
 }

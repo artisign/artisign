@@ -107,12 +107,28 @@ describe("pins and chips", () => {
     expect(preview().hidden).toBe(true);
   });
 
-  it("keeps a marker off the tile's top-right corner, where the pin button sits", () => {
+  it("puts a pin on its element's top-right corner, even where that is the tile's own corner (the tile has no pin button)", () => {
     docs.two = docWith({ hero: [0, 0, 400, 100] });
     const board = setup();
     board.setData({ comments: [], threads: [thread("c", "two", "hero")] });
-    // Tile two spans x 300-500 (right 500): the pin's centre is at most right - 28.
-    expect(pins()[0].style.left).toBe(`${500 - 28 - 12}px`);
+    // Tile two spans x 300-500: the element's right edge is the tile's, and the pin is centred on it.
+    expect(pins()[0].style.left).toBe(`${500 - 12}px`);
+  });
+
+  it("sets the chips right after where the tile's label text ends, on its line", () => {
+    const board = setup({
+      geometry: () => ({
+        zoom,
+        tiles: [{ screen: "one", x: 0, y: 0, width: 200, height: 300, naturalWidth: 400 }],
+        docOf: (s) => docs[s] ?? null,
+        labelEnd: () => ({ right: 90, top: -26, height: 18 }),
+      }),
+    });
+    board.setData({ comments: [], threads: [thread("a", "one", "btn-a")] });
+    const row = layer.querySelector(".board-comment-chips");
+    const layerLeft = layer.getBoundingClientRect().left;
+    expect(row.style.left).toBe(`${90 - layerLeft + 8}px`);
+    expect(row.style.height).toBe("18px");
   });
 
   it("draws nothing while Comments is off, and again when it is back on", () => {
@@ -272,9 +288,9 @@ describe("the preview", () => {
   });
 });
 
-describe("below 60 % zoom", () => {
+describe("below 15 % zoom", () => {
   it("shows one dot per tile with the number of its threads, and no pins or chips", () => {
-    zoom = 42;
+    zoom = 10;
     const board = setup();
     board.setData({ comments: [], threads: [thread("a", "one", "btn-a"), thread("b", "one", "btn-b"), thread("c", "two", "hero")] });
     const dots = [...layer.querySelectorAll(".board-comment-dot")];
@@ -284,7 +300,7 @@ describe("below 60 % zoom", () => {
   });
 
   it("opens the screen's thread list on a click; a row opens that thread in Screens", () => {
-    zoom = 42;
+    zoom = 10;
     const board = setup();
     board.setData({
       comments: [record("a", "one", "btn-a", "Primary?"), record("b", "one", "btn-b", "Label", { author: "agent", agent: "ux-agent" })],
@@ -301,11 +317,11 @@ describe("below 60 % zoom", () => {
     expect(calls.open).toEqual([["one", "b"]]);
   });
 
-  it("closes a pin's preview when the zoom drops below 60 %, and the list when it comes back", () => {
+  it("closes a pin's preview when the zoom drops below 15 %, and the list when it comes back", () => {
     const board = setup();
     board.setData({ comments: [record("a", "one", "btn-a", "x")], threads: [thread("a", "one", "btn-a")] });
     press(pins()[0]);
-    zoom = 40;
+    zoom = 10;
     board.layout();
     expect(preview().hidden).toBe(true);
     press(layer.querySelector(".board-comment-dot"));

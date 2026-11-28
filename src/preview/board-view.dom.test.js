@@ -55,15 +55,33 @@ beforeEach(() => {
 });
 
 describe("board clusters — DOM", () => {
-  it("renders collapsed clusters as frames with the main tile, header text and thumbnails", async () => {
+  it("renders collapsed clusters as frames with the main tile, the toggle and thumbnails; the cluster's label is its main tile's", async () => {
     const { board, tiles } = setup();
     await board.setScreens(names, flows, "p", { screens, expanded: [], clusters: true });
     expect(frameRoots(tiles)).toEqual(["dash", "cart"]);
     expect(tileNames(tiles)).toEqual(["dash", "cart", "plain"]);
     const header = tiles.querySelector('[data-root="cart"] .board-cluster-header');
-    expect(header.textContent).toContain("cart");
-    expect(header.textContent).toContain("2 in subtree · depth 3");
-    expect(tiles.querySelectorAll('[data-root="cart"] .board-cluster-thumb')).toHaveLength(2);
+    expect(header.textContent).toBe("keyboard_arrow_downExpand");
+    expect(header.getAttribute("aria-label")).toBe("Expand cart");
+    const label = tiles.querySelector('.board-tile[data-screen="cart"] .board-tile-label');
+    expect(label.querySelector(".board-tile-name").textContent).toBe("cart");
+    expect(label.querySelector(".board-tile-count").textContent).toBe("2 variants");
+    expect(tiles.querySelector('.board-tile[data-screen="dash"] .board-tile-count').textContent).toBe("1 variant");
+    expect(tiles.querySelector('.board-tile[data-screen="plain"] .board-tile-count')).toBeNull();
+    // The frame above is the first thumb (ringed), then one per variant.
+    const thumbs = [...tiles.querySelectorAll('[data-root="cart"] .board-cluster-thumb')];
+    expect(thumbs).toHaveLength(3);
+    expect(thumbs[0].classList.contains("on")).toBe(true);
+    expect(thumbs.slice(1).some((el) => el.classList.contains("on"))).toBe(false);
+  });
+
+  it("an expanded cluster offers Collapse; its toggle is the header's whole content", async () => {
+    const { board, tiles } = setup();
+    await board.setScreens(names, flows, "p", { screens, expanded: ["cart"], clusters: true });
+    const header = tiles.querySelector('[data-root="cart"] .board-cluster-header');
+    expect(header.textContent).toBe("keyboard_arrow_upCollapse");
+    expect(header.getAttribute("aria-expanded")).toBe("true");
+    expect(header.getAttribute("aria-label")).toBe("Collapse cart");
   });
 
   it("a header click reports the cluster; expand adds the main screen, collapse removes every member entry", async () => {
@@ -150,5 +168,83 @@ describe("board clusters — DOM", () => {
     await board.setScreens(["cart-clear-confirm"], [], "p", { screens, expanded: ["cart"], clusters: true });
     expect([...tiles.querySelectorAll(".board-tile.context")].map((t) => t.dataset.screen).sort()).toEqual(["cart", "cart-clear"]);
     expect(tiles.querySelector('.board-tile[data-screen="cart-clear-confirm"]').classList.contains("context")).toBe(false);
+  });
+});
+
+describe("board tiles — Stitch look", () => {
+  it("the label is the screen's name with a viewport glyph; a screen outside the filter and pinned carries the pin mark and the dashed card", async () => {
+    const { board, tiles } = setup();
+    await board.setScreens(["plain", "cart"], [], "p", { screens, pinned: ["plain"], outsideFilter: ["plain"], expanded: [], clusters: true });
+    const plain = tiles.querySelector('.board-tile[data-screen="plain"]');
+    expect(plain.classList.contains("outside-filter")).toBe(true);
+    expect(plain.querySelector(".board-tile-name").textContent).toBe("plain");
+    expect(plain.querySelector(".board-tile-viewport").textContent).toMatch(/smartphone|desktop_windows/);
+    const pin = plain.querySelector(".board-tile-pin");
+    expect(pin.hidden).toBe(false);
+    expect(pin.getAttribute("aria-label")).toBe("Unpin plain from the board");
+    const cart = tiles.querySelector('.board-tile[data-screen="cart"]');
+    expect(cart.classList.contains("outside-filter")).toBe(false);
+    expect(cart.querySelector(".board-tile-pin").hidden).toBe(true); // pinning starts in the card's list
+    expect(tiles.querySelector('[data-root="cart"]').classList.contains("outside-filter")).toBe(false);
+  });
+
+  it("the pin mark unpins, and does not reach the surface's own click", async () => {
+    const onTogglePin = vi.fn();
+    const { board, tiles } = setup({ onTogglePin });
+    await board.setScreens(["plain"], [], "p", { screens, pinned: ["plain"], expanded: [], clusters: true });
+    tiles.querySelector(".board-tile-pin").click();
+    expect(onTogglePin).toHaveBeenCalledWith("plain");
+  });
+
+  it("a cluster whose main screen is outside the filter gets the dashed outline on its frame", async () => {
+    const { board, tiles } = setup();
+    await board.setScreens(["cart"], [], "p", { screens, pinned: ["cart"], outsideFilter: ["cart"], expanded: [], clusters: true });
+    expect(tiles.querySelector('[data-root="cart"]').classList.contains("outside-filter")).toBe(true);
+  });
+
+  it("only the tile of the screen being written has the ring and the Writing chip, and it follows the agent", async () => {
+    const { board, tiles } = setup();
+    await board.setScreens(names, [], "p", { screens, expanded: [], clusters: false });
+    board.setWritingScreen("plain");
+    const chip = (name) => tiles.querySelector(`.board-tile[data-screen="${name}"] .board-tile-writing`);
+    expect(tiles.querySelector(".board-tile.writing").dataset.screen).toBe("plain");
+    expect(chip("plain").hidden).toBe(false);
+    expect(chip("plain").textContent).toBe("editWriting");
+    expect(chip("dash").hidden).toBe(true);
+    board.setWritingScreen("dash");
+    expect([...tiles.querySelectorAll(".board-tile.writing")].map((t) => t.dataset.screen)).toEqual(["dash"]);
+    board.setWritingScreen(null);
+    expect(tiles.querySelector(".board-tile.writing")).toBeNull();
+    // A rebuild (a filter change) keeps the ring on the screen still being written.
+    board.setWritingScreen("cart");
+    await board.setScreens(["cart", "plain"], [], "p", { screens, expanded: [], clusters: false });
+    expect(tiles.querySelector(".board-tile.writing").dataset.screen).toBe("cart");
+  });
+
+  it("a label hides below the overview zoom, is truncated to the tile below 100 % and full above", async () => {
+    const { board, tiles } = setup();
+    await board.setScreens(["plain"], [], "p", { screens, expanded: [], clusters: false });
+    const label = tiles.querySelector(".board-tile-label");
+    board.setZoom(10);
+    expect(label.dataset.mode).toBe("hidden");
+    board.setZoom(50);
+    expect(label.dataset.mode).toBe("truncated");
+    board.setZoom(150);
+    expect(label.dataset.mode).toBe("full");
+  });
+});
+
+describe("keys inside a tile", () => {
+  it("are handed to the shell, and stop being handed over when the tile's document goes", async () => {
+    const onTileKeydown = vi.fn();
+    const { board, tiles } = setup({ onTileKeydown });
+    await board.setScreens(["plain"], [], "p", { screens, expanded: [], clusters: false });
+    const iframe = tiles.querySelector("iframe");
+    iframe.dispatchEvent(new Event("load")); // jsdom: the srcdoc document is there, the load event is ours to send
+    iframe.contentDocument.dispatchEvent(new KeyboardEvent("keydown", { key: "e", bubbles: true }));
+    expect(onTileKeydown).toHaveBeenCalledTimes(1);
+    await board.setScreens([], [], "p", { screens, expanded: [], clusters: false });
+    iframe.contentDocument.dispatchEvent(new KeyboardEvent("keydown", { key: "e", bubbles: true }));
+    expect(onTileKeydown).toHaveBeenCalledTimes(1);
   });
 });

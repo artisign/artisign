@@ -387,21 +387,6 @@ export function computeBoardColumns(screens, sizes, viewportWidth, viewportHeigh
   return bestColumns;
 }
 
-/**
- * Pixel offset of the zoom-slider thumb along its track — the linear
- * mapping from the `$zoom-slider` design-system component (5%–200% ->
- * 0–`trackWidth`px).
- * @param {number} zoomPercent
- * @param {number} [trackWidth]
- * @param {number} [min]
- * @param {number} [max]
- * @returns {number}
- */
-export function zoomSliderOffset(zoomPercent, trackWidth = 140, min = MIN_BOARD_ZOOM, max = MAX_BOARD_ZOOM) {
-  const clamped = clampZoom(zoomPercent, min, max);
-  return ((clamped - min) / (max - min)) * trackWidth;
-}
-
 // Solved so that one mouse wheel "notch" (100 raw px — Chrome/Safari/Edge's
 // deltaMode-0 convention for a physical wheel click) changes zoom by
 // exactly ×1.2 (zooming in) or ÷1.2 (zooming out): exp(-100 * k) = 1/1.2.
@@ -480,25 +465,24 @@ export function stepZoomUp(zoom, step = BOARD_ZOOM_STEP, max = MAX_BOARD_ZOOM) {
   return Math.min(max, next);
 }
 
-// The "low zoom" legibility threshold from the `chr-621` design-system tag
-// notes — shared by two unrelated-looking rules that are actually the same
-// rule: below this, a tile's name label is illegible at the canvas's own
-// scale (labelDisplayMode), AND the UNPINNED pin affordance is pure visual
-// noise that drowns the handful of pinned markers a human is scanning for
-// at an overview zoom (CHR-624 — see board-view.js's applyZoomDependentTileState).
-export const LOW_ZOOM_AFFORDANCE_THRESHOLD = 60;
+/**
+ * Below this board zoom the board is an overview (dozens of tiles at a few percent): no name labels are drawn and the comment pins collapse into one count dot per tile (board-comments.js). From here up a label is drawn at a constant size, whatever the zoom — the design's labels and pins read the same at 24 % and at 200 % — truncated to the tile's own width below 100 %; at 100 % and above the full name shows.
+ */
+export const OVERVIEW_ZOOM_BELOW = 15;
 
 /**
- * Below this board zoom, a tile's name label is illegible at the canvas's
- * own scale and isn't rendered at all; below 100% but at/above this, it's
- * rendered truncated (ellipsis) to the tile's own width; at 100% and above,
- * the full name always shows. See the `chr-621` design-system tag notes'
- * "Label degradation by zoom" section.
+ * A variant tile inside an expanded cluster keeps no label below this zoom: its label (one size at every zoom) would not fit the little room the cluster's layout leaves above the tile.
+ */
+export const MEMBER_LABEL_MIN_ZOOM = 60;
+
+/**
  * @param {number} zoomPercent
+ * @param {{ member?: boolean }} [tile] `member`: a variant tile of an expanded cluster (the cluster's own main tile and every plain tile are not)
  * @returns {"hidden" | "truncated" | "full"}
  */
-export function labelDisplayMode(zoomPercent) {
-  if (zoomPercent < LOW_ZOOM_AFFORDANCE_THRESHOLD) return "hidden";
+export function labelDisplayMode(zoomPercent, { member = false } = {}) {
+  if (zoomPercent < OVERVIEW_ZOOM_BELOW) return "hidden";
+  if (member && zoomPercent < MEMBER_LABEL_MIN_ZOOM) return "hidden";
   if (zoomPercent < 100) return "truncated";
   return "full";
 }
@@ -570,20 +554,16 @@ const DEPTH_GAP = 56;
 const TILE_GAP = 28;
 const MORE_HEIGHT = 56;
 const MAX_THUMBS = 8;
-/** The badge on a tile that is on the board only because it is pinned (the design's `outside-filter` variant). */
-export const OUTSIDE_FILTER_BADGE = "pinned · outside filter";
 
-/** Room a tile's name label takes above its box (CSS `.board-tile-label`: ~17px line + 6px margin), and with the "pinned · outside filter" badge (`.board-tile-badge`: 16px high, 24px above the box) — plus a little air. */
+/** Room a tile's name label takes above its box in board px (the label is 18px high at its own size and sits 8px above the box; a little air on top). Cluster frames reserve this so the label never lands on the frame header or on the tile above. */
 const LABEL_ABOVE = 24;
-const BADGE_ABOVE = 42;
 
 /**
- * How far above its box a tile draws its label / badge, in board px. Cluster frames reserve this so neither lands on the frame header or on the tile above.
- * @param {boolean} badged whether the tile carries the outside-filter badge
+ * How far above its box a tile draws its label, in board px.
  * @returns {number}
  */
-export function tileAboveExtent(badged) {
-  return badged ? BADGE_ABOVE : LABEL_ABOVE;
+export function tileAboveExtent() {
+  return LABEL_ABOVE;
 }
 
 function allNodes(node) {
@@ -705,9 +685,9 @@ function layoutTile(screen, x, y, sizes, scale) {
   return { screen, x, y, width: natural.width * scale, height: natural.height * scale, naturalWidth: natural.width, naturalHeight: natural.height };
 }
 
-function collapsedBlock(cluster, sizes, badged) {
+function collapsedBlock(cluster, sizes) {
   const main = screenSize(sizes, cluster.root);
-  const above = tileAboveExtent(badged.has(cluster.root));
+  const above = tileAboveExtent();
   const width = Math.max(FRAME_MIN_WIDTH, main.width + FRAME_PAD * 2);
   const others = cluster.members.filter((m) => m.parent !== null);
   const height = FRAME_HEADER + above + main.height + (others.length > 0 ? 12 + THUMB_ROW : 0) + FRAME_PAD;
@@ -745,10 +725,10 @@ export function clusterTileScale(cluster, sizes) {
   return Math.max(MIN_CLUSTER_TILE_SCALE, Math.min(CLUSTER_TILE_SCALE, MAX_LEVEL_HEIGHT / tallest));
 }
 
-function expandedBlock(cluster, sizes, badged) {
+function expandedBlock(cluster, sizes) {
   const scale = clusterTileScale(cluster, sizes);
   const columns = cluster.levels.map((level) => {
-    const entries = level.tiles.map((m) => ({ member: m, size: screenSize(sizes, m.screen), above: tileAboveExtent(badged.has(m.screen)) }));
+    const entries = level.tiles.map((m) => ({ member: m, size: screenSize(sizes, m.screen), above: tileAboveExtent() }));
     const tileWidth = Math.max(...entries.map((e) => e.size.width * scale));
     const moreWidth = level.hidden.length > 0 ? 140 : 0;
     const width = Math.max(tileWidth, moreWidth);
@@ -840,7 +820,7 @@ function expandedBlock(cluster, sizes, badged) {
  *
  * @param {(string | { type: "tile", screen: string } | object)[]} items
  * @param {Record<string, { width: number, height: number }>} sizes
- * @param {{ columns?: number, gapX?: number, gapY?: number, padding?: number, badged?: Set<string> }} [options]
+ * @param {{ columns?: number, gapX?: number, gapY?: number, padding?: number }} [options]
  * @returns {{
  *   tiles: ReturnType<typeof computeBoardLayout>["tiles"],
  *   frames: object[], mores: object[], connectors: { from: string, to: string, more?: boolean }[],
@@ -852,7 +832,6 @@ export function computeClusterLayout(items, sizes, options = {}) {
   const gapX = options.gapX ?? BASE_GAP;
   const gapY = options.gapY ?? BASE_GAP;
   const padding = options.padding ?? BASE_PADDING;
-  const badged = options.badged ?? new Set(); // tiles drawing the "pinned · outside filter" badge above their box
   const out = { tiles: [], frames: [], mores: [], connectors: [], contentWidth: padding * 2, contentHeight: padding * 2 };
 
   const blocks = items.map((item) => {
@@ -861,7 +840,7 @@ export function computeClusterLayout(items, sizes, options = {}) {
       const natural = screenSize(sizes, screen);
       return { width: natural.width, height: natural.height, emit: (x, y, o) => o.tiles.push(layoutTile(screen, x, y, sizes, 1)) };
     }
-    return item.expanded ? expandedBlock(item, sizes, badged) : collapsedBlock(item, sizes, badged);
+    return item.expanded ? expandedBlock(item, sizes) : collapsedBlock(item, sizes);
   });
 
   let y = padding;
@@ -974,13 +953,13 @@ export function computeBoardVisibility(screens, filter, pinned) {
 }
 
 /**
- * The `$board-toolbar` `status` slot's text — "N shown — M matches ·
- * K pinned", exactly as the approved `board-view` design screen shows it.
- * Takes `computeBoardVisibility`'s own return shape so the two can never
- * drift apart.
- * @param {{ shownCount: number, matchCount: number, pinnedCount: number }} visibility
+ * The line under the find field on the Board (design `board-view*`): what is on the board, with no filter "All N on the board", with one "N on the board", "N shown by the agent" while the agent's presentation is up, "Nothing on the board" when there is nothing.
+ * @param {{ shownCount: number }} visibility computeBoardVisibility's return shape
+ * @param {{ filtered: boolean, presented: boolean }} state `filtered`: the find field holds a filter; `presented`: the agent switched the human to the Board and the notice is still up
  * @returns {string}
  */
-export function formatBoardStatusText({ shownCount, matchCount, pinnedCount }) {
-  return `${shownCount} shown — ${matchCount} matches · ${pinnedCount} pinned`;
+export function formatBoardStatus({ shownCount }, { filtered, presented }) {
+  if (shownCount === 0) return "Nothing on the board";
+  if (presented) return `${shownCount} shown by the agent`;
+  return filtered ? `${shownCount} on the board` : `All ${shownCount} on the board`;
 }

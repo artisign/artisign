@@ -56,14 +56,13 @@ describe("resolveShortcut", () => {
     expect(press("Escape")).toBe("leave");
   });
 
-  it("zoom presets are Shift+digit (by code, any layout) in Screens, Fit all / 100% on the Board", () => {
-    expect(press("!", { shiftKey: true, code: "Digit1" })).toBe("zoom-fit");
-    expect(press("%", { shiftKey: true, code: "Digit5" })).toBe("zoom-50");
-    expect(press(")", { shiftKey: true, code: "Digit0" })).toBe("zoom-100");
-    expect(press("@", { shiftKey: true, code: "Digit2" })).toBe("zoom-200");
-    expect(press("!", { shiftKey: true, code: "Digit1" }, { view: "board" })).toBe("board-fit-all");
-    expect(press(")", { shiftKey: true, code: "Digit0" }, { view: "board" })).toBe("board-100");
-    expect(press("%", { shiftKey: true, code: "Digit5" }, { view: "board" })).toBeNull(); // no 50% on the Board
+  it("zoom presets are Shift+digit (by code, any layout), the same in Screens and on the Board", () => {
+    for (const view of ["screens", "board"]) {
+      expect(press("!", { shiftKey: true, code: "Digit1" }, { view })).toBe("zoom-fit");
+      expect(press("%", { shiftKey: true, code: "Digit5" }, { view })).toBe("zoom-50");
+      expect(press(")", { shiftKey: true, code: "Digit0" }, { view })).toBe("zoom-100");
+      expect(press("@", { shiftKey: true, code: "Digit2" }, { view })).toBe("zoom-200");
+    }
   });
 
   it("+ and - zoom (the unshifted = counts as +)", () => {
@@ -71,6 +70,19 @@ describe("resolveShortcut", () => {
     expect(press("=")).toBe("zoom-in");
     expect(press("-")).toBe("zoom-out");
     expect(press("+", { repeat: true })).toBe("zoom-in"); // zoom keeps stepping while held
+  });
+
+  it("F is the Flow tool outside the Board, E is its flow arrows on the Board", () => {
+    expect(press("f")).toBe("flow");
+    expect(press("f", {}, { view: "board" })).toBeNull();
+    expect(press("e", {}, { view: "board" })).toBe("board-edges");
+  });
+
+  it("M is Comments everywhere, Shift+M is Show resolved on the Board only", () => {
+    expect(press("m")).toBe("comments");
+    expect(press("m", {}, { view: "board" })).toBe("comments");
+    expect(press("M", { shiftKey: true }, { view: "board" })).toBe("board-show-resolved");
+    expect(press("M", { shiftKey: true })).toBeNull();
   });
 
   it("E / G / Shift+G are Board only", () => {

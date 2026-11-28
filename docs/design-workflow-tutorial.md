@@ -336,7 +336,7 @@ values are promoted and swept.
 artisign is a two-party loop: agents design, the human reviews in the
 browser and comments on specific nodes.
 
-If the human turns on **Follow mode** (the topbar toggle, off by default),
+If the human turns on **Follow mode** (the Agent bar's switch, off by default),
 every tool call you make drives their view live: the preview switches to
 whatever screen/mockup you touch and briefly outlines the affected nodes. Nothing to do differently on your side — it's
 a read of the same MCP traffic you're already producing, not another

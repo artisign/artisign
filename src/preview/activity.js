@@ -7,6 +7,7 @@
 // follow toggle lives alongside it, same split as comments.js/mockups.js.
 
 import { highlightSelection, bareNodeId } from "./comments.js";
+import { handleListArrowKeys, setRovingTabindex } from "./menu-keys.js";
 
 export const ACTIVITY_FEED_LIMIT = 50;
 export const READ_HIGHLIGHT_MS = 1200;
@@ -44,12 +45,6 @@ export function activityNavigationTarget(event) {
 /** @param {"read" | "write"} kind */
 export function highlightDurationMs(kind) {
   return kind === "write" ? WRITE_HIGHLIGHT_MS : READ_HIGHLIGHT_MS;
-}
-
-/** Feed row visual variant, independent of whether the row's target still exists (see activityTargetExists) — that's the caller's job, since it needs the live screens/mockups lists this module doesn't hold. */
-export function activityEntryVariant(event) {
-  if (!event.ok) return "error";
-  return event.kind === "write" ? "write" : "default";
 }
 
 /**
@@ -158,29 +153,106 @@ function nodeLabel(event) {
   return bareNodeId(event.nodes[0]);
 }
 
-/** @param {{ target: object | null, tool: string, nodes: string[] }} event */
-export function formatActivityTarget(event) {
-  const target = event.target;
-  if (!target) return "project-wide";
-  if (target.kind === "mockup") return target.variant ? `mockup · ${target.name} / ${target.variant}` : `mockup · ${target.name}`;
-  if (target.kind === "component") return `component · ${target.name}${target.variant ? "#" + target.variant : ""}`;
-  if (target.kind === "pattern") return `pattern · ${target.name}`;
-  const label = nodeLabel(event);
-  return label ? `screen · ${target.name} · ${label}` : `screen · ${target.name}`;
+/** The text of a feed row, in the design's words (`agent-activity`): "Wrote **home**", "Read the project", "Could not update **settings**". `name` is the one bold part.
+ * @typedef {{ before: string, name: string | null, after: string }} ActivityText */
+
+const WROTE = ["Wrote", "Writing", "write"];
+const UPDATED = ["Updated", "Updating", "update"];
+const VERBS = {
+  inspect_node: ["Inspected", "Inspecting", "inspect"],
+  delete_entity: ["Deleted", "Deleting", "delete"],
+  create_comment: ["Commented", "Commenting", "comment"],
+  reply_comment: ["Replied to a comment", "Replying to a comment", "reply to a comment"],
+  write_html: WROTE,
+  write_mockup: WROTE,
+  import_html: WROTE,
+  promote_mockup: WROTE,
+};
+const READ = ["Read", "Reading", "read"];
+
+/** What a call with no single target is about, in a few words ("the project"). */
+const BROAD_SUBJECTS = {
+  get_design_system: "the design system",
+  set_tokens: "the design system tokens",
+  list_comments: "the comments",
+  get_guide: "the guide",
+  list_use_cases: "the use cases",
+  get_use_case: "the use cases",
+  set_use_cases: "the use cases",
+  suggest_use_case_variants: "the use cases",
+  set_board_state: "the Board",
+};
+
+/** @returns {[string, string, string]} past, progressive and base form of the call's verb */
+function verbFor(event) {
+  const own = VERBS[event.tool];
+  if (own) return own;
+  return event.kind === "read" ? READ : UPDATED;
 }
 
 /**
- * Relative time for a feed row ("just now", "4s ago", "2m ago", ...).
+ * The words of one feed row or of the live status: `progressive` gives "Writing home" (what the agent does now), otherwise "Wrote home" (what it did). A failed call says what failed ("Could not update settings", the daemon sends no reason); a call on a target that is gone says so.
+ * @param {{ tool: string, kind: "read" | "write", ok: boolean, target: object | null, nodes: string[] }} event
+ * @param {{ gone?: boolean, progressive?: boolean }} [options] `gone`: the target no longer exists
+ * @returns {ActivityText}
+ */
+export function describeActivity(event, { gone = false, progressive = false } = {}) {
+  const [past, ing, base] = verbFor(event);
+  const target = event.target;
+  let pre = "";
+  let name = null;
+  let post = "";
+  // The agent's comment calls carry no target (src/mcp/activity.ts): the verb stands alone, with no invented object.
+  if (!target) pre = BROAD_SUBJECTS[event.tool] ?? (event.tool === "create_comment" || event.tool === "reply_comment" ? "" : "the project");
+  else if (target.kind === "mockup") {
+    pre = "mockup";
+    name = target.name;
+    post = target.variant ? `, variant ${target.variant}` : "";
+  } else if (target.kind === "component" || target.kind === "pattern") {
+    pre = target.kind;
+    name = target.name;
+  } else {
+    name = target.name;
+    const node = nodeLabel(event);
+    post = node ? `, ${node}` : "";
+  }
+  const words = (verb) => [verb, pre].filter(Boolean).join(" ") + (name !== null ? " " : "");
+  if (!event.ok) return { before: words(`Could not ${base}`), name, after: post };
+  const suffix = gone && event.tool !== "delete_entity" ? `${post}, which no longer exists` : post;
+  return { before: words(progressive ? ing : past), name, after: suffix };
+}
+
+/** The visual variant of a feed row (design `agent-activity`): independent of anything but the event and whether its target is gone. */
+export function activityVariant(event, gone = false) {
+  if (!event.ok) return "error";
+  if (gone && event.tool !== "delete_entity") return "deleted";
+  if (event.tool === "create_comment" || event.tool === "reply_comment") return "agent-comment";
+  return event.kind === "write" ? "write" : "default";
+}
+
+const VARIANT_ICONS = { default: "visibility", write: "edit", "agent-comment": "chat_bubble", error: "error", deleted: "link_off" };
+
+/**
+ * Whether clicking a feed row does anything: a call that worked, on a target that exists, which the view can go to (a screen, a mockup, or a component/pattern in the Design System).
+ * @param {object} event
+ * @param {boolean} exists
+ */
+export function activityIsActionable(event, exists) {
+  if (!event.ok || !exists || event.tool === "delete_entity") return false;
+  const kind = event.target?.kind;
+  return kind === "screen" || kind === "mockup" || kind === "component" || kind === "pattern";
+}
+
+/**
+ * Relative time for a feed row, in the design's words ("now", "1 min ago", "2 h ago").
  * @param {number} at epoch ms
  * @param {number} [now] epoch ms, injectable for tests
  */
 export function formatActivityTime(at, now = Date.now()) {
-  const seconds = Math.max(0, Math.round((now - at) / 1000));
-  if (seconds < 1) return "just now";
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  return `${Math.round(minutes / 60)}h ago`;
+  const minutes = Math.floor(Math.max(0, now - at) / 60000);
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes} min ago`;
+  return `${Math.floor(minutes / 60)} h ago`;
 }
 
 // --- Follow on/off/paused state machine -----------------------------------
@@ -216,108 +288,97 @@ export function nextFollowState(state, action) {
 }
 
 /**
- * Which action a click on the follow toggle resolves to. `hitResume` is
- * true only when the click landed on the "Resume" affordance itself (only
- * present/hittable while paused, per the `$follow-toggle` `paused` variant)
- * — clicking anywhere else on an already-paused toggle turns follow off
- * outright, same as clicking an active "following" toggle does.
+ * Which action a click on the Follow switch resolves to: off → on; on or paused → off (a paused follow is resumed by its own Resume button).
  * @param {FollowState} state
- * @param {boolean} hitResume
+ * @returns {"toggle-on" | "toggle-off"}
  */
-export function followToggleClickAction(state, hitResume) {
-  if (!state.enabled) return "toggle-on";
-  if (state.paused) return hitResume ? "resume" : "toggle-off";
-  return "toggle-off";
-}
-
-// --- DOM: follow toggle ----------------------------------------------------
-
-/**
- * Syncs the follow toggle to `state` — `data-state` on the outer pill
- * drives the off/following/paused look (style.css), the divider/"Resume"
- * button included; `aria-pressed` belongs on the actual toggle BUTTON
- * (review fix 4 — it's a sibling of "Resume" now, not the same element),
- * so this takes both separately.
- * @param {HTMLElement} containerEl the outer `.follow-toggle` pill
- * @param {HTMLElement} toggleButtonEl the toggle button (dot + label)
- * @param {HTMLElement} labelEl
- * @param {FollowState} state
- */
-export function renderFollowToggle(containerEl, toggleButtonEl, labelEl, state) {
-  const uiState = !state.enabled ? "off" : state.paused ? "paused" : "following";
-  containerEl.dataset.state = uiState;
-  toggleButtonEl.setAttribute("aria-pressed", String(state.enabled && !state.paused));
-  labelEl.textContent = uiState === "off" ? "Follow" : uiState === "following" ? "Following" : "Follow paused";
+export function followToggleClickAction(state) {
+  return state.enabled ? "toggle-off" : "toggle-on";
 }
 
 // --- DOM: activity feed ----------------------------------------------------
 
 /**
- * Renders the activity feed list — `activity-entry`'s four variants
- * (default/write/error/deleted) via a class, and only wires a click handler
- * on rows that are actually navigable (not a failed call, not a deleted
- * target) so an inert row can never throw on click.
- * @param {HTMLElement} listEl
+ * Fills `el` with an activity text: the words, the one name in bold.
+ * @param {HTMLElement} el
+ * @param {ActivityText} text
+ */
+export function fillActivityText(el, { before, name, after }) {
+  el.textContent = before;
+  if (name !== null) {
+    const bold = document.createElement("b");
+    bold.textContent = name;
+    el.append(bold);
+  }
+  if (after) el.append(after);
+}
+
+/** The event behind each actionable row, to find a row again after a re-render. */
+const rowEvents = new WeakMap();
+
+/**
+ * Renders the Activity feed (design `agent-activity`): an icon box, the words, the time. A row the view can go to is a real <button> (Enter/Space for free); the arrow keys move between them with a roving tab stop, so a feed of fifty is one Tab stop. A failed call, a deleted target and a broad read are plain text: nothing to open.
+ * @param {HTMLElement} listEl the <ol>
  * @param {HTMLElement} emptyEl
  * @param {object[]} feed newest first — see pushActivityEntry
  * @param {{ exists: (event: object) => boolean, onSelect: (event: object) => void, now?: () => number }} options
  */
 export function renderActivityFeed(listEl, emptyEl, feed, { exists, onSelect, now = Date.now }) {
+  // The feed re-renders on every call: the row that had the tab stop (or focus) keeps it, found again by its event.
+  const current = /** @type {HTMLElement | null} */ (listEl.contains(document.activeElement) ? document.activeElement : listEl.querySelector('button.agent-activity[tabindex="0"]'));
+  const keptEvent = current?.closest("button.agent-activity") ? rowEvents.get(/** @type {HTMLElement} */ (current.closest("button.agent-activity"))) : undefined;
+  const hadFocus = listEl.contains(document.activeElement) && document.activeElement !== listEl;
   listEl.innerHTML = "";
   emptyEl.hidden = feed.length > 0;
+  listEl.hidden = feed.length === 0;
   const nowMs = now();
+  const rows = [];
   for (const event of feed) {
-    const gone = !exists(event);
-    const variant = gone ? "deleted" : activityEntryVariant(event);
-    const inert = variant === "error" || gone;
-
-    // A real <button> (same pattern as screens.js/mockups.js's own list
-    // rows), not a <li> with a click listener (review fix 4): Enter/Space
-    // activation and tab-stop focus come for free from the native element
-    // instead of a hand-rolled keydown handler. `aria-disabled`, not the
-    // `disabled` attribute, on an inert row — same reasoning as the board
-    // zoom buttons' own aria-disabled use — keeps it perceivable to a
-    // screen reader as a distinct state while staying focusable; no click
-    // handler is attached at all for one, so activating it is a no-op
-    // rather than something that has to check its own inertness first.
+    const stillThere = exists(event);
+    const variant = activityVariant(event, !stillThere);
     const li = document.createElement("li");
-    li.className = "activity-entry-row";
 
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = `activity-entry activity-entry-${variant}`;
-    if (inert) row.setAttribute("aria-disabled", "true");
-
-    const mark = document.createElement("span");
-    mark.className = "activity-entry-mark";
-    mark.setAttribute("aria-hidden", "true");
-    // A failed call carries a cross, not just a colour: the mark's shape is what tells the four kinds apart.
-    if (variant === "error") {
-      mark.classList.add("icon");
-      mark.textContent = "close";
+    const row = document.createElement(activityIsActionable(event, stillThere) ? "button" : "div");
+    row.className = "agent-activity";
+    row.dataset.variant = variant;
+    if (row instanceof HTMLButtonElement) {
+      row.type = "button";
+      row.addEventListener("click", () => onSelect(event));
+      rowEvents.set(row, event);
+      rows.push(row);
     }
-    row.appendChild(mark);
 
-    const body = document.createElement("span");
-    body.className = "activity-entry-body";
-    const tool = document.createElement("span");
-    tool.className = "activity-entry-tool";
-    tool.textContent = event.tool;
-    body.appendChild(tool);
-    const target = document.createElement("span");
-    target.className = "activity-entry-target";
-    target.textContent = gone ? "target removed" : formatActivityTarget(event);
-    body.appendChild(target);
-    row.appendChild(body);
+    const icon = document.createElement("span");
+    icon.className = "agent-activity-icon icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = VARIANT_ICONS[variant];
+    row.appendChild(icon);
 
-    const time = document.createElement("span");
-    time.className = "activity-entry-time";
+    const main = document.createElement("span");
+    main.className = "agent-activity-main";
+    const text = document.createElement("span");
+    text.className = "agent-activity-text";
+    fillActivityText(text, describeActivity(event, { gone: !stillThere }));
+    main.appendChild(text);
+    const time = document.createElement("time");
+    time.className = "agent-activity-time";
+    time.dateTime = new Date(event.at).toISOString();
     time.textContent = formatActivityTime(event.at, nowMs);
-    row.appendChild(time);
+    main.appendChild(time);
+    row.appendChild(main);
 
-    if (!inert) row.addEventListener("click", () => onSelect(event));
     li.appendChild(row);
     listEl.appendChild(li);
+  }
+  const kept = rows.find((row) => rowEvents.get(row) === keptEvent) ?? rows[0];
+  setRovingTabindex(rows, kept);
+  if (hadFocus && kept) kept.focus();
+  if (!listEl.dataset.keys) {
+    listEl.dataset.keys = "on";
+    listEl.addEventListener("keydown", (evt) => {
+      const actionable = [...listEl.querySelectorAll("button.agent-activity")];
+      if (handleListArrowKeys(evt, actionable, { wrap: false })) setRovingTabindex(actionable, /** @type {HTMLElement} */ (document.activeElement));
+    });
   }
 }
 

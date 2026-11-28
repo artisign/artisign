@@ -52,26 +52,15 @@
           <button type="button" class="view-tab" data-view="usecases" aria-pressed="false">Use Cases<span class="chrome-badge"><span class="visually-hidden">, </span>Beta</span></button>
         </nav>
         <div id="topbar-end" class="float-pill">
-          <!-- CHR-628/CHR-629/CHR-631: one always-present follow-mode toggle, not a fork per
-               tab/state — see the `$follow-toggle` component's usage note. data-state (off/
-               following/paused) drives the look; the divider + "Resume" button only show
-               while paused (style.css). Two sibling buttons, not one button with the "Resume"
-               affordance nested inside it (review fix 4) — a button can't contain another
-               interactive descendant, and a keyboard activation's own event.target is the
-               outer button either way, never a nested span. Interim home until the Agent bar (CHR-1271) takes Follow and Live. -->
-          <span id="follow-toggle" class="follow-toggle chrome-pill project-only" data-state="off">
-            <button type="button" id="follow-toggle-toggle" class="follow-toggle-toggle" aria-pressed="false" data-tooltip="Follow the agent" data-shortcut-id="follow">
-              <span id="follow-toggle-dot" class="follow-toggle-dot" aria-hidden="true"></span>
-              <span id="follow-toggle-label" class="follow-toggle-label">Follow</span>
-            </button>
-            <span id="follow-toggle-divider" class="follow-toggle-divider" aria-hidden="true"></span>
-            <button type="button" id="follow-toggle-resume" class="follow-toggle-resume" data-tooltip="Resume follow" data-shortcut-id="follow-resume">Resume</button>
+          <!-- CHR-1269: the Design System view and Use Cases have no Agent bar; their top bar carries the Live chip and the Follow control instead (shown by style.css only there). Same state as the Agent bar's, drawn by agent-bar.js. -->
+          <span id="topbar-agent" class="project-only">
+            <span id="topbar-follow" class="float-follow">
+              <span id="topbar-follow-on" class="topbar-follow-part"><label id="topbar-follow-label" class="agent-follow-label" for="topbar-follow-switch" data-tooltip="Follow the agent" data-shortcut-id="follow">Follow</label><input type="checkbox" id="topbar-follow-switch" class="follow-switch" role="switch" switch /></span>
+              <span id="topbar-follow-paused" class="topbar-follow-part" hidden><span class="agent-follow-label"><span class="icon" aria-hidden="true">pause_circle</span>Follow paused</span><button type="button" id="topbar-follow-resume" class="follow-resume" data-tooltip="Resume following" data-shortcut-id="follow-resume"><span class="icon" aria-hidden="true">play_arrow</span>Resume</button></span>
+            </span>
+            <span id="topbar-connection" class="live-chip" role="status" data-state="live" data-tooltip="Live reload: connected"><span class="live-chip-dot" aria-hidden="true"></span><span id="topbar-connection-label">Live</span></span>
           </span>
           <button type="button" id="warning-badge" class="chrome-chip chrome-chip--warning" title="Render diagnostics — click to step through" hidden></button>
-          <span id="connection-status" class="chrome-live" data-tooltip="Live reload: connected">
-            <span id="connection-status-dot" class="chrome-live-dot" aria-hidden="true"></span>
-            <span id="connection-status-label">Live</span>
-          </span>
           <!-- CHR-926: app settings (theme, the per-browser toggles), MCP setup and About. An ARIA menu like the zoom menu (CHR-920); wired by settings-menu.js. -->
           <div id="settings-controls">
             <button type="button" id="settings-trigger" class="chrome-icon-btn" aria-haspopup="true" aria-expanded="false" aria-controls="settings-menu" aria-label="Settings" data-tooltip="Settings">
@@ -350,7 +339,51 @@
             </div>
           </div>
         </main>
-        <!-- CHR-1268: the right column's floating panel — Inspect, Notes, Comments or Compare's Differences, one at a time (tool-panels.js). Until the Agent bar (CHR-1269) lands it takes the whole column. The grip drags it (position remembered), the cross closes it. -->
+        <!-- CHR-1269: the Agent bar — the right column's floating card (design `float-card` + `agent-status` + `agent-activity` + `agent-note`). What the agent is doing now, the Follow switch, the Activity feed and the note field for the agent. It folds to its head by itself while a tool panel below takes the column (agent-bar.js). The grip drags it (position remembered), the chevron folds it. -->
+        <aside id="agent-bar" class="float-card" data-collapsed="false" aria-labelledby="agent-bar-title">
+          <div class="float-card-head">
+            <button type="button" id="agent-bar-grip" class="float-grip" aria-label="Agent bar handle. Use arrow keys to move." data-tooltip="Drag to move"><span class="icon" aria-hidden="true">drag_indicator</span></button>
+            <h2 id="agent-bar-title" class="float-card-title">Agent</h2>
+            <!-- Shown only while the bar is folded: the status dot and the live status (design `agent-bar-folded`). -->
+            <span id="agent-bar-folded-status" class="agent-folded-status" data-look="active" hidden><span class="agent-folded-dot" aria-hidden="true"></span><span id="agent-bar-folded-text"></span></span>
+            <span id="connection" class="live-chip" role="status" data-state="live" data-tooltip="Live reload: connected"><span class="live-chip-dot" aria-hidden="true"></span><span id="connection-label">Live</span></span>
+            <button type="button" id="agent-bar-fold" class="chrome-icon-btn" aria-expanded="true" aria-label="Fold Agent bar" data-tooltip="Fold Agent bar" data-shortcut-id="panel-agent"><span id="agent-bar-fold-icon" class="icon" aria-hidden="true">keyboard_arrow_up</span></button>
+          </div>
+          <span id="agent-bar-live" class="visually-hidden" role="status" aria-live="polite"></span>
+          <div id="agent-bar-body" class="float-card-body">
+            <div id="agent-status" data-look="active">
+              <!-- Only the two text lines are the live region: the switch and Resume below are controls, not a status message. -->
+              <p id="agent-status-now" role="status"><span id="agent-status-dot" aria-hidden="true"></span><span id="agent-status-text"></span></p>
+              <p id="agent-status-detail" role="status"></p>
+              <div id="agent-follow-row">
+                <label id="follow-label" class="agent-follow-label" for="follow-switch" data-tooltip="Follow the agent" data-shortcut-id="follow"><span class="icon" aria-hidden="true">visibility</span>Follow the agent</label>
+                <input type="checkbox" id="follow-switch" class="follow-switch" role="switch" switch />
+              </div>
+              <div id="agent-follow-paused-row" hidden>
+                <span class="agent-follow-label"><span class="icon" aria-hidden="true">pause_circle</span>Follow paused</span>
+                <button type="button" id="follow-resume" class="follow-resume" data-tooltip="Resume following" data-shortcut-id="follow-resume"><span class="icon" aria-hidden="true">play_arrow</span>Resume</button>
+              </div>
+            </div>
+            <div class="agent-section-head"><span>Activity</span><span>Newest first</span></div>
+            <ol id="agent-feed"></ol>
+            <div id="agent-feed-empty" hidden>
+              <span class="icon" aria-hidden="true">history</span>
+              <p class="agent-feed-empty-title">No activity yet</p>
+              <p class="agent-feed-empty-text">Each read and write of your AI tool shows up here, with Follow on or off.</p>
+            </div>
+            <form id="agent-note" aria-label="Note for the agent" novalidate>
+              <label for="agent-note-field" class="visually-hidden">Note for the agent</label>
+              <textarea id="agent-note-field" rows="2" placeholder="Leave a note for the agent" aria-describedby="agent-note-reason agent-note-scope agent-note-error"></textarea>
+              <span id="agent-note-reason" class="visually-hidden"></span>
+              <p id="agent-note-error" role="alert" hidden></p>
+              <div id="agent-note-foot">
+                <span id="agent-note-scope"><span id="agent-note-scope-icon" class="icon" aria-hidden="true">desktop_windows</span><span id="agent-note-scope-text"></span></span>
+                <button type="submit" id="agent-note-send" aria-label="Send note" data-tooltip="Send note"><span class="icon" aria-hidden="true">arrow_upward</span></button>
+              </div>
+            </form>
+          </div>
+        </aside>
+        <!-- CHR-1268: the right column's floating panel — Inspect, Notes, Comments or Compare's Differences, one at a time (tool-panels.js). It sits below the Agent bar, which folds to its head above it. The grip drags it (position remembered), the cross closes it. -->
         <aside id="tool-panel" class="float-card" hidden aria-labelledby="tool-panel-title">
           <div class="float-card-head">
             <button type="button" id="tool-panel-grip" class="float-grip" aria-label="Panel handle. Use arrow keys to move." data-tooltip="Drag to move"><span class="icon" aria-hidden="true">drag_indicator</span></button>

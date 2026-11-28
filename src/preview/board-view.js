@@ -150,10 +150,12 @@ export function createBoardView({
   /** @type {Map<string, () => void>} */
   const modeCleanupByScreen = new Map();
   let flowModeOn = false;
+  /** Comment or Inspect is active (CHR-1295, CHR-1296): the tool owns the left button, like flow mode. */
+  let pickToolOn = false;
   // CHR-1290/CHR-1291 — the canvas input shared with the Screens view: a left-drag pans (the surface scrolls), the mouse wheel and a pinch zoom around the pointer, a trackpad two-finger scroll stays the surface's native scroll. Flow mode keeps the left button for its clicks.
   const canvasInput = createCanvasInput({
     surfaceEl,
-    isToolActive: () => flowModeOn,
+    isToolActive: () => flowModeOn || pickToolOn,
     canHandle: () => !isHidden(),
     ignoreSelector: "#board-comment-layer *",
     onManual: () => onManualNavigate?.(),
@@ -1061,6 +1063,10 @@ export function createBoardView({
     zoomToTile,
     commentGeometry,
     tileFrames,
+    /** @param {boolean} on */
+    setPickTool(on) {
+      pickToolOn = on;
+    },
     setEdgesVisible,
     setWritingScreen,
     setViewports,

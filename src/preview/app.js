@@ -632,7 +632,9 @@ function syncCommentModes() {
 function syncBoardTools() {
   const onBoard = currentView === "board";
   boardCanvas.setMode(activeMode === "comment" && onBoard);
-  boardPicker.setActive(onBoard && (activeMode === "comment" || activeMode === "inspect"));
+  const picking = onBoard && (activeMode === "comment" || activeMode === "inspect");
+  boardPicker.setActive(picking);
+  board.setPickTool(picking);
   if (!(onBoard && activeMode === "inspect")) boardInspectHover = null;
   const tooLow = onBoard && activeMode === "inspect" && boardZoom < TOOL_MIN_ZOOM;
   boardInspectHintEl.hidden = !tooLow;

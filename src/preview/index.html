@@ -310,7 +310,7 @@
             </div>
           </section>
         </main>
-        <!-- CHR-1269: the Agent bar — the right column's floating card (design `float-card` + `agent-status` + `agent-activity` + `agent-note`). What the agent is doing now, the Follow switch, the Activity feed and the note field for the agent. It folds to its head by itself while a tool panel below takes the column (agent-bar.js). The grip drags it (position remembered), the chevron folds it. -->
+        <!-- CHR-1269: the Agent bar — the right column's floating card (design `float-card` + `agent-status` + `agent-activity`). What the agent is doing now, the Follow switch and the Activity feed. It folds to its head by itself while a tool panel below takes the column (agent-bar.js). The grip drags it (position remembered), the chevron folds it. -->
         <aside id="agent-bar" class="float-card" data-collapsed="false" aria-labelledby="agent-bar-title">
           <div class="float-card-head">
             <button type="button" id="agent-bar-grip" class="float-grip" aria-label="Agent bar handle. Use arrow keys to move." data-tooltip="Drag to move"><span class="icon" aria-hidden="true">drag_indicator</span></button>
@@ -342,16 +342,6 @@
               <p class="agent-feed-empty-title">No activity yet</p>
               <p class="agent-feed-empty-text">Each read and write of your AI tool shows up here, with Follow on or off.</p>
             </div>
-            <form id="agent-note" aria-label="Note for the agent" novalidate>
-              <label for="agent-note-field" class="visually-hidden">Note for the agent</label>
-              <textarea id="agent-note-field" rows="2" placeholder="Leave a note for the agent" aria-describedby="agent-note-reason agent-note-scope agent-note-error"></textarea>
-              <span id="agent-note-reason" class="visually-hidden"></span>
-              <p id="agent-note-error" role="alert" hidden></p>
-              <div id="agent-note-foot">
-                <span id="agent-note-scope"><span id="agent-note-scope-icon" class="icon" aria-hidden="true">desktop_windows</span><span id="agent-note-scope-text"></span></span>
-                <button type="submit" id="agent-note-send" aria-label="Send note" data-tooltip="Send note"><span class="icon" aria-hidden="true">arrow_upward</span></button>
-              </div>
-            </form>
           </div>
         </aside>
         <!-- CHR-1268: the right column's floating panel — Inspect, Notes, Comments or Compare's Differences, one at a time (tool-panels.js). It sits below the Agent bar, which folds to its head above it. The grip drags it (position remembered), the cross closes it. -->
